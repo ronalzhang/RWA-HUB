@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}58HUB{% endblock %}</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-gray-100">
+    <nav class="bg-white shadow">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex">
+                    <div class="flex-shrink-0 flex items-center">
+                        <a href="/" class="text-2xl font-bold text-blue-600">58HUB</a>
+                    </div>
+                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                        <a href="/" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            首页
+                        </a>
+                        <a href="/assets" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            资产列表
+                        </a>
+                        <a href="/assets/create" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            创建资产
+                        </a>
+                        <a href="/admin" id="adminLink" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium hidden">
+                            后台管理
+                        </a>
+                    </div>
+                </div>
+                <div class="hidden sm:ml-6 sm:flex sm:items-center">
+                    <button id="connectWalletBtn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        连接钱包
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+    window.currentAccount = null;
+
+    async function initWeb3() {
+        if (window.ethereum) {
+            window.web3 = new Web3(window.ethereum);
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) {
+                    window.currentAccount = accounts[0];
+                    updateConnectButton();
+                    await checkAndUpdateAdminLink();
+                }
+                
+                window.ethereum.on('accountsChanged', async function (accounts) {
+                    window.currentAccount = accounts[0] || null;
+                    updateConnectButton();
+                    await checkAndUpdateAdminLink();
+                });
+            } catch (error) {
+                console.error("初始化Web3失败:", error);
+            }
+        }
+    }
+
+    function updateConnectButton() {
+        const connectBtn = document.getElementById('connectWalletBtn');
+        if (!connectBtn) return;
+        
+        if (window.currentAccount) {
+            const shortAddress = `${window.currentAccount.substring(0, 6)}...${window.currentAccount.substring(38)}`;
+            connectBtn.textContent = shortAddress;
+            connectBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+            connectBtn.classList.add('bg-gray-600', 'cursor-default');
+            connectBtn.disabled = true;
+        } else {
+            connectBtn.textContent = '连接钱包';
+            connectBtn.classList.remove('bg-gray-600', 'cursor-default');
+            connectBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+            connectBtn.disabled = false;
+        }
+    }
+
+    async function connectWallet() {
+        if (window.currentAccount) return;
+        
+        if (window.ethereum) {
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                window.currentAccount = accounts[0];
+                updateConnectButton();
+                await checkAndUpdateAdminLink();
+            } catch (error) {
+                console.error("连接钱包失败:", error);
+                alert("连接钱包失败: " + error.message);
+            }
+        } else {
+            alert("请安装MetaMask钱包");
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initWeb3();
+        const connectBtn = document.getElementById('connectWalletBtn');
+        if (connectBtn) {
+            connectBtn.addEventListener('click', connectWallet);
+        }
+    });
+
+    // 检查是否是管理员并更新后台管理链接显示
+    async function checkAndUpdateAdminLink() {
+        const adminAddresses = [
+            '0x6394993426DBA3b654eF0052698Fe9E0B6A98870',
+            '0x124e5B8A4E6c68eC66e181E0B54817b12D879c57'
+        ];
+        
+        const adminLink = document.getElementById('adminLink');
+        if (!adminLink) return;
+        
+        if (window.currentAccount && adminAddresses.map(addr => addr.toLowerCase()).includes(window.currentAccount.toLowerCase())) {
+            adminLink.classList.remove('hidden');
+            // 更新后台管理链接，添加钱包地址
+            adminLink.href = `/admin?eth_address=${window.currentAccount}`;
+        } else {
+            adminLink.classList.add('hidden');
+        }
+    }
+
+    // 监听钱包连接状态变化
+    if (window.ethereum) {
+        window.ethereum.on('accountsChanged', async (accounts) => {
+            if (accounts.length > 0) {
+                window.currentAccount = accounts[0];
+                checkAndUpdateAdminLink();
+            }
+        });
+    }
+
+    // 页面加载完成后检查钱包状态
+    document.addEventListener('DOMContentLoaded', async () => {
+        if (window.ethereum) {
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) {
+                    window.currentAccount = accounts[0];
+                    checkAndUpdateAdminLink();
+                }
+            } catch (error) {
+                console.error('检查钱包状态失败:', error);
+            }
+        }
+    });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

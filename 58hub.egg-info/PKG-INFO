@@ -1,0 +1,12 @@
+Metadata-Version: 2.2
+Name: 58hub
+Version: 0.1.0
+Summary: A Web3 NFT marketplace
+Author: 58Hub Team
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+
+ 

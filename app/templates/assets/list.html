@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}资产列表 - 58HUB{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">资产列表</h1>
+    </div>
+
+    <!-- 加载提示 -->
+    <div id="loading" class="text-center py-4 hidden">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        <p class="mt-2 text-gray-600">正在加载资产列表...</p>
+    </div>
+
+    <!-- 错误提示 -->
+    <div id="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 hidden" role="alert">
+        <span class="block sm:inline" id="errorMessage"></span>
+    </div>
+
+    <!-- 资产列表 -->
+    <div id="assetList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- 资产卡片将通过JavaScript动态添加 -->
+    </div>
+
+    <!-- 暂无资产提示 -->
+    <div id="noAssets" class="text-center py-8 hidden">
+        <p class="text-gray-500 text-lg">暂无可用资产</p>
+        <p class="text-gray-400 mt-2">请等待管理员审核通过后显示</p>
+    </div>
+</div>
+
+<script>
+async function loadAssets() {
+    console.log('开始加载资产列表...');
+    showLoading(true);
+    showError(false);
+    
+    try {
+        const response = await fetch('/api/assets');
+        console.log('API响应状态:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('获取到的资产数据:', data);
+        
+        const assetList = document.getElementById('assetList');
+        assetList.innerHTML = ''; // 清空现有内容
+        
+        if (!data.assets || data.assets.length === 0) {
+            console.log('没有找到资产');
+            document.getElementById('noAssets').classList.remove('hidden');
+            assetList.classList.add('hidden');
+        } else {
+            console.log(`找到 ${data.assets.length} 个资产`);
+            document.getElementById('noAssets').classList.add('hidden');
+            assetList.classList.remove('hidden');
+            
+            data.assets.forEach(asset => {
+                const card = createAssetCard(asset);
+                assetList.appendChild(card);
+            });
+        }
+    } catch (error) {
+        console.error('加载资产列表失败:', error);
+        showError(true, '加载资产列表失败，请稍后重试');
+        // 显示错误后不要自动重试，避免无限循环
+        return;
+    } finally {
+        showLoading(false);
+    }
+}
+
+function createAssetCard(asset) {
+    const card = document.createElement('div');
+    card.className = 'bg-white rounded-lg shadow-md overflow-hidden';
+    
+    // 获取第一张图片，如果没有则使用默认图片
+    let imageUrl = '/static/images/default.png'; // 默认图片
+    try {
+        // 确保images是数组或字符串
+        let images = asset.images;
+        if (typeof images === 'string') {
+            try {
+                images = JSON.parse(images.replace(/\\/g, ''));
+            } catch (e) {
+                // 如果解析失败，可能是单个图片路径
+                images = [images];
+            }
+        }
+        if (Array.isArray(images) && images.length > 0) {
+            // 检查图片路径是否以/开头
+            imageUrl = images[0].startsWith('/') ? images[0] : `/${images[0]}`;
+            console.log('使用图片:', imageUrl);
+        }
+    } catch (e) {
+        console.error('解析图片数据失败:', e, asset.images);
+    }
+    
+    // 计算总价值
+    let totalValue = '暂无数据';
+    if (asset.asset_type === 'REAL_ESTATE') { // 不动产
+        if (asset.area && asset.token_price) {
+            totalValue = `${Math.floor(asset.area * asset.token_price).toLocaleString()} USDT`;
+        }
+    } else { // 类不动产
+        if (asset.total_value) {
+            totalValue = `${Math.floor(parseFloat(asset.total_value)).toLocaleString()} USDT`;
+        }
+    }
+    
+    const cardHtml = `
+        <div class="relative" style="padding-bottom: 66.67%;">
+            <img src="${imageUrl}" alt="${asset.name}" class="absolute h-full w-full object-cover" 
+                 onerror="this.onerror=null; this.src='/static/images/default.png';">
+        </div>
+        <div class="p-4">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">${asset.name}</h3>
+            <div class="text-sm text-gray-600 space-y-1">
+                <p>类型: ${asset.asset_type === 'REAL_ESTATE' ? '不动产' : '类不动产'}</p>
+                <p>位置: ${asset.location || '暂无数据'}</p>
+                <p>总价值: ${totalValue}</p>
+                <p>年收益: ${asset.annual_revenue ? Math.floor(asset.annual_revenue).toLocaleString() + ' USDT' : '暂无数据'}</p>
+            </div>
+            <div class="mt-4">
+                <a href="/assets/${asset.id}" class="text-blue-600 hover:text-blue-800 font-medium">
+                    查看详情 →
+                </a>
+            </div>
+        </div>
+    `;
+    
+    card.innerHTML = cardHtml;
+    return card;
+}
+
+function showLoading(show) {
+    document.getElementById('loading').classList.toggle('hidden', !show);
+}
+
+function showError(show, message = '') {
+    const errorDiv = document.getElementById('error');
+    const errorMessage = document.getElementById('errorMessage');
+    errorDiv.classList.toggle('hidden', !show);
+    if (show) {
+        errorMessage.textContent = message;
+    }
+}
+
+// 页面加载完成后加载资产列表
+document.addEventListener('DOMContentLoaded', loadAssets);
+</script>
+{% endblock %}

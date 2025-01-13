@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}资产管理 - 58HUB{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">资产管理</h1>
+    </div>
+
+    <!-- 资产列表 -->
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+        <div class="px-4 py-5 sm:px-6">
+            <h2 class="text-lg font-medium text-gray-900">资产列表</h2>
+        </div>
+        <div class="border-t border-gray-200">
+            <div id="assetList" class="divide-y divide-gray-200">
+                <!-- 资产列表将通过 JavaScript 动态加载 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载提示 -->
+    <div id="loading" class="text-center py-4 hidden">
+        <div class="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm text-gray-500">
+            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            加载中...
+        </div>
+    </div>
+
+    <!-- 分页控件 -->
+    <div id="pagination" class="flex justify-center space-x-2 mt-4">
+        <!-- 分页按钮将通过 JavaScript 动态生成 -->
+    </div>
+</div>
+
+<script>
+// 格式化数字
+function formatNumber(value) {
+    if (value == null || isNaN(value)) {
+        return '暂无数据';
+    }
+    return new Intl.NumberFormat('zh-CN').format(value);
+}
+
+// 显示加载状态
+function showLoading(show) {
+    const loading = document.getElementById('loading');
+    if (show) {
+        loading.classList.remove('hidden');
+    } else {
+        loading.classList.add('hidden');
+    }
+}
+
+// 显示错误信息
+function showError(message) {
+    alert(message);
+}
+
+// 加载资产列表
+async function loadAssets(page = 1) {
+    showLoading(true);
+    try {
+        const response = await fetch(`/api/assets/?page=${page}&per_page=10`);
+        if (!response.ok) {
+            throw new Error('加载资产列表失败');
+        }
+        const data = await response.json();
+        
+        // 更新资产列表
+        const assetList = document.getElementById('assetList');
+        assetList.innerHTML = data.assets.map(asset => `
+            <div class="p-4 hover:bg-gray-50">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-900">${asset.name} <span class="text-sm text-gray-500">${asset.token_symbol}</span></h3>
+                        <p class="mt-1 text-sm text-gray-500">
+                            类型: ${asset.type === 'real_estate' ? '不动产' : '类不动产'} | 
+                            ${asset.type === 'real_estate' ? `面积: ${formatNumber(asset.area)} m² |` : ''} 
+                            总价值: ${formatNumber(asset.total_value)} USDT
+                        </p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <a href="/assets/${asset.id}" class="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                            查看
+                        </a>
+                        <a href="/assets/${asset.id}/edit" class="inline-flex items-center px-3 py-1 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            编辑
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        // 更新分页
+        const pagination = document.getElementById('pagination');
+        const totalPages = Math.ceil(data.total / data.per_page);
+        let paginationHtml = '';
+        
+        // 上一页按钮
+        paginationHtml += `
+            <button 
+                class="px-3 py-1 rounded-md ${page === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                ${page === 1 ? 'disabled' : `onclick="loadAssets(${page - 1})"`}
+            >
+                上一页
+            </button>
+        `;
+
+        // 页码按钮
+        for (let i = 1; i <= totalPages; i++) {
+            paginationHtml += `
+                <button 
+                    class="px-3 py-1 rounded-md ${i === page ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                    onclick="loadAssets(${i})"
+                >
+                    ${i}
+                </button>
+            `;
+        }
+
+        // 下一页按钮
+        paginationHtml += `
+            <button 
+                class="px-3 py-1 rounded-md ${page === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                ${page === totalPages ? 'disabled' : `onclick="loadAssets(${page + 1})"`}
+            >
+                下一页
+            </button>
+        `;
+
+        pagination.innerHTML = paginationHtml;
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        showLoading(false);
+    }
+}
+
+// 页面加载完成后加载资产列表
+document.addEventListener('DOMContentLoaded', () => {
+    loadAssets();
+});
+</script>
+{% endblock %} 

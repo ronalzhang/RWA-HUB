@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}服务器错误 - 58HUB{% endblock %}
+
+{% block content %}
+<div class="min-h-[500px] flex items-center justify-center">
+    <div class="text-center">
+        <h1 class="text-9xl font-bold text-gray-200">500</h1>
+        <p class="mt-4 text-xl text-gray-600">抱歉，服务器出现了问题</p>
+        <p class="mt-2 text-gray-500">我们正在努力修复，请稍后再试</p>
+        <div class="mt-6">
+            <a href="{{ url_for('home') }}" 
+               class="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                返回首页
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

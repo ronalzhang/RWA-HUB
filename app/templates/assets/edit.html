@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+
+{% block title %}编辑资产 - 58HUB{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">编辑资产</h1>
+    </div>
+
+    <!-- 钱包连接提示 -->
+    <div id="walletAlert" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-yellow-700">
+                    请先连接钱包以编辑资产
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑表单 -->
+    <form id="editForm" class="bg-white shadow overflow-hidden sm:rounded-lg p-6 hidden" onsubmit="submitForm(event)">
+        <div class="grid grid-cols-1 gap-6">
+            <!-- 基本信息 -->
+            <div class="space-y-6">
+                <h3 class="text-lg font-medium text-gray-900">基本信息</h3>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">资产名称</label>
+                    <input type="text" id="name" name="name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">资产类型</label>
+                    <select id="assetType" name="asset_type" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" disabled>
+                        <option value="10">不动产</option>
+                        <option value="20">类不动产</option>
+                    </select>
+                    <p class="mt-1 text-sm text-gray-500">资产类型创建后不可修改</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">位置</label>
+                    <input type="text" id="location" name="location" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+                </div>
+
+                <div id="areaField">
+                    <label class="block text-sm font-medium text-gray-700">面积 (m²)</label>
+                    <input type="number" id="area" name="area" step="0.01" min="0" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <p class="mt-1 text-sm text-gray-500">仅不动产需要填写</p>
+                </div>
+
+                <div id="totalValueField">
+                    <label class="block text-sm font-medium text-gray-700">总价值 (USDT)</label>
+                    <input type="number" id="totalValue" name="total_value" step="0.01" min="0" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <p class="mt-1 text-sm text-gray-500">仅类不动产需要填写</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">预期年收益 (元)</label>
+                    <input type="number" id="annualRevenue" name="annual_revenue" step="0.01" min="0" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+                    <p class="mt-1 text-sm text-gray-500">请输入资产每年预期产生的实际收益金额</p>
+                </div>
+            </div>
+
+            <!-- 代币信息 -->
+            <div class="space-y-6">
+                <h3 class="text-lg font-medium text-gray-900">代币信息</h3>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">代币价格 (USDT)</label>
+                    <input type="number" id="tokenPrice" name="token_price" step="0.000001" min="0" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">代币发行量</label>
+                    <input type="number" id="tokenSupply" name="token_supply" min="0" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <p class="mt-1 text-sm text-gray-500">不动产将根据面积自动计算，类不动产需要手动输入</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">代币代码</label>
+                    <input type="text" id="tokenSymbol" name="token_symbol" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-100" readonly>
+                    <p class="mt-1 text-sm text-gray-500">代币代码创建后不可修改</p>
+                </div>
+            </div>
+
+            <!-- 图片和文档 -->
+            <div class="space-y-6">
+                <h3 class="text-lg font-medium text-gray-900">图片和文档</h3>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">资产图片</label>
+                    <input type="file" id="images" name="images" accept="image/*" multiple class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <p class="mt-1 text-sm text-gray-500">支持 jpg、jpeg、png、gif 格式，可多选</p>
+                    <div id="currentImages" class="mt-2 grid grid-cols-4 gap-4">
+                        <!-- 当前图片将在这里显示 -->
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">相关文档</label>
+                    <input type="file" id="documents" name="documents" accept=".pdf,.doc,.docx" multiple class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <p class="mt-1 text-sm text-gray-500">支持 pdf、doc、docx 格式，可多选</p>
+                    <div id="currentDocuments" class="mt-2">
+                        <!-- 当前文档将在这里显示 -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="history.back()" class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    取消
+                </button>
+                <button type="submit" id="submitButton" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    保存
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+let currentAsset = null;
+const assetId = window.location.pathname.split('/').slice(-2)[0];
+
+// 格式化数字
+function formatNumber(value) {
+    if (value == null || isNaN(value)) {
+        return '';
+    }
+    return value.toString();
+}
+
+// 显示错误信息
+function showError(message) {
+    alert(message);
+}
+
+// 检查是否是管理员
+async function checkIsAdmin() {
+    if (!window.ethereum || !window.currentAccount) {
+        return false;
+    }
+    
+    // 直接检查当前地址是否在配置的管理员列表中
+    const adminAddresses = [
+        '0x6394993426DBA3b654eF0052698Fe9E0B6A98870',
+        '0xd1db8bb8b723fade2d8aeea21d0e75fa6f7cb5af'
+    ];
+    
+    return adminAddresses.map(addr => addr.toLowerCase())
+        .includes(window.currentAccount.toLowerCase());
+}
+
+// 加载资产详情
+async function loadAssetDetails() {
+    const assetId = window.location.pathname.split('/')[2];
+    
+    try {
+        const response = await fetch(`/api/assets/${assetId}`, {
+            headers: {
+                'X-Eth-Address': window.currentAccount
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('加载资产详情失败');
+        }
+
+        const data = await response.json();
+        console.log('加载的资产数据:', data);  // 添加日志
+        
+        // 如果资产已上链，显示提示并返回
+        if (data.token_address) {
+            alert('已上链资产无法修改');
+            window.location.href = '/admin/dashboard';
+            return;
+        }
+        
+        // 保存当前资产数据
+        currentAsset = {
+            ...data,
+            images: typeof data.images === 'string' ? JSON.parse(data.images) : (Array.isArray(data.images) ? data.images : []),
+            documents: typeof data.documents === 'string' ? JSON.parse(data.documents) : (Array.isArray(data.documents) ? data.documents : [])
+        };
+        
+        // 填充表单数据
+        document.getElementById('name').value = data.name || '';
+        document.getElementById('assetType').value = data.asset_type === 'REAL_ESTATE' ? '10' : '20';
+        document.getElementById('location').value = data.location || '';
+        document.getElementById('area').value = data.area || '';
+        document.getElementById('totalValue').value = data.total_value || '';
+        document.getElementById('tokenPrice').value = data.token_price || '';
+        document.getElementById('tokenSupply').value = data.token_supply || '';
+        document.getElementById('tokenSymbol').value = data.token_symbol || '';
+        document.getElementById('annualRevenue').value = data.annual_revenue || '';
+
+        // 根据资产类型显示/隐藏相关字段
+        const isRealEstate = data.asset_type === 'REAL_ESTATE';
+        document.getElementById('areaField').style.display = isRealEstate ? 'block' : 'none';
+        document.getElementById('totalValueField').style.display = isRealEstate ? 'none' : 'block';
+        
+        // 显示当前图片
+        displayCurrentImages(currentAsset.images);
+        
+        // 显示当前文档
+        displayCurrentDocuments(currentAsset.documents);
+
+        // 显示编辑表单
+        document.getElementById('walletAlert').classList.add('hidden');
+        document.getElementById('editForm').classList.remove('hidden');
+        
+    } catch (error) {
+        console.error('加载资产详情失败:', error);
+        alert(error.message || '加载资产详情失败');
+        window.location.href = '/admin/dashboard';
+    }
+}
+
+// 显示当前图片
+function displayCurrentImages(images) {
+    const currentImagesDiv = document.getElementById('currentImages');
+    if (images.length > 0) {
+        currentImagesDiv.innerHTML = images.map(image => {
+            const imagePath = image.startsWith('/') ? image : `/${image}`;
+            return `
+                <div class="relative">
+                    <img src="${imagePath}" 
+                         class="w-full h-24 object-cover rounded"
+                         onerror="this.onerror=null; this.src='/static/images/default.png';">
+                    <button type="button" 
+                            onclick="removeImage('${image}')" 
+                            class="absolute top-0 right-0 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600">×</button>
+                </div>
+            `;
+        }).join('');
+    } else {
+        currentImagesDiv.innerHTML = '<p class="text-sm text-gray-500">暂无图片</p>';
+    }
+}
+
+// 显示当前文档
+function displayCurrentDocuments(documents) {
+    const currentDocumentsDiv = document.getElementById('currentDocuments');
+    if (documents.length > 0) {
+        currentDocumentsDiv.innerHTML = documents.map(doc => {
+            const docPath = doc.startsWith('/') ? doc : `/${doc}`;
+            const docName = doc.split('/').pop();
+            return `
+                <div class="flex items-center justify-between py-2">
+                    <a href="${docPath}" target="_blank" class="text-sm text-blue-600 hover:text-blue-800">${docName}</a>
+                    <button type="button" onclick="removeDocument('${doc}')" class="text-red-500 hover:text-red-600">删除</button>
+                </div>
+            `;
+        }).join('');
+    } else {
+        currentDocumentsDiv.innerHTML = '<p class="text-sm text-gray-500">暂无文档</p>';
+    }
+}
+
+// 移除图片
+function removeImage(imageName) {
+    if (!currentAsset || !currentAsset.images) return;
+    const index = currentAsset.images.indexOf(imageName);
+    if (index > -1) {
+        currentAsset.images.splice(index, 1);
+        // 更新显示
+        const currentImagesDiv = document.getElementById('currentImages');
+        if (currentAsset.images.length > 0) {
+            currentImagesDiv.innerHTML = currentAsset.images.map(image => {
+                const imagePath = image.startsWith('/') ? image : `/${image}`;
+                return `
+                    <div class="relative">
+                        <img src="${imagePath}" 
+                             class="w-full h-24 object-cover rounded"
+                             onerror="this.onerror=null; this.src='/static/images/default.png';">
+                        <button type="button" 
+                                onclick="removeImage('${image}')" 
+                                class="absolute top-0 right-0 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600">×</button>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            currentImagesDiv.innerHTML = '<p class="text-sm text-gray-500">暂无图片</p>';
+        }
+    }
+}
+
+// 移除文档
+function removeDocument(docName) {
+    if (!currentAsset || !currentAsset.documents) return;
+    const index = currentAsset.documents.indexOf(docName);
+    if (index > -1) {
+        currentAsset.documents.splice(index, 1);
+        // 更新显示
+        const currentDocumentsDiv = document.getElementById('currentDocuments');
+        if (currentAsset.documents.length > 0) {
+            currentDocumentsDiv.innerHTML = currentAsset.documents.map(doc => {
+                const docPath = doc.startsWith('/') ? doc : `/${doc}`;
+                const docName = doc.split('/').pop();
+                return `
+                    <div class="flex items-center justify-between py-2">
+                        <a href="${docPath}" target="_blank" class="text-sm text-blue-600 hover:text-blue-800">${docName}</a>
+                        <button type="button" onclick="removeDocument('${doc}')" class="text-red-500 hover:text-red-600">删除</button>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            currentDocumentsDiv.innerHTML = '<p class="text-sm text-gray-500">暂无文档</p>';
+        }
+    }
+}
+
+// 提交表单
+async function submitForm(event) {
+    event.preventDefault();
+    
+    const submitButton = document.getElementById('submitButton');
+    submitButton.disabled = true;
+    
+    try {
+        const formData = new FormData(event.target);
+        
+        // 验证必填字段
+        const name = formData.get('name');
+        const location = formData.get('location');
+        const annualRevenue = parseFloat(formData.get('annual_revenue'));
+        
+        if (!name || !location || isNaN(annualRevenue) || annualRevenue <= 0) {
+            throw new Error('请填写必填字段，年化收益必须大于0');
+        }
+        
+        // 根据资产类型验证字段
+        const assetType = document.getElementById('assetType').value;
+        if (assetType === '10') { // 不动产
+            const area = parseFloat(formData.get('area'));
+            const totalValue = parseFloat(formData.get('total_value'));
+            if (isNaN(area) || area <= 0 || isNaN(totalValue) || totalValue <= 0) {
+                throw new Error('不动产项目的面积和总价值必须大于0');
+            }
+        } else { // 类不动产
+            const totalValue = parseFloat(formData.get('total_value'));
+            const tokenSupply = parseFloat(formData.get('token_supply'));
+            if (isNaN(totalValue) || totalValue <= 0 || isNaN(tokenSupply) || tokenSupply <= 0) {
+                throw new Error('类不动产项目的总价值和代币供应量必须大于0');
+            }
+        }
+        
+        // 发送PUT请求
+        const response = await fetch(`/api/assets/${assetId}`, {
+            method: 'PUT',
+            headers: {
+                'X-Eth-Address': window.currentAccount
+            },
+            body: formData
+        });
+
+        let errorMessage;
+        try {
+            const data = await response.json();
+            errorMessage = data.message || '保存失败，请重试';
+        } catch (e) {
+            // 如果响应不是JSON格式，使用状态文本
+            errorMessage = response.statusText || '保存失败，请重试';
+        }
+        
+        if (!response.ok) {
+            throw new Error(errorMessage);
+        }
+        
+        alert('保存成功');
+        window.location.href = `/admin?eth_address=${window.currentAccount}`;
+    } catch (error) {
+        console.error('保存失败:', error);
+        alert(error.message || '保存失败，请重试');
+    } finally {
+        submitButton.disabled = false;
+    }
+}
+
+// 获取URL参数
+function getUrlParam(name) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name);
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        // 检查MetaMask是否安装
+        if (!window.ethereum) {
+            throw new Error('请先安装MetaMask钱包');
+        }
+
+        // 请求连接钱包
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (!accounts || accounts.length === 0) {
+            await window.ethereum.request({ method: 'eth_requestAccounts' });
+        }
+
+        // 获取连接的钱包地址
+        const connectedAccount = (await window.ethereum.request({ method: 'eth_accounts' }))[0];
+        if (!connectedAccount) {
+            throw new Error('请先连接钱包');
+        }
+
+        // 设置当前账户
+        window.currentAccount = connectedAccount;
+
+        // 检查是否是管理员
+        const isAdmin = await checkIsAdmin();
+        if (!isAdmin) {
+            throw new Error('当前钱包地址不是管理员');
+        }
+
+        // 加载资产详情
+        await loadAssetDetails();
+
+    } catch (error) {
+        console.error('初始化失败:', error);
+        alert(error.message || '页面加载失败');
+        window.location.href = '/admin/dashboard';
+    }
+});
+
+// 监听钱包账号变化
+if (window.ethereum) {
+    window.ethereum.on('accountsChanged', async (accounts) => {
+        if (accounts.length > 0) {
+            window.currentAccount = accounts[0];
+            const isAdmin = await checkIsAdmin();
+            if (isAdmin) {
+                document.getElementById('walletAlert').classList.add('hidden');
+                document.getElementById('editForm').classList.remove('hidden');
+                await loadAssetDetails();  // 当钱包地址变化时重新加载数据
+            } else {
+                alert('请使用管理员钱包地址');
+                window.location.href = '/admin/dashboard';
+            }
+        } else {
+            alert('请连接钱包');
+            window.location.href = '/admin/dashboard';
+        }
+    });
+}
+</script>
+{% endblock %} 

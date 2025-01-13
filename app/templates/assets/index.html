@@ -1,0 +1,26 @@
+function updateAssetCard(asset) {
+    const card = document.createElement('div');
+    card.className = 'col-md-4 mb-4';
+    card.innerHTML = `
+        <div class="card h-100">
+            <img src="/${asset.images && asset.images.length > 0 ? asset.images[0] : 'static/images/placeholder.jpg'}" 
+                 class="card-img-top" 
+                 alt="Asset Image" 
+                 style="height: 200px; object-fit: cover"
+                 onerror="this.onerror=null; this.src='/static/images/placeholder.jpg';">
+            <div class="card-body">
+                <h5 class="card-title">${asset.name}</h5>
+                <p class="card-text">
+                    <strong>类型:</strong> ${asset.asset_type}<br>
+                    <strong>代币符号:</strong> ${asset.token_symbol}<br>
+                    <strong>代币价格:</strong> ${asset.token_price} USDT<br>
+                    <strong>总价值:</strong> ${asset.total_value} USDT<br>
+                    <strong>地址:</strong> ${asset.location}<br>
+                    <strong>年收益:</strong> ${asset.annual_revenue}%
+                </p>
+                <a href="/assets/${asset.id}" class="btn btn-primary">查看详情</a>
+            </div>
+        </div>
+    `;
+    return card;
+} 

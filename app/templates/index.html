@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="bg-white shadow rounded-lg p-6">
+    <div class="text-center">
+        <h1 class="text-4xl font-bold text-gray-900">欢迎来到58HUB</h1>
+        <p class="mt-4 text-xl text-gray-600">基于区块链的资产管理平台</p>
+    </div>
+
+    <div class="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="bg-gray-50 p-6 rounded-lg">
+            <h3 class="text-lg font-medium text-gray-900">资产管理</h3>
+            <p class="mt-2 text-gray-600">轻松管理您的数字资产，查看详细信息和交易历史。</p>
+        </div>
+
+        <div class="bg-gray-50 p-6 rounded-lg">
+            <h3 class="text-lg font-medium text-gray-900">安全可靠</h3>
+            <p class="mt-2 text-gray-600">基于区块链技术，确保您的资产安全和交易透明。</p>
+        </div>
+
+        <div class="bg-gray-50 p-6 rounded-lg">
+            <h3 class="text-lg font-medium text-gray-900">便捷交易</h3>
+            <p class="mt-2 text-gray-600">简单的操作界面，让资产交易变得更加便捷。</p>
+        </div>
+    </div>
+
+    <div class="mt-12 text-center">
+        <a href="/assets" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 mx-2">
+            浏览资产
+        </a>
+        <a href="/assets/create" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 mx-2">
+            创建资产
+        </a>
+    </div>
+</div>
+{% endblock %}

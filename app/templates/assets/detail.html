@@ -1,0 +1,580 @@
+{% extends "base.html" %}
+
+{% block title %}资产详情 - 58HUB{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+<script src="/static/js/AssetTokenABI.js"></script>
+<script src="/static/js/USDTABI.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- 资产基本信息 -->
+    <div class="bg-white rounded-lg shadow overflow-hidden mb-6">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h1 id="assetName" class="text-2xl font-bold text-gray-900"></h1>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- 基本信息 -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">基本信息</h3>
+                    <dl class="grid grid-cols-1 gap-x-4 gap-y-4">
+                        <div class="sm:col-span-1">
+                            <dt class="text-sm font-medium text-gray-500">资产类型</dt>
+                            <dd class="mt-1 text-sm text-gray-900" id="assetType"></dd>
+                        </div>
+                        <div class="sm:col-span-1">
+                            <dt class="text-sm font-medium text-gray-500">位置</dt>
+                            <dd class="mt-1 text-sm text-gray-900" id="location"></dd>
+                        </div>
+                        <div class="sm:col-span-1" id="areaContainer">
+                            <dt class="text-sm font-medium text-gray-500">面积</dt>
+                            <dd class="mt-1 text-sm text-gray-900" id="area"></dd>
+                        </div>
+                        <div class="sm:col-span-1">
+                            <dt class="text-sm font-medium text-gray-500">资产总价值</dt>
+                            <dd class="mt-1 text-sm text-gray-900" id="totalValue"></dd>
+                        </div>
+                        <div class="sm:col-span-1">
+                            <dt class="text-sm font-medium text-gray-500">所有者地址</dt>
+                            <dd class="mt-1 text-sm text-gray-900 break-all" id="ownerAddress"></dd>
+                        </div>
+                    </dl>
+                </div>
+
+                <!-- 代币信息 -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">代币信息</h3>
+                    <dl class="grid grid-cols-1 gap-x-4 gap-y-4">
+                        <div class="sm:col-span-1">
+                            <dt class="text-sm font-medium text-gray-500">代币代码</dt>
+                            <dd class="mt-1 text-sm text-gray-900" id="tokenSymbol"></dd>
+                        </div>
+                        <div class="sm:col-span-1">
+                            <dt class="text-sm font-medium text-gray-500">代币价格</dt>
+                            <dd class="mt-1 text-sm text-gray-900" id="tokenPrice"></dd>
+                        </div>
+                        <div class="sm:col-span-1">
+                            <dt class="text-sm font-medium text-gray-500">剩余可售数量</dt>
+                            <dd class="mt-1 text-sm text-gray-900" id="availableSupply"></dd>
+                        </div>
+                        <div class="sm:col-span-1">
+                            <dt class="text-sm font-medium text-gray-500">预期年收益</dt>
+                            <dd class="mt-1 text-sm text-gray-900" id="annualRevenue"></dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片展示 -->
+    <div class="bg-white rounded-lg shadow overflow-hidden mb-6">
+        <div class="relative" style="padding-bottom: 56.25%">
+            <div id="imageCarousel" class="absolute inset-0">
+                <!-- 图片将通过JavaScript动态加载 -->
+            </div>
+            <button id="prevButton" onclick="showPreviousImage()" class="absolute left-0 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-r hidden hover:bg-opacity-75 transition-opacity">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </button>
+            <button id="nextButton" onclick="showNextImage()" class="absolute right-0 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-l hidden hover:bg-opacity-75 transition-opacity">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
+        <!-- 缩略图导航 -->
+        <div id="thumbnailNav" class="flex justify-center gap-2 p-4 overflow-x-auto">
+            <!-- 缩略图将通过JavaScript动态加载 -->
+        </div>
+    </div>
+
+    <!-- 交易区域 -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-4 py-5 sm:p-6">
+            <div id="walletAlert" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 hidden">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-yellow-700">
+                            请先连接钱包以进行交易
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <div class="w-1/3">
+                    <label for="tradeAmount" class="block text-sm font-medium text-gray-700 mb-1">交易数量</label>
+                    <input type="number" id="tradeAmount" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="输入数量">
+                </div>
+                <div class="w-1/3">
+                    <label for="totalPrice" class="block text-sm font-medium text-gray-700 mb-1">总价 (USDT)</label>
+                    <input type="text" id="totalPrice" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md bg-gray-50" readonly>
+                </div>
+                <div class="w-1/3 flex items-end">
+                    <button id="buyBtn" class="hidden flex-1 inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                        购买
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentAsset = null;
+let currentImageIndex = 0;
+let tokenContract = null;
+let usdtContract = null;
+const USDT_ADDRESS = '0xdAC17F958D2ee523a2206206994597C13D831ec7'; // USDT合约地址
+
+function formatNumber(value) {
+    if (value == null || isNaN(value)) return '暂无数据';
+    // 根据不同类型的数据使用不同的格式化方式
+    if (typeof value === 'number' && Number.isInteger(value)) {
+        // 整数类型（如代币数量）
+        return new Intl.NumberFormat('zh-CN', {
+            maximumFractionDigits: 0
+        }).format(value);
+    } else {
+        // 其他数值类型（如价格、面积等）
+        return new Intl.NumberFormat('zh-CN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(value);
+    }
+}
+
+// 更新交易按钮显示状态
+function updateTradeButtons() {
+    const buyBtn = document.getElementById('buyBtn');
+    const walletAlert = document.getElementById('walletAlert');
+
+    // 检查钱包连接状态
+    if (!window.ethereum || !window.currentAccount) {
+        buyBtn.classList.add('hidden');
+        walletAlert.classList.remove('hidden');
+        return;
+    }
+
+    // 钱包已连接，显示购买按钮
+    walletAlert.classList.add('hidden');
+    buyBtn.classList.remove('hidden');
+}
+
+// 监听钱包状态变化
+if (window.ethereum) {
+    window.ethereum.on('accountsChanged', function (accounts) {
+        if (accounts.length > 0) {
+            window.currentAccount = accounts[0];
+            updateTradeButtons();
+        } else {
+            window.currentAccount = null;
+            updateTradeButtons();
+        }
+    });
+}
+
+// 更新图片轮播
+function updateImageCarousel() {
+    if (!currentAsset || !currentAsset.images || currentAsset.images.length === 0) {
+        // 显示默认图片
+        const carousel = document.getElementById('imageCarousel');
+        carousel.innerHTML = `
+            <img src="/static/images/placeholder.jpg" 
+                 alt="暂无图片" 
+                 class="absolute inset-0 w-full h-full object-contain">
+        `;
+        // 隐藏导航按钮
+        document.getElementById('prevButton').classList.add('hidden');
+        document.getElementById('nextButton').classList.add('hidden');
+        // 清空缩略图
+        document.getElementById('thumbnailNav').innerHTML = '';
+        return;
+    }
+
+    const carousel = document.getElementById('imageCarousel');
+    const currentImage = currentAsset.images[currentImageIndex];
+    
+    // 更新主图片
+    carousel.innerHTML = `
+        <img src="${currentImage}" 
+             alt="${currentAsset.name || '资产图片'} - 图片 ${currentImageIndex + 1}/${currentAsset.images.length}" 
+             class="absolute inset-0 w-full h-full object-contain transition-opacity duration-300"
+             loading="lazy"
+             onerror="this.onerror=null; this.src='/static/images/placeholder.jpg'; this.alt='图片加载失败';">
+    `;
+    
+    // 更新导航按钮显示状态
+    const prevButton = document.getElementById('prevButton');
+    const nextButton = document.getElementById('nextButton');
+    if (currentAsset.images.length > 1) {
+        prevButton.classList.remove('hidden');
+        nextButton.classList.remove('hidden');
+    } else {
+        prevButton.classList.add('hidden');
+        nextButton.classList.add('hidden');
+    }
+    
+    // 更新缩略图
+    const thumbnailNav = document.getElementById('thumbnailNav');
+    thumbnailNav.innerHTML = currentAsset.images.map((image, index) => `
+        <button onclick="showImage(${index})" 
+                class="thumbnail w-20 h-20 flex-shrink-0 focus:outline-none ${index === currentImageIndex ? 'ring-2 ring-blue-500' : ''}"
+                title="查看第 ${index + 1} 张图片">
+            <img src="${image}" 
+                 alt="缩略图 ${index + 1}" 
+                 class="w-full h-full object-cover rounded"
+                 loading="lazy"
+                 onerror="this.onerror=null; this.src='/static/images/placeholder.jpg';">
+        </button>
+    `).join('');
+}
+
+// 添加图片切换函数
+window.showImage = function(index) {
+    if (!currentAsset || !currentAsset.images || index < 0 || index >= currentAsset.images.length) return;
+    currentImageIndex = index;
+    updateImageCarousel();
+}
+
+// 切换到上一张图片
+window.showPreviousImage = function() {
+    if (!currentAsset || !currentAsset.images || currentAsset.images.length <= 1) return;
+    currentImageIndex = (currentImageIndex - 1 + currentAsset.images.length) % currentAsset.images.length;
+    updateImageCarousel();
+}
+
+// 切换到下一张图片
+window.showNextImage = function() {
+    if (!currentAsset || !currentAsset.images || currentAsset.images.length <= 1) return;
+    currentImageIndex = (currentImageIndex + 1) % currentAsset.images.length;
+    updateImageCarousel();
+}
+
+// 添加键盘导航支持
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'ArrowLeft') {
+        showPreviousImage();
+    } else if (event.key === 'ArrowRight') {
+        showNextImage();
+    }
+});
+
+// 更新资产详情显示函数
+async function loadAssetDetails() {
+    const assetId = window.location.pathname.split('/').pop();
+    try {
+        // 准备请求头
+        const headers = {};
+        
+        // 优先从URL参数获取钱包地址
+        const ethAddress = new URLSearchParams(window.location.search).get('eth_address') || 
+                          localStorage.getItem('eth_address') ||
+                          sessionStorage.getItem('eth_address');
+                          
+        if (ethAddress) {
+            headers['X-Eth-Address'] = ethAddress;
+            window.currentAccount = ethAddress;
+        }
+        
+        // 添加时间戳防止缓存
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/api/assets/${assetId}?t=${timestamp}`, {
+            headers: headers
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || '加载资产详情失败');
+        }
+        
+        const data = await response.json();
+        console.log('Asset data:', data);
+        
+        // 确保数据不为空
+        if (!data || Object.keys(data).length === 0) {
+            throw new Error('获取到的资产数据为空');
+        }
+        
+        currentAsset = data;
+        
+        // 更新资产基本信息
+        document.getElementById('assetName').textContent = data.name || '未命名资产';
+        document.getElementById('assetType').textContent = data.asset_type === 'REAL_ESTATE' ? '不动产' : '类不动产';
+        document.getElementById('location').textContent = data.location || '暂无数据';
+        
+        // 根据资产类型显示或隐藏面积信息
+        const areaContainer = document.getElementById('areaContainer');
+        if (data.asset_type === 'REAL_ESTATE') {
+            areaContainer.classList.remove('hidden');
+            document.getElementById('area').textContent = data.area ? `${formatNumber(data.area)} m²` : '暂无数据';
+        } else {
+            areaContainer.classList.add('hidden');
+        }
+        
+        // 更新其他资产信息
+        document.getElementById('totalValue').textContent = data.total_value ? `${formatNumber(data.total_value)} USDT` : '暂无数据';
+        document.getElementById('ownerAddress').textContent = data.owner_address || '暂无数据';
+        document.getElementById('tokenSymbol').textContent = data.token_symbol || '暂无数据';
+        document.getElementById('tokenPrice').textContent = data.token_price ? `${formatNumber(data.token_price)} USDT` : '暂无数据';
+        document.getElementById('availableSupply').textContent = data.token_supply ? formatNumber(parseInt(data.token_supply)) : '暂无数据';
+        document.getElementById('annualRevenue').textContent = data.annual_revenue ? `${formatNumber(data.annual_revenue)} USDT` : '暂无数据';
+        
+        // 处理图片数据
+        try {
+            if (typeof data.images === 'string') {
+                currentAsset.images = JSON.parse(data.images);
+            } else if (Array.isArray(data.images)) {
+                currentAsset.images = data.images;
+            } else {
+                currentAsset.images = [];
+            }
+            
+            // 确保所有图片路径都是正确的
+            currentAsset.images = currentAsset.images.map(img => {
+                if (img.startsWith('http') || img.startsWith('/')) {
+                    return img;
+                }
+                return `/${img}`;
+            });
+            
+            console.log('处理后的图片数据:', currentAsset.images);
+        } catch (error) {
+            console.error('处理图片数据失败:', error);
+            currentAsset.images = [];
+        }
+        
+        // 更新图片轮播
+        currentImageIndex = 0;
+        updateImageCarousel();
+        
+        // 只有在资产未审核通过且当前用户是所有者或管理员时，才显示钱包连接提示
+        const walletAlert = document.getElementById('walletAlert');
+        if (data.status !== 'APPROVED' && ethAddress && (!window.ethereum || !window.ethereum.selectedAddress)) {
+            walletAlert.classList.remove('hidden');
+        } else {
+            walletAlert.classList.add('hidden');
+        }
+        
+        // 初始化合约（如果钱包已连接）
+        if (window.ethereum && window.currentAccount) {
+            try {
+                await initContracts();
+            } catch (error) {
+                console.error('初始化合约失败:', error);
+            }
+        }
+        
+    } catch (error) {
+        console.error('加载资产详情失败:', error);
+        alert(error.message || '加载资产详情失败');
+    }
+}
+
+// 页面加载完成后执行
+document.addEventListener('DOMContentLoaded', async function() {
+    // 如果URL中有eth_address参数，保存到localStorage和sessionStorage
+    const urlParams = new URLSearchParams(window.location.search);
+    const ethAddress = urlParams.get('eth_address');
+    if (ethAddress) {
+        localStorage.setItem('eth_address', ethAddress);
+        sessionStorage.setItem('eth_address', ethAddress);
+        // 设置cookie
+        document.cookie = `eth_address=${ethAddress}; path=/; max-age=86400`;
+    }
+    
+    // 加载资产详情
+    await loadAssetDetails();
+    
+    // 如果有钱包地址但钱包未连接，显示连接提示
+    if (window.currentAccount && (!window.ethereum || !window.ethereum.selectedAddress)) {
+        document.getElementById('walletAlert').classList.remove('hidden');
+    }
+});
+
+// 添加交易金额输入监听
+document.getElementById('tradeAmount').addEventListener('input', function(e) {
+    const amount = parseFloat(e.target.value);
+    const totalPriceInput = document.getElementById('totalPrice');
+    if (currentAsset && !isNaN(amount)) {
+        const total = amount * currentAsset.token_price;
+        totalPriceInput.value = formatNumber(total);
+    } else {
+        totalPriceInput.value = '';
+    }
+});
+
+// 初始化Web3和合约
+async function initContracts() {
+    if (typeof window.ethereum === 'undefined') {
+        throw new Error('请安装MetaMask钱包');
+    }
+
+    const web3 = new Web3(window.ethereum);
+    
+    // 初始化USDT合约
+    usdtContract = new web3.eth.Contract(USDT_ABI, USDT_ADDRESS);
+    
+    // 初始化资产代币合约
+    if (currentAsset && currentAsset.token_address) {
+        tokenContract = new web3.eth.Contract(AssetTokenABI, currentAsset.token_address);
+    }
+}
+
+// 检查USDT余额
+async function checkUSDTBalance(address) {
+    if (!usdtContract) {
+        throw new Error('USDT合约未初始化');
+    }
+    const balance = await usdtContract.methods.balanceOf(address).call();
+    return web3.utils.fromWei(balance, 'mwei'); // USDT使用6位小数
+}
+
+// 检查USDT授权
+async function checkUSDTAllowance(owner, spender) {
+    if (!usdtContract) {
+        throw new Error('USDT合约未初始化');
+    }
+    const allowance = await usdtContract.methods.allowance(owner, spender).call();
+    return web3.utils.fromWei(allowance, 'mwei');
+}
+
+// 授权USDT
+async function approveUSDT(spender, amount) {
+    if (!usdtContract) {
+        throw new Error('USDT合约未初始化');
+    }
+    const amountInWei = web3.utils.toWei(amount.toString(), 'mwei');
+    return await usdtContract.methods.approve(spender, amountInWei)
+        .send({ from: window.currentAccount });
+}
+
+// 转移USDT
+async function transferUSDT(to, amount) {
+    if (!usdtContract) {
+        throw new Error('USDT合约未初始化');
+    }
+    const amountInWei = web3.utils.toWei(amount.toString(), 'mwei');
+    return await usdtContract.methods.transfer(to, amountInWei)
+        .send({ from: window.currentAccount });
+}
+
+// 更新购买按钮点击事件
+document.getElementById('buyBtn').addEventListener('click', async function() {
+    if (!window.ethereum || !window.currentAccount) {
+        alert('请先连接钱包');
+        return;
+    }
+
+    const amount = parseInt(document.getElementById('tradeAmount').value);
+    if (isNaN(amount) || amount <= 0) {
+        alert('请输入有效的交易数量');
+        return;
+    }
+
+    try {
+        // 初始化合约
+        await initContracts();
+
+        // 计算总价
+        const totalPrice = amount * currentAsset.token_price;
+
+        // 检查是否是自己的资产
+        const isSelfTrade = window.currentAccount.toLowerCase() === currentAsset.owner_address.toLowerCase();
+
+        if (!isSelfTrade) {
+            // 如果不是自己的资产，需要进行USDT转账
+            // 检查USDT余额
+            const balance = await checkUSDTBalance(window.currentAccount);
+            if (parseFloat(balance) < totalPrice) {
+                alert('USDT余额不足');
+                return;
+            }
+
+            // 检查USDT授权
+            const allowance = await checkUSDTAllowance(window.currentAccount, currentAsset.owner_address);
+            if (parseFloat(allowance) < totalPrice) {
+                // 请求授权
+                try {
+                    await approveUSDT(currentAsset.owner_address, totalPrice);
+                } catch (error) {
+                    alert('USDT授权失败');
+                    return;
+                }
+            }
+
+            // 转移USDT
+            try {
+                await transferUSDT(currentAsset.owner_address, totalPrice);
+            } catch (error) {
+                alert('USDT转账失败');
+                return;
+            }
+        }
+
+        // 创建交易记录
+        const response = await fetch('/api/trades/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Eth-Address': window.currentAccount
+            },
+            body: JSON.stringify({
+                asset_id: currentAsset.id,
+                amount: amount,
+                trade_type: 'buy',
+                is_self_trade: isSelfTrade
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('创建交易失败');
+        }
+
+        // 转移资产代币
+        if (tokenContract && !isSelfTrade) {
+            try {
+                await tokenContract.methods.transfer(window.currentAccount, amount)
+                    .send({ from: currentAsset.owner_address });
+            } catch (error) {
+                alert('资产代币转移失败');
+                return;
+            }
+        }
+
+        alert(isSelfTrade ? '内部转移成功！' : '交易成功！');
+        // 刷新页面显示最新状态
+        window.location.reload();
+    } catch (error) {
+        console.error('交易失败:', error);
+        alert('交易失败: ' + error.message);
+    }
+});
+
+// 添加管理员检查函数
+async function checkIsAdmin() {
+    if (!window.ethereum || !window.currentAccount) {
+        return false;
+    }
+    
+    const adminAddresses = [
+        '0x6394993426DBA3b654eF0052698Fe9E0B6A98870',
+        '0x124e5B8A4E6c68eC66e181E0B54817b12D879c57'
+    ];
+    
+    return adminAddresses.map(addr => addr.toLowerCase())
+        .includes(window.currentAccount.toLowerCase());
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,957 @@
+{% extends "base.html" %}
+
+{% block title %}后台管理 - 58HUB{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- 错误提示 -->
+    <div id="errorAlert" class="hidden mb-4 bg-red-50 border-l-4 border-red-400 p-4">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p id="errorMessage" class="text-sm text-red-700"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载状态 -->
+    <div id="loadingIndicator" class="hidden">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity flex items-center justify-center">
+            <div class="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+        </div>
+    </div>
+
+    <!-- 空状态提示 -->
+    <div id="emptyState" class="hidden text-center py-12">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">暂无数据</h3>
+        <p class="mt-1 text-sm text-gray-500">当前没有任何资产数据。</p>
+    </div>
+
+    <!-- 钱包连接提示 -->
+    <div id="walletAlert" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+        <div class="flex justify-between items-center">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-yellow-700">
+                        请连接管理员钱包以访问后台管理功能
+                    </p>
+                </div>
+            </div>
+            <div>
+                <button onclick="connectWallet()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
+                    连接钱包
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminContent" class="hidden">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-900">后台管理</h1>
+        </div>
+
+        <!-- 数据分析卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div class="bg-white rounded-lg shadow p-4">
+                <h3 class="text-sm font-medium text-gray-500">总用户数</h3>
+                <p class="mt-2 text-2xl font-semibold text-gray-900" id="totalUsers">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <h3 class="text-sm font-medium text-gray-500">待审核资产</h3>
+                <p class="mt-2 text-2xl font-semibold text-gray-900" id="pendingAssets">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <h3 class="text-sm font-medium text-gray-500">已审核资产</h3>
+                <p class="mt-2 text-2xl font-semibold text-gray-900" id="approvedAssets">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <h3 class="text-sm font-medium text-gray-500">总资产价值</h3>
+                <p class="mt-2 text-2xl font-semibold text-gray-900" id="totalValue">0</p>
+            </div>
+        </div>
+
+        <!-- 待审核资产列表 -->
+        <div class="bg-white shadow rounded-lg mb-4">
+            <div class="px-3 py-3 border-b border-gray-200">
+                <h2 class="text-base font-medium text-gray-900">待审核资产</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">资产名称</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">所有者</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">提交时间</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200" id="pendingAssetsList">
+                        <!-- 待审核资产列表将通过JavaScript动态加载 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 数据统计图表 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- 左侧资产类型分布和价值区间分布 -->
+            <div class="space-y-6">
+                <!-- 资产类型分布 -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">资产类型分布</h3>
+                    <canvas id="assetTypeChart"></canvas>
+                </div>
+                
+                <!-- 资产价值区间分布 -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">资产价值区间分布</h3>
+                    <canvas id="valueDistributionChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- 右侧图表 -->
+            <div class="md:col-span-2 grid grid-cols-1 gap-6">
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">每月交易量</h3>
+                    <canvas id="tradeVolumeChart"></canvas>
+                </div>
+                <div class="bg-white shadow rounded-lg p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-medium text-gray-900">用户注册数量</h3>
+                        <div class="flex space-x-2">
+                            <button onclick="switchUserChart('daily')" id="dailyUserBtn" class="px-3 py-1 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">每日</button>
+                            <button onclick="switchUserChart('monthly')" id="monthlyUserBtn" class="px-3 py-1 text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200">每月</button>
+                        </div>
+                    </div>
+                    <canvas id="userRegistrationChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 所有项目列表 -->
+        <div class="bg-white shadow rounded-lg mb-4">
+            <div class="px-3 py-3 border-b border-gray-200">
+                <h2 class="text-base font-medium text-gray-900">所有项目</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">资产名称</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">所有者</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">提交时间</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200" id="allAssetsList">
+                        <!-- 项目列表将通过JavaScript动态加载 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// 格式化数字显示
+function formatNumber(value) {
+    if (value == null || isNaN(value)) return '0';
+    return new Intl.NumberFormat().format(value);
+}
+
+// 格式化时间显示
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// 连接钱包
+async function connectWallet() {
+    try {
+        // 检查是否安装了MetaMask
+        if (!window.ethereum) {
+            throw new Error('请先安装MetaMask钱包');
+        }
+
+        // 请求连接钱包
+        const accounts = await window.ethereum.request({ 
+            method: 'eth_requestAccounts' 
+        });
+        
+        if (!accounts || accounts.length === 0) {
+            throw new Error('未能获取钱包地址');
+        }
+
+        window.currentAccount = accounts[0];
+        console.log('钱包连接成功:', window.currentAccount);
+
+        // 检查是否是管理员
+        const isAdmin = await checkIsAdmin();
+        if (!isAdmin) {
+            throw new Error('该钱包地址不是管理员');
+        }
+
+        // 更新UI显示
+        document.getElementById('walletAlert').classList.add('hidden');
+        document.getElementById('adminContent').classList.remove('hidden');
+        
+        // 加载数据
+        loadStats();
+        loadPendingAssets();
+        loadAllAssets();
+
+        return true;
+    } catch (error) {
+        console.error('连接钱包失败:', error);
+        const errorMessage = error.message || '未知错误';
+        alert('连接钱包失败: ' + errorMessage);
+        return false;
+    }
+}
+
+// 检查是否是管理员
+async function checkIsAdmin() {
+    if (!window.currentAccount) {
+        return false;
+    }
+    
+    const adminAddresses = [
+        '0x6394993426DBA3b654eF0052698Fe9E0B6A98870',
+        '0x124e5B8A4E6c68eC66e181E0B54817b12D879c57'
+    ];
+    
+    return adminAddresses.map(addr => addr.toLowerCase())
+        .includes(window.currentAccount.toLowerCase());
+}
+
+// 更新页面显示
+async function updateDisplay() {
+    const isAdmin = await checkIsAdmin();
+    document.getElementById('walletAlert').classList.toggle('hidden', isAdmin);
+    document.getElementById('adminContent').classList.toggle('hidden', !isAdmin);
+    
+    if (isAdmin) {
+        loadStats();
+        loadPendingAssets();
+        loadAllAssets();
+    }
+}
+
+// 显示/隐藏加载状态
+function toggleLoading(show) {
+    document.getElementById('loadingIndicator').classList.toggle('hidden', !show);
+}
+
+// 显示错误信息
+function showError(message) {
+    const errorAlert = document.getElementById('errorAlert');
+    const errorMessage = document.getElementById('errorMessage');
+    errorMessage.textContent = message;
+    errorAlert.classList.remove('hidden');
+    setTimeout(() => {
+        errorAlert.classList.add('hidden');
+    }, 5000); // 5秒后自动隐藏
+}
+
+// 显示空状态
+function toggleEmptyState(show) {
+    document.getElementById('emptyState').classList.toggle('hidden', !show);
+}
+
+// 更新加载统计数据函数
+async function loadStats() {
+    try {
+        const response = await fetchWithAuth('/api/admin/stats');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || '加载统计数据失败');
+        }
+        const data = await response.json();
+        
+        // 更新统计数据
+        document.getElementById('totalUsers').textContent = formatNumber(data.total_users);
+        document.getElementById('pendingAssets').textContent = formatNumber(data.pending_assets);
+        document.getElementById('approvedAssets').textContent = formatNumber(data.approved_assets);
+        document.getElementById('totalValue').textContent = `$${formatNumber(data.total_value)}`;
+        
+        // 更新所有图表
+        updateCharts(data);
+    } catch (error) {
+        console.error('加载统计数据失败:', error);
+        showError(error.message);
+    }
+}
+
+// 加载待审核资产
+async function loadPendingAssets() {
+    try {
+        const response = await fetchWithAuth('/api/admin/pending-assets');
+        if (!response.ok) throw new Error('加载待审核资产失败');
+        const data = await response.json();
+        
+        const tbody = document.getElementById('pendingAssetsList');
+        if (!data.assets || data.assets.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="px-2 py-4 text-center text-gray-500">暂无待审核资产</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = data.assets.map(asset => {
+            const firstImage = asset.images && asset.images.length > 0 ? 
+                (asset.images[0].startsWith('/') ? asset.images[0] : `/${asset.images[0]}`) : 
+                '/static/images/default.png';
+            return `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-2 py-2 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 h-8 w-8">
+                                <img class="h-8 w-8 rounded object-cover" 
+                                     src="${firstImage}" 
+                                     onerror="this.onerror=null; this.src='/static/images/default.png';"
+                                     alt="${asset.name}">
+                            </div>
+                            <div class="ml-2">
+                                <a href="/assets/${asset.id}" class="text-xs font-medium text-blue-600 hover:text-blue-900 hover:underline">${asset.name}</a>
+                                <div class="text-xs text-gray-500">${asset.token_symbol}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-900">${asset.asset_type === 'REAL_ESTATE' ? '不动产' : '类不动产'}</td>
+                    <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-500">${asset.owner_address}</td>
+                    <td class="px-2 py-2 whitespace-nowrap text-xs">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">待审核</span>
+                    </td>
+                    <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-500">${formatDate(asset.created_at)}</td>
+                    <td class="px-2 py-2 whitespace-nowrap text-xs">
+                        <div class="flex space-x-1">
+                            <button onclick="approveAsset(${asset.id})" class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700">通过</button>
+                            <button onclick="rejectAsset(${asset.id})" class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700">拒绝</button>
+                            <a href="/assets/${asset.id}" class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">查看</a>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('加载待审核资产失败:', error);
+        showError(error.message);
+    }
+}
+
+// 审核资产
+async function approveAsset(assetId) {
+    if (!confirm('确定要通过这个资产吗？')) return;
+    
+    toggleLoading(true);
+    try {
+        const response = await fetchWithAuth(`/api/admin/assets/${assetId}/approve`, {
+            method: 'POST'
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || '审核失败');
+        }
+        
+        showSuccess('审核通过成功！');
+        await Promise.all([
+            loadPendingAssets(),
+            loadAllAssets(),
+            loadStats()
+        ]);
+    } catch (error) {
+        console.error('审核失败:', error);
+        showError(error.message);
+    } finally {
+        toggleLoading(false);
+    }
+}
+
+// 拒绝资产
+async function rejectAsset(assetId) {
+    const reason = prompt('请输入拒绝原因：');
+    if (reason === null) return;
+    
+    try {
+        const response = await fetch(`/api/admin/assets/${assetId}/reject`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Eth-Address': window.currentAccount
+            },
+            body: JSON.stringify({ reason })
+        });
+        
+        if (!response.ok) throw new Error('拒绝失败');
+        
+        alert('已拒绝该资产');
+        // 重新加载所有数据
+        loadPendingAssets();
+        loadAllAssets();
+        loadStats();
+    } catch (error) {
+        console.error('拒绝失败:', error);
+        alert('操作失败，请重试');
+    }
+}
+
+// 定义全局变量存储图表实例
+let assetTypeChart = null;
+let tradeVolumeChart = null;
+let userRegistrationChart = null;
+let currentUserChartType = 'daily';
+
+// 更新资产类型分布图表
+function updateAssetTypeChart(data) {
+    const ctx = document.getElementById('assetTypeChart').getContext('2d');
+    if (assetTypeChart) {
+        assetTypeChart.destroy();
+    }
+    assetTypeChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['不动产', '类不动产'],
+            datasets: [{
+                data: [data.real_estate, data.semi_real_estate],
+                backgroundColor: ['#60A5FA', '#34D399']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+// 更新月度交易量图表
+function updateTradeVolumeChart(data) {
+    const ctx = document.getElementById('tradeVolumeChart').getContext('2d');
+    if (tradeVolumeChart) {
+        tradeVolumeChart.destroy();
+    }
+    tradeVolumeChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(item => item.month),
+            datasets: [{
+                label: '交易量',
+                data: data.map(item => item.count),
+                borderColor: '#60A5FA',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// 切换用户注册数量图表显示类型
+function switchUserChart(type) {
+    currentUserChartType = type;
+    document.getElementById('dailyUserBtn').classList.toggle('bg-blue-600', type === 'daily');
+    document.getElementById('dailyUserBtn').classList.toggle('text-white', type === 'daily');
+    document.getElementById('dailyUserBtn').classList.toggle('bg-gray-100', type !== 'daily');
+    document.getElementById('dailyUserBtn').classList.toggle('text-gray-700', type !== 'daily');
+    
+    document.getElementById('monthlyUserBtn').classList.toggle('bg-blue-600', type === 'monthly');
+    document.getElementById('monthlyUserBtn').classList.toggle('text-white', type === 'monthly');
+    document.getElementById('monthlyUserBtn').classList.toggle('bg-gray-100', type !== 'monthly');
+    document.getElementById('monthlyUserBtn').classList.toggle('text-gray-700', type !== 'monthly');
+    
+    loadStats();
+}
+
+// 更新用户注册数量图表
+function updateUserRegistrationChart(data, type) {
+    const ctx = document.getElementById('userRegistrationChart').getContext('2d');
+    if (userRegistrationChart) {
+        userRegistrationChart.destroy();
+    }
+    
+    const chartData = type === 'daily' ? data.daily_users : data.monthly_users;
+    
+    userRegistrationChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.map(item => type === 'daily' ? item.date : item.month),
+            datasets: [{
+                label: '注册用户数',
+                data: chartData.map(item => item.count),
+                borderColor: '#60A5FA',
+                backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                tension: 0.1,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            }
+        }
+    });
+}
+
+// 获取状态样式
+function getStatusStyle(status) {
+    const styles = {
+        'PENDING': {
+            style: 'px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800',
+            text: '待审核'
+        },
+        'APPROVED': {
+            style: 'px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800',
+            text: '已通过'
+        },
+        'REJECTED': {
+            style: 'px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800',
+            text: '已拒绝'
+        },
+        'ON_CHAIN': {
+            style: 'px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800',
+            text: '已上链'
+        },
+        'DELETED': {
+            style: 'px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800',
+            text: '已删除'
+        }
+    };
+    return styles[status] || { style: 'text-gray-500', text: '未知状态' };
+}
+
+// 获取状态文本
+function getStatusText(status) {
+    return getStatusStyle(status).text;
+}
+
+// 格式化日期
+function formatDate(dateStr) {
+    if (!dateStr) return '暂无数据';
+    const date = new Date(dateStr);
+    return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// 更新加载资产列表函数
+async function loadAllAssets() {
+    try {
+        const response = await fetchWithAuth('/api/admin/assets');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || '加载资产列表失败');
+        }
+        const data = await response.json();
+        console.log('获取到的资产数据:', data);
+        
+        const tbody = document.getElementById('allAssetsList');
+        if (!data.assets || data.assets.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="px-2 py-2 text-center text-gray-500">暂无资产</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = data.assets.map(asset => {
+            const { style } = getStatusStyle(asset.status);
+            const firstImage = asset.images && asset.images.length > 0 ? 
+                (asset.images[0].startsWith('/') ? asset.images[0] : `/${asset.images[0]}`) : 
+                '/static/images/default.png';
+            return `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-2 py-2 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 h-8 w-8">
+                                <img class="h-8 w-8 rounded object-cover" 
+                                     src="${firstImage}" 
+                                     onerror="this.onerror=null; this.src='/static/images/default.png';"
+                                     alt="${asset.name}">
+                            </div>
+                            <div class="ml-2">
+                                <a href="/assets/${asset.id}" class="text-xs font-medium text-blue-600 hover:text-blue-900 hover:underline">${asset.name}</a>
+                                <div class="text-xs text-gray-500">${asset.token_symbol || '暂无代币'}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-900">${asset.asset_type === 'REAL_ESTATE' ? '不动产' : '类不动产'}</td>
+                    <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-500">${asset.owner_address || '暂无'}</td>
+                    <td class="px-2 py-2 whitespace-nowrap text-xs">
+                        <span class="${style}">${getStatusText(asset.status)}</span>
+                    </td>
+                    <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-500">${formatDate(asset.created_at)}</td>
+                    <td class="px-2 py-2 whitespace-nowrap text-xs">
+                        <div class="flex space-x-1">
+                            ${!asset.token_address ? `<a href="/assets/${asset.id}/edit?eth_address=${window.currentAccount}" class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">编辑</a>` : ''}
+                            <a href="/assets/${asset.id}" class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">查看</a>
+                            ${!asset.token_address ? `<button onclick="deleteAsset(${asset.id})" class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700">删除</button>` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('加载资产列表失败:', error);
+        showError(error.message);
+    }
+}
+
+// 显示成功消息
+function showSuccess(message) {
+    const successAlert = document.createElement('div');
+    successAlert.className = 'fixed bottom-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded';
+    successAlert.textContent = message;
+    document.body.appendChild(successAlert);
+    setTimeout(() => successAlert.remove(), 3000);
+}
+
+// 添加viewAsset函数
+async function viewAsset(assetId) {
+    // 确保当前账户存在
+    if (!window.currentAccount) {
+        alert('请先连接钱包');
+        return;
+    }
+    
+    // 将当前管理员地址存储到sessionStorage
+    sessionStorage.setItem('adminAddress', window.currentAccount);
+    
+    // 跳转到资产详情页
+    window.location.href = `/assets/${assetId}`;
+}
+
+// 删除资产
+async function deleteAsset(assetId) {
+    if (!confirm('确定要删除这个资产吗？此操作不可恢复。')) {
+        return;
+    }
+    
+    try {
+        const response = await fetchWithAuth(`/api/admin/assets/${assetId}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            throw new Error('删除资产失败');
+        }
+        
+        showSuccess('删除资产成功');
+        // 重新加载数据
+        await Promise.all([
+            loadStats(),
+            loadAllAssets()
+        ]);
+    } catch (error) {
+        console.error('删除资产失败:', error);
+        showError(error.message);
+    }
+}
+
+// 更新资产列表渲染函数
+function renderAssetList(assets, containerId) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = assets.map(asset => `
+        <tr>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900">${asset.name}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-900">${asset.asset_type === 'REAL_ESTATE' ? '不动产' : '类不动产'}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-500">${asset.owner_address}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-500">${formatStatus(asset.status)}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-500">${formatDate(asset.created_at)}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                ${renderActionButtons(asset)}
+            </td>
+        </tr>
+    `).join('');
+}
+
+// 渲染操作按钮
+function renderActionButtons(asset) {
+    let buttons = [];
+    
+    // 审核相关按钮
+    if (asset.status === 'PENDING') {
+        buttons.push(`<button onclick="approveAsset(${asset.id})" class="text-green-600 hover:text-green-900 mr-4">通过</button>`);
+        buttons.push(`<button onclick="rejectAsset(${asset.id})" class="text-red-600 hover:text-red-900 mr-4">拒绝</button>`);
+        buttons.push(`<button onclick="editAsset(${asset.id}, false)" class="text-blue-600 hover:text-blue-900 mr-4">编辑</button>`);
+    } else if (asset.status === 'REJECTED') {
+        buttons.push(`<button onclick="approveAsset(${asset.id})" class="text-green-600 hover:text-green-900 mr-4">重新审核</button>`);
+        buttons.push(`<button onclick="editAsset(${asset.id}, false)" class="text-blue-600 hover:text-blue-900 mr-4">编辑</button>`);
+    }
+    
+    // 编辑按钮 - 根据上链状态显示不同的编辑选项
+    if (asset.token_address && asset.status === 'APPROVED') {
+        // 已上链资产只能编辑非链上数据
+        buttons.push(`<button onclick="editAsset(${asset.id}, true)" class="text-blue-600 hover:text-blue-900 mr-4" title="只能编辑非链上数据">受限编辑</button>`);
+    } else if (asset.status === 'APPROVED') {
+        // 未上链资产可以完全编辑
+        buttons.push(`<button onclick="editAsset(${asset.id}, false)" class="text-blue-600 hover:text-blue-900 mr-4">编辑</button>`);
+    }
+    
+    // 删除按钮
+    if (asset.status !== 'DELETED') {
+        buttons.push(`<button onclick="deleteAsset(${asset.id})" class="text-gray-600 hover:text-gray-900">删除</button>`);
+    }
+    
+    return buttons.join('');
+}
+
+// 格式化状态显示
+function formatStatus(status) {
+    const statusMap = {
+        'PENDING': '待审核',
+        'APPROVED': '已通过',
+        'REJECTED': '已拒绝',
+        'DELETED': '已删除'
+    };
+    return statusMap[status] || status;
+}
+
+// 添加编辑资产函数
+async function editAsset(assetId, isOnChain) {
+    try {
+        // 检查MetaMask是否安装
+        if (!window.ethereum) {
+            throw new Error('请先安装MetaMask钱包');
+        }
+
+        // 确保钱包已连接
+        if (!window.currentAccount) {
+            const accounts = await window.ethereum.request({ 
+                method: 'eth_requestAccounts' 
+            });
+            
+            if (!accounts || accounts.length === 0) {
+                throw new Error('未能获取钱包地址');
+            }
+            window.currentAccount = accounts[0];
+        }
+
+        // 验证是否是管理员
+        const isAdmin = await checkIsAdmin();
+        if (!isAdmin) {
+            throw new Error('该钱包地址不是管理员');
+        }
+
+        // 跳转到编辑页面，传递钱包地址和上链状态参数
+        window.location.href = `/assets/${assetId}/edit?eth_address=${window.currentAccount}&is_on_chain=${isOnChain}`;
+    } catch (error) {
+        console.error('准备编辑资产失败:', error);
+        alert(error.message || '未知错误');
+    }
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', async () => {
+    if (window.ethereum) {
+        try {
+            // 检查是否已连接
+            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+            if (accounts.length > 0) {
+                window.currentAccount = accounts[0];
+                const isAdmin = await checkIsAdmin();
+                if (isAdmin) {
+                    document.getElementById('walletAlert').classList.add('hidden');
+                    document.getElementById('adminContent').classList.remove('hidden');
+                    loadStats();
+                    loadPendingAssets();
+                    loadAllAssets();
+                } else {
+                    throw new Error('该钱包地址不是管理员');
+                }
+            }
+        } catch (error) {
+            console.error('检查钱包状态失败:', error);
+            const errorMessage = error.message || '未知错误';
+            alert('检查钱包状态失败: ' + errorMessage);
+        }
+    } else {
+        alert('请安装MetaMask钱包');
+    }
+});
+
+// 监听钱包账号变化
+if (window.ethereum) {
+    window.ethereum.on('accountsChanged', async (accounts) => {
+        if (accounts.length > 0) {
+            window.currentAccount = accounts[0];
+            const isAdmin = await checkIsAdmin();
+            if (isAdmin) {
+                document.getElementById('walletAlert').classList.add('hidden');
+                document.getElementById('adminContent').classList.remove('hidden');
+                loadStats();
+                loadPendingAssets();
+                loadAllAssets();
+            } else {
+                alert('该钱包地址不是管理员');
+                window.location.href = '/';
+            }
+        } else {
+            window.currentAccount = null;
+            document.getElementById('walletAlert').classList.remove('hidden');
+            document.getElementById('adminContent').classList.add('hidden');
+        }
+    });
+}
+
+// 在发送API请求时添加钱包地址
+async function fetchWithAuth(url, options = {}) {
+    if (!window.currentAccount) {
+        throw new Error('未连接钱包');
+    }
+    
+    const defaultOptions = {
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Eth-Address': window.currentAccount
+        }
+    };
+    
+    return fetch(url, { ...defaultOptions, ...options });
+}
+
+// 初始化所有图表
+function initCharts() {
+    // 初始化资产类型分布图表
+    const typeCtx = document.getElementById('assetTypeChart').getContext('2d');
+    assetTypeChart = new Chart(typeCtx, {
+        type: 'pie',
+        data: {
+            labels: ['房地产', '准不动产'],
+            datasets: [{
+                data: [0, 0],
+                backgroundColor: ['#4F46E5', '#818CF8']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // 初始化资产价值区间分布图表
+    const valueCtx = document.getElementById('valueDistributionChart').getContext('2d');
+    valueDistributionChart = new Chart(valueCtx, {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '资产数量',
+                data: [],
+                backgroundColor: '#6366F1',
+                borderColor: '#4F46E5',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+
+    // ... 其他图表初始化代码 ...
+}
+
+// 更新资产价值区间分布图表
+function updateValueDistributionChart(data) {
+    if (!data.value_distribution) return;
+    
+    const labels = data.value_distribution.map(item => item.label);
+    const values = data.value_distribution.map(item => item.count);
+    
+    valueDistributionChart.data.labels = labels;
+    valueDistributionChart.data.datasets[0].data = values;
+    valueDistributionChart.update();
+}
+
+// 在页面加载完成后初始化图表
+document.addEventListener('DOMContentLoaded', async () => {
+    initCharts();  // 初始化所有图表
+    // ... 其他初始化代码 ...
+});
+
+// 在updateCharts函数中添加对新图表的更新
+function updateCharts(data) {
+    // 更新资产类型分布
+    updateAssetTypeChart(data.type_distribution);
+    // 更新交易量图表
+    updateTradeVolumeChart(data.monthly_trades);
+    // 更新用户注册图表
+    updateUserRegistrationChart(data, currentUserChartType);
+    // 更新资产价值区间分布图表
+    updateValueDistributionChart(data);
+}
+</script>
+{% endblock %}
