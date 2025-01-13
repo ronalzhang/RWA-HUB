@@ -1,4 +1,4 @@
-from flask import render_template
+from flask import render_template, Blueprint, jsonify
 from . import main_bp
 
 @main_bp.route('/')
@@ -14,4 +14,9 @@ def login():
 @main_bp.route('/auth/register')
 def register():
     """注册页面"""
-    return render_template('auth/register.html') 
+    return render_template('auth/register.html')
+
+@main_bp.route('/health')
+def health_check():
+    """健康检查接口"""
+    return jsonify({"status": "healthy"}), 200 

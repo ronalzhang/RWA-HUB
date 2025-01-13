@@ -21,9 +21,10 @@ COPY . .
 # 设置环境变量
 ENV FLASK_APP=wsgi.py
 ENV PYTHONUNBUFFERED=1
+ENV PORT=8000
 
 # 暴露端口
-EXPOSE 8000
+EXPOSE $PORT
 
 # 启动命令
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "wsgi:app"] 
+CMD gunicorn --bind 0.0.0.0:$PORT wsgi:app 
