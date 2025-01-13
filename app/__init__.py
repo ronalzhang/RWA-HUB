@@ -1,36 +1,42 @@
+import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_cors import CORS
-import os
-import sys
-
-# 添加项目根目录到Python路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import Config
 
 db = SQLAlchemy()
 migrate = Migrate()
 
-def create_app(config_class=Config):
+def create_app():
     app = Flask(__name__)
-    app.config.from_object(config_class)
     
+    # 配置数据库URL
+    database_url = os.getenv('DATABASE_URL', 'sqlite:///app.db')
+    # 如果是 PostgreSQL URL，需要修改前缀
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev')
+    
+    # 初始化扩展
+    CORS(app)
     db.init_app(app)
     migrate.init_app(app, db)
-    CORS(app)
     
     # 注册蓝图
-    from app.routes import main_bp, auth_bp, assets_bp, admin_bp
-    from app.routes import auth_api_bp, assets_api_bp, trades_api_bp, admin_api_bp
+    from .routes import main_bp, auth_bp, assets_bp, admin_bp
+    from .routes.api import auth_api_bp, assets_api_bp, trades_api_bp, admin_api_bp
     
     app.register_blueprint(main_bp)
-    app.register_blueprint(auth_bp, url_prefix='/auth')
-    app.register_blueprint(assets_bp, url_prefix='/assets')
-    app.register_blueprint(admin_bp, url_prefix='/admin')
-    app.register_blueprint(auth_api_bp, url_prefix='/api/auth')
-    app.register_blueprint(assets_api_bp, url_prefix='/api/assets')
-    app.register_blueprint(trades_api_bp, url_prefix='/api/trades')
-    app.register_blueprint(admin_api_bp, url_prefix='/api/admin')
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(assets_bp)
+    app.register_blueprint(admin_bp)
+    
+    app.register_blueprint(auth_api_bp, url_prefix='/api')
+    app.register_blueprint(assets_api_bp, url_prefix='/api')
+    app.register_blueprint(trades_api_bp, url_prefix='/api')
+    app.register_blueprint(admin_api_bp, url_prefix='/api')
     
     return app
