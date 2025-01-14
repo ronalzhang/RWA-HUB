@@ -94,37 +94,98 @@
         </div>
     </div>
 
-    <!-- 交易区域 -->
-    <div class="bg-white rounded-lg shadow overflow-hidden">
-        <div class="px-4 py-5 sm:p-6">
-            <div id="walletAlert" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 hidden">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-                        </svg>
+    <!-- 交易/分红操作区域（二选一显示） -->
+    <div class="operation-container">
+        <!-- 交易模块（默认显示） -->
+        <div id="tradeModule" class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-4 py-5 sm:p-6">
+                <div class="flex items-center space-x-4">
+                    <div class="w-1/3">
+                        <label for="tradeAmount" class="block text-sm font-medium text-gray-700 mb-1">交易数量</label>
+                        <input type="number" id="tradeAmount" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="输入数量">
                     </div>
-                    <div class="ml-3">
-                        <p class="text-sm text-yellow-700">
+                    <div class="w-1/3">
+                        <label for="totalPrice" class="block text-sm font-medium text-gray-700 mb-1">总价 (USDC)</label>
+                        <input type="text" id="totalPrice" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md bg-gray-50" readonly>
+                    </div>
+                    <div class="w-1/3 flex items-end">
+                        <!-- 购买按钮和连接提示共用同一个位置 -->
+                        <button id="buyBtn" class="hidden flex-1 inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                            购买
+                        </button>
+                        <div id="walletAlert" class="flex-1 text-center text-sm text-yellow-700">
                             请先连接钱包以进行交易
-                        </p>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="flex items-center space-x-4">
-                <div class="w-1/3">
-                    <label for="tradeAmount" class="block text-sm font-medium text-gray-700 mb-1">交易数量</label>
-                    <input type="number" id="tradeAmount" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="输入数量">
+        <!-- 分红发起模块（默认隐藏） -->
+        <div id="dividendModule" class="hidden bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-lg font-medium leading-6 text-gray-900">发起分红</h3>
+                <div class="mt-4">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">当前持有人数量</label>
+                            <p id="holdersCount" class="mt-1 text-sm text-gray-900">-</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">预估Gas费用</label>
+                            <p id="estimatedGas" class="mt-1 text-sm text-gray-900">-</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">平台手续费</label>
+                            <p class="mt-1 text-sm text-gray-900">1.5%</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">建议分红金额范围</label>
+                            <p id="suggestedAmount" class="mt-1 text-sm text-gray-900">-</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <label for="dividendAmount" class="block text-sm font-medium text-gray-700">分红金额 (USDC)</label>
+                        <div class="mt-1">
+                            <input type="number" name="dividendAmount" id="dividendAmount" min="10000" step="0.000001"
+                                   class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                   placeholder="最小分红金额为10000 USDC">
+                        </div>
+                        <p id="perTokenDividend" class="mt-1 text-sm text-gray-500">每代币分红金额：- USDC</p>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button type="button" id="distributeDividendBtn"
+                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            发起分红
+                        </button>
+                    </div>
                 </div>
-                <div class="w-1/3">
-                    <label for="totalPrice" class="block text-sm font-medium text-gray-700 mb-1">总价 (USDT)</label>
-                    <input type="text" id="totalPrice" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md bg-gray-50" readonly>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分红历史模块（始终显示） -->
+    <div id="dividendHistoryModule" class="mt-8 bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg font-medium leading-6 text-gray-900">分红历史</h3>
+            <div class="mt-4">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分红日期</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分红金额</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dividendHistoryBody" class="bg-white divide-y divide-gray-200">
+                            <!-- 分红历史记录将通过JavaScript动态添加 -->
+                        </tbody>
+                    </table>
                 </div>
-                <div class="w-1/3 flex items-end">
-                    <button id="buyBtn" class="hidden flex-1 inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                        购买
-                    </button>
+                <div id="noDividendHistory" class="text-center py-4 text-gray-500" style="display: none;">
+                    暂无分红记录
                 </div>
             </div>
         </div>
@@ -157,19 +218,36 @@ function formatNumber(value) {
 
 // 更新交易按钮显示状态
 function updateTradeButtons() {
+    const tradeModule = document.getElementById('tradeModule');
     const buyBtn = document.getElementById('buyBtn');
     const walletAlert = document.getElementById('walletAlert');
 
-    // 检查钱包连接状态
-    if (!window.ethereum || !window.currentAccount) {
-        buyBtn.classList.add('hidden');
-        walletAlert.classList.remove('hidden');
-        return;
-    }
+    try {
+        // 检查钱包连接状态
+        if (!window.ethereum || !window.currentAccount) {
+            // 未连接钱包时，显示交易模块但隐藏购买按钮
+            tradeModule.classList.remove('hidden');
+            buyBtn.classList.add('hidden');
+            walletAlert.classList.remove('hidden');
+            return;
+        }
 
-    // 钱包已连接，显示购买按钮
-    walletAlert.classList.add('hidden');
-    buyBtn.classList.remove('hidden');
+        // 检查是否是资产所有者
+        const isOwner = window.currentAccount && currentAsset && 
+                       window.currentAccount.toLowerCase() === currentAsset.owner_address.toLowerCase();
+        
+        // 更新显示状态
+        if (isOwner) {
+            tradeModule.classList.add('hidden');
+            walletAlert.classList.add('hidden');
+        } else {
+            tradeModule.classList.remove('hidden');
+            buyBtn.classList.remove('hidden');
+            walletAlert.classList.add('hidden');
+        }
+    } catch (error) {
+        console.error('更新交易按钮状态失败:', error);
+    }
 }
 
 // 监听钱包状态变化
@@ -177,12 +255,188 @@ if (window.ethereum) {
     window.ethereum.on('accountsChanged', function (accounts) {
         if (accounts.length > 0) {
             window.currentAccount = accounts[0];
+            // 更新钱包状态显示
+            updateWalletStatus();
             updateTradeButtons();
+            checkDividendModuleVisibility();
         } else {
             window.currentAccount = null;
+            // 更新钱包状态显示
+            updateWalletStatus();
             updateTradeButtons();
+            hideDividendModule();
         }
     });
+}
+
+// 检查是否显示分红模块
+async function checkDividendModuleVisibility() {
+    const dividendModule = document.getElementById('dividendModule');
+    
+    try {
+        // 检查当前用户是否是资产所有者
+        const isOwner = window.currentAccount && currentAsset && 
+                       window.currentAccount.toLowerCase() === currentAsset.owner_address.toLowerCase();
+        
+        // 只有连接钱包且是资产所有者时才显示分红模块
+        dividendModule.style.display = isOwner ? 'block' : 'none';
+        
+        if (isOwner) {
+            await updateDividendModuleInfo();
+        }
+    } catch (error) {
+        console.error('检查分红模块显示状态失败:', error);
+        dividendModule.style.display = 'none';
+    }
+}
+
+// 显示分红模块
+function showDividendModule() {
+    const dividendModule = document.getElementById('dividendModule');
+    if (dividendModule) {
+        dividendModule.style.display = 'block';
+    }
+}
+
+// 隐藏分红模块
+function hideDividendModule() {
+    const dividendModule = document.getElementById('dividendModule');
+    if (dividendModule) {
+        dividendModule.style.display = 'none';
+    }
+}
+
+// 更新分红模块信息
+async function updateDividendModuleInfo() {
+    try {
+        // 获取持有人数量
+        const response = await fetch(`/api/assets/${currentAsset.id}/holders-count`);
+        console.log('持有人数量API响应:', response);
+        const data = await response.json();
+        console.log('持有人数量数据:', data);
+        const holdersCount = data.count;
+        
+        // 更新持有人数量显示
+        document.getElementById('holdersCount').textContent = `${holdersCount}人`;
+        console.log('当前持有人数量:', holdersCount);
+        
+        // 更新建议分红金额
+        let suggestedAmount = '≥10000 USDC';
+        if (holdersCount > 500) {
+            suggestedAmount = '≥100000 USDC';
+        } else if (holdersCount > 100) {
+            suggestedAmount = '≥50000 USDC';
+        } else if (holdersCount > 50) {
+            suggestedAmount = '≥20000 USDC';
+        } else if (holdersCount > 10) {
+            suggestedAmount = '≥15000 USDC';
+        }
+        document.getElementById('suggestedAmount').textContent = suggestedAmount;
+        console.log('建议分红金额:', suggestedAmount);
+        
+        // 更新Gas预估（显示为百分比）
+        let gasFeePercentage;
+        if (holdersCount <= 10) gasFeePercentage = 0.3;
+        else if (holdersCount <= 50) gasFeePercentage = 0.5;
+        else if (holdersCount <= 100) gasFeePercentage = 1.0;
+        else if (holdersCount <= 500) gasFeePercentage = 1.5;
+        else gasFeePercentage = 2.0;
+        
+        console.log('Gas费用计算:', {
+            持有人数量: holdersCount,
+            费用百分比: gasFeePercentage
+        });
+
+        document.getElementById('estimatedGas').textContent = `约 ${gasFeePercentage}%`;
+            
+        // 设置分红金额输入监听
+        const dividendAmountInput = document.getElementById('dividendAmount');
+        
+        // 移除旧的事件监听器
+        const oldListener = dividendAmountInput.onInput;
+        if (oldListener) {
+            dividendAmountInput.removeEventListener('input', oldListener);
+        }
+        
+        // 创建新的事件监听器
+        dividendAmountInput.onInput = function() {
+            const amount = parseFloat(this.value) || 0;
+            console.log('输入的分红金额:', amount);
+            
+            // 获取代币总供应量（不需要除以1e18）
+            const totalSupply = Number(currentAsset.token_supply);
+            
+            console.log('分红计算详情:', {
+                输入金额: amount,
+                代币总供应量: totalSupply,
+                计算公式: '(分红金额 / 代币总量) * 100'
+            });
+            
+            if (totalSupply > 0) {
+                // 计算每100代币的分红金额
+                const per100Tokens = (amount / totalSupply) * 100;
+                console.log('计算过程:', `(${amount} / ${totalSupply}) * 100 = ${per100Tokens}`);
+                
+                // 根据数值大小动态调整小数位数
+                let decimals = 6;
+                if (per100Tokens >= 0.01) decimals = 4;
+                if (per100Tokens >= 1) decimals = 2;
+                
+                document.getElementById('perTokenDividend').textContent = 
+                    `每100代币分红金额：${per100Tokens.toFixed(decimals)} USDC`;
+            } else {
+                document.getElementById('perTokenDividend').textContent = 
+                    `每100代币分红金额：0 USDC`;
+            }
+        };
+        
+        // 添加新的事件监听器
+        dividendAmountInput.addEventListener('input', dividendAmountInput.onInput);
+        
+        // 如果输入框已有值，立即计算一次
+        if (dividendAmountInput.value) {
+            dividendAmountInput.onInput.call(dividendAmountInput);
+        }
+        
+    } catch (error) {
+        console.error('更新分红模块信息失败:', error);
+        // 设置默认值
+        document.getElementById('holdersCount').textContent = '获取失败';
+        document.getElementById('estimatedGas').textContent = '计算失败';
+    }
+}
+
+// 加载分红历史
+async function loadDividendHistory() {
+    if (!tokenContract || !currentAsset) return;
+
+    try {
+        const history = await tokenContract.methods.getDividendHistory().call();
+        const tbody = document.getElementById('dividendHistoryBody');
+        const noHistoryDiv = document.getElementById('noDividendHistory');
+
+        tbody.innerHTML = '';
+
+        if (history && history.length > 0) {
+            history.forEach(record => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${new Date(record.timestamp * 1000).toLocaleDateString()}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${formatNumber(web3.utils.fromWei(record.totalAmount, 'ether'))} USDC
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            noHistoryDiv.style.display = 'none';
+        } else {
+            noHistoryDiv.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('加载分红历史失败:', error);
+    }
 }
 
 // 更新图片轮播
@@ -281,11 +535,14 @@ async function loadAssetDetails() {
         // 优先从URL参数获取钱包地址
         const ethAddress = new URLSearchParams(window.location.search).get('eth_address') || 
                           localStorage.getItem('eth_address') ||
-                          sessionStorage.getItem('eth_address');
+                          sessionStorage.getItem('eth_address') ||
+                          (window.ethereum && window.ethereum.selectedAddress);
                           
         if (ethAddress) {
             headers['X-Eth-Address'] = ethAddress;
             window.currentAccount = ethAddress;
+            // 更新钱包状态显示
+            updateWalletStatus();
         }
         
         // 添加时间戳防止缓存
@@ -327,8 +584,25 @@ async function loadAssetDetails() {
         document.getElementById('totalValue').textContent = data.total_value ? `${formatNumber(data.total_value)} USDT` : '暂无数据';
         document.getElementById('ownerAddress').textContent = data.owner_address || '暂无数据';
         document.getElementById('tokenSymbol').textContent = data.token_symbol || '暂无数据';
-        document.getElementById('tokenPrice').textContent = data.token_price ? `${formatNumber(data.token_price)} USDT` : '暂无数据';
-        document.getElementById('availableSupply').textContent = data.token_supply ? formatNumber(parseInt(data.token_supply)) : '暂无数据';
+        document.getElementById('tokenPrice').textContent = data.token_price ? `${formatNumber(data.token_price)} USDC` : '暂无数据';
+        
+        // 正确设置和显示代币总量（添加详细日志）
+        console.log('API返回的原始数据:', data);
+        console.log('代币总量原始值:', data.token_supply);
+
+        // 确保token_supply是字符串类型并转换为数字
+        currentAsset.token_supply = data.token_supply ? data.token_supply.toString() : '0';
+        const tokenSupply = Number(currentAsset.token_supply);
+
+        console.log('代币总量处理过程:', {
+            原始值: data.token_supply,
+            转换后数值: tokenSupply
+        });
+
+        // 显示代币总量（不需要除以1e18）
+        document.getElementById('availableSupply').textContent = 
+            tokenSupply > 0 ? formatNumber(tokenSupply) : '暂无数据';
+            
         document.getElementById('annualRevenue').textContent = data.annual_revenue ? `${formatNumber(data.annual_revenue)} USDT` : '暂无数据';
         
         // 处理图片数据
@@ -371,10 +645,26 @@ async function loadAssetDetails() {
         if (window.ethereum && window.currentAccount) {
             try {
                 await initContracts();
+                updateTradeButtons(); // 添加这行，确保按钮状态被更新
             } catch (error) {
                 console.error('初始化合约失败:', error);
             }
         }
+        
+        // 检查是否显示分红模块（当前用户是否是资产所有者）
+        const isOwner = window.currentAccount && 
+                       window.currentAccount.toLowerCase() === data.owner_address.toLowerCase();
+        const dividendModule = document.getElementById('dividendModule');
+        if (isOwner) {
+            dividendModule.style.display = 'block';
+            // 初始化分红模块信息
+            await updateDividendModuleInfo();
+        } else {
+            dividendModule.style.display = 'none';
+        }
+
+        // 加载分红历史
+        await loadDividendHistory();
         
     } catch (error) {
         console.error('加载资产详情失败:', error);
@@ -384,22 +674,29 @@ async function loadAssetDetails() {
 
 // 页面加载完成后执行
 document.addEventListener('DOMContentLoaded', async function() {
-    // 如果URL中有eth_address参数，保存到localStorage和sessionStorage
-    const urlParams = new URLSearchParams(window.location.search);
-    const ethAddress = urlParams.get('eth_address');
-    if (ethAddress) {
-        localStorage.setItem('eth_address', ethAddress);
-        sessionStorage.setItem('eth_address', ethAddress);
-        // 设置cookie
-        document.cookie = `eth_address=${ethAddress}; path=/; max-age=86400`;
-    }
-    
-    // 加载资产详情
-    await loadAssetDetails();
-    
-    // 如果有钱包地址但钱包未连接，显示连接提示
-    if (window.currentAccount && (!window.ethereum || !window.ethereum.selectedAddress)) {
-        document.getElementById('walletAlert').classList.remove('hidden');
+    try {
+        // 检查MetaMask是否安装
+        if (typeof window.ethereum !== 'undefined') {
+            // 获取当前账户
+            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+            if (accounts.length > 0) {
+                window.currentAccount = accounts[0];
+                // 保存地址到storage
+                localStorage.setItem('eth_address', window.currentAccount);
+                sessionStorage.setItem('eth_address', window.currentAccount);
+                // 更新钱包状态显示
+                updateWalletStatus();
+            }
+        }
+        
+        // 初始化页面显示
+        await loadAssetDetails();
+        updateTradeButtons();
+        await updateDividendModule();
+        await loadHoldersCount();
+        await loadDividendHistory();
+    } catch (error) {
+        console.error('初始化页面失败:', error);
     }
 });
 
@@ -575,6 +872,406 @@ async function checkIsAdmin() {
     
     return adminAddresses.map(addr => addr.toLowerCase())
         .includes(window.currentAccount.toLowerCase());
+}
+
+// 检查是否是资产发起人
+async function checkIsAssetOwner() {
+    const assetId = window.location.pathname.split('/').pop();
+    const eth_address = window.currentAccount || 
+                       localStorage.getItem('eth_address') || 
+                       sessionStorage.getItem('eth_address');
+    if (!eth_address) return false;
+    
+    try {
+        const response = await fetch(`/api/assets/${assetId}/owner`);
+        const data = await response.json();
+        return data.owner_address.toLowerCase() === eth_address.toLowerCase();
+    } catch (error) {
+        console.error('检查资产所有者失败:', error);
+        return false;
+    }
+}
+
+// 更新分红模块显示
+async function updateDividendModule() {
+    const isOwner = await checkIsAssetOwner();
+    document.getElementById('dividendModule').style.display = isOwner ? 'block' : 'none';
+}
+
+// 加载持有人数量
+async function loadHoldersCount() {
+    const assetId = window.location.pathname.split('/').pop();
+    try {
+        const response = await fetch(`/api/assets/${assetId}/holders-count`);
+        const data = await response.json();
+        document.getElementById('holdersCount').textContent = `${data.count}人`;
+        
+        // 更新建议分红金额
+        const count = data.count;
+        let suggestedAmount = '';
+        if (count <= 10) suggestedAmount = '≥10000 USDC';
+        else if (count <= 50) suggestedAmount = '≥15000 USDC';
+        else if (count <= 100) suggestedAmount = '≥20000 USDC';
+        else if (count <= 500) suggestedAmount = '≥50000 USDC';
+        else suggestedAmount = '≥100000 USDC';
+        
+        document.getElementById('suggestedAmount').textContent = suggestedAmount;
+        
+        // 更新Gas预估
+        if (window.ethereum) {
+            const web3 = new Web3(window.ethereum);
+            const gasPrice = await web3.eth.getGasPrice();
+            const estimatedGas = 35000 * count; // 每个接收者约35000 Gas
+            const estimatedGasCost = web3.utils.fromWei(
+                (BigInt(gasPrice) * BigInt(estimatedGas)).toString(),
+                'ether'
+            );
+            const ethPrice = 2000; // 假设ETH价格为2000 USD
+            const estimatedUSDCost = (Number(estimatedGasCost) * ethPrice).toFixed(2);
+            document.getElementById('estimatedGas').textContent = 
+                `约 ${Number(estimatedGasCost).toFixed(4)} ETH (≈${estimatedUSDCost} USD)`;
+        }
+    } catch (error) {
+        console.error('加载持有人数量失败:', error);
+    }
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', async () => {
+    await updateDividendModule();
+    await loadHoldersCount();
+    await loadDividendHistory();
+    
+    // 监听分红金额输入
+    document.getElementById('dividendAmount').addEventListener('input', async (e) => {
+        const amount = parseFloat(e.target.value) || 0;
+        const totalSupply = await assetTokenContract.methods.totalSupply().call();
+        const perToken = amount / (totalSupply / 1e18);
+        document.getElementById('perTokenDividend').textContent = 
+            `每代币分红金额：${perToken.toFixed(6)} USDC`;
+    });
+    
+    // 监听发起分红按钮
+    document.getElementById('distributeDividendBtn').addEventListener('click', distributeDividend);
+});
+
+// 更新钱包状态显示
+async function updateWalletStatus() {
+    const walletStatus = document.getElementById('walletStatus');
+    const connectWalletBtn = document.getElementById('connectWalletBtn');
+    const walletDropdown = document.getElementById('walletDropdown');
+    
+    try {
+        // 检查钱包连接状态
+        let currentAccount = null;
+        
+        // 按优先级检查账户
+        if (window.ethereum && window.ethereum.selectedAddress) {
+            currentAccount = window.ethereum.selectedAddress;
+        } else {
+            currentAccount = localStorage.getItem('currentAccount');
+        }
+        
+        // 更新全局变量
+        window.currentAccount = currentAccount;
+        
+        if (currentAccount) {
+            // 已连接状态
+            const shortAddress = `${currentAccount.substring(0, 6)}...${currentAccount.substring(38)}`;
+            connectWalletBtn.textContent = shortAddress;
+            
+            // 设置已连接状态的样式
+            connectWalletBtn.className = 'inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none cursor-pointer';
+            
+            // 移除旧的事件监听器
+            const newBtn = connectWalletBtn.cloneNode(true);
+            connectWalletBtn.parentNode.replaceChild(newBtn, connectWalletBtn);
+            
+            // 添加新的点击事件
+            newBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                walletDropdown.classList.toggle('hidden');
+                
+                // 设置下拉菜单位置
+                const rect = newBtn.getBoundingClientRect();
+                walletDropdown.style.position = 'absolute';
+                walletDropdown.style.top = `${rect.bottom + window.scrollY}px`;
+                walletDropdown.style.left = `${rect.left}px`;
+                walletDropdown.style.minWidth = `${rect.width}px`;
+            });
+            
+            // 更新交易按钮状态
+            updateTradeButtons();
+        } else {
+            // 未连接状态
+            connectWalletBtn.textContent = '连接钱包';
+            
+            // 设置未连接状态的样式
+            connectWalletBtn.className = 'inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none cursor-pointer';
+            
+            // 隐藏下拉菜单
+            walletDropdown.classList.add('hidden');
+            
+            // 移除旧的事件监听器并添加连接钱包事件
+            const newBtn = connectWalletBtn.cloneNode(true);
+            connectWalletBtn.parentNode.replaceChild(newBtn, connectWalletBtn);
+            newBtn.addEventListener('click', connectWallet);
+        }
+        
+        // 添加全局点击事件来关闭下拉菜单
+        document.addEventListener('click', (e) => {
+            if (!connectWalletBtn.contains(e.target) && !walletDropdown.contains(e.target)) {
+                walletDropdown.classList.add('hidden');
+            }
+        });
+        
+    } catch (error) {
+        console.error('更新钱包状态失败:', error);
+    }
+}
+
+// 断开钱包连接
+async function disconnectWallet() {
+    window.currentAccount = null;
+    localStorage.removeItem('currentAccount');
+    await updateWalletStatus();
+    updateTradeButtons();
+    document.getElementById('walletDropdown').classList.add('hidden');
+}
+
+// 确保在页面加载完成后初始化钱包状态
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('页面加载完成，初始化钱包状态');
+    
+    // 检查是否已经连接钱包
+    if (window.ethereum) {
+        try {
+            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+            console.log('当前连接的账户:', accounts);
+            
+            if (accounts && accounts.length > 0) {
+                window.currentAccount = accounts[0];
+                localStorage.setItem('currentAccount', window.currentAccount);
+                console.log('检测到已连接的钱包:', window.currentAccount);
+            }
+        } catch (error) {
+            console.error('检查钱包状态失败:', error);
+        }
+    }
+    
+    // 更新界面显示
+    await updateWalletStatus();
+    
+    // 监听钱包账户变化
+    if (window.ethereum) {
+        window.ethereum.on('accountsChanged', async function (accounts) {
+            console.log('钱包账户发生变化:', accounts);
+            if (accounts.length > 0) {
+                window.currentAccount = accounts[0];
+                localStorage.setItem('currentAccount', window.currentAccount);
+            } else {
+                window.currentAccount = null;
+                localStorage.removeItem('currentAccount');
+            }
+            await updateWalletStatus();
+            updateTradeButtons();
+        });
+    }
+});
+
+// 连接钱包函数
+async function connectWallet() {
+    try {
+        if (!window.ethereum) {
+            alert('请先安装MetaMask钱包');
+            return;
+        }
+
+        const accounts = await window.ethereum.request({ 
+            method: 'eth_requestAccounts' 
+        });
+        
+        if (accounts && accounts.length > 0) {
+            window.currentAccount = accounts[0];
+            localStorage.setItem('currentAccount', window.currentAccount);
+            
+            // 初始化Web3合约
+            await initContracts();
+            
+            // 更新显示状态
+            await updateModulesVisibility();
+            
+            // 刷新页面以确保所有状态都正确更新
+            window.location.reload();
+        }
+    } catch (error) {
+        console.error('连接钱包失败:', error);
+        alert('连接钱包失败: ' + (error.message || '未知错误'));
+    }
+}
+
+function updateConnectButton() {
+    const connectBtn = document.getElementById('connectWalletBtn');
+    if (!connectBtn) return;
+    
+    if (window.currentAccount) {
+        const shortAddress = `${window.currentAccount.substring(0, 6)}...${window.currentAccount.substring(38)}`;
+        connectBtn.textContent = shortAddress;
+        connectBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700', 'text-white');
+        connectBtn.classList.add('bg-gray-100', 'text-blue-600', 'hover:bg-gray-200', 'border', 'border-gray-300');
+        connectBtn.disabled = false;
+    } else {
+        connectBtn.textContent = '连接钱包';
+        connectBtn.classList.remove('bg-gray-100', 'text-blue-600', 'hover:bg-gray-200', 'border', 'border-gray-300');
+        connectBtn.classList.add('bg-blue-600', 'hover:bg-blue-700', 'text-white');
+        connectBtn.disabled = false;
+    }
+}
+
+// 更新模块显示状态
+async function updateModulesVisibility() {
+    const tradeModule = document.getElementById('tradeModule');
+    const dividendModule = document.getElementById('dividendModule');
+    const walletAlert = document.getElementById('walletAlert');
+    const buyBtn = document.getElementById('buyBtn');
+
+    try {
+        // 检查是否连接钱包
+        const isWalletConnected = window.ethereum && window.ethereum.selectedAddress;
+        
+        // 检查是否是资产所有者
+        const isOwner = isWalletConnected && currentAsset && 
+                       window.ethereum.selectedAddress.toLowerCase() === currentAsset.owner_address.toLowerCase();
+
+        // 默认显示交易模块
+        tradeModule.classList.remove('hidden');
+        dividendModule.classList.add('hidden');
+
+        if (!isWalletConnected) {
+            // 未连接钱包：显示交易模块的提示，隐藏购买按钮
+            walletAlert.classList.remove('hidden');
+            buyBtn.classList.add('hidden');
+        } else if (isOwner) {
+            // 是资产所有者：显示分红模块，隐藏交易模块
+            tradeModule.classList.add('hidden');
+            dividendModule.classList.remove('hidden');
+            // 初始化分红模块信息
+            await updateDividendModuleInfo();
+        } else {
+            // 已连接但不是所有者：显示交易模块的购买按钮，隐藏提示
+            walletAlert.classList.add('hidden');
+            buyBtn.classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('更新模块显示状态失败:', error);
+        // 发生错误时，显示交易模块的提示，隐藏购买按钮
+        walletAlert.classList.remove('hidden');
+        buyBtn.classList.add('hidden');
+    }
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        // 检查是否已经连接钱包
+        if (window.ethereum) {
+            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+            if (accounts && accounts.length > 0) {
+                window.ethereum.selectedAddress = accounts[0];
+                localStorage.setItem('currentAccount', accounts[0]);
+                // 初始化Web3合约
+                await initContracts();
+            }
+        }
+        
+        // 加载资产详情
+        await loadAssetDetails();
+        
+        // 更新显示状态
+        await updateModulesVisibility();
+        
+        // 监听钱包账户变化
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', async function (accounts) {
+                if (accounts.length > 0) {
+                    window.ethereum.selectedAddress = accounts[0];
+                    localStorage.setItem('currentAccount', accounts[0]);
+                    await initContracts();
+                } else {
+                    window.ethereum.selectedAddress = null;
+                    localStorage.removeItem('currentAccount');
+                }
+                await updateModulesVisibility();
+            });
+        }
+        
+        // 加载其他信息
+        await loadDividendHistory();
+    } catch (error) {
+        console.error('初始化页面失败:', error);
+    }
+});
+
+// 连接钱包函数
+async function connectWallet() {
+    try {
+        if (!window.ethereum) {
+            alert('请先安装MetaMask钱包');
+            return;
+        }
+
+        const accounts = await window.ethereum.request({ 
+            method: 'eth_requestAccounts' 
+        });
+        
+        if (accounts && accounts.length > 0) {
+            window.ethereum.selectedAddress = accounts[0];
+            localStorage.setItem('currentAccount', accounts[0]);
+            
+            // 初始化Web3合约
+            await initContracts();
+            
+            // 更新显示状态
+            await updateModulesVisibility();
+            
+            // 刷新页面以确保所有状态都正确更新
+            window.location.reload();
+        }
+    } catch (error) {
+        console.error('连接钱包失败:', error);
+        alert('连接钱包失败: ' + (error.message || '未知错误'));
+    }
+}
+
+// 断开钱包连接
+async function disconnectWallet() {
+    window.ethereum.selectedAddress = null;
+    localStorage.removeItem('currentAccount');
+    await updateModulesVisibility();
+    // 刷新页面以确保所有状态都正确更新
+    window.location.reload();
+}
+
+// 初始化Web3和合约
+async function initContracts() {
+    if (typeof window.ethereum === 'undefined') {
+        throw new Error('请安装MetaMask钱包');
+    }
+
+    if (!window.ethereum.selectedAddress) {
+        return; // 如果未连接钱包，直接返回
+    }
+
+    const web3 = new Web3(window.ethereum);
+    window.web3 = web3;
+    
+    // 初始化USDT合约
+    usdtContract = new web3.eth.Contract(USDT_ABI, USDT_ADDRESS);
+    
+    // 初始化资产代币合约
+    if (currentAsset && currentAsset.token_address) {
+        tokenContract = new web3.eth.Contract(AssetTokenABI, currentAsset.token_address);
+    }
 }
 </script>
 {% endblock %} 

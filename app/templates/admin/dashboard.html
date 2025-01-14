@@ -348,7 +348,7 @@ async function loadPendingAssets() {
                         <div class="flex space-x-1">
                             <button onclick="approveAsset(${asset.id})" class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700">通过</button>
                             <button onclick="rejectAsset(${asset.id})" class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700">拒绝</button>
-                            <a href="/assets/${asset.id}" class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">查看</a>
+                            <a href="/assets/${asset.id}/edit?eth_address=${window.currentAccount}&return_to=/admin" class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">编辑</a>
                         </div>
                     </td>
                 </tr>
@@ -629,8 +629,7 @@ async function loadAllAssets() {
                     <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-500">${formatDate(asset.created_at)}</td>
                     <td class="px-2 py-2 whitespace-nowrap text-xs">
                         <div class="flex space-x-1">
-                            ${!asset.token_address ? `<a href="/assets/${asset.id}/edit?eth_address=${window.currentAccount}" class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">编辑</a>` : ''}
-                            <a href="/assets/${asset.id}" class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">查看</a>
+                            ${!asset.token_address ? `<a href="/assets/${asset.id}/edit?eth_address=${window.currentAccount}&return_to=/admin" class="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">编辑</a>` : ''}
                             ${!asset.token_address ? `<button onclick="deleteAsset(${asset.id})" class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700">删除</button>` : ''}
                         </div>
                     </td>
@@ -952,6 +951,52 @@ function updateCharts(data) {
     updateUserRegistrationChart(data, currentUserChartType);
     // 更新资产价值区间分布图表
     updateValueDistributionChart(data);
+}
+
+function renderPendingAssetList(assets) {
+    const eth_address = window.currentAccount || localStorage.getItem('eth_address') || sessionStorage.getItem('eth_address');
+    const assetList = document.getElementById('pendingAssetList');
+    if (!assets || assets.length === 0) {
+        assetList.innerHTML = '<tr><td colspan="6" class="text-center">暂无待审核资产</td></tr>';
+        return;
+    }
+    assetList.innerHTML = assets.map(asset => `
+        <tr>
+            <td>${asset.name}</td>
+            <td>${asset.type === 'real_estate' ? '房地产' : '准房地产'}</td>
+            <td>${asset.owner_address}</td>
+            <td>${formatDate(asset.created_at)}</td>
+            <td>
+                <a href="/assets/${asset.id}/edit?eth_address=${eth_address}&return_to=/admin" class="btn btn-primary btn-sm">编辑</a>
+                <button onclick="approveAsset(${asset.id})" class="btn btn-success btn-sm">通过</button>
+                <button onclick="rejectAsset(${asset.id})" class="btn btn-danger btn-sm">拒绝</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderAssetList(assets) {
+    const eth_address = window.currentAccount || localStorage.getItem('eth_address') || sessionStorage.getItem('eth_address');
+    const assetList = document.getElementById('assetList');
+    if (!assets || assets.length === 0) {
+        assetList.innerHTML = '<tr><td colspan="7" class="text-center">暂无资产</td></tr>';
+        return;
+    }
+    assetList.innerHTML = assets.map(asset => `
+        <tr>
+            <td>${asset.name}</td>
+            <td>${asset.type === 'real_estate' ? '房地产' : '准房地产'}</td>
+            <td>${asset.owner_address}</td>
+            <td>${getStatusStyle(asset.status).text}</td>
+            <td>${formatDate(asset.created_at)}</td>
+            <td>
+                ${!asset.token_address ? `
+                    <a href="/assets/${asset.id}/edit?eth_address=${eth_address}&return_to=/admin" class="btn btn-primary btn-sm">编辑</a>
+                ` : ''}
+                <button onclick="deleteAsset(${asset.id})" class="btn btn-danger btn-sm">删除</button>
+            </td>
+        </tr>
+    `).join('');
 }
 </script>
 {% endblock %}

@@ -1,8 +1,9 @@
-from flask import render_template, send_from_directory, current_app, abort, request, redirect, url_for, jsonify
-from . import assets_bp
+from flask import render_template, send_from_directory, current_app, abort, request, redirect, url_for, jsonify, Blueprint
 from ..models import db, Asset
 from ..utils import is_admin, save_files
 import os
+
+assets_bp = Blueprint('assets', __name__)
 
 # 页面路由
 @assets_bp.route("/")

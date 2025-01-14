@@ -1,14 +1,19 @@
-from flask import jsonify, request, g, current_app
+from flask import jsonify, request, g, current_app, Blueprint
 from app.models.user import User
 from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.trade import Trade
 from app import db
-from . import auth_api_bp, assets_api_bp, trades_api_bp
 from app.utils.decorators import token_required, eth_address_required
 from .admin import is_admin
 import os
 import json
 from werkzeug.utils import secure_filename
+from app.models.dividend import Dividend
+
+# 创建蓝图
+auth_api_bp = Blueprint('auth_api', __name__)
+assets_api_bp = Blueprint('assets_api', __name__)
+trades_api_bp = Blueprint('trades_api', __name__)
 
 # 允许的文件扩展名
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
@@ -37,9 +42,18 @@ def list_assets():
     """获取资产列表"""
     try:
         # 获取管理员地址列表
-        admin_addresses = list(current_app.config.get('ADMIN_ADDRESSES', set()))
+        admin_addresses = [
+            '0x6394993426DBA3b654eF0052698Fe9E0B6A98870',
+            '0x124e5B8A4E6c68eC66e181E0B54817b12D879c57'
+        ]
+        
+        # 从请求头、URL参数或cookie获取地址
+        eth_address = request.headers.get('X-Eth-Address') or \
+                     request.args.get('eth_address') or \
+                     request.cookies.get('eth_address')
+        
         # 检查是否是管理员
-        is_admin = hasattr(g, 'eth_address') and g.eth_address in admin_addresses
+        is_admin = eth_address and eth_address.lower() in [addr.lower() for addr in admin_addresses]
         
         # 如果是管理员，获取所有资产，否则只获取已审核通过的资产
         query = Asset.query if is_admin else Asset.query.filter_by(status=AssetStatus.APPROVED)
@@ -61,6 +75,18 @@ def list_assets():
         for asset in assets:
             try:
                 asset_dict = asset.to_dict()
+                # 确保图片路径正确
+                if asset_dict.get('images'):
+                    if isinstance(asset_dict['images'], str):
+                        try:
+                            asset_dict['images'] = json.loads(asset_dict['images'])
+                        except:
+                            asset_dict['images'] = [asset_dict['images']]
+                    # 确保所有图片路径都以/开头
+                    asset_dict['images'] = [
+                        path if path.startswith('/') else f'/{path}'
+                        for path in asset_dict['images']
+                    ]
                 asset_list.append(asset_dict)
             except Exception as e:
                 current_app.logger.error(f'Error converting asset {asset.id} to dict: {str(e)}')
@@ -316,3 +342,75 @@ def create_trade():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500 
+
+# 获取资产持有人数量
+@assets_api_bp.route('/<int:asset_id>/holders-count')
+def get_holders_count(asset_id):
+    try:
+        # 这里暂时返回模拟数据,后续需要从区块链获取实际数据
+        return jsonify({
+            'count': 50  # 模拟数据
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# 获取资产所有者
+@assets_api_bp.route('/<int:asset_id>/owner')
+def get_asset_owner(asset_id):
+    try:
+        asset = Asset.query.get_or_404(asset_id)
+        return jsonify({
+            'owner_address': asset.owner_address
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# 获取资产分红历史
+@assets_api_bp.route('/<int:asset_id>/dividends')
+def get_asset_dividends(asset_id):
+    try:
+        dividends = Dividend.query.filter_by(asset_id=asset_id).order_by(Dividend.created_at.desc()).all()
+        return jsonify([{
+            'created_at': d.created_at.strftime('%Y-%m-%d'),
+            'total_amount': d.total_amount
+        } for d in dividends])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# 创建分红记录
+@assets_api_bp.route('/<int:asset_id>/dividends', methods=['POST'])
+@eth_address_required
+def create_dividend(asset_id):
+    """创建分红记录"""
+    try:
+        # 1. 验证请求数据
+        data = request.get_json()
+        if not data or 'total_amount' not in data or 'tx_hash' not in data:
+            return jsonify({'error': '请求数据不完整'}), 400
+            
+        # 2. 验证资产所有者
+        asset = Asset.query.get_or_404(asset_id)
+        eth_address = g.eth_address.lower()
+        if eth_address != asset.owner_address.lower():
+            return jsonify({'error': '只有资产所有者可以创建分红记录'}), 403
+            
+        # 3. 验证金额
+        total_amount = float(data['total_amount'])
+        if total_amount < 10000:
+            return jsonify({'error': '分红金额不能小于10000 USDC'}), 400
+            
+        # 4. 创建分红记录
+        dividend = Dividend(
+            asset_id=asset_id,
+            total_amount=total_amount,
+            tx_hash=data['tx_hash']
+        )
+        db.session.add(dividend)
+        db.session.commit()
+        
+        return jsonify(dividend.to_dict()), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'创建分红记录失败: {str(e)}')
+        return jsonify({'error': '创建分红记录失败'}), 500 

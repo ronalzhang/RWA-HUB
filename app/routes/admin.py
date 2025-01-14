@@ -1,13 +1,16 @@
-from flask import render_template, jsonify, request, g, current_app, redirect, url_for
+from flask import render_template, jsonify, request, g, current_app, redirect, url_for, Blueprint
 from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.trade import Trade
 from app import db
-from . import admin_bp, admin_api_bp
 from app.utils.decorators import eth_address_required
 from sqlalchemy import func
 from datetime import datetime, timedelta
 from functools import wraps
 import json
+
+# 创建蓝图
+admin_bp = Blueprint('admin', __name__)
+admin_api_bp = Blueprint('admin_api', __name__)
 
 def is_admin(eth_address=None):
     """检查指定地址或当前用户是否是管理员"""

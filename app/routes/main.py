@@ -1,5 +1,6 @@
 from flask import render_template, Blueprint, jsonify
-from . import main_bp
+
+main_bp = Blueprint('main', __name__)
 
 @main_bp.route('/')
 def index():

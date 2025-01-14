@@ -9,7 +9,7 @@
     </div>
     <div class="border-t border-gray-200">
         <div class="px-4 py-5 sm:p-6">
-            <div id="walletAlert" class="mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-4 hidden">
+            <div id="walletAlert" class="mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-4">
                 <div class="flex">
                     <div class="flex-shrink-0">
                         <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
@@ -88,11 +88,11 @@
                     </div>
 
                     <div class="mb-4">
-                        <label for="annual_revenue" class="block text-sm font-medium text-gray-700">预期年收益 (元)</label>
+                        <label for="annual_revenue" class="block text-sm font-medium text-gray-700">预期年收益 (USDC)</label>
                         <input type="number" id="annual_revenue" name="annual_revenue" required min="0" step="0.01"
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                             placeholder="请输入预期年收益金额">
-                        <p class="mt-1 text-sm text-gray-500">请输入资产每年预期产生的实际收益金额</p>
+                        <p class="mt-1 text-sm text-gray-500">请输入资产每年预期产生的实际收益金额，分给代币持有者的收益</p>
                     </div>
 
                     <div>
@@ -153,67 +153,38 @@
 </div>
 
 <script>
-let currentAccount = null;
-
-async function checkWalletConnection() {
-    if (typeof window.ethereum !== 'undefined') {
-        try {
-            // 先尝试从localStorage获取地址
-            const savedAddress = localStorage.getItem('eth_address');
-            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-            
-            if (accounts.length > 0) {
-                currentAccount = accounts[0];
-                // 保存到localStorage和cookie
-                localStorage.setItem('eth_address', currentAccount);
-                document.cookie = `eth_address=${currentAccount}; path=/; max-age=86400`;
-                
-                document.getElementById('walletAlert').classList.add('hidden');
-                document.getElementById('createAssetForm').style.display = 'block';
-                return true;
-            } else if (savedAddress) {
-                // 如果有保存的地址但钱包未连接，尝试自动连接
-                try {
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    currentAccount = accounts[0];
-                    document.getElementById('walletAlert').classList.add('hidden');
-                    document.getElementById('createAssetForm').style.display = 'block';
-                    return true;
-                } catch (error) {
-                    console.warn('自动连接钱包失败:', error);
-                }
-            }
-        } catch (error) {
-            console.error('检查钱包连接失败:', error);
-        }
-    }
-    
-    document.getElementById('walletAlert').classList.remove('hidden');
-    document.getElementById('createAssetForm').style.display = 'none';
-    return false;
-}
-
-async function connectWallet() {
-    if (typeof window.ethereum !== 'undefined') {
-        try {
-            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-            currentAccount = accounts[0];
-            await checkWalletConnection();
-        } catch (error) {
-            console.error('连接钱包失败:', error);
-        }
+// 检查钱包连接状态
+function checkWalletConnection() {
+    if (window.currentAccount) {
+        document.getElementById('walletAlert').classList.add('hidden');
+        document.getElementById('createAssetForm').style.display = 'block';
+        return true;
     } else {
-        alert('请安装MetaMask钱包');
+        document.getElementById('walletAlert').classList.remove('hidden');
+        document.getElementById('createAssetForm').style.display = 'none';
+        return false;
     }
 }
 
-document.getElementById('walletAlert').addEventListener('click', connectWallet);
+// 点击提示框时连接钱包
+document.getElementById('walletAlert').addEventListener('click', async () => {
+    const connectBtn = document.getElementById('connectWalletBtn');
+    if (connectBtn) {
+        connectBtn.click();
+    }
+});
 
 // 监听钱包连接状态
 if (window.ethereum) {
     window.ethereum.on('accountsChanged', checkWalletConnection);
-    checkWalletConnection();
 }
+
+// 页面加载时检查钱包状态
+document.addEventListener('DOMContentLoaded', () => {
+    checkWalletConnection();
+    // 监听全局钱包连接状态变化
+    setInterval(checkWalletConnection, 1000);
+});
 
 // 处理资产类型切换
 document.getElementById('asset_type').addEventListener('change', function() {
@@ -331,6 +302,7 @@ document.getElementById('token_code').addEventListener('input', function(e) {
 document.getElementById('createAssetForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
+    const currentAccount = window.currentAccount || localStorage.getItem('eth_address') || sessionStorage.getItem('eth_address');
     if (!currentAccount) {
         alert('请先连接钱包');
         return;
@@ -398,7 +370,7 @@ document.getElementById('createAssetForm').addEventListener('submit', async func
         sessionStorage.setItem('eth_address', currentAccount);
         document.cookie = `eth_address=${currentAccount}; path=/; max-age=86400`;
         
-        const response = await fetch('/api/assets', {
+        const response = await fetch('/api/assets/', {
             method: 'POST',
             headers: {
                 'X-Eth-Address': currentAccount

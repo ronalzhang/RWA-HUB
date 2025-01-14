@@ -24,3 +24,43 @@ function updateAssetCard(asset) {
     `;
     return card;
 } 
+
+async function loadAssets() {
+    try {
+        // 获取钱包地址
+        const eth_address = window.currentAccount || localStorage.getItem('eth_address') || sessionStorage.getItem('eth_address');
+        
+        // 准备请求头
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        if (eth_address) {
+            headers['X-Eth-Address'] = eth_address;
+        }
+        
+        const response = await fetch('/api/assets/', {
+            headers: headers
+        });
+        
+        if (!response.ok) {
+            throw new Error('加载资产列表失败');
+        }
+        
+        const data = await response.json();
+        const container = document.getElementById('assetList');
+        container.innerHTML = '';
+        
+        if (!data.assets || data.assets.length === 0) {
+            container.innerHTML = '<div class="col-12 text-center"><p>暂无资产</p></div>';
+            return;
+        }
+        
+        data.assets.forEach(asset => {
+            container.appendChild(updateAssetCard(asset));
+        });
+    } catch (error) {
+        console.error('加载资产列表失败:', error);
+        const container = document.getElementById('assetList');
+        container.innerHTML = '<div class="col-12 text-center"><p class="text-danger">加载资产列表失败，请稍后重试</p></div>';
+    }
+} 

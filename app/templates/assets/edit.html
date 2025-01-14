@@ -149,10 +149,10 @@ async function checkIsAdmin() {
         return false;
     }
     
-    // 直接检查当前地址是否在配置的管理员列表中
+    // 管理员地址列表
     const adminAddresses = [
         '0x6394993426DBA3b654eF0052698Fe9E0B6A98870',
-        '0xd1db8bb8b723fade2d8aeea21d0e75fa6f7cb5af'
+        '0x124e5B8A4E6c68eC66e181E0B54817b12D879c57'
     ];
     
     return adminAddresses.map(addr => addr.toLowerCase())
@@ -180,7 +180,7 @@ async function loadAssetDetails() {
         // 如果资产已上链，显示提示并返回
         if (data.token_address) {
             alert('已上链资产无法修改');
-            window.location.href = '/admin/dashboard';
+            window.location.href = '/admin';
             return;
         }
         
@@ -220,7 +220,7 @@ async function loadAssetDetails() {
     } catch (error) {
         console.error('加载资产详情失败:', error);
         alert(error.message || '加载资产详情失败');
-        window.location.href = '/admin/dashboard';
+        window.location.href = '/admin';
     }
 }
 
@@ -399,20 +399,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             throw new Error('请先安装MetaMask钱包');
         }
 
-        // 请求连接钱包
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        if (!accounts || accounts.length === 0) {
-            await window.ethereum.request({ method: 'eth_requestAccounts' });
+        // 从URL或localStorage获取钱包地址
+        const urlEthAddress = new URLSearchParams(window.location.search).get('eth_address');
+        const storedEthAddress = localStorage.getItem('eth_address') || sessionStorage.getItem('eth_address');
+        
+        // 如果URL中有地址，优先使用URL中的地址
+        if (urlEthAddress) {
+            window.currentAccount = urlEthAddress;
+            localStorage.setItem('eth_address', urlEthAddress);
+            sessionStorage.setItem('eth_address', urlEthAddress);
+        } else if (storedEthAddress) {
+            window.currentAccount = storedEthAddress;
         }
 
-        // 获取连接的钱包地址
-        const connectedAccount = (await window.ethereum.request({ method: 'eth_accounts' }))[0];
-        if (!connectedAccount) {
+        // 如果没有地址，尝试连接钱包
+        if (!window.currentAccount) {
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            if (accounts && accounts.length > 0) {
+                window.currentAccount = accounts[0];
+                localStorage.setItem('eth_address', accounts[0]);
+                sessionStorage.setItem('eth_address', accounts[0]);
+            }
+        }
+
+        if (!window.currentAccount) {
             throw new Error('请先连接钱包');
         }
-
-        // 设置当前账户
-        window.currentAccount = connectedAccount;
 
         // 检查是否是管理员
         const isAdmin = await checkIsAdmin();
@@ -426,7 +438,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
         console.error('初始化失败:', error);
         alert(error.message || '页面加载失败');
-        window.location.href = '/admin/dashboard';
+        window.location.href = '/admin';
     }
 });
 
@@ -442,11 +454,11 @@ if (window.ethereum) {
                 await loadAssetDetails();  // 当钱包地址变化时重新加载数据
             } else {
                 alert('请使用管理员钱包地址');
-                window.location.href = '/admin/dashboard';
+                window.location.href = '/admin';
             }
         } else {
             alert('请连接钱包');
-            window.location.href = '/admin/dashboard';
+            window.location.href = '/admin';
         }
     });
 }

@@ -1,6 +1,7 @@
 from app import create_app
 import logging
 import socket
+import argparse
 
 def get_ip():
     """获取本机IP地址"""
@@ -12,14 +13,25 @@ def get_ip():
         s.close()
         return ip
     except:
-        return "0.0.0.0"
+        return "127.0.0.1"
 
 if __name__ == '__main__':
+    # 创建参数解析器
+    parser = argparse.ArgumentParser(description='启动Flask应用服务器')
+    parser.add_argument('--port', type=int, default=8080, help='服务器端口号')
+    parser.add_argument('--host', type=str, default='127.0.0.1', help='服务器主机地址')
+    args = parser.parse_args()
+
     logging.basicConfig(level=logging.INFO)
     app = create_app()
-    # 修改host为0.0.0.0允许外部访问
+    
+    # 使用命令行参数中的端口和主机
+    port = args.port
+    host = args.host
+    
     print("Starting server...")
     print("Access URLs:")
-    print("Local:    http://127.0.0.1:8080")
-    print(f"Network:  http://{get_ip()}:8080")
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    print(f"Local:    http://127.0.0.1:{port}")
+    print(f"Network:  http://{get_ip()}:{port}")
+    
+    app.run(host=host, port=port, debug=True)
