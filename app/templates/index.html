@@ -1,36 +1,487 @@
 {% extends "base.html" %}
 
+{% block title %}RWA-HUB - 实物资产数字化平台{% endblock %}
+
 {% block content %}
-<div class="bg-white shadow rounded-lg p-6">
-    <div class="text-center">
-        <h1 class="text-4xl font-bold text-gray-900">欢迎来到58HUB</h1>
-        <p class="mt-4 text-xl text-gray-600">基于区块链的资产管理平台</p>
-    </div>
-
-    <div class="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-        <div class="bg-gray-50 p-6 rounded-lg">
-            <h3 class="text-lg font-medium text-gray-900">资产管理</h3>
-            <p class="mt-2 text-gray-600">轻松管理您的数字资产，查看详细信息和交易历史。</p>
+<!-- Hero Section -->
+<div class="hero-section position-relative overflow-hidden">
+    <div class="hero-bg-pattern"></div>
+    <div class="container position-relative">
+        <div class="row align-items-center min-vh-80">
+            <div class="col-lg-6 pe-lg-5">
+                <div class="hero-content" data-aos="fade-up">
+                    <h1 class="display-4 fw-bold text-white mb-4">
+                        实物资产<br>
+                        <span class="gradient-text">数字化平台</span>
+                    </h1>
+                    <p class="lead text-white-75 mb-5">发布资产，即刻开启资产数字化之旅<br>安全、透明、高效的区块链资产管理平台</p>
+                    <div class="d-flex gap-3 flex-wrap">
+                        <button type="button" class="btn btn-gradient btn-lg px-4 py-3" onclick="window.location.href='{{ url_for('assets.create_asset_page') }}'">
+                            <i class="fas fa-plus me-2"></i>发布资产
+                        </button>
+                        <button type="button" class="btn btn-outline-light btn-lg px-4 py-3" onclick="document.getElementById('features').scrollIntoView({behavior: 'smooth'})">
+                            了解更多 <i class="fas fa-arrow-right ms-2"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 mt-5 mt-lg-0">
+                <div class="platform-illustration" data-aos="fade-left">
+                    <img src="{{ url_for('static', filename='images/platform-illustration.png') }}" 
+                         alt="Platform Illustration" 
+                         class="img-fluid">
+                </div>
+            </div>
         </div>
-
-        <div class="bg-gray-50 p-6 rounded-lg">
-            <h3 class="text-lg font-medium text-gray-900">安全可靠</h3>
-            <p class="mt-2 text-gray-600">基于区块链技术，确保您的资产安全和交易透明。</p>
-        </div>
-
-        <div class="bg-gray-50 p-6 rounded-lg">
-            <h3 class="text-lg font-medium text-gray-900">便捷交易</h3>
-            <p class="mt-2 text-gray-600">简单的操作界面，让资产交易变得更加便捷。</p>
-        </div>
-    </div>
-
-    <div class="mt-12 text-center">
-        <a href="/assets" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 mx-2">
-            浏览资产
-        </a>
-        <a href="/assets/create" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 mx-2">
-            创建资产
-        </a>
     </div>
 </div>
+
+<!-- 最新资产 -->
+<section class="latest-assets py-6" id="assets">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-5">
+            <div>
+                <h2 class="fw-bold mb-0" data-aos="fade-up">最新资产</h2>
+                <p class="text-muted mt-2" data-aos="fade-up" data-aos-delay="100">发现优质资产，开启投资之旅</p>
+            </div>
+            <a href="{{ url_for('assets.list_assets_page') }}" 
+               class="btn btn-outline-primary"
+               data-aos="fade-up"
+               data-aos-delay="100">
+                查看全部 <i class="fas fa-arrow-right ms-2"></i>
+            </a>
+        </div>
+
+        <div class="row g-4">
+            {% if assets %}
+                {% for asset in assets %}
+                <div class="col-md-4" data-aos="fade-up" data-aos-delay="{{ loop.index * 100 }}">
+                    <a href="{{ url_for('assets.asset_detail_page', asset_id=asset.id) }}" class="text-decoration-none">
+                        <div class="asset-card h-100">
+                            <!-- 资产图片 -->
+                            <div class="position-relative">
+                                {% if asset.images %}
+                                {% set images = asset.images|from_json %}
+                                {% if images %}
+                                <img src="{{ url_for('static', filename=images[0]) }}" 
+                                     class="img-cover" 
+                                     alt="{{ asset.name }}">
+                                {% else %}
+                                <div class="img-placeholder">
+                                    <i class="fas fa-image"></i>
+                                </div>
+                                {% endif %}
+                                {% else %}
+                                <div class="img-placeholder">
+                                    <i class="fas fa-image"></i>
+                                </div>
+                                {% endif %}
+                                
+                                <!-- 状态标签 -->
+                                <div class="position-absolute top-0 start-0 m-2">
+                                    {% if asset.status == 1 %}
+                                    <span class="badge bg-warning">待审核</span>
+                                    {% elif asset.status == 2 %}
+                                    <span class="badge bg-success">已上链</span>
+                                    {% elif asset.status == 3 %}
+                                    <span class="badge bg-danger">已拒绝</span>
+                                    {% endif %}
+                                </div>
+
+                                <!-- 资产类型标签 -->
+                                <div class="position-absolute top-0 end-0 m-2">
+                                    {% if asset.asset_type == 10 %}
+                                    <span class="badge bg-primary">不动产</span>
+                                    {% else %}
+                                    <span class="badge bg-info">类不动产</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- 资产信息 -->
+                            <div class="asset-info">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <h5 class="asset-title mb-0">{{ asset.name }}</h5>
+                                    <span class="badge bg-primary">{{ asset.token_symbol }}</span>
+                                </div>
+                                <div class="asset-details">
+                                    <p class="location mb-2">
+                                        <i class="fas fa-map-marker-alt me-1"></i>{{ asset.location }}
+                                    </p>
+                                    {% if asset.asset_type == 10 %}
+                                    <p class="mb-2">
+                                        <span class="text-muted">面积：</span>
+                                        <span class="fw-bold">{{ asset.area|number_format }} ㎡</span>
+                                    </p>
+                                    {% else %}
+                                    <p class="mb-2">
+                                        <span class="text-muted">总价值：</span>
+                                        <span class="fw-bold">{{ asset.total_value|number_format }} USDC</span>
+                                    </p>
+                                    {% endif %}
+                                    <p class="mb-2">
+                                        <span class="text-muted">代币价格：</span>
+                                        <span class="fw-bold">{{ asset.token_price|number_format }} USDC</span>
+                                    </p>
+                                    <p class="mb-0">
+                                        <span class="text-muted">预期年收益：</span>
+                                        <span class="text-success fw-bold">{{ asset.annual_revenue|number_format }} USDC</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <div class="empty-state">
+                        <i class="fas fa-box-open mb-3"></i>
+                        <h4>暂无资产</h4>
+                        {% if current_user_address %}
+                        <p class="text-muted mb-4">点击右上角的"发布资产"按钮开始创建</p>
+                        {% else %}
+                        <p class="text-muted mb-4">请先连接钱包</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- 平台特色 -->
+<section class="features py-6" id="features">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold mb-4" data-aos="fade-up">平台特色</h2>
+            <p class="text-muted" data-aos="fade-up" data-aos-delay="100">基于区块链技术，打造安全、透明的资产数字化生态</p>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-4" data-aos="fade-up" data-aos-delay="200">
+                <div class="feature-card h-100">
+                    <div class="feature-icon mb-4">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h4 class="mb-3">去中心化交易</h4>
+                    <p class="text-muted mb-0">资产信息直接上链，无需注册，连接钱包即可发布和交易，真正实现去中心化</p>
+                </div>
+            </div>
+            <div class="col-md-4" data-aos="fade-up" data-aos-delay="300">
+                <div class="feature-card h-100">
+                    <div class="feature-icon mb-4">
+                        <i class="fas fa-wallet"></i>
+                    </div>
+                    <h4 class="mb-3">资产安全可控</h4>
+                    <p class="text-muted mb-0">代币始终存储在用户个人钱包中，平台不托管任何资产，保障资产安全</p>
+                </div>
+            </div>
+            <div class="col-md-4" data-aos="fade-up" data-aos-delay="400">
+                <div class="feature-card h-100">
+                    <div class="feature-icon mb-4">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h4 class="mb-3">信息透明可信</h4>
+                    <p class="text-muted mb-0">所有交易信息记录在区块链上，公开透明，不可篡改，保障交易安全可信</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 资产类型 -->
+<section class="asset-types py-6 bg-light">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold mb-4" data-aos="fade-up">资产类型</h2>
+            <p class="text-muted" data-aos="fade-up" data-aos-delay="100">支持两种主要资产类型，满足不同需求</p>
+        </div>
+        <div class="row g-4 justify-content-center">
+            <div class="col-md-6" data-aos="fade-up" data-aos-delay="200">
+                <div class="asset-type-card h-100">
+                    <div class="asset-type-icon mb-4">
+                        <i class="fas fa-home"></i>
+                    </div>
+                    <h4 class="mb-3">不动产 (RH-10YYYY)</h4>
+                    <ul class="list-unstyled text-muted">
+                        <li><i class="fas fa-check me-2"></i>代币量 = 面积 × 10000</li>
+                        <li><i class="fas fa-check me-2"></i>需上传房产证、土地证等</li>
+                        <li><i class="fas fa-check me-2"></i>显示资产总面积</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="col-md-6" data-aos="fade-up" data-aos-delay="300">
+                <div class="asset-type-card h-100">
+                    <div class="asset-type-icon mb-4">
+                        <i class="fas fa-boxes"></i>
+                    </div>
+                    <h4 class="mb-3">类不动产 (RH-20YYYY)</h4>
+                    <ul class="list-unstyled text-muted">
+                        <li><i class="fas fa-check me-2"></i>代币量自定义</li>
+                        <li><i class="fas fa-check me-2"></i>需上传拍卖、展览文件等</li>
+                        <li><i class="fas fa-check me-2"></i>显示资产总价值</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+/* 全局样式 */
+:root {
+    --primary-color: #1e3c72;
+    --secondary-color: #2a5298;
+    --gradient: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+}
+
+.py-6 {
+    padding-top: 5rem;
+    padding-bottom: 5rem;
+}
+
+/* Hero Section */
+.hero-section {
+    background: var(--gradient);
+    padding: 2rem 0 1rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-bg-pattern {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 50%);
+    opacity: 0.6;
+}
+
+.gradient-text {
+    background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.hero-stats {
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.backdrop-blur {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.stat-item {
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 1rem;
+    transition: all 0.3s ease;
+}
+
+.stat-item:hover {
+    background: rgba(255,255,255,0.1);
+    transform: translateY(-5px);
+}
+
+.text-gradient {
+    background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 2rem;
+}
+
+/* 按钮样式 */
+.btn {
+    border-radius: 0.75rem;
+    transition: all 0.3s ease;
+}
+
+.btn-gradient {
+    background: var(--gradient);
+    border: none;
+    color: white;
+}
+
+.btn-gradient:hover {
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(30, 60, 114, 0.3);
+}
+
+/* 特色卡片 */
+.feature-card {
+    padding: 2rem;
+    border-radius: 1rem;
+    background: white;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    transition: all 0.3s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+
+.feature-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 1rem;
+    background: var(--gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+}
+
+/* 资产类型卡片 */
+.asset-type-card {
+    padding: 2rem;
+    border-radius: 1rem;
+    background: white;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    transition: all 0.3s ease;
+}
+
+.asset-type-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+
+.asset-type-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 1.5rem;
+    background: var(--gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 2rem;
+}
+
+.asset-type-card ul li {
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
+/* 资产卡片 */
+.asset-card {
+    border-radius: 1rem;
+    background: white;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.asset-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+
+.asset-image {
+    height: 200px;
+    overflow: hidden;
+}
+
+.img-cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.img-placeholder {
+    width: 100%;
+    height: 100%;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #adb5bd;
+    font-size: 2rem;
+}
+
+.asset-status {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+}
+
+.asset-info {
+    padding: 1.5rem;
+}
+
+.asset-title {
+    font-size: 1.1rem;
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.asset-details {
+    font-size: 0.9rem;
+}
+
+.location {
+    color: #6c757d;
+    font-size: 0.85rem;
+}
+
+/* 空状态 */
+.empty-state {
+    padding: 3rem;
+    text-align: center;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    color: #adb5bd;
+    display: block;
+}
+
+/* 动画 */
+[data-aos] {
+    transition: opacity 0.8s, transform 0.8s;
+}
+
+[data-aos="fade-up"] {
+    transform: translateY(50px);
+    opacity: 0;
+}
+
+[data-aos].aos-animate {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.platform-illustration {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+.platform-illustration img {
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
+    opacity: 0.8;  /* 设置透明度，0.8 = 80%不透明 */
+}
+</style>
+
+<!-- AOS Animation Library -->
+<link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+<script>
+    AOS.init({
+        duration: 800,
+        once: true,
+        offset: 100
+    });
+</script>
 {% endblock %}

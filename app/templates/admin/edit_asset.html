@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block title %}编辑资产 - RWAHUB{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">编辑资产</h5>
+                </div>
+                <div class="card-body">
+                    <form id="editForm" onsubmit="handleSubmit(event)">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">资产名称</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="assetType" class="form-label">资产类型</label>
+                            <select class="form-select" id="assetType" name="asset_type" onchange="handleAssetTypeChange()" required>
+                                <option value="10">不动产</option>
+                                <option value="20">类不动产</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="location" class="form-label">位置</label>
+                            <input type="text" class="form-control" id="location" name="location" required>
+                        </div>
+                        
+                        <div class="mb-3" id="areaField">
+                            <label for="area" class="form-label">面积（平方米）</label>
+                            <input type="number" class="form-control" id="area" name="area" step="0.01">
+                        </div>
+                        
+                        <div class="mb-3" id="totalValueField">
+                            <label for="totalValue" class="form-label">总价值（ETH）</label>
+                            <input type="number" class="form-control" id="totalValue" name="total_value" step="0.000001">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="tokenSymbol" class="form-label">代币代码</label>
+                            <input type="text" class="form-control" id="tokenSymbol" name="token_symbol" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="tokenPrice" class="form-label">代币价格（ETH）</label>
+                            <input type="number" class="form-control" id="tokenPrice" name="token_price" step="0.000001" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="tokenSupply" class="form-label">代币供应量</label>
+                            <input type="number" class="form-control" id="tokenSupply" name="token_supply" min="1" step="1" required>
+                            <div class="form-text">请输入整数数量</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="annualRevenue" class="form-label">预期年收益（USDC）</label>
+                            <input type="number" class="form-control" id="annualRevenue" name="annual_revenue" min="0" step="0.01" required>
+                            <div class="form-text">请输入具体金额数值</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">资产图片</label>
+                            <input type="file" class="form-control" id="images" name="images" multiple accept="image/*">
+                            <div id="imagePreview" class="mt-2 row g-2"></div>
+                            <div id="imageNav" class="mt-2 d-flex overflow-auto">
+                                <!-- 图片导航缩略图将在这里显示 -->
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">相关文档</label>
+                            <input type="file" class="form-control" id="documents" name="documents" multiple>
+                            <div id="documentList" class="mt-2"></div>
+                        </div>
+                        
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary me-2" onclick="history.back()">取消</button>
+                            <button type="submit" class="btn btn-primary">保存</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentAsset = null;
+
+// 处理资产类型变化
+function handleAssetTypeChange() {
+    const assetType = document.getElementById('assetType').value;
+    const areaField = document.getElementById('areaField');
+    const totalValueField = document.getElementById('totalValueField');
+    
+    if (assetType === '10') { // 不动产
+        areaField.style.display = 'block';
+        totalValueField.style.display = 'none';
+    } else { // 类不动产
+        areaField.style.display = 'none';
+        totalValueField.style.display = 'block';
+    }
+}
+
+// 加载资产信息
+async function loadAssetData() {
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const ethAddress = urlParams.get('eth_address');
+        if (!ethAddress) {
+            throw new Error('未找到钱包地址');
+        }
+
+        const response = await fetch(`/api/admin/assets/${assetId}`, {
+            headers: {
+                'X-Eth-Address': ethAddress
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('获取资产信息失败');
+        }
+
+        const data = await response.json();
+        console.log('加载的资产数据:', data);
+        
+        // 如果资产已上链，显示提示并返回
+        if (data.token_address) {
+            alert('已上链资产无法修改');
+            window.location.href = `/admin/dashboard?eth_address=${ethAddress}`;
+            return;
+        }
+        
+        // 填充表单数据
+        document.getElementById('name').value = data.name || '';
+        document.getElementById('assetType').value = data.asset_type || '';
+        document.getElementById('location').value = data.location || '';
+        document.getElementById('area').value = data.area || '';
+        document.getElementById('totalValue').value = data.total_value || '';
+        document.getElementById('tokenSymbol').value = data.token_symbol || '';
+        document.getElementById('tokenPrice').value = data.token_price || '';
+        document.getElementById('tokenSupply').value = Math.floor(data.token_supply || 0);
+        document.getElementById('annualRevenue').value = data.annual_revenue || '';
+        
+        // 根据资产类型显示/隐藏相关字段
+        handleAssetTypeChange();
+        
+        // 显示现有图片
+        if (data.images && data.images.length > 0) {
+            displayExistingImages(data.images);
+        }
+        
+        // 显示现有文档
+        if (data.documents && data.documents.length > 0) {
+            const docPreview = document.getElementById('docPreview');
+            docPreview.innerHTML = '';
+            data.documents.forEach(doc => {
+                const col = document.createElement('div');
+                col.className = 'col-12 mb-2';
+                col.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-file me-2"></i>
+                        <a href="/${doc}" target="_blank" class="text-truncate">${doc.split('/').pop()}</a>
+                        <button type="button" class="btn btn-sm btn-danger ms-2" 
+                                onclick="removeDocument('${doc}')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+                docPreview.appendChild(col);
+            });
+        }
+        
+    } catch (error) {
+        console.error('加载资产数据失败:', error);
+        alert('加载资产信息失败: ' + error.message);
+    }
+}
+
+// 处理表单提交
+async function handleSubmit(event) {
+    event.preventDefault();
+    
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const ethAddress = urlParams.get('eth_address');
+        const assetId = window.location.pathname.split('/')[3];
+        
+        const formData = new FormData(event.target);
+        
+        const response = await fetch(`/api/admin/assets/${assetId}`, {
+            method: 'PUT',
+            headers: {
+                'X-Eth-Address': ethAddress
+            },
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || '保存失败');
+        }
+        
+        alert('保存成功');
+        window.location.href = '/admin/dashboard';
+        
+    } catch (error) {
+        console.error('保存失败:', error);
+        alert(error.message || '保存失败，请重试');
+    }
+}
+
+// 移除图片
+function removeImage(image) {
+    if (confirm('确定要删除这张图片吗？')) {
+        // TODO: 调用后端API删除图片
+        const preview = document.querySelector(`img[src="/${image}"]`).closest('.col-auto');
+        preview.remove();
+    }
+}
+
+// 移除文档
+function removeDocument(doc) {
+    if (confirm('确定要删除这个文档吗？')) {
+        // TODO: 调用后端API删除文档
+        const item = document.querySelector(`a[href="/${doc}"]`).closest('.mb-2');
+        item.remove();
+    }
+}
+
+// 处理图片预览和导航
+function handleImagePreview(files) {
+    const imagePreview = document.getElementById('imagePreview');
+    const imageNav = document.getElementById('imageNav');
+    imagePreview.innerHTML = '';
+    imageNav.innerHTML = '';
+    
+    Array.from(files).forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            // 添加主预览图
+            const col = document.createElement('div');
+            col.className = 'col-12 mb-3 position-relative';
+            col.innerHTML = `
+                <img src="${e.target.result}" class="img-fluid" style="max-height: 400px; width: 100%; object-fit: contain;">
+            `;
+            imagePreview.appendChild(col);
+            
+            // 添加导航缩略图
+            const thumb = document.createElement('div');
+            thumb.className = 'me-2';
+            thumb.innerHTML = `
+                <img src="${e.target.result}" class="img-thumbnail" style="height: 60px; cursor: pointer;"
+                     onclick="showImage(${index})">
+            `;
+            imageNav.appendChild(thumb);
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+// 显示选中的图片
+function showImage(index) {
+    const images = document.querySelectorAll('#imagePreview .col-12');
+    images.forEach((img, i) => {
+        if (i === index) {
+            img.style.display = 'block';
+        } else {
+            img.style.display = 'none';
+        }
+    });
+    
+    // 更新导航缩略图的选中状态
+    const thumbs = document.querySelectorAll('#imageNav img');
+    thumbs.forEach((thumb, i) => {
+        if (i === index) {
+            thumb.classList.add('border', 'border-primary');
+        } else {
+            thumb.classList.remove('border', 'border-primary');
+        }
+    });
+}
+
+// 监听图片上传
+document.getElementById('images').addEventListener('change', function(e) {
+    handleImagePreview(this.files);
+});
+
+// 加载现有图片
+function displayExistingImages(images) {
+    if (!images || !images.length) return;
+    
+    const imagePreview = document.getElementById('imagePreview');
+    const imageNav = document.getElementById('imageNav');
+    imagePreview.innerHTML = '';
+    imageNav.innerHTML = '';
+    
+    images.forEach((image, index) => {
+        // 添加主预览图
+        const col = document.createElement('div');
+        col.className = 'col-12 mb-3 position-relative';
+        col.style.display = index === 0 ? 'block' : 'none';
+        col.innerHTML = `
+            <img src="/${image}" class="img-fluid" style="max-height: 400px; width: 100%; object-fit: contain;">
+            <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0" 
+                    onclick="removeImage('${image}')">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        imagePreview.appendChild(col);
+        
+        // 添加导航缩略图
+        const thumb = document.createElement('div');
+        thumb.className = 'me-2';
+        thumb.innerHTML = `
+            <img src="/${image}" class="img-thumbnail ${index === 0 ? 'border border-primary' : ''}" 
+                 style="height: 60px; cursor: pointer;"
+                 onclick="showImage(${index})">
+        `;
+        imageNav.appendChild(thumb);
+    });
+}
+
+// 页面加载完成后执行
+document.addEventListener('DOMContentLoaded', loadAssetData);
+</script>
+{% endblock %} 

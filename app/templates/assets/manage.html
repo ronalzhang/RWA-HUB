@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}资产管理 - 58HUB{% endblock %}
+{% block title %}资产管理 - RWA-HUB{% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
@@ -65,7 +65,7 @@ function showError(message) {
 async function loadAssets(page = 1) {
     showLoading(true);
     try {
-        const response = await fetch(`/api/assets/?page=${page}&per_page=10`);
+        const response = await fetch(`${window.appConfig.API_BASE_URL}/api/assets/list?page=${page}&per_page=10`);
         if (!response.ok) {
             throw new Error('加载资产列表失败');
         }

@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block title %}分红管理 - RWA-HUB{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+<script src="/static/js/AssetTokenABI.js"></script>
+<script src="/static/js/USDCABI.js"></script>
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-2xl font-bold text-gray-900 mb-6">分红管理</h2>
+        
+        <!-- 分红信息展示 -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p class="text-sm text-gray-500">总发行量</p>
+                    <p class="text-lg font-medium text-gray-900" id="totalSupply">--</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">当前持有人数</p>
+                    <p class="text-lg font-medium text-gray-500" id="holderCount">--</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">已分红次数</p>
+                    <p class="text-lg font-medium text-gray-500" id="dividendCount">--</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">已分红总额</p>
+                    <p class="text-lg font-medium text-gray-500" id="totalDividend">--</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 分红表单 -->
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <label class="block text-sm font-medium text-gray-700">分红金额</label>
+                <div class="mt-1 relative rounded-md shadow-sm w-2/3">
+                    <input type="number" id="dividendAmount" class="focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-12 sm:text-sm border-gray-300 rounded-md" placeholder="输入分红金额">
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <span class="text-gray-500 sm:text-sm">USDC</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 预估费用信息 -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-500">预估Gas费用</span>
+                        <span class="text-sm text-gray-900" id="estimatedGas">--</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-500">平台手续费(1.5%)</span>
+                        <span class="text-sm text-gray-900" id="platformFee">--</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-500">实际分红金额</span>
+                        <span class="text-sm text-gray-900" id="actualDividendAmount">--</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-500">每Token分红金额</span>
+                        <span class="text-sm text-gray-900" id="dividendPerToken">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 发起分红按钮 -->
+            <div class="flex justify-end mt-4">
+                <button id="initiateDividendButton" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    发起分红
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 分红历史 -->
+    <div class="bg-white rounded-lg shadow p-6 mt-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-medium text-gray-900">分红历史</h3>
+            <div class="text-sm text-gray-500">
+                累计分红：<span id="totalDividendAmount" class="font-medium text-gray-900">--</span>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分红金额</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">每Token分红</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易Hash</th>
+                    </tr>
+                </thead>
+                <tbody id="dividendHistoryContent" class="bg-white divide-y divide-gray-200">
+                    <!-- 分红历史记录将通过JavaScript动态加载 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentAsset = null;
+let tokenContract = null;
+let usdtContract = null;
+
+// 监听钱包连接事件
+window.addEventListener('walletConnected', async (event) => {
+    await checkPermissionAndInit();
+});
+
+// 监听钱包断开连接事件
+window.addEventListener('walletDisconnected', async () => {
+    window.location.href = `/assets/${getAssetId()}`;
+});
+
+// 监听钱包切换事件
+window.addEventListener('walletChanged', async (event) => {
+    await checkPermissionAndInit();
+});
+
+// 获取资产ID
+function getAssetId() {
+    return window.location.pathname.split('/')[2];
+}
+
+// 检查权限并初始化
+async function checkPermissionAndInit() {
+    if (!window.walletState.currentAccount) {
+        window.location.href = `/assets/${getAssetId()}`;
+        return;
+    }
+
+    try {
+        const { is_owner, is_admin } = await checkAssetOwner(getAssetId());
+        if (!is_owner && !is_admin) {
+            alert('您没有权限访问此页面');
+            window.location.href = `/assets/${getAssetId()}`;
+            return;
+        }
+
+        await initializeContracts();
+        await loadDividendStats();
+        await loadDividendHistory();
+    } catch (error) {
+        console.error('初始化失败:', error);
+        alert('页面加载失败，请刷新重试');
+    }
+}
+
+// 检查资产所有者
+async function checkAssetOwner(assetId) {
+    try {
+        const response = await fetch(`${window.appConfig.API_BASE_URL}/api/assets/${assetId}/check_owner`, {
+            headers: {
+                'X-Eth-Address': window.walletState.currentAccount
+            }
+        });
+        if (!response.ok) {
+            throw new Error('检查资产所有者失败');
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('检查资产所有者失败:', error);
+        return { is_owner: false, is_admin: false };
+    }
+}
+
+// 初始化智能合约
+async function initializeContracts() {
+    if (!window.ethereum || !window.walletState.currentAccount) {
+        return;
+    }
+
+    try {
+        const web3 = new Web3(window.ethereum);
+        
+        // 获取资产信息
+        const response = await fetch(`${window.appConfig.API_BASE_URL}/api/assets/${getAssetId()}`);
+        if (!response.ok) {
+            throw new Error('加载资产信息失败');
+        }
+        
+        currentAsset = await response.json();
+        
+        // 初始化资产代币合约
+        if (currentAsset.token_address) {
+            tokenContract = new web3.eth.Contract(AssetTokenABI, currentAsset.token_address);
+        }
+        
+        // 初始化USDC合约
+        const usdcAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'; // USDC合约地址
+        usdtContract = new web3.eth.Contract(USDCABI, usdcAddress);
+    } catch (error) {
+        console.error('初始化合约失败:', error);
+        throw error;
+    }
+}
+
+// 加载分红统计信息
+async function loadDividendStats() {
+    try {
+        // 获取总发行量
+        if (tokenContract) {
+            const totalSupply = await tokenContract.methods.totalSupply().call();
+            document.getElementById('totalSupply').textContent = `${totalSupply} Token`;
+        }
+        
+        // 获取分红统计
+        const response = await fetch(`${window.appConfig.API_BASE_URL}/api/assets/${getAssetId()}/dividend_stats`);
+        if (response.ok) {
+            const stats = await response.json();
+            document.getElementById('dividendCount').textContent = stats.count || '--';
+            document.getElementById('totalDividend').textContent = stats.total_amount ? 
+                `${stats.total_amount} USDC` : '--';
+            document.getElementById('holderCount').textContent = stats.holder_count || '--';
+        }
+    } catch (error) {
+        console.error('加载分红统计失败:', error);
+    }
+}
+
+// 加载分红历史
+async function loadDividendHistory() {
+    try {
+        const response = await fetch(`${window.appConfig.API_BASE_URL}/api/assets/${getAssetId()}/dividend_history`);
+        if (!response.ok) {
+            throw new Error('加载分红历史失败');
+        }
+        
+        const data = await response.json();
+        
+        // 更新累计分红金额
+        document.getElementById('totalDividendAmount').textContent = 
+            data.total_amount ? `${data.total_amount} USDC` : '--';
+        
+        // 更新分红历史列表
+        const historyContent = document.getElementById('dividendHistoryContent');
+        if (data.records && data.records.length > 0) {
+            historyContent.innerHTML = data.records.map(item => `
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.amount} USDC</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.per_token} USDC</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <a href="https://etherscan.io/tx/${item.tx_hash}" target="_blank" class="text-blue-600 hover:text-blue-800">
+                            ${item.tx_hash.substring(0, 6)}...${item.tx_hash.substring(item.tx_hash.length - 4)}
+                        </a>
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            historyContent.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">暂无分红记录</td></tr>';
+        }
+    } catch (error) {
+        console.error('加载分红历史失败:', error);
+        document.getElementById('dividendHistoryContent').innerHTML = 
+            '<tr><td colspan="4" class="px-6 py-4 text-center text-red-500">加载分红历史失败</td></tr>';
+    }
+}
+
+// 更新分红预估费用
+function updateDividendEstimate(amount) {
+    if (!amount || amount <= 0) {
+        document.getElementById('estimatedGas').textContent = '--';
+        document.getElementById('platformFee').textContent = '--';
+        document.getElementById('actualDividendAmount').textContent = '--';
+        document.getElementById('dividendPerToken').textContent = '--';
+        return;
+    }
+    
+    const gasFee = 200; // 固定200U的gas费
+    const platformFee = amount * 0.015; // 1.5%的平台费
+    const actualAmount = amount - gasFee - platformFee;
+    
+    document.getElementById('estimatedGas').textContent = `${gasFee} USDC`;
+    document.getElementById('platformFee').textContent = `${platformFee.toFixed(2)} USDC`;
+    document.getElementById('actualDividendAmount').textContent = `${actualAmount.toFixed(2)} USDC`;
+    
+    if (currentAsset && currentAsset.token_supply > 0) {
+        const perToken = actualAmount / currentAsset.token_supply;
+        document.getElementById('dividendPerToken').textContent = `${perToken.toFixed(6)} USDC`;
+    }
+}
+
+// 监听分红金额输入
+document.getElementById('dividendAmount').addEventListener('input', function(event) {
+    const amount = parseFloat(event.target.value) || 0;
+    updateDividendEstimate(amount);
+});
+
+// 处理发起分红
+document.getElementById('initiateDividendButton').addEventListener('click', async function() {
+    if (!window.walletState.currentAccount || !tokenContract || !usdtContract) {
+        alert('请先连接钱包');
+        return;
+    }
+    
+    const amount = parseFloat(document.getElementById('dividendAmount').value);
+    if (!amount || amount <= 0) {
+        alert('请输入有效的分红金额');
+        return;
+    }
+    
+    try {
+        // 检查USDC余额和授权
+        const balance = await usdtContract.methods.balanceOf(window.walletState.currentAccount).call();
+        const allowance = await usdtContract.methods.allowance(window.walletState.currentAccount, currentAsset.token_address).call();
+        
+        if (balance < amount) {
+            alert('USDC余额不足');
+            return;
+        }
+        
+        if (allowance < amount) {
+            // 请求USDC授权
+            await usdtContract.methods.approve(currentAsset.token_address, amount).send({
+                from: window.walletState.currentAccount
+            });
+        }
+        
+        // 执行分红
+        await tokenContract.methods.distributeDividend(amount).send({
+            from: window.walletState.currentAccount
+        });
+        
+        alert('分红发起成功！');
+        window.location.reload();
+    } catch (error) {
+        console.error('发起分红失败:', error);
+        alert('发起分红失败，请重试');
+    }
+});
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', async () => {
+    if (window.walletState.currentAccount) {
+        await checkPermissionAndInit();
+    } else {
+        window.location.href = `/assets/${getAssetId()}`;
+    }
+});
+</script>
+{% endblock %} 

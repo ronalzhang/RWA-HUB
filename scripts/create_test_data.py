@@ -1,120 +1,92 @@
+import os
+import random
+from datetime import datetime
 from app import create_app, db
 from app.models.asset import Asset, AssetType, AssetStatus
-from app.models.user import User
-import random
-import string
-from datetime import datetime, UTC
-
-# 测试数据
-test_locations = [
-    "上海市浦东新区陆家嘴",
-    "北京市朝阳区CBD",
-    "深圳市南山区科技园",
-    "广州市天河区珠江新城",
-    "杭州市西湖区",
-    "成都市武侯区",
-    "重庆市渝中区",
-    "南京市鼓楼区",
-    "武汉市江汉区",
-    "西安市雁塔区"
-]
-
-test_names = [
-    "阳光大厦", "星河中心", "科技广场", "环球金融中心", "创新大厦",
-    "未来城", "智慧园区", "商务中心", "文化广场", "生态园"
-]
-
-# 测试图片
-test_images = [
-    "building1.jpg",
-    "building2.jpg",
-    "building3.jpg",
-    "building4.jpg",
-    "building5.jpg"
-]
 
 def generate_eth_address():
     """生成随机以太坊地址"""
-    return "0x" + "".join(random.choices(string.hexdigits, k=40)).lower()
+    return '0x' + ''.join(random.choices('0123456789abcdef', k=40))
 
-def generate_token_symbol():
-    """生成随机代币符号"""
-    type_code = random.choice(["01", "02"])
-    asset_code = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    return f"RH-{type_code}{asset_code}"
-
-def create_test_user():
-    """创建测试用户"""
-    user = User(
-        username="test_user",
-        email="test@example.com",
-        eth_address=generate_eth_address()
-    )
-    user.set_password("password123")
-    return user
+def generate_token_symbol(asset_type, index):
+    """生成代币符号"""
+    type_code = '10' if asset_type == AssetType.REAL_ESTATE else '20'
+    return f'RH-{type_code}{str(index+1).zfill(4)}'
 
 def create_test_data():
-    """创建所有测试数据"""
-    app = create_app()
-    
+    """创建测试数据"""
+    app = create_app('development')
     with app.app_context():
-        # 清空现有数据
-        Asset.query.delete()
-        User.query.delete()
-        db.session.commit()
+        db.create_all()
         
-        # 创建测试用户
-        test_user = create_test_user()
-        db.session.add(test_user)
-        db.session.commit()
-        print("Successfully created test user!")
-        print("Username: test_user")
-        print("Password: password123")
-        print("ETH Address:", test_user.eth_address)
+        # 测试数据 - 位置
+        locations = [
+            '北京市朝阳区建国路88号',
+            '上海市浦东新区陆家嘴环路1000号',
+            '广州市天河区珠江新城',
+            '深圳市南山区科技园',
+            '杭州市西湖区文三路'
+        ]
         
-        # 创建20个测试资产
-        for i in range(20):
-            # 随机选择资产类型
-            asset_type = random.choice([AssetType.REAL_ESTATE, AssetType.SEMI_REAL_ESTATE])
-            
-            # 随机生成面积和价格
-            area = round(random.uniform(1000, 10000), 2) if asset_type == AssetType.REAL_ESTATE else None
-            token_price = round(random.uniform(100, 1000), 2)
-            total_value = round(random.uniform(1000000, 10000000), 2) if asset_type == AssetType.SEMI_REAL_ESTATE else None
-            
-            # 计算代币发行量
-            if asset_type == AssetType.REAL_ESTATE:
-                token_supply = int(area * 10000)  # 每平方米10000个代币
-            else:
-                token_supply = int(total_value / token_price)  # 总价值除以代币价格
-            
-            # 随机选择1-3张图片
-            num_images = random.randint(1, 3)
-            images = random.sample(test_images, num_images)
-            
-            # 创建资产
+        # 测试数据 - 名称
+        names = [
+            '优质商业写字楼',
+            '高端住宅公寓',
+            '核心商圈商铺',
+            '工业园区厂房',
+            '城市综合体'
+        ]
+        
+        # 测试数据 - 图片
+        images = [
+            ['building1.jpg', 'building2.jpg'],
+            ['apartment1.jpg', 'apartment2.jpg'],
+            ['shop1.jpg', 'shop2.jpg'],
+            ['factory1.jpg', 'factory2.jpg'],
+            ['complex1.jpg', 'complex2.jpg']
+        ]
+        
+        # 创建5个不动产资产
+        for i in range(5):
             asset = Asset(
-                name=f"{random.choice(test_names)}{i+1}",
-                asset_type=asset_type,
-                area=area,
-                token_price=token_price,
-                token_supply=token_supply,
-                location=random.choice(test_locations),
-                owner_address=test_user.eth_address,
-                token_symbol=generate_token_symbol(),
-                total_value=total_value,
-                annual_revenue=random.uniform(100000, 1000000),
-                contract_address=generate_eth_address()
+                name=f'{names[i]} - 不动产',
+                asset_type=AssetType.REAL_ESTATE,
+                location=locations[i],
+                area=random.uniform(1000, 5000),  # 1000-5000平方米
+                token_price=random.uniform(100, 1000),  # 100-1000 USDC
+                token_symbol=generate_token_symbol(AssetType.REAL_ESTATE, i),
+                annual_revenue=random.uniform(3, 8),  # 3-8%
+                images={'paths': images[i]},
+                documents={'paths': ['proof1.pdf', 'proof2.pdf']},
+                status=AssetStatus.APPROVED if i < 3 else AssetStatus.PENDING,
+                owner_address=generate_eth_address(),
+                creator_address=generate_eth_address()
             )
-            asset.images = images
-            asset.status = AssetStatus.APPROVED.value  # 设置为已审核状态
-            
             db.session.add(asset)
-            print(f"Created asset: {asset.name} ({asset.token_symbol})")
         
-        # 提交所有更改
+        # 创建5个类不动产资产
+        for i in range(5):
+            asset = Asset(
+                name=f'{names[i]} - 类不动产',
+                asset_type=AssetType.SEMI_REAL_ESTATE,
+                location=locations[i],
+                total_value=random.uniform(1000000, 5000000),  # 100-500万USDC
+                token_price=random.uniform(10, 100),  # 10-100 USDC
+                token_supply=random.randint(10000, 50000),  # 1-5万代币
+                token_symbol=generate_token_symbol(AssetType.SEMI_REAL_ESTATE, i),
+                annual_revenue=random.uniform(5, 12),  # 5-12%
+                images={'paths': images[i]},
+                documents={'paths': ['auction1.pdf', 'auction2.pdf']},
+                status=AssetStatus.APPROVED if i < 3 else AssetStatus.PENDING,
+                owner_address=generate_eth_address(),
+                creator_address=generate_eth_address()
+            )
+            db.session.add(asset)
+        
         db.session.commit()
-        print("\nSuccessfully created 20 test assets!")
+        print("测试数据创建成功！")
+        print("- 5个不动产资产 (3个已审核, 2个待审核)")
+        print("- 5个类不动产资产 (3个已审核, 2个待审核)")
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     create_test_data() 

@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+
+{% block title %}分红管理 - 58HUB{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- 页面标题 -->
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">分红管理</h1>
+        <p class="mt-1 text-sm text-gray-500">管理资产分红发放</p>
+    </div>
+
+    <!-- 资产信息卡片 -->
+    <div class="bg-white rounded-lg shadow overflow-hidden mb-6">
+        <div class="px-4 py-5 sm:p-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-4">资产信息</h2>
+            <dl class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">资产名称</dt>
+                    <dd class="mt-1 text-sm text-gray-900" id="assetName">--</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">代币代码</dt>
+                    <dd class="mt-1 text-sm text-gray-900" id="tokenSymbol">--</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">持有人数量</dt>
+                    <dd class="mt-1 text-sm text-gray-900" id="holderCount">--</dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+
+    <!-- 分红发放表单 -->
+    <div class="bg-white rounded-lg shadow overflow-hidden mb-6">
+        <div class="px-4 py-5 sm:p-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-4">发放分红</h2>
+            <form id="dividendForm" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 分红金额 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">分红总金额</label>
+                        <div class="mt-1 relative rounded-md shadow-sm">
+                            <input type="number" id="dividendAmount" name="amount" required
+                                   class="focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-12 sm:text-sm border-gray-300 rounded-md"
+                                   placeholder="输入分红总金额">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                <span class="text-gray-500 sm:text-sm">USDC</span>
+                            </div>
+                        </div>
+                        <p class="mt-1 text-sm text-gray-500" id="perTokenAmount">每Token分红：-- USDC</p>
+                    </div>
+
+                    <!-- USDC余额 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">USDC余额</label>
+                        <div class="mt-1 relative rounded-md shadow-sm">
+                            <input type="text" id="usdcBalance" readonly
+                                   class="bg-gray-50 focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-12 sm:text-sm border-gray-300 rounded-md">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                <span class="text-gray-500 sm:text-sm">USDC</span>
+                            </div>
+                        </div>
+                        <p class="mt-1 text-sm text-gray-500">当前可用USDC余额</p>
+                    </div>
+                </div>
+
+                <!-- 分红说明 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">分红说明</label>
+                    <div class="mt-1">
+                        <textarea id="dividendDescription" name="description" rows="3"
+                                  class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                  placeholder="请输入分红说明（可选）"></textarea>
+                    </div>
+                </div>
+
+                <!-- 提交按钮 -->
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="window.history.back()"
+                            class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        返回
+                    </button>
+                    <button type="submit" id="submitButton"
+                            class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        发放分红
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 分红历史 -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-4 py-5 sm:p-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-4">分红历史</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分红金额</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">每Token分红</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">说明</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易Hash</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dividendHistoryContent" class="bg-white divide-y divide-gray-200">
+                        <!-- 分红历史记录将通过JavaScript动态加载 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+// 全局变量
+let assetId = null;
+let tokenContract = null;
+let usdcContract = null;
+let totalSupply = 0;
+
+// 页面初始化
+async function initializePage() {
+    try {
+        // 获取资产ID
+        assetId = getAssetId();
+        if (!assetId) {
+            showErrorToast('无效的资产ID');
+            return;
+        }
+
+        // 检查钱包连接
+        if (!window.ethereum || !window.ethereum.selectedAddress) {
+            showErrorToast('请先连接钱包');
+            return;
+        }
+
+        // 加载资产信息
+        await loadAssetInfo();
+        
+        // 加载分红历史
+        await loadDividendHistory();
+        
+        // 初始化合约
+        await initializeContracts();
+        
+        // 设置表单监听器
+        setupFormListeners();
+        
+    } catch (error) {
+        console.error('初始化页面失败:', error);
+        showErrorToast('初始化页面失败，请刷新重试');
+    }
+}
+
+// 从URL获取资产ID
+function getAssetId() {
+    const pathParts = window.location.pathname.split('/');
+    return pathParts[pathParts.length - 2] || null;
+}
+
+// 加载资产信息
+async function loadAssetInfo() {
+    try {
+        const response = await fetch(`/api/assets/${assetId}`);
+        if (!response.ok) throw new Error('加载资产信息失败');
+        
+        const assetData = await response.json();
+        
+        // 更新页面显示
+        document.getElementById('assetName').textContent = assetData.name;
+        document.getElementById('tokenSymbol').textContent = assetData.token_symbol;
+        
+        // 加载持有人数量
+        const statsResponse = await fetch(`/api/admin/assets/${assetId}/dividend_stats`, {
+            headers: { 'X-Eth-Address': window.ethereum.selectedAddress }
+        });
+        if (statsResponse.ok) {
+            const stats = await statsResponse.json();
+            document.getElementById('holderCount').textContent = stats.holder_count || 0;
+        }
+        
+    } catch (error) {
+        console.error('加载资产信息失败:', error);
+        showErrorToast('加载资产信息失败');
+    }
+}
+
+// 初始化合约
+async function initializeContracts() {
+    try {
+        // 初始化合约实例
+        tokenContract = new web3.eth.Contract(AssetTokenABI, currentAsset.token_address);
+        usdcContract = new web3.eth.Contract(USDCABI, currentAsset.usdc_address);
+        
+        // 获取代币总供应量
+        totalSupply = await tokenContract.methods.totalSupply().call();
+        
+        // 获取USDC余额
+        const balance = await usdcContract.methods.balanceOf(window.ethereum.selectedAddress).call();
+        document.getElementById('usdcBalance').value = web3.utils.fromWei(balance, 'ether');
+        
+    } catch (error) {
+        console.error('初始化合约失败:', error);
+        showErrorToast('初始化合约失败');
+    }
+}
+
+// 设置表单监听器
+function setupFormListeners() {
+    const form = document.getElementById('dividendForm');
+    const amountInput = document.getElementById('dividendAmount');
+    
+    // 监听金额输入
+    amountInput.addEventListener('input', () => {
+        const amount = parseFloat(amountInput.value) || 0;
+        const perToken = totalSupply > 0 ? amount / web3.utils.fromWei(totalSupply, 'ether') : 0;
+        document.getElementById('perTokenAmount').textContent = `每Token分红：${perToken.toFixed(6)} USDC`;
+    });
+    
+    // 监听表单提交
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await handleDividendSubmit();
+    });
+}
+
+// 处理分红提交
+async function handleDividendSubmit() {
+    try {
+        const amount = document.getElementById('dividendAmount').value;
+        const description = document.getElementById('dividendDescription').value;
+        
+        if (!amount || parseFloat(amount) <= 0) {
+            showErrorToast('请输入有效的分红金额');
+            return;
+        }
+        
+        // 显示确认对话框
+        if (!confirm(`确认发放 ${amount} USDC 的分红吗？`)) {
+            return;
+        }
+        
+        // 禁用提交按钮
+        const submitButton = document.getElementById('submitButton');
+        submitButton.disabled = true;
+        submitButton.textContent = '处理中...';
+        
+        // 调用合约发放分红
+        const amountWei = web3.utils.toWei(amount.toString(), 'ether');
+        
+        // 首先授权USDC
+        await usdcContract.methods.approve(currentAsset.token_address, amountWei)
+            .send({ from: window.ethereum.selectedAddress });
+            
+        // 然后发放分红
+        await tokenContract.methods.distributeDividend(amountWei)
+            .send({ from: window.ethereum.selectedAddress });
+            
+        // 记录分红信息到后端
+        await fetch(`/api/admin/assets/${assetId}/dividends`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Eth-Address': window.ethereum.selectedAddress
+            },
+            body: JSON.stringify({
+                amount: amount,
+                description: description
+            })
+        });
+        
+        showSuccessToast('分红发放成功');
+        
+        // 重新加载分红历史
+        await loadDividendHistory();
+        
+    } catch (error) {
+        console.error('发放分红失败:', error);
+        showErrorToast('发放分红失败: ' + error.message);
+    } finally {
+        // 恢复提交按钮
+        const submitButton = document.getElementById('submitButton');
+        submitButton.disabled = false;
+        submitButton.textContent = '发放分红';
+    }
+}
+
+// 加载分红历史
+async function loadDividendHistory() {
+    try {
+        const response = await fetch(`/api/admin/assets/${assetId}/dividend_stats`, {
+            headers: { 'X-Eth-Address': window.ethereum.selectedAddress }
+        });
+        
+        if (!response.ok) throw new Error('加载分红历史失败');
+        
+        const data = await response.json();
+        const records = data.records || [];
+        
+        const historyContent = document.getElementById('dividendHistoryContent');
+        if (records.length > 0) {
+            historyContent.innerHTML = records.map(record => `
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${new Date(record.date).toLocaleString('zh-CN')}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${record.amount} USDC
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${record.per_token} USDC
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${record.description || '--'}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            record.status === 'SUCCESS' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }">
+                            ${record.status === 'SUCCESS' ? '成功' : '处理中'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${record.tx_hash ? `
+                            <a href="https://etherscan.io/tx/${record.tx_hash}" 
+                               target="_blank" 
+                               class="text-blue-600 hover:text-blue-800">
+                                ${record.tx_hash.substring(0, 6)}...${record.tx_hash.substring(record.tx_hash.length - 4)}
+                            </a>
+                        ` : '--'}
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            historyContent.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                        暂无分红记录
+                    </td>
+                </tr>
+            `;
+        }
+    } catch (error) {
+        console.error('加载分红历史失败:', error);
+        showErrorToast('加载分红历史失败');
+    }
+}
+
+// 在页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', initializePage);
+</script>
+{% endblock %} 

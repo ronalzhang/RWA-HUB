@@ -16,8 +16,10 @@ admin_api_bp = Blueprint('admin_api', __name__)
 from . import views
 from . import api
 from . import admin
+from . import assets
 
 # 确保所有路由都已注册
 from .views import *
 from .api import *
 from .admin import *
+from .assets import *
