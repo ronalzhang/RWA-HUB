@@ -1,6 +1,6 @@
-# 58HUB 资产管理平台
+# RWA-HUB 资产管理平台
 
-58HUB 是一个基于 Web3 技术的资产管理平台，支持不动产和类不动产的数字化和通证化管理。
+RWA-HUB 是一个基于 Web3 技术的资产管理平台，支持不动产和类不动产的数字化和通证化管理。
 
 ## 功能特点
 
@@ -20,8 +20,8 @@
 
 1. 克隆仓库：
 ```bash
-git clone https://github.com/yourusername/58HUB.git
-cd 58HUB
+git clone https://github.com/ronalzhang/RWA-HUB.git
+cd RWA-HUB
 ```
 
 2. 创建虚拟环境：
