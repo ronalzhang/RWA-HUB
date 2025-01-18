@@ -1,434 +1,355 @@
 {% extends "base.html" %}
 
-{% block title %}创建资产 - 58HUB{% endblock %}
+{% block title %}发布资产 - RWA-HUB{% endblock %}
 
 {% block content %}
-<div class="bg-white shadow rounded-lg">
-    <div class="px-4 py-5 sm:px-6">
-        <h1 class="text-2xl font-bold text-gray-900">创建新资产</h1>
+<div class="container mt-4">
+    <h2 class="mb-4">发布资产</h2>
+
+    <!-- 未连接钱包时显示 -->
+    <div id="walletAlert" class="alert alert-warning text-center">
+        <h4 class="alert-heading">请先连接钱包</h4>
+        <p class="mb-0">连接以太坊钱包后即可发布资产，无需注册</p>
     </div>
-    <div class="border-t border-gray-200">
-        <div class="px-4 py-5 sm:p-6">
-            <div id="walletAlert" class="mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-4 hidden">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                        </svg>
-                    </div>
-                    <div class="ml-3">
-                        <p class="text-sm text-yellow-700">
-                            请先连接MetaMask钱包
-                        </p>
-                    </div>
+
+    <!-- 已连接钱包时显示 -->
+    <div id="createForm" class="card" style="display: none;">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">发布资产</h5>
+        </div>
+        <div class="card-body">
+            <form id="assetForm" enctype="multipart/form-data">
+                <!-- 基础信息 -->
+                <div class="form-group mb-3">
+                    <label for="name">资产名称 <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="name" name="name" required maxlength="100" placeholder="请输入资产名称">
+                    <small class="form-text text-muted">建议使用具有识别度的名称，如"北京市朝阳区XX大厦"</small>
                 </div>
-            </div>
-            
-            <form id="createAssetForm" class="space-y-6" style="display: none;">
-                <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
-                    <div class="sm:col-span-2">
-                        <label for="name" class="block text-sm font-medium text-gray-700">资产名称</label>
-                        <div class="mt-1">
-                            <input type="text" name="name" id="name" required
-                                   class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                        </div>
-                    </div>
 
-                    <div>
-                        <label for="asset_type" class="block text-sm font-medium text-gray-700">资产类型</label>
-                        <div class="mt-1">
-                            <select name="asset_type" id="asset_type" required
-                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                <option value="10">不动产</option>
-                                <option value="20">类不动产</option>
-                            </select>
-                        </div>
-                    </div>
+                <div class="form-group mb-3">
+                    <label for="description">资产描述 <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="description" name="description" rows="4" required maxlength="1000" placeholder="请详细描述资产情况，包括：1. 资产基本情况 2. 收益来源 3. 风险说明"></textarea>
+                    <small class="form-text text-muted">详细的描述有助于投资者更好地了解项目价值</small>
+                </div>
 
-                    <div id="areaField">
-                        <label for="area" class="block text-sm font-medium text-gray-700">面积（平方米）</label>
-                        <div class="mt-1">
-                            <input type="number" name="area" id="area" step="0.01" min="0"
-                                   class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                        </div>
-                    </div>
+                <div class="form-group mb-3">
+                    <label for="location">资产位置 <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="location" name="location" required maxlength="200" placeholder="请输入详细地址">
+                    <small class="form-text text-muted">请填写完整的地址信息，如"北京市朝阳区XX路XX号"</small>
+                </div>
 
-                    <div id="totalValueField">
-                        <label for="total_value" class="block text-sm font-medium text-gray-700">资产总价值 (USDT)</label>
-                        <div class="mt-1">
-                            <input type="number" name="total_value" id="total_value" step="0.01" min="0"
-                                   class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                        </div>
-                    </div>
+                <div class="form-group mb-3">
+                    <label for="asset_type">资产类型 <span class="text-danger">*</span></label>
+                    <select class="form-control" id="asset_type" name="asset_type" required>
+                        <option value="">请选择资产类型</option>
+                        <option value="10">不动产（房产、土地等）</option>
+                        <option value="20">类不动产（珠宝、艺术品等）</option>
+                    </select>
+                    <small class="form-text text-muted">不动产需要上传房产证/土地证，类不动产需要上传拍卖文件等权属证明</small>
+                </div>
 
-                    <div id="tokenSupplyField" style="display: none;">
-                        <label for="token_supply" class="block text-sm font-medium text-gray-700">代币发行量</label>
-                        <div class="mt-1">
-                            <input type="number" name="token_supply" id="token_supply" min="1"
-                                   class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label for="token_price" class="block text-sm font-medium text-gray-700">代币价格 (USDT)</label>
-                        <div class="mt-1">
-                            <input type="number" name="token_price" id="token_price" step="0.01" min="0" required readonly
-                                   class="block w-full rounded-md border-gray-300 bg-gray-50 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                        </div>
-                        <p class="mt-1 text-sm text-gray-500" id="tokenPriceHint">代币价格将根据总价值自动计算</p>
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label for="description" class="block text-sm font-medium text-gray-700">资产描述</label>
-                        <div class="mt-1">
-                            <textarea id="description" name="description" rows="4"
-                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    placeholder="请输入资产的详细描述信息"></textarea>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <label for="annual_revenue" class="block text-sm font-medium text-gray-700">预期年收益 (元)</label>
-                        <input type="number" id="annual_revenue" name="annual_revenue" required min="0" step="0.01"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                            placeholder="请输入预期年收益金额">
-                        <p class="mt-1 text-sm text-gray-500">请输入资产每年预期产生的实际收益金额</p>
-                    </div>
-
-                    <div>
-                        <label for="token_code" class="block text-sm font-medium text-gray-700">代币代码</label>
-                        <div class="mt-1">
-                            <div class="flex rounded-md shadow-sm">
-                                <span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
-                                    RH-
-                                </span>
-                                <input type="text" name="token_code" id="token_code" pattern="[0-9]{6}" maxlength="6" readonly
-                                       class="flex-1 block w-full rounded-none rounded-r-md border-gray-300 bg-gray-50 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                                       title="代币代码将自动生成">
-                            </div>
-                            <p class="mt-1 text-sm text-gray-500">代币代码将自动生成，管理员可在审核时修改</p>
-                        </div>
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label for="location" class="block text-sm font-medium text-gray-700">位置</label>
-                        <div class="mt-1">
-                            <input type="text" name="location" id="location"
-                                   class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                        </div>
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label for="images" class="block text-sm font-medium text-gray-700">图片</label>
-                        <div class="mt-1">
-                            <input type="file" name="images" id="images" accept="image/*" multiple
-                                   class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                        </div>
-                        <p class="mt-2 text-sm text-gray-500">支持多个图片文件</p>
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label for="documents" class="block text-sm font-medium text-gray-700">相关文档</label>
-                        <div class="mt-1">
-                            <input type="file" name="documents" id="documents" accept=".pdf,.doc,.docx"
-                                   class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                        </div>
-                        <p class="mt-2 text-sm text-gray-500">支持PDF、Word文档</p>
+                <!-- 不动产特有字段 -->
+                <div id="realEstateFields" style="display: none;">
+                    <div class="form-group mb-3">
+                        <label for="area">建筑面积(平方米) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="area" name="area" min="0" step="0.01" placeholder="请输入建筑面积">
+                        <small class="form-text text-muted">系统将自动按照 面积×10000 计算代币发行量，如：100平米将发行1,000,000代币</small>
                     </div>
                 </div>
 
-                <div class="pt-5">
-                    <div class="flex justify-end space-x-3">
-                        <a href="/assets" class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            取消
-                        </a>
-                        <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            创建资产
-                        </button>
+                <!-- 类不动产特有字段 -->
+                <div id="semiRealEstateFields" style="display: none;">
+                    <div class="form-group mb-3">
+                        <label for="token_supply">代币发行量 <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="token_supply" name="token_supply" min="1" placeholder="请输入计划发行的代币数量">
+                        <small class="form-text text-muted">建议设置合理的代币发行量，便于投资者参与</small>
                     </div>
                 </div>
+
+                <!-- 共同字段 -->
+                <div class="form-group mb-3">
+                    <label for="total_value">总价值(USDC) <span class="text-danger">*</span></label>
+                    <input type="number" class="form-control" id="total_value" name="total_value" min="0" step="0.01" required placeholder="请输入资产总价值">
+                    <small class="form-text text-muted">请输入资产的实际市场价值，系统将自动计算代币单价</small>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="token_price">代币单价(USDC)</label>
+                    <input type="number" class="form-control" id="token_price" name="token_price" readonly>
+                    <small class="form-text text-muted">代币单价 = 总价值 ÷ 代币发行量</small>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="token_symbol">代币代码</label>
+                    <input type="text" class="form-control" id="token_symbol" name="token_symbol" readonly>
+                    <small class="form-text text-muted">代币代码格式：RH-XXYYYY（XX：资产类型代码，YYYY：随机编号）</small>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="annual_revenue">预期年收益(USDC) <span class="text-danger">*</span></label>
+                    <input type="number" class="form-control" id="annual_revenue" name="annual_revenue" min="0" step="0.01" required placeholder="请输入预期的年收益">
+                    <small class="form-text text-muted">请根据实际情况预估年收益，投资者将根据此数据评估投资价值</small>
+                </div>
+
+                <!-- 文件上传 -->
+                <div class="form-group mb-3">
+                    <label>资产图片 <span class="text-danger">*</span></label>
+                    <div class="custom-file">
+                        <input type="file" class="form-control" id="images" name="images" accept="image/*" multiple required>
+                    </div>
+                    <small class="form-text text-muted">请上传清晰的资产实拍图片，支持jpg、png、gif格式，每张不超过5MB</small>
+                    <div id="imagePreview" class="mt-2 row"></div>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label>权属证明</label>
+                    <div class="custom-file">
+                        <input type="file" class="form-control" id="documents" name="documents" accept=".pdf,.doc,.docx" multiple>
+                    </div>
+                    <small class="form-text text-muted" id="documentHint">可选：不动产可上传房产证、土地证等，类不动产可上传拍卖文件等权属证明</small>
+                    <div id="documentList" class="mt-2"></div>
+                </div>
+
+                <div class="alert alert-info">
+                    <h6 class="alert-heading">发布提示：</h6>
+                    <ol class="mb-0">
+                        <li>资产信息发布后将上链存证，请确保信息真实准确</li>
+                        <li>上传的证明文件将用于平台审核，请确保真实有效</li>
+                        <li>发布后将进入待审核状态，审核通过后即可开始交易</li>
+                    </ol>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg w-100">发布资产</button>
             </form>
         </div>
     </div>
 </div>
 
 <script>
-let currentAccount = null;
-
+// 检查钱包连接状态
 async function checkWalletConnection() {
-    if (typeof window.ethereum !== 'undefined') {
-        try {
-            // 先尝试从localStorage获取地址
-            const savedAddress = localStorage.getItem('eth_address');
-            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-            
-            if (accounts.length > 0) {
-                currentAccount = accounts[0];
-                // 保存到localStorage和cookie
-                localStorage.setItem('eth_address', currentAccount);
-                document.cookie = `eth_address=${currentAccount}; path=/; max-age=86400`;
-                
-                document.getElementById('walletAlert').classList.add('hidden');
-                document.getElementById('createAssetForm').style.display = 'block';
-                return true;
-            } else if (savedAddress) {
-                // 如果有保存的地址但钱包未连接，尝试自动连接
-                try {
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    currentAccount = accounts[0];
-                    document.getElementById('walletAlert').classList.add('hidden');
-                    document.getElementById('createAssetForm').style.display = 'block';
-                    return true;
-                } catch (error) {
-                    console.warn('自动连接钱包失败:', error);
-                }
-            }
-        } catch (error) {
-            console.error('检查钱包连接失败:', error);
-        }
-    }
+    const walletAlert = document.getElementById('walletAlert');
+    const createForm = document.getElementById('createForm');
     
-    document.getElementById('walletAlert').classList.remove('hidden');
-    document.getElementById('createAssetForm').style.display = 'none';
-    return false;
-}
-
-async function connectWallet() {
-    if (typeof window.ethereum !== 'undefined') {
-        try {
-            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-            currentAccount = accounts[0];
-            await checkWalletConnection();
-        } catch (error) {
-            console.error('连接钱包失败:', error);
+    try {
+        // 检查 localStorage 中的状态
+        const isWalletConnected = localStorage.getItem('walletConnected') === 'true';
+        const storedAddress = localStorage.getItem('userAddress');
+        
+        // 如果 localStorage 显示未连接，则显示警告
+        if (!isWalletConnected || !storedAddress) {
+            walletAlert.style.display = 'block';
+            createForm.style.display = 'none';
+            return;
         }
-    } else {
-        alert('请安装MetaMask钱包');
+        
+        // 检查 MetaMask 状态
+        if (!window.ethereum) {
+            walletAlert.style.display = 'block';
+            createForm.style.display = 'none';
+            return;
+        }
+        
+        // 获取当前连接的账户
+        const accounts = await window.ethereum.request({
+            method: 'eth_accounts'
+        });
+        
+        // 只有当 MetaMask 账户存在且与存储的地址匹配时才显示表单
+        if (accounts && accounts.length > 0 && 
+            accounts[0].toLowerCase() === storedAddress.toLowerCase()) {
+            window.currentAccount = accounts[0];
+            walletAlert.style.display = 'none';
+            createForm.style.display = 'block';
+        } else {
+            walletAlert.style.display = 'block';
+            createForm.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('检查钱包状态失败:', error);
+        walletAlert.style.display = 'block';
+        createForm.style.display = 'none';
     }
 }
 
-document.getElementById('walletAlert').addEventListener('click', connectWallet);
+// 提交表单
+async function submitForm(event) {
+    event.preventDefault();
+    
+    try {
+        // 检查钱包连接
+        if (!window.ethereum || !window.currentAccount) {
+            throw new Error('请先连接钱包');
+        }
 
-// 监听钱包连接状态
+        const form = event.target;
+        const formData = new FormData(form);
+        
+        // 添加钱包地址到请求头和表单数据中
+        const headers = new Headers();
+        headers.append('X-Eth-Address', window.currentAccount);
+        formData.append('eth_address', window.currentAccount);
+        
+        const response = await fetch('/api/assets/create', {
+            method: 'POST',
+            headers: headers,
+            body: formData
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || '创建失败');
+        }
+
+        const result = await response.json();
+        if (result.asset && result.asset.id) {
+            alert('创建成功!');
+            window.location.href = `/assets/${result.asset.id}`;
+        } else {
+            throw new Error('创建成功但返回的资产ID无效');
+        }
+    } catch (error) {
+        console.error('创建失败:', error);
+        alert(error.message || '创建失败');
+    }
+}
+
+// 页面加载时检查钱包状态
+document.addEventListener('DOMContentLoaded', checkWalletConnection);
+
+// 监听钱包连接状态变化
 if (window.ethereum) {
     window.ethereum.on('accountsChanged', checkWalletConnection);
-    checkWalletConnection();
+    window.ethereum.on('chainChanged', checkWalletConnection);
+    window.ethereum.on('connect', checkWalletConnection);
+    window.ethereum.on('disconnect', checkWalletConnection);
 }
 
-// 处理资产类型切换
 document.getElementById('asset_type').addEventListener('change', function() {
-    const areaField = document.getElementById('areaField');
-    const totalValueField = document.getElementById('totalValueField');
-    const tokenSupplyField = document.getElementById('tokenSupplyField');
+    const realEstateFields = document.getElementById('realEstateFields');
+    const semiRealEstateFields = document.getElementById('semiRealEstateFields');
+    const documentHint = document.getElementById('documentHint');
     const area = document.getElementById('area');
-    const totalValue = document.getElementById('total_value');
     const tokenSupply = document.getElementById('token_supply');
-    const tokenPrice = document.getElementById('token_price');
-    const tokenPriceHint = document.getElementById('tokenPriceHint');
     
-    if (this.value === '10') { // 不动产
-        areaField.style.display = 'block';
-        totalValueField.style.display = 'block';
-        tokenSupplyField.style.display = 'none';
+    // 重置相关字段
+    document.getElementById('token_price').value = '';
+    document.getElementById('total_value').value = '';
+    document.getElementById('token_symbol').value = '';
+    
+    if (this.value === '10') {  // 不动产
+        realEstateFields.style.display = 'block';
+        semiRealEstateFields.style.display = 'none';
+        documentHint.textContent = '可选：请上传房产证、土地证等证明文件';
         area.required = true;
-        totalValue.required = true;
         tokenSupply.required = false;
-        tokenPriceHint.textContent = '代币价格 = 总价值 / (面积 × 10000)，每平方米对应10000个代币';
-        
-        // 如果已有面积，立即计算代币发行量
-        if (area.value) {
-            const tokenSupplyValue = Math.floor(parseFloat(area.value) * 10000);
-            tokenSupply.value = tokenSupplyValue;
-            console.log('不动产代币发行量:', tokenSupplyValue);
-        }
-    } else { // 类不动产
-        areaField.style.display = 'none';
-        totalValueField.style.display = 'block';
-        tokenSupplyField.style.display = 'block';
+        // 生成代币代码
+        generateTokenSymbol('10');
+    } else if (this.value === '20') {  // 类不动产
+        realEstateFields.style.display = 'none';
+        semiRealEstateFields.style.display = 'block';
+        documentHint.textContent = '可选：请上传拍卖文件等证明文件';
         area.required = false;
-        totalValue.required = true;
         tokenSupply.required = true;
-        tokenPriceHint.textContent = '代币价格 = 总价值 / 代币发行量';
+        // 生成代币代码
+        generateTokenSymbol('20');
+    } else {
+        realEstateFields.style.display = 'none';
+        semiRealEstateFields.style.display = 'none';
+        documentHint.textContent = '可选：请上传相关证明文件';
+        area.required = false;
+        tokenSupply.required = false;
+        document.getElementById('token_symbol').value = '';
     }
-    
-    generateTokenCode(this.value);
-    calculateTokenPrice();
 });
 
-// 自动生成代币代码
-function generateTokenCode(assetType) {
-    const timestamp = Date.now().toString();
-    const randomNum = timestamp.slice(-4).padStart(4, '0');
-    document.getElementById('token_code').value = assetType + randomNum;
+// 生成代币代码
+function generateTokenSymbol(typeCode) {
+    // 生成4位随机数字
+    const randomNumber = Array.from({length: 4}, () => Math.floor(Math.random() * 10)).join('');
+    const tokenSymbol = `RH-${typeCode}${randomNumber}`;
+    document.getElementById('token_symbol').value = tokenSymbol;
 }
 
-// 计算代币价格
-function calculateTokenPrice() {
-    const assetType = document.getElementById('asset_type').value;
-    const totalValue = parseFloat(document.getElementById('total_value').value) || 0;
-    const tokenPrice = document.getElementById('token_price');
-    const tokenSupply = document.getElementById('token_supply');
-
-    if (assetType === '10') { // 不动产
-        const area = parseFloat(document.getElementById('area').value) || 0;
-        if (totalValue > 0 && area > 0) {
-            const supplyValue = Math.floor(area * 10000);
-            tokenSupply.value = supplyValue;
-            console.log('计算不动产代币价格:', {
-                totalValue,
-                area,
-                supplyValue,
-                price: totalValue / supplyValue
-            });
-            tokenPrice.value = (totalValue / supplyValue).toFixed(2);
-        } else {
-            tokenPrice.value = '';
-        }
-    } else { // 类不动产
-        const supplyValue = parseInt(tokenSupply.value) || 0;
-        if (totalValue > 0 && supplyValue > 0) {
-            console.log('计算类不动产代币价格:', {
-                totalValue,
-                supplyValue,
-                price: totalValue / supplyValue
-            });
-            tokenPrice.value = (totalValue / supplyValue).toFixed(2);
-        } else {
-            tokenPrice.value = '';
-        }
-    }
-}
-
-// 添加面积变化监听器
+// 自动计算代币发行量和代币单价
 document.getElementById('area').addEventListener('input', function() {
-    if (document.getElementById('asset_type').value === '10') {
-        const area = parseFloat(this.value) || 0;
-        const tokenSupplyValue = Math.floor(area * 10000);
-        document.getElementById('token_supply').value = tokenSupplyValue;
-        console.log('面积变化，更新代币发行量:', tokenSupplyValue);
+    if (this.value) {
+        const tokenSupply = parseFloat(this.value) * 10000;
+        document.getElementById('token_supply').value = tokenSupply;
         calculateTokenPrice();
     }
 });
 
-document.getElementById('total_value').addEventListener('input', calculateTokenPrice);
 document.getElementById('token_supply').addEventListener('input', calculateTokenPrice);
+document.getElementById('total_value').addEventListener('input', calculateTokenPrice);
 
-// 初始化时生成代币代码
-generateTokenCode(document.getElementById('asset_type').value);
-
-document.getElementById('token_code').addEventListener('input', function(e) {
-    let value = e.target.value.replace(/\D/g, '');
-    if (value.length > 6) {
-        value = value.slice(0, 6);
-    }
-    const assetType = document.getElementById('asset_type').value;
-    if (value.length >= 2) {
-        value = assetType === '10' ? '10' + value.slice(2) : '20' + value.slice(2);
-    }
-    e.target.value = value;
-});
-
-document.getElementById('createAssetForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
+function calculateTokenPrice() {
+    const totalValue = parseFloat(document.getElementById('total_value').value) || 0;
+    let tokenSupply = 0;
     
-    if (!currentAccount) {
-        alert('请先连接钱包');
-        return;
-    }
-    
-    const formData = new FormData(this);
-    const submitButton = this.querySelector('button[type="submit"]');
-    const originalText = submitButton.textContent;
-    
-    try {
-        submitButton.textContent = '创建中...';
-        submitButton.disabled = true;
-
-        // 确保代币发行量和价格计算正确
-        const assetType = document.getElementById('asset_type').value;
+    if (document.getElementById('asset_type').value === 'REAL_ESTATE') {
         const area = parseFloat(document.getElementById('area').value) || 0;
-        const totalValue = parseFloat(document.getElementById('total_value').value) || 0;
-        let tokenSupply = parseInt(document.getElementById('token_supply').value) || 0;
-
-        if (assetType === '10') { // 不动产
-            if (area <= 0) {
-                alert('请输入有效的面积');
-                return;
-            }
-            if (totalValue <= 0) {
-                alert('请输入有效的总价值');
-                return;
-            }
-            // 重新计算代币发行量
-            tokenSupply = Math.floor(area * 10000);
-            formData.set('token_supply', tokenSupply.toString());
-        } else { // 类不动产
-            if (totalValue <= 0) {
-                alert('请输入有效的总价值');
-                return;
-            }
-            if (tokenSupply <= 0) {
-                alert('请输入有效的代币发行量');
-                return;
-            }
-        }
-
-        // 计算代币价格
+        tokenSupply = area * 10000;
+    } else {
+        tokenSupply = parseFloat(document.getElementById('token_supply').value) || 0;
+    }
+    
+    if (totalValue && tokenSupply) {
         const tokenPrice = totalValue / tokenSupply;
-        formData.set('token_price', tokenPrice.toFixed(2));
-        
-        // 确保图片和文档数据正确添加到FormData
-        const images = document.getElementById('images').files;
-        const documents = document.getElementById('documents').files;
-        
-        // 清除之前的文件（如果有的话）
-        formData.delete('images');
-        formData.delete('documents');
-        
-        // 重新添加文件
-        for (let i = 0; i < images.length; i++) {
-            formData.append('images', images[i]);
-        }
-        for (let i = 0; i < documents.length; i++) {
-            formData.append('documents', documents[i]);
-        }
+        document.getElementById('token_price').value = tokenPrice.toFixed(6);
+    }
+}
 
-        // 确保钱包地址已保存
-        localStorage.setItem('eth_address', currentAccount);
-        sessionStorage.setItem('eth_address', currentAccount);
-        document.cookie = `eth_address=${currentAccount}; path=/; max-age=86400`;
-        
-        const response = await fetch('/api/assets', {
-            method: 'POST',
-            headers: {
-                'X-Eth-Address': currentAccount
-            },
-            body: formData
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-            alert('资产创建成功！等待审核后，将自动上链。');
-            
-            // 确保在跳转前钱包状态已经完全保存
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            // 构建带有钱包地址的URL并添加时间戳防止缓存
-            const timestamp = new Date().getTime();
-            const redirectUrl = `/assets/${data.id}?eth_address=${currentAccount}&t=${timestamp}`;
-            window.location.href = redirectUrl;
-        } else {
-            alert(data.error || '创建失败，请重试');
+// 图片预览
+document.getElementById('images').addEventListener('change', function(e) {
+    const preview = document.getElementById('imagePreview');
+    preview.innerHTML = '';
+    
+    for (const file of this.files) {
+        if (file.size > 5 * 1024 * 1024) {
+            alert('图片大小不能超过5MB');
+            this.value = '';
+            preview.innerHTML = '';
+            return;
         }
-    } catch (error) {
-        console.error('创建资产失败:', error);
-        alert('创建失败，请重试');
-    } finally {
-        submitButton.textContent = originalText;
-        submitButton.disabled = false;
+        
+        const reader = new FileReader();
+        const div = document.createElement('div');
+        div.className = 'col-md-3 mb-2';
+        
+        reader.onload = function(e) {
+            div.innerHTML = `
+                <img src="${e.target.result}" class="img-thumbnail" style="height: 150px; object-fit: cover;">
+            `;
+        };
+        
+        reader.readAsDataURL(file);
+        preview.appendChild(div);
     }
 });
+
+// 文档列表显示
+document.getElementById('documents').addEventListener('change', function(e) {
+    const list = document.getElementById('documentList');
+    list.innerHTML = '';
+    
+    for (const file of this.files) {
+        if (file.size > 10 * 1024 * 1024) {
+            alert('文档大小不能超过10MB');
+            this.value = '';
+            list.innerHTML = '';
+            return;
+        }
+        
+        const div = document.createElement('div');
+        div.className = 'alert alert-info mb-1';
+        div.textContent = file.name;
+        list.appendChild(div);
+    }
+});
+
+// 表单提交
+document.getElementById('assetForm').addEventListener('submit', submitForm);
 </script>
 {% endblock %}
 

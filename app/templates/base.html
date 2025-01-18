@@ -3,157 +3,307 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}58HUB{% endblock %}</title>
-    <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>{% block title %}{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        .wallet-btn {
+            min-width: 160px;
+            text-align: center;
+        }
+        
+        .dropdown-menu {
+            min-width: 160px;
+        }
+        
+        .wallet-address {
+            font-family: monospace;
+        }
+    </style>
+    
     {% block head %}{% endblock %}
 </head>
-<body class="bg-gray-100">
-    <nav class="bg-white shadow">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex">
-                    <div class="flex-shrink-0 flex items-center">
-                        <a href="/" class="text-2xl font-bold text-blue-600">58HUB</a>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/">RWA-HUB.com</a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('assets.list_assets_page') }}">全部资产</a>
+                    </li>
+                    <li class="nav-item d-none" id="adminEntry">
+                        <a class="nav-link" href="#" id="adminLink">
+                            <i class="fas fa-user-shield me-1"></i>管理后台
+                        </a>
+                    </li>
+                </ul>
+                
+                <!-- 钱包连接 -->
+                <div class="d-flex align-items-center">
+                    <div class="dropdown">
+                        <button id="walletBtn" class="btn btn-outline-primary wallet-btn" type="button" onclick="handleWalletClick()">
+                            <i class="fas fa-wallet me-2"></i>
+                            <span id="walletBtnText">连接钱包</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" id="walletMenu">
+                            <li><a class="dropdown-item" href="#" id="switchWallet">
+                                <i class="fas fa-exchange-alt me-2"></i>切换钱包
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" id="disconnectWallet">
+                                <i class="fas fa-power-off me-2"></i>断开连接
+                            </a></li>
+                        </ul>
                     </div>
-                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-                        <a href="/" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            首页
-                        </a>
-                        <a href="/assets" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            资产列表
-                        </a>
-                        <a href="/assets/create" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            创建资产
-                        </a>
-                        <a href="/admin" id="adminLink" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium hidden">
-                            后台管理
-                        </a>
-                    </div>
-                </div>
-                <div class="hidden sm:ml-6 sm:flex sm:items-center">
-                    <button id="connectWalletBtn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        连接钱包
-                    </button>
                 </div>
             </div>
         </div>
     </nav>
 
-    <main>
-        {% block content %}{% endblock %}
-    </main>
+    <!-- 主要内容 -->
+    {% block content %}{% endblock %}
 
+    <!-- 页脚 -->
+    <footer class="footer mt-auto py-1 bg-light border-top">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5 class="mb-1">RWA-HUB.com</h5>
+                    <p class="text-muted mb-0">基于区块链技术的实物资产数字化平台</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <div class="mb-2">
+                        <a href="#" class="text-decoration-none text-muted me-3">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                        <a href="#" class="text-decoration-none text-muted me-3">
+                            <i class="fab fa-telegram"></i>
+                        </a>
+                        <a href="#" class="text-decoration-none text-muted">
+                            <i class="fab fa-discord"></i>
+                        </a>
+                    </div>
+                    <p class="text-muted small mb-0">
+                        © 2024 RWA-HUB.com 版权所有
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 钱包连接脚本 -->
     <script>
-    window.currentAccount = null;
+    // 钱包连接状态管理
+    let currentAccount = null;
+    let walletEventListeners = [];
 
-    async function initWeb3() {
-        if (window.ethereum) {
-            window.web3 = new Web3(window.ethereum);
+    // 检查是否已经连接
+    async function checkConnection() {
+        if (typeof window.ethereum !== 'undefined') {
             try {
                 const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-                if (accounts.length > 0) {
-                    window.currentAccount = accounts[0];
-                    updateConnectButton();
-                    await checkAndUpdateAdminLink();
-                }
+                const storedAddress = localStorage.getItem('userAddress');
                 
-                window.ethereum.on('accountsChanged', async function (accounts) {
-                    window.currentAccount = accounts[0] || null;
-                    updateConnectButton();
-                    await checkAndUpdateAdminLink();
-                });
+                // 只有当前账户存在且与存储的地址匹配时才连接
+                if (accounts.length > 0 && storedAddress && 
+                    accounts[0].toLowerCase() === storedAddress.toLowerCase()) {
+                    handleAccountsChanged(accounts);
+                    setupWalletEventListeners(); // 重新设置事件监听器
+                } else {
+                    clearWalletState();
+                }
             } catch (error) {
-                console.error("初始化Web3失败:", error);
+                console.error('检查钱包连接失败:', error);
+                clearWalletState();
             }
         }
     }
 
-    function updateConnectButton() {
-        const connectBtn = document.getElementById('connectWalletBtn');
-        if (!connectBtn) return;
+    // 清除钱包状态
+    function clearWalletState() {
+        currentAccount = null;
+        localStorage.removeItem('walletConnected');
+        localStorage.removeItem('userAddress');
+        updateWalletUI(null);
         
-        if (window.currentAccount) {
-            const shortAddress = `${window.currentAccount.substring(0, 6)}...${window.currentAccount.substring(38)}`;
-            connectBtn.textContent = shortAddress;
-            connectBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
-            connectBtn.classList.add('bg-gray-600', 'cursor-default');
-            connectBtn.disabled = true;
-        } else {
-            connectBtn.textContent = '连接钱包';
-            connectBtn.classList.remove('bg-gray-600', 'cursor-default');
-            connectBtn.classList.add('bg-green-600', 'hover:bg-green-700');
-            connectBtn.disabled = false;
+        // 移除所有事件监听器
+        if (window.ethereum && walletEventListeners.length > 0) {
+            walletEventListeners.forEach(listener => {
+                window.ethereum.removeListener(listener.event, listener.handler);
+            });
+            walletEventListeners = [];
         }
     }
 
+    // 处理钱包按钮点击
+    async function handleWalletClick() {
+        if (!currentAccount) {
+            await connectWallet();
+        }
+    }
+
+    // 连接钱包
     async function connectWallet() {
-        if (window.currentAccount) return;
-        
-        if (window.ethereum) {
+        if (typeof window.ethereum !== 'undefined') {
             try {
                 const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                window.currentAccount = accounts[0];
-                updateConnectButton();
-                await checkAndUpdateAdminLink();
+                handleAccountsChanged(accounts);
+                setupWalletEventListeners();
             } catch (error) {
-                console.error("连接钱包失败:", error);
-                alert("连接钱包失败: " + error.message);
+                console.error('连接钱包失败:', error);
             }
         } else {
-            alert("请安装MetaMask钱包");
+            alert('请安装MetaMask钱包');
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        initWeb3();
-        const connectBtn = document.getElementById('connectWalletBtn');
-        if (connectBtn) {
-            connectBtn.addEventListener('click', connectWallet);
+    // 设置钱包事件监听器
+    function setupWalletEventListeners() {
+        if (typeof window.ethereum !== 'undefined') {
+            // 先移除现有的监听器
+            if (walletEventListeners.length > 0) {
+                walletEventListeners.forEach(listener => {
+                    window.ethereum.removeListener(listener.event, listener.handler);
+                });
+                walletEventListeners = [];
+            }
+            
+            // 添加新的监听器
+            const listeners = [
+                { event: 'accountsChanged', handler: handleAccountsChanged },
+                { event: 'chainChanged', handler: () => window.location.reload() },
+                { event: 'disconnect', handler: handleDisconnect }
+            ];
+            
+            listeners.forEach(listener => {
+                window.ethereum.on(listener.event, listener.handler);
+                walletEventListeners.push(listener);
+            });
         }
-    });
+    }
 
-    // 检查是否是管理员并更新后台管理链接显示
-    async function checkAndUpdateAdminLink() {
-        const adminAddresses = [
-            '0x6394993426DBA3b654eF0052698Fe9E0B6A98870',
-            '0x124e5B8A4E6c68eC66e181E0B54817b12D879c57'
-        ];
+    // 断开钱包
+    async function handleDisconnect() {
+        try {
+            clearWalletState();
+            
+            // 关闭下拉菜单
+            const dropdownInstance = bootstrap.Dropdown.getInstance(document.getElementById('walletBtn'));
+            if (dropdownInstance) {
+                dropdownInstance.hide();
+            }
+            
+            // 刷新页面
+            window.location.reload();
+        } catch (error) {
+            console.error('断开钱包失败:', error);
+        }
+    }
+
+    // 处理账户变更
+    function handleAccountsChanged(accounts) {
+        if (accounts.length === 0) {
+            clearWalletState();
+        } else if (accounts[0] !== currentAccount) {
+            currentAccount = accounts[0];
+            localStorage.setItem('walletConnected', 'true');
+            localStorage.setItem('userAddress', currentAccount);
+            updateWalletUI(currentAccount);
+        }
+    }
+
+    // 更新钱包UI
+    function updateWalletUI(account) {
+        const walletBtn = document.getElementById('walletBtn');
+        const walletBtnText = document.getElementById('walletBtnText');
+        const walletMenu = document.getElementById('walletMenu');
+        const adminEntry = document.getElementById('adminEntry');
         
-        const adminLink = document.getElementById('adminLink');
-        if (!adminLink) return;
-        
-        if (window.currentAccount && adminAddresses.map(addr => addr.toLowerCase()).includes(window.currentAccount.toLowerCase())) {
-            adminLink.classList.remove('hidden');
-            // 更新后台管理链接，添加钱包地址
-            adminLink.href = `/admin?eth_address=${window.currentAccount}`;
+        if (account) {
+            const shortAddress = `${account.substring(0, 6)}...${account.substring(38)}`;
+            walletBtnText.textContent = shortAddress;
+            walletBtn.setAttribute('data-bs-toggle', 'dropdown');
+            walletBtn.classList.remove('btn-outline-primary');
+            walletBtn.classList.add('btn-outline-success');
+            
+            // 检查是否是管理员
+            checkAdminStatus(account);
         } else {
-            adminLink.classList.add('hidden');
+            walletBtnText.textContent = '连接钱包';
+            walletBtn.removeAttribute('data-bs-toggle');
+            walletBtn.classList.remove('btn-outline-success');
+            walletBtn.classList.add('btn-outline-primary');
+            adminEntry.classList.add('d-none');
         }
     }
 
-    // 监听钱包连接状态变化
-    if (window.ethereum) {
-        window.ethereum.on('accountsChanged', async (accounts) => {
-            if (accounts.length > 0) {
-                window.currentAccount = accounts[0];
-                checkAndUpdateAdminLink();
+    // 检查管理员状态
+    async function checkAdminStatus(address) {
+        try {
+            const response = await fetch('/api/admin/check', {
+                headers: {
+                    'X-Eth-Address': address
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const adminEntry = document.getElementById('adminEntry');
+                const adminLink = document.getElementById('adminLink');
+                
+                if (data.is_admin === true) {
+                    adminEntry.classList.remove('d-none');
+                    adminLink.href = `/admin/?eth_address=${address}`;
+                } else {
+                    adminEntry.classList.add('d-none');
+                }
+            }
+        } catch (error) {
+            console.error('检查管理员状态失败:', error);
+        }
+    }
+
+    // 初始化事件监听
+    document.addEventListener('DOMContentLoaded', function() {
+        const switchWallet = document.getElementById('switchWallet');
+        const disconnectWallet = document.getElementById('disconnectWallet');
+        
+        // 切换钱包
+        switchWallet.addEventListener('click', async function(e) {
+            e.preventDefault();
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_requestPermissions',
+                    params: [{ eth_accounts: {} }]
+                });
+            } catch (error) {
+                console.error('切换钱包失败:', error);
             }
         });
-    }
-
-    // 页面加载完成后检查钱包状态
-    document.addEventListener('DOMContentLoaded', async () => {
-        if (window.ethereum) {
-            try {
-                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-                if (accounts.length > 0) {
-                    window.currentAccount = accounts[0];
-                    checkAndUpdateAdminLink();
-                }
-            } catch (error) {
-                console.error('检查钱包状态失败:', error);
-            }
+        
+        // 断开连接
+        disconnectWallet.addEventListener('click', function(e) {
+            e.preventDefault();
+            handleDisconnect();
+        });
+        
+        // 检查初始状态
+        if (localStorage.getItem('walletConnected') === 'true') {
+            checkConnection();
         }
     });
     </script>

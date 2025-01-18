@@ -1,0 +1,142 @@
+/* 基础样式 */
+:root {
+    --primary-color: #0d6efd;
+    --danger-color: #dc3545;
+    --success-color: #198754;
+    --warning-color: #ffc107;
+}
+
+/* 功能图标样式 */
+.feature-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 表格样式 */
+.table th {
+    font-weight: 600;
+}
+
+.table td {
+    text-align: start;
+}
+
+/* 分页样式 */
+.pagination .page-link {
+    padding: 0.5rem 0.75rem;
+    color: var(--primary-color);
+}
+
+.pagination .page-item.active .page-link {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+/* 卡片样式 */
+.card {
+    transition: transform 0.2s ease-in-out;
+    -webkit-transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    -webkit-transform: translateY(-2px);
+}
+
+/* 按钮样式 */
+.btn {
+    transition: all 0.2s ease-in-out;
+    -webkit-transition: all 0.2s ease-in-out;
+    text-decoration-skip-ink: none;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    -webkit-transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* 加载动画样式 */
+.spinner-border {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-width: 0.2em;
+}
+
+/* 表格响应式样式 */
+@media (max-width: 768px) {
+    .table-responsive {
+        border: 0;
+    }
+    
+    .table thead {
+        display: none;
+    }
+    
+    .table tr {
+        margin-bottom: 1rem;
+        display: block;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    .table td {
+        display: block;
+        text-align: right;
+        padding: 0.5rem;
+        border: none;
+    }
+    
+    .table td::before {
+        content: attr(data-label);
+        float: left;
+        font-weight: bold;
+    }
+}
+
+/* 无障碍焦点样式 */
+:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* 高对比度模式支持 */
+@media (prefers-contrast: more) {
+    .text-muted {
+        color: #595959 !important;
+    }
+    
+    .btn-outline-primary {
+        border-width: 2px;
+    }
+}
+
+/* 辅助功能类 */
+.visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+/* 触摸设备优化 */
+@media (hover: none) {
+    .btn:hover {
+        transform: none;
+        -webkit-transform: none;
+    }
+    
+    .card:hover {
+        transform: none;
+        -webkit-transform: none;
+    }
+} 

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}编辑资产 - 58HUB{% endblock %}
+{% block title %}编辑资产 - RWA-HUB{% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
@@ -149,14 +149,24 @@ async function checkIsAdmin() {
         return false;
     }
     
-    // 直接检查当前地址是否在配置的管理员列表中
-    const adminAddresses = [
-        '0x6394993426DBA3b654eF0052698Fe9E0B6A98870',
-        '0xd1db8bb8b723fade2d8aeea21d0e75fa6f7cb5af'
-    ];
-    
-    return adminAddresses.map(addr => addr.toLowerCase())
-        .includes(window.currentAccount.toLowerCase());
+    try {
+        const response = await fetch('/api/admin/check_admin', {
+            method: 'GET',
+            headers: {
+                'X-Eth-Address': window.currentAccount
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('验证管理员权限失败');
+        }
+        
+        const data = await response.json();
+        return data.is_admin;
+    } catch (error) {
+        console.error('验证管理员权限失败:', error);
+        return false;
+    }
 }
 
 // 加载资产详情

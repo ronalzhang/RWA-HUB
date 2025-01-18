@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="600" height="600" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- 背景圆形 -->
+    <circle cx="300" cy="300" r="250" fill="#E3F2FD" opacity="0.5"/>
+    
+    <!-- 区块链连接线 -->
+    <path d="M150 300 L250 200 L350 300 L450 200" stroke="#90CAF9" stroke-width="4" stroke-linecap="round"/>
+    <path d="M150 350 L250 250 L350 350 L450 250" stroke="#64B5F6" stroke-width="4" stroke-linecap="round"/>
+    <path d="M150 400 L250 300 L350 400 L450 300" stroke="#42A5F5" stroke-width="4" stroke-linecap="round"/>
+    
+    <!-- 区块 -->
+    <g transform="translate(150,250)">
+        <rect width="60" height="60" rx="8" fill="#1E88E5"/>
+        <rect x="15" y="15" width="30" height="30" rx="4" fill="white"/>
+    </g>
+    
+    <g transform="translate(250,150)">
+        <rect width="60" height="60" rx="8" fill="#1976D2"/>
+        <rect x="15" y="15" width="30" height="30" rx="4" fill="white"/>
+    </g>
+    
+    <g transform="translate(350,250)">
+        <rect width="60" height="60" rx="8" fill="#1565C0"/>
+        <rect x="15" y="15" width="30" height="30" rx="4" fill="white"/>
+    </g>
+    
+    <g transform="translate(450,150)">
+        <rect width="60" height="60" rx="8" fill="#0D47A1"/>
+        <rect x="15" y="15" width="30" height="30" rx="4" fill="white"/>
+    </g>
+    
+    <!-- 房屋图标 -->
+    <g transform="translate(200,350)">
+        <path d="M25,50 L10,35 L25,20 L40,35 L25,50" fill="#1E88E5"/>
+        <rect x="15" y="35" width="20" height="15" fill="#1E88E5"/>
+    </g>
+    
+    <!-- 钱包图标 -->
+    <g transform="translate(300,400)">
+        <rect x="10" y="15" width="30" height="25" rx="4" fill="#1976D2"/>
+        <rect x="35" y="20" width="10" height="15" rx="2" fill="#1976D2"/>
+    </g>
+    
+    <!-- 代币图标 -->
+    <g transform="translate(400,350)">
+        <circle cx="25" cy="25" r="15" fill="#1565C0"/>
+        <text x="25" y="30" font-size="14" fill="white" text-anchor="middle">₮</text>
+    </g>
+    
+    <!-- 装饰点 -->
+    <circle cx="100" cy="200" r="4" fill="#90CAF9"/>
+    <circle cx="500" cy="200" r="4" fill="#90CAF9"/>
+    <circle cx="100" cy="400" r="4" fill="#90CAF9"/>
+    <circle cx="500" cy="400" r="4" fill="#90CAF9"/>
+    
+    <!-- 装饰线 -->
+    <path d="M50 150 L100 150" stroke="#E3F2FD" stroke-width="2"/>
+    <path d="M500 150 L550 150" stroke="#E3F2FD" stroke-width="2"/>
+    <path d="M50 450 L100 450" stroke="#E3F2FD" stroke-width="2"/>
+    <path d="M500 450 L550 450" stroke="#E3F2FD" stroke-width="2"/>
+</svg> 

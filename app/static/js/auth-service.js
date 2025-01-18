@@ -34,7 +34,7 @@ class AuthService {
             this.account = accounts[0];
             
             // 获取nonce
-            const nonceResponse = await fetch("/api/auth/nonce", {
+            const nonceResponse = await fetch(`${window.appConfig.API_BASE_URL}/api/auth/nonce`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -51,7 +51,7 @@ class AuthService {
             );
             
             // 验证签名并获取令牌
-            const authResponse = await fetch("/api/auth/verify", {
+            const authResponse = await fetch(`${window.appConfig.API_BASE_URL}/api/auth/verify`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"

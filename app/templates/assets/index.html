@@ -1,26 +1,203 @@
-function updateAssetCard(asset) {
-    const card = document.createElement('div');
-    card.className = 'col-md-4 mb-4';
-    card.innerHTML = `
-        <div class="card h-100">
-            <img src="/${asset.images && asset.images.length > 0 ? asset.images[0] : 'static/images/placeholder.jpg'}" 
-                 class="card-img-top" 
-                 alt="Asset Image" 
-                 style="height: 200px; object-fit: cover"
-                 onerror="this.onerror=null; this.src='/static/images/placeholder.jpg';">
-            <div class="card-body">
-                <h5 class="card-title">${asset.name}</h5>
-                <p class="card-text">
-                    <strong>类型:</strong> ${asset.asset_type}<br>
-                    <strong>代币符号:</strong> ${asset.token_symbol}<br>
-                    <strong>代币价格:</strong> ${asset.token_price} USDT<br>
-                    <strong>总价值:</strong> ${asset.total_value} USDT<br>
-                    <strong>地址:</strong> ${asset.location}<br>
-                    <strong>年收益:</strong> ${asset.annual_revenue}%
-                </p>
-                <a href="/assets/${asset.id}" class="btn btn-primary">查看详情</a>
+{% extends "base.html" %}
+
+{% block title %}RWA-HUB - 实物资产数字化平台{% endblock %}
+
+{% block content %}
+<!-- 平台介绍 -->
+<div class="bg-light py-5">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h1 class="display-4 mb-4">实物资产数字化平台</h1>
+                <p class="lead mb-4">将实物资产转化为区块链上的数字资产，实现价值的自由流通</p>
+                {% if not current_user_address %}
+                <button class="btn btn-primary btn-lg" onclick="connectWallet()">
+                    <i class="fas fa-wallet me-2"></i>连接钱包
+                </button>
+                {% else %}
+                <a href="{{ url_for('assets.create_asset_page') }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-plus me-2"></i>发布资产
+                </a>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                <img src="{{ url_for('static', filename='images/platform-illustration.png') }}" alt="平台优势" class="img-fluid" style="max-width: 400px;">
             </div>
         </div>
-    `;
-    return card;
-} 
+    </div>
+</div>
+
+<!-- 最新资产 -->
+<div class="container my-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">最新资产</h2>
+        <a href="{{ url_for('assets.list_assets_page') }}" class="btn btn-outline-primary">
+            查看全部 <i class="fas fa-arrow-right ms-2"></i>
+        </a>
+    </div>
+
+    <div class="row g-4">
+        {% if assets %}
+            {% for asset in assets %}
+            <div class="col-md-4">
+                <a href="{{ url_for('assets.asset_detail_page', asset_id=asset.id) }}" class="text-decoration-none">
+                    <div class="card h-100">
+                        <!-- 资产图片 -->
+                        <div class="position-relative">
+                            {% if asset.images %}
+                            {% set images = asset.images|from_json %}
+                            {% if images %}
+                            <img src="{{ url_for('static', filename=images[0]) }}" 
+                                 class="card-img-top" 
+                                 alt="{{ asset.name }}"
+                                 style="height: 200px; object-fit: cover;">
+                            {% else %}
+                            <div class="bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                                <i class="fas fa-image fa-3x text-muted"></i>
+                            </div>
+                            {% endif %}
+                            {% else %}
+                            <div class="bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                                <i class="fas fa-image fa-3x text-muted"></i>
+                            </div>
+                            {% endif %}
+                            
+                            <!-- 状态标签 -->
+                            <div class="position-absolute top-0 end-0 m-2">
+                                {% if asset.status == 1 %}
+                                <span class="badge bg-warning">待审核</span>
+                                {% elif asset.status == 2 %}
+                                <span class="badge bg-success">已通过</span>
+                                {% elif asset.status == 3 %}
+                                <span class="badge bg-danger">已拒绝</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 资产信息 -->
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h5 class="card-title text-truncate mb-0 text-dark">{{ asset.name }}</h5>
+                                <span class="badge bg-secondary">{{ asset.token_symbol }}</span>
+                            </div>
+                            <p class="card-text text-muted small mb-2">
+                                <i class="fas fa-map-marker-alt me-1"></i>{{ asset.location }}
+                            </p>
+                            {% if asset.asset_type == 10 %}
+                            <p class="card-text mb-2">
+                                <span class="text-muted">面积：</span>
+                                <span class="fw-bold text-dark">{{ asset.area|number_format }} ㎡</span>
+                            </p>
+                            {% else %}
+                            <p class="card-text mb-2">
+                                <span class="text-muted">总价值：</span>
+                                <span class="fw-bold text-dark">{{ asset.total_value|number_format }} USDC</span>
+                            </p>
+                            {% endif %}
+                            <p class="card-text mb-2">
+                                <span class="text-muted">代币价格：</span>
+                                <span class="fw-bold text-dark">{{ asset.token_price|number_format }} USDC</span>
+                            </p>
+                            <p class="card-text">
+                                <span class="text-muted">预期年收益：</span>
+                                <span class="fw-bold text-success">{{ asset.annual_revenue|number_format }} USDC</span>
+                            </p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">暂无资产</h4>
+                {% if current_user_address %}
+                <p class="text-muted mb-4">点击右上角的"发布资产"按钮开始创建</p>
+                {% else %}
+                <p class="text-muted mb-4">请先连接钱包</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 平台优势 -->
+<div class="bg-light py-5">
+    <div class="container">
+        <h2 class="text-center mb-5">平台优势</h2>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card border-0 bg-transparent h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-shield-alt fa-3x text-primary mb-3"></i>
+                        <h4>安全可靠</h4>
+                        <p class="text-muted">资产信息上链存证，确保真实可信</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 bg-transparent h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-exchange-alt fa-3x text-primary mb-3"></i>
+                        <h4>流动性强</h4>
+                        <p class="text-muted">资产代币化，实现价值自由流通</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 bg-transparent h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-hand-holding-usd fa-3x text-primary mb-3"></i>
+                        <h4>收益稳定</h4>
+                        <p class="text-muted">定期分红，确保投资收益</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* 卡片样式 */
+.card {
+    transition: transform 0.2s;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+/* 图片样式 */
+.card-img-top {
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+
+/* 标签样式 */
+.badge {
+    font-weight: 500;
+    padding: 0.5em 1em;
+    border-radius: 6px;
+}
+
+/* 按钮样式 */
+.btn {
+    border-radius: 8px;
+    padding: 0.6rem 1.2rem;
+    font-weight: 500;
+}
+
+/* 平台优势卡片 */
+.bg-transparent.card:hover {
+    transform: none;
+    box-shadow: none;
+    cursor: default;
+}
+</style>
+{% endblock %}
