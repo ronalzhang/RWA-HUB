@@ -71,7 +71,7 @@
                                 {% if asset.images %}
                                 {% set images = asset.images|from_json %}
                                 {% if images %}
-                                <img src="{{ url_for('static', filename=images[0]) }}" 
+                                <img src="{{ images[0] }}" 
                                      class="img-cover" 
                                      alt="{{ asset.name }}">
                                 {% else %}
