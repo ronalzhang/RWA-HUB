@@ -31,6 +31,11 @@ def create_app(config_name='development'):
     db.init_app(app)
     migrate.init_app(app, db)
     cors.init_app(app)
+
+     # 初始化七牛云存储
+    from .utils.storage import init_storage
+    with app.app_context():
+        init_storage()
     
     # 添加自定义过滤器
     @app.template_filter('from_json')
