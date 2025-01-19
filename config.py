@@ -56,12 +56,16 @@ class ProductionConfig(Config):
     def init_app(cls, app):
         Config.init_app(app)
         
-        # 处理 PostgreSQL 数据库 URL
+        # 处理数据库 URL
         database_url = os.environ.get('DATABASE_URL')
-        if database_url and database_url.startswith('postgres://'):
+        if not database_url:
+            raise ValueError('Production environment requires DATABASE_URL to be set')
+            
+        # 处理 Render 特定的 postgres:// URL
+        if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
-        cls.SQLALCHEMY_DATABASE_URI = database_url or 'sqlite:///instance/app.db'
+        cls.SQLALCHEMY_DATABASE_URI = database_url
     
     # 生产环境特定配置
     SESSION_COOKIE_SECURE = True

@@ -20,6 +20,7 @@ def verify_db_tables():
             
             # 获取所有模型类
             required_tables = {table.name for table in db.Model.metadata.tables.values()}
+            logger.info(f"需要的表: {required_tables}")
             
             if not required_tables.issubset(set(existing_tables)):
                 missing_tables = required_tables - set(existing_tables)
@@ -36,6 +37,14 @@ def init_db():
     try:
         app = create_app()
         with app.app_context():
+            # 检查数据库连接
+            try:
+                db.engine.connect()
+                logger.info("数据库连接成功")
+            except Exception as e:
+                logger.error(f"数据库连接失败: {e}")
+                raise
+            
             # 运行数据库迁移
             try:
                 logger.info("开始运行数据库迁移...")
@@ -58,6 +67,9 @@ def init_db():
 
 if __name__ == '__main__':
     logger.info("启动应用...")
+    logger.info(f"环境: {os.environ.get('FLASK_ENV', 'development')}")
+    logger.info(f"数据库 URL: {os.environ.get('DATABASE_URL', '未设置')}")
+    
     success = False
     
     for attempt in range(3):  # 最多尝试3次
