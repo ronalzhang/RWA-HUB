@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 def verify_db_tables():
     """验证数据库表是否存在"""
     try:
-        app = create_app()
+        app = create_app(os.getenv('FLASK_ENV', 'production'))  # 默认使用生产环境
         with app.app_context():
             # 检查所有模型的表是否存在
             inspector = db.inspect(db.engine)
@@ -34,12 +34,17 @@ def verify_db_tables():
 def init_db():
     """初始化数据库"""
     try:
-        app = create_app()
+        # 确保使用正确的配置
+        if not os.environ.get('DATABASE_URL'):
+            raise ValueError("DATABASE_URL 环境变量未设置")
+            
+        app = create_app(os.getenv('FLASK_ENV', 'production'))  # 默认使用生产环境
         with app.app_context():
             # 检查数据库连接
             try:
                 db.engine.connect()
                 logger.info("数据库连接成功")
+                logger.info(f"当前数据库 URL: {app.config['SQLALCHEMY_DATABASE_URI']}")
             except Exception as e:
                 logger.error(f"数据库连接失败: {e}")
                 raise
@@ -66,7 +71,7 @@ def init_db():
 
 if __name__ == '__main__':
     logger.info("启动应用...")
-    logger.info(f"环境: {os.environ.get('FLASK_ENV', 'development')}")
+    logger.info(f"环境: {os.environ.get('FLASK_ENV', 'production')}")  # 默认使用生产环境
     logger.info(f"数据库 URL: {os.environ.get('DATABASE_URL', '未设置')}")
     
     success = False
@@ -83,8 +88,8 @@ if __name__ == '__main__':
     if not success:
         logger.error("所有数据库初始化尝试都失败了")
         
-    app = create_app()
-    port = int(os.environ.get('PORT', 3000))
+    app = create_app(os.getenv('FLASK_ENV', 'production'))  # 默认使用生产环境
+    port = int(os.environ.get('PORT', 10000))  # Render 默认使用 10000 端口
     host = os.environ.get('HOST', '0.0.0.0')
     debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     
