@@ -3,7 +3,6 @@ import os
 from app import create_app, db
 from sqlalchemy.exc import OperationalError
 from flask_migrate import upgrade
-import sqlite3
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
