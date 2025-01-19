@@ -22,19 +22,13 @@
                         <!-- 资产图片 -->
                         <div class="position-relative">
                             {% if asset.images %}
-                            {% set images = asset.images|from_json %}
-                            {% if images %}
-                            <img src="{{ images[0] }}" class="card-img-top" alt="{{ asset.name }}"
-                                 style="height: 200px; object-fit: cover;">
+                                {% set first_image = asset.images|from_json|first %}
+                                <img src="{{ first_image }}" class="card-img-top" alt="{{ asset.name }}"
+                                     style="height: 200px; object-fit: cover;">
                             {% else %}
-                            <div class="bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
-                                <i class="fas fa-image fa-3x text-muted"></i>
-                            </div>
-                            {% endif %}
-                            {% else %}
-                            <div class="bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
-                                <i class="fas fa-image fa-3x text-muted"></i>
-                            </div>
+                                <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 200px;">
+                                    <i class="fas fa-image fa-3x text-muted"></i>
+                                </div>
                             {% endif %}
                             
                             <!-- 状态标签 -->
