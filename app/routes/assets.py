@@ -380,7 +380,7 @@ def create_asset():
                 area=float(area) if area else None,
                 owner_address=g.eth_address,
                 creator_address=g.eth_address,  # 设置创建者地址
-                status=AssetStatus.PENDING
+                status=AssetStatus.PENDING.value  # 使用枚举值
             )
             
             # 先添加资产记录并获取ID
