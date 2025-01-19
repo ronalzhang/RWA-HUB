@@ -289,19 +289,43 @@ def create_asset():
         name = request.form.get('name')
         asset_type = request.form.get('asset_type')
         total_value = request.form.get('total_value')
-        token_code = request.form.get('token_code')
         annual_revenue = request.form.get('annual_revenue')
         description = request.form.get('description')
         location = request.form.get('location')
         area = request.form.get('area')
+        token_supply = request.form.get('token_supply')
+        token_price = request.form.get('token_price')
+        
+        # 记录接收到的数据
+        current_app.logger.info(f'接收到的表单数据: {request.form}')
+        current_app.logger.info(f'接收到的文件: {request.files}')
         
         # 验证必填字段
-        if not all([name, asset_type, total_value, token_code, annual_revenue]):
-            return jsonify({'error': '缺少必填字段'}), 400
+        required_fields = {
+            'name': name,
+            'asset_type': asset_type,
+            'total_value': total_value,
+            'annual_revenue': annual_revenue,
+            'description': description,
+            'location': location
+        }
+        
+        # 根据资产类型添加额外的必填字段
+        if asset_type == '10':  # 不动产
+            required_fields['area'] = area
+        else:  # 类不动产
+            required_fields['token_supply'] = token_supply
+            
+        # 检查必填字段
+        missing_fields = [field for field, value in required_fields.items() if not value]
+        if missing_fields:
+            current_app.logger.warning(f'缺少必填字段: {missing_fields}')
+            return jsonify({'error': f'缺少必填字段: {", ".join(missing_fields)}'}), 400
             
         # 检查图片文件
         images = request.files.getlist('images[]')
         if not images or not any(image.filename for image in images):
+            current_app.logger.warning('未上传图片文件')
             return jsonify({'error': '请至少上传一张资产图片'}), 400
             
         # 创建资产记录
@@ -309,7 +333,6 @@ def create_asset():
             name=name,
             asset_type=asset_type,
             total_value=float(total_value),
-            token_code=token_code,
             annual_revenue=float(annual_revenue),
             description=description,
             location=location,
