@@ -30,7 +30,7 @@
                 <div class="carousel-inner">
                     {% for image in images %}
                     <div class="carousel-item {% if loop.first %}active{% endif %}">
-                        <img src="{{ image }}" class="d-block w-100" alt="Asset image {{ loop.index }}">
+                        <img src="{{ image }}" class="d-block w-100" alt="Asset image {{ loop.index }}" style="max-height: 500px; object-fit: contain;">
                     </div>
                     {% endfor %}
                 </div>
