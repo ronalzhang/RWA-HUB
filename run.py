@@ -4,6 +4,8 @@ from app import create_app, db
 from sqlalchemy.exc import OperationalError
 from flask_migrate import upgrade
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 # 获取环境配置
 env = os.environ.get('FLASK_ENV', 'development')
 app = create_app(env)
