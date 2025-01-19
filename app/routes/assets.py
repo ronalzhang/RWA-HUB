@@ -1,4 +1,4 @@
-from flask import render_template, send_from_directory, current_app, abort, request, redirect, url_for, jsonify, g
+from flask import render_template, send_from_directory, current_app, abort, request, redirect, url_for, jsonify, g, Response
 from . import assets_bp, assets_api_bp
 from .. import db  # 直接从应用实例导入 db
 from ..models import Asset
@@ -10,6 +10,7 @@ import os
 import json
 from datetime import datetime
 import random
+import requests
 
 # 页面路由
 @assets_bp.route("/")
@@ -504,3 +505,28 @@ def create_asset():
 def allowed_file(filename, allowed_extensions):
     """检查文件类型是否允许"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
+
+@assets_bp.route('/proxy/image/<path:image_path>')
+def proxy_image(image_path):
+    """代理七牛云图片请求"""
+    try:
+        # 构建七牛云的完整URL
+        qiniu_url = f"http://{current_app.config['QINIU_DOMAIN']}/{image_path}"
+        current_app.logger.info(f"代理图片请求: {qiniu_url}")
+        
+        # 请求七牛云图片
+        response = requests.get(qiniu_url, stream=True)
+        
+        if response.status_code == 200:
+            # 返回图片内容
+            return Response(
+                response.raw.read(),
+                content_type=response.headers['content-type']
+            )
+        else:
+            current_app.logger.error(f"获取图片失败: {response.status_code}")
+            abort(404)
+            
+    except Exception as e:
+        current_app.logger.error(f"代理图片请求失败: {str(e)}")
+        abort(500)
