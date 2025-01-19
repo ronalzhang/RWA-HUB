@@ -28,7 +28,7 @@ class QiniuStorage:
             ret, info = put_data(token, filename, file_data)
             
             if info.status_code == 200:
-                # 返回文件的访问URL
+                # 返回文件的访问URL，使用域名原本的协议
                 return f"http://{self.domain}/{ret['key']}"
             else:
                 logger.error(f"文件上传失败: {info}")
