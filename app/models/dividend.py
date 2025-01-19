@@ -17,7 +17,7 @@ class DividendRecord(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
-    asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False)
+    asset_id = db.Column(db.Integer, db.ForeignKey('assets.id', name='fk_dividend_records_asset_id'), nullable=False)
     total_amount = db.Column(db.Float, nullable=False)  # 总分红金额
     actual_amount = db.Column(db.Float, nullable=False)  # 实际分红金额
     platform_fee = db.Column(db.Float, nullable=False)  # 平台手续费
