@@ -46,6 +46,11 @@ class ProductionConfig(Config):
         'postgresql://rwa_hub_user:3YIeu6i1Nuyb6z8wRAxdctbMJVrSseJB@dpg-cu6b270gph6c73c50eag-a/rwa_hub'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    @staticmethod
+    def init_app(app):
+        # 生产环境特定的配置
+        pass
+
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
