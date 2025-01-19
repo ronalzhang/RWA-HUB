@@ -12,12 +12,6 @@ class Config:
     QINIU_BUCKET_NAME = os.environ.get('QINIU_BUCKET_NAME', 'rwa-hub')
     QINIU_DOMAIN = os.environ.get('QINIU_DOMAIN', 'sqbw3uvy8.sabkt.gdipper.com')
     
-    # 七牛云配置
-    QINIU_ACCESS_KEY = os.environ.get('QINIU_ACCESS_KEY', 'your-access-key')
-    QINIU_SECRET_KEY = os.environ.get('QINIU_SECRET_KEY', 'your-secret-key')
-    QINIU_BUCKET_NAME = os.environ.get('QINIU_BUCKET_NAME', 'rwa-hub')
-    QINIU_DOMAIN = os.environ.get('QINIU_DOMAIN', 'sqbw3uvy8.sabkt.gdipper.com')
-    
     # 管理员配置
     ADMIN_CONFIG = {
         'super_admin': {
@@ -45,23 +39,30 @@ class Config:
         '查看统计': 2   # 副管理员及以上可查看统计
     }
     
-    # 为了向后兼容，保留原有的管理员地址列表
-    @property
-    def ADMIN_ADDRESSES(self):
-        return [admin['address'] if 'address' in admin else address for address, admin in self.ADMIN_CONFIG.items()]
+    @staticmethod
+    def init_app(app):
+        # 基础配置初始化
+        pass
 
 class DevelopmentConfig(Config):
     DEBUG = True
+    
+    @staticmethod
+    def init_app(app):
+        Config.init_app(app)
+        # 开发环境特定的配置
+        pass
 
 class ProductionConfig(Config):
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'postgresql://rwa_hub_user:3YIeu6i1Nuyb6z8wRAxdctbMJVrSseJB@dpg-cu6b270gph6c73c50eag-a/rwa_hub'
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-
+    
     @staticmethod
     def init_app(app):
+        Config.init_app(app)
         # 生产环境特定的配置
+        if os.environ.get('DATABASE_URL'):
+            if os.environ.get('DATABASE_URL').startswith('postgres://'):
+                os.environ['DATABASE_URL'] = os.environ.get('DATABASE_URL').replace('postgres://', 'postgresql://', 1)
         pass
 
 config = {
