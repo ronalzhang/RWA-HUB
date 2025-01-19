@@ -95,7 +95,7 @@
                 <div class="form-group mb-3">
                     <label>资产图片 <span class="text-danger">*</span></label>
                     <div class="custom-file">
-                        <input type="file" class="form-control" id="images" name="images" accept="image/*" multiple required>
+                        <input type="file" class="form-control" id="images" name="images[]" accept="image/*" multiple required>
                     </div>
                     <small class="form-text text-muted">请上传清晰的资产实拍图片，支持jpg、png、gif格式，每张不超过5MB</small>
                     <div id="imagePreview" class="mt-2 row"></div>
@@ -104,7 +104,7 @@
                 <div class="form-group mb-3">
                     <label>权属证明</label>
                     <div class="custom-file">
-                        <input type="file" class="form-control" id="documents" name="documents" accept=".pdf,.doc,.docx" multiple>
+                        <input type="file" class="form-control" id="documents" name="documents[]" accept=".pdf,.doc,.docx" multiple>
                     </div>
                     <small class="form-text text-muted" id="documentHint">可选：不动产可上传房产证、土地证等，类不动产可上传拍卖文件等权属证明</small>
                     <div id="documentList" class="mt-2"></div>
