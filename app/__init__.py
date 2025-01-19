@@ -17,7 +17,10 @@ def create_app(config_name='development'):
     
     # 加载配置
     if isinstance(config_name, str):
-        app.config.from_object(f'config.{config_name.capitalize()}Config')
+        config_class = config.get(config_name.lower(), config['default'])
+        app.config.from_object(config_class)
+        # 初始化配置
+        config_class.init_app(app)
     else:
         app.config.from_object(config_name)
     
