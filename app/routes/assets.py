@@ -4,6 +4,7 @@ from ..models import db, Asset
 from ..models.asset import AssetStatus
 from ..utils import is_admin, save_files
 from ..utils.decorators import eth_address_required
+from ..utils.storage import storage
 import os
 import json
 
@@ -137,26 +138,131 @@ def create_asset_page():
         return redirect(url_for('main.index'))
     return render_template("assets/create.html")
 
-@assets_bp.route("/<int:asset_id>/edit")
-def edit_asset_page(asset_id):
-    """编辑资产页面"""
-    # 从请求参数获取钱包地址和上链状态
-    eth_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address')
-    if not eth_address:
-        return redirect(url_for('main.index'))
-    
-    # 检查管理员权限
-    if not is_admin(eth_address):
-        return redirect(url_for('main.index'))
+@assets_bp.route("/<int:asset_id>/edit", methods=['PUT'])
+@eth_address_required
+def edit_asset(asset_id):
+    """编辑资产"""
+    try:
+        # 获取资产信息
+        asset = Asset.query.get_or_404(asset_id)
         
-    # 获取资产信息
-    asset = Asset.query.get_or_404(asset_id)
-    
-    # 如果资产已上链，重定向到首页
-    if asset.token_address:
-        return redirect(url_for('main.index'))
+        # 检查权限
+        if not is_admin(g.eth_address) and asset.owner_address != g.eth_address:
+            return jsonify({'error': '没有编辑权限'}), 403
+            
+        # 如果资产已上链，不允许编辑
+        if asset.token_address:
+            return jsonify({'error': '已上链资产不可修改'}), 400
+            
+        # 更新基本信息
+        asset.name = request.form.get('name', asset.name)
+        asset.description = request.form.get('description', asset.description)
+        asset.location = request.form.get('location', asset.location)
+        asset.area = float(request.form.get('area')) if request.form.get('area') else asset.area
+        asset.total_value = float(request.form.get('total_value')) if request.form.get('total_value') else asset.total_value
+        asset.annual_revenue = float(request.form.get('annual_revenue')) if request.form.get('annual_revenue') else asset.annual_revenue
         
-    return render_template('assets/edit.html', asset_id=asset_id)
+        # 处理图片文件
+        if 'images[]' in request.files:
+            images = request.files.getlist('images[]')
+            if images and any(image.filename for image in images):
+                image_paths = []
+                asset_type_folder = 'real_estate' if asset.asset_type == '10' else 'quasi_real_estate'
+                
+                # 删除旧图片
+                if asset.images:
+                    old_images = json.loads(asset.images)
+                    for old_image in old_images:
+                        try:
+                            # 从URL中提取key
+                            key = old_image.split('/')[-1]
+                            storage.delete(f'{asset_type_folder}/{asset.id}/{key}')
+                        except Exception as e:
+                            current_app.logger.error(f'删除旧图片失败: {str(e)}')
+                
+                # 上传新图片
+                for i, image in enumerate(images):
+                    if image and image.filename and allowed_file(image.filename, ['jpg', 'jpeg', 'png']):
+                        try:
+                            # 构建文件名
+                            ext = image.filename.rsplit(".", 1)[1].lower()
+                            filename = f'{asset_type_folder}/{asset.id}/image_{i+1}.{ext}'
+                            
+                            # 读取文件内容
+                            file_data = image.read()
+                            
+                            # 上传到七牛云
+                            if storage is None:
+                                raise Exception("七牛云存储未初始化")
+                                
+                            url = storage.upload(file_data, filename)
+                            if url:
+                                image_paths.append(url)
+                                current_app.logger.info(f'上传图片成功: {url}')
+                            else:
+                                raise Exception("七牛云上传失败")
+                                
+                        except Exception as e:
+                            current_app.logger.error(f'上传图片失败: {str(e)}')
+                            continue
+                
+                if image_paths:
+                    asset.images = json.dumps(image_paths)
+                    
+        # 处理文档文件
+        if 'documents[]' in request.files:
+            documents = request.files.getlist('documents[]')
+            if documents and any(doc.filename for doc in documents):
+                doc_paths = []
+                asset_type_folder = 'real_estate' if asset.asset_type == '10' else 'quasi_real_estate'
+                
+                # 删除旧文档
+                if asset.documents:
+                    old_docs = json.loads(asset.documents)
+                    for old_doc in old_docs:
+                        try:
+                            # 从URL中提取key
+                            key = old_doc.split('/')[-1]
+                            storage.delete(f'{asset_type_folder}/{asset.id}/documents/{key}')
+                        except Exception as e:
+                            current_app.logger.error(f'删除旧文档失败: {str(e)}')
+                
+                # 上传新文档
+                for i, doc in enumerate(documents):
+                    if doc and doc.filename and allowed_file(doc.filename, ['pdf', 'doc', 'docx']):
+                        try:
+                            # 构建文件名
+                            ext = doc.filename.rsplit(".", 1)[1].lower()
+                            filename = f'{asset_type_folder}/{asset.id}/documents/document_{i+1}.{ext}'
+                            
+                            # 读取文件内容
+                            file_data = doc.read()
+                            
+                            # 上传到七牛云
+                            if storage is None:
+                                raise Exception("七牛云存储未初始化")
+                                
+                            url = storage.upload(file_data, filename)
+                            if url:
+                                doc_paths.append(url)
+                                current_app.logger.info(f'上传文档成功: {url}')
+                            else:
+                                raise Exception("七牛云上传失败")
+                                
+                        except Exception as e:
+                            current_app.logger.error(f'上传文档失败: {str(e)}')
+                            continue
+                
+                if doc_paths:
+                    asset.documents = json.dumps(doc_paths)
+                    
+        db.session.commit()
+        return jsonify({'message': '更新成功'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'更新资产失败: {str(e)}', exc_info=True)
+        return jsonify({'error': '更新资产失败'}), 500
 
 @assets_bp.route("/static/uploads/<path:filename>")
 def serve_uploaded_file(filename):
@@ -242,21 +348,26 @@ def create_asset():
             for i, image in enumerate(images):
                 if image and image.filename and allowed_file(image.filename, ['jpg', 'jpeg', 'png']):
                     try:
-                        # 构建保存路径
-                        save_dir = os.path.join(current_app.root_path, 'static', 'uploads', asset_type_folder, str(asset.id))
-                        os.makedirs(save_dir, exist_ok=True)
+                        # 构建文件名
+                        ext = image.filename.rsplit(".", 1)[1].lower()
+                        filename = f'{asset_type_folder}/{asset.id}/image_{i+1}.{ext}'
                         
-                        # 保存文件
-                        filename = f'image_{i+1}.{image.filename.rsplit(".", 1)[1].lower()}'
-                        file_path = os.path.join(save_dir, filename)
-                        image.save(file_path)
+                        # 读取文件内容
+                        file_data = image.read()
                         
-                        # 记录相对路径 - 从 app/static/uploads 开始计算相对路径
-                        relative_path = os.path.join(asset_type_folder, str(asset.id), filename)
-                        image_paths.append(relative_path)
-                        current_app.logger.info(f'保存图片成功: {file_path}, 相对路径: {relative_path}')
+                        # 上传到七牛云
+                        if storage is None:
+                            raise Exception("七牛云存储未初始化")
+                            
+                        url = storage.upload(file_data, filename)
+                        if url:
+                            image_paths.append(url)
+                            current_app.logger.info(f'上传图片成功: {url}')
+                        else:
+                            raise Exception("七牛云上传失败")
+                            
                     except Exception as e:
-                        current_app.logger.error(f'保存图片失败: {str(e)}')
+                        current_app.logger.error(f'上传图片失败: {str(e)}')
                         continue
             
             # 保存图片路径到资产记录
@@ -271,21 +382,26 @@ def create_asset():
                 for i, doc in enumerate(documents):
                     if doc and doc.filename and allowed_file(doc.filename, ['pdf', 'doc', 'docx']):
                         try:
-                            # 构建保存路径
-                            save_dir = os.path.join(current_app.root_path, 'static', 'uploads', asset_type_folder, str(asset.id), 'documents')
-                            os.makedirs(save_dir, exist_ok=True)
+                            # 构建文件名
+                            ext = doc.filename.rsplit(".", 1)[1].lower()
+                            filename = f'{asset_type_folder}/{asset.id}/documents/document_{i+1}.{ext}'
                             
-                            # 保存文件
-                            filename = f'document_{i+1}.{doc.filename.rsplit(".", 1)[1].lower()}'
-                            file_path = os.path.join(save_dir, filename)
-                            doc.save(file_path)
+                            # 读取文件内容
+                            file_data = doc.read()
                             
-                            # 记录相对路径 - 从 app/static/uploads 开始计算相对路径
-                            relative_path = os.path.join(asset_type_folder, str(asset.id), 'documents', filename)
-                            doc_paths.append(relative_path)
-                            current_app.logger.info(f'保存文档成功: {file_path}, 相对路径: {relative_path}')
+                            # 上传到七牛云
+                            if storage is None:
+                                raise Exception("七牛云存储未初始化")
+                                
+                            url = storage.upload(file_data, filename)
+                            if url:
+                                doc_paths.append(url)
+                                current_app.logger.info(f'上传文档成功: {url}')
+                            else:
+                                raise Exception("七牛云上传失败")
+                                
                         except Exception as e:
-                            current_app.logger.error(f'保存文档失败: {str(e)}')
+                            current_app.logger.error(f'上传文档失败: {str(e)}')
                             continue
                 
                 if doc_paths:
