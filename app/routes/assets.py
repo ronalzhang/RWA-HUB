@@ -363,23 +363,35 @@ def create_asset():
             return jsonify({'error': '请至少上传一张资产图片'}), 400
             
         # 创建资产记录
-        asset = Asset(
-            name=name,
-            asset_type=asset_type,
-            total_value=float(total_value),
-            token_code=token_code,  # 使用生成的代币代码
-            annual_revenue=float(annual_revenue),
-            description=description,
-            location=location,
-            area=float(area) if area else None,
-            owner_address=g.eth_address,
-            status=AssetStatus.PENDING
-        )
-        
         try:
+            current_app.logger.info('开始创建资产记录')
+            current_app.logger.info(f'创建资产参数: name={name}, asset_type={asset_type}, token_code={token_code}, total_value={total_value}')
+            
+            # 生成代币符号
+            token_symbol = f"RH-{token_code}"
+            current_app.logger.info(f'生成的代币符号: {token_symbol}')
+            
+            asset = Asset(
+                name=name,
+                asset_type=asset_type,
+                total_value=float(total_value),
+                token_code=token_code,
+                token_symbol=token_symbol,
+                token_price=float(token_price) if token_price else 0,
+                token_supply=int(token_supply) if token_supply else None,
+                annual_revenue=float(annual_revenue),
+                description=description,
+                location=location,
+                area=float(area) if area else None,
+                owner_address=g.eth_address,
+                status=AssetStatus.PENDING
+            )
+            
             # 先添加资产记录并获取ID
+            current_app.logger.info('添加资产记录到数据库')
             db.session.add(asset)
             db.session.flush()
+            current_app.logger.info(f'资产记录创建成功，ID: {asset.id}')
             
             # 处理图片文件
             image_paths = []
@@ -457,9 +469,9 @@ def create_asset():
             }), 201
             
         except Exception as e:
+            current_app.logger.error(f'创建资产记录失败: {str(e)}', exc_info=True)
             db.session.rollback()
-            current_app.logger.error(f'保存资产记录失败: {str(e)}', exc_info=True)
-            return jsonify({'error': '保存资产记录失败'}), 500
+            return jsonify({'error': f'创建资产失败: {str(e)}'}), 500
             
     except Exception as e:
         current_app.logger.error(f'创建资产失败: {str(e)}', exc_info=True)
