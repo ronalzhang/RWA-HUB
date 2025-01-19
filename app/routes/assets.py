@@ -296,7 +296,7 @@ def create_asset():
         
         # 获取表单数据
         name = request.form.get('name')
-        asset_type = request.form.get('asset_type')
+        asset_type = int(request.form.get('asset_type'))  # 转换为整数
         total_value = request.form.get('total_value')
         annual_revenue = request.form.get('annual_revenue')
         description = request.form.get('description')
