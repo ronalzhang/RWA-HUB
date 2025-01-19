@@ -7,10 +7,10 @@ logger = logging.getLogger(__name__)
 
 class QiniuStorage:
     def __init__(self):
-        self.access_key = os.getenv('QINIU_ACCESS_KEY')
-        self.secret_key = os.getenv('QINIU_SECRET_KEY')
-        self.bucket_name = os.getenv('QINIU_BUCKET_NAME')
-        self.domain = os.getenv('QINIU_DOMAIN')  # 您的七牛云域名
+        self.access_key = current_app.config.get('QINIU_ACCESS_KEY')
+        self.secret_key = current_app.config.get('QINIU_SECRET_KEY')
+        self.bucket_name = current_app.config.get('QINIU_BUCKET_NAME')
+        self.domain = current_app.config.get('QINIU_DOMAIN')  # 您的七牛云域名
         
         if not all([self.access_key, self.secret_key, self.bucket_name, self.domain]):
             raise ValueError("七牛云配置不完整")
