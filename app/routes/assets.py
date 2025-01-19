@@ -338,10 +338,10 @@ def create_asset():
         }
         
         # 根据资产类型添加额外的必填字段
-        if asset_type == '20':  # 类不动产
+        if asset_type == 20:  # 类不动产
             current_app.logger.info('资产类型为类不动产，添加 token_supply 必填字段')
             required_fields['token_supply'] = token_supply
-        elif asset_type == '10':  # 不动产
+        elif asset_type == 10:  # 不动产
             current_app.logger.info('资产类型为不动产，添加 area 必填字段')
             required_fields['area'] = area
             
@@ -391,7 +391,7 @@ def create_asset():
             
             # 处理图片文件
             image_paths = []
-            asset_type_folder = 'real_estate' if asset_type == '10' else 'quasi_real_estate'
+            asset_type_folder = 'real_estate' if asset_type == 10 else 'quasi_real_estate'
             
             for i, image in enumerate(images):
                 if image and image.filename and allowed_file(image.filename, ['jpg', 'jpeg', 'png']):
