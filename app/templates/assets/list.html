@@ -24,9 +24,7 @@
                             {% if asset.images %}
                             {% set images = asset.images|from_json %}
                             {% if images %}
-                            <img src="{{ url_for('static', filename=images[0]) }}" 
-                                 class="card-img-top" 
-                                 alt="{{ asset.name }}"
+                            <img src="{{ images[0] }}" class="card-img-top" alt="{{ asset.name }}"
                                  style="height: 200px; object-fit: cover;">
                             {% else %}
                             <div class="bg-light d-flex align-items-center justify-content-center" style="height: 200px;">

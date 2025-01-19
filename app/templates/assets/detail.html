@@ -29,7 +29,7 @@
                     {% if asset.images %}
                     {% for image in asset.images|from_json %}
                     <div class="carousel-item {% if loop.first %}active{% endif %}" style="height: 400px;">
-                        <img src="{{ url_for('static', filename=image) }}" class="d-block w-100 h-100" alt="资产图片" style="object-fit: cover;">
+                        <img src="{{ image }}" class="d-block w-100 h-100" alt="资产图片" style="object-fit: cover;">
                     </div>
                     {% endfor %}
                     {% else %}
@@ -71,7 +71,7 @@
             {% if asset.images and (asset.images|from_json)|length > 1 %}
             <div class="d-flex gap-2 mt-2 overflow-auto">
                 {% for image in asset.images|from_json %}
-                <img src="{{ url_for('static', filename=image) }}" 
+                <img src="{{ image }}" 
                      class="img-thumbnail" 
                      alt="缩略图" 
                      style="width: 80px; height: 60px; object-fit: cover; cursor: pointer;"
