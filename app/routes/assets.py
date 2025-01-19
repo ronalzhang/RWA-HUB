@@ -1,6 +1,7 @@
 from flask import render_template, send_from_directory, current_app, abort, request, redirect, url_for, jsonify, g
 from . import assets_bp, assets_api_bp
-from ..models import db, Asset
+from .. import db  # 直接从应用实例导入 db
+from ..models import Asset
 from ..models.asset import AssetStatus
 from ..utils import is_admin, save_files
 from ..utils.decorators import eth_address_required
