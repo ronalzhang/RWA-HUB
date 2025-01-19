@@ -285,6 +285,13 @@ def dividend_page(asset_id):
 def create_asset():
     """创建资产"""
     try:
+        # 记录请求信息
+        current_app.logger.info('开始处理创建资产请求')
+        current_app.logger.info(f'请求方法: {request.method}')
+        current_app.logger.info(f'请求头: {dict(request.headers)}')
+        current_app.logger.info(f'表单数据: {dict(request.form)}')
+        current_app.logger.info(f'文件: {dict(request.files)}')
+        
         # 获取表单数据
         name = request.form.get('name')
         asset_type = request.form.get('asset_type')
@@ -296,9 +303,17 @@ def create_asset():
         token_supply = request.form.get('token_supply')
         token_price = request.form.get('token_price')
         
-        # 记录接收到的数据
-        current_app.logger.info(f'接收到的表单数据: {request.form}')
-        current_app.logger.info(f'接收到的文件: {request.files}')
+        # 记录获取到的字段值
+        current_app.logger.info('获取到的字段值:')
+        current_app.logger.info(f'name: {name}')
+        current_app.logger.info(f'asset_type: {asset_type}')
+        current_app.logger.info(f'total_value: {total_value}')
+        current_app.logger.info(f'annual_revenue: {annual_revenue}')
+        current_app.logger.info(f'description: {description}')
+        current_app.logger.info(f'location: {location}')
+        current_app.logger.info(f'area: {area}')
+        current_app.logger.info(f'token_supply: {token_supply}')
+        current_app.logger.info(f'token_price: {token_price}')
         
         # 验证必填字段
         required_fields = {
@@ -311,16 +326,23 @@ def create_asset():
         }
         
         # 根据资产类型添加额外的必填字段
-        if asset_type == '10':  # 不动产
-            required_fields['area'] = area
-        else:  # 类不动产
+        if asset_type == '20':  # 类不动产
+            current_app.logger.info('资产类型为类不动产，添加 token_supply 必填字段')
             required_fields['token_supply'] = token_supply
+        elif asset_type == '10':  # 不动产
+            current_app.logger.info('资产类型为不动产，添加 area 必填字段')
+            required_fields['area'] = area
             
         # 检查必填字段
         missing_fields = [field for field, value in required_fields.items() if not value]
         if missing_fields:
             current_app.logger.warning(f'缺少必填字段: {missing_fields}')
-            return jsonify({'error': f'缺少必填字段: {", ".join(missing_fields)}'}), 400
+            current_app.logger.warning('必填字段验证失败，返回400错误')
+            return jsonify({
+                'error': f'缺少必填字段: {", ".join(missing_fields)}',
+                'missing_fields': missing_fields,
+                'received_values': {k: v for k, v in required_fields.items()}
+            }), 400
             
         # 检查图片文件
         images = request.files.getlist('images[]')
