@@ -198,7 +198,9 @@ async function submitForm(event) {
 
         let result;
         try {
-            result = await response.json();
+            const responseText = await response.text();
+            console.log('服务器响应:', responseText);
+            result = JSON.parse(responseText);
         } catch (e) {
             console.error('解析响应失败:', e);
             throw new Error('服务器响应格式错误');
@@ -212,11 +214,12 @@ async function submitForm(event) {
             throw new Error(result.error || '创建失败');
         }
 
+        console.log('创建成功，返回结果:', result);
         if (result.id) {
             alert('创建成功!');
             window.location.href = `/assets/${result.id}`;
         } else {
-            console.error('创建结果:', result);
+            console.error('创建结果无效:', result);
             throw new Error('创建成功但返回的资产ID无效');
         }
     } catch (error) {
