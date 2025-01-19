@@ -1,5 +1,7 @@
-from app import create_app, db
+import logging
 import os
+from app import create_app, db
+from sqlalchemy.exc import OperationalError
 from flask_migrate import upgrade
 
 # 获取环境配置
