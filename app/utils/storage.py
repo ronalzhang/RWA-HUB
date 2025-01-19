@@ -51,8 +51,8 @@ class QiniuStorage:
             logger.info(f"上传响应: status={info.status_code}, ret={ret}")
             
             if info.status_code == 200:
-                # 构建文件URL，使用https协议
-                file_url = f"https://{self.domain}/{ret['key']}"
+                # 构建文件URL，使用http协议
+                file_url = f"http://{self.domain}/{ret['key']}"
                 logger.info(f"文件上传成功: {file_url}")
                 return file_url
             else:
