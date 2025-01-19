@@ -26,18 +26,20 @@ def create_app(config_name='development'):
     else:
         app.config.from_object(config_name)
     
-    # 配置日志
+    # 确保日志目录存在
     if not os.path.exists('logs'):
-        os.mkdir('logs')
-    
-    # 创建日志处理器
-    file_handler = RotatingFileHandler('logs/rwa_hub.log', maxBytes=10240, backupCount=10)
+        os.makedirs('logs')
+        
+    # 设置日志处理器
+    file_handler = RotatingFileHandler(
+        'logs/rwa_hub.log',
+        maxBytes=10240,  # 10MB
+        backupCount=10
+    )
     file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+        '%(asctime)s [%(levelname)s] %(message)s [in %(pathname)s:%(lineno)d]'
     ))
     file_handler.setLevel(logging.INFO)
-    
-    # 配置应用日志
     app.logger.addHandler(file_handler)
     app.logger.setLevel(logging.INFO)
     app.logger.info('RWA-HUB 启动')
