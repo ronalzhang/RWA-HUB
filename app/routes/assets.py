@@ -264,28 +264,10 @@ def edit_asset(asset_id):
         current_app.logger.error(f'更新资产失败: {str(e)}', exc_info=True)
         return jsonify({'error': '更新资产失败'}), 500
 
-@assets_bp.route("/static/uploads/<path:filename>")
-def serve_uploaded_file(filename):
-    """提供上传文件的访问"""
-    try:
-        # 获取上传目录
-        uploads_dir = os.path.join(current_app.root_path, 'static', 'uploads')
-        current_app.logger.info(f"上传目录: {uploads_dir}")
-        
-        # 构建完整的文件路径
-        file_path = os.path.join(uploads_dir, filename)
-        current_app.logger.info(f"请求的文件路径: {file_path}")
-        
-        # 检查文件是否存在
-        if os.path.exists(file_path):
-            current_app.logger.info(f"文件存在，准备发送: {file_path}")
-            return send_from_directory(uploads_dir, filename)
-            
-        current_app.logger.error(f"文件不存在: {file_path}")
-        abort(404)
-    except Exception as e:
-        current_app.logger.error(f"处理文件访问时出错 {filename}: {str(e)}")
-        abort(404)
+# @assets_bp.route("/static/uploads/<path:filename>")
+# def serve_uploaded_file(filename):
+#     """提供上传文件的访问（已弃用，改用七牛云）"""
+#     pass  # 注释掉整个函数体
 
 @assets_bp.route('/<int:asset_id>/dividend')
 def dividend_page(asset_id):
