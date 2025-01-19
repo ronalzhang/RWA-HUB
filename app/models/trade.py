@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from app import db
+from .. import db
 from sqlalchemy.orm import validates
 
 class TradeType(enum.Enum):
@@ -9,6 +9,7 @@ class TradeType(enum.Enum):
 
 class Trade(db.Model):
     __tablename__ = 'trades'
+    __table_args__ = {'extend_existing': True}
 
     id = db.Column(db.Integer, primary_key=True)
     asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False)
@@ -18,6 +19,9 @@ class Trade(db.Model):
     trader_address = db.Column(db.String(42), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     is_self_trade = db.Column(db.Boolean, nullable=False, default=False)
+
+    # 关联关系
+    asset = db.relationship('app.models.asset.Asset', backref=db.backref('trades', lazy=True))
 
     @validates('type')
     def validate_type(self, key, value):
