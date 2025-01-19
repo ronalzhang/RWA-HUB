@@ -8,12 +8,12 @@ class DividendRecord(db.Model):
     """分红记录模型"""
     __tablename__ = 'dividend_records'
     __table_args__ = (
-        {'extend_existing': True},
         Index('ix_dividend_records_asset_id', 'asset_id'),  # 资产ID索引
         Index('ix_dividend_records_created_at', 'created_at'),  # 创建时间索引
         CheckConstraint('total_amount >= 10000', name='ck_total_amount_min'),  # 最小分红金额10000
         CheckConstraint('platform_fee = total_amount * 0.015', name='ck_platform_fee_rate'),  # 平台费用1.5%
         CheckConstraint('actual_amount = total_amount - platform_fee', name='ck_actual_amount'),  # 实际分配金额
+        {'extend_existing': True}  # 放在元组的最后
     )
 
     id = db.Column(db.Integer, primary_key=True)
