@@ -4,7 +4,12 @@ from app import create_app, db
 from sqlalchemy.exc import OperationalError
 from flask_migrate import upgrade
 
-logging.basicConfig(level=logging.INFO)
+# 配置详细的日志格式
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 logger = logging.getLogger(__name__)
 
 def verify_db_tables():
@@ -76,12 +81,12 @@ def init_db():
 
 if __name__ == '__main__':
     logger.info("启动应用...")
-    logger.info(f"环境: {os.environ.get('FLASK_ENV', 'production')}")  # 默认使用生产环境
+    logger.info(f"环境: {os.environ.get('FLASK_ENV', 'production')}")
     logger.info(f"数据库 URL: {os.environ.get('DATABASE_URL', '未设置')}")
     
     success = False
     
-    for attempt in range(3):  # 最多尝试3次
+    for attempt in range(3):
         try:
             init_db()
             success = True
@@ -93,10 +98,14 @@ if __name__ == '__main__':
     if not success:
         logger.error("所有数据库初始化尝试都失败了")
         
-    app = create_app(os.getenv('FLASK_ENV', 'production'))  # 默认使用生产环境
-    port = int(os.environ.get('PORT', 10000))  # Render 默认使用 10000 端口
+    app = create_app(os.getenv('FLASK_ENV', 'production'))
+    
+    # 强制启用调试模式和错误显示
+    app.config['DEBUG'] = True
+    app.config['PROPAGATE_EXCEPTIONS'] = True
+    
+    port = int(os.environ.get('PORT', 10000))
     host = os.environ.get('HOST', '0.0.0.0')
-    debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     
     print("启动服务器...")
     print("访问地址:")
@@ -104,9 +113,9 @@ if __name__ == '__main__':
     print(f"外部:    http://{host}:{port}")
     
     if os.environ.get('FLASK_ENV') == 'production':
-        # 生产环境使用 waitress
+        # 生产环境使用 waitress，但保持错误日志
         from waitress import serve
         serve(app, host=host, port=port)
     else:
         # 开发环境使用 Flask 内置服务器
-        app.run(host=host, port=port, debug=debug)
+        app.run(host=host, port=port, debug=True)
