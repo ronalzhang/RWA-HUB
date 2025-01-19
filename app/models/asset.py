@@ -43,8 +43,8 @@ class Asset(db.Model):
     deleted_by = db.Column(db.String(42))
 
     # 添加关联
-    dividend_records = db.relationship('app.models.dividend.DividendRecord', backref='asset', lazy=True, cascade='all, delete-orphan')
-    trades = db.relationship('app.models.trade.Trade', backref='asset', lazy=True)
+    dividend_records = db.relationship('app.models.dividend.DividendRecord', backref=db.backref('related_asset', lazy=True), lazy=True, cascade='all, delete-orphan')
+    trades = db.relationship('app.models.trade.Trade', backref=db.backref('related_asset', lazy=True), lazy=True)
 
     # 添加索引
     __table_args__ = (
