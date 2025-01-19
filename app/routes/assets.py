@@ -305,13 +305,13 @@ def create_asset():
         token_supply = request.form.get('token_supply')
         token_price = request.form.get('token_price')
         
-        # 生成代币代码
+        # 生成代币符号
         while True:
             random_num = ''.join([str(random.randint(0, 9)) for _ in range(4)])
-            token_code = f"{asset_type}{random_num}"
+            token_symbol = f"RH-{asset_type}{random_num}"
             
-            # 检查代币代码是否已存在
-            existing_asset = Asset.query.filter_by(token_code=token_code).first()
+            # 检查代币符号是否已存在
+            existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
             if not existing_asset:
                 break
                 
@@ -365,17 +365,12 @@ def create_asset():
         # 创建资产记录
         try:
             current_app.logger.info('开始创建资产记录')
-            current_app.logger.info(f'创建资产参数: name={name}, asset_type={asset_type}, token_code={token_code}, total_value={total_value}')
-            
-            # 生成代币符号
-            token_symbol = f"RH-{token_code}"
-            current_app.logger.info(f'生成的代币符号: {token_symbol}')
+            current_app.logger.info(f'创建资产参数: name={name}, asset_type={asset_type}, token_symbol={token_symbol}, total_value={total_value}')
             
             asset = Asset(
                 name=name,
                 asset_type=asset_type,
                 total_value=float(total_value),
-                token_code=token_code,
                 token_symbol=token_symbol,
                 token_price=float(token_price) if token_price else 0,
                 token_supply=int(token_supply) if token_supply else None,
@@ -384,6 +379,7 @@ def create_asset():
                 location=location,
                 area=float(area) if area else None,
                 owner_address=g.eth_address,
+                creator_address=g.eth_address,  # 设置创建者地址
                 status=AssetStatus.PENDING
             )
             
