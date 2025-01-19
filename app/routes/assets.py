@@ -7,6 +7,8 @@ from ..utils.decorators import eth_address_required
 from ..utils.storage import storage
 import os
 import json
+from datetime import datetime
+import random
 
 # 页面路由
 @assets_bp.route("/")
@@ -303,6 +305,16 @@ def create_asset():
         token_supply = request.form.get('token_supply')
         token_price = request.form.get('token_price')
         
+        # 生成代币代码
+        while True:
+            random_num = ''.join([str(random.randint(0, 9)) for _ in range(4)])
+            token_code = f"{asset_type}{random_num}"
+            
+            # 检查代币代码是否已存在
+            existing_asset = Asset.query.filter_by(token_code=token_code).first()
+            if not existing_asset:
+                break
+                
         # 记录获取到的字段值
         current_app.logger.info('获取到的字段值:')
         current_app.logger.info(f'name: {name}')
@@ -355,6 +367,7 @@ def create_asset():
             name=name,
             asset_type=asset_type,
             total_value=float(total_value),
+            token_code=token_code,  # 使用生成的代币代码
             annual_revenue=float(annual_revenue),
             description=description,
             location=location,
