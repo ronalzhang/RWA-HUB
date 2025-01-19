@@ -36,7 +36,7 @@ class Config:
     # 为了向后兼容，保留原有的管理员地址列表
     @property
     def ADMIN_ADDRESSES(self):
-        return list(self.ADMIN_CONFIG.keys())
+        return [admin['address'] if 'address' in admin else address for address, admin in self.ADMIN_CONFIG.items()]
 
 class DevelopmentConfig(Config):
     DEBUG = True
