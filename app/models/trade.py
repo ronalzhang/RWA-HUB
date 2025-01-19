@@ -9,10 +9,9 @@ class TradeType(enum.Enum):
 
 class Trade(db.Model):
     __tablename__ = 'trades'
-    __table_args__ = {
-        'extend_existing': True,
-        'sqlite_on_conflict': 'IGNORE'
-    }
+    __table_args__ = (
+        {'extend_existing': True}
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False)
