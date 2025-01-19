@@ -40,15 +40,28 @@ class Config:
         'admin': ['查看', '编辑']  # 普通管理员只能查看和编辑
     }
 
+    @staticmethod
+    def init_app(app):
+        pass
+
 class DevelopmentConfig(Config):
     DEBUG = True
     SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URL') or \
-        'sqlite:///dev.db'
+        'sqlite:///instance/app.db'
 
 class ProductionConfig(Config):
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'sqlite:///prod.db'
+    
+    @classmethod
+    def init_app(cls, app):
+        Config.init_app(app)
+        
+        # 处理 PostgreSQL 数据库 URL
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url and database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        cls.SQLALCHEMY_DATABASE_URI = database_url or 'sqlite:///instance/app.db'
     
     # 生产环境特定配置
     SESSION_COOKIE_SECURE = True
