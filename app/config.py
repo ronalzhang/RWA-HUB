@@ -12,6 +12,12 @@ class Config:
     QINIU_BUCKET_NAME = os.environ.get('QINIU_BUCKET_NAME', 'rwa-hub')
     QINIU_DOMAIN = os.environ.get('QINIU_DOMAIN', 'sqbw3uvy8.sabkt.gdipper.com')
     
+    # 七牛云配置
+    QINIU_ACCESS_KEY = os.environ.get('QINIU_ACCESS_KEY', 'your-access-key')
+    QINIU_SECRET_KEY = os.environ.get('QINIU_SECRET_KEY', 'your-secret-key')
+    QINIU_BUCKET_NAME = os.environ.get('QINIU_BUCKET_NAME', 'rwa-hub')
+    QINIU_DOMAIN = os.environ.get('QINIU_DOMAIN', 'sqbw3uvy8.sabkt.gdipper.com')
+    
     # 管理员配置
     ADMIN_CONFIG = {
         'super_admin': {

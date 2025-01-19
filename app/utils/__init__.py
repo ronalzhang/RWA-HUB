@@ -16,7 +16,7 @@ def is_admin(eth_address=None):
     return hasattr(g, 'eth_address') and g.eth_address.lower() in [addr.lower() for addr in admin_addresses] 
 
 def save_files(files, asset_type, asset_id):
-    """保存上传的文件
+    """保存上传的文件到七牛云
     
     Args:
         files: 文件列表
@@ -24,11 +24,9 @@ def save_files(files, asset_type, asset_id):
         asset_id: 资产ID
         
     Returns:
-        保存的文件路径列表
+        保存的文件 URL 列表
     """
-    # 创建资产目录
-    asset_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], asset_type, str(asset_id))
-    os.makedirs(asset_dir, exist_ok=True)
+    from .storage import storage
     
     # 允许的文件扩展名
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
@@ -37,13 +35,30 @@ def save_files(files, asset_type, asset_id):
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
     
     # 保存文件
-    file_paths = []
+    file_urls = []
     for i, file in enumerate(files):
         if file and allowed_file(file.filename):
-            ext = os.path.splitext(secure_filename(file.filename))[1]
-            filename = f'file_{i+1}{ext}'
-            file_path = os.path.join(asset_dir, filename)
-            file.save(file_path)
-            file_paths.append(os.path.join('static', 'uploads', asset_type, str(asset_id), filename))
+            try:
+                # 构建文件名
+                ext = os.path.splitext(secure_filename(file.filename))[1]
+                filename = f'{asset_type}/{asset_id}/file_{i+1}{ext}'
+                
+                # 读取文件内容
+                file_data = file.read()
+                
+                # 上传到七牛云
+                if storage is None:
+                    raise Exception("七牛云存储未初始化")
+                    
+                url = storage.upload(file_data, filename)
+                if url:
+                    file_urls.append(url)
+                    current_app.logger.info(f'上传文件成功: {url}')
+                else:
+                    raise Exception("七牛云上传失败")
+                    
+            except Exception as e:
+                current_app.logger.error(f'上传文件失败: {str(e)}')
+                continue
             
-    return file_paths 
+    return file_urls
