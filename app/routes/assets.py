@@ -194,19 +194,28 @@ def edit_asset(asset_id):
                             # 读取文件内容
                             file_data = image.read()
                             
-                            # 上传到七牛云
+                            # 检查七牛云存储是否初始化
                             if storage is None:
+                                current_app.logger.error('七牛云存储未初始化')
                                 raise Exception("七牛云存储未初始化")
                                 
+                            # 上传到七牛云
+                            current_app.logger.info(f'开始上传图片到七牛云: {filename}')
                             url = storage.upload(file_data, filename)
+                            
                             if url:
+                                # 确保URL不包含@符号
+                                if url.startswith('@'):
+                                    url = url[1:]
                                 image_paths.append(url)
-                                current_app.logger.info(f'上传图片成功: {url}')
+                                current_app.logger.info(f'图片上传成功: {url}')
                             else:
+                                current_app.logger.error(f'七牛云返回的URL为空: {filename}')
                                 raise Exception("七牛云上传失败")
                                 
                         except Exception as e:
                             current_app.logger.error(f'上传图片失败: {str(e)}')
+                            current_app.logger.error(f'文件名: {image.filename}, 目标路径: {filename}')
                             continue
                 
                 if image_paths:
@@ -394,6 +403,8 @@ def create_asset():
             image_paths = []
             asset_type_folder = 'real_estate' if asset_type == 10 else 'quasi_real_estate'
             
+            current_app.logger.info(f'开始处理图片上传，资产类型文件夹: {asset_type_folder}')
+            
             for i, image in enumerate(images):
                 if image and image.filename and allowed_file(image.filename, ['jpg', 'jpeg', 'png']):
                     try:
@@ -401,27 +412,43 @@ def create_asset():
                         ext = image.filename.rsplit(".", 1)[1].lower()
                         filename = f'{asset_type_folder}/{asset.id}/image_{i+1}.{ext}'
                         
+                        current_app.logger.info(f'处理第 {i+1} 张图片: {image.filename} -> {filename}')
+                        
                         # 读取文件内容
                         file_data = image.read()
                         
-                        # 上传到七牛云
+                        # 检查七牛云存储是否初始化
                         if storage is None:
+                            current_app.logger.error('七牛云存储未初始化')
                             raise Exception("七牛云存储未初始化")
-                            
+                        
+                        # 上传到七牛云
+                        current_app.logger.info(f'开始上传图片到七牛云: {filename}')
                         url = storage.upload(file_data, filename)
+                        
                         if url:
+                            # 确保URL不包含@符号
+                            if url.startswith('@'):
+                                url = url[1:]
                             image_paths.append(url)
-                            current_app.logger.info(f'上传图片成功: {url}')
+                            current_app.logger.info(f'图片上传成功: {url}')
                         else:
+                            current_app.logger.error(f'七牛云返回的URL为空: {filename}')
                             raise Exception("七牛云上传失败")
                             
                     except Exception as e:
                         current_app.logger.error(f'上传图片失败: {str(e)}')
+                        current_app.logger.error(f'文件名: {image.filename}, 目标路径: {filename}')
                         continue
+                else:
+                    current_app.logger.warning(f'跳过无效的图片文件: {image.filename if image else "None"}')
             
             # 保存图片路径到资产记录
             if not image_paths:
+                current_app.logger.error('没有成功上传任何图片')
                 raise Exception('没有成功保存任何图片')
+                
+            current_app.logger.info(f'所有图片上传成功，保存路径列表: {image_paths}')
             asset.images = json.dumps(image_paths)
             
             # 处理文档文件
