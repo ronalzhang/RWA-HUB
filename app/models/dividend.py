@@ -26,9 +26,6 @@ class DividendRecord(db.Model):
     tx_hash = db.Column(db.String(66), nullable=False)  # 交易哈希
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
-    # 关联关系
-    asset = db.relationship('app.models.asset.Asset', backref=db.backref('dividend_records', lazy=True))
-
     PLATFORM_FEE_RATE = 0.015  # 1.5%
     MIN_TOTAL_AMOUNT = 10000  # 最小分红金额
 
