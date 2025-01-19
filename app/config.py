@@ -6,13 +6,14 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static/uploads')
     
-    # 管理员权限配置
+    # 管理员配置
     ADMIN_CONFIG = {
-        '0x6394993426DBA3b654eF0052698Fe9E0B6A98870': {
-            'role': '主管理员',
-            'name': '主管理员',
-            'permissions': ['审核', '编辑', '删除', '发布公告', '管理用户', '查看统计'],
-            'level': 1  # 最高级别
+        'super_admin': {
+            'address': '0x6394993426DBA3b654eF0052698Fe9E0B6A98870',
+            'role': 'super_admin',
+            'name': '超级管理员',
+            'level': 1,
+            'permissions': ['审核', '编辑', '删除', '发布公告', '管理用户', '查看统计']
         },
         '0x124e5B8A4E6c68eC66e181E0B54817b12D879c57': {
             'role': '副管理员',
