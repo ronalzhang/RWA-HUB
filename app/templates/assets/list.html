@@ -23,10 +23,9 @@
                         <div class="position-relative">
                             {% if asset.images %}
                                 {% set first_image = asset.images|from_json|first %}
-                                <img src="{{ first_image }}" class="card-img-top" alt="{{ asset.name }}"
-                                     style="height: 200px; object-fit: cover;">
+                                <img src="{{ first_image }}" class="card-img-top" alt="{{ asset.name }}">
                             {% else %}
-                                <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 200px;">
+                                <div class="text-center p-4 bg-light">
                                     <i class="fas fa-image fa-3x text-muted"></i>
                                 </div>
                             {% endif %}
