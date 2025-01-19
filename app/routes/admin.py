@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 import json
 import os
+from app.utils.storage import storage
 
 def get_admin_permissions(eth_address):
     """获取管理员权限"""
@@ -443,34 +444,19 @@ def delete_asset(asset_id):
 def batch_delete_assets():
     """批量删除资产"""
     try:
-        # 获取当前用户地址
-        eth_address = request.headers.get('X-Eth-Address')
-        if not eth_address:
-            return jsonify({'error': '请先连接钱包'}), 401
-            
-        # 检查管理员权限
-        if not is_admin(eth_address):
-            return jsonify({'error': '没有删除权限'}), 403
-            
         # 获取要删除的资产ID列表
-        data = request.get_json()
-        if not data or 'asset_ids' not in data:
-            return jsonify({'error': '请提供要删除的资产ID列表'}), 400
-            
-        asset_ids = data['asset_ids']
+        asset_ids = request.json.get('asset_ids', [])
         if not asset_ids:
-            return jsonify({'error': '资产ID列表为空'}), 400
+            return jsonify({'error': '未选择要删除的资产'}), 400
             
-        # 获取所有要删除的资产
+        eth_address = g.eth_address
         assets = Asset.query.filter(Asset.id.in_(asset_ids)).all()
         
-        # 检查是否有已上链的资产
-        on_chain_assets = [asset for asset in assets if asset.token_address]
-        if on_chain_assets:
-            return jsonify({
-                'error': '部分资产已上链，无法删除',
-                'on_chain_assets': [asset.id for asset in on_chain_assets]
-            }), 400
+        if not assets:
+            return jsonify({'error': '未找到要删除的资产'}), 404
+            
+        if storage is None:
+            return jsonify({'error': '七牛云存储未初始化'}), 500
             
         # 批量删除文件和标记资产
         for asset in assets:
@@ -478,21 +464,17 @@ def batch_delete_assets():
                 # 删除资产相关的文件
                 if asset.images:
                     images = json.loads(asset.images) if isinstance(asset.images, str) else asset.images
-                    for image_path in images:
+                    for image_url in images:
                         try:
-                            full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], image_path.lstrip('/'))
-                            if os.path.exists(full_path):
-                                os.remove(full_path)
+                            storage.delete(image_url)
                         except Exception as e:
                             current_app.logger.error(f'删除图片失败: {str(e)}')
                 
                 if asset.documents:
                     documents = json.loads(asset.documents) if isinstance(asset.documents, str) else asset.documents
-                    for doc_path in documents:
+                    for doc_url in documents:
                         try:
-                            full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], doc_path.lstrip('/'))
-                            if os.path.exists(full_path):
-                                os.remove(full_path)
+                            storage.delete(doc_url)
                         except Exception as e:
                             current_app.logger.error(f'删除文档失败: {str(e)}')
             except Exception as e:
@@ -694,123 +676,36 @@ def approve_assets():
 def batch_approve_assets():
     """批量审核资产"""
     try:
-        # 获取当前用户地址
-        eth_address = request.headers.get('X-Eth-Address')
-        if not eth_address:
-            return jsonify({'error': '请先连接钱包'}), 401
-            
-        # 检查管理员权限
-        if not is_admin(eth_address):
-            return jsonify({'error': '没有审核权限'}), 403
-            
-        # 检查审核权限
-        if not has_permission('审核'):
-            return jsonify({'error': '没有审核权限'}), 403
-            
         # 获取要审核的资产ID列表
-        data = request.get_json()
-        if not data or 'asset_ids' not in data:
-            return jsonify({'error': '请提供要审核的资产ID列表'}), 400
-            
-        asset_ids = data['asset_ids']
+        asset_ids = request.json.get('asset_ids', [])
         if not asset_ids:
-            return jsonify({'error': '资产ID列表为空'}), 400
+            return jsonify({'error': '未选择要审核的资产'}), 400
             
-        # 获取所有要审核的资产
+        eth_address = g.eth_address
         assets = Asset.query.filter(Asset.id.in_(asset_ids)).all()
         
-        # 检查是否所有资产都是待审核状态
-        non_pending_assets = [asset for asset in assets if asset.status != AssetStatus.PENDING]
-        if non_pending_assets:
-            return jsonify({
-                'error': '部分资产不在待审核状态',
-                'non_pending_assets': [asset.id for asset in non_pending_assets]
-            }), 400
+        if not assets:
+            return jsonify({'error': '未找到要审核的资产'}), 404
             
         # 批量审核资产
         for asset in assets:
-            try:
-                # 创建资产目录
-                asset_type = 'real_estate' if asset.asset_type == AssetType.REAL_ESTATE else 'quasi_real_estate'
-                asset_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], asset_type, str(asset.id))
-                os.makedirs(asset_dir, exist_ok=True)
-                
-                # 处理图片
-                if asset.images:
-                    images = json.loads(asset.images) if isinstance(asset.images, str) else asset.images
-                    new_image_paths = []
-                    for i, image_path in enumerate(images):
-                        try:
-                            # 获取原始文件路径
-                            src_path = os.path.join(current_app.config['UPLOAD_FOLDER'], image_path.lstrip('/'))
-                            if os.path.exists(src_path):
-                                # 构建新的文件名和路径
-                                filename = f'image_{i+1}{os.path.splitext(image_path)[1]}'
-                                dst_path = os.path.join(asset_dir, filename)
-                                
-                                # 如果文件不在正确的位置，移动它
-                                if src_path != dst_path:
-                                    os.rename(src_path, dst_path)
-                                
-                                # 更新图片路径
-                                new_image_paths.append(os.path.join('static', 'uploads', asset_type, str(asset.id), filename))
-                        except Exception as e:
-                            current_app.logger.error(f'处理资产 {asset.id} 的图片 {image_path} 失败: {str(e)}')
-                            continue
-                    
-                    # 更新资产的图片路径
-                    if new_image_paths:
-                        asset.images = json.dumps(new_image_paths)
-                
-                # 处理文档
-                if asset.documents:
-                    documents = json.loads(asset.documents) if isinstance(asset.documents, str) else asset.documents
-                    new_doc_paths = []
-                    for i, doc_path in enumerate(documents):
-                        try:
-                            # 获取原始文件路径
-                            src_path = os.path.join(current_app.config['UPLOAD_FOLDER'], doc_path.lstrip('/'))
-                            if os.path.exists(src_path):
-                                # 构建新的文件名和路径
-                                filename = f'doc_{i+1}{os.path.splitext(doc_path)[1]}'
-                                dst_path = os.path.join(asset_dir, filename)
-                                
-                                # 如果文件不在正确的位置，移动它
-                                if src_path != dst_path:
-                                    os.rename(src_path, dst_path)
-                                
-                                # 更新文档路径
-                                new_doc_paths.append(os.path.join('static', 'uploads', asset_type, str(asset.id), filename))
-                        except Exception as e:
-                            current_app.logger.error(f'处理资产 {asset.id} 的文档 {doc_path} 失败: {str(e)}')
-                            continue
-                    
-                    # 更新资产的文档路径
-                    if new_doc_paths:
-                        asset.documents = json.dumps(new_doc_paths)
-                
-                # 更新审核状态
-                asset.status = AssetStatus.APPROVED.value
-                asset.approved_at = datetime.utcnow()
-                asset.approved_by = eth_address
-                
-            except Exception as e:
-                current_app.logger.error(f'处理资产 {asset.id} 失败: {str(e)}')
+            if asset.status != AssetStatus.PENDING.value:
                 continue
+                
+            # 更新资产状态
+            asset.status = AssetStatus.APPROVED.value
+            asset.approved_at = datetime.utcnow()
+            asset.approved_by = eth_address
+            
+            # 不需要移动文件，因为已经存储在七牛云上
             
         db.session.commit()
-        return jsonify({
-            'message': '资产审核成功',
-            'approved_count': len(assets)
-        }), 200
+        return jsonify({'message': f'成功审核 {len(assets)} 个资产'})
         
     except Exception as e:
-        current_app.logger.error(f'批量审核资产失败: {str(e)}', exc_info=True)
         db.session.rollback()
-        return jsonify({
-            'error': '批量审核资产失败',
-            'message': str(e)
-        }), 500 
+        current_app.logger.error(f'批量审核资产失败: {str(e)}')
+        return jsonify({'error': '批量审核资产失败'}), 500
 
 @admin_api_bp.route('/assets/<int:asset_id>', methods=['GET'])
 @admin_required
