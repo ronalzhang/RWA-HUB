@@ -64,6 +64,7 @@ def create_app(config_name='development'):
     # 先注册API路由
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(admin_api_bp, url_prefix='/api/admin')
+    app.register_blueprint(assets_api_bp, url_prefix='/api/assets')
     
     # 再注册页面路由
     app.register_blueprint(main_bp)
