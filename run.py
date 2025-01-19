@@ -26,6 +26,11 @@ def verify_db_tables():
                 logger.warning(f"缺少必要的表: {missing_tables}")
                 return False
                 
+            # 检查每个表的列
+            for table_name in required_tables:
+                columns = inspector.get_columns(table_name)
+                logger.info(f"表 {table_name} 的列: {[col['name'] for col in columns]}")
+                
             return True
     except Exception as e:
         logger.error(f"验证数据库表时出错: {e}")
