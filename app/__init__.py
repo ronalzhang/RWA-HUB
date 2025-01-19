@@ -59,7 +59,7 @@ def create_app(config_name='development'):
         return value
     
     # 注册蓝图
-    from .routes import main_bp, auth_bp, assets_bp, api_bp, admin_bp, admin_api_bp
+    from .routes import main_bp, auth_bp, assets_bp, api_bp, admin_bp, admin_api_bp, assets_api_bp
     
     # 先注册API路由
     app.register_blueprint(api_bp, url_prefix='/api')
