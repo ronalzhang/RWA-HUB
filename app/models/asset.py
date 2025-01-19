@@ -44,7 +44,7 @@ class Asset(db.Model):
 
     # 添加关联
     dividend_records = db.relationship('app.models.dividend.DividendRecord', backref='asset', lazy=True, cascade='all, delete-orphan')
-    trades = db.relationship('Trade', backref='asset', lazy=True)
+    trades = db.relationship('app.models.trade.Trade', backref='asset', lazy=True)
 
     # 添加索引
     __table_args__ = (
