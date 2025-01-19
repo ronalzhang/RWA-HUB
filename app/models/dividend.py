@@ -1,4 +1,4 @@
-from app.models import db
+from .. import db
 from datetime import datetime
 
 class DividendRecord(db.Model):
