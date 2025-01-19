@@ -25,7 +25,7 @@ class Config:
             'role': '副管理员',
             'name': '副管理员',
             'permissions': ['审核', '编辑', '查看统计'],
-            'level': 2  # 次级
+            'level': 2
         }
     }
     
