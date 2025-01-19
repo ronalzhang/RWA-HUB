@@ -190,7 +190,7 @@ async function submitForm(event) {
         headers.append('X-Eth-Address', window.currentAccount);
         formData.append('eth_address', window.currentAccount);
         
-        const response = await fetch('/api/assets/create', {
+        const response = await fetch('/api/assets', {
             method: 'POST',
             headers: headers,
             body: formData
