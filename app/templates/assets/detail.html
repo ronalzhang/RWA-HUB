@@ -27,9 +27,9 @@
             <div id="assetCarousel" class="carousel slide" data-bs-ride="carousel">
                 <div class="carousel-inner">
                     {% if asset.images %}
-                    {% for image in asset.images|from_json %}
-                    <div class="carousel-item {% if loop.first %}active{% endif %}" style="height: 400px;">
-                        <img src="{{ image }}" class="d-block w-100 h-100" alt="资产图片" style="object-fit: cover;">
+                    {% for image in asset.images %}
+                    <div class="carousel-item {% if loop.first %}active{% endif %}">
+                        <img src="{{ image }}" class="d-block w-100" alt="资产图片">
                     </div>
                     {% endfor %}
                     {% else %}
