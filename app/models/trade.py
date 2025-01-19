@@ -22,9 +22,6 @@ class Trade(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     is_self_trade = db.Column(db.Boolean, nullable=False, default=False)
 
-    # 关联关系
-    asset = db.relationship('app.models.asset.Asset', backref=db.backref('trades', lazy=True))
-
     @validates('type')
     def validate_type(self, key, value):
         if value not in [t.value for t in TradeType]:
