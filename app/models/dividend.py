@@ -1,10 +1,20 @@
 from .. import db
 from datetime import datetime
+from sqlalchemy.orm import validates
+from sqlalchemy import Index, CheckConstraint
+import re
 
 class DividendRecord(db.Model):
     """分红记录模型"""
     __tablename__ = 'dividend_records'
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = (
+        {'extend_existing': True},
+        Index('ix_dividend_records_asset_id', 'asset_id'),  # 资产ID索引
+        Index('ix_dividend_records_created_at', 'created_at'),  # 创建时间索引
+        CheckConstraint('total_amount >= 10000', name='ck_total_amount_min'),  # 最小分红金额10000
+        CheckConstraint('platform_fee = total_amount * 0.015', name='ck_platform_fee_rate'),  # 平台费用1.5%
+        CheckConstraint('actual_amount = total_amount - platform_fee', name='ck_actual_amount'),  # 实际分配金额
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False)
@@ -17,7 +27,29 @@ class DividendRecord(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     # 关联关系
-    asset = db.relationship('Asset', backref=db.backref('dividend_records', lazy=True))
+    asset = db.relationship('app.models.asset.Asset', backref=db.backref('dividend_records', lazy=True))
+
+    PLATFORM_FEE_RATE = 0.015  # 1.5%
+    MIN_TOTAL_AMOUNT = 10000  # 最小分红金额
+
+    @validates('total_amount')
+    def validate_total_amount(self, key, value):
+        if value < self.MIN_TOTAL_AMOUNT:
+            raise ValueError(f'分红金额不能小于 {self.MIN_TOTAL_AMOUNT} USDC')
+        return value
+
+    @validates('platform_fee')
+    def validate_platform_fee(self, key, value):
+        expected_fee = self.total_amount * self.PLATFORM_FEE_RATE
+        if abs(value - expected_fee) > 0.01:  # 允许0.01的误差
+            raise ValueError('平台费用必须是总金额的1.5%')
+        return value
+
+    @validates('tx_hash')
+    def validate_tx_hash(self, key, value):
+        if not re.match(r'^0x[a-fA-F0-9]{64}$', value):
+            raise ValueError('Invalid transaction hash format')
+        return value
 
     def to_dict(self):
         """转换为字典格式"""
