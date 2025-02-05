@@ -100,22 +100,16 @@ if __name__ == '__main__':
         
     app = create_app(os.getenv('FLASK_ENV', 'production'))
     
-    # 强制启用调试模式和错误显示
-    app.config['DEBUG'] = True
+    # 生产环境配置
+    app.config['DEBUG'] = False
     app.config['PROPAGATE_EXCEPTIONS'] = True
     
     port = int(os.environ.get('PORT', 10000))
-    host = os.environ.get('HOST', '0.0.0.0')
     
     print("启动服务器...")
     print("访问地址:")
     print(f"本地:    http://127.0.0.1:{port}")
-    print(f"外部:    http://{host}:{port}")
     
-    if os.environ.get('FLASK_ENV') == 'production':
-        # 生产环境使用 waitress，但保持错误日志
-        from waitress import serve
-        serve(app, host=host, port=port)
-    else:
-        # 开发环境使用 Flask 内置服务器
-        app.run(host=host, port=port, debug=True)
+    # 使用waitress作为生产服务器
+    from waitress import serve
+    serve(app, host='127.0.0.1', port=port, threads=4, url_scheme='https')
