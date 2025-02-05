@@ -11,7 +11,6 @@ from werkzeug.utils import secure_filename
 from flask import Blueprint
 import random
 from app.models.dividend import DividendRecord
-from app.models import UserPreference
 
 api_bp = Blueprint('api', __name__)
 
@@ -510,30 +509,13 @@ def get_asset_dividend_history(asset_id):
 def update_language_preference():
     try:
         data = request.json
-        user_address = request.headers.get('X-Eth-Address')
         language = data.get('language')
         
-        if not user_address or not language:
-            return jsonify({'error': 'Missing required parameters'}), 400
-            
-        if language not in ['en', 'zh_Hant']:
+        if not language or language not in ['en', 'zh_Hant']:
             return jsonify({'error': 'Invalid language'}), 400
         
-        # 更新或创建用户语言偏好
-        user_pref = UserPreference.query.filter_by(wallet_address=user_address).first()
-        if user_pref:
-            user_pref.language = language
-        else:
-            user_pref = UserPreference(wallet_address=user_address, language=language)
-            db.session.add(user_pref)
-        
-        db.session.commit()
-        
-        # 更新 session 中的语言设置
-        session['language'] = language
-        
+        # 语言偏好功能已移除，直接返回成功
         return jsonify({'success': True}), 200
         
     except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500 
+        return jsonify({'error': str(e)}), 500
