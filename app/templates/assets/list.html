@@ -41,20 +41,20 @@
                             <!-- 状态标签 -->
                             <div class="position-absolute top-0 start-0 m-2">
                                 {% if asset.status == 1 %}
-                                <span class="badge bg-warning">待审核</span>
+                                <span class="badge bg-warning">{{ _('Pending Review') }}</span>
                                 {% elif asset.status == 2 %}
-                                <span class="badge bg-success">已上链</span>
+                                <span class="badge bg-success">{{ _('On Chain') }}</span>
                                 {% elif asset.status == 3 %}
-                                <span class="badge bg-danger">已拒绝</span>
+                                <span class="badge bg-danger">{{ _('Rejected') }}</span>
                                 {% endif %}
                             </div>
                             
                             <!-- 资产类型标签 -->
                             <div class="position-absolute top-0 end-0 m-2">
                                 {% if asset.asset_type == 10 %}
-                                <span class="badge bg-primary">不动产</span>
+                                <span class="badge bg-primary">{{ _('Real Estate') }}</span>
                                 {% else %}
-                                <span class="badge bg-info">类不动产</span>
+                                <span class="badge bg-info">{{ _('Similar Assets') }}</span>
                                 {% endif %}
                             </div>
                         </div>

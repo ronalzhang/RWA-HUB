@@ -344,6 +344,150 @@ msgstr "資產列表"
 msgid "Publish Asset"
 msgstr "發布資產"
 
+#: app/templates/assets/list.html:43
+msgid "Pending Review"
+msgstr "待審核"
+
+#: app/templates/assets/list.html:45
+msgid "On Chain"
+msgstr "已上鏈"
+
+#: app/templates/assets/list.html:47
+msgid "Rejected"
+msgstr "已拒絕"
+
+#: app/templates/assets/list.html:53
+msgid "Real Estate"
+msgstr "不動產"
+
+#: app/templates/assets/list.html:55
+msgid "Similar Assets"
+msgstr "類不動產"
+
+#: app/templates/assets/detail.html:19
+msgid "Back to List"
+msgstr "返回列表"
+
+#: app/templates/assets/detail.html:29
+msgid "Dividend Management"
+msgstr "分紅管理"
+
+#: app/templates/assets/detail.html:73
+msgid "Basic Information"
+msgstr "基本信息"
+
+#: app/templates/assets/detail.html:78
+msgid "Area"
+msgstr "面積"
+
+#: app/templates/assets/detail.html:85
+msgid "Total Value"
+msgstr "總價值"
+
+#: app/templates/assets/detail.html:92
+msgid "Expected Annual Revenue"
+msgstr "預期年收益"
+
+#: app/templates/assets/detail.html:100
+msgid "Token Information"
+msgstr "代幣信息"
+
+#: app/templates/assets/detail.html:105
+msgid "Token Symbol"
+msgstr "代幣符號"
+
+#: app/templates/assets/detail.html:112
+msgid "Token Price"
+msgstr "代幣價格"
+
+#: app/templates/assets/detail.html:119
+msgid "Total Supply / Remaining"
+msgstr "發行總量 / 剩餘可售"
+
+#: app/templates/assets/detail.html:126
+msgid "Publisher Address"
+msgstr "發布地址"
+
+#: app/templates/assets/detail.html:136
+msgid "Buy"
+msgstr "購買"
+
+#: app/templates/assets/detail.html:138
+msgid "Trading function coming soon"
+msgstr "即將開放交易功能"
+
+#: app/templates/assets/detail.html:147
+msgid "Asset Description"
+msgstr "資產描述"
+
+#: app/templates/assets/detail.html:155
+msgid "Dividend History"
+msgstr "分紅歷史"
+
+#: app/templates/assets/detail.html:161
+msgid "Time"
+msgstr "時間"
+
+#: app/templates/assets/detail.html:162
+msgid "Dividend Amount"
+msgstr "分紅金額"
+
+#: app/templates/assets/detail.html:163
+msgid "Per Token Dividend"
+msgstr "每token分紅"
+
+#: app/templates/assets/detail.html:164
+msgid "Status"
+msgstr "狀態"
+
+#: app/templates/assets/detail.html:173
+msgid "Pending Confirmation"
+msgstr "待確認"
+
+#: app/templates/assets/detail.html:175
+msgid "Completed"
+msgstr "已完成"
+
+#: app/templates/assets/detail.html:177
+msgid "Cancelled"
+msgstr "已取消"
+
+#: app/templates/assets/detail.html:193
+msgid "Initiate Dividend"
+msgstr "發起分紅"
+
+#: app/templates/assets/detail.html:198
+msgid "Current Holders Count"
+msgstr "當前持有人數"
+
+#: app/templates/assets/detail.html:202
+msgid "Dividend Amount (USDC)"
+msgstr "分紅金額 (USDC)"
+
+#: app/templates/assets/detail.html:204
+msgid "Minimum dividend amount is 10,000 USDC"
+msgstr "最小分紅金額為10,000 USDC"
+
+#: app/templates/assets/detail.html:207
+msgid "Estimated Gas Fee"
+msgstr "預估Gas費用"
+
+#: app/templates/assets/detail.html:211
+msgid "Platform Fee (1.5%)"
+msgstr "平台手續費 (1.5%)"
+
+#: app/templates/assets/detail.html:215
+msgid "Per Token Dividend Amount"
+msgstr "每代幣分紅金額"
+
+#: app/templates/assets/detail.html:220
+msgid "Cancel"
+msgstr "取消"
+
+#: app/templates/assets/detail.html:221
+msgid "Start Dividend"
+msgstr "發起分紅"
+
 #: venv/lib/python3.13/site-packages/click/_termui_impl.py:556
 #, python-brace-format
 msgid "{editor}: Editing failed"

@@ -14,7 +14,7 @@
 <div class="container mt-4">
     <!-- 返回按钮 -->
     <a href="{{ url_for('assets.list_assets_page') }}" class="btn btn-link text-muted mb-3">
-        <i class="fas fa-arrow-left me-2"></i>返回列表
+        <i class="fas fa-arrow-left me-2"></i>{{ _('Back to List') }}
     </a>
 
     <!-- 资产状态标签 -->
@@ -23,7 +23,7 @@
             <h2 class="mb-0">{{ asset.name }}</h2>
             {% if (asset.owner_address and asset.owner_address|lower == current_user_address|lower) or is_admin %}
             <a href="{{ url_for('assets.dividend_page', asset_id=asset.id) }}" class="btn btn-outline-primary">
-                <i class="fas fa-coins me-2"></i>分红管理
+                <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
             </a>
             {% endif %}
         </div>
@@ -80,26 +80,26 @@
                 <div class="card-body">
                     <!-- 基本信息 -->
                     <div class="mb-4">
-                        <h5 class="text-muted mb-3">基本信息</h5>
+                        <h5 class="text-muted mb-3">{{ _('Basic Information') }}</h5>
                         <div class="row g-3">
                             {% if asset.asset_type == 10 %}
                             <div class="col-12">
                                 <div class="bg-light rounded p-3">
-                                    <small class="text-muted d-block mb-1">面积</small>
+                                    <small class="text-muted d-block mb-1">{{ _('Area') }}</small>
                                     <h5 class="mb-0">{{ asset.area|number_format }} ㎡</h5>
                                 </div>
                             </div>
                             {% else %}
                             <div class="col-12">
                                 <div class="bg-light rounded p-3">
-                                    <small class="text-muted d-block mb-1">总价值</small>
+                                    <small class="text-muted d-block mb-1">{{ _('Total Value') }}</small>
                                     <h5 class="mb-0">{{ asset.total_value|number_format }} USDC</h5>
                                 </div>
                             </div>
                             {% endif %}
                             <div class="col-12">
                                 <div class="bg-light rounded p-3">
-                                    <small class="text-muted d-block mb-1">预期年收益</small>
+                                    <small class="text-muted d-block mb-1">{{ _('Expected Annual Revenue') }}</small>
                                     <h5 class="mb-0">{{ asset.annual_revenue|number_format }} USDC</h5>
                                 </div>
                             </div>
@@ -108,29 +108,29 @@
 
                     <!-- 代币信息 -->
                     <div class="mb-4">
-                        <h5 class="text-muted mb-3">代币信息</h5>
+                        <h5 class="text-muted mb-3">{{ _('Token Information') }}</h5>
                         <div class="row g-3">
                             <div class="col-12">
                                 <div class="bg-light rounded p-3">
-                                    <small class="text-muted d-block mb-1">代币符号</small>
+                                    <small class="text-muted d-block mb-1">{{ _('Token Symbol') }}</small>
                                     <h5 class="mb-0">{{ asset.token_symbol }}</h5>
                                 </div>
                             </div>
                             <div class="col-12">
                                 <div class="bg-light rounded p-3">
-                                    <small class="text-muted d-block mb-1">代币价格</small>
+                                    <small class="text-muted d-block mb-1">{{ _('Token Price') }}</small>
                                     <h5 class="mb-0">{{ "%.6f"|format(asset.token_price) }} USDC</h5>
                                 </div>
                             </div>
                             <div class="col-12">
                                 <div class="bg-light rounded p-3">
-                                    <small class="text-muted d-block mb-1">发行总量 / 剩余可售</small>
+                                    <small class="text-muted d-block mb-1">{{ _('Total Supply / Remaining') }}</small>
                                     <h5 class="mb-0">{{ '%d'|format(asset.token_supply|int) }} / {{ '%d'|format(remaining_supply|default(asset.token_supply)|int) }} token</h5>
                                 </div>
                             </div>
                             <div class="col-12">
                                 <div class="bg-light rounded p-3">
-                                    <small class="text-muted d-block mb-1">发布地址</small>
+                                    <small class="text-muted d-block mb-1">{{ _('Publisher Address') }}</small>
                                     <h5 class="mb-0 text-break">{{ asset.owner_address[:6] }}...{{ asset.owner_address[-4:] }}</h5>
                                 </div>
                             </div>
@@ -140,9 +140,9 @@
                     <!-- 交易按钮 -->
                     {% if asset.status == 2 %}
                     <button class="btn btn-primary btn-lg w-100" id="buyButton" disabled>
-                        <i class="fas fa-shopping-cart me-2"></i>购买
+                        <i class="fas fa-shopping-cart me-2"></i>{{ _('Buy') }}
                     </button>
-                    <small class="text-muted d-block text-center mt-2">即将开放交易功能</small>
+                    <small class="text-muted d-block text-center mt-2">{{ _('Trading function coming soon') }}</small>
                     {% endif %}
                 </div>
             </div>
@@ -152,7 +152,7 @@
     <!-- 资产描述 -->
     <div class="card mb-4">
         <div class="card-body">
-            <h5 class="card-title mb-3">资产描述</h5>
+            <h5 class="card-title mb-3">{{ _('Asset Description') }}</h5>
             <div class="card-text">{{ asset.description|safe }}</div>
         </div>
     </div>
@@ -161,15 +161,15 @@
     {% if dividend_records %}
     <div class="card">
         <div class="card-body">
-            <h5 class="card-title mb-3">分红历史</h5>
+            <h5 class="card-title mb-3">{{ _('Dividend History') }}</h5>
             <div class="table-responsive">
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>时间</th>
-                            <th>分红金额</th>
-                            <th>每token分红</th>
-                            <th>状态</th>
+                            <th>{{ _('Time') }}</th>
+                            <th>{{ _('Dividend Amount') }}</th>
+                            <th>{{ _('Per Token Dividend') }}</th>
+                            <th>{{ _('Status') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -180,11 +180,11 @@
                             <td>{{ record.per_token_amount|number_format }} USDC</td>
                             <td>
                                 {% if record.status == 1 %}
-                                <span class="badge bg-warning">待确认</span>
+                                <span class="badge bg-warning">{{ _('Pending Confirmation') }}</span>
                                 {% elif record.status == 2 %}
-                                <span class="badge bg-success">已完成</span>
+                                <span class="badge bg-success">{{ _('Completed') }}</span>
                                 {% elif record.status == 3 %}
-                                <span class="badge bg-danger">已取消</span>
+                                <span class="badge bg-danger">{{ _('Cancelled') }}</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -202,35 +202,35 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">发起分红</h5>
+                <h5 class="modal-title">{{ _('Initiate Dividend') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label class="form-label">当前持有人数</label>
+                    <label class="form-label">{{ _('Current Holders Count') }}</label>
                     <input type="text" class="form-control" id="holdersCount" readonly>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">分红金额 (USDC)</label>
+                    <label class="form-label">{{ _('Dividend Amount (USDC)') }}</label>
                     <input type="number" class="form-control" id="dividendAmount" min="10000" step="1000">
-                    <div class="form-text">最小分红金额为10,000 USDC</div>
+                    <div class="form-text">{{ _('Minimum dividend amount is 10,000 USDC') }}</div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">预估Gas费用</label>
+                    <label class="form-label">{{ _('Estimated Gas Fee') }}</label>
                     <input type="text" class="form-control" id="estimatedGas" readonly>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">平台手续费 (1.5%)</label>
+                    <label class="form-label">{{ _('Platform Fee (1.5%)') }}</label>
                     <input type="text" class="form-control" id="platformFee" readonly>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">每代币分红金额</label>
+                    <label class="form-label">{{ _('Per Token Dividend Amount') }}</label>
                     <input type="text" class="form-control" id="perTokenDividend" readonly>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-primary" onclick="startDividend()">发起分红</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('Cancel') }}</button>
+                <button type="button" class="btn btn-primary" onclick="startDividend()">{{ _('Start Dividend') }}</button>
             </div>
         </div>
     </div>
