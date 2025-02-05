@@ -42,7 +42,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('assets.list_assets_page') }}">全部资产</a>
+                        <a class="nav-link" href="{{ url_for('assets.list_assets_page') }}">{{ _('All Assets') }}</a>
                     </li>
                     <li class="nav-item d-none" id="adminEntry">
                         <a class="nav-link" href="#" id="adminLink">
@@ -56,16 +56,30 @@
                     <div class="dropdown">
                         <button id="walletBtn" class="btn btn-outline-primary wallet-btn" type="button" onclick="handleWalletClick()">
                             <i class="fas fa-wallet me-2"></i>
-                            <span id="walletBtnText">连接钱包</span>
+                            <span id="walletBtnText">{{ _('Connect Wallet') }}</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm" id="walletMenu">
                             <li><a class="dropdown-item" href="#" id="switchWallet">
-                                <i class="fas fa-exchange-alt me-2"></i>切换钱包
+                                <i class="fas fa-exchange-alt me-2"></i>{{ _('Switch Wallet') }}
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item text-danger" href="#" id="disconnectWallet">
-                                <i class="fas fa-power-off me-2"></i>断开连接
+                                <i class="fas fa-power-off me-2"></i>{{ _('Disconnect') }}
                             </a></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 语言切换 -->
+                <div class="navbar-nav ms-auto">
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="languageDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-globe me-1"></i>
+                            {{ 'English' if request.cookies.get('language', 'en') == 'en' else '繁體中文' }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="changeLanguage('en')">English</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="changeLanguage('zh_Hant')">繁體中文</a></li>
                         </ul>
                     </div>
                 </div>
@@ -82,7 +96,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <h5 class="mb-1">RWA-HUB.com</h5>
-                    <p class="text-muted mb-0">基于区块链技术的实物资产数字化平台</p>
+                    <p class="text-muted mb-0">{{ _('Blockchain-based Physical Asset Digitization Platform') }}</p>
                 </div>
                 <div class="col-md-6 text-md-end">
                     <div class="mb-2">
@@ -97,7 +111,7 @@
                         </a>
                     </div>
                     <p class="text-muted small mb-0">
-                        © 2024 RWA-HUB.com 版权所有
+                        © 2024 RWA-HUB.com {{ _('All Rights Reserved') }}
                     </p>
                 </div>
             </div>
@@ -308,6 +322,16 @@
             checkConnection();
         }
     });
+    </script>
+
+    <!-- 添加语言切换脚本 -->
+    <script>
+    function changeLanguage(lang) {
+        // 设置 cookie，有效期一年
+        document.cookie = `language=${lang};path=/;max-age=31536000`;
+        // 刷新页面以应用新的语言设置
+        window.location.reload();
+    }
     </script>
 
     {% block scripts %}{% endblock %}

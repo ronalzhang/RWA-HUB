@@ -1,0 +1,714 @@
+# Chinese (Traditional) translations for PROJECT.
+# Copyright (C) 2025 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2025-02-05 14:22+0800\n"
+"PO-Revision-Date: 2025-02-05 13:45+0800\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: zh_Hant\n"
+"Language-Team: zh_Hant <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: app/templates/base.html:45
+msgid "All Assets"
+msgstr "全部資產"
+
+#: app/templates/base.html:59
+msgid "Connect Wallet"
+msgstr "連接錢包"
+
+#: app/templates/base.html:63
+msgid "Switch Wallet"
+msgstr "切換錢包"
+
+#: app/templates/base.html:67
+msgid "Disconnect"
+msgstr "斷開連接"
+
+#: app/templates/base.html:99
+msgid "Blockchain-based Physical Asset Digitization Platform"
+msgstr "基於區塊鏈的實物資產數字化平台"
+
+#: app/templates/base.html:114
+msgid "All Rights Reserved"
+msgstr "版權所有"
+
+#: app/templates/index.html:3
+msgid "Physical Asset Digitization Platform"
+msgstr "實物資產數字化平台"
+
+#: app/templates/index.html:22
+msgid "Real World Assets"
+msgstr "實物資產"
+
+#: app/templates/index.html:23
+msgid "Digital Platform"
+msgstr "數字化平台"
+
+#: app/templates/index.html:25
+msgid "Start your asset digitization journey now"
+msgstr "即刻開啟資產數字化之旅"
+
+#: app/templates/index.html:25
+msgid "Secure, transparent, and efficient blockchain asset management platform"
+msgstr "安全、透明、高效的區塊鏈資產管理平台"
+
+#: app/templates/index.html:28
+msgid "Publish Asset"
+msgstr "發布資產"
+
+#: app/templates/index.html:33
+msgid "White Paper"
+msgstr "白皮書"
+
+#: app/templates/index.html:54
+msgid "Latest Assets"
+msgstr "最新資產"
+
+#: app/templates/index.html:55
+msgid "Discover quality assets and start your investment journey"
+msgstr "發現優質資產，開啟投資之旅"
+
+#: app/templates/index.html:61
+msgid "View All"
+msgstr "查看全部"
+
+#: app/templates/index.html:93
+msgid "Pending Review"
+msgstr "待審核"
+
+#: app/templates/index.html:95
+msgid "On Chain"
+msgstr "已上鏈"
+
+#: app/templates/index.html:97
+msgid "Rejected"
+msgstr "已拒絕"
+
+#: app/templates/assets/create.html:26 app/templates/index.html:104
+#: app/templates/index.html:217
+msgid "Real Estate"
+msgstr "不動產"
+
+#: app/templates/assets/create.html:27 app/templates/index.html:106
+#: app/templates/index.html:230
+msgid "Similar Assets"
+msgstr "類不動產"
+
+#: app/templates/index.html:123
+msgid "Area"
+msgstr "面積"
+
+#: app/templates/index.html:128
+msgid "Total Value"
+msgstr "總價值"
+
+#: app/templates/index.html:133
+msgid "Token Price"
+msgstr "代幣價格"
+
+#: app/templates/index.html:137
+msgid "Expected Annual Revenue"
+msgstr "預期年收益"
+
+#: app/templates/index.html:151
+msgid "No Assets"
+msgstr "暫無資產"
+
+#: app/templates/index.html:153
+msgid "Click the \"Publish Asset\" button in the top right to create"
+msgstr "點擊右上角的「發布資產」按鈕開始創建"
+
+#: app/templates/index.html:155
+msgid "Please connect wallet first"
+msgstr "請先連接錢包"
+
+#: app/templates/index.html:169
+msgid "Platform Features"
+msgstr "平台特色"
+
+#: app/templates/index.html:170
+msgid "Building a secure and transparent asset digitization ecosystem based on blockchain technology"
+msgstr "基於區塊鏈技術，打造安全、透明的資產數字化生態"
+
+#: app/templates/index.html:178
+msgid "Decentralized Trading"
+msgstr "去中心化交易"
+
+#: app/templates/index.html:179
+msgid "Asset information directly on chain, no registration required, connect wallet to publish and trade, truly decentralized"
+msgstr "資產信息直接上鏈，無需註冊，連接錢包即可發布和交易，真正實現去中心化"
+
+#: app/templates/index.html:187
+msgid "Asset Security Control"
+msgstr "資產安全可控"
+
+#: app/templates/index.html:188
+msgid "Tokens are always stored in users personal wallets, platform does not custody any assets, ensuring asset security"
+msgstr "代幣始終存儲在用戶個人錢包中，平台不託管任何資產，保障資產安全"
+
+#: app/templates/index.html:196
+msgid "Transparent Information"
+msgstr "信息透明可信"
+
+#: app/templates/index.html:197
+msgid "All transaction information is recorded on the blockchain, transparent and immutable, ensuring transaction security"
+msgstr "所有交易信息記錄在區塊鏈上，公開透明，不可篡改，保障交易安全可信"
+
+#: app/templates/index.html:208
+msgid "Asset Types"
+msgstr "資產類型"
+
+#: app/templates/index.html:209
+msgid "Supporting two main asset types to meet different needs"
+msgstr "支持兩種主要資產類型，滿足不同需求"
+
+#: app/templates/index.html:219
+msgid "Token amount = Area × 10000"
+msgstr "代幣量 = 面積 × 10000"
+
+#: app/templates/index.html:220
+msgid "Requires property certificate, land certificate, etc."
+msgstr "需上傳房產證、土地證等"
+
+#: app/templates/index.html:221
+msgid "Shows total asset area"
+msgstr "顯示資產總面積"
+
+#: app/templates/index.html:232
+msgid "Customizable token amount"
+msgstr "代幣量自定義"
+
+#: app/templates/index.html:233
+msgid "Requires auction, exhibition documents, etc."
+msgstr "需上傳拍賣、展覽文件等"
+
+#: app/templates/index.html:234
+msgid "Shows total asset value"
+msgstr "顯示資產總價值"
+
+#: app/templates/assets/create.html:3 app/templates/assets/create.html:7
+msgid "Create Asset"
+msgstr "創建資產"
+
+#: app/templates/assets/create.html:13
+msgid "Basic Information"
+msgstr "基本信息"
+
+#: app/templates/assets/create.html:17
+msgid "Asset Name"
+msgstr "資產名稱"
+
+#: app/templates/assets/create.html:19
+msgid "Please enter asset name"
+msgstr "請輸入資產名稱"
+
+#: app/templates/assets/create.html:23
+msgid "Asset Type"
+msgstr "資產類型"
+
+#: app/templates/assets/create.html:25 app/templates/assets/create.html:29
+msgid "Please select asset type"
+msgstr "請選擇資產類型"
+
+#: app/templates/assets/create.html:33
+msgid "Asset Location"
+msgstr "資產位置"
+
+#: app/templates/assets/create.html:35
+msgid "Please enter asset location"
+msgstr "請輸入資產位置"
+
+#: app/templates/assets/create.html:39
+msgid "Asset Description"
+msgstr "資產描述"
+
+#: app/templates/assets/create.html:41
+msgid "Please enter asset description"
+msgstr "請輸入資產描述"
+
+#: app/templates/assets/create.html:49
+msgid "Asset Details"
+msgstr "資產信息"
+
+#: app/templates/assets/create.html:53
+msgid "Asset Area (㎡)"
+msgstr "資產面積（㎡）"
+
+#: app/templates/assets/create.html:55
+msgid "Please enter asset area"
+msgstr "請輸入資產面積"
+
+#: app/templates/assets/create.html:59
+msgid "Total Value (USDC)"
+msgstr "資產總價值（USDC）"
+
+#: app/templates/assets/create.html:61
+msgid "Please enter total value"
+msgstr "請輸入資產總價值"
+
+#: app/templates/assets/create.html:65
+msgid "Token Price (USDC)"
+msgstr "代幣價格（USDC）"
+
+#: app/templates/assets/create.html:67
+msgid "Please enter token price"
+msgstr "請輸入代幣價格"
+
+#: app/templates/assets/create.html:71
+msgid "Expected Annual Revenue (USDC)"
+msgstr "預期年收益（USDC）"
+
+#: app/templates/assets/create.html:73
+msgid "Please enter expected annual revenue"
+msgstr "請輸入預期年收益"
+
+#: app/templates/assets/create.html:81
+msgid "Asset Images"
+msgstr "資產圖片"
+
+#: app/templates/assets/create.html:86
+msgid "Drag and drop images here or click to select"
+msgstr "拖放圖片或點擊選擇"
+
+#: app/templates/assets/create.html:95
+msgid "Asset Documents"
+msgstr "資產證明文件"
+
+#: app/templates/assets/create.html:99
+msgid "Required Documents"
+msgstr "必備文件"
+
+#: app/templates/assets/create.html:101
+msgid "For Real Estate"
+msgstr "不動產"
+
+#: app/templates/assets/create.html:103
+msgid "Property Certificate"
+msgstr "房產證"
+
+#: app/templates/assets/create.html:104
+msgid "Land Certificate"
+msgstr "土地證"
+
+#: app/templates/assets/create.html:105
+msgid "Assessment Report"
+msgstr "評估報告"
+
+#: app/templates/assets/create.html:109
+msgid "For Similar Assets"
+msgstr "類不動產"
+
+#: app/templates/assets/create.html:111
+msgid "Auction Certificate"
+msgstr "拍賣證明"
+
+#: app/templates/assets/create.html:112
+msgid "Exhibition Documents"
+msgstr "展覽文件"
+
+#: app/templates/assets/create.html:113
+msgid "Asset Proof"
+msgstr "資產證明"
+
+#: app/templates/assets/create.html:120
+msgid "Drag and drop documents here or click to select"
+msgstr "拖放文件或點擊選擇"
+
+#: app/templates/assets/create.html:128
+msgid "Save Draft"
+msgstr "保存草稿"
+
+#: app/templates/assets/create.html:129
+msgid "Submit for Review"
+msgstr "提交審核"
+
+#: app/templates/assets/create.html:140
+msgid "Error"
+msgstr "錯誤"
+
+#: app/templates/assets/list.html:3 app/templates/assets/list.html:17
+msgid "Asset List"
+msgstr "資產列表"
+
+#: app/templates/assets/list.html:19
+msgid "Publish Asset"
+msgstr "發布資產"
+
+#: venv/lib/python3.13/site-packages/click/_termui_impl.py:556
+#, python-brace-format
+msgid "{editor}: Editing failed"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/_termui_impl.py:560
+#, python-brace-format
+msgid "{editor}: Editing failed: {e}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1124
+msgid "Aborted!"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1349
+#: venv/lib/python3.13/site-packages/click/core.py:1379
+#, python-brace-format
+msgid "(Deprecated) {text}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1396
+msgid "Options"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1422
+#, python-brace-format
+msgid "Got unexpected extra argument ({args})"
+msgid_plural "Got unexpected extra arguments ({args})"
+msgstr[0] ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1438
+#, python-brace-format
+msgid "DeprecationWarning: The command {name!r} is deprecated."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1645
+msgid "Commands"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1677
+msgid "Missing command."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1755
+#, python-brace-format
+msgid "No such command {name!r}."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:2313
+msgid "Value must be an iterable."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:2334
+#, python-brace-format
+msgid "Takes {nargs} values but 1 was given."
+msgid_plural "Takes {nargs} values but {len} were given."
+msgstr[0] ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:2783
+#, python-brace-format
+msgid "env var: {var}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:2813
+msgid "(dynamic)"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:2828
+#, python-brace-format
+msgid "default: {default}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:2841
+msgid "required"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/decorators.py:457
+#, python-format
+msgid "%(prog)s, version %(version)s"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/decorators.py:520
+msgid "Show the version and exit."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/decorators.py:541
+msgid "Show this message and exit."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:49
+#: venv/lib/python3.13/site-packages/click/exceptions.py:88
+#, python-brace-format
+msgid "Error: {message}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:80
+#, python-brace-format
+msgid "Try '{command} {option}' for help."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:129
+#, python-brace-format
+msgid "Invalid value: {message}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:131
+#, python-brace-format
+msgid "Invalid value for {param_hint}: {message}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:187
+msgid "Missing argument"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:189
+msgid "Missing option"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:191
+msgid "Missing parameter"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:193
+#, python-brace-format
+msgid "Missing {param_type}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:200
+#, python-brace-format
+msgid "Missing parameter: {param_name}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:220
+#, python-brace-format
+msgid "No such option: {name}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:232
+#, python-brace-format
+msgid "Did you mean {possibility}?"
+msgid_plural "(Possible options: {possibilities})"
+msgstr[0] ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:270
+msgid "unknown error"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:277
+#, python-brace-format
+msgid "Could not open file {filename!r}: {message}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/parser.py:233
+#, python-brace-format
+msgid "Argument {name!r} takes {nargs} values."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/parser.py:415
+#, python-brace-format
+msgid "Option {name!r} does not take a value."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/parser.py:476
+#, python-brace-format
+msgid "Option {name!r} requires an argument."
+msgid_plural "Option {name!r} requires {nargs} arguments."
+msgstr[0] ""
+
+#: venv/lib/python3.13/site-packages/click/shell_completion.py:326
+msgid "Shell completion is not supported for Bash versions older than 4.4."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/shell_completion.py:333
+msgid "Couldn't detect Bash version, shell completion is not supported."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/termui.py:158
+msgid "Repeat for confirmation"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/termui.py:174
+msgid "Error: The value you entered was invalid."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/termui.py:176
+#, python-brace-format
+msgid "Error: {e.message}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/termui.py:187
+msgid "Error: The two entered values do not match."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/termui.py:243
+msgid "Error: invalid input"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/termui.py:773
+msgid "Press any key to continue..."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:267
+#, python-brace-format
+msgid ""
+"Choose from:\n"
+"\t{choices}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:299
+#, python-brace-format
+msgid "{value!r} is not {choice}."
+msgid_plural "{value!r} is not one of {choices}."
+msgstr[0] ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:393
+#, python-brace-format
+msgid "{value!r} does not match the format {format}."
+msgid_plural "{value!r} does not match the formats {formats}."
+msgstr[0] ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:415
+#, python-brace-format
+msgid "{value!r} is not a valid {number_type}."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:471
+#, python-brace-format
+msgid "{value} is not in the range {range}."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:612
+#, python-brace-format
+msgid "{value!r} is not a valid boolean."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:636
+#, python-brace-format
+msgid "{value!r} is not a valid UUID."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:826
+msgid "file"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:828
+msgid "directory"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:830
+msgid "path"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:881
+#, python-brace-format
+msgid "{name} {filename!r} does not exist."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:890
+#, python-brace-format
+msgid "{name} {filename!r} is a file."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:898
+#, python-brace-format
+msgid "{name} {filename!r} is a directory."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:907
+#, python-brace-format
+msgid "{name} {filename!r} is not readable."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:916
+#, python-brace-format
+msgid "{name} {filename!r} is not writable."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:925
+#, python-brace-format
+msgid "{name} {filename!r} is not executable."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:992
+#, python-brace-format
+msgid "{len_type} values are required, but {len_value} was given."
+msgid_plural "{len_type} values are required, but {len_value} were given."
+msgstr[0] ""
+
+#: venv/lib/python3.13/site-packages/semantic_version/django_fields.py:50
+msgid "Enter a valid version number in X.Y.Z format."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/semantic_version/django_fields.py:52
+msgid "Version"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/semantic_version/django_fields.py:86
+msgid "Enter a valid version number spec list in ==X.Y.Z,>=A.B.C format."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/semantic_version/django_fields.py:88
+msgid "Version specification list"
+msgstr ""
+
+#~ msgid "Asset List"
+#~ msgstr "資產列表"
+
+#~ msgid "No assets found"
+#~ msgstr "未找到資產"
+
+#~ msgid "Asset Information"
+#~ msgstr "資產信息"
+
+#~ msgid "Transaction History"
+#~ msgstr "交易歷史"
+
+#~ msgid "No transactions found"
+#~ msgstr "未找到交易記錄"
+
+#~ msgid "Welcome to RWA-HUB"
+#~ msgstr "歡迎來到 RWA-HUB"
+
+#~ msgid "Your Gateway to Digital Asset Management"
+#~ msgstr "您的數字資產管理門戶"
+
+#~ msgid "Secure Asset Management"
+#~ msgstr "安全資產管理"
+
+#~ msgid ""
+#~ "Advanced blockchain technology ensures the "
+#~ "security of your digital assets"
+#~ msgstr "先進的區塊鏈技術確保您的數字資產安全"
+
+#~ msgid "Transparent Transactions"
+#~ msgstr "透明交易"
+
+#~ msgid ""
+#~ "All transactions are recorded on the "
+#~ "blockchain for complete transparency"
+#~ msgstr "所有交易都記錄在區塊鏈上，完全透明"
+
+#~ msgid "Easy Integration"
+#~ msgstr "輕鬆整合"
+
+#~ msgid "Simple integration with existing systems and workflows"
+#~ msgstr "與現有系統和工作流程輕鬆整合"
+
+#~ msgid "Art Collections"
+#~ msgstr "藝術品"
+
+#~ msgid "Precious Metals"
+#~ msgstr "貴金屬"
+
+#~ msgid "Commodities"
+#~ msgstr "大宗商品"
+
+#~ msgid "Page Not Found"
+#~ msgstr "頁面未找到"
+
+#~ msgid "The page you are looking for does not exist."
+#~ msgstr "您要查找的頁面不存在。"
+
+#~ msgid "Internal Server Error"
+#~ msgstr "服務器內部錯誤"
+
+#~ msgid "Something went wrong. Please try again later."
+#~ msgstr "出現錯誤。請稍後再試。"
+

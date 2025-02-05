@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}RWA-HUB - 实物资产数字化平台{% endblock %}
+{% block title %}RWA-HUB - {{ _('Physical Asset Digitization Platform') }}{% endblock %}
 
 {% block content %}
 <!DOCTYPE html>
@@ -19,18 +19,18 @@
             <div class="col-lg-6 pe-lg-5">
                 <div class="hero-content" data-aos="fade-up">
                     <h1 class="display-4 fw-bold text-white mb-4">
-                        实物资产<br>
-                        <span class="gradient-text">数字化平台</span>
+                        {{ _('Physical Assets') }}<br>
+                        <span class="gradient-text">{{ _('Digital Platform') }}</span>
                     </h1>
-                    <p class="lead text-white-75 mb-5">发布资产，即刻开启资产数字化之旅<br>安全、透明、高效的区块链资产管理平台</p>
+                    <p class="lead text-white-75 mb-5">{{ _('Start your asset digitization journey now') }}<br>{{ _('Secure, transparent, and efficient blockchain asset management platform') }}</p>
                     <div class="d-flex gap-3 flex-wrap">
                         <button type="button" class="btn btn-gradient btn-lg px-4 py-3" onclick="window.location.href='{{ url_for('assets.create_asset_page') }}'">
-                            <i class="fas fa-plus me-2"></i>发布资产
+                            <i class="fas fa-plus me-2"></i>{{ _('Publish Asset') }}
                         </button>
                         <a href="http://sqbw3uvy8.sabkt.gdipper.com/docs/whitpaper.pdf" 
                            class="btn btn-outline-light btn-lg px-4 py-3" 
                            target="_blank">
-                            白皮书 <i class="fas fa-file-pdf ms-2"></i>
+                            {{ _('White Paper') }} <i class="fas fa-file-pdf ms-2"></i>
                         </a>
                     </div>
                 </div>
@@ -46,19 +46,19 @@
     </div>
 </div>
 
-<!-- 最新资产 -->
+<!-- Latest Assets -->
 <section class="latest-assets py-6" id="assets">
     <div class="container">
         <div class="d-flex justify-content-between align-items-center mb-5">
             <div>
-                <h2 class="fw-bold mb-0" data-aos="fade-up">最新资产</h2>
-                <p class="text-muted mt-2" data-aos="fade-up" data-aos-delay="100">发现优质资产，开启投资之旅</p>
+                <h2 class="fw-bold mb-0" data-aos="fade-up">{{ _('Latest Assets') }}</h2>
+                <p class="text-muted mt-2" data-aos="fade-up" data-aos-delay="100">{{ _('Discover quality assets and start your investment journey') }}</p>
             </div>
             <a href="{{ url_for('assets.list_assets_page') }}" 
                class="btn btn-outline-primary"
                data-aos="fade-up"
                data-aos-delay="100">
-                查看全部 <i class="fas fa-arrow-right ms-2"></i>
+                {{ _('View All') }} <i class="fas fa-arrow-right ms-2"></i>
             </a>
         </div>
 
@@ -68,7 +68,7 @@
                 <div class="col-md-4" data-aos="fade-up" data-aos-delay="{{ loop.index * 100 }}">
                     <a href="{{ url_for('assets.asset_detail_page', asset_id=asset.id) }}" class="text-decoration-none">
                         <div class="asset-card h-100">
-                            <!-- 资产图片 -->
+                            <!-- Asset Image -->
                             <div class="position-relative">
                                 {% if asset.images %}
                                 {% set images = asset.images|from_json %}
@@ -87,28 +87,28 @@
                                 </div>
                                 {% endif %}
                                 
-                                <!-- 状态标签 -->
+                                <!-- Status Label -->
                                 <div class="position-absolute top-0 start-0 m-2">
                                     {% if asset.status == 1 %}
-                                    <span class="badge bg-warning">待审核</span>
+                                    <span class="badge bg-warning">{{ _('Pending Review') }}</span>
                                     {% elif asset.status == 2 %}
-                                    <span class="badge bg-success">已上链</span>
+                                    <span class="badge bg-success">{{ _('On Chain') }}</span>
                                     {% elif asset.status == 3 %}
-                                    <span class="badge bg-danger">已拒绝</span>
+                                    <span class="badge bg-danger">{{ _('Rejected') }}</span>
                                     {% endif %}
                                 </div>
 
-                                <!-- 资产类型标签 -->
+                                <!-- Asset Type Label -->
                                 <div class="position-absolute top-0 end-0 m-2">
                                     {% if asset.asset_type == 10 %}
-                                    <span class="badge bg-primary">不动产</span>
+                                    <span class="badge bg-primary">{{ _('Real Estate') }}</span>
                                     {% else %}
-                                    <span class="badge bg-info">类不动产</span>
+                                    <span class="badge bg-info">{{ _('Similar Assets') }}</span>
                                     {% endif %}
                                 </div>
                             </div>
 
-                            <!-- 资产信息 -->
+                            <!-- Asset Info -->
                             <div class="asset-info">
                                 <div class="d-flex justify-content-between align-items-start mb-3">
                                     <h5 class="asset-title mb-0">{{ asset.name }}</h5>
@@ -120,21 +120,21 @@
                                     </p>
                                     {% if asset.asset_type == 10 %}
                                     <p class="mb-2">
-                                        <span class="text-muted">面积：</span>
+                                        <span class="text-muted">{{ _('Area') }}：</span>
                                         <span class="fw-bold">{{ asset.area|number_format }} ㎡</span>
                                     </p>
                                     {% else %}
                                     <p class="mb-2">
-                                        <span class="text-muted">总价值：</span>
+                                        <span class="text-muted">{{ _('Total Value') }}：</span>
                                         <span class="fw-bold">{{ asset.total_value|number_format }} USDC</span>
                                     </p>
                                     {% endif %}
                                     <p class="mb-2">
-                                        <span class="text-muted">代币价格：</span>
+                                        <span class="text-muted">{{ _('Token Price') }}：</span>
                                         <span class="fw-bold">{{ asset.token_price|number_format }} USDC</span>
                                     </p>
                                     <p class="mb-0">
-                                        <span class="text-muted">预期年收益：</span>
+                                        <span class="text-muted">{{ _('Expected Annual Revenue') }}：</span>
                                         <span class="text-success fw-bold">{{ asset.annual_revenue|number_format }} USDC</span>
                                     </p>
                                 </div>
@@ -148,11 +148,11 @@
                 <div class="text-center py-5">
                     <div class="empty-state">
                         <i class="fas fa-box-open mb-3"></i>
-                        <h4>暂无资产</h4>
+                        <h4>{{ _('No Assets') }}</h4>
                         {% if current_user_address %}
-                        <p class="text-muted mb-4">点击右上角的"发布资产"按钮开始创建</p>
+                        <p class="text-muted mb-4">{{ _('Click the "Publish Asset" button in the top right to create') }}</p>
                         {% else %}
-                        <p class="text-muted mb-4">请先连接钱包</p>
+                        <p class="text-muted mb-4">{{ _('Please connect wallet first') }}</p>
                         {% endif %}
                     </div>
                 </div>
@@ -162,12 +162,12 @@
     </div>
 </section>
 
-<!-- 平台特色 -->
+<!-- Platform Features -->
 <section class="features py-6" id="features">
     <div class="container">
         <div class="text-center mb-5">
-            <h2 class="fw-bold mb-4" data-aos="fade-up">平台特色</h2>
-            <p class="text-muted" data-aos="fade-up" data-aos-delay="100">基于区块链技术，打造安全、透明的资产数字化生态</p>
+            <h2 class="fw-bold mb-4" data-aos="fade-up">{{ _('Platform Features') }}</h2>
+            <p class="text-muted" data-aos="fade-up" data-aos-delay="100">{{ _('Building a secure and transparent asset digitization ecosystem based on blockchain technology') }}</p>
         </div>
         <div class="row g-4">
             <div class="col-md-4" data-aos="fade-up" data-aos-delay="200">
@@ -175,8 +175,8 @@
                     <div class="feature-icon mb-4">
                         <i class="fas fa-shield-alt"></i>
                     </div>
-                    <h4 class="mb-3">去中心化交易</h4>
-                    <p class="text-muted mb-0">资产信息直接上链，无需注册，连接钱包即可发布和交易，真正实现去中心化</p>
+                    <h4 class="mb-3">{{ _('Decentralized Trading') }}</h4>
+                    <p class="text-muted mb-0">{{ _('Asset information directly on chain, no registration required, connect wallet to publish and trade, truly decentralized') }}</p>
                 </div>
             </div>
             <div class="col-md-4" data-aos="fade-up" data-aos-delay="300">
@@ -184,8 +184,8 @@
                     <div class="feature-icon mb-4">
                         <i class="fas fa-wallet"></i>
                     </div>
-                    <h4 class="mb-3">资产安全可控</h4>
-                    <p class="text-muted mb-0">代币始终存储在用户个人钱包中，平台不托管任何资产，保障资产安全</p>
+                    <h4 class="mb-3">{{ _('Asset Security Control') }}</h4>
+                    <p class="text-muted mb-0">{{ _('Tokens are always stored in users personal wallets, platform does not custody any assets, ensuring asset security') }}</p>
                 </div>
             </div>
             <div class="col-md-4" data-aos="fade-up" data-aos-delay="400">
@@ -193,20 +193,20 @@
                     <div class="feature-icon mb-4">
                         <i class="fas fa-chart-line"></i>
                     </div>
-                    <h4 class="mb-3">信息透明可信</h4>
-                    <p class="text-muted mb-0">所有交易信息记录在区块链上，公开透明，不可篡改，保障交易安全可信</p>
+                    <h4 class="mb-3">{{ _('Transparent Information') }}</h4>
+                    <p class="text-muted mb-0">{{ _('All transaction information is recorded on the blockchain, transparent and immutable, ensuring transaction security') }}</p>
                 </div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- 资产类型 -->
+<!-- Asset Types -->
 <section class="asset-types py-6 bg-light">
     <div class="container">
         <div class="text-center mb-5">
-            <h2 class="fw-bold mb-4" data-aos="fade-up">资产类型</h2>
-            <p class="text-muted" data-aos="fade-up" data-aos-delay="100">支持两种主要资产类型，满足不同需求</p>
+            <h2 class="fw-bold mb-4" data-aos="fade-up">{{ _('Asset Types') }}</h2>
+            <p class="text-muted" data-aos="fade-up" data-aos-delay="100">{{ _('Supporting two main asset types to meet different needs') }}</p>
         </div>
         <div class="row g-4 justify-content-center">
             <div class="col-md-6" data-aos="fade-up" data-aos-delay="200">
@@ -214,11 +214,11 @@
                     <div class="asset-type-icon mb-4">
                         <i class="fas fa-home"></i>
                     </div>
-                    <h4 class="mb-3">不动产 (RH-10YYYY)</h4>
+                    <h4 class="mb-3">{{ _('Real Estate') }} (RH-10YYYY)</h4>
                     <ul class="list-unstyled text-muted">
-                        <li><i class="fas fa-check me-2"></i>代币量 = 面积 × 10000</li>
-                        <li><i class="fas fa-check me-2"></i>需上传房产证、土地证等</li>
-                        <li><i class="fas fa-check me-2"></i>显示资产总面积</li>
+                        <li><i class="fas fa-check me-2"></i>{{ _('Token amount = Area × 10000') }}</li>
+                        <li><i class="fas fa-check me-2"></i>{{ _('Requires property certificate, land certificate, etc.') }}</li>
+                        <li><i class="fas fa-check me-2"></i>{{ _('Shows total asset area') }}</li>
                     </ul>
                 </div>
             </div>
@@ -227,11 +227,11 @@
                     <div class="asset-type-icon mb-4">
                         <i class="fas fa-boxes"></i>
                     </div>
-                    <h4 class="mb-3">类不动产 (RH-20YYYY)</h4>
+                    <h4 class="mb-3">{{ _('Similar Assets') }} (RH-20YYYY)</h4>
                     <ul class="list-unstyled text-muted">
-                        <li><i class="fas fa-check me-2"></i>代币量自定义</li>
-                        <li><i class="fas fa-check me-2"></i>需上传拍卖、展览文件等</li>
-                        <li><i class="fas fa-check me-2"></i>显示资产总价值</li>
+                        <li><i class="fas fa-check me-2"></i>{{ _('Customizable token amount') }}</li>
+                        <li><i class="fas fa-check me-2"></i>{{ _('Requires auction, exhibition documents, etc.') }}</li>
+                        <li><i class="fas fa-check me-2"></i>{{ _('Shows total asset value') }}</li>
                     </ul>
                 </div>
             </div>

@@ -1,7 +1,8 @@
-from flask import Flask
+from flask import Flask, request, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_cors import CORS
+from flask_babel import Babel
 from app.config import config
 import json
 import os
@@ -13,6 +14,11 @@ from decimal import Decimal
 db = SQLAlchemy()
 migrate = Migrate()
 cors = CORS()
+babel = Babel()
+
+def get_locale():
+    # 从 cookie 中获取用户语言偏好，默认英文
+    return request.cookies.get('language', 'en')
 
 def create_app(config_name='development'):
     app = Flask(__name__)
@@ -25,6 +31,11 @@ def create_app(config_name='development'):
         config_class.init_app(app)
     else:
         app.config.from_object(config_name)
+    
+    # 配置 Babel
+    app.config['BABEL_DEFAULT_LOCALE'] = 'en'
+    app.config['BABEL_SUPPORTED_LOCALES'] = ['en', 'zh_Hant']
+    babel.init_app(app, locale_selector=get_locale)
     
     # 确保日志目录存在
     if not os.path.exists('logs'):
