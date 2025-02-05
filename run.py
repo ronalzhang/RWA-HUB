@@ -112,4 +112,4 @@ if __name__ == '__main__':
     
     # 使用waitress作为生产服务器
     from waitress import serve
-    serve(app, host='127.0.0.1', port=port, threads=4, url_scheme='https')
+    serve(app, host='0.0.0.0', port=port, threads=4, url_scheme='https')

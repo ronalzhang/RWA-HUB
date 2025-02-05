@@ -515,7 +515,7 @@ def update_language_preference():
             return jsonify({'error': 'Invalid language'}), 400
         
         # 语言偏好功能已移除，直接返回成功
-        return jsonify({'success': True}), 200
+        return jsonify({'message': 'Language preference updated successfully'}), 200
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)}), 500 
