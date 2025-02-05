@@ -21,6 +21,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+项目开发方案.md
 
 # PM2配置文件
 ecosystem.config.js
