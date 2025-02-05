@@ -5,6 +5,7 @@ __pycache__/
 *.so
 .Python
 env/
+.venv/
 build/
 develop-eggs/
 dist/
@@ -20,6 +21,12 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# PM2配置文件
+ecosystem.config.js
+
+# 备份文件
+*.bak
 
 # 虚拟环境
 venv/
@@ -48,3 +55,6 @@ static/uploads/
 # 系统文件
 .DS_Store
 Thumbs.db 
+
+# 测试文件
+test_*.py
