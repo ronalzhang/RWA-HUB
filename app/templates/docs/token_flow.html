@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block title %}通证发行流程 - RWA-HUB{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <h2 class="text-center mb-5">资产通证化流程</h2>
+    
+    <div class="token-flow">
+        <!-- 步骤1：资产提交 -->
+        <div class="flow-step" data-aos="fade-up">
+            <div class="step-icon">
+                <i class="fas fa-file-upload"></i>
+            </div>
+            <div class="step-content">
+                <h4>资产提交</h4>
+                <p>发布人提交资产信息和证明材料</p>
+                <div class="step-details">
+                    <div class="detail-group">
+                        <h6>不动产</h6>
+                        <ul>
+                            <li>房产证/土地证</li>
+                            <li>评估报告</li>
+                            <li>产权证明</li>
+                        </ul>
+                    </div>
+                    <div class="detail-group">
+                        <h6>类不动产</h6>
+                        <ul>
+                            <li>拍卖证书</li>
+                            <li>展览文件</li>
+                            <li>资产证明</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 步骤2：资产定价 -->
+        <div class="flow-step" data-aos="fade-up" data-aos-delay="100">
+            <div class="step-icon">
+                <i class="fas fa-calculator"></i>
+            </div>
+            <div class="step-content">
+                <h4>资产定价</h4>
+                <p>设置资产价值和代币参数</p>
+                <div class="pricing-details">
+                    <div class="detail-item">
+                        <h6>代币发行量计算</h6>
+                        <ul>
+                            <li>不动产：面积(㎡) × 10000</li>
+                            <li>类不动产：自定义发行量</li>
+                        </ul>
+                    </div>
+                    <div class="detail-item">
+                        <h6>价格设置</h6>
+                        <ul>
+                            <li>单价设定（USDC）</li>
+                            <li>最小购买单位</li>
+                            <li>预期年化收益</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 步骤3：合规审核 -->
+        <div class="flow-step" data-aos="fade-up" data-aos-delay="200">
+            <div class="step-icon">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <div class="step-content">
+                <h4>合规审核</h4>
+                <p>平台管理员进行资产审核</p>
+                <div class="audit-items">
+                    <div class="audit-group">
+                        <h6>审核内容</h6>
+                        <ul>
+                            <li>资产真实性</li>
+                            <li>材料完整性</li>
+                            <li>定价合理性</li>
+                            <li>风险评估</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 步骤4：智能合约部署 -->
+        <div class="flow-step" data-aos="fade-up" data-aos-delay="300">
+            <div class="step-icon">
+                <i class="fas fa-code-branch"></i>
+            </div>
+            <div class="step-content">
+                <h4>智能合约部署</h4>
+                <p>审核通过后自动部署合约</p>
+                <div class="contract-details">
+                    <div class="detail-item">
+                        <h6>代币特性</h6>
+                        <ul>
+                            <li>整数代币：1 token = 1个完整代币单位，不可分割</li>
+                            <li>固定总量：发行后总量固定，不可增发</li>
+                            <li>代币销毁：支持资产注销时的代币销毁</li>
+                            <li>一币一权：每个代币代表相同权益</li>
+                        </ul>
+                    </div>
+                    <div class="detail-item">
+                        <h6>发行规则</h6>
+                        <ul>
+                            <li>不动产：1 token = 1平方厘米</li>
+                            <li>类不动产：按资产规模确定总量</li>
+                            <li>交易单位：最小1个完整token</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 步骤5：资产上链 -->
+        <div class="flow-step" data-aos="fade-up" data-aos-delay="400">
+            <div class="step-icon">
+                <i class="fas fa-link"></i>
+            </div>
+            <div class="step-content">
+                <h4>资产上链</h4>
+                <p>完成资产通证化</p>
+                <div class="final-steps">
+                    <div class="step-group">
+                        <h6>发布人确认</h6>
+                        <ul>
+                            <li>确认合约参数</li>
+                            <li>支付gas费用</li>
+                            <li>接收代币</li>
+                        </ul>
+                    </div>
+                    <div class="step-group">
+                        <h6>开放交易</h6>
+                        <ul>
+                            <li>代币直接发放至发布人钱包</li>
+                            <li>可立即在平台交易</li>
+                            <li>支持USDC购买</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.token-flow {
+    position: relative;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.token-flow::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50px;
+    height: 100%;
+    width: 2px;
+    background: linear-gradient(to bottom, #1e3c72, #2a5298);
+}
+
+.flow-step {
+    display: flex;
+    margin-bottom: 3rem;
+    position: relative;
+}
+
+.step-icon {
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 2rem;
+    flex-shrink: 0;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    z-index: 1;
+}
+
+.step-content {
+    margin-left: 2rem;
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    flex-grow: 1;
+}
+
+.step-details, .pricing-details, .audit-items, .contract-details, .final-steps {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.detail-group, .detail-item, .audit-group, .step-group {
+    margin-bottom: 1rem;
+}
+
+.detail-group:last-child, .detail-item:last-child, .audit-group:last-child, .step-group:last-child {
+    margin-bottom: 0;
+}
+
+h6 {
+    color: #1e3c72;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+ul {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 0;
+}
+
+li {
+    margin-bottom: 0.5rem;
+    padding-left: 1.5rem;
+    position: relative;
+}
+
+li::before {
+    content: '•';
+    color: #1e3c72;
+    position: absolute;
+    left: 0;
+}
+
+.step-group ul li::before {
+    content: '✓';
+    color: #28a745;
+}
+
+@media (max-width: 768px) {
+    .token-flow::before {
+        left: 30px;
+    }
+    
+    .step-icon {
+        width: 60px;
+        height: 60px;
+        font-size: 1.5rem;
+    }
+}
+</style>
+{% endblock %} 

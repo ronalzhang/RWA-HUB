@@ -1,0 +1,502 @@
+# Translations template for PROJECT.
+# Copyright (C) 2025 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2025-02-05 13:44+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: app/templates/base.html:45
+msgid "All Assets"
+msgstr ""
+
+#: app/templates/base.html:59
+msgid "Connect Wallet"
+msgstr ""
+
+#: app/templates/base.html:63
+msgid "Switch Wallet"
+msgstr ""
+
+#: app/templates/base.html:67
+msgid "Disconnect"
+msgstr ""
+
+#: app/templates/base.html:99
+msgid "Blockchain-based Physical Asset Digitization Platform"
+msgstr ""
+
+#: app/templates/base.html:114
+msgid "All Rights Reserved"
+msgstr ""
+
+#: app/templates/assets/create.html:3 app/templates/assets/create.html:7
+msgid "Create Asset"
+msgstr ""
+
+#: app/templates/assets/create.html:13
+msgid "Basic Information"
+msgstr ""
+
+#: app/templates/assets/create.html:17
+msgid "Asset Name"
+msgstr ""
+
+#: app/templates/assets/create.html:19
+msgid "Please enter asset name"
+msgstr ""
+
+#: app/templates/assets/create.html:23
+msgid "Asset Type"
+msgstr ""
+
+#: app/templates/assets/create.html:25 app/templates/assets/create.html:29
+msgid "Please select asset type"
+msgstr ""
+
+#: app/templates/assets/create.html:26
+msgid "Real Estate"
+msgstr ""
+
+#: app/templates/assets/create.html:27
+msgid "Similar Assets"
+msgstr ""
+
+#: app/templates/assets/create.html:33
+msgid "Asset Location"
+msgstr ""
+
+#: app/templates/assets/create.html:35
+msgid "Please enter asset location"
+msgstr ""
+
+#: app/templates/assets/create.html:39
+msgid "Asset Description"
+msgstr ""
+
+#: app/templates/assets/create.html:41
+msgid "Please enter asset description"
+msgstr ""
+
+#: app/templates/assets/create.html:49
+msgid "Asset Details"
+msgstr ""
+
+#: app/templates/assets/create.html:53
+msgid "Asset Area (㎡)"
+msgstr ""
+
+#: app/templates/assets/create.html:55
+msgid "Please enter asset area"
+msgstr ""
+
+#: app/templates/assets/create.html:59
+msgid "Total Value (USDC)"
+msgstr ""
+
+#: app/templates/assets/create.html:61
+msgid "Please enter total value"
+msgstr ""
+
+#: app/templates/assets/create.html:65
+msgid "Token Price (USDC)"
+msgstr ""
+
+#: app/templates/assets/create.html:67
+msgid "Please enter token price"
+msgstr ""
+
+#: app/templates/assets/create.html:71
+msgid "Expected Annual Revenue (USDC)"
+msgstr ""
+
+#: app/templates/assets/create.html:73
+msgid "Please enter expected annual revenue"
+msgstr ""
+
+#: app/templates/assets/create.html:81
+msgid "Asset Images"
+msgstr ""
+
+#: app/templates/assets/create.html:86
+msgid "Drag and drop images here or click to select"
+msgstr ""
+
+#: app/templates/assets/create.html:95
+msgid "Asset Documents"
+msgstr ""
+
+#: app/templates/assets/create.html:99
+msgid "Required Documents"
+msgstr ""
+
+#: app/templates/assets/create.html:101
+msgid "For Real Estate"
+msgstr ""
+
+#: app/templates/assets/create.html:103
+msgid "Property Certificate"
+msgstr ""
+
+#: app/templates/assets/create.html:104
+msgid "Land Certificate"
+msgstr ""
+
+#: app/templates/assets/create.html:105
+msgid "Assessment Report"
+msgstr ""
+
+#: app/templates/assets/create.html:109
+msgid "For Similar Assets"
+msgstr ""
+
+#: app/templates/assets/create.html:111
+msgid "Auction Certificate"
+msgstr ""
+
+#: app/templates/assets/create.html:112
+msgid "Exhibition Documents"
+msgstr ""
+
+#: app/templates/assets/create.html:113
+msgid "Asset Proof"
+msgstr ""
+
+#: app/templates/assets/create.html:120
+msgid "Drag and drop documents here or click to select"
+msgstr ""
+
+#: app/templates/assets/create.html:128
+msgid "Save Draft"
+msgstr ""
+
+#: app/templates/assets/create.html:129
+msgid "Submit for Review"
+msgstr ""
+
+#: app/templates/assets/create.html:140
+msgid "Error"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/_termui_impl.py:556
+#, python-brace-format
+msgid "{editor}: Editing failed"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/_termui_impl.py:560
+#, python-brace-format
+msgid "{editor}: Editing failed: {e}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1124
+msgid "Aborted!"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1349
+#: venv/lib/python3.13/site-packages/click/core.py:1379
+#, python-brace-format
+msgid "(Deprecated) {text}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1396
+msgid "Options"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1422
+#, python-brace-format
+msgid "Got unexpected extra argument ({args})"
+msgid_plural "Got unexpected extra arguments ({args})"
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1438
+#, python-brace-format
+msgid "DeprecationWarning: The command {name!r} is deprecated."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1645
+msgid "Commands"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1677
+msgid "Missing command."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:1755
+#, python-brace-format
+msgid "No such command {name!r}."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:2313
+msgid "Value must be an iterable."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:2334
+#, python-brace-format
+msgid "Takes {nargs} values but 1 was given."
+msgid_plural "Takes {nargs} values but {len} were given."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:2783
+#, python-brace-format
+msgid "env var: {var}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:2813
+msgid "(dynamic)"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:2828
+#, python-brace-format
+msgid "default: {default}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/core.py:2841
+msgid "required"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/decorators.py:457
+#, python-format
+msgid "%(prog)s, version %(version)s"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/decorators.py:520
+msgid "Show the version and exit."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/decorators.py:541
+msgid "Show this message and exit."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:49
+#: venv/lib/python3.13/site-packages/click/exceptions.py:88
+#, python-brace-format
+msgid "Error: {message}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:80
+#, python-brace-format
+msgid "Try '{command} {option}' for help."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:129
+#, python-brace-format
+msgid "Invalid value: {message}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:131
+#, python-brace-format
+msgid "Invalid value for {param_hint}: {message}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:187
+msgid "Missing argument"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:189
+msgid "Missing option"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:191
+msgid "Missing parameter"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:193
+#, python-brace-format
+msgid "Missing {param_type}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:200
+#, python-brace-format
+msgid "Missing parameter: {param_name}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:220
+#, python-brace-format
+msgid "No such option: {name}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:232
+#, python-brace-format
+msgid "Did you mean {possibility}?"
+msgid_plural "(Possible options: {possibilities})"
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:270
+msgid "unknown error"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/exceptions.py:277
+#, python-brace-format
+msgid "Could not open file {filename!r}: {message}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/parser.py:233
+#, python-brace-format
+msgid "Argument {name!r} takes {nargs} values."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/parser.py:415
+#, python-brace-format
+msgid "Option {name!r} does not take a value."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/parser.py:476
+#, python-brace-format
+msgid "Option {name!r} requires an argument."
+msgid_plural "Option {name!r} requires {nargs} arguments."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.13/site-packages/click/shell_completion.py:326
+msgid "Shell completion is not supported for Bash versions older than 4.4."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/shell_completion.py:333
+msgid "Couldn't detect Bash version, shell completion is not supported."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/termui.py:158
+msgid "Repeat for confirmation"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/termui.py:174
+msgid "Error: The value you entered was invalid."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/termui.py:176
+#, python-brace-format
+msgid "Error: {e.message}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/termui.py:187
+msgid "Error: The two entered values do not match."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/termui.py:243
+msgid "Error: invalid input"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/termui.py:773
+msgid "Press any key to continue..."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:267
+#, python-brace-format
+msgid ""
+"Choose from:\n"
+"\t{choices}"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:299
+#, python-brace-format
+msgid "{value!r} is not {choice}."
+msgid_plural "{value!r} is not one of {choices}."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:393
+#, python-brace-format
+msgid "{value!r} does not match the format {format}."
+msgid_plural "{value!r} does not match the formats {formats}."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:415
+#, python-brace-format
+msgid "{value!r} is not a valid {number_type}."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:471
+#, python-brace-format
+msgid "{value} is not in the range {range}."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:612
+#, python-brace-format
+msgid "{value!r} is not a valid boolean."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:636
+#, python-brace-format
+msgid "{value!r} is not a valid UUID."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:826
+msgid "file"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:828
+msgid "directory"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:830
+msgid "path"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:881
+#, python-brace-format
+msgid "{name} {filename!r} does not exist."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:890
+#, python-brace-format
+msgid "{name} {filename!r} is a file."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:898
+#, python-brace-format
+msgid "{name} {filename!r} is a directory."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:907
+#, python-brace-format
+msgid "{name} {filename!r} is not readable."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:916
+#, python-brace-format
+msgid "{name} {filename!r} is not writable."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:925
+#, python-brace-format
+msgid "{name} {filename!r} is not executable."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/click/types.py:992
+#, python-brace-format
+msgid "{len_type} values are required, but {len_value} was given."
+msgid_plural "{len_type} values are required, but {len_value} were given."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.13/site-packages/semantic_version/django_fields.py:50
+msgid "Enter a valid version number in X.Y.Z format."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/semantic_version/django_fields.py:52
+msgid "Version"
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/semantic_version/django_fields.py:86
+msgid "Enter a valid version number spec list in ==X.Y.Z,>=A.B.C format."
+msgstr ""
+
+#: venv/lib/python3.13/site-packages/semantic_version/django_fields.py:88
+msgid "Version specification list"
+msgstr ""
+
