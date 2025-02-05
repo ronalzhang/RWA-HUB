@@ -1,86 +1,80 @@
-# RWA-HUB 资产管理平台
+# RWA-HUB 4.0
 
-RWA-HUB 是一个基于 Web3 技术的资产管理平台，支持不动产和类不动产的数字化和通证化管理。
+RWA-HUB 是一个基于区块链的实物资产数字化平台，致力于将不动产和类不动产转化为数字通证，实现资产的流动性提升和价值管理。
 
 ## 功能特点
 
-- 资产管理：支持不动产和类不动产的创建、编辑、删除和查询
-- 权限控制：基于区块链地址的角色权限管理系统
-- 通证化：支持资产的通证化和分红管理
-- 安全性：完整的安全机制和数据验证
+- 资产数字化：将实物资产转化为区块链上的数字通证
+- 智能合约：基于 ERC20 标准的资产代币和交易市场
+- 安全可靠：完整的测试用例和审计机制
+- 交易管理：支持一级市场交易，二级市场开发中
 
 ## 技术栈
 
+- 智能合约：Solidity, Hardhat
+- 前端：HTML5, CSS3, JavaScript, Web3.js
 - 后端：Python Flask
-- 数据库：SQLite（可扩展至其他数据库）
-- Web3：支持以太坊网络
-- 前端：HTML/CSS/JavaScript
+- 数据库：PostgreSQL
+- 区块链：以太坊, Sepolia测试网
 
-## 安装说明
+## 快速开始
 
-1. 克隆仓库：
+1. 克隆项目
 ```bash
-git clone https://github.com/ronalzhang/RWA-HUB.git
-cd RWA-HUB
+git clone https://github.com/your-username/RWA-HUB_4.0.git
+cd RWA-HUB_4.0
 ```
 
-2. 创建虚拟环境：
+2. 安装依赖
 ```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或
-.\venv\Scripts\activate  # Windows
+npm install
 ```
 
-3. 安装依赖：
-```bash
-pip install -r requirements.txt
-```
-
-4. 配置环境变量：
+3. 配置环境变量
 ```bash
 cp .env.example .env
 # 编辑 .env 文件，填入必要的配置信息
 ```
 
-5. 初始化数据库：
+4. 运行测试
 ```bash
-flask db upgrade
+npx hardhat test
 ```
 
-6. 运行程序：
+5. 部署合约
 ```bash
-python run.py
+npx hardhat run scripts/deploy.js --network sepolia
 ```
 
-## 开发环境
+## 项目结构
 
-- Python 3.8+
-- Flask 2.3.3
-- SQLAlchemy 2.0.37
-- Web3 6.10.0
+```
+RWA-HUB_4.0/
+├── contracts/           # 智能合约
+├── scripts/            # 部署和交互脚本
+├── test/              # 测试文件
+├── app/               # Web应用
+└── docs/              # 文档
+```
 
-## 部署说明
+## 已部署合约
 
-1. 生产环境配置：
-   - 使用生产级别的 WSGI 服务器（如 Gunicorn）
-   - 启用 HTTPS
-   - 配置安全的密钥
-   - 使用生产级别的数据库
+- 测试网：Sepolia
+- RealEstateToken: `0x8e2cbB9C52f0404e4fe50C04c1999434de1cB281`
+- RealEstateMarket: [待部署]
 
-2. 环境变量配置：
-   - SECRET_KEY：应用密钥
-   - FLASK_ENV：运行环境（development/production）
-   - DATABASE_URL：数据库连接 URL
-   - WEB3_PROVIDER_URI：Web3 提供者 URI
+## 开发路线图
+
+- [x] 智能合约开发
+- [x] 合约测试
+- [ ] 前端开发
+- [ ] 后端开发
+- [ ] 二级市场
+- [ ] 积分系统
 
 ## 贡献指南
 
-欢迎提交 Pull Request 和 Issue。在提交之前，请确保：
-
-1. 代码符合 PEP 8 规范
-2. 添加了必要的测试
-3. 更新了文档
+欢迎提交 Issue 和 Pull Request 来帮助改进项目。
 
 ## 许可证
 

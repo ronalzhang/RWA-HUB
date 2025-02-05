@@ -59,3 +59,50 @@ Thumbs.db
 
 # 测试文件
 test_*.py
+
+node_modules/
+.env
+
+# Hardhat files
+/cache
+/artifacts
+
+# TypeChain files
+/typechain
+/typechain-types
+
+# solidity-coverage files
+/coverage
+/coverage.json
+
+# Hardhat Ignition default folder for deployments against a local node
+ignition/deployments/chain-31337
+
+# 依赖
+node_modules/
+.env
+.venv/
+
+# Hardhat
+cache/
+artifacts/
+
+# IDE
+.vscode/
+.idea/
+
+# 编译输出
+dist/
+build/
+
+# 日志
+*.log
+
+# 测试覆盖率
+coverage/
+coverage.json
+
+# 本地开发
+.DS_Store
+*.swp
+*.swo
