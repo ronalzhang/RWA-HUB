@@ -43,7 +43,7 @@ msgid "All Rights Reserved"
 msgstr "版權所有"
 
 #: app/templates/index.html:3
-msgid "Physical Asset Digitization Platform"
+msgid "Real World Asset Tokenization Platform"
 msgstr "實物資產數字化平台"
 
 #: app/templates/index.html:22
@@ -51,11 +51,11 @@ msgid "Real World Assets"
 msgstr "實物資產"
 
 #: app/templates/index.html:23
-msgid "Digital Platform"
+msgid "Tokenization Platform"
 msgstr "數字化平台"
 
 #: app/templates/index.html:25
-msgid "Start your asset digitization journey now"
+msgid "Start your asset tokenization journey now"
 msgstr "即刻開啟資產數字化之旅"
 
 #: app/templates/index.html:25

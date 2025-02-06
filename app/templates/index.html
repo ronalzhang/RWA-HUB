@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}RWA-HUB - {{ _('Physical Asset Digitization Platform') }}{% endblock %}
+{% block title %}RWA-HUB - {{ _('Real World Asset Tokenization Platform') }}{% endblock %}
 
 {% block content %}
 <!DOCTYPE html>
@@ -19,10 +19,10 @@
             <div class="col-lg-6 pe-lg-5">
                 <div class="hero-content" data-aos="fade-up">
                     <h1 class="display-4 fw-bold text-white mb-4">
-                        {{ _('Physical Assets') }}<br>
-                        <span class="gradient-text">{{ _('Digital Platform') }}</span>
+                        {{ _('Real World Assets') }}<br>
+                        <span class="gradient-text">{{ _('Tokenization Platform') }}</span>
                     </h1>
-                    <p class="lead text-white-75 mb-5">{{ _('Start your asset digitization journey now') }}<br>{{ _('Secure, transparent, and efficient blockchain asset management platform') }}</p>
+                    <p class="lead text-white-75 mb-5">{{ _('Start your asset tokenization journey now') }}<br>{{ _('Secure, transparent, and efficient blockchain asset management platform') }}</p>
                     <div class="d-flex gap-3 flex-wrap">
                         <button type="button" class="btn btn-gradient btn-lg px-4 py-3" onclick="window.location.href='{{ url_for('assets.create_asset_page') }}'">
                             <i class="fas fa-plus me-2"></i>{{ _('Publish Asset') }}
