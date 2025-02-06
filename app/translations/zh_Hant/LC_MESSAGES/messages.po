@@ -43,7 +43,7 @@ msgid "All Rights Reserved"
 msgstr "版權所有"
 
 #: app/templates/index.html:3
-msgid "Physical Asset Digitization Platform"
+msgid "Real World Asset Digitization Platform"
 msgstr "實物資產數字化平台"
 
 #: app/templates/index.html:22
