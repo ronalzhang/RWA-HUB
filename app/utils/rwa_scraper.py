@@ -96,7 +96,7 @@ def get_rwa_stats():
         logger.info("成功创建 BeautifulSoup 对象")
         
         # 记录 HTML 内容的一部分,用于调试
-        logger.debug(f"HTML 内容片段: {response.text[:1000]}")
+        logger.info(f"HTML 内容片段: {response.text[:1000]}")
         
         # 提取数据
         stats = {}
@@ -125,7 +125,7 @@ def get_rwa_stats():
                     except ValueError:
                         logger.warning(f"无法将 {value} 转换为数值")
                 else:
-                    logger.debug(f"未找到元素 {field} 使用选择器 {selector}")
+                    logger.info(f"未找到元素 {field} 使用选择器 {selector}")
         
         # 尝试提取变化率
         change_selectors = ['.change-value', '.percent-change', '[data-testid="change-value"]']
@@ -143,7 +143,7 @@ def get_rwa_stats():
                 except ValueError:
                     logger.warning(f"无法将变化率 {change_text} 转换为数值")
             else:
-                logger.debug(f"未找到变化率元素使用选择器 {selector}")
+                logger.info(f"未找到变化率元素使用选择器 {selector}")
         
         logger.info(f"HTML 解析结果: {stats}")
         
