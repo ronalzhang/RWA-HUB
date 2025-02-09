@@ -48,23 +48,19 @@ def get_rwa_stats():
         
         # 使用更简单的选择器
         try:
-            # 找到所有 stat-item 元素
-            stat_items = soup.find_all('div', class_='stat-item')
-            logger.info(f"找到 {len(stat_items)} 个 stat-item 元素")
+            # 找到所有 h4.text-gradient 元素
+            value_elements = soup.find_all('h4', class_='text-gradient')
+            logger.info(f"找到 {len(value_elements)} 个 text-gradient 元素")
             
-            # 记录所有找到的 stat-item 元素的内容
-            for i, item in enumerate(stat_items):
-                logger.info(f"stat-item {i + 1} 内容: {item}")
-            
-            for item in stat_items:
-                # 获取标题和值
-                title = item.find('h6', class_='text-white-75')
-                value = item.find('h4', class_='text-gradient')
-                change = item.find('small', class_='text-white-75')
+            # 记录所有找到的元素的内容
+            for i, element in enumerate(value_elements):
+                logger.info(f"text-gradient {i + 1} 内容: {element.text}")
                 
-                if title and value:
+                # 获取父元素的标题
+                title = element.find_previous('h6', class_='text-white-75')
+                if title:
                     title_text = title.text.strip()
-                    value_text = value.text.strip()
+                    value_text = element.text.strip()
                     logger.info(f"找到统计项: {title_text} = {value_text}")
                     
                     if 'Total RWA Onchain' in title_text:
@@ -75,6 +71,7 @@ def get_rwa_stats():
                             logger.info(f"提取 total_rwa_onchain: {stats['total_rwa_onchain']}")
                             
                             # 提取变化率
+                            change = element.find_next('small', class_='text-white-75')
                             if change:
                                 change_text = change.text.strip()
                                 logger.info(f"变化率文本: {change_text}")
@@ -93,6 +90,7 @@ def get_rwa_stats():
                             logger.info(f"提取 total_holders: {stats['total_holders']}")
                             
                             # 提取变化率
+                            change = element.find_next('small', class_='text-white-75')
                             if change:
                                 change_text = change.text.strip()
                                 logger.info(f"变化率文本: {change_text}")
@@ -117,10 +115,7 @@ def get_rwa_stats():
                             stats['total_stablecoin'] = float(value_match.group(1))
                             logger.info(f"提取 total_stablecoin: {stats['total_stablecoin']}")
                 else:
-                    if not title:
-                        logger.warning("未找到标题元素")
-                    if not value:
-                        logger.warning("未找到值元素")
+                    logger.warning(f"未找到元素 {i + 1} 的标题")
         
         except Exception as e:
             logger.error(f"解析统计数据时出错: {str(e)}")
