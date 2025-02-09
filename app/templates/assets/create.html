@@ -95,16 +95,16 @@
                 
                 <div class="mb-3">
                     <label for="tokenPrice" class="form-label">{{ _('Token Price') }} (USDC)</label>
-                    <input type="number" class="form-control" id="tokenPrice" name="tokenPrice" step="0.01" min="0" max="1000000" required>
-                    <small class="form-text text-muted">{{ _('Enter the price for each token in USDC') }}</small>
-                    <div class="invalid-feedback">{{ _('Please enter a valid token price') }}</div>
+                    <input type="number" class="form-control" id="tokenPrice" name="tokenPrice" step="0.01" min="0" max="1000000" readonly>
+                    <small class="form-text text-muted">{{ _('Token price will be calculated automatically based on total value and token supply') }}</small>
+                    <div class="invalid-feedback">{{ _('Token price calculation failed') }}</div>
                 </div>
                 
                 <div class="mb-3">
-                    <label for="annualRevenue" class="form-label">{{ _('Expected Annual Revenue') }} (%)</label>
-                    <input type="number" class="form-control" id="annualRevenue" name="annualRevenue" step="0.01" min="0" max="100" required>
-                    <small class="form-text text-muted">{{ _('Enter the expected annual revenue percentage between 0 and 100') }}</small>
-                    <div class="invalid-feedback">{{ _('Please enter a valid annual revenue percentage') }}</div>
+                    <label for="annualRevenue" class="form-label">{{ _('Expected Annual Revenue') }} (USDC)</label>
+                    <input type="number" class="form-control" id="annualRevenue" name="annualRevenue" step="0.01" min="0" required>
+                    <small class="form-text text-muted">{{ _('Enter the expected annual revenue in USDC') }}</small>
+                    <div class="invalid-feedback">{{ _('Please enter a valid annual revenue') }}</div>
                 </div>
             </div>
         </div>

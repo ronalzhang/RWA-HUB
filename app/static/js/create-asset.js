@@ -426,6 +426,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const assetTypeSelect = document.getElementById('type');
         const areaInput = document.getElementById('area');
         const tokenSupplyInput = document.getElementById('tokenSupply');
+        const totalValueInput = document.getElementById('totalValue');
+        const tokenPriceInput = document.getElementById('tokenPrice');
         const tokenSupplyGroup = document.querySelector('.token-supply-group');
         const tokenSupplyDisplay = document.createElement('div');
         tokenSupplyDisplay.className = 'form-text mt-1';
@@ -437,6 +439,7 @@ document.addEventListener('DOMContentLoaded', function() {
             tokenSupplyInput.readOnly = isRealEstate;
             tokenSupplyInput.value = '';
             tokenSupplyDisplay.textContent = '';
+            tokenPriceInput.value = '';
             
             if (isRealEstate) {
                 // 如果是不动产，显示自动计算提示
@@ -476,6 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         tokenSupplyDisplay.textContent = `总发行量: ${value.toLocaleString()} 代币`;
                         tokenSupplyDisplay.classList.remove('text-danger');
                         this.setCustomValidity('');
+                        calculateTokenPrice();
                     }
                 } else {
                     tokenSupplyDisplay.textContent = '请输入有效的代币发行量';
@@ -485,15 +489,35 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 300));
 
+        // 监听总价值变化
+        totalValueInput.addEventListener('input', debounce(function() {
+            calculateTokenPrice();
+        }, 300));
+
         // 计算代币数量（不动产）
         function calculateTokenSupply(area) {
             if (!isNaN(area) && area > 0) {
                 const tokenSupply = Math.floor(area * 10000); // 1平方米 = 10000代币
                 tokenSupplyInput.value = tokenSupply;
                 tokenSupplyDisplay.textContent = `总发行量: ${tokenSupply.toLocaleString()} 代币 (${area}㎡ × 10000)`;
+                calculateTokenPrice();
             } else {
                 tokenSupplyInput.value = '';
                 tokenSupplyDisplay.textContent = '请输入有效的面积';
+                tokenPriceInput.value = '';
+            }
+        }
+
+        // 计算代币价格
+        function calculateTokenPrice() {
+            const totalValue = parseFloat(totalValueInput.value);
+            const tokenSupply = parseFloat(tokenSupplyInput.value);
+            
+            if (!isNaN(totalValue) && !isNaN(tokenSupply) && tokenSupply > 0) {
+                const tokenPrice = totalValue / tokenSupply;
+                tokenPriceInput.value = tokenPrice.toFixed(6);
+            } else {
+                tokenPriceInput.value = '';
             }
         }
     }
