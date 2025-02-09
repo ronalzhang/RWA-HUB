@@ -1,4 +1,4 @@
-from flask import Flask, request, session
+from flask import Flask, request, session, g
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_cors import CORS
@@ -9,16 +9,20 @@ import os
 import logging
 from logging.handlers import RotatingFileHandler
 from decimal import Decimal
+from flask_wtf.csrf import CSRFProtect
 
 # 初始化扩展
 db = SQLAlchemy()
 migrate = Migrate()
 cors = CORS()
 babel = Babel()
+csrf = CSRFProtect()
 
 def get_locale():
     # 从 cookie 中获取用户语言偏好，默认英文
-    return request.cookies.get('language', 'en')
+    if not g.get('lang_code', None):
+        g.lang_code = request.cookies.get('language', 'en')
+    return g.lang_code
 
 def create_app(config_name='development'):
     app = Flask(__name__)
@@ -31,6 +35,11 @@ def create_app(config_name='development'):
         config_class.init_app(app)
     else:
         app.config.from_object(config_name)
+    
+    # 配置 CSRF 保护
+    app.config['WTF_CSRF_ENABLED'] = True
+    app.config['WTF_CSRF_SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-csrf-key')
+    app.config['WTF_CSRF_TIME_LIMIT'] = 3600  # CSRF token 有效期1小时
     
     # 配置 Babel
     app.config['BABEL_DEFAULT_LOCALE'] = 'en'
@@ -62,6 +71,7 @@ def create_app(config_name='development'):
     db.init_app(app)
     migrate.init_app(app, db)
     cors.init_app(app)
+    csrf.init_app(app)
 
     # 初始化七牛云存储
     from .utils.storage import init_storage
