@@ -2,12 +2,23 @@ from flask import render_template
 from ..models.asset import Asset
 from ..models.user import User
 from . import main_bp
+from ..utils.rwa_scraper import get_rwa_stats
 
 @main_bp.route('/')
 def index():
     """首页"""
-    # 获取最新6个已审核资产
-    assets = Asset.query.filter_by(status=1).order_by(Asset.created_at.desc()).limit(6).all()
+    # 获取最新6个已上链资产
+    assets = Asset.query.filter_by(status=2).order_by(Asset.created_at.desc()).limit(6).all()
+    
+    # 获取 RWA 统计数据
+    rwa_stats = get_rwa_stats() or {
+        'total_rwa_onchain': '16.96',
+        'total_rwa_change': '-1.32',
+        'total_holders': '83,506',
+        'holders_change': '+1.92',
+        'total_issuers': '112',
+        'total_stablecoin': '220.39'
+    }
     
     # 获取资产所有者信息
     asset_data = []
@@ -29,7 +40,7 @@ def index():
             'annual_revenue': asset.annual_revenue
         })
     
-    return render_template('index.html', assets=asset_data)
+    return render_template('index.html', assets=asset_data, rwa_stats=rwa_stats)
 
 @main_bp.route('/auth/login')
 def login():
