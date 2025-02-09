@@ -41,7 +41,7 @@ def get_rwa_stats():
         logger.info("成功创建 BeautifulSoup 对象")
         
         # 记录 HTML 内容的一部分,用于调试
-        logger.info(f"HTML 内容片段: {response.text[:1000]}")
+        logger.info(f"HTML 内容片段: {response.text[:2000]}")
         
         # 提取数据
         stats = {}
@@ -51,6 +51,10 @@ def get_rwa_stats():
             # 找到所有 stat-item 元素
             stat_items = soup.find_all('div', class_='stat-item')
             logger.info(f"找到 {len(stat_items)} 个 stat-item 元素")
+            
+            # 记录所有找到的 stat-item 元素的内容
+            for i, item in enumerate(stat_items):
+                logger.info(f"stat-item {i + 1} 内容: {item}")
             
             for item in stat_items:
                 # 获取标题和值
@@ -73,10 +77,13 @@ def get_rwa_stats():
                             # 提取变化率
                             if change:
                                 change_text = change.text.strip()
+                                logger.info(f"变化率文本: {change_text}")
                                 change_match = re.search(r'([+-]?\d+\.?\d*)%', change_text)
                                 if change_match:
                                     stats['total_rwa_change'] = float(change_match.group(1))
                                     logger.info(f"提取 total_rwa_change: {stats['total_rwa_change']}")
+                                else:
+                                    logger.warning(f"无法从文本 '{change_text}' 提取变化率")
                     
                     elif 'Total Asset Holders' in title_text:
                         # 提取数值
@@ -88,10 +95,13 @@ def get_rwa_stats():
                             # 提取变化率
                             if change:
                                 change_text = change.text.strip()
+                                logger.info(f"变化率文本: {change_text}")
                                 change_match = re.search(r'([+-]?\d+\.?\d*)%', change_text)
                                 if change_match:
                                     stats['holders_change'] = float(change_match.group(1))
                                     logger.info(f"提取 holders_change: {stats['holders_change']}")
+                                else:
+                                    logger.warning(f"无法从文本 '{change_text}' 提取变化率")
                     
                     elif 'Total Asset Issuers' in title_text:
                         # 提取数值
@@ -106,9 +116,15 @@ def get_rwa_stats():
                         if value_match:
                             stats['total_stablecoin'] = float(value_match.group(1))
                             logger.info(f"提取 total_stablecoin: {stats['total_stablecoin']}")
+                else:
+                    if not title:
+                        logger.warning("未找到标题元素")
+                    if not value:
+                        logger.warning("未找到值元素")
         
         except Exception as e:
             logger.error(f"解析统计数据时出错: {str(e)}")
+            logger.exception(e)  # 记录完整的异常堆栈
         
         logger.info(f"HTML 解析结果: {stats}")
         
