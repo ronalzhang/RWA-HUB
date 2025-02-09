@@ -4,37 +4,48 @@ from .admin import admin_required, is_admin
 from ..models import Asset
 from ..models.asset import AssetStatus
 from sqlalchemy import or_ as db_or
+from ..models.user import User
+from ..utils.rwa_scraper import get_rwa_stats
 
 # 主页路由
 @main_bp.route('/')
 def index():
     """首页"""
     try:
-        # 获取当前用户的钱包地址
-        eth_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address')
-        current_app.logger.info(f'当前用户钱包地址: {eth_address}')
+        # 获取最新6个已上链资产
+        assets = Asset.query.filter_by(status=2).order_by(Asset.created_at.desc()).limit(6).all()
         
-        # 构建查询条件
-        current_app.logger.info(f'查询条件: eth_address={eth_address}')
+        # 获取 RWA 统计数据
+        rwa_stats = get_rwa_stats() or {
+            'total_rwa_onchain': '16.96',
+            'total_rwa_change': '-1.32',
+            'total_holders': '83,506',
+            'holders_change': '+1.92',
+            'total_issuers': '112',
+            'total_stablecoin': '220.39'
+        }
         
-        # 获取资产列表
-        query = Asset.query
+        # 获取资产所有者信息
+        asset_data = []
+        for asset in assets:
+            owner = User.query.filter_by(eth_address=asset.owner_address).first()
+            asset_data.append({
+                'id': asset.id,
+                'name': asset.name,
+                'price': asset.price,
+                'images': asset.images if asset.images else ['/static/images/placeholder.jpg'],
+                'owner_name': owner.name if owner else '未知用户',
+                'status': asset.status,
+                'token_symbol': asset.token_symbol,
+                'location': asset.location,
+                'asset_type': asset.asset_type,
+                'area': asset.area,
+                'total_value': asset.total_value,
+                'token_price': asset.token_price,
+                'annual_revenue': asset.annual_revenue
+            })
         
-        # 如果是管理员，显示所有未删除的资产
-        if eth_address and is_admin(eth_address):
-            query = query.filter(Asset.status != AssetStatus.DELETED.value)
-        else:
-            # 非管理员只能看到已审核通过的资产
-            query = query.filter(Asset.status == AssetStatus.APPROVED.value)
-            
-        assets = query.order_by(Asset.created_at.desc()).limit(6).all()
-        
-        current_app.logger.info(f'获取资产列表成功: 找到 {len(assets)} 个资产')
-        current_app.logger.info(f'资产状态: {[asset.status for asset in assets]}')
-        
-        return render_template('index.html', 
-                             assets=assets,
-                             current_user_address=eth_address)
+        return render_template('index.html', assets=asset_data, rwa_stats=rwa_stats)
                              
     except Exception as e:
         current_app.logger.error(f'获取资产列表失败: {str(e)}')
