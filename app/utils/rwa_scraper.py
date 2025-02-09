@@ -29,22 +29,46 @@ def get_rwa_stats():
     }
     
     try:
-        url = "https://app.rwa.xyz/"
+        logger.info("开始获取 RWA 统计数据")
+        
+        # 尝试从 API 获取数据
+        api_url = "https://api.rwa.xyz/v1/stats"
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept': 'application/json',
             'Referer': 'https://app.rwa.xyz/'
         }
         
-        logger.info("开始获取 RWA 统计数据")
+        logger.info(f"尝试从 API 获取数据: {api_url}")
+        try:
+            response = requests.get(api_url, headers=headers, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            logger.info(f"API 响应: {data}")
+            
+            if isinstance(data, dict):
+                stats = {}
+                stats['total_rwa_onchain'] = str(data.get('totalRWAOnchain', default_stats['total_rwa_onchain']))
+                stats['total_rwa_change'] = str(data.get('rwaChange30d', default_stats['total_rwa_change']))
+                stats['total_holders'] = str(data.get('totalHolders', default_stats['total_holders']))
+                stats['holders_change'] = str(data.get('holdersChange30d', default_stats['holders_change']))
+                stats['total_issuers'] = str(data.get('totalIssuers', default_stats['total_issuers']))
+                stats['total_stablecoin'] = str(data.get('totalStablecoin', default_stats['total_stablecoin']))
+                
+                logger.info(f"成功从 API 获取数据: {stats}")
+                return stats
+        except Exception as e:
+            logger.error(f"从 API 获取数据失败: {str(e)}")
         
-        # 添加超时设置
+        # 如果 API 获取失败,尝试从网页获取
+        url = "https://app.rwa.xyz/"
+        logger.info(f"尝试从网页获取数据: {url}")
+        
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         
         logger.info(f"获取到响应,状态码: {response.status_code}")
-        logger.debug(f"响应内容: {response.text[:500]}...")  # 只记录前500个字符
+        logger.debug(f"响应内容: {response.text[:500]}...")
         
         # 尝试解析 JSON
         try:
@@ -76,10 +100,10 @@ def get_rwa_stats():
         
         # 使用更灵活的选择器
         selectors = {
-            'total_rwa_onchain': ['[data-testid="total-rwa"]', '.total-rwa', '.rwa-value'],
-            'total_holders': ['[data-testid="total-holders"]', '.total-holders', '.holders-count'],
-            'total_issuers': ['[data-testid="total-issuers"]', '.total-issuers', '.issuers-count'],
-            'total_stablecoin': ['[data-testid="total-stablecoin"]', '.total-stablecoin', '.stablecoin-value']
+            'total_rwa_onchain': ['[data-testid="total-rwa"]', '.total-rwa', '.rwa-value', '.stat-value'],
+            'total_holders': ['[data-testid="total-holders"]', '.total-holders', '.holders-count', '.stat-value'],
+            'total_issuers': ['[data-testid="total-issuers"]', '.total-issuers', '.issuers-count', '.stat-value'],
+            'total_stablecoin': ['[data-testid="total-stablecoin"]', '.total-stablecoin', '.stablecoin-value', '.stat-value']
         }
         
         def extract_value(text):
@@ -102,14 +126,19 @@ def get_rwa_stats():
         # 尝试使用不同的选择器查找数据
         for key, selector_list in selectors.items():
             for selector in selector_list:
+                logger.debug(f"尝试使用选择器 '{selector}' 查找 {key}")
                 element = soup.select_one(selector)
                 if element:
+                    logger.debug(f"找到元素: {element.text}")
                     value, change = extract_value(element.text)
                     if value:
                         stats[key] = value
                         if change and key in ['total_rwa_onchain', 'total_holders']:
                             stats[f"{key}_change"] = change
-                    break
+                        logger.info(f"成功提取 {key}: value={value}, change={change}")
+                        break
+                else:
+                    logger.debug(f"未找到匹配的元素: {selector}")
         
         logger.info(f"HTML 解析结果: {stats}")
         
