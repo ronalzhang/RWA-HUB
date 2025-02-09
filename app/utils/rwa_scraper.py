@@ -90,63 +90,68 @@ def get_rwa_stats():
                 
         except json.JSONDecodeError:
             logger.info("响应不是 JSON 格式,尝试解析 HTML")
-            
+        
         # 如果不是 JSON,尝试解析 HTML
         soup = BeautifulSoup(response.text, 'html.parser')
         logger.info("成功创建 BeautifulSoup 对象")
         
+        # 记录 HTML 内容的一部分,用于调试
+        logger.debug(f"HTML 内容片段: {response.text[:1000]}")
+        
         # 提取数据
         stats = {}
         
-        # 使用更灵活的选择器
+        # 使用更精确的选择器
         selectors = {
-            'total_rwa_onchain': ['[data-testid="total-rwa"]', '.total-rwa', '.rwa-value', '.stat-value'],
-            'total_holders': ['[data-testid="total-holders"]', '.total-holders', '.holders-count', '.stat-value'],
-            'total_issuers': ['[data-testid="total-issuers"]', '.total-issuers', '.issuers-count', '.stat-value'],
-            'total_stablecoin': ['[data-testid="total-stablecoin"]', '.total-stablecoin', '.stablecoin-value', '.stat-value']
+            'total_rwa_onchain': ['div.total-rwa', 'div[data-testid="total-rwa"]', '.rwa-value', '.stat-value'],
+            'total_holders': ['div.total-holders', 'div[data-testid="total-holders"]', '.holders-count', '.stat-value'],
+            'total_issuers': ['div.total-issuers', 'div[data-testid="total-issuers"]', '.issuers-count', '.stat-value'],
+            'total_stablecoin': ['div.total-stablecoin', 'div[data-testid="total-stablecoin"]', '.stablecoin-value', '.stat-value']
         }
         
-        def extract_value(text):
-            if not text:
-                return None, None
-            try:
-                # 改进的数值提取正则表达式
-                value_match = re.search(r'\$?([\d,]+(?:\.\d+)?)[BM]?', text)
-                change_match = re.search(r'([+-]?\d+(?:\.\d+)?)\s*%', text)
-                
-                value = value_match.group(1) if value_match else None
-                change = change_match.group(1) if change_match else None
-                
-                logger.debug(f"从文本 '{text}' 提取的值: value={value}, change={change}")
-                return value, change
-            except Exception as e:
-                logger.error(f"从文本 '{text}' 提取值时出错: {str(e)}")
-                return None, None
-        
-        # 尝试使用不同的选择器查找数据
-        for key, selector_list in selectors.items():
+        for field, selector_list in selectors.items():
             for selector in selector_list:
-                logger.debug(f"尝试使用选择器 '{selector}' 查找 {key}")
                 element = soup.select_one(selector)
                 if element:
-                    logger.debug(f"找到元素: {element.text}")
-                    value, change = extract_value(element.text)
-                    if value:
-                        stats[key] = value
-                        if change and key in ['total_rwa_onchain', 'total_holders']:
-                            stats[f"{key}_change"] = change
-                        logger.info(f"成功提取 {key}: value={value}, change={change}")
+                    logger.info(f"找到元素 {field} 使用选择器 {selector}: {element.text}")
+                    # 提取数值
+                    value = element.text.strip()
+                    # 移除货币符号和逗号
+                    value = re.sub(r'[^\d.]', '', value)
+                    try:
+                        stats[field] = float(value)
+                        logger.info(f"成功提取 {field} 的值: {stats[field]}")
                         break
+                    except ValueError:
+                        logger.warning(f"无法将 {value} 转换为数值")
                 else:
-                    logger.debug(f"未找到匹配的元素: {selector}")
+                    logger.debug(f"未找到元素 {field} 使用选择器 {selector}")
+        
+        # 尝试提取变化率
+        change_selectors = ['.change-value', '.percent-change', '[data-testid="change-value"]']
+        for selector in change_selectors:
+            change_element = soup.select_one(selector)
+            if change_element:
+                logger.info(f"找到变化率元素使用选择器 {selector}: {change_element.text}")
+                change_text = change_element.text.strip()
+                try:
+                    # 提取百分比数值
+                    change_value = float(re.sub(r'[^\d.-]', '', change_text))
+                    stats['total_rwa_change'] = change_value
+                    logger.info(f"成功提取变化率: {change_value}%")
+                    break
+                except ValueError:
+                    logger.warning(f"无法将变化率 {change_text} 转换为数值")
+            else:
+                logger.debug(f"未找到变化率元素使用选择器 {selector}")
         
         logger.info(f"HTML 解析结果: {stats}")
         
         # 使用默认值填充缺失字段
         for field in default_stats:
             if field not in stats or stats[field] is None:
-                logger.warning(f"字段 '{field}' 缺失或无效,使用默认值")
                 stats[field] = default_stats[field]
+                logger.warning(f"字段 '{field}' 缺失或无效,使用默认值")
         
         return stats
         
