@@ -6,6 +6,9 @@ from ..models.asset import AssetStatus
 from sqlalchemy import or_ as db_or
 from ..models.user import User
 from ..utils.rwa_scraper import get_rwa_stats
+from flask_wtf import FlaskForm
+from wtforms import StringField, SelectField, TextAreaField, FloatField
+from wtforms.validators import DataRequired, Length, NumberRange
 
 # 默认的 RWA 统计数据
 DEFAULT_RWA_STATS = {
@@ -16,6 +19,16 @@ DEFAULT_RWA_STATS = {
     'total_issuers': '112',
     'total_stablecoin': '220.39'
 }
+
+class AssetForm(FlaskForm):
+    name = StringField('Asset Name', validators=[DataRequired(), Length(max=100)])
+    type = SelectField('Asset Type', choices=[('10', 'Real Estate'), ('20', 'Similar Assets')], validators=[DataRequired()])
+    location = StringField('Asset Location', validators=[DataRequired(), Length(max=200)])
+    description = TextAreaField('Asset Description', validators=[DataRequired(), Length(max=1000)])
+    area = FloatField('Asset Area', validators=[NumberRange(min=0, max=1000000)])
+    total_value = FloatField('Total Value', validators=[DataRequired(), NumberRange(min=0, max=1000000000)])
+    token_price = FloatField('Token Price', validators=[DataRequired(), NumberRange(min=0, max=1000000)])
+    annual_revenue = FloatField('Annual Revenue', validators=[DataRequired(), NumberRange(min=0, max=100)])
 
 # 主页路由
 @main_bp.route('/')
@@ -84,7 +97,8 @@ def register():
 # 资产页面路由
 @assets_bp.route('/create')
 def create_asset():
-    return render_template('assets/create.html')
+    form = AssetForm()
+    return render_template('assets/create.html', form=form)
 
 @assets_bp.route('/<int:asset_id>')
 def asset_detail(asset_id):
