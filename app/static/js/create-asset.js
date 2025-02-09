@@ -155,18 +155,42 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 设置文件上传
     function setupFileUpload(dropArea, input, handler, type) {
-        dropArea.addEventListener('click', () => input.click());
-        dropArea.addEventListener('dragover', handleDragOver);
-        dropArea.addEventListener('dragleave', handleDragLeave);
+        // 点击上传
+        dropArea.addEventListener('click', () => {
+            input.value = ''; // 清除之前的选择
+            input.click();
+        });
+        
+        // 拖拽处理
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropArea.classList.add('dragover');
+        });
+        
+        dropArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropArea.classList.remove('dragover');
+        });
+        
         dropArea.addEventListener('drop', (e) => {
             e.preventDefault();
             e.stopPropagation();
             dropArea.classList.remove('dragover');
-            handler(e.dataTransfer.files);
+            const files = e.dataTransfer.files;
+            console.log('拖拽文件数量:', files.length);
+            if (files.length > 0) {
+                handler(files);
+            }
         });
         
-        input.addEventListener('change', function() {
-            handler(this.files);
+        // 文件选择处理
+        input.addEventListener('change', function(e) {
+            console.log('选择文件数量:', this.files.length);
+            if (this.files.length > 0) {
+                handler(this.files);
+            }
         });
     }
     
@@ -265,7 +289,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (validFiles.length === 0) return;
         
         // 检查总数限制
-        const currentCount = imagePreview.children.length;
+        const currentCount = uploadedFiles.images.size;
         if (currentCount + validFiles.length > 10) {
             showError(_('图片总数不能超过 10 张'));
             return;
@@ -277,13 +301,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         let processed = 0;
         validFiles.forEach(file => {
-            // 直接添加到uploadedFiles
-            uploadedFiles.images.set(file.name, file);
-            console.log('添加图片到uploadedFiles:', file.name);
-            
             const reader = new FileReader();
             reader.onload = function(e) {
+                // 先添加到预览
                 createImagePreview(file, e.target.result);
+                // 再添加到uploadedFiles
+                uploadedFiles.images.set(file.name, file);
+                console.log('添加图片到uploadedFiles:', file.name);
+                
                 processed++;
                 updateProgress(progressContainer, progressBar, processed, validFiles.length);
             };
