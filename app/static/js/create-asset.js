@@ -456,16 +456,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // 监听面积输入变化（不动产）
-        areaInput.addEventListener('input', debounce(function() {
-            if (assetTypeSelect.value === '10' && this.value) {
-                calculateTokenSupply(parseFloat(this.value));
+        areaInput.addEventListener('input', function() {
+            if (assetTypeSelect.value === '10') {
+                const area = parseFloat(this.value);
+                if (!isNaN(area) && area > 0) {
+                    calculateTokenSupply(area);
+                } else {
+                    tokenSupplyInput.value = '';
+                    tokenPriceInput.value = '';
+                    tokenSupplyDisplay.textContent = '请输入有效的面积';
+                }
             }
-        }, 300));
+        });
 
         // 监听代币数量输入（类不动产）
-        tokenSupplyInput.addEventListener('input', debounce(function() {
+        tokenSupplyInput.addEventListener('input', function() {
             if (assetTypeSelect.value === '20') {
-                const value = parseFloat(this.value);
+                const value = parseInt(this.value);
                 if (!isNaN(value)) {
                     if (value <= 0) {
                         tokenSupplyDisplay.textContent = '代币发行量必须大于0';
@@ -481,20 +488,19 @@ document.addEventListener('DOMContentLoaded', function() {
                         this.setCustomValidity('');
                         calculateTokenPrice();
                     }
-                } else {
-                    tokenSupplyDisplay.textContent = '请输入有效的代币发行量';
-                    tokenSupplyDisplay.classList.add('text-danger');
-                    this.setCustomValidity('请输入有效的代币发行量');
                 }
             }
-        }, 300));
+        });
 
         // 监听总价值变化
-        totalValueInput.addEventListener('input', debounce(function() {
-            if (this.value) {
+        totalValueInput.addEventListener('input', function() {
+            const totalValue = parseFloat(this.value);
+            if (!isNaN(totalValue) && totalValue > 0) {
                 calculateTokenPrice();
+            } else {
+                tokenPriceInput.value = '';
             }
-        }, 300));
+        });
 
         // 计算代币数量（不动产）
         function calculateTokenSupply(area) {
@@ -502,24 +508,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 const tokenSupply = Math.floor(area * 10000); // 1平方米 = 10000代币
                 tokenSupplyInput.value = tokenSupply;
                 tokenSupplyDisplay.textContent = `总发行量: ${tokenSupply.toLocaleString()} 代币 (${area}㎡ × 10000)`;
-                calculateTokenPrice(); // 计算代币价格
-            } else {
-                tokenSupplyInput.value = '';
-                tokenSupplyDisplay.textContent = '请输入有效的面积';
-                tokenPriceInput.value = '';
+                calculateTokenPrice();
             }
         }
 
         // 计算代币价格
         function calculateTokenPrice() {
             const totalValue = parseFloat(totalValueInput.value);
-            const tokenSupply = parseFloat(tokenSupplyInput.value);
+            const tokenSupply = parseInt(tokenSupplyInput.value);
             
-            if (!isNaN(totalValue) && !isNaN(tokenSupply) && tokenSupply > 0) {
+            if (!isNaN(totalValue) && !isNaN(tokenSupply) && totalValue > 0 && tokenSupply > 0) {
                 const tokenPrice = totalValue / tokenSupply;
                 tokenPriceInput.value = tokenPrice.toFixed(6);
             } else {
                 tokenPriceInput.value = '';
+            }
+        }
+
+        // 初始化时如果已有值则计算
+        if (assetTypeSelect.value === '10' && areaInput.value) {
+            calculateTokenSupply(parseFloat(areaInput.value));
+        } else if (assetTypeSelect.value === '20' && tokenSupplyInput.value) {
+            const value = parseInt(tokenSupplyInput.value);
+            if (!isNaN(value) && value > 0) {
+                tokenSupplyDisplay.textContent = `总发行量: ${value.toLocaleString()} 代币`;
+                calculateTokenPrice();
             }
         }
     }
