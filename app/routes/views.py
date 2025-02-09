@@ -49,9 +49,19 @@ def index():
                              
     except Exception as e:
         current_app.logger.error(f'获取资产列表失败: {str(e)}')
+        # 添加默认的 rwa_stats 数据
+        default_rwa_stats = {
+            'total_rwa_onchain': '16.96',
+            'total_rwa_change': '-1.32',
+            'total_holders': '83,506',
+            'holders_change': '+1.92',
+            'total_issuers': '112',
+            'total_stablecoin': '220.39'
+        }
         return render_template('index.html', 
                              assets=[],
-                             current_user_address=None)
+                             current_user_address=None,
+                             rwa_stats=default_rwa_stats)
 
 # 静态文件路由
 @main_bp.route('/static/<path:filename>')

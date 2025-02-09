@@ -1,0 +1,34 @@
+服务器地址:8.219.92.139
+服务器用户名:root
+服务器密码:123abc$74531ABC
+
+render
+第三方数据库外部地址:
+postgresql://rwa_hub_user:3YIeu6i1Nuyb6z8wRAxdctbMJVrSseJB@dpg-cu6b270gph6c73c50eag-a.oregon-p
+内部数据库地址:
+postgresql://rwa_hub_user:3YIeu6i1Nuyb6z8wRAxdctbMJVrSseJB@dpg-cu6b270gph6c73c50eag-a/rwa_hub
+
+阿里云镜像加速器：（docker）
+https://cv9hrppy.mirror.aliyuncs.com
+
+
+free-proxy-list.net
+配置 Git 代理：在终端中执行以下命令，可以解决连接GitHub
+   # 配置第一个代理
+   git config --global http.proxy http://31.220.15.234:80
+   git config --global https.proxy http://31.220.15.234:80
+
+   # 如果需要切换到第二个代理
+   git config --global http.proxy http://13.38.176.104:3128
+   git config --global https.proxy http://13.38.176.104:3128
+
+   # 如果需要切换到第三个代理
+   git config --global http.proxy http://44.226.167.102:3128
+   git config --global https.proxy http://44.226.167.102:3128
+
+
+github.com
+
+本地公钥内容：
+godfather@iMac 1Lightning %      cat ~/.ssh/id_rsa.pub
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDPRSMsIixLy+9OgD9kUtvB0CKKfged+ecSOcmDLZ2YBGcEUXy6Lficj/BaC1e3qU4kSuy1YkkPvf6bGcVxCPD08SfcAVLw7qxbJ1mvQRFOiQYJhJGFrEHEKn5VOIYt27UJXmKDxx5Ckpgp6ReKM81COyHrJltZqC/vHzlA1CaUGWZez4WPu/bgVmWMoYGfR247BNsxR2QAxsv+E3UHWPCMvQiMG2QmnBpIwnHZki7wJnsBfZYDF0NniMDVmaDXKfbXKppFswddKke4aL/BEvalF7G/WbvAgPXkGd+L1iv3epoU+11KGWNcNldPNLDepScjNgIxB+rUFbV+uypQ98wLANWKUVRmbOYauk+1Y+MjIA6EHzPYpzd8yt6GWcFCdtNymxrDtuAANM4exFfhConfQdDfjfSmOAOfeSV7gU3j8fAHIEgUQURQofQiiwsZeGfv8fi81cez4K5tnhJ9K64DNPwWb4WMA0wCV6rqh/Y5RopRwS+8fxLG8SUtvg+AM2DHLSns079JTr4tHpkH/lCZhkmA9UT4BRL9GVvdkGd/h4Qhzdcpn4hpEldYPYDCtybcBWKAyouENjDtg/bKqQnDroJ8/19aJNtYWyAV7iC0vDoHstwd07iruO0eEWB5eush8I+m2/cFWxjgIbXiHmD7WMgakEMUwUfHfihREtYjtw== jiaming0427@gmail.com
