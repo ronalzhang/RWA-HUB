@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -30,81 +31,102 @@ def get_rwa_stats():
     try:
         url = "https://app.rwa.xyz/"
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://app.rwa.xyz/'
         }
         
+        logger.info("开始获取 RWA 统计数据")
+        
         # 添加超时设置
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         
+        logger.info(f"获取到响应,状态码: {response.status_code}")
+        logger.debug(f"响应内容: {response.text[:500]}...")  # 只记录前500个字符
+        
+        # 尝试解析 JSON
+        try:
+            data = response.json()
+            logger.info("成功解析 JSON 响应")
+            
+            # 提取所需数据
+            stats = {}
+            if isinstance(data, dict):
+                stats['total_rwa_onchain'] = str(data.get('totalRWAOnchain', default_stats['total_rwa_onchain']))
+                stats['total_rwa_change'] = str(data.get('rwaChange30d', default_stats['total_rwa_change']))
+                stats['total_holders'] = str(data.get('totalHolders', default_stats['total_holders']))
+                stats['holders_change'] = str(data.get('holdersChange30d', default_stats['holders_change']))
+                stats['total_issuers'] = str(data.get('totalIssuers', default_stats['total_issuers']))
+                stats['total_stablecoin'] = str(data.get('totalStablecoin', default_stats['total_stablecoin']))
+                
+                logger.info(f"成功提取数据: {stats}")
+                return stats
+                
+        except json.JSONDecodeError:
+            logger.info("响应不是 JSON 格式,尝试解析 HTML")
+            
+        # 如果不是 JSON,尝试解析 HTML
         soup = BeautifulSoup(response.text, 'html.parser')
+        logger.info("成功创建 BeautifulSoup 对象")
         
         # 提取数据
         stats = {}
         
-        # 使用正则表达式匹配数字和符号
+        # 使用更灵活的选择器
+        selectors = {
+            'total_rwa_onchain': ['[data-testid="total-rwa"]', '.total-rwa', '.rwa-value'],
+            'total_holders': ['[data-testid="total-holders"]', '.total-holders', '.holders-count'],
+            'total_issuers': ['[data-testid="total-issuers"]', '.total-issuers', '.issuers-count'],
+            'total_stablecoin': ['[data-testid="total-stablecoin"]', '.total-stablecoin', '.stablecoin-value']
+        }
+        
         def extract_value(text):
             if not text:
                 return None, None
             try:
-                value_match = re.search(r'\$?([\d,.]+)B?', text)
-                change_match = re.search(r'([+-]?\d+\.?\d*)%', text)
+                # 改进的数值提取正则表达式
+                value_match = re.search(r'\$?([\d,]+(?:\.\d+)?)[BM]?', text)
+                change_match = re.search(r'([+-]?\d+(?:\.\d+)?)\s*%', text)
                 
                 value = value_match.group(1) if value_match else None
                 change = change_match.group(1) if change_match else None
                 
+                logger.debug(f"从文本 '{text}' 提取的值: value={value}, change={change}")
                 return value, change
             except Exception as e:
-                logger.error(f"Error extracting value from text '{text}': {str(e)}")
+                logger.error(f"从文本 '{text}' 提取值时出错: {str(e)}")
                 return None, None
         
-        # 获取所有统计数据
-        stat_elements = soup.find_all('div', class_='stat-item')
-        if not stat_elements:
-            logger.warning("No stat elements found, using default values")
-            return default_stats
-            
-        for element in stat_elements:
-            try:
-                title = element.find('h4')
-                value = element.find('h3')
-                
-                if not title or not value:
-                    continue
-                    
-                title = title.text.strip()
-                value = value.text.strip()
-                
-                if 'Total RWA Onchain' in title:
-                    stats['total_rwa_onchain'], stats['total_rwa_change'] = extract_value(value)
-                elif 'Total Asset Holders' in title:
-                    stats['total_holders'], stats['holders_change'] = extract_value(value)
-                elif 'Total Asset Issuers' in title:
-                    stats['total_issuers'], _ = extract_value(value)
-                elif 'Total Stablecoin Value' in title:
-                    stats['total_stablecoin'], _ = extract_value(value)
-            except Exception as e:
-                logger.error(f"Error processing stat element: {str(e)}")
-                continue
+        # 尝试使用不同的选择器查找数据
+        for key, selector_list in selectors.items():
+            for selector in selector_list:
+                element = soup.select_one(selector)
+                if element:
+                    value, change = extract_value(element.text)
+                    if value:
+                        stats[key] = value
+                        if change and key in ['total_rwa_onchain', 'total_holders']:
+                            stats[f"{key}_change"] = change
+                    break
         
-        # 验证所有必需的字段是否存在
-        required_fields = ['total_rwa_onchain', 'total_rwa_change', 'total_holders', 
-                         'holders_change', 'total_issuers', 'total_stablecoin']
+        logger.info(f"HTML 解析结果: {stats}")
         
-        # 如果缺少任何必需字段，使用默认值填充
-        for field in required_fields:
+        # 使用默认值填充缺失字段
+        for field in default_stats:
             if field not in stats or stats[field] is None:
-                logger.warning(f"Missing or invalid field '{field}', using default value")
+                logger.warning(f"字段 '{field}' 缺失或无效,使用默认值")
                 stats[field] = default_stats[field]
-            
+        
         return stats
         
     except requests.Timeout:
-        logger.error("Request timeout while fetching RWA stats")
+        logger.error("获取 RWA 统计数据超时")
         return default_stats
     except requests.RequestException as e:
-        logger.error(f"Network error while fetching RWA stats: {str(e)}")
+        logger.error(f"获取 RWA 统计数据时发生网络错误: {str(e)}")
         return default_stats
     except Exception as e:
-        logger.error(f"Unexpected error while fetching RWA stats: {str(e)}")
+        logger.error(f"获取 RWA 统计数据时发生意外错误: {str(e)}")
         return default_stats
