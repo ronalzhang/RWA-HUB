@@ -15,17 +15,20 @@ function debounce(func, wait) {
 async function submitWithRetry(formData, maxRetries = 3) {
     for (let i = 0; i < maxRetries; i++) {
         try {
-            const response = await fetch(form.action, {
+            const response = await fetch('/api/assets', {
                 method: 'POST',
                 body: formData,
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content,
                 },
                 credentials: 'same-origin'
             });
+            
+            console.log('提交响应:', response);
             return response;
         } catch (error) {
+            console.error('提交错误:', error);
             if (i === maxRetries - 1) throw error;
             await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
         }
@@ -207,27 +210,38 @@ document.addEventListener('DOMContentLoaded', function() {
             submitBtn.querySelector('.spinner-border').classList.remove('d-none');
             
             const formData = new FormData(form);
+            
             // 添加资产类型字段
             formData.append('asset_type', assetTypeSelect.value);
             
             // 添加文件数据
+            console.log('上传的图片数量:', uploadedFiles.images.size);
             uploadedFiles.images.forEach((file, name) => {
+                console.log('添加图片到formData:', name);
                 formData.append('images[]', file);
             });
+            
+            console.log('上传的文档数量:', uploadedFiles.documents.size);
             uploadedFiles.documents.forEach((file, name) => {
+                console.log('添加文档到formData:', name);
                 formData.append('documents[]', file);
             });
             
             const response = await submitWithRetry(formData);
+            console.log('提交响应状态:', response.status);
+            
             if (!response.ok) {
                 const result = await response.json();
                 throw new Error(result.error || _('创建资产失败'));
             }
             
             const result = await response.json();
+            console.log('提交成功，结果:', result);
+            
             localStorage.removeItem('assetDraft');
             window.location.href = result.redirect || '/assets';
         } catch (error) {
+            console.error('提交失败:', error);
             showError(error.message || _('网络错误'));
         } finally {
             submitBtn.disabled = false;
@@ -263,6 +277,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         let processed = 0;
         validFiles.forEach(file => {
+            // 直接添加到uploadedFiles
+            uploadedFiles.images.set(file.name, file);
+            console.log('添加图片到uploadedFiles:', file.name);
+            
             const reader = new FileReader();
             reader.onload = function(e) {
                 createImagePreview(file, e.target.result);

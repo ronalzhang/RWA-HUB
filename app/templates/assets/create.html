@@ -22,7 +22,7 @@
         {% endif %}
     {% endwith %}
     
-    <form id="assetForm" class="needs-validation" action="{{ url_for('assets.create_asset') }}" method="POST" enctype="multipart/form-data" novalidate>
+    <form id="assetForm" class="needs-validation" action="{{ url_for('assets_api.create_asset') }}" method="POST" enctype="multipart/form-data" novalidate>
         {{ form.csrf_token }}
         
         <!-- 基本信息 -->
