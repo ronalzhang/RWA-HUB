@@ -44,7 +44,14 @@ def create_app(config_name='development'):
     # 配置 Babel
     app.config['BABEL_DEFAULT_LOCALE'] = 'en'
     app.config['BABEL_SUPPORTED_LOCALES'] = ['en', 'zh_Hant']
-    babel.init_app(app, locale_selector=get_locale)
+    babel.init_app(app)
+    
+    @babel.localeselector
+    def get_locale():
+        # 从 cookie 中获取用户语言偏好，默认英文
+        if not g.get('lang_code', None):
+            g.lang_code = request.cookies.get('language', 'en')
+        return g.lang_code
     
     # 确保日志目录存在
     if not os.path.exists('logs'):
