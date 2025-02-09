@@ -57,8 +57,8 @@ def index():
         current_app.logger.error(f'获取资产列表失败: {str(e)}')
         return render_template('index.html', 
                              assets=[],
-                             current_user_address=request.headers.get('X-Eth-Address'),
-                             rwa_stats=DEFAULT_RWA_STATS)
+                             rwa_stats=DEFAULT_RWA_STATS,  # 确保在异常情况下也传递 rwa_stats
+                             current_user_address=request.headers.get('X-Eth-Address'))
 
 # 静态文件路由
 @main_bp.route('/static/<path:filename>')
