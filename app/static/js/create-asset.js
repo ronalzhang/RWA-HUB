@@ -275,6 +275,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 文件处理函数
     function handleImageFiles(files) {
+        console.log('开始处理图片文件:', files.length, '个文件');
+        
         const validFiles = validateFiles(files, {
             types: ['image/jpeg', 'image/png', 'image/webp'],
             maxSize: 5 * 1024 * 1024,
@@ -286,10 +288,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
+        console.log('验证通过的文件数量:', validFiles.length);
+        
         if (validFiles.length === 0) return;
         
         // 检查总数限制
         const currentCount = uploadedFiles.images.size;
+        console.log('当前已有图片数量:', currentCount);
+        
         if (currentCount + validFiles.length > 10) {
             showError(_('图片总数不能超过 10 张'));
             return;
@@ -301,8 +307,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         let processed = 0;
         validFiles.forEach(file => {
+            console.log('处理图片:', file.name, file.type, file.size);
+            
             const reader = new FileReader();
             reader.onload = function(e) {
+                console.log('图片读取完成:', file.name);
                 // 先添加到预览
                 createImagePreview(file, e.target.result);
                 // 再添加到uploadedFiles
@@ -312,6 +321,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 processed++;
                 updateProgress(progressContainer, progressBar, processed, validFiles.length);
             };
+            
+            reader.onerror = function(e) {
+                console.error('图片读取失败:', file.name, e);
+                showError(_('图片读取失败: ') + file.name);
+            };
+            
             reader.readAsDataURL(file);
         });
     }
@@ -367,7 +382,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         Array.from(files).forEach(file => {
             // 检查文件类型
-            if (!options.types.includes(file.type)) {
+            const fileExt = file.name.split('.').pop().toLowerCase();
+            const isValidType = options.types.includes(file.type) || 
+                              (file.type.startsWith('image/') && ['jpg', 'jpeg', 'png', 'webp'].includes(fileExt));
+            
+            if (!isValidType) {
                 errors.push(`${file.name}: ${options.errorMessages.type}`);
                 return;
             }
@@ -482,21 +501,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function validateRequiredFiles() {
-        const selectedType = assetTypeSelect.value;
         const hasImages = imagePreview.children.length > 0;
-        const hasDocuments = documentPreview.children.length > 0;
         
         if (!hasImages) {
-            showError(_('Please upload at least one image'));
+            showError(_('请至少上传一张资产图片'));
             return false;
         }
         
-        const requiredDocCount = selectedType === '10' ? 3 : 3;
-        if (!hasDocuments || documentPreview.children.length < requiredDocCount) {
-            showError(_(`Please upload all required documents (${requiredDocCount} documents needed)`));
-            return false;
-        }
-        
+        // 文档不再是必需的
         return true;
     }
     
