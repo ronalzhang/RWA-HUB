@@ -207,6 +207,9 @@ document.addEventListener('DOMContentLoaded', function() {
             submitBtn.querySelector('.spinner-border').classList.remove('d-none');
             
             const formData = new FormData(form);
+            // 添加资产类型字段
+            formData.append('asset_type', assetTypeSelect.value);
+            
             // 添加文件数据
             uploadedFiles.images.forEach((file, name) => {
                 formData.append('images[]', file);
@@ -216,16 +219,16 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             const response = await submitWithRetry(formData);
-            const result = await response.json();
-            
-            if (response.ok) {
-                localStorage.removeItem('assetDraft');
-                window.location.href = result.redirect || '/assets';
-            } else {
-                showError(result.error || _('Failed to create asset'));
+            if (!response.ok) {
+                const result = await response.json();
+                throw new Error(result.error || _('创建资产失败'));
             }
+            
+            const result = await response.json();
+            localStorage.removeItem('assetDraft');
+            window.location.href = result.redirect || '/assets';
         } catch (error) {
-            showError(_('Network error occurred'));
+            showError(error.message || _('网络错误'));
         } finally {
             submitBtn.disabled = false;
             submitBtn.querySelector('.spinner-border').classList.add('d-none');
@@ -263,7 +266,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const reader = new FileReader();
             reader.onload = function(e) {
                 createImagePreview(file, e.target.result);
-                updateProgress(progressContainer, progressBar, ++processed, validFiles.length);
+                processed++;
+                updateProgress(progressContainer, progressBar, processed, validFiles.length);
             };
             reader.readAsDataURL(file);
         });
