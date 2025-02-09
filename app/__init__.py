@@ -58,7 +58,7 @@ def create_app(config_name='development'):
         encoding='utf-8'
     )
     file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s [%(levelname)s] %(message)s [in %(pathname)s:%(lineno)d]'
+        '%(asctime)s [%(levelname)s] [%(pathname)s:%(lineno)d]\n%(message)s\n'
     ))
     file_handler.setLevel(logging.INFO)
     app.logger.addHandler(file_handler)
