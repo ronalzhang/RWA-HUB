@@ -55,8 +55,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const documentPreview = document.getElementById('documentPreview').querySelector('.list-group');
     const draftSavedToast = new bootstrap.Toast(document.getElementById('draftSavedToast'));
     
-    // 初始化
+    // 初始化所有功能
     initializeForm();
+    setupTokenSupplyCalculation();
     
     // 字符计数器（带防抖）
     descriptionField.addEventListener('input', debounce(function() {
@@ -99,7 +100,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function initializeForm() {
         loadDraft();
         setupAccessibility();
-        setupTokenSupplyCalculation();
     }
     
     // 加载草稿
@@ -491,7 +491,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 监听总价值变化
         totalValueInput.addEventListener('input', debounce(function() {
-            calculateTokenPrice();
+            if (this.value) {
+                calculateTokenPrice();
+            }
         }, 300));
 
         // 计算代币数量（不动产）
@@ -500,7 +502,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const tokenSupply = Math.floor(area * 10000); // 1平方米 = 10000代币
                 tokenSupplyInput.value = tokenSupply;
                 tokenSupplyDisplay.textContent = `总发行量: ${tokenSupply.toLocaleString()} 代币 (${area}㎡ × 10000)`;
-                calculateTokenPrice();
+                calculateTokenPrice(); // 计算代币价格
             } else {
                 tokenSupplyInput.value = '';
                 tokenSupplyDisplay.textContent = '请输入有效的面积';
