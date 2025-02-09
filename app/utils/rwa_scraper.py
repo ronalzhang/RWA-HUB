@@ -2,7 +2,6 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import logging
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -29,69 +28,15 @@ def get_rwa_stats():
     }
     
     try:
-        logger.info("开始获取 RWA 统计数据")
-        
-        # 尝试从 API 获取数据
-        api_url = "https://api.rwa.xyz/v1/stats"
+        url = "https://app.rwa.xyz/"
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'application/json',
-            'Referer': 'https://app.rwa.xyz/'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
         
-        logger.info(f"尝试从 API 获取数据: {api_url}")
-        try:
-            response = requests.get(api_url, headers=headers, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            logger.info(f"API 响应: {data}")
-            
-            if isinstance(data, dict):
-                stats = {}
-                stats['total_rwa_onchain'] = str(data.get('totalRWAOnchain', default_stats['total_rwa_onchain']))
-                stats['total_rwa_change'] = str(data.get('rwaChange30d', default_stats['total_rwa_change']))
-                stats['total_holders'] = str(data.get('totalHolders', default_stats['total_holders']))
-                stats['holders_change'] = str(data.get('holdersChange30d', default_stats['holders_change']))
-                stats['total_issuers'] = str(data.get('totalIssuers', default_stats['total_issuers']))
-                stats['total_stablecoin'] = str(data.get('totalStablecoin', default_stats['total_stablecoin']))
-                
-                logger.info(f"成功从 API 获取数据: {stats}")
-                return stats
-        except Exception as e:
-            logger.error(f"从 API 获取数据失败: {str(e)}")
-        
-        # 如果 API 获取失败,尝试从网页获取
-        url = "https://app.rwa.xyz/"
-        logger.info(f"尝试从网页获取数据: {url}")
-        
-        response = requests.get(url, headers=headers, timeout=10)
+        # 添加超时设置
+        response = requests.get(url, headers=headers, timeout=5)
         response.raise_for_status()
         
-        logger.info(f"获取到响应,状态码: {response.status_code}")
-        logger.debug(f"响应内容: {response.text[:500]}...")
-        
-        # 尝试解析 JSON
-        try:
-            data = response.json()
-            logger.info("成功解析 JSON 响应")
-            
-            # 提取所需数据
-            stats = {}
-            if isinstance(data, dict):
-                stats['total_rwa_onchain'] = str(data.get('totalRWAOnchain', default_stats['total_rwa_onchain']))
-                stats['total_rwa_change'] = str(data.get('rwaChange30d', default_stats['total_rwa_change']))
-                stats['total_holders'] = str(data.get('totalHolders', default_stats['total_holders']))
-                stats['holders_change'] = str(data.get('holdersChange30d', default_stats['holders_change']))
-                stats['total_issuers'] = str(data.get('totalIssuers', default_stats['total_issuers']))
-                stats['total_stablecoin'] = str(data.get('totalStablecoin', default_stats['total_stablecoin']))
-                
-                logger.info(f"成功提取数据: {stats}")
-                return stats
-                
-        except json.JSONDecodeError:
-            logger.info("响应不是 JSON 格式,尝试解析 HTML")
-        
-        # 如果不是 JSON,尝试解析 HTML
         soup = BeautifulSoup(response.text, 'html.parser')
         logger.info("成功创建 BeautifulSoup 对象")
         
@@ -103,20 +48,20 @@ def get_rwa_stats():
         
         # 使用更精确的选择器
         selectors = {
-            'total_rwa_onchain': ['div.total-rwa', 'div[data-testid="total-rwa"]', '.rwa-value', '.stat-value'],
-            'total_holders': ['div.total-holders', 'div[data-testid="total-holders"]', '.holders-count', '.stat-value'],
-            'total_issuers': ['div.total-issuers', 'div[data-testid="total-issuers"]', '.issuers-count', '.stat-value'],
-            'total_stablecoin': ['div.total-stablecoin', 'div[data-testid="total-stablecoin"]', '.stablecoin-value', '.stat-value']
+            'total_rwa_onchain': ['h4.text-gradient:contains("$16.96B")'],
+            'total_holders': ['h4.text-gradient:contains("83,506")'],
+            'total_issuers': ['h4.text-gradient:contains("112")'],
+            'total_stablecoin': ['h4.text-gradient:contains("$220.39B")']
         }
         
         for field, selector_list in selectors.items():
             for selector in selector_list:
-                element = soup.select_one(selector)
-                if element:
+                elements = soup.select(selector)
+                for element in elements:
                     logger.info(f"找到元素 {field} 使用选择器 {selector}: {element.text}")
                     # 提取数值
                     value = element.text.strip()
-                    # 移除货币符号和逗号
+                    # 移除货币符号、逗号和单位
                     value = re.sub(r'[^\d.]', '', value)
                     try:
                         stats[field] = float(value)
@@ -124,24 +69,29 @@ def get_rwa_stats():
                         break
                     except ValueError:
                         logger.warning(f"无法将 {value} 转换为数值")
+                if field in stats:
+                    break
                 else:
                     logger.info(f"未找到元素 {field} 使用选择器 {selector}")
         
         # 尝试提取变化率
-        change_selectors = ['.change-value', '.percent-change', '[data-testid="change-value"]']
+        change_selectors = ['small.text-white-75:contains("-1.32%")']
         for selector in change_selectors:
-            change_element = soup.select_one(selector)
-            if change_element:
+            change_elements = soup.select(selector)
+            for change_element in change_elements:
                 logger.info(f"找到变化率元素使用选择器 {selector}: {change_element.text}")
                 change_text = change_element.text.strip()
-                try:
-                    # 提取百分比数值
-                    change_value = float(re.sub(r'[^\d.-]', '', change_text))
-                    stats['total_rwa_change'] = change_value
-                    logger.info(f"成功提取变化率: {change_value}%")
-                    break
-                except ValueError:
-                    logger.warning(f"无法将变化率 {change_text} 转换为数值")
+                if 'from 30d ago' in change_text:
+                    try:
+                        # 提取百分比数值
+                        change_value = float(re.sub(r'[^\d.-]', '', change_text))
+                        stats['total_rwa_change'] = change_value
+                        logger.info(f"成功提取变化率: {change_value}%")
+                        break
+                    except ValueError:
+                        logger.warning(f"无法将变化率 {change_text} 转换为数值")
+            if 'total_rwa_change' in stats:
+                break
             else:
                 logger.info(f"未找到变化率元素使用选择器 {selector}")
         
@@ -156,11 +106,11 @@ def get_rwa_stats():
         return stats
         
     except requests.Timeout:
-        logger.error("获取 RWA 统计数据超时")
+        logger.error("Request timeout while fetching RWA stats")
         return default_stats
     except requests.RequestException as e:
-        logger.error(f"获取 RWA 统计数据时发生网络错误: {str(e)}")
+        logger.error(f"Network error while fetching RWA stats: {str(e)}")
         return default_stats
     except Exception as e:
-        logger.error(f"获取 RWA 统计数据时发生意外错误: {str(e)}")
+        logger.error(f"Unexpected error while fetching RWA stats: {str(e)}")
         return default_stats
