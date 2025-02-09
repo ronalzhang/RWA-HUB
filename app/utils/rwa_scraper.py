@@ -46,54 +46,69 @@ def get_rwa_stats():
         # 提取数据
         stats = {}
         
-        # 使用更精确的选择器
-        selectors = {
-            'total_rwa_onchain': ['h4.text-gradient:contains("$16.96B")'],
-            'total_holders': ['h4.text-gradient:contains("83,506")'],
-            'total_issuers': ['h4.text-gradient:contains("112")'],
-            'total_stablecoin': ['h4.text-gradient:contains("$220.39B")']
-        }
+        # 使用更简单的选择器
+        try:
+            # 找到所有 stat-item 元素
+            stat_items = soup.find_all('div', class_='stat-item')
+            logger.info(f"找到 {len(stat_items)} 个 stat-item 元素")
+            
+            for item in stat_items:
+                # 获取标题和值
+                title = item.find('h6', class_='text-white-75')
+                value = item.find('h4', class_='text-gradient')
+                change = item.find('small', class_='text-white-75')
+                
+                if title and value:
+                    title_text = title.text.strip()
+                    value_text = value.text.strip()
+                    logger.info(f"找到统计项: {title_text} = {value_text}")
+                    
+                    if 'Total RWA Onchain' in title_text:
+                        # 提取数值
+                        value_match = re.search(r'\$?([\d.]+)B', value_text)
+                        if value_match:
+                            stats['total_rwa_onchain'] = float(value_match.group(1))
+                            logger.info(f"提取 total_rwa_onchain: {stats['total_rwa_onchain']}")
+                            
+                            # 提取变化率
+                            if change:
+                                change_text = change.text.strip()
+                                change_match = re.search(r'([+-]?\d+\.?\d*)%', change_text)
+                                if change_match:
+                                    stats['total_rwa_change'] = float(change_match.group(1))
+                                    logger.info(f"提取 total_rwa_change: {stats['total_rwa_change']}")
+                    
+                    elif 'Total Asset Holders' in title_text:
+                        # 提取数值
+                        value_match = re.search(r'([\d,]+)', value_text)
+                        if value_match:
+                            stats['total_holders'] = float(value_match.group(1).replace(',', ''))
+                            logger.info(f"提取 total_holders: {stats['total_holders']}")
+                            
+                            # 提取变化率
+                            if change:
+                                change_text = change.text.strip()
+                                change_match = re.search(r'([+-]?\d+\.?\d*)%', change_text)
+                                if change_match:
+                                    stats['holders_change'] = float(change_match.group(1))
+                                    logger.info(f"提取 holders_change: {stats['holders_change']}")
+                    
+                    elif 'Total Asset Issuers' in title_text:
+                        # 提取数值
+                        value_match = re.search(r'(\d+)', value_text)
+                        if value_match:
+                            stats['total_issuers'] = float(value_match.group(1))
+                            logger.info(f"提取 total_issuers: {stats['total_issuers']}")
+                    
+                    elif 'Total Stablecoin Value' in title_text:
+                        # 提取数值
+                        value_match = re.search(r'\$?([\d.]+)B', value_text)
+                        if value_match:
+                            stats['total_stablecoin'] = float(value_match.group(1))
+                            logger.info(f"提取 total_stablecoin: {stats['total_stablecoin']}")
         
-        for field, selector_list in selectors.items():
-            for selector in selector_list:
-                elements = soup.select(selector)
-                for element in elements:
-                    logger.info(f"找到元素 {field} 使用选择器 {selector}: {element.text}")
-                    # 提取数值
-                    value = element.text.strip()
-                    # 移除货币符号、逗号和单位
-                    value = re.sub(r'[^\d.]', '', value)
-                    try:
-                        stats[field] = float(value)
-                        logger.info(f"成功提取 {field} 的值: {stats[field]}")
-                        break
-                    except ValueError:
-                        logger.warning(f"无法将 {value} 转换为数值")
-                if field in stats:
-                    break
-                else:
-                    logger.info(f"未找到元素 {field} 使用选择器 {selector}")
-        
-        # 尝试提取变化率
-        change_selectors = ['small.text-white-75:contains("-1.32%")']
-        for selector in change_selectors:
-            change_elements = soup.select(selector)
-            for change_element in change_elements:
-                logger.info(f"找到变化率元素使用选择器 {selector}: {change_element.text}")
-                change_text = change_element.text.strip()
-                if 'from 30d ago' in change_text:
-                    try:
-                        # 提取百分比数值
-                        change_value = float(re.sub(r'[^\d.-]', '', change_text))
-                        stats['total_rwa_change'] = change_value
-                        logger.info(f"成功提取变化率: {change_value}%")
-                        break
-                    except ValueError:
-                        logger.warning(f"无法将变化率 {change_text} 转换为数值")
-            if 'total_rwa_change' in stats:
-                break
-            else:
-                logger.info(f"未找到变化率元素使用选择器 {selector}")
+        except Exception as e:
+            logger.error(f"解析统计数据时出错: {str(e)}")
         
         logger.info(f"HTML 解析结果: {stats}")
         
