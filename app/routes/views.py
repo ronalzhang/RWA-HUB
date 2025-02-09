@@ -21,14 +21,50 @@ DEFAULT_RWA_STATS = {
 }
 
 class AssetForm(FlaskForm):
+    # 基本信息
     name = StringField('Asset Name', validators=[DataRequired(), Length(max=100)])
     type = SelectField('Asset Type', choices=[('10', 'Real Estate'), ('20', 'Similar Assets')], validators=[DataRequired()])
     location = StringField('Asset Location', validators=[DataRequired(), Length(max=200)])
     description = TextAreaField('Asset Description', validators=[DataRequired(), Length(max=1000)])
-    area = FloatField('Asset Area', validators=[NumberRange(min=0, max=1000000)])
-    total_value = FloatField('Total Value', validators=[DataRequired(), NumberRange(min=0, max=1000000000)])
-    token_price = FloatField('Token Price', validators=[DataRequired(), NumberRange(min=0, max=1000000)])
-    annual_revenue = FloatField('Annual Revenue', validators=[DataRequired(), NumberRange(min=0, max=100)])
+    
+    # 不动产特有字段
+    area = FloatField('Asset Area', validators=[
+        NumberRange(min=0, max=1000000, message='Area must be between 0 and 1,000,000 square meters')
+    ])
+    
+    # 类不动产特有字段
+    token_supply = FloatField('Token Supply', validators=[
+        NumberRange(min=0, max=100000000, message='Token supply must be between 0 and 100,000,000')
+    ])
+    
+    # 通用价值信息
+    total_value = FloatField('Total Value (USDC)', validators=[
+        DataRequired(),
+        NumberRange(min=0, max=1000000000, message='Total value must be between 0 and 1,000,000,000 USDC')
+    ])
+    token_price = FloatField('Token Price (USDC)', validators=[
+        DataRequired(),
+        NumberRange(min=0, max=1000000, message='Token price must be between 0 and 1,000,000 USDC')
+    ])
+    annual_revenue = FloatField('Annual Revenue (%)', validators=[
+        DataRequired(),
+        NumberRange(min=0, max=100, message='Annual revenue must be between 0% and 100%')
+    ])
+
+    def validate(self):
+        if not super().validate():
+            return False
+            
+        if self.type.data == '10':  # 不动产
+            if not self.area.data:
+                self.area.errors.append('Area is required for real estate assets')
+                return False
+        else:  # 类不动产
+            if not self.token_supply.data:
+                self.token_supply.errors.append('Token supply is required for similar assets')
+                return False
+                
+        return True
 
 # 主页路由
 @main_bp.route('/')
