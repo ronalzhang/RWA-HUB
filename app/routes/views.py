@@ -80,4 +80,4 @@ def asset_detail(asset_id):
 # 管理页面路由
 @assets_bp.route('/manage')
 def manage_assets():
-    return render_template('assets/manage.html') 
+    return render_template('assets/manage.html')
