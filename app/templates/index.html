@@ -23,6 +23,51 @@
                         <span class="gradient-text">{{ _('Digital Platform') }}</span>
                     </h1>
                     <p class="lead text-white-75 mb-5">{{ _('Start your asset digitization journey now') }}<br>{{ _('Secure, transparent, and efficient blockchain asset management platform') }}</p>
+                    
+                    <!-- RWA 统计数据 -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-6">
+                            <div class="stat-item p-3 rounded backdrop-blur">
+                                <h6 class="text-white-75 mb-2">{{ _('Total RWA Onchain') }}</h6>
+                                <h3 class="text-gradient mb-1">${{ rwa_stats.total_rwa_onchain }}B</h3>
+                                <small class="text-white-75">
+                                    {% if rwa_stats.total_rwa_change|float > 0 %}
+                                    <i class="fas fa-arrow-up text-success"></i>
+                                    {% else %}
+                                    <i class="fas fa-arrow-down text-danger"></i>
+                                    {% endif %}
+                                    {{ rwa_stats.total_rwa_change }}% {{ _('from 30d ago') }}
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="stat-item p-3 rounded backdrop-blur">
+                                <h6 class="text-white-75 mb-2">{{ _('Total Asset Holders') }}</h6>
+                                <h3 class="text-gradient mb-1">{{ rwa_stats.total_holders }}</h3>
+                                <small class="text-white-75">
+                                    {% if rwa_stats.holders_change|float > 0 %}
+                                    <i class="fas fa-arrow-up text-success"></i>
+                                    {% else %}
+                                    <i class="fas fa-arrow-down text-danger"></i>
+                                    {% endif %}
+                                    {{ rwa_stats.holders_change }}% {{ _('from 30d ago') }}
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="stat-item p-3 rounded backdrop-blur">
+                                <h6 class="text-white-75 mb-2">{{ _('Total Asset Issuers') }}</h6>
+                                <h3 class="text-gradient mb-1">{{ rwa_stats.total_issuers }}</h3>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="stat-item p-3 rounded backdrop-blur">
+                                <h6 class="text-white-75 mb-2">{{ _('Total Stablecoin Value') }}</h6>
+                                <h3 class="text-gradient mb-1">${{ rwa_stats.total_stablecoin }}B</h3>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="d-flex gap-3 flex-wrap">
                         <button type="button" class="btn btn-gradient btn-lg px-4 py-3" onclick="window.location.href='{{ url_for('assets.create_asset_page') }}'">
                             <i class="fas fa-plus me-2"></i>{{ _('Publish Asset') }}

@@ -13,9 +13,10 @@ WTForms==3.0.1
 alembic==1.12.0
 email-validator==2.0.0
 python-dateutil==2.8.2
-requests==2.31.0
+requests>=2.31.0
 web3==6.10.0
 gunicorn==21.2.0 
 PyJWT==2.8.0
 psycopg2-binary==2.9.9
 qiniu==7.13.1
+beautifulsoup4>=4.12.2
