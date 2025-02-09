@@ -119,9 +119,14 @@
                 <div class="upload-area" id="imageUpload">
                     <i class="fas fa-cloud-upload-alt mb-2"></i>
                     <p>点击或拖拽图片到此处上传</p>
-                    <small class="text-muted d-block">支持所有图片格式，单个文件不超过6MB，最多10张</small>
+                    <small class="text-muted d-block">支持JPG、JPEG、PNG格式，单个文件不超过6MB，最多10张</small>
                 </div>
                 <div id="imagePreview" class="mt-3 row g-2"></div>
+                <div class="progress mt-2 d-none" id="imageUploadProgress">
+                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div id="imageUploadError" class="alert alert-danger mt-2 d-none">
+                </div>
             </div>
         </div>
         

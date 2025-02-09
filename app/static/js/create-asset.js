@@ -215,108 +215,297 @@ document.addEventListener('DOMContentLoaded', function() {
         draftSavedToast.show();
     }
     
+    // 验证必需的文件
+    function validateRequiredFiles() {
+        // 验证图片
+        if (uploadedFiles.images.size === 0) {
+            showError('请至少上传一张资产图片');
+            return false;
+        }
+        
+        // 验证文档
+        const assetType = document.getElementById('type').value;
+        const requiredDocs = {
+            '10': ['房产证', '土地证', '评估报告'],
+            '20': ['拍卖证书', '展览文件', '资产证明']
+        }[assetType] || [];
+        
+        if (uploadedFiles.documents.size === 0) {
+            showError(`请上传必需的资产文档：${requiredDocs.join('、')}`);
+            return false;
+        }
+        
+        return true;
+    }
+    
     // 处理表单提交
     async function handleSubmit(e) {
         e.preventDefault();
         
-        if (!form.checkValidity()) {
-            e.stopPropagation();
-            form.classList.add('was-validated');
-            return;
-        }
-        
-        if (!validateRequiredFiles()) {
-            return;
-        }
-        
         try {
+            // 基础表单验证
+            if (!form.checkValidity()) {
+                e.stopPropagation();
+                form.classList.add('was-validated');
+                showError('请填写所有必填字段');
+                return;
+            }
+            
+            // 验证文件
+            if (!validateRequiredFiles()) {
+                return;
+            }
+            
+            // 验证数值
+            const totalValue = parseFloat(document.getElementById('totalValue').value);
+            const annualRevenue = parseFloat(document.getElementById('annualRevenue').value);
+            
+            if (annualRevenue > totalValue) {
+                showError('预期年收益不能大于资产总价值');
+                return;
+            }
+            
+            // 禁用提交按钮并显示加载状态
             submitBtn.disabled = true;
             submitBtn.querySelector('.spinner-border').classList.remove('d-none');
             
             const formData = new FormData(form);
             
-            // 添加资产类型字段
+            // 添加资产类型
             formData.append('asset_type', assetTypeSelect.value);
             
-            // 添加文件数据
-            console.log('上传的图片数量:', uploadedFiles.images.size);
+            // 添加图片文件
             uploadedFiles.images.forEach((file, name) => {
-                console.log('添加图片到formData:', name);
                 formData.append('images[]', file);
             });
             
-            console.log('上传的文档数量:', uploadedFiles.documents.size);
+            // 添加文档文件
             uploadedFiles.documents.forEach((file, name) => {
-                console.log('添加文档到formData:', name);
                 formData.append('documents[]', file);
             });
             
+            // 提交表单
             const response = await submitWithRetry(formData);
-            console.log('提交响应状态:', response.status);
             
             if (!response.ok) {
                 const result = await response.json();
-                throw new Error(result.error || _('创建资产失败'));
+                throw new Error(result.error || '创建资产失败');
             }
             
             const result = await response.json();
-            console.log('提交成功，结果:', result);
             
+            // 清除草稿
             localStorage.removeItem('assetDraft');
-            window.location.href = result.redirect || '/assets';
+            
+            // 显示成功提示
+            const successToast = new bootstrap.Toast(document.getElementById('draftSavedToast'));
+            document.querySelector('#draftSavedToast .toast-body').textContent = '资产创建成功，正在跳转...';
+            successToast.show();
+            
+            // 延迟跳转
+            setTimeout(() => {
+                window.location.href = result.redirect || '/assets';
+            }, 1500);
+            
         } catch (error) {
             console.error('提交失败:', error);
-            showError(error.message || _('网络错误'));
+            showError(error.message || '网络错误，请稍后重试');
         } finally {
             submitBtn.disabled = false;
             submitBtn.querySelector('.spinner-border').classList.add('d-none');
         }
     }
     
-    // 文件处理函数
+    // 图片处理函数
     function handleImageFiles(files) {
         console.log('开始处理图片文件:', files.length, '个文件');
         
+        // 检查预览容器是否存在
+        const imagePreview = document.getElementById('imagePreview');
+        if (!imagePreview) {
+            console.error('找不到图片预览容器');
+            showError('系统错误：图片预览组件未找到');
+            return;
+        }
+        
+        // 隐藏之前的错误提示
+        const errorDiv = document.getElementById('imageUploadError');
+        if (errorDiv) {
+            errorDiv.classList.add('d-none');
+            errorDiv.textContent = '';
+        }
+        
+        // 文件验证
         const validFiles = validateFiles(files, {
+            types: ['image/jpeg', 'image/jpg', 'image/png'],
             maxSize: 6 * 1024 * 1024,  // 6MB
             maxCount: 10,
+            maxDimension: 4096, // 最大尺寸4096px
             errorMessages: {
+                type: '只支持 JPG、JPEG、PNG 格式的图片',
                 size: '图片大小不能超过 6MB',
-                count: '最多只能上传 10 张图片'
+                count: '最多只能上传 10 张图片',
+                dimension: '图片尺寸不能超过 4096x4096'
             }
         });
         
         console.log('验证通过的文件数量:', validFiles.length);
-        
         if (validFiles.length === 0) return;
         
         // 检查总数限制
         const currentCount = uploadedFiles.images.size;
         console.log('当前已有图片数量:', currentCount);
-        
         if (currentCount + validFiles.length > 10) {
-            showError('图片总数不能超过 10 张');
+            showImageError('图片总数不能超过 10 张');
             return;
         }
         
-        validFiles.forEach(file => {
-            console.log('处理图片:', file.name, file.type, file.size);
+        // 显示进度条
+        const progressContainer = document.getElementById('imageUploadProgress');
+        const progressBar = progressContainer?.querySelector('.progress-bar');
+        if (progressContainer && progressBar) {
+            progressContainer.classList.remove('d-none');
+            progressBar.style.width = '0%';
+        }
+        
+        let processedCount = 0;
+        validFiles.forEach((file, index) => {
+            console.log(`处理第 ${index + 1} 张图片:`, file.name);
+            
+            // 创建临时的加载状态预览
+            const tempPreview = createLoadingPreview(file.name);
             
             const reader = new FileReader();
-            reader.onload = function(e) {
-                console.log('图片读取完成:', file.name);
-                createImagePreview(file, e.target.result);
-                uploadedFiles.images.set(file.name, file);
-                console.log('添加图片到uploadedFiles:', file.name);
+            reader.onload = async function(e) {
+                try {
+                    console.log(`图片 ${file.name} 读取完成，开始处理`);
+                    
+                    // 压缩图片
+                    const compressedImage = await compressImage(e.target.result, {
+                        maxWidth: 2048,
+                        maxHeight: 2048,
+                        quality: 0.8
+                    });
+                    
+                    console.log(`图片 ${file.name} 压缩完成`);
+                    
+                    // 移除加载状态预览
+                    if (tempPreview) {
+                        tempPreview.remove();
+                    }
+                    
+                    // 创建实际预览
+                    createImagePreview(file, compressedImage);
+                    uploadedFiles.images.set(file.name, dataURLtoFile(compressedImage, file.name));
+                    
+                    // 更新进度
+                    processedCount++;
+                    const progress = (processedCount / validFiles.length) * 100;
+                    updateImageProgress(progress);
+                    
+                    console.log(`图片 ${file.name} 处理完成，进度: ${progress}%`);
+                    
+                    // 所有文件处理完成
+                    if (processedCount === validFiles.length) {
+                        console.log('所有图片处理完成');
+                        setTimeout(() => {
+                            if (progressContainer && progressBar) {
+                                progressContainer.classList.add('d-none');
+                                progressBar.style.width = '0%';
+                            }
+                        }, 500);
+                    }
+                } catch (error) {
+                    console.error(`处理图片 ${file.name} 失败:`, error);
+                    showImageError(`处理图片 ${file.name} 失败: ${error.message}`);
+                    if (tempPreview) {
+                        tempPreview.remove();
+                    }
+                    processedCount++;
+                }
             };
             
-            reader.onerror = function(e) {
-                console.error('图片读取失败:', file.name, e);
-                showError('图片读取失败: ' + file.name);
+            reader.onerror = function(error) {
+                console.error(`读取图片 ${file.name} 失败:`, error);
+                showImageError(`读取图片 ${file.name} 失败`);
+                if (tempPreview) {
+                    tempPreview.remove();
+                }
+                processedCount++;
             };
             
+            console.log(`开始读取图片 ${file.name}`);
             reader.readAsDataURL(file);
         });
+    }
+    
+    // 创建加载状态预览
+    function createLoadingPreview(filename) {
+        const div = document.createElement('div');
+        div.className = 'col-md-4 col-lg-3';
+        div.innerHTML = `
+            <div class="card h-100">
+                <div class="card-img-wrapper d-flex align-items-center justify-content-center bg-light">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="card-text small text-truncate mb-0">${filename}</p>
+                    <small class="text-muted">处理中...</small>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('imagePreview').appendChild(div);
+        return div;
+    }
+    
+    // 压缩图片
+    async function compressImage(dataURL, options = {}) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                let { width, height } = img;
+                
+                // 计算缩放比例
+                if (width > options.maxWidth) {
+                    height *= options.maxWidth / width;
+                    width = options.maxWidth;
+                }
+                if (height > options.maxHeight) {
+                    width *= options.maxHeight / height;
+                    height = options.maxHeight;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // 转换为 base64
+                resolve(canvas.toDataURL('image/jpeg', options.quality || 0.8));
+            };
+            img.onerror = reject;
+            img.src = dataURL;
+        });
+    }
+    
+    // 将 base64 转换为文件对象
+    function dataURLtoFile(dataURL, filename) {
+        const arr = dataURL.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        
+        return new File([u8arr], filename, { type: mime });
     }
     
     function handleDocumentFiles(files) {
@@ -364,37 +553,73 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 检查文件数量
         if (files.length > options.maxCount) {
-            showError(options.errorMessages.count);
+            showImageError(options.errorMessages.count);
             return [];
         }
         
-        Array.from(files).forEach(file => {
+        const checkImageDimensions = (file) => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = function() {
+                    if (img.width > options.maxDimension || img.height > options.maxDimension) {
+                        errors.push(`${file.name}: ${options.errorMessages.dimension}`);
+                        resolve(false);
+                    } else {
+                        resolve(true);
+                    }
+                };
+                img.onerror = () => resolve(false);
+                img.src = URL.createObjectURL(file);
+            });
+        };
+        
+        const validateFile = async (file) => {
+            // 检查文件类型
+            if (!options.types.includes(file.type)) {
+                errors.push(`${file.name}: ${options.errorMessages.type}`);
+                return;
+            }
+            
             // 检查文件大小
             if (file.size > options.maxSize) {
                 errors.push(`${file.name}: ${options.errorMessages.size}`);
                 return;
             }
             
-            validFiles.push(file);
-        });
+            // 检查图片尺寸
+            if (await checkImageDimensions(file)) {
+                validFiles.push(file);
+            }
+        };
         
-        // 显示所有错误
-        if (errors.length > 0) {
-            showError(errors.join('\n'));
-        }
+        // 等待所有文件验证完成
+        Promise.all(Array.from(files).map(validateFile)).then(() => {
+            if (errors.length > 0) {
+                showImageError(errors.join('\n'));
+            }
+        });
         
         return validFiles;
     }
     
     function createImagePreview(file, dataUrl) {
+        console.log('创建图片预览:', file.name);
+        
+        const imagePreview = document.getElementById('imagePreview');
+        if (!imagePreview) {
+            console.error('找不到图片预览容器');
+            return;
+        }
+        
         const div = document.createElement('div');
-        div.className = 'col-md-4 col-lg-3';
+        div.className = 'col-md-4 col-lg-3 mb-3';
         div.innerHTML = `
             <div class="card h-100">
                 <div class="card-img-wrapper">
-                    <img src="${dataUrl}" class="card-img-top" alt="${_('预览')}" loading="lazy">
+                    <img src="${dataUrl}" class="card-img-top" alt="${file.name}" loading="lazy" 
+                        onerror="this.onerror=null; this.src='/static/images/image-error.png';">
                     <div class="card-img-overlay d-flex justify-content-end">
-                        <button type="button" class="btn btn-danger btn-sm remove-file" aria-label="${_('删除文件')}">
+                        <button type="button" class="btn btn-danger btn-sm remove-file" aria-label="删除图片">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -405,16 +630,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
         `;
+        
         imagePreview.appendChild(div);
         
-        uploadedFiles.images.set(file.name, file);
+        // 删除按钮事件
+        const removeButton = div.querySelector('.remove-file');
+        if (removeButton) {
+            removeButton.addEventListener('click', function() {
+                if (confirm('确定要删除这张图片吗？')) {
+                    uploadedFiles.images.delete(file.name);
+                    div.remove();
+                    console.log(`已删除图片: ${file.name}`);
+                }
+            });
+        }
         
-        div.querySelector('.remove-file').addEventListener('click', function() {
-            if (confirm(_('确定要删除这张图片吗？'))) {
-                uploadedFiles.images.delete(file.name);
-                div.remove();
-            }
-        });
+        console.log(`图片预览创建完成: ${file.name}`);
     }
     
     function createDocumentPreview(file) {
@@ -478,18 +709,6 @@ document.addEventListener('DOMContentLoaded', function() {
         this.classList.remove('dragover');
     }
     
-    function validateRequiredFiles() {
-        const hasImages = imagePreview.children.length > 0;
-        
-        if (!hasImages) {
-            showError(_('请至少上传一张资产图片'));
-            return false;
-        }
-        
-        // 文档不再是必需的
-        return true;
-    }
-    
     function getFileIcon(type) {
         switch (type) {
             case 'application/pdf':
@@ -504,7 +723,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function showError(message) {
         const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
-        document.getElementById('errorMessage').textContent = message;
+        const errorMessage = document.getElementById('errorMessage');
+        errorMessage.textContent = message;
+        
+        // 添加图标
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-exclamation-circle me-2 text-danger';
+        errorMessage.insertBefore(icon, errorMessage.firstChild);
+        
         errorModal.show();
     }
 
@@ -631,5 +857,25 @@ document.addEventListener('DOMContentLoaded', function() {
         const sizes = ['B', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // 更新上传进度
+    function updateImageProgress(progress) {
+        const progressBar = document.querySelector('#imageUploadProgress .progress-bar');
+        progressBar.style.width = `${progress}%`;
+        progressBar.setAttribute('aria-valuenow', progress);
+    }
+
+    // 显示图片错误
+    function showImageError(message) {
+        console.error('图片错误:', message);
+        const errorDiv = document.getElementById('imageUploadError');
+        if (errorDiv) {
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('d-none');
+        } else {
+            console.error('找不到错误提示容器');
+            showError(message);
+        }
     }
 }); 
