@@ -7,6 +7,16 @@ from sqlalchemy import or_ as db_or
 from ..models.user import User
 from ..utils.rwa_scraper import get_rwa_stats
 
+# 默认的 RWA 统计数据
+DEFAULT_RWA_STATS = {
+    'total_rwa_onchain': '16.96',
+    'total_rwa_change': '-1.32',
+    'total_holders': '83,506',
+    'holders_change': '+1.92',
+    'total_issuers': '112',
+    'total_stablecoin': '220.39'
+}
+
 # 主页路由
 @main_bp.route('/')
 def index():
@@ -16,14 +26,7 @@ def index():
         assets = Asset.query.filter_by(status=2).order_by(Asset.created_at.desc()).limit(6).all()
         
         # 获取 RWA 统计数据
-        rwa_stats = get_rwa_stats() or {
-            'total_rwa_onchain': '16.96',
-            'total_rwa_change': '-1.32',
-            'total_holders': '83,506',
-            'holders_change': '+1.92',
-            'total_issuers': '112',
-            'total_stablecoin': '220.39'
-        }
+        rwa_stats = get_rwa_stats() or DEFAULT_RWA_STATS
         
         # 获取资产所有者信息
         asset_data = []
@@ -32,7 +35,7 @@ def index():
             asset_data.append({
                 'id': asset.id,
                 'name': asset.name,
-                'price': asset.price,
+                'price': asset.token_price,  # 使用 token_price 替代 price
                 'images': asset.images if asset.images else ['/static/images/placeholder.jpg'],
                 'owner_name': owner.name if owner else '未知用户',
                 'status': asset.status,
@@ -45,23 +48,17 @@ def index():
                 'annual_revenue': asset.annual_revenue
             })
         
-        return render_template('index.html', assets=asset_data, rwa_stats=rwa_stats)
+        return render_template('index.html', 
+                             assets=asset_data, 
+                             rwa_stats=rwa_stats,
+                             current_user_address=request.headers.get('X-Eth-Address'))
                              
     except Exception as e:
         current_app.logger.error(f'获取资产列表失败: {str(e)}')
-        # 添加默认的 rwa_stats 数据
-        default_rwa_stats = {
-            'total_rwa_onchain': '16.96',
-            'total_rwa_change': '-1.32',
-            'total_holders': '83,506',
-            'holders_change': '+1.92',
-            'total_issuers': '112',
-            'total_stablecoin': '220.39'
-        }
         return render_template('index.html', 
                              assets=[],
-                             current_user_address=None,
-                             rwa_stats=default_rwa_stats)
+                             current_user_address=request.headers.get('X-Eth-Address'),
+                             rwa_stats=DEFAULT_RWA_STATS)
 
 # 静态文件路由
 @main_bp.route('/static/<path:filename>')
