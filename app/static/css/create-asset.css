@@ -1,0 +1,234 @@
+.upload-area {
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    outline: none;
+}
+
+.upload-area:hover,
+.upload-area.dragover,
+.upload-area:focus {
+    border-color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.05);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.upload-area.dragover {
+    transform: scale(1.02);
+}
+
+.upload-area i {
+    font-size: 2rem;
+    color: #6c757d;
+    transition: color 0.3s ease;
+}
+
+.upload-area:hover i,
+.upload-area.dragover i,
+.upload-area:focus i {
+    color: #0d6efd;
+}
+
+.upload-area p {
+    margin-bottom: 0;
+    color: #6c757d;
+    transition: color 0.3s ease;
+}
+
+.upload-area:hover p,
+.upload-area.dragover p,
+.upload-area:focus p {
+    color: #0d6efd;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.progress {
+    height: 0.5rem;
+    border-radius: 0.25rem;
+    overflow: hidden;
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+}
+
+.remove-file {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 1;
+}
+
+.card:hover .remove-file {
+    opacity: 1;
+}
+
+#imagePreview .card-img-top {
+    height: 150px;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+#imagePreview .card:hover .card-img-top {
+    transform: scale(1.05);
+}
+
+.list-group-item {
+    transition: all 0.3s ease;
+    border-left: 3px solid transparent;
+}
+
+.list-group-item:hover {
+    background-color: #f8f9fa;
+    border-left-color: #0d6efd;
+}
+
+.list-group-item .remove-file {
+    position: static;
+    opacity: 1;
+}
+
+.text-truncate {
+    max-width: 200px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.toast-container {
+    z-index: 1050;
+}
+
+/* 文件类型图标颜色 */
+.far.fa-file-pdf {
+    color: #dc3545;
+}
+
+.far.fa-file-word {
+    color: #0d6efd;
+}
+
+.far.fa-file-alt {
+    color: #6c757d;
+}
+
+/* 表单验证状态样式 */
+.form-control:focus {
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.was-validated .form-control:valid {
+    border-color: #198754;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(0.375em + 0.1875rem) center;
+    background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+}
+
+.was-validated .form-control:invalid {
+    border-color: #dc3545;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(0.375em + 0.1875rem) center;
+    background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+}
+
+/* 禁用状态样式 */
+.btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.form-control:disabled,
+.form-control[readonly] {
+    background-color: #e9ecef;
+    opacity: 1;
+}
+
+/* 加载动画 */
+@keyframes spinner {
+    to {transform: rotate(360deg);}
+}
+
+.spinner-border {
+    animation: spinner 0.8s linear infinite;
+}
+
+/* 错误提示动画 */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+.invalid-feedback.show {
+    animation: shake 0.6s ease-in-out;
+}
+
+/* Toast动画 */
+@keyframes slideIn {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+.toast.show {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+    .upload-area {
+        padding: 1rem;
+    }
+    
+    .upload-area i {
+        font-size: 1.5rem;
+    }
+    
+    #imagePreview .card-img-top {
+        height: 120px;
+    }
+    
+    .text-truncate {
+        max-width: 150px;
+    }
+    
+    .card:hover {
+        transform: none;
+    }
+    
+    .remove-file {
+        opacity: 1;
+    }
+    
+    /* 移动端触摸优化 */
+    .btn {
+        min-height: 44px;
+        padding: 0.5rem 1rem;
+    }
+    
+    .form-control {
+        min-height: 44px;
+    }
+    
+    /* 移动端滚动优化 */
+    .modal-body {
+        -webkit-overflow-scrolling: touch;
+    }
+} 
