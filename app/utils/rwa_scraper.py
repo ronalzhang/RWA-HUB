@@ -91,9 +91,11 @@ def get_rwa_stats():
         required_fields = ['total_rwa_onchain', 'total_rwa_change', 'total_holders', 
                          'holders_change', 'total_issuers', 'total_stablecoin']
         
-        if not all(field in stats for field in required_fields):
-            logger.warning("Missing required fields in scraped data, using default values")
-            return default_stats
+        # 如果缺少任何必需字段，使用默认值填充
+        for field in required_fields:
+            if field not in stats or stats[field] is None:
+                logger.warning(f"Missing or invalid field '{field}', using default value")
+                stats[field] = default_stats[field]
             
         return stats
         
