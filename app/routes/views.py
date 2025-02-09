@@ -26,7 +26,14 @@ def index():
         assets = Asset.query.filter_by(status=2).order_by(Asset.created_at.desc()).limit(6).all()
         
         # 获取 RWA 统计数据
-        rwa_stats = get_rwa_stats() or DEFAULT_RWA_STATS
+        try:
+            rwa_stats = get_rwa_stats()
+            if rwa_stats is None:
+                current_app.logger.warning('获取 RWA 统计数据失败，使用默认值')
+                rwa_stats = DEFAULT_RWA_STATS
+        except Exception as e:
+            current_app.logger.error(f'获取 RWA 统计数据出错: {str(e)}')
+            rwa_stats = DEFAULT_RWA_STATS
         
         # 获取资产所有者信息
         asset_data = []
