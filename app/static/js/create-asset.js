@@ -464,7 +464,23 @@ document.addEventListener('DOMContentLoaded', function() {
             if (assetTypeSelect.value === '20') {
                 const value = parseFloat(this.value);
                 if (!isNaN(value)) {
-                    tokenSupplyDisplay.textContent = `总发行量: ${value.toLocaleString()} 代币`;
+                    if (value <= 0) {
+                        tokenSupplyDisplay.textContent = '代币发行量必须大于0';
+                        tokenSupplyDisplay.classList.add('text-danger');
+                        this.setCustomValidity('代币发行量必须大于0');
+                    } else if (value > 100000000) {
+                        tokenSupplyDisplay.textContent = '代币发行量不能超过1亿';
+                        tokenSupplyDisplay.classList.add('text-danger');
+                        this.setCustomValidity('代币发行量不能超过1亿');
+                    } else {
+                        tokenSupplyDisplay.textContent = `总发行量: ${value.toLocaleString()} 代币`;
+                        tokenSupplyDisplay.classList.remove('text-danger');
+                        this.setCustomValidity('');
+                    }
+                } else {
+                    tokenSupplyDisplay.textContent = '请输入有效的代币发行量';
+                    tokenSupplyDisplay.classList.add('text-danger');
+                    this.setCustomValidity('请输入有效的代币发行量');
                 }
             }
         }, 300));

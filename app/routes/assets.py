@@ -345,7 +345,8 @@ def create_asset():
             'total_value': total_value,
             'annual_revenue': annual_revenue,
             'description': description,
-            'location': location
+            'location': location,
+            'token_price': token_price  # 添加token_price作为必填字段
         }
         
         # 根据资产类型添加额外的必填字段
@@ -355,6 +356,16 @@ def create_asset():
         elif asset_type == 10:  # 不动产
             current_app.logger.info('资产类型为不动产，添加 area 必填字段')
             required_fields['area'] = area
+            
+        # 验证token_price的值
+        try:
+            token_price_float = float(token_price)
+            if token_price_float <= 0:
+                current_app.logger.warning('代币价格必须大于0')
+                return jsonify({'error': '代币价格必须大于0'}), 400
+        except (TypeError, ValueError):
+            current_app.logger.warning('无效的代币价格格式')
+            return jsonify({'error': '请输入有效的代币价格'}), 400
             
         # 检查必填字段
         missing_fields = [field for field, value in required_fields.items() if not value]
@@ -406,6 +417,7 @@ def create_asset():
             
             current_app.logger.info(f'开始处理图片上传，资产类型文件夹: {asset_type_folder}')
             
+            upload_errors = []
             for i, image in enumerate(images):
                 if image and image.filename and allowed_file(image.filename, ['jpg', 'jpeg', 'png']):
                     try:
@@ -418,6 +430,11 @@ def create_asset():
                         # 读取文件内容
                         file_data = image.read()
                         
+                        # 检查文件大小
+                        if len(file_data) > 5 * 1024 * 1024:  # 5MB
+                            upload_errors.append(f'图片 {image.filename} 超过5MB大小限制')
+                            continue
+                            
                         # 检查七牛云存储是否初始化
                         if storage is None:
                             current_app.logger.error('七牛云存储未初始化')
@@ -434,20 +451,31 @@ def create_asset():
                             image_paths.append(url)
                             current_app.logger.info(f'图片上传成功: {url}')
                         else:
-                            current_app.logger.error(f'七牛云返回的URL为空: {filename}')
-                            raise Exception("七牛云上传失败")
+                            upload_errors.append(f'上传图片 {image.filename} 失败：七牛云返回空URL')
                             
                     except Exception as e:
                         current_app.logger.error(f'上传图片失败: {str(e)}')
                         current_app.logger.error(f'文件名: {image.filename}, 目标路径: {filename}')
+                        upload_errors.append(f'上传图片 {image.filename} 失败：{str(e)}')
                         continue
                 else:
-                    current_app.logger.warning(f'跳过无效的图片文件: {image.filename if image else "None"}')
+                    if not image or not image.filename:
+                        upload_errors.append('发现空文件')
+                    else:
+                        upload_errors.append(f'不支持的图片格式: {image.filename}')
             
+            # 检查是否有上传错误
+            if upload_errors:
+                current_app.logger.error('图片上传过程中发生错误：\n' + '\n'.join(upload_errors))
+                return jsonify({
+                    'error': '部分图片上传失败',
+                    'details': upload_errors
+                }), 400
+                
             # 保存图片路径到资产记录
             if not image_paths:
                 current_app.logger.error('没有成功上传任何图片')
-                raise Exception('没有成功保存任何图片')
+                return jsonify({'error': '没有成功上传任何图片'}), 400
                 
             current_app.logger.info(f'所有图片上传成功，保存路径列表: {image_paths}')
             asset.images = json.dumps(image_paths)
