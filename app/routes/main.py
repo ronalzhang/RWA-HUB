@@ -27,7 +27,7 @@ def index():
         asset_data.append({
             'id': asset.id,
             'name': asset.name,
-            'price': asset.price,
+            'token_price': asset.token_price,
             'images': asset.images if asset.images else ['/static/images/placeholder.jpg'],
             'owner_name': owner.name if owner else '未知用户',
             'status': asset.status,
@@ -36,7 +36,6 @@ def index():
             'asset_type': asset.asset_type,
             'area': asset.area,
             'total_value': asset.total_value,
-            'token_price': asset.token_price,
             'annual_revenue': asset.annual_revenue
         })
     
