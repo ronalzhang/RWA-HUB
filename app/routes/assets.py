@@ -431,8 +431,8 @@ def create_asset():
                         file_data = image.read()
                         
                         # 检查文件大小
-                        if len(file_data) > 5 * 1024 * 1024:  # 5MB
-                            upload_errors.append(f'图片 {image.filename} 超过5MB大小限制')
+                        if len(file_data) > 6 * 1024 * 1024:  # 6MB
+                            upload_errors.append(f'图片 {image.filename} 超过6MB大小限制')
                             continue
                             
                         # 检查七牛云存储是否初始化
