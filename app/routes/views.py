@@ -77,18 +77,9 @@ def index():
         assets = Asset.query.filter_by(status=2).order_by(Asset.created_at.desc()).limit(6).all()
         current_app.logger.info(f"获取到 {len(assets)} 个已上链资产")
         
-        # 获取 RWA 统计数据
-        try:
-            current_app.logger.info("开始获取 RWA 统计数据")
-            rwa_stats = get_rwa_stats()
-            current_app.logger.info(f"获取到 RWA 统计数据: {rwa_stats}")
-            
-            if rwa_stats is None:
-                current_app.logger.warning('获取 RWA 统计数据失败，使用默认值')
-                rwa_stats = DEFAULT_RWA_STATS
-        except Exception as e:
-            current_app.logger.error(f'获取 RWA 统计数据出错: {str(e)}')
-            rwa_stats = DEFAULT_RWA_STATS
+        # 直接获取 RWA 统计数据
+        rwa_stats = get_rwa_stats()
+        current_app.logger.info(f"获取到 RWA 统计数据: {rwa_stats}")
         
         # 获取资产所有者信息
         asset_data = []
@@ -97,7 +88,7 @@ def index():
             asset_data.append({
                 'id': asset.id,
                 'name': asset.name,
-                'price': asset.token_price,  # 使用 token_price 替代 price
+                'price': asset.token_price,
                 'images': asset.images if asset.images else ['/static/images/placeholder.jpg'],
                 'owner_name': owner.name if owner else '未知用户',
                 'status': asset.status,
@@ -110,7 +101,6 @@ def index():
                 'annual_revenue': asset.annual_revenue
             })
         
-        current_app.logger.info("准备渲染首页模板")
         return render_template('index.html', 
                              assets=asset_data, 
                              rwa_stats=rwa_stats,
@@ -120,7 +110,7 @@ def index():
         current_app.logger.error(f'处理首页请求失败: {str(e)}')
         return render_template('index.html', 
                              assets=[],
-                             rwa_stats=DEFAULT_RWA_STATS,  # 确保在异常情况下也传递 rwa_stats
+                             rwa_stats=DEFAULT_RWA_STATS,
                              current_user_address=request.headers.get('X-Eth-Address'))
 
 # 静态文件路由
