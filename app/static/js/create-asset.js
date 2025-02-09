@@ -278,13 +278,11 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('开始处理图片文件:', files.length, '个文件');
         
         const validFiles = validateFiles(files, {
-            types: ['image/jpeg', 'image/png', 'image/webp'],
-            maxSize: 5 * 1024 * 1024,
+            maxSize: 6 * 1024 * 1024,  // 6MB
             maxCount: 10,
             errorMessages: {
-                type: _('只支持 JPG、PNG、WEBP 格式的图片'),
-                size: _('图片大小不能超过 5MB'),
-                count: _('最多只能上传 10 张图片')
+                size: '图片大小不能超过 6MB',
+                count: '最多只能上传 10 张图片'
             }
         });
         
@@ -297,34 +295,24 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('当前已有图片数量:', currentCount);
         
         if (currentCount + validFiles.length > 10) {
-            showError(_('图片总数不能超过 10 张'));
+            showError('图片总数不能超过 10 张');
             return;
         }
         
-        const progressBar = document.querySelector('#imageUploadProgress .progress-bar');
-        const progressContainer = document.getElementById('imageUploadProgress');
-        showProgress(progressContainer, progressBar, validFiles.length);
-        
-        let processed = 0;
         validFiles.forEach(file => {
             console.log('处理图片:', file.name, file.type, file.size);
             
             const reader = new FileReader();
             reader.onload = function(e) {
                 console.log('图片读取完成:', file.name);
-                // 先添加到预览
                 createImagePreview(file, e.target.result);
-                // 再添加到uploadedFiles
                 uploadedFiles.images.set(file.name, file);
                 console.log('添加图片到uploadedFiles:', file.name);
-                
-                processed++;
-                updateProgress(progressContainer, progressBar, processed, validFiles.length);
             };
             
             reader.onerror = function(e) {
                 console.error('图片读取失败:', file.name, e);
-                showError(_('图片读取失败: ') + file.name);
+                showError('图片读取失败: ' + file.name);
             };
             
             reader.readAsDataURL(file);
@@ -381,16 +369,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         Array.from(files).forEach(file => {
-            // 检查文件类型
-            const fileExt = file.name.split('.').pop().toLowerCase();
-            const isValidType = options.types.includes(file.type) || 
-                              (file.type.startsWith('image/') && ['jpg', 'jpeg', 'png', 'webp'].includes(fileExt));
-            
-            if (!isValidType) {
-                errors.push(`${file.name}: ${options.errorMessages.type}`);
-                return;
-            }
-            
             // 检查文件大小
             if (file.size > options.maxSize) {
                 errors.push(`${file.name}: ${options.errorMessages.size}`);
