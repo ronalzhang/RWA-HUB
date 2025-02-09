@@ -46,21 +46,24 @@ def create_app(config_name='development'):
     app.config['BABEL_SUPPORTED_LOCALES'] = ['en', 'zh_Hant']
     babel.init_app(app, locale_selector=get_locale)
     
-    # 确保日志目录存在
+    # 配置日志
     if not os.path.exists('logs'):
         os.makedirs('logs')
-        
-    # 设置日志处理器
+    
+    # 配置日志处理器
     file_handler = RotatingFileHandler(
         'logs/rwa_hub.log',
-        maxBytes=10240,  # 10MB
-        backupCount=10
+        maxBytes=10*1024*1024,  # 10MB
+        backupCount=5,
+        encoding='utf-8'
     )
     file_handler.setFormatter(logging.Formatter(
         '%(asctime)s [%(levelname)s] %(message)s [in %(pathname)s:%(lineno)d]'
     ))
     file_handler.setLevel(logging.INFO)
     app.logger.addHandler(file_handler)
+    
+    # 设置日志级别
     app.logger.setLevel(logging.INFO)
     app.logger.info('RWA-HUB 启动')
     
