@@ -105,4 +105,4 @@ def get_rwa_stats():
         return default_stats
     except Exception as e:
         logger.error(f"Unexpected error while fetching RWA stats: {str(e)}")
-        return default_stats 
+        return default_stats
