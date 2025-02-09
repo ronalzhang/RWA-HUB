@@ -237,13 +237,22 @@ document.addEventListener('DOMContentLoaded', function() {
         const validFiles = validateFiles(files, {
             types: ['image/jpeg', 'image/png', 'image/webp'],
             maxSize: 5 * 1024 * 1024,
+            maxCount: 10,
             errorMessages: {
-                type: _('Invalid file type'),
-                size: _('File too large (max 5MB)')
+                type: _('只支持 JPG、PNG、WEBP 格式的图片'),
+                size: _('图片大小不能超过 5MB'),
+                count: _('最多只能上传 10 张图片')
             }
         });
         
         if (validFiles.length === 0) return;
+        
+        // 检查总数限制
+        const currentCount = imagePreview.children.length;
+        if (currentCount + validFiles.length > 10) {
+            showError(_('图片总数不能超过 10 张'));
+            return;
+        }
         
         const progressBar = document.querySelector('#imageUploadProgress .progress-bar');
         const progressContainer = document.getElementById('imageUploadProgress');
@@ -268,13 +277,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
             ],
             maxSize: 10 * 1024 * 1024,
+            maxCount: 5,
             errorMessages: {
-                type: _('Invalid file type'),
-                size: _('File too large (max 10MB)')
+                type: _('只支持 PDF、DOC、DOCX 格式的文档'),
+                size: _('文档大小不能超过 10MB'),
+                count: _('最多只能上传 5 个文档')
             }
         });
         
         if (validFiles.length === 0) return;
+        
+        // 检查总数限制
+        const currentCount = documentPreview.children.length;
+        if (currentCount + validFiles.length > 5) {
+            showError(_('文档总数不能超过 5 个'));
+            return;
+        }
         
         const progressBar = document.querySelector('#documentUploadProgress .progress-bar');
         const progressContainer = document.getElementById('documentUploadProgress');
@@ -289,32 +307,57 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500);
     }
     
-    // 辅助函数
+    // 验证文件
     function validateFiles(files, options) {
-        return Array.from(files).filter(file => {
+        const validFiles = [];
+        const errors = [];
+        
+        // 检查文件数量
+        if (files.length > options.maxCount) {
+            showError(options.errorMessages.count);
+            return [];
+        }
+        
+        Array.from(files).forEach(file => {
+            // 检查文件类型
             if (!options.types.includes(file.type)) {
-                showError(`${options.errorMessages.type}: ${file.name}`);
-                return false;
+                errors.push(`${file.name}: ${options.errorMessages.type}`);
+                return;
             }
+            
+            // 检查文件大小
             if (file.size > options.maxSize) {
-                showError(`${options.errorMessages.size}: ${file.name}`);
-                return false;
+                errors.push(`${file.name}: ${options.errorMessages.size}`);
+                return;
             }
-            return true;
+            
+            validFiles.push(file);
         });
+        
+        // 显示所有错误
+        if (errors.length > 0) {
+            showError(errors.join('\n'));
+        }
+        
+        return validFiles;
     }
     
     function createImagePreview(file, dataUrl) {
         const div = document.createElement('div');
         div.className = 'col-md-4 col-lg-3';
         div.innerHTML = `
-            <div class="card">
-                <img src="${dataUrl}" class="card-img-top" alt="${_('Preview')}" loading="lazy">
+            <div class="card h-100">
+                <div class="card-img-wrapper">
+                    <img src="${dataUrl}" class="card-img-top" alt="${_('预览')}" loading="lazy">
+                    <div class="card-img-overlay d-flex justify-content-end">
+                        <button type="button" class="btn btn-danger btn-sm remove-file" aria-label="${_('删除文件')}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
                 <div class="card-body">
-                    <p class="card-text small text-truncate">${file.name}</p>
-                    <button type="button" class="btn btn-sm btn-danger remove-file" aria-label="${_('Remove file')}">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    <p class="card-text small text-truncate mb-0">${file.name}</p>
+                    <small class="text-muted">${formatFileSize(file.size)}</small>
                 </div>
             </div>
         `;
@@ -323,8 +366,10 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadedFiles.images.set(file.name, file);
         
         div.querySelector('.remove-file').addEventListener('click', function() {
-            uploadedFiles.images.delete(file.name);
-            div.remove();
+            if (confirm(_('确定要删除这张图片吗？'))) {
+                uploadedFiles.images.delete(file.name);
+                div.remove();
+            }
         });
     }
     
@@ -332,11 +377,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const div = document.createElement('div');
         div.className = 'list-group-item d-flex justify-content-between align-items-center';
         div.innerHTML = `
-            <div>
-                <i class="far fa-file-${getFileIcon(file.type)} me-2"></i>
-                <span class="text-truncate">${file.name}</span>
+            <div class="d-flex align-items-center">
+                <i class="far fa-file-${getFileIcon(file.type)} fa-2x me-3"></i>
+                <div>
+                    <div class="text-truncate" style="max-width: 200px;">${file.name}</div>
+                    <small class="text-muted">${formatFileSize(file.size)}</small>
+                </div>
             </div>
-            <button type="button" class="btn btn-sm btn-danger remove-file" aria-label="${_('Remove file')}">
+            <button type="button" class="btn btn-danger btn-sm remove-file" aria-label="${_('删除文件')}">
                 <i class="fas fa-trash"></i>
             </button>
         `;
@@ -345,8 +393,10 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadedFiles.documents.set(file.name, file);
         
         div.querySelector('.remove-file').addEventListener('click', function() {
-            uploadedFiles.documents.delete(file.name);
-            div.remove();
+            if (confirm(_('确定要删除这个文档吗？'))) {
+                uploadedFiles.documents.delete(file.name);
+                div.remove();
+            }
         });
     }
     
@@ -535,5 +585,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 calculateTokenPrice();
             }
         }
+    }
+
+    // 格式化文件大小
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 }); 

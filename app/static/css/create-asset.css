@@ -6,6 +6,7 @@
     cursor: pointer;
     transition: all 0.3s ease;
     outline: none;
+    background-color: #f8f9fa;
 }
 
 .upload-area:hover,
@@ -21,8 +22,9 @@
 }
 
 .upload-area i {
-    font-size: 2rem;
+    font-size: 2.5rem;
     color: #6c757d;
+    margin-bottom: 1rem;
     transition: color 0.3s ease;
 }
 
@@ -61,9 +63,11 @@
     border-radius: 0.25rem;
     overflow: hidden;
     background-color: #e9ecef;
+    margin-top: 1rem;
 }
 
 .progress-bar {
+    background-color: #0d6efd;
     transition: width 0.3s ease;
 }
 
@@ -198,7 +202,7 @@
     }
     
     .upload-area i {
-        font-size: 1.5rem;
+        font-size: 2rem;
     }
     
     #imagePreview .card-img-top {
@@ -230,5 +234,148 @@
     /* 移动端滚动优化 */
     .modal-body {
         -webkit-overflow-scrolling: touch;
+    }
+    
+    .card-img-wrapper {
+        padding-top: 66.67%; /* 3:2 比例 */
+    }
+    
+    .card-img-overlay {
+        opacity: 1;
+        background: linear-gradient(to bottom, rgba(0,0,0,0.2), transparent);
+    }
+    
+    .list-group-item .remove-file {
+        opacity: 1;
+    }
+}
+
+/* 图片预览样式 */
+.card-img-wrapper {
+    position: relative;
+    padding-top: 75%; /* 4:3 比例 */
+    overflow: hidden;
+}
+
+.card-img-wrapper img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.card-img-wrapper:hover img {
+    transform: scale(1.05);
+}
+
+.card-img-overlay {
+    background: linear-gradient(to bottom, rgba(0,0,0,0.4), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.card:hover .card-img-overlay {
+    opacity: 1;
+}
+
+/* 文档列表样式 */
+.list-group-item {
+    transition: all 0.3s ease;
+    border-left: 3px solid transparent;
+}
+
+.list-group-item:hover {
+    background-color: #f8f9fa;
+    border-left-color: #0d6efd;
+}
+
+.list-group-item .remove-file {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.list-group-item:hover .remove-file {
+    opacity: 1;
+}
+
+/* 进度条样式 */
+.progress {
+    height: 0.5rem;
+    border-radius: 0.25rem;
+    background-color: #e9ecef;
+    overflow: hidden;
+    margin-top: 1rem;
+}
+
+.progress-bar {
+    background-color: #0d6efd;
+    transition: width 0.3s ease;
+}
+
+/* 错误提示样式 */
+.invalid-feedback {
+    display: none;
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.was-validated .form-control:invalid ~ .invalid-feedback {
+    display: block;
+}
+
+/* 上传区域样式 */
+.upload-area {
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-color: #f8f9fa;
+}
+
+.upload-area:hover,
+.upload-area.dragover {
+    border-color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.05);
+}
+
+.upload-area i {
+    font-size: 2.5rem;
+    color: #6c757d;
+    margin-bottom: 1rem;
+    transition: color 0.3s ease;
+}
+
+.upload-area:hover i,
+.upload-area.dragover i {
+    color: #0d6efd;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .card-img-wrapper {
+        padding-top: 66.67%; /* 3:2 比例 */
+    }
+    
+    .card-img-overlay {
+        opacity: 1;
+        background: linear-gradient(to bottom, rgba(0,0,0,0.2), transparent);
+    }
+    
+    .list-group-item .remove-file {
+        opacity: 1;
+    }
+    
+    .upload-area {
+        padding: 1rem;
+    }
+    
+    .upload-area i {
+        font-size: 2rem;
     }
 } 
