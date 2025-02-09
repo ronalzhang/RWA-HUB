@@ -1,4 +1,4 @@
-from flask import render_template
+from flask import render_template, request
 from ..models.asset import Asset
 from ..models.user import User
 from . import main_bp
@@ -40,7 +40,10 @@ def index():
             'annual_revenue': asset.annual_revenue
         })
     
-    return render_template('index.html', assets=asset_data, rwa_stats=rwa_stats)
+    return render_template('index.html', 
+                         assets=asset_data, 
+                         rwa_stats=rwa_stats,
+                         current_user_address=request.headers.get('X-Eth-Address'))
 
 @main_bp.route('/auth/login')
 def login():
