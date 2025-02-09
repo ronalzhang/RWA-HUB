@@ -34,7 +34,7 @@
                 <div class="mb-3">
                     <label for="name" class="form-label">{{ _('Asset Name') }}</label>
                     <input type="text" class="form-control" id="name" name="name" required maxlength="100">
-                    <small class="form-text text-muted">{{ _('Enter a descriptive name for your asset (max 100 characters)') }}</small>
+                    <small class="form-text text-muted">{{ _('Enter a descriptive name for your asset') }} ({{ _('max 100 characters') }})</small>
                     <div class="invalid-feedback">{{ _('Please enter asset name') }}</div>
                 </div>
                 
@@ -59,7 +59,7 @@
                 <div class="mb-3">
                     <label for="description" class="form-label">{{ _('Asset Description') }}</label>
                     <textarea class="form-control" id="description" name="description" rows="3" required maxlength="1000"></textarea>
-                    <small class="form-text text-muted">{{ _('Provide a detailed description of your asset (max 1000 characters)') }}</small>
+                    <small class="form-text text-muted">{{ _('Provide a detailed description of your asset') }} ({{ _('max 1000 characters') }})</small>
                     <div class="invalid-feedback">{{ _('Please enter asset description') }}</div>
                     <div class="text-muted mt-1"><span id="descriptionCount">0</span>/1000</div>
                 </div>
@@ -73,28 +73,28 @@
             </div>
             <div class="card-body">
                 <div class="mb-3 asset-area-group">
-                    <label for="area" class="form-label">{{ _('Asset Area (㎡)') }}</label>
+                    <label for="area" class="form-label">{{ _('Asset Area') }} (㎡)</label>
                     <input type="number" class="form-control" id="area" name="area" step="0.01" min="0" max="1000000" data-required-for-type="10">
-                    <small class="form-text text-muted">{{ _('Required for real estate assets. Enter the total area in square meters') }}</small>
+                    <small class="form-text text-muted">{{ _('Required for real estate assets') }}. {{ _('Enter the total area in square meters') }}</small>
                     <div class="invalid-feedback">{{ _('Please enter a valid asset area') }}</div>
                 </div>
                 
                 <div class="mb-3 token-supply-group">
                     <label for="tokenSupply" class="form-label">{{ _('Token Supply') }}</label>
                     <input type="number" class="form-control" id="tokenSupply" name="tokenSupply" step="1" min="0" max="100000000">
-                    <small class="form-text text-muted">{{ _('For real estate, this will be calculated automatically (area × 10000). For similar assets, enter the desired token supply') }}</small>
+                    <small class="form-text text-muted">{{ _('For real estate, this will be calculated automatically') }} ({{ _('area × 10000') }}). {{ _('For similar assets, enter the desired token supply') }}</small>
                     <div class="invalid-feedback">{{ _('Please enter a valid token supply') }}</div>
                 </div>
                 
                 <div class="mb-3">
-                    <label for="totalValue" class="form-label">{{ _('Total Value (USDC)') }}</label>
+                    <label for="totalValue" class="form-label">{{ _('Total Value') }} (USDC)</label>
                     <input type="number" class="form-control" id="totalValue" name="totalValue" step="0.01" min="0" max="1000000000" required>
                     <small class="form-text text-muted">{{ _('Enter the total value of the asset in USDC') }}</small>
                     <div class="invalid-feedback">{{ _('Please enter a valid total value') }}</div>
                 </div>
                 
                 <div class="mb-3">
-                    <label for="tokenPrice" class="form-label">{{ _('Token Price (USDC)') }}</label>
+                    <label for="tokenPrice" class="form-label">{{ _('Token Price') }} (USDC)</label>
                     <input type="number" class="form-control" id="tokenPrice" name="tokenPrice" step="0.01" min="0" max="1000000" required>
                     <small class="form-text text-muted">{{ _('Enter the price for each token in USDC') }}</small>
                     <div class="invalid-feedback">{{ _('Please enter a valid token price') }}</div>
