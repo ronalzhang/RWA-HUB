@@ -99,6 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function initializeForm() {
         loadDraft();
         setupAccessibility();
+        setupTokenSupplyCalculation();
     }
     
     // 加载草稿
@@ -418,5 +419,66 @@ document.addEventListener('DOMContentLoaded', function() {
         const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
         document.getElementById('errorMessage').textContent = message;
         errorModal.show();
+    }
+
+    // Token数量计算和显示
+    function setupTokenSupplyCalculation() {
+        const assetTypeSelect = document.getElementById('type');
+        const areaInput = document.getElementById('area');
+        const tokenSupplyInput = document.getElementById('tokenSupply');
+        const tokenSupplyGroup = document.querySelector('.token-supply-group');
+        const tokenSupplyDisplay = document.createElement('div');
+        tokenSupplyDisplay.className = 'form-text mt-1';
+        tokenSupplyGroup.appendChild(tokenSupplyDisplay);
+
+        // 监听资产类型变化
+        assetTypeSelect.addEventListener('change', function() {
+            const isRealEstate = this.value === '10';
+            tokenSupplyInput.readOnly = isRealEstate;
+            tokenSupplyInput.value = '';
+            tokenSupplyDisplay.textContent = '';
+            
+            if (isRealEstate) {
+                // 如果是不动产，显示自动计算提示
+                tokenSupplyDisplay.textContent = '代币数量将根据面积自动计算';
+                // 如果已有面积，立即计算
+                if (areaInput.value) {
+                    calculateTokenSupply(parseFloat(areaInput.value));
+                }
+            } else {
+                // 如果是类不动产，显示手动输入提示
+                tokenSupplyDisplay.textContent = '请输入代币发行总量';
+                tokenSupplyInput.removeAttribute('readonly');
+            }
+        });
+
+        // 监听面积输入变化（不动产）
+        areaInput.addEventListener('input', debounce(function() {
+            if (assetTypeSelect.value === '10' && this.value) {
+                calculateTokenSupply(parseFloat(this.value));
+            }
+        }, 300));
+
+        // 监听代币数量输入（类不动产）
+        tokenSupplyInput.addEventListener('input', debounce(function() {
+            if (assetTypeSelect.value === '20') {
+                const value = parseFloat(this.value);
+                if (!isNaN(value)) {
+                    tokenSupplyDisplay.textContent = `总发行量: ${value.toLocaleString()} 代币`;
+                }
+            }
+        }, 300));
+
+        // 计算代币数量（不动产）
+        function calculateTokenSupply(area) {
+            if (!isNaN(area) && area > 0) {
+                const tokenSupply = Math.floor(area * 10000); // 1平方米 = 10000代币
+                tokenSupplyInput.value = tokenSupply;
+                tokenSupplyDisplay.textContent = `总发行量: ${tokenSupply.toLocaleString()} 代币 (${area}㎡ × 10000)`;
+            } else {
+                tokenSupplyInput.value = '';
+                tokenSupplyDisplay.textContent = '请输入有效的面积';
+            }
+        }
     }
 }); 

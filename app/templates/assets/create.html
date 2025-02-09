@@ -79,6 +79,13 @@
                     <div class="invalid-feedback">{{ _('Please enter a valid asset area') }}</div>
                 </div>
                 
+                <div class="mb-3 token-supply-group">
+                    <label for="tokenSupply" class="form-label">{{ _('Token Supply') }}</label>
+                    <input type="number" class="form-control" id="tokenSupply" name="tokenSupply" step="1" min="0" max="100000000">
+                    <small class="form-text text-muted">{{ _('For real estate, this will be calculated automatically (area × 10000). For similar assets, enter the desired token supply') }}</small>
+                    <div class="invalid-feedback">{{ _('Please enter a valid token supply') }}</div>
+                </div>
+                
                 <div class="mb-3">
                     <label for="totalValue" class="form-label">{{ _('Total Value (USDC)') }}</label>
                     <input type="number" class="form-control" id="totalValue" name="totalValue" step="0.01" min="0" max="1000000000" required>
@@ -94,7 +101,7 @@
                 </div>
                 
                 <div class="mb-3">
-                    <label for="annualRevenue" class="form-label">{{ _('Expected Annual Revenue (USDC)') }}</label>
+                    <label for="annualRevenue" class="form-label">{{ _('Expected Annual Revenue (%)') }}</label>
                     <input type="number" class="form-control" id="annualRevenue" name="annualRevenue" step="0.01" min="0" max="100" required>
                     <small class="form-text text-muted">{{ _('Enter the expected annual revenue percentage (0-100)') }}</small>
                     <div class="invalid-feedback">{{ _('Please enter a valid annual revenue percentage') }}</div>
