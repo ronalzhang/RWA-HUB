@@ -25,12 +25,12 @@
                     <p class="lead text-white-75 mb-5">{{ _('Start your asset tokenization journey now') }}<br>{{ _('Secure, transparent, and efficient blockchain asset management platform') }}</p>
                     
                     <!-- RWA 统计数据 -->
-                    <div class="row g-3 mb-4">
+                    <div class="row g-2 mb-4">
                         <div class="col-6">
-                            <div class="stat-item p-3 rounded backdrop-blur">
-                                <h6 class="text-white-75 mb-2">{{ _('Total RWA Onchain') }}</h6>
-                                <h3 class="text-gradient mb-1">${{ rwa_stats.total_rwa_onchain }}B</h3>
-                                <small class="text-white-75">
+                            <div class="stat-item p-2 rounded backdrop-blur">
+                                <h6 class="text-white-75 mb-1 small">{{ _('Total RWA Onchain') }}</h6>
+                                <h4 class="text-gradient mb-1">${{ rwa_stats.total_rwa_onchain }}B</h4>
+                                <small class="text-white-75 fs-7">
                                     {% if rwa_stats.total_rwa_change|float > 0 %}
                                     <i class="fas fa-arrow-up text-success"></i>
                                     {% else %}
@@ -41,10 +41,10 @@
                             </div>
                         </div>
                         <div class="col-6">
-                            <div class="stat-item p-3 rounded backdrop-blur">
-                                <h6 class="text-white-75 mb-2">{{ _('Total Asset Holders') }}</h6>
-                                <h3 class="text-gradient mb-1">{{ rwa_stats.total_holders }}</h3>
-                                <small class="text-white-75">
+                            <div class="stat-item p-2 rounded backdrop-blur">
+                                <h6 class="text-white-75 mb-1 small">{{ _('Total Asset Holders') }}</h6>
+                                <h4 class="text-gradient mb-1">{{ rwa_stats.total_holders }}</h4>
+                                <small class="text-white-75 fs-7">
                                     {% if rwa_stats.holders_change|float > 0 %}
                                     <i class="fas fa-arrow-up text-success"></i>
                                     {% else %}
@@ -55,15 +55,15 @@
                             </div>
                         </div>
                         <div class="col-6">
-                            <div class="stat-item p-3 rounded backdrop-blur">
-                                <h6 class="text-white-75 mb-2">{{ _('Total Asset Issuers') }}</h6>
-                                <h3 class="text-gradient mb-1">{{ rwa_stats.total_issuers }}</h3>
+                            <div class="stat-item p-2 rounded backdrop-blur">
+                                <h6 class="text-white-75 mb-1 small">{{ _('Total Asset Issuers') }}</h6>
+                                <h4 class="text-gradient mb-1">{{ rwa_stats.total_issuers }}</h4>
                             </div>
                         </div>
                         <div class="col-6">
-                            <div class="stat-item p-3 rounded backdrop-blur">
-                                <h6 class="text-white-75 mb-2">{{ _('Total Stablecoin Value') }}</h6>
-                                <h3 class="text-gradient mb-1">${{ rwa_stats.total_stablecoin }}B</h3>
+                            <div class="stat-item p-2 rounded backdrop-blur">
+                                <h6 class="text-white-75 mb-1 small">{{ _('Total Stablecoin Value') }}</h6>
+                                <h4 class="text-gradient mb-1">${{ rwa_stats.total_stablecoin }}B</h4>
                             </div>
                         </div>
                     </div>
@@ -334,20 +334,25 @@
 
 .stat-item {
     border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 1rem;
+    border-radius: 0.75rem;
     transition: all 0.3s ease;
 }
 
 .stat-item:hover {
     background: rgba(255,255,255,0.1);
-    transform: translateY(-5px);
+    transform: translateY(-2px);
 }
 
 .text-gradient {
     background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    font-size: 2rem;
+    font-size: 1.5rem;
+    line-height: 1.2;
+}
+
+.fs-7 {
+    font-size: 0.75rem;
 }
 
 /* 按钮样式 */
