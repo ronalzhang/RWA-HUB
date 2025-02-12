@@ -164,10 +164,9 @@ def create_asset():
         description = request.form.get('description')
         total_value = float(request.form.get('totalValue', 0))
         token_price = float(request.form.get('tokenPrice', 0))
-        annual_revenue = float(request.form.get('expectedAnnualRevenue', 0))
         
         # 验证必填字段
-        if not all([name, asset_type, location, description, total_value, token_price, annual_revenue]):
+        if not all([name, asset_type, location, description, total_value]):
             return jsonify({'error': '请填写所有必要字段'}), 400
             
         # 根据资产类型处理特定字段
@@ -175,20 +174,40 @@ def create_asset():
             area = float(request.form.get('area', 0))
             if area <= 0:
                 return jsonify({'error': '不动产面积必须大于0'}), 400
-            token_supply = int(area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER)
+            token_count = int(area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER)
         else:  # 类不动产
             area = None
-            token_supply = int(request.form.get('tokenCount', 0))
-            if token_supply <= 0:
+            token_count = int(request.form.get('tokenCount', 0))
+            if token_count <= 0:
                 return jsonify({'error': '代币数量必须大于0'}), 400
         
-        # 处理文件上传到临时目录
-        temp_image_paths = []
-        temp_doc_paths = []
-        asset_type_folder = 'real_estate' if asset_type == '10' else 'quasi_real_estate'
+        # 创建资产记录
+        asset = Asset(
+            name=name,
+            asset_type=asset_type,
+            location=location,
+            description=description,
+            area=area,
+            total_value=total_value,
+            token_count=token_count,
+            token_price=token_price,  # 使用前端传来的价格
+            token_symbol=request.form.get('tokenSymbol'),  # 保存代币符号
+            annual_revenue=float(request.form.get('expectedAnnualRevenue', 0)),  # 保存预期年收益
+            owner_address=g.eth_address,
+            creator_address=g.eth_address,
+            status=AssetStatus.PENDING.value
+        )
+        
+        # 保存资产记录以获取ID
+        db.session.add(asset)
+        db.session.commit()
+        
+        # 移动文件到正式目录
+        final_image_paths = []
+        final_doc_paths = []
         
         try:
-            # 处理图片
+            # 移动图片
             if 'images' in request.files:
                 images = request.files.getlist('images')
                 for i, image in enumerate(images):
@@ -196,7 +215,7 @@ def create_asset():
                         try:
                             # 构建临时文件名
                             ext = image.filename.rsplit('.', 1)[1].lower()
-                            temp_filename = f'{asset_type_folder}/temp/images/image_{i+1}_{int(time.time())}_{random.randint(1000, 9999)}.{ext}'
+                            temp_filename = f'{asset_type.lower()}/temp/images/image_{i+1}_{int(time.time())}_{random.randint(1000, 9999)}.{ext}'
                             
                             # 上传到七牛云临时目录
                             file_data = image.read()
@@ -229,7 +248,7 @@ def create_asset():
                         try:
                             # 构建临时文件名
                             ext = doc.filename.rsplit('.', 1)[1].lower()
-                            temp_filename = f'{asset_type_folder}/temp/documents/doc_{i+1}_{int(time.time())}_{random.randint(1000, 9999)}.{ext}'
+                            temp_filename = f'{asset_type.lower()}/temp/documents/doc_{i+1}_{int(time.time())}_{random.randint(1000, 9999)}.{ext}'
                             
                             # 上传到七牛云临时目录
                             file_data = doc.read()
@@ -254,41 +273,18 @@ def create_asset():
                                     pass
                             return jsonify({'error': f'上传文档 {doc.filename} 失败'}), 500
             
-            # 创建资产记录
-            asset = Asset(
-                name=name,
-                asset_type=asset_type,
-                location=location,
-                description=description,
-                area=area,
-                total_value=total_value,
-                token_price=token_price,
-                token_supply=token_supply,
-                annual_revenue=annual_revenue,
-                owner_address=g.eth_address,
-                creator_address=g.eth_address,
-                status=AssetStatus.PENDING.value
-            )
-            
-            # 保存资产记录以获取ID
-            db.session.add(asset)
-            db.session.commit()
-            
             # 移动文件到正式目录
-            final_image_paths = []
-            final_doc_paths = []
-            
             try:
                 # 移动图片
                 for temp_file in temp_image_paths:
-                    final_key = f'{asset_type_folder}/{asset.id}/images/{temp_file["filename"]}'
+                    final_key = f'{asset_type.lower()}/{asset.id}/images/{temp_file["filename"]}'
                     storage.move(temp_file['temp_key'], final_key)
                     final_url = storage.get_url(final_key)
                     final_image_paths.append(final_url)
                 
                 # 移动文档
                 for temp_file in temp_doc_paths:
-                    final_key = f'{asset_type_folder}/{asset.id}/documents/{temp_file["filename"]}'
+                    final_key = f'{asset_type.lower()}/{asset.id}/documents/{temp_file["filename"]}'
                     storage.move(temp_file['temp_key'], final_key)
                     final_url = storage.get_url(final_key)
                     final_doc_paths.append(final_url)
@@ -360,7 +356,7 @@ def update_asset(asset_id):
         asset.total_value = float(request.form.get('total_value'))
         asset.annual_revenue = float(request.form.get('annual_revenue'))
         asset.token_price = float(request.form.get('token_price'))
-        asset.token_supply = int(request.form.get('token_supply'))
+        asset.token_count = int(request.form.get('token_count'))
         asset.token_symbol = request.form.get('token_symbol')
         
         # 处理图片和文档
@@ -602,7 +598,7 @@ def get_asset_holders(asset_id):
         # 模拟返回持有人数据
         return jsonify({
             'holders_count': 100,  # 模拟数据
-            'total_supply': asset.token_supply
+            'total_supply': asset.token_count
         })
         
     except Exception as e:
