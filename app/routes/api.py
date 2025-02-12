@@ -161,7 +161,6 @@ def create_asset():
         asset_type = request.form.get('type')
         location = request.form.get('location')
         description = request.form.get('description')
-        area = float(request.form.get('area', 0))
         total_value = float(request.form.get('totalValue', 0))
         token_price = float(request.form.get('tokenPrice', 0))
         annual_revenue = float(request.form.get('expectedAnnualRevenue', 0))
@@ -170,8 +169,17 @@ def create_asset():
         if not all([name, asset_type, location, description, total_value, token_price, annual_revenue]):
             return jsonify({'error': '请填写所有必要字段'}), 400
             
-        # 计算代币数量
-        token_supply = int(total_value / token_price)
+        # 根据资产类型处理特定字段
+        if asset_type == '10':  # 不动产
+            area = float(request.form.get('area', 0))
+            if area <= 0:
+                return jsonify({'error': '不动产面积必须大于0'}), 400
+            token_supply = int(area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER)
+        else:  # 类不动产
+            area = None
+            token_supply = int(request.form.get('tokenCount', 0))
+            if token_supply <= 0:
+                return jsonify({'error': '代币数量必须大于0'}), 400
         
         # 创建资产记录
         asset = Asset(
@@ -185,6 +193,7 @@ def create_asset():
             token_supply=token_supply,
             annual_revenue=annual_revenue,
             owner_address=g.eth_address,
+            creator_address=g.eth_address,
             status=AssetStatus.PENDING.value
         )
         
