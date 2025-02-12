@@ -1,4 +1,4 @@
-from flask import render_template, send_from_directory, current_app, abort, request, redirect, url_for, jsonify, g, Response
+from flask import render_template, send_from_directory, current_app, abort, request, redirect, url_for, jsonify, g, Response, flash
 from . import assets_bp, assets_api_bp
 from .. import db  # 直接从应用实例导入 db
 from ..models import Asset
@@ -137,9 +137,16 @@ def asset_detail_page(asset_id):
 @assets_bp.route("/create")
 def create_asset_page():
     """创建资产页面"""
-    eth_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address')
+    # 从多个来源获取钱包地址
+    eth_address = request.headers.get('X-Eth-Address') or \
+                 request.cookies.get('eth_address') or \
+                 request.args.get('eth_address')
+                 
     if not eth_address:
+        # 如果未连接钱包，重定向到首页并显示提示消息
+        flash('请先连接钱包', 'warning')
         return redirect(url_for('main.index'))
+        
     return render_template("assets/create.html")
 
 @assets_bp.route("/<int:asset_id>/edit", methods=['PUT'])
