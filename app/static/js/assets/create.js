@@ -1,5 +1,11 @@
 // 表单验证和提交处理
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    // 检查钱包连接状态
+    if (!window.walletState || !window.walletState.isConnected || !window.walletState.currentAccount) {
+        showError('Please connect your wallet first');
+        return;
+    }
+
     // 获取必要的 DOM 元素
     const form = document.getElementById('assetForm');
     const typeSelect = document.getElementById('type');
@@ -176,11 +182,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 提交数据到服务器
     async function submitData(formData) {
+        if (!window.walletState || !window.walletState.isConnected || !window.walletState.currentAccount) {
+            throw new Error('Please connect your wallet first');
+        }
         return await fetch('/api/assets', {
             method: 'POST',
             body: formData,
             headers: {
-                'X-Eth-Address': localStorage.getItem('userAddress')
+                'X-Eth-Address': window.walletState.currentAccount
             }
         });
     }
