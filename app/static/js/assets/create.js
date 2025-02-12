@@ -201,7 +201,7 @@ function calculateRealEstateTokens() {
 function calculateTokenPrice() {
     const totalValue = parseFloat(document.getElementById('totalValue').value) || 0;
     const area = parseFloat(document.getElementById('area').value) || 0;
-    const tokenCount = area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER;
+    const tokenCount = area * 10000;  // 使用相同的计算方式
     
     if (totalValue > 0 && tokenCount > 0) {
         const price = totalValue / tokenCount;
@@ -740,10 +740,14 @@ function initializeFormElements() {
     });
 
     // 监听面积变化
-    elements.area.addEventListener('input', calculateRealEstateTokens);
+    if (elements.area) {
+        elements.area.addEventListener('input', calculateRealEstateTokens);
+    }
     
     // 监听总价值变化
-    elements.totalValue.addEventListener('input', calculateTokenPrice);
+    if (elements.totalValue) {
+        elements.totalValue.addEventListener('input', calculateTokenPrice);
+    }
 
     return elements;
 }
