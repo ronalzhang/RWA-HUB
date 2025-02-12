@@ -749,6 +749,9 @@ function initializeFormElements() {
         elements.totalValue.addEventListener('input', calculateTokenPrice);
     }
 
+    // 初始化所有事件监听器
+    initializeEventListeners(elements);
+
     return elements;
 }
 
