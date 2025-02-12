@@ -40,7 +40,7 @@ def create_app(config_name='development'):
     # 添加安全头
     @app.after_request
     def add_security_headers(response):
-        response.headers['Content-Security-Policy'] = "default-src 'self'; img-src * 'self' data: blob: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
+        response.headers['Content-Security-Policy'] = "default-src 'self'; img-src * 'self' data: blob: http: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com;"
         return response
     
     # 确保日志目录存在
