@@ -724,7 +724,7 @@ async function connectWallet() {
 
 // 初始化表单元素
 function initializeFormElements() {
-    const formElements = {
+    const elements = {
         form: document.getElementById('assetForm'),
         nameInput: document.getElementById('name'),
         typeInput: document.getElementById('type'),
@@ -735,22 +735,16 @@ function initializeFormElements() {
         tokenCountInput: document.getElementById('tokenCount'),
         expectedAnnualRevenueInput: document.getElementById('expectedAnnualRevenue'),
         imageDropzone: document.getElementById('imageDropzone'),
-        documentDropzone: document.getElementById('documentDropzone')
+        documentDropzone: document.getElementById('documentDropzone'),
+        saveDraftBtn: document.getElementById('saveDraft'),
+        previewBtn: document.getElementById('previewForm')
     };
 
-    // 验证必要的表单元素是否存在
-    const missingElements = Object.entries(formElements)
-        .filter(([key, element]) => !element)
-        .map(([key]) => key);
+    // 生成初始代币代码
+    const tokenSymbol = generateTokenSymbol();
+    document.getElementById('tokenSymbol').value = tokenSymbol;
 
-    if (missingElements.length > 0) {
-        console.error('缺少必要的表单元素:', missingElements);
-        showError('页面加载错误，请刷新重试');
-        return;
-    }
-
-    // 初始化事件监听
-    initializeEventListeners(formElements);
+    return elements;
 }
 
 // 初始化事件监听
@@ -1031,48 +1025,19 @@ function updateDocumentRequirements(type) {
 
 // 更新资产类型显示
 function updateAssetTypeDisplay() {
-    const type = typeInput.value;
-    const realEstateFields = document.querySelectorAll('.asset-type-field.real-estate');
-    const similarAssetsFields = document.querySelectorAll('.asset-type-field.similar-assets');
-    
-    // 生成并显示代币代码
-    const tokenSymbolInput = document.getElementById('tokenSymbol');
-    if (type) {
-        const randomNum = Math.floor(Math.random() * 9999) + 1000; // 生成1000-9999的随机数
-        const assetCode = type === CONFIG.ASSET_TYPE.REAL_ESTATE ? '10' : '20';
-        tokenSymbolInput.value = `${assetCode}${randomNum}`;
-    } else {
-        tokenSymbolInput.value = '';
+    const type = document.getElementById('type').value;
+    const realEstateFields = document.querySelectorAll('.real-estate');
+    const similarAssetsFields = document.querySelectorAll('.similar-assets');
+
+    if (type === '10') {
+        realEstateFields.forEach(field => field.classList.remove('hidden'));
+        similarAssetsFields.forEach(field => field.classList.add('hidden'));
+    } else if (type === '20') {
+        realEstateFields.forEach(field => field.classList.add('hidden'));
+        similarAssetsFields.forEach(field => field.classList.remove('hidden'));
     }
 
-    if (type === CONFIG.ASSET_TYPE.REAL_ESTATE) {
-        realEstateFields.forEach(field => {
-            field.classList.remove('hidden');
-            field.querySelectorAll('input, select').forEach(input => input.required = true);
-        });
-        similarAssetsFields.forEach(field => {
-            field.classList.add('hidden');
-            field.querySelectorAll('input, select').forEach(input => {
-                input.required = false;
-                input.value = '';
-            });
-        });
-        calculateRealEstateTokens();
-    } else if (type === CONFIG.ASSET_TYPE.SIMILAR_ASSETS) {
-        realEstateFields.forEach(field => {
-            field.classList.add('hidden');
-            field.querySelectorAll('input, select').forEach(input => {
-                input.required = false;
-                input.value = '';
-            });
-        });
-        similarAssetsFields.forEach(field => {
-            field.classList.remove('hidden');
-            field.querySelectorAll('input, select').forEach(input => input.required = true);
-        });
-    }
-    
-    calculateTokenPrice();
+    // 更新文档要求显示
     updateDocumentRequirements(type);
 }
 
@@ -1265,7 +1230,7 @@ function previewAsset() {
 // 添加提交资产函数
 async function submitAsset() {
     try {
-        // 检查钱包连接状态
+        // 获取当前连接的钱包地址
         const ethAddress = localStorage.getItem('userAddress');
         if (!ethAddress) {
             throw new Error('请先连接钱包');
@@ -1277,7 +1242,7 @@ async function submitAsset() {
             return;
         }
 
-        const formData = new FormData(form);
+        const formData = new FormData(document.getElementById('assetForm'));
         
         // 添加钱包地址到表单数据
         formData.append('eth_address', ethAddress);
@@ -1342,17 +1307,31 @@ async function submitAsset() {
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || error.error || '提交失败');
+            const errorData = await response.json();
+            throw new Error(errorData.error || '提交失败');
         }
 
         const result = await response.json();
         
         // 提交成功后的处理
         localStorage.removeItem(CONFIG.DRAFT.KEY);
-        window.location.href = `/assets/${result.assetId}`;
+        showToast('资产创建成功！');
+        
+        // 延迟2秒后跳转
+        setTimeout(() => {
+            window.location.href = `/assets/${result.assetId}`;
+        }, 2000);
+
     } catch (error) {
-        console.error('提交失败:', error);
-        showError(error.message || '提交失败');
+        console.error('提交表单失败:', error);
+        showError(error.message);
     }
+}
+
+// 修改代币代码生成逻辑
+function generateTokenSymbol() {
+    const type = document.getElementById('type').value;
+    const timestamp = new Date().getTime();
+    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    return `${type}${randomNum}`;
 } 
