@@ -187,43 +187,27 @@ function resetCalculations() {
     calculatedElements.similarAssets.tokenPrice.textContent = '0.000000';
 }
 
-// 计算代币数量（不动产）
+// 面积变化时计算代币数量
 function calculateRealEstateTokens() {
-    const area = parseFloat(areaInput.value) || 0;
-    if (area > 0) {
-        const tokenCount = Math.floor(area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER);
-        calculatedElements.realEstate.tokenCount.textContent = formatNumber(tokenCount);
-        return tokenCount;
-    }
-    calculatedElements.realEstate.tokenCount.textContent = '0';
-    return 0;
+    const area = parseFloat(document.getElementById('area').value) || 0;
+    const tokenCount = area * 10000;
+    document.getElementById('calculatedTokenCount').textContent = formatNumber(tokenCount);
+    
+    // 同时更新代币价格
+    calculateTokenPrice();
 }
 
-// 计算代币价格
+// 总价值或面积变化时计算代币价格
 function calculateTokenPrice() {
-    const totalValue = parseFloat(totalValueInput.value) || 0;
-    let tokenCount = 0;
+    const totalValue = parseFloat(document.getElementById('totalValue').value) || 0;
+    const area = parseFloat(document.getElementById('area').value) || 0;
+    const tokenCount = area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER;
     
-    if (typeInput.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
-        tokenCount = calculateRealEstateTokens();
-        if (totalValue > 0 && tokenCount > 0) {
-            const tokenPrice = totalValue / tokenCount;
-            const formattedPrice = formatNumber(tokenPrice, CONFIG.CALCULATION.PRICE_DECIMALS);
-            calculatedElements.realEstate.tokenPrice.textContent = formattedPrice;
-            calculatedElements.realEstate.tokenCount.textContent = formatNumber(tokenCount);
-        } else {
-            calculatedElements.realEstate.tokenPrice.textContent = '0.000000';
-            calculatedElements.realEstate.tokenCount.textContent = '0';
-        }
+    if (totalValue > 0 && tokenCount > 0) {
+        const price = totalValue / tokenCount;
+        document.getElementById('calculatedTokenPrice').textContent = formatNumber(price, CONFIG.CALCULATION.PRICE_DECIMALS);
     } else {
-        tokenCount = parseInt(tokenCountInput.value) || 0;
-        if (totalValue > 0 && tokenCount > 0) {
-            const tokenPrice = totalValue / tokenCount;
-            const formattedPrice = formatNumber(tokenPrice, CONFIG.CALCULATION.PRICE_DECIMALS);
-            calculatedElements.similarAssets.tokenPrice.textContent = formattedPrice;
-        } else {
-            calculatedElements.similarAssets.tokenPrice.textContent = '0.000000';
-        }
+        document.getElementById('calculatedTokenPrice').textContent = '0.000000';
     }
 }
 
@@ -726,15 +710,16 @@ async function connectWallet() {
 function generateTokenSymbol(type) {
     if (!type) return '';
     const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `${type}${randomNum}`;
+    return `RH${type}${randomNum}`;  // 直接拼接RH，不加连字符
 }
 
-// 初始化表单元素
+// 初始化表单元素和事件监听
 function initializeFormElements() {
     const elements = {
         form: document.getElementById('assetForm'),
         type: document.getElementById('type'),
         area: document.getElementById('area'),
+        totalValue: document.getElementById('totalValue'),
         tokenCount: document.getElementById('tokenCount'),
         imageInput: document.getElementById('imageInput'),
         imageDropzone: document.getElementById('imageDropzone'),
@@ -754,12 +739,11 @@ function initializeFormElements() {
         }
     });
 
-    // 生成初始代币代码（如果已选择类型）
-    const initialType = elements.type.value;
-    if (initialType) {
-        const tokenSymbol = generateTokenSymbol(initialType);
-        document.getElementById('tokenSymbol').value = tokenSymbol;
-    }
+    // 监听面积变化
+    elements.area.addEventListener('input', calculateRealEstateTokens);
+    
+    // 监听总价值变化
+    elements.totalValue.addEventListener('input', calculateTokenPrice);
 
     return elements;
 }
@@ -840,27 +824,6 @@ function initializeEventListeners(elements) {
             toggleAssetTypeFields(type);
             calculateTokenPrice();
         }
-    });
-    
-    // 不动产计算触发器
-    elements.area.addEventListener('input', function() {
-        if (elements.type.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
-            calculateTokenPrice();
-        }
-    });
-    
-    // 类不动产计算触发器
-    document.getElementById('totalValueSimilar').addEventListener('input', function() {
-        calculateTokenPrice();
-    });
-    
-    document.getElementById('tokenCount').addEventListener('input', function() {
-        calculateTokenPrice();
-    });
-    
-    // 总价值变化触发器
-    elements.totalValue.addEventListener('input', function() {
-        calculateTokenPrice();
     });
     
     // 表单提交增强
