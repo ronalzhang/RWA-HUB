@@ -1,56 +1,133 @@
 // 表单验证和提交处理
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        // 等待 MetaMask 注入完成
-        if (typeof window.ethereum === 'undefined') {
-            await new Promise(resolve => {
-                const checkMetaMask = setInterval(() => {
-                    if (typeof window.ethereum !== 'undefined') {
-                        clearInterval(checkMetaMask);
-                        resolve();
-                    }
-                }, 100);
-                
-                // 10秒后超时
-                setTimeout(() => {
-                    clearInterval(checkMetaMask);
-                    resolve();
-                }, 10000);
+        // 检查钱包连接状态
+        await checkConnection();
+        
+        // 监听钱包状态变化
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', async (accounts) => {
+                if (accounts.length === 0) {
+                    await clearWalletState();
+                } else {
+                    await checkConnection();
+                }
+            });
+
+            window.ethereum.on('chainChanged', async () => {
+                await checkConnection();
             });
         }
-        
-        // 检查钱包连接状态
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        if (accounts.length === 0) {
-            // 禁用表单
-            document.getElementById('assetForm').classList.add('disabled');
-            // 显示连接钱包提示
-            showToast('warning', '请先连接钱包');
-            return;
-        }
-        
-        // 初始化表单
-        initForm();
-        
+
+        // 初始化表单事件监听
+        initFormEvents();
     } catch (error) {
-        console.error('初始化失败:', error);
-        showToast('error', error.message || '页面加载失败');
+        console.error('页面初始化失败:', error);
     }
 });
 
-// 监听钱包连接状态变化
-if (window.ethereum) {
-    window.ethereum.on('accountsChanged', async (accounts) => {
-        if (accounts.length === 0) {
-            // 禁用表单
-            document.getElementById('assetForm').classList.add('disabled');
-            // 显示连接钱包提示
-            showToast('warning', '请先连接钱包');
+// 检查钱包连接状态
+async function checkConnection() {
+    try {
+        if (!window.ethereum) {
+            throw new Error('未检测到 MetaMask');
+        }
+
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length > 0) {
+            window.walletState.currentAccount = accounts[0];
+            window.walletState.isConnected = true;
+            updateUI(true);
         } else {
-            // 启用表单
-            document.getElementById('assetForm').classList.remove('disabled');
-            // 重新初始化表单
-            initForm();
+            await clearWalletState();
+        }
+    } catch (error) {
+        console.error('检查钱包连接失败:', error);
+        await clearWalletState();
+    }
+}
+
+// 清除钱包状态
+async function clearWalletState() {
+    window.walletState.currentAccount = null;
+    window.walletState.isConnected = false;
+    window.walletState.isAdmin = false;
+    window.walletState.permissions = [];
+    
+    // 清除事件监听器
+    if (walletEventListeners && walletEventListeners.length) {
+        walletEventListeners.forEach(listener => {
+            if (window.ethereum) {
+                window.ethereum.removeListener(listener.event, listener.callback);
+            }
+        });
+        walletEventListeners = [];
+    }
+    
+    updateUI(false);
+}
+
+// 更新 UI 显示
+function updateUI(isConnected) {
+    const connectBtn = document.getElementById('connect-wallet');
+    const accountDisplay = document.getElementById('account-display');
+    const createForm = document.getElementById('create-asset-form');
+    
+    if (isConnected && window.walletState.currentAccount) {
+        connectBtn.style.display = 'none';
+        accountDisplay.textContent = `${window.walletState.currentAccount.substring(0, 6)}...${window.walletState.currentAccount.substring(38)}`;
+        accountDisplay.style.display = 'block';
+        if (createForm) {
+            createForm.style.display = 'block';
+        }
+    } else {
+        connectBtn.style.display = 'block';
+        accountDisplay.style.display = 'none';
+        if (createForm) {
+            createForm.style.display = 'none';
+        }
+    }
+}
+
+// 初始化表单事件
+function initFormEvents() {
+    const form = document.getElementById('create-asset-form');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!window.walletState.isConnected) {
+            alert('请先连接钱包');
+            return;
+        }
+        
+        try {
+            // 获取表单数据
+            const formData = new FormData(form);
+            const assetData = {};
+            for (let [key, value] of formData.entries()) {
+                assetData[key] = value;
+            }
+            
+            // 发送创建请求
+            const response = await fetch('/api/assets/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(assetData)
+            });
+            
+            if (!response.ok) {
+                throw new Error('创建资产失败');
+            }
+            
+            const result = await response.json();
+            alert('资产创建成功!');
+            window.location.href = '/assets';
+        } catch (error) {
+            console.error('创建资产失败:', error);
+            alert('创建资产失败: ' + error.message);
         }
     });
 }

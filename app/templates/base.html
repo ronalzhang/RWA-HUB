@@ -125,6 +125,9 @@
     
     <!-- 钱包连接脚本 -->
     <script>
+    // 定义全局事件监听器数组
+    let walletEventListeners = [];
+    
     // 等待 MetaMask 注入完成
     window.addEventListener('load', async () => {
         // 全局钱包状态管理

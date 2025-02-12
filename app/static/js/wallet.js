@@ -1,74 +1,114 @@
 // 初始化钱包状态
-if (!window.walletState) {
-    window.walletState = {
-        currentAccount: null,
-        connectionStatus: localStorage.getItem('walletConnectionStatus') || 'disconnected', // disconnected, connecting, connected, error
-        isAdmin: false,
-        networkId: null,
-        networkName: null,
-        permissions: [],
-        lastError: null,
-        permissionCache: new Map(),
-        
-        // 获取当前账户
-        getCurrentAccount() {
-            return this.currentAccount;
-        },
-        
-        // 检查是否已连接
-        isConnected() {
-            return this.connectionStatus === 'connected' && this.currentAccount !== null;
-        },
-        
-        // 设置连接状态
-        setConnectionStatus(status) {
-            this.connectionStatus = status;
-            localStorage.setItem('walletConnectionStatus', status);
-        },
-        
-        // 检查是否是管理员
-        async checkIsAdmin() {
-            try {
-                if (!this.currentAccount) return false;
-                
-                const response = await fetch('/api/admin/check', {
-                    method: 'GET',
-                    headers: {
-                        'X-Eth-Address': this.currentAccount
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error('检查管理员状态失败');
-                }
-                
-                const data = await response.json();
-                this.isAdmin = data.is_admin;
-                this.permissions = data.is_admin ? data.permissions : [];
-                return this.isAdmin;
-            } catch (error) {
-                console.error('检查管理员状态失败:', error);
-                this.isAdmin = false;
-                this.permissions = [];
-                return false;
-            }
-        },
-        
-        // 清除状态
-        clearState() {
-            this.currentAccount = null;
-            this.setConnectionStatus('disconnected');
-            this.isAdmin = false;
-            this.networkId = null;
-            this.networkName = null;
-            this.permissions = [];
-            this.lastError = null;
-            this.permissionCache.clear();
-            localStorage.removeItem('walletConnected');
-            localStorage.removeItem('userAddress');
+window.walletState = {
+    currentAccount: null,
+    isConnected: false,
+    isAdmin: false,
+    permissions: []
+};
+
+// 连接钱包
+async function connectWallet() {
+    try {
+        if (!window.ethereum) {
+            throw new Error('请安装 MetaMask');
         }
-    };
+
+        const accounts = await window.ethereum.request({
+            method: 'eth_requestAccounts'
+        });
+
+        if (accounts.length > 0) {
+            window.walletState.currentAccount = accounts[0];
+            window.walletState.isConnected = true;
+            
+            // 触发连接成功事件
+            const event = new CustomEvent('walletConnected', {
+                detail: { account: accounts[0] }
+            });
+            window.dispatchEvent(event);
+            
+            return accounts[0];
+        }
+    } catch (error) {
+        console.error('连接钱包失败:', error);
+        throw error;
+    }
 }
+
+// 断开钱包连接
+async function disconnectWallet() {
+    try {
+        window.walletState.currentAccount = null;
+        window.walletState.isConnected = false;
+        window.walletState.isAdmin = false;
+        window.walletState.permissions = [];
+        
+        // 触发断开连接事件
+        const event = new CustomEvent('walletDisconnected');
+        window.dispatchEvent(event);
+    } catch (error) {
+        console.error('断开钱包失败:', error);
+        throw error;
+    }
+}
+
+// 检查钱包连接状态
+async function checkWalletConnection() {
+    try {
+        if (!window.ethereum) {
+            return false;
+        }
+
+        const accounts = await window.ethereum.request({
+            method: 'eth_accounts'
+        });
+
+        if (accounts.length > 0) {
+            window.walletState.currentAccount = accounts[0];
+            window.walletState.isConnected = true;
+            return true;
+        }
+
+        return false;
+    } catch (error) {
+        console.error('检查钱包连接失败:', error);
+        return false;
+    }
+}
+
+// 监听钱包事件
+function initWalletListeners() {
+    if (!window.ethereum) return;
+
+    // 账户变更
+    window.ethereum.on('accountsChanged', async (accounts) => {
+        if (accounts.length === 0) {
+            await disconnectWallet();
+        } else {
+            window.walletState.currentAccount = accounts[0];
+            window.walletState.isConnected = true;
+            
+            // 触发账户变更事件
+            const event = new CustomEvent('accountChanged', {
+                detail: { account: accounts[0] }
+            });
+            window.dispatchEvent(event);
+        }
+    });
+
+    // 链变更
+    window.ethereum.on('chainChanged', () => {
+        window.location.reload();
+    });
+}
+
+// 导出函数
+window.wallet = {
+    connect: connectWallet,
+    disconnect: disconnectWallet,
+    checkConnection: checkWalletConnection,
+    initListeners: initWalletListeners
+};
 
 // 支持的网络配置
 const SUPPORTED_NETWORKS = {
