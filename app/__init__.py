@@ -37,6 +37,12 @@ def create_app(config_name='development'):
     app.config['BABEL_SUPPORTED_LOCALES'] = ['en', 'zh_Hant']
     babel.init_app(app)
     
+    # 添加安全头
+    @app.after_request
+    def add_security_headers(response):
+        response.headers['Content-Security-Policy'] = "default-src 'self'; img-src * 'self' data: blob: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
+        return response
+    
     # 确保日志目录存在
     if not os.path.exists('logs'):
         os.makedirs('logs')
