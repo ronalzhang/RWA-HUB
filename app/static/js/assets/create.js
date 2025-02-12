@@ -845,6 +845,13 @@ function initializeEventListeners(elements) {
     elements.form.addEventListener('submit', async function(e) {
         e.preventDefault();
         
+        // 获取钱包地址
+        const ethAddress = localStorage.getItem('userAddress');
+        if (!ethAddress) {
+            showError('请先连接钱包');
+            return;
+        }
+        
         const errors = validateForm();
         if (errors.length > 0) {
             showError(errors.join('\n'));
@@ -905,12 +912,15 @@ function initializeEventListeners(elements) {
             // 发送请求
             const response = await fetch('/api/assets/create', {
                 method: 'POST',
+                headers: {
+                    'X-Eth-Address': ethAddress  // 添加以太坊地址到请求头
+                },
                 body: formData
             });
             
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.message || error.error || '提交失败');
+                throw new Error(error.error || '提交失败');
             }
             
             const result = await response.json();
