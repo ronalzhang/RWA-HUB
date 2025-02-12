@@ -129,41 +129,45 @@
     let walletEventListeners = [];
     
     // 等待 MetaMask 注入完成
-    window.addEventListener('load', async () => {
-        // 全局钱包状态管理
-        if (!window.walletState) {
-            window.walletState = {
-                currentAccount: null,
-                isConnected: false,
-                isAdmin: false,
-                permissions: []
-            };
-        }
+    function waitForMetaMask() {
+        return new Promise((resolve) => {
+            if (typeof window.ethereum !== 'undefined') {
+                return resolve();
+            }
 
-        // 检查是否已经连接
-        await checkConnection();
-    });
+            let tries = 0;
+            const interval = setInterval(() => {
+                if (typeof window.ethereum !== 'undefined' || tries >= 50) {
+                    clearInterval(interval);
+                    resolve();
+                }
+                tries++;
+            }, 100);
+        });
+    }
 
-    // 检查是否已经连接
-    async function checkConnection() {
-        if (typeof window.ethereum !== 'undefined') {
-            try {
+    // 初始化钱包
+    async function initWallet() {
+        try {
+            await waitForMetaMask();
+            
+            // 检查是否已经连接
+            if (typeof window.ethereum !== 'undefined') {
                 const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-                const storedAddress = localStorage.getItem('userAddress');
-                
-                if (accounts.length > 0 && storedAddress && 
-                    accounts[0].toLowerCase() === storedAddress.toLowerCase()) {
+                if (accounts.length > 0) {
                     handleAccountsChanged(accounts);
                     setupWalletEventListeners();
                 } else {
                     clearWalletState();
                 }
-            } catch (error) {
-                console.error('检查钱包连接失败:', error);
-                clearWalletState();
             }
+        } catch (error) {
+            console.error('初始化钱包失败:', error);
         }
     }
+
+    // 在 DOMContentLoaded 后初始化
+    document.addEventListener('DOMContentLoaded', initWallet);
 
     // 清除钱包状态
     function clearWalletState() {
