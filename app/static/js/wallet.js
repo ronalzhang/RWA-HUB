@@ -31,14 +31,11 @@ if (!window.walletState) {
             try {
                 if (!this.currentAccount) return false;
                 
-                const response = await fetch('/api/check_admin', {
-                    method: 'POST',
+                const response = await fetch('/api/admin/check', {
+                    method: 'GET',
                     headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        address: this.currentAccount
-                    })
+                        'X-Eth-Address': this.currentAccount
+                    }
                 });
                 
                 if (!response.ok) {
@@ -121,6 +118,10 @@ async function handleAccountsChanged(accounts) {
             window.walletState.connectionStatus = 'connected';
             // 检查新账户的管理员权限
             await window.walletState.checkIsAdmin();
+            
+            // 保存连接状态
+            localStorage.setItem('walletConnectionStatus', 'connected');
+            localStorage.setItem('userAddress', accounts[0]);
         }
     } catch (error) {
         console.error('处理账户变更失败:', error);
@@ -139,6 +140,15 @@ async function handleAccountsChanged(accounts) {
             error: window.walletState.lastError
         }
     }));
+    
+    // 如果在管理页面，检查权限并更新UI
+    if (window.location.pathname.startsWith('/admin')) {
+        const isAdmin = await window.walletState.checkIsAdmin();
+        if (!isAdmin) {
+            alert('当前钱包地址不是管理员');
+            window.location.href = '/';
+        }
+    }
 }
 
 // 处理网络变更

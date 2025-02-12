@@ -14,22 +14,37 @@ from app.utils.storage import storage
 def get_admin_permissions(eth_address):
     """获取管理员权限"""
     if not eth_address:
+        current_app.logger.warning('未提供钱包地址')
         return None
         
     # 转换为小写进行比较
     eth_address = eth_address.lower()
-    super_admin = current_app.config['ADMIN_CONFIG']['super_admin']
-    super_admin_address = super_admin['address'].lower()
+    admin_config = current_app.config.get('ADMIN_CONFIG', {})
     
-    if eth_address == super_admin_address:
-        return {
-            'is_admin': True,
-            'role': super_admin['role'],
-            'name': super_admin['name'],
-            'level': super_admin['level'],
-            'permissions': super_admin['permissions']
-        }
+    current_app.logger.info(f'检查管理员权限 - 输入地址: {eth_address}')
     
+    # 遍历所有管理员配置
+    for key, config in admin_config.items():
+        # 获取要比较的地址
+        compare_address = ''
+        if key == 'super_admin':
+            compare_address = config.get('address', '').lower()
+        elif key.startswith('0x'):
+            compare_address = key.lower()
+            
+        current_app.logger.info(f'比较地址: {compare_address} vs {eth_address}')
+        
+        if compare_address and compare_address == eth_address:
+            current_app.logger.info(f'找到管理员匹配: {key}')
+            return {
+                'is_admin': True,
+                'role': config.get('role', 'admin'),
+                'name': config.get('name', '管理员'),
+                'level': config.get('level', 2),
+                'permissions': config.get('permissions', [])
+            }
+    
+    current_app.logger.info(f'未找到管理员权限: {eth_address}')
     return None
 
 def is_admin(eth_address=None):
@@ -559,14 +574,19 @@ def check_admin():
     eth_address = eth_address.lower()
     current_app.logger.info(f'检查管理员权限 - 地址(小写): {eth_address}')
     
+    # 获取管理员权限信息
     admin_data = get_admin_permissions(eth_address)
     is_admin = bool(admin_data)
     
     if not is_admin:
         current_app.logger.warning('未找到管理员权限')
+    else:
+        current_app.logger.info(f'找到管理员权限: {admin_data}')
     
-    current_app.logger.info(f'检查管理员权限 - 结果: {is_admin}')
-    return jsonify({'is_admin': is_admin, **(admin_data or {})}), 200
+    return jsonify({
+        'is_admin': is_admin,
+        **(admin_data or {})
+    }), 200
 
 @admin_api_bp.route('/admins')
 @admin_required
