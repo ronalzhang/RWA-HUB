@@ -1,5 +1,10 @@
 import logging
 import os
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
+
 from app import create_app, db
 from sqlalchemy.exc import OperationalError
 from flask_migrate import upgrade
