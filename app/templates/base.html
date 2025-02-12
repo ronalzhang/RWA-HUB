@@ -233,17 +233,10 @@
     async function handleDisconnect() {
         try {
             clearWalletState();
-            
-            // 关闭下拉菜单
-            const dropdownInstance = bootstrap.Dropdown.getInstance(document.getElementById('walletBtn'));
-            if (dropdownInstance) {
-                dropdownInstance.hide();
-            }
-            
             // 刷新页面
             window.location.reload();
         } catch (error) {
-            console.error('Failed to disconnect wallet:', error);
+            console.error('断开钱包失败:', error);
         }
     }
 
@@ -348,23 +341,45 @@
         document.getElementById('walletMenu').style.display = 'none';
         if (typeof window.ethereum !== 'undefined') {
             try {
-                // 先断开当前连接
-                await handleDisconnect();
+                // 先清除当前状态
+                clearWalletState();
                 
-                // 请求新的钱包连接
+                // 请求切换钱包
                 await window.ethereum.request({
                     method: 'wallet_requestPermissions',
-                    params: [{ eth_accounts: {} }]
+                    params: [{
+                        eth_accounts: {}
+                    }]
                 });
                 
-                // 获取新的账户
-                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                // 等待新的钱包连接
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+                
                 if (accounts.length > 0) {
-                    handleAccountsChanged(accounts);
+                    // 更新状态
+                    window.walletState.currentAccount = accounts[0];
+                    window.walletState.isConnected = true;
+                    localStorage.setItem('walletConnected', 'true');
+                    localStorage.setItem('userAddress', accounts[0]);
+                    
+                    // 更新UI
+                    updateWalletUI(accounts[0]);
+                    
+                    // 检查管理员权限
+                    await checkIsAdmin(accounts[0]);
+                    
+                    // 刷新页面以确保所有状态都正确更新
+                    window.location.reload();
                 }
             } catch (error) {
                 console.error('切换钱包失败:', error);
-                alert('切换钱包失败，请重试');
+                if (error.code === 4001) {
+                    alert('您取消了切换钱包');
+                } else {
+                    alert('切换钱包失败，请重试');
+                }
             }
         }
     });

@@ -11,11 +11,58 @@ from werkzeug.utils import secure_filename
 from flask import Blueprint
 import random
 from app.models.dividend import DividendRecord
+from functools import wraps
+from datetime import datetime, timedelta
+import redis
 
 api_bp = Blueprint('api', __name__)
 
 # 允许的文件扩展名
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
+
+# 1. 初始化 Redis 客户端
+try:
+    redis_client = redis.Redis(
+        host=current_app.config.get('REDIS_HOST', 'localhost'),
+        port=current_app.config.get('REDIS_PORT', 6379),
+        db=current_app.config.get('REDIS_DB', 0),
+        decode_responses=True
+    )
+except Exception as e:
+    current_app.logger.error(f"Redis连接失败: {str(e)}")
+    redis_client = None
+
+# 缓存装饰器
+def cache_permission(timeout=300):  # 默认缓存5分钟
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            if not redis_client:
+                return f(*args, **kwargs)
+
+            eth_address = request.headers.get('X-Eth-Address')
+            if not eth_address:
+                return jsonify({'error': '未提供钱包地址'}), 401
+
+            cache_key = f"permission:{eth_address.lower()}"
+            cached_data = redis_client.get(cache_key)
+
+            if cached_data:
+                return jsonify(json.loads(cached_data))
+
+            result = f(*args, **kwargs)
+            if getattr(result, 'status_code', 200) == 200:
+                try:
+                    redis_client.setex(
+                        cache_key,
+                        timeout,
+                        json.dumps(result.get_json() if hasattr(result, 'get_json') else result)
+                    )
+                except Exception as e:
+                    current_app.logger.error(f"缓存权限数据失败: {str(e)}")
+            return result
+        return wrapped
+    return decorator
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -344,18 +391,53 @@ def get_dividend_history(asset_id):
         current_app.logger.error(f'获取分红历史失败: {str(e)}')
         return jsonify({'error': '获取分红历史失败'}), 500 
 
-@api_bp.route('/check_admin')
+# 优化管理员检查API
+@api_bp.route('/admin/check')
+@cache_permission(timeout=300)
 def check_admin():
-    """检查管理员权限（已废弃，使用 /api/admin/check）"""
-    eth_address = request.headers.get('X-Eth-Address')
-    if not eth_address:
-        return jsonify({'is_admin': False}), 200
+    """检查管理员权限"""
+    try:
+        eth_address = request.headers.get('X-Eth-Address')
+        if not eth_address:
+            return jsonify({
+                'is_admin': False,
+                'permissions': [],
+                'message': '未提供钱包地址'
+            }), 200
+
+        # 获取管理员权限信息
+        admin_info = get_admin_permissions(eth_address)
         
-    admin_info = get_admin_permissions(eth_address)
-    return jsonify({
-        'is_admin': bool(admin_info),
-        **(admin_info or {})
-    }), 200
+        if not admin_info:
+            return jsonify({
+                'is_admin': False,
+                'permissions': [],
+                'message': '非管理员账户'
+            }), 200
+
+        # 添加缓存统计
+        if redis_client:
+            try:
+                redis_client.incr('admin_check_count')
+                redis_client.expire('admin_check_count', 86400)  # 24小时过期
+            except Exception as e:
+                current_app.logger.error(f"更新缓存统计失败: {str(e)}")
+
+        return jsonify({
+            'is_admin': True,
+            'permissions': admin_info.get('permissions', []),
+            'role': admin_info.get('role', ''),
+            'message': '验证成功',
+            'cache_status': bool(redis_client)
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f'检查管理员权限失败: {str(e)}')
+        return jsonify({
+            'is_admin': False,
+            'permissions': [],
+            'message': f'检查管理员权限失败: {str(e)}'
+        }), 500
 
 @api_bp.route('/assets/<int:asset_id>/check_permission', methods=['GET'])
 @eth_address_required

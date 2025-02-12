@@ -84,6 +84,162 @@ const SUPPORTED_NETWORKS = {
     }
 };
 
+// 防抖函数
+function debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
+// 优化的钱包状态管理器
+const WalletStateManager = {
+    state: {
+        currentAccount: null,
+        isConnected: false,
+        isAdmin: false,
+        permissions: [],
+        networkId: null,
+        networkName: null,
+        lastError: null,
+        lastCheck: null
+    },
+    
+    checkInterval: 5000, // 5秒内不重复检查
+    
+    async updateState(newState) {
+        const now = Date.now();
+        if (this.state.lastCheck && (now - this.state.lastCheck < this.checkInterval)) {
+            return this.state;
+        }
+        
+        this.state = { 
+            ...this.state, 
+            ...newState, 
+            lastCheck: now 
+        };
+        
+        // 持久化状态
+        localStorage.setItem('walletState', JSON.stringify({
+            currentAccount: this.state.currentAccount,
+            isConnected: this.state.isConnected,
+            networkId: this.state.networkId,
+            lastCheck: this.state.lastCheck
+        }));
+        
+        // 触发状态变更事件
+        window.dispatchEvent(new CustomEvent('walletStateChanged', {
+            detail: this.state
+        }));
+        
+        return this.state;
+    },
+    
+    // 批量更新状态
+    async batchUpdateState(updates) {
+        const combinedUpdates = updates.reduce((acc, update) => ({
+            ...acc,
+            ...update
+        }), {});
+        
+        await this.updateState(combinedUpdates);
+    },
+
+    // 清除状态
+    clearState() {
+        this.state = {
+            currentAccount: null,
+            isConnected: false,
+            isAdmin: false,
+            permissions: [],
+            networkId: null,
+            networkName: null,
+            lastError: null,
+            lastCheck: null
+        };
+        localStorage.removeItem('walletState');
+        window.dispatchEvent(new CustomEvent('walletStateChanged', {
+            detail: this.state
+        }));
+    }
+};
+
+// 权限管理器
+const PermissionManager = {
+    cache: new Map(),
+    cacheTimeout: 5 * 60 * 1000, // 5分钟缓存
+    pendingChecks: new Map(), // 存储进行中的权限检查
+    
+    async checkPermissions(address) {
+        if (!address) return null;
+        
+        // 检查是否有正在进行的请求
+        if (this.pendingChecks.has(address)) {
+            return await this.pendingChecks.get(address);
+        }
+        
+        // 检查缓存
+        const cached = this.getFromCache(address);
+        if (cached) return cached;
+        
+        // 创建新的请求
+        const checkPromise = this._doPermissionCheck(address);
+        this.pendingChecks.set(address, checkPromise);
+        
+        try {
+            const result = await checkPromise;
+            return result;
+        } finally {
+            this.pendingChecks.delete(address);
+        }
+    },
+    
+    // 从缓存获取权限
+    getFromCache(address) {
+        const cached = this.cache.get(address?.toLowerCase());
+        if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+            return cached.data;
+        }
+        return null;
+    },
+    
+    // 设置缓存
+    setToCache(address, permissions) {
+        this.cache.set(address?.toLowerCase(), {
+            data: permissions,
+            timestamp: Date.now()
+        });
+    },
+    
+    // 实际进行权限检查的私有方法
+    async _doPermissionCheck(address) {
+        try {
+            const response = await fetch('/api/admin/check', {
+                headers: { 
+                    'X-Eth-Address': address,
+                    'Cache-Control': 'max-age=300' // 添加缓存控制头
+                }
+            });
+            
+            if (!response.ok) throw new Error('权限检查失败');
+            
+            const permissions = await response.json();
+            this.setToCache(address, permissions);
+            return permissions;
+        } catch (error) {
+            console.error('权限检查失败:', error);
+            return null;
+        }
+    },
+    
+    // 清除缓存
+    clearCache() {
+        this.cache.clear();
+        this.pendingChecks.clear();
+    }
+};
+
 // 初始化钱包
 async function initWallet() {
     try {
@@ -193,38 +349,53 @@ async function handleNetworkChanged(chainId) {
     }
 }
 
-// 连接钱包
-async function connectWallet() {
+// 优化后的钱包连接和切换函数
+const connectWallet = debounce(async () => {
     try {
         if (!window.ethereum) {
             throw new Error('请安装 MetaMask 钱包');
         }
         
-        window.walletState.setConnectionStatus('connecting');
-        window.walletState.lastError = null;
-        
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-        
-        await handleNetworkChanged(chainId);
         await handleAccountsChanged(accounts);
-        
         return accounts[0];
     } catch (error) {
-        console.error('连接钱包失败:', error);
-        window.walletState.setConnectionStatus('error');
-        
-        let message = '连接钱包失败';
-        if (error.code === 4001) {
-            message = '您取消了连接钱包';
-        } else if (error.code === -32002) {
-            message = '钱包连接请求正在处理中,请检查 MetaMask';
+        handleWalletError(error);
+        throw error;
+    }
+}, 500);
+
+const switchWallet = debounce(async () => {
+    try {
+        if (!window.ethereum) {
+            throw new Error('请安装 MetaMask 钱包');
         }
         
-        window.walletState.lastError = message;
-        throw new Error(message);
+        // 先清除当前状态
+        WalletStateManager.clearState();
+        PermissionManager.clearCache();
+        
+        // 请求切换钱包
+        await window.ethereum.request({
+            method: 'wallet_requestPermissions',
+            params: [{
+                eth_accounts: {}
+            }]
+        });
+        
+        // 获取新账户
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length > 0) {
+            await handleAccountsChanged(accounts);
+            return accounts[0];
+        }
+        
+        throw new Error('未选择账户');
+    } catch (error) {
+        handleWalletError(error);
+        throw error;
     }
-}
+}, 500);
 
 // 断开钱包连接
 async function disconnectWallet() {
@@ -248,6 +419,9 @@ async function disconnectWallet() {
             error: null
         }
     }));
+    
+    // 刷新页面
+    window.location.reload();
 }
 
 // 添加网络变更监听
@@ -256,12 +430,41 @@ if (window.ethereum) {
     window.ethereum.on('accountsChanged', handleAccountsChanged);
     window.ethereum.on('disconnect', () => {
         window.walletState.clearState();
+        window.location.reload();
     });
     
     // 初始化钱包
     initWallet().catch(console.error);
 }
 
-// 导出函数到全局作用域
+// 导出全局函数
+window.walletState = WalletStateManager.state;
 window.connectWallet = connectWallet;
-window.disconnectWallet = disconnectWallet; 
+window.switchWallet = switchWallet;
+window.disconnectWallet = () => {
+    WalletStateManager.clearState();
+    PermissionManager.clearCache();
+    window.location.reload();
+};
+
+// 初始化
+document.addEventListener('DOMContentLoaded', async () => {
+    // 恢复保存的状态
+    const savedState = localStorage.getItem('walletState');
+    if (savedState) {
+        try {
+            const state = JSON.parse(savedState);
+            if (state.isConnected && state.currentAccount) {
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0 && accounts[0].toLowerCase() === state.currentAccount.toLowerCase()) {
+                    await handleAccountsChanged(accounts);
+                } else {
+                    WalletStateManager.clearState();
+                }
+            }
+        } catch (error) {
+            console.error('恢复状态失败:', error);
+            WalletStateManager.clearState();
+        }
+    }
+}); 
