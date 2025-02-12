@@ -145,26 +145,11 @@ function showError(message) {
 
 // 检查是否是管理员
 async function checkIsAdmin() {
-    if (!window.ethereum || !window.currentAccount) {
-        return false;
-    }
-    
     try {
-        const response = await fetch('/api/admin/check_admin', {
-            method: 'GET',
-            headers: {
-                'X-Eth-Address': window.currentAccount
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error('验证管理员权限失败');
-        }
-        
-        const data = await response.json();
-        return data.is_admin;
+        if (!window.walletState) return false;
+        return await window.walletState.checkIsAdmin();
     } catch (error) {
-        console.error('验证管理员权限失败:', error);
+        console.error('检查管理员状态失败:', error);
         return false;
     }
 }

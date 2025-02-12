@@ -4,7 +4,7 @@ from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.trade import Trade
 from app import db
 from app.utils.decorators import token_required, eth_address_required
-from .admin import is_admin
+from .admin import is_admin, get_admin_permissions
 import os
 import json
 from werkzeug.utils import secure_filename
@@ -344,37 +344,18 @@ def get_dividend_history(asset_id):
         current_app.logger.error(f'获取分红历史失败: {str(e)}')
         return jsonify({'error': '获取分红历史失败'}), 500 
 
-@api_bp.route('/check_admin', methods=['POST'])
+@api_bp.route('/check_admin')
 def check_admin():
-    try:
-        data = request.get_json()
-        if not data or 'address' not in data:
-            return jsonify({'error': 'Missing address parameter'}), 400
-            
-        address = data['address']
-        # 使用 is_admin_address 函数检查是否是管理员
-        is_admin = is_admin_address(address)
+    """检查管理员权限（已废弃，使用 /api/admin/check）"""
+    eth_address = request.headers.get('X-Eth-Address')
+    if not eth_address:
+        return jsonify({'is_admin': False}), 200
         
-        if is_admin:
-            # 获取管理员配置信息
-            admin_config = current_app.config['ADMIN_CONFIG']
-            admin_info = admin_config.get(address.lower()) or admin_config.get(address)
-            
-            return jsonify({
-                'is_admin': True,
-                'role': admin_info['role'],
-                'name': admin_info.get('name', ''),
-                'level': admin_info.get('level', 1),
-                'permissions': admin_info['permissions']
-            })
-        
-        return jsonify({
-            'is_admin': False,
-            'admin_config': None
-        })
-    except Exception as e:
-        current_app.logger.error(f'检查管理员状态失败: {str(e)}')
-        return jsonify({'error': '检查管理员状态失败'}), 500 
+    admin_info = get_admin_permissions(eth_address)
+    return jsonify({
+        'is_admin': bool(admin_info),
+        **(admin_info or {})
+    }), 200
 
 @api_bp.route('/assets/<int:asset_id>/check_permission', methods=['GET'])
 @eth_address_required
