@@ -28,107 +28,166 @@
         border-radius: 4px;
         background-color: #f8f9fa;
     }
+    .calculation-info {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 4px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+    .calculation-info .value {
+        font-weight: bold;
+        color: #0d6efd;
+    }
+    .form-section {
+        background-color: #fff;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .form-section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: #495057;
+    }
+    .input-help {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    .required-mark::after {
+        content: "*";
+        color: #dc3545;
+        margin-left: 4px;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container py-5">
-    <h2 class="mb-4">{{ _('Create Asset') }}</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">{{ _('Create Asset') }}</h2>
+        <div class="text-muted">
+            <i class="fas fa-info-circle me-1"></i>
+            {{ _('All fields marked with * are required') }}
+        </div>
+    </div>
     
     <form id="assetForm" class="needs-validation" novalidate>
-        <div class="row g-3">
-            <!-- Basic Information -->
-            <div class="col-md-6">
-                <label for="name" class="form-label">{{ _('Asset Name') }}</label>
-                <input type="text" class="form-control" id="name" required>
+        <!-- Basic Information Section -->
+        <div class="form-section">
+            <div class="form-section-title">{{ _('Basic Information') }}</div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="name" class="form-label required-mark">{{ _('Asset Name') }}</label>
+                    <input type="text" class="form-control" id="name" required>
+                    <div class="input-help">{{ _('2-100 characters') }}</div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="type" class="form-label required-mark">{{ _('Asset Type') }}</label>
+                    <select class="form-select" id="type" required>
+                        <option value="">{{ _('Please select...') }}</option>
+                        <option value="10">{{ _('Real Estate') }}</option>
+                        <option value="20">{{ _('Similar Assets') }}</option>
+                    </select>
+                </div>
+                
+                <div class="col-12">
+                    <label for="location" class="form-label required-mark">{{ _('Asset Location') }}</label>
+                    <input type="text" class="form-control" id="location" required>
+                    <div class="input-help">{{ _('5-200 characters') }}</div>
+                </div>
+                
+                <div class="col-12">
+                    <label for="description" class="form-label required-mark">{{ _('Asset Description') }}</label>
+                    <textarea class="form-control" id="description" rows="3" required></textarea>
+                    <div class="input-help">{{ _('10-1000 characters') }}</div>
+                </div>
             </div>
-            
-            <div class="col-md-6">
-                <label for="type" class="form-label">{{ _('Asset Type') }}</label>
-                <select class="form-select" id="type" required>
-                    <option value="">{{ _('Please select...') }}</option>
-                    <option value="10">{{ _('Real Estate') }}</option>
-                    <option value="20">{{ _('Similar Assets') }}</option>
-                </select>
+        </div>
+        
+        <!-- Value Information Section -->
+        <div class="form-section">
+            <div class="form-section-title">{{ _('Value Information') }}</div>
+            <div class="row g-3">
+                <div class="col-md-6 asset-area-group" style="display: none;">
+                    <label for="area" class="form-label required-mark">{{ _('Building Area') }} (m²)</label>
+                    <input type="number" class="form-control" id="area" step="0.01">
+                    <div class="input-help">{{ _('Greater than 0 and not exceeding 1,000,000') }}</div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="totalValue" class="form-label required-mark">{{ _('Total Value') }} (U)</label>
+                    <input type="number" class="form-control" id="totalValue" required>
+                    <div class="input-help">{{ _('Greater than 0 and not exceeding 1 trillion') }}</div>
+                </div>
+                
+                <div class="col-md-6 token-amount-group" style="display: none;">
+                    <label for="tokenAmount" class="form-label required-mark">{{ _('Token Amount') }}</label>
+                    <input type="number" class="form-control" id="tokenAmount">
+                    <div class="input-help">{{ _('Total number of tokens to be issued') }}</div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="tokenPrice" class="form-label">{{ _('Token Price') }} (U)</label>
+                    <input type="number" class="form-control" id="tokenPrice" readonly>
+                    <div class="input-help">{{ _('Automatically calculated based on total value and token amount') }}</div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="annualRevenue" class="form-label required-mark">{{ _('Expected Annual Revenue') }} (U)</label>
+                    <input type="number" class="form-control" id="annualRevenue" step="0.01" required>
+                    <div class="input-help">{{ _('Expected annual dividend amount (must not exceed total value)') }}</div>
+                </div>
+                
+                <div class="col-12">
+                    <div id="calculationInfo" class="calculation-info" style="display: none;"></div>
+                </div>
             </div>
-            
-            <div class="col-12 asset-area-group">
-                <label for="area" class="form-label">{{ _('Building Area') }} (m²)</label>
-                <input type="number" class="form-control" id="area" step="0.01">
-            </div>
-            
-            <div class="col-12">
-                <label for="location" class="form-label">{{ _('Asset Location') }}</label>
-                <input type="text" class="form-control" id="location" required>
-            </div>
-            
-            <div class="col-12">
-                <label for="description" class="form-label">{{ _('Asset Description') }}</label>
-                <textarea class="form-control" id="description" rows="3" required></textarea>
-            </div>
-            
-            <!-- Value Information -->
-            <div class="col-md-6">
-                <label for="totalValue" class="form-label">{{ _('Total Value') }} (U)</label>
-                <input type="number" class="form-control" id="totalValue" required>
-            </div>
-            
-            <div class="col-md-6 token-amount-group" style="display: none;">
-                <label for="tokenAmount" class="form-label">{{ _('Token Amount') }}</label>
-                <input type="number" class="form-control" id="tokenAmount">
-            </div>
-            
-            <div class="col-md-6">
-                <label for="tokenPrice" class="form-label">{{ _('Token Price') }} (U)</label>
-                <input type="number" class="form-control" id="tokenPrice" readonly>
-                <small class="form-text text-muted">Automatically calculated</small>
-            </div>
-            
-            <div class="col-md-6">
-                <label for="annualRevenue" class="form-label">{{ _('Expected Annual Revenue') }} (U)</label>
-                <input type="number" class="form-control" id="annualRevenue" step="0.01" required>
-                <small class="form-text text-muted">Expected annual dividend amount</small>
-            </div>
+        </div>
+        
+        <!-- File Upload Section -->
+        <div class="form-section">
+            <div class="form-section-title">{{ _('Asset Files') }}</div>
             
             <!-- Image Upload -->
-            <div class="col-12">
-                <label class="form-label">{{ _('Asset Images') }}</label>
+            <div class="mb-4">
+                <label class="form-label required-mark">{{ _('Asset Images') }}</label>
                 <div id="imageUpload" class="upload-area">
                     <i class="fas fa-cloud-upload-alt"></i>
                     <p class="mb-0">{{ _('Click or drag to upload images') }}</p>
-                    <small class="text-muted">{{ _('Supports jpg, png, gif formats') }}</small>
+                    <small class="text-muted">{{ _('Supports jpg, png, gif formats (Max 10 images, 10MB each)') }}</small>
                 </div>
                 <div id="imagePreview" class="row g-3 mt-2"></div>
             </div>
             
             <!-- Document Upload -->
-            <div class="col-12">
+            <div>
                 <label class="form-label">{{ _('Asset Documents') }}</label>
-                <div class="real-estate-docs mb-2" style="display: none;">
-                    <small class="text-muted">
-                        {{ _('Required Documents') }}:
-                        <ul>
-                            <li>{{ _('Property Certificate') }}</li>
-                            <li>{{ _('Land Use Rights Certificate') }}</li>
-                            <li>{{ _('Property Purchase Contract') }}</li>
-                            <li>{{ _('Asset Valuation Report') }}</li>
-                        </ul>
-                    </small>
+                <div class="real-estate-docs mb-2 alert alert-info" style="display: none;">
+                    <h6 class="alert-heading">{{ _('Required Documents for Real Estate') }}:</h6>
+                    <ul class="mb-0">
+                        <li>{{ _('Property Certificate') }}</li>
+                        <li>{{ _('Land Use Rights Certificate') }}</li>
+                        <li>{{ _('Property Purchase Contract') }}</li>
+                        <li>{{ _('Asset Valuation Report') }}</li>
+                    </ul>
                 </div>
-                <div class="similar-assets-docs mb-2" style="display: none;">
-                    <small class="text-muted">
-                        {{ _('Required Documents') }}:
-                        <ul>
-                            <li>{{ _('Asset Ownership Certificate') }}</li>
-                            <li>{{ _('Asset Usage Rights Certificate') }}</li>
-                            <li>{{ _('Asset Valuation Report') }}</li>
-                        </ul>
-                    </small>
+                <div class="similar-assets-docs mb-2 alert alert-info" style="display: none;">
+                    <h6 class="alert-heading">{{ _('Required Documents for Similar Assets') }}:</h6>
+                    <ul class="mb-0">
+                        <li>{{ _('Asset Ownership Certificate') }}</li>
+                        <li>{{ _('Asset Usage Rights Certificate') }}</li>
+                        <li>{{ _('Asset Valuation Report') }}</li>
+                    </ul>
                 </div>
                 <div id="documentUpload" class="upload-area">
                     <i class="fas fa-file-upload"></i>
                     <p class="mb-0">{{ _('Click or drag to upload documents') }}</p>
-                    <small class="text-muted">{{ _('Supports pdf, doc, docx formats') }}</small>
+                    <small class="text-muted">{{ _('Supports pdf, doc, docx formats (Max 5 documents, 10MB each)') }}</small>
                 </div>
                 <div id="documentPreview" class="mt-2"></div>
             </div>
@@ -136,8 +195,14 @@
         
         <!-- Submit Buttons -->
         <div class="d-flex justify-content-end gap-2 mt-4">
-            <button type="button" id="saveDraft" class="btn btn-secondary">{{ _('Save Draft') }}</button>
-            <button type="submit" class="btn btn-primary">{{ _('Create Asset') }}</button>
+            <button type="button" id="saveDraft" class="btn btn-secondary">
+                <i class="fas fa-save me-1"></i>
+                {{ _('Save Draft') }}
+            </button>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-check me-1"></i>
+                {{ _('Create Asset') }}
+            </button>
         </div>
     </form>
 </div>
