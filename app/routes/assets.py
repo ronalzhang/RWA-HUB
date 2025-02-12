@@ -310,10 +310,16 @@ def create_asset():
         asset_type = request.form.get('type')
         location = request.form.get('location')
         description = request.form.get('description')
+        token_symbol = request.form.get('tokenSymbol')
+        expected_annual_revenue = float(request.form.get('expectedAnnualRevenue', 0))
         
         # 验证必填字段
-        if not all([name, asset_type, location, description]):
+        if not all([name, asset_type, location, description, token_symbol]):
             return jsonify({'error': '缺少必要字段'}), 400
+            
+        # 验证预期年收益
+        if expected_annual_revenue <= 0:
+            return jsonify({'error': '预期年收益必须大于0'}), 400
             
         # 获取和验证数值字段
         try:
@@ -351,9 +357,21 @@ def create_asset():
             total_value=total_value,
             token_count=token_count,
             token_price=token_price,
+            token_symbol=token_symbol,
+            annual_revenue=expected_annual_revenue,
             owner_address=g.eth_address,
+            creator_address=g.eth_address,
             status=1  # 待审核状态
         )
+        
+        # 先保存资产记录以获取ID
+        try:
+            db.session.add(asset)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"保存资产记录失败: {str(e)}")
+            return jsonify({'error': '保存失败'}), 500
         
         # 处理文件上传
         try:
@@ -391,21 +409,21 @@ def create_asset():
                     if doc_paths:
                         asset.documents = json.dumps(doc_paths)
                         
+            # 更新资产记录的文件路径
+            if asset.images or asset.documents:
+                db.session.commit()
+                        
         except Exception as e:
             current_app.logger.error(f"文件处理错误: {str(e)}")
+            # 删除已创建的资产记录
+            db.session.delete(asset)
+            db.session.commit()
             return jsonify({'error': '文件处理失败'}), 500
             
-        try:
-            db.session.add(asset)
-            db.session.commit()
-            return jsonify({
-                'message': '资产创建成功',
-                'assetId': asset.id
-            })
-        except Exception as e:
-            db.session.rollback()
-            current_app.logger.error(f"数据库错误: {str(e)}")
-            return jsonify({'error': '保存失败'}), 500
+        return jsonify({
+            'message': '资产创建成功',
+            'assetId': asset.id
+        })
             
     except Exception as e:
         current_app.logger.error(f"创建资产失败: {str(e)}")

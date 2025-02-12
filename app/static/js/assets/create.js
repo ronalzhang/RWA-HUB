@@ -546,7 +546,10 @@ function loadDraft() {
         // 填充表单数据
         Object.entries(draft.data).forEach(([key, value]) => {
             const input = form.elements[key];
-            if (input) input.value = value;
+            if (input) {
+                input.value = value;
+                input.removeAttribute('readonly'); // 移除只读属性
+            }
         });
         
         // 加载图片和文档
@@ -717,10 +720,15 @@ function generateTokenSymbol(type) {
 function initializeFormElements() {
     const elements = {
         form: document.getElementById('assetForm'),
+        nameInput: document.getElementById('name'),
         type: document.getElementById('type'),
+        locationInput: document.getElementById('location'),
+        descriptionInput: document.getElementById('description'),
         area: document.getElementById('area'),
         totalValue: document.getElementById('totalValue'),
         tokenCount: document.getElementById('tokenCount'),
+        tokenSymbol: document.getElementById('tokenSymbol'),
+        expectedAnnualRevenue: document.getElementById('expectedAnnualRevenue'),
         imageInput: document.getElementById('imageInput'),
         imageDropzone: document.getElementById('imageDropzone'),
         documentInput: document.getElementById('documentInput'),
@@ -734,7 +742,7 @@ function initializeFormElements() {
         const type = this.value;
         if (type) {
             const tokenSymbol = generateTokenSymbol(type);
-            document.getElementById('tokenSymbol').value = tokenSymbol;
+            elements.tokenSymbol.value = tokenSymbol;
             toggleAssetTypeFields(type);
         }
     });
@@ -1024,10 +1032,15 @@ function previewAsset() {
 
     // 根据资产类型获取特定字段
     if (assetData.type === CONFIG.ASSET_TYPE.REAL_ESTATE) {
-        assetData.area = formData.get('area');
+        const area = parseFloat(formData.get('area')) || 0;
+        assetData.area = area;
         assetData.totalValue = formData.get('totalValue');
-        assetData.tokenCount = calculatedElements.realEstate.tokenCount.textContent.replace(/,/g, '');
-        assetData.tokenPrice = calculatedElements.realEstate.tokenPrice.textContent.replace(/,/g, '');
+        // 使用与calculateRealEstateTokens相同的计算逻辑
+        assetData.tokenCount = area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER;
+        // 计算代币价格
+        assetData.tokenPrice = assetData.tokenCount > 0 ? 
+            (parseFloat(assetData.totalValue) / assetData.tokenCount).toFixed(CONFIG.CALCULATION.PRICE_DECIMALS) : 
+            '0.000000';
         assetData.expectedAnnualRevenue = formData.get('expectedAnnualRevenue');
         assetData.assetTypeName = '不动产';
     } else {
@@ -1205,6 +1218,50 @@ async function submitAsset() {
         }
 
         const formData = new FormData(document.getElementById('assetForm'));
+        const assetType = formData.get('type');
+        
+        // 验证必填字段
+        const name = formData.get('name');
+        const location = formData.get('location');
+        const description = formData.get('description');
+        const tokenSymbol = formData.get('tokenSymbol');
+        const expectedAnnualRevenue = parseFloat(formData.get('expectedAnnualRevenue')) || 0;
+        
+        if (!name || !location || !description || !tokenSymbol) {
+            throw new Error('请填写所有必要字段');
+        }
+        
+        if (expectedAnnualRevenue <= 0) {
+            throw new Error('预期年收益必须大于0');
+        }
+        
+        // 根据资产类型添加正确的代币数量和价格
+        if (assetType === CONFIG.ASSET_TYPE.REAL_ESTATE) {
+            const area = parseFloat(formData.get('area')) || 0;
+            if (area <= 0) {
+                throw new Error('面积必须大于0');
+            }
+            const tokenCount = area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER;
+            const totalValue = parseFloat(formData.get('totalValue')) || 0;
+            if (totalValue <= 0) {
+                throw new Error('总价值必须大于0');
+            }
+            const tokenPrice = tokenCount > 0 ? (totalValue / tokenCount).toFixed(CONFIG.CALCULATION.PRICE_DECIMALS) : '0.000000';
+            
+            formData.set('tokenCount', tokenCount.toString());
+            formData.set('tokenPrice', tokenPrice);
+        } else {
+            const tokenCount = parseInt(formData.get('tokenCount')) || 0;
+            if (tokenCount <= 0) {
+                throw new Error('代币数量必须大于0');
+            }
+            const totalValue = parseFloat(formData.get('totalValue')) || 0;
+            if (totalValue <= 0) {
+                throw new Error('总价值必须大于0');
+            }
+            const tokenPrice = (totalValue / tokenCount).toFixed(CONFIG.CALCULATION.PRICE_DECIMALS);
+            formData.set('tokenPrice', tokenPrice);
+        }
         
         // 添加图片
         if (uploadedImages.length > 0) {
@@ -1226,7 +1283,7 @@ async function submitAsset() {
         const response = await fetch('/api/assets/create', {
             method: 'POST',
             headers: {
-                'X-Eth-Address': ethAddress  // 确保在请求头中添加钱包地址
+                'X-Eth-Address': ethAddress
             },
             body: formData
         });
