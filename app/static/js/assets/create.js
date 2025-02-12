@@ -613,41 +613,16 @@ function validateForm() {
 
 // 事件监听器
 document.addEventListener('DOMContentLoaded', async function() {
-    // 检查钱包连接状态
-    if (!window.ethereum) {
-        // 显示安装钱包提示
-        const walletPrompt = document.createElement('div');
-        walletPrompt.className = 'container text-center py-5';
-        walletPrompt.innerHTML = `
-            <div class="card shadow-sm">
-                <div class="card-body py-5">
-                    <i class="fas fa-exclamation-circle fa-3x text-warning mb-3"></i>
-                    <h3 class="mb-3">请先安装MetaMask钱包</h3>
-                    <p class="text-muted mb-4">您需要安装MetaMask钱包才能创建资产</p>
-                    <a href="https://metamask.io/download/" target="_blank" class="btn btn-primary">
-                        <i class="fas fa-download me-2"></i>安装MetaMask
-                    </a>
-                </div>
-            </div>
-        `;
-        
-        // 隐藏表单内容
+    const isConnected = await checkWalletConnection();
+    
+    if (!isConnected) {
+        // 显示连接钱包提示
         const formContent = document.getElementById('assetForm');
         if (formContent) {
             formContent.style.display = 'none';
-        }
-        
-        // 在表单前插入提示
-        formContent.parentNode.insertBefore(walletPrompt, formContent);
-        return;
-    }
-    
-    try {
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        if (!accounts || accounts.length === 0) {
-            // 显示连接钱包提示
+            
             const walletPrompt = document.createElement('div');
-            walletPrompt.className = 'container text-center py-5';
+            walletPrompt.className = 'wallet-prompt container text-center py-5';
             walletPrompt.innerHTML = `
                 <div class="card shadow-sm">
                     <div class="card-body py-5">
@@ -661,52 +636,93 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>
             `;
             
-            // 隐藏表单内容
-            const formContent = document.getElementById('assetForm');
-            if (formContent) {
-                formContent.style.display = 'none';
-            }
-            
-            // 在表单前插入提示
             formContent.parentNode.insertBefore(walletPrompt, formContent);
-            return;
         }
-        
+    } else {
         // 如果已连接钱包，显示表单并初始化
         const formContent = document.getElementById('assetForm');
         if (formContent) {
             formContent.style.display = 'block';
         }
-        
-        // 保存钱包地址到localStorage
-        localStorage.setItem('userAddress', accounts[0]);
-        
-        // 初始化表单元素
         initializeFormElements();
-        
-    } catch (error) {
-        console.error('检查钱包连接失败:', error);
-        showError('钱包连接检查失败');
     }
 });
 
 // 添加连接钱包函数
 async function connectWallet() {
     try {
+        // 请求用户连接钱包
         const accounts = await window.ethereum.request({
             method: 'eth_requestAccounts'
         });
         
         if (accounts && accounts.length > 0) {
-            // 保存钱包地址
-            localStorage.setItem('userAddress', accounts[0]);
-            // 刷新页面
+            const userAddress = accounts[0];
+            // 保存钱包地址到localStorage
+            localStorage.setItem('userAddress', userAddress);
+            console.log('钱包已连接，地址:', userAddress);
+            
+            // 显示表单内容
+            const formContent = document.getElementById('assetForm');
+            if (formContent) {
+                formContent.style.display = 'block';
+            }
+            
+            // 隐藏连接钱包提示
+            const walletPrompt = document.querySelector('.wallet-prompt');
+            if (walletPrompt) {
+                walletPrompt.style.display = 'none';
+            }
+            
+            // 初始化表单元素
+            initializeFormElements();
+            
+            // 刷新页面以确保所有状态正确更新
             window.location.reload();
         }
     } catch (error) {
         console.error('连接钱包失败:', error);
         showError('连接钱包失败，请重试');
     }
+}
+
+// 检查钱包连接状态
+async function checkWalletConnection() {
+    try {
+        if (!window.ethereum) {
+            showError('请先安装MetaMask钱包');
+            return false;
+        }
+
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts && accounts.length > 0) {
+            const userAddress = accounts[0];
+            localStorage.setItem('userAddress', userAddress);
+            console.log('当前连接的钱包地址:', userAddress);
+            return true;
+        } else {
+            console.log('未连接钱包');
+            return false;
+        }
+    } catch (error) {
+        console.error('检查钱包连接失败:', error);
+        return false;
+    }
+}
+
+// 监听钱包账户变化
+if (window.ethereum) {
+    window.ethereum.on('accountsChanged', async function (accounts) {
+        if (accounts.length === 0) {
+            // 用户断开了钱包连接
+            localStorage.removeItem('userAddress');
+            window.location.reload();
+        } else {
+            // 用户切换了账户
+            localStorage.setItem('userAddress', accounts[0]);
+            window.location.reload();
+        }
+    });
 }
 
 // 修改代币代码生成逻辑
@@ -866,16 +882,17 @@ function initializeEventListeners(elements) {
         
         // 根据资产类型处理不同字段
         if (elements.type.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
-            formData.append('area', elements.area.value);
+            const area = parseFloat(elements.area.value);
+            const tokenCount = Math.floor(area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER);
+            formData.append('area', area);
             formData.append('totalValue', elements.totalValue.value);
-            formData.append('tokenCount', calculatedElements.realEstate.tokenCount.textContent.replace(/,/g, ''));
-            formData.append('tokenPrice', calculatedElements.realEstate.tokenPrice.textContent.replace(/,/g, ''));
             formData.append('expectedAnnualRevenue', elements.expectedAnnualRevenue.value);
+            formData.append('tokenCount', tokenCount);  // 添加计算后的代币数量
         } else {
-            formData.append('tokenCount', elements.tokenCount.value);
-            formData.append('totalValue', document.getElementById('totalValueSimilar').value);
-            formData.append('tokenPrice', calculatedElements.similarAssets.tokenPrice.textContent.replace(/,/g, ''));
-            formData.append('expectedAnnualRevenue', document.getElementById('expectedAnnualRevenueSimilar').value);
+            const tokenCount = parseInt(elements.tokenCount.value);
+            formData.append('tokenCount', tokenCount);
+            formData.append('totalValue', elements.totalValueSimilar.value);
+            formData.append('expectedAnnualRevenue', elements.expectedAnnualRevenueSimilar.value);
         }
         
         try {
@@ -1221,98 +1238,79 @@ function previewAsset() {
 // 修改提交资产函数
 async function submitAsset() {
     try {
-        // 获取当前连接的钱包地址
-        const ethAddress = localStorage.getItem('userAddress');
-        if (!ethAddress) {
+        // 检查钱包地址
+        const userAddress = localStorage.getItem('userAddress');
+        if (!userAddress) {
             throw new Error('请先连接钱包');
         }
 
-        const formData = new FormData(document.getElementById('assetForm'));
-        const assetType = formData.get('type');
-        
-        // 验证必填字段
-        const name = formData.get('name');
-        const location = formData.get('location');
-        const description = formData.get('description');
-        const tokenSymbol = formData.get('tokenSymbol');
-        const expectedAnnualRevenue = parseFloat(formData.get('expectedAnnualRevenue')) || 0;
-        
-        if (!name || !location || !description || !tokenSymbol) {
-            throw new Error('请填写所有必要字段');
-        }
-        
-        if (expectedAnnualRevenue <= 0) {
-            throw new Error('预期年收益必须大于0');
-        }
-        
-        // 根据资产类型添加正确的代币数量和价格
-        if (assetType === CONFIG.ASSET_TYPE.REAL_ESTATE) {
-            const area = parseFloat(formData.get('area')) || 0;
-            if (area <= 0) {
-                throw new Error('面积必须大于0');
-            }
-            const tokenCount = area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER;
-            const totalValue = parseFloat(formData.get('totalValue')) || 0;
-            if (totalValue <= 0) {
-                throw new Error('总价值必须大于0');
-            }
-            const tokenPrice = tokenCount > 0 ? (totalValue / tokenCount).toFixed(CONFIG.CALCULATION.PRICE_DECIMALS) : '0.000000';
-            
-            formData.set('tokenCount', tokenCount.toString());
-            formData.set('tokenPrice', tokenPrice);
-        } else {
-            const tokenCount = parseInt(formData.get('tokenCount')) || 0;
-            if (tokenCount <= 0) {
-                throw new Error('代币数量必须大于0');
-            }
-            const totalValue = parseFloat(formData.get('totalValue')) || 0;
-            if (totalValue <= 0) {
-                throw new Error('总价值必须大于0');
-            }
-            const tokenPrice = (totalValue / tokenCount).toFixed(CONFIG.CALCULATION.PRICE_DECIMALS);
-            formData.set('tokenPrice', tokenPrice);
-        }
-        
-        // 添加图片
-        if (uploadedImages.length > 0) {
-            for (const image of uploadedImages) {
-                const blob = await dataURLtoBlob(image.data);
-                formData.append('images[]', blob, image.name);
-            }
+        // 验证表单
+        if (!validateForm()) {
+            return;
         }
 
-        // 添加文档
-        if (uploadedDocuments.length > 0) {
-            for (const doc of uploadedDocuments) {
-                const blob = await dataURLtoBlob(doc.data);
-                formData.append('documents[]', blob, doc.name);
-            }
+        // 准备表单数据
+        const formData = new FormData();
+        
+        // 添加基本信息
+        formData.append('name', elements.nameInput.value.trim());
+        formData.append('type', elements.type.value);
+        formData.append('location', elements.locationInput.value.trim());
+        formData.append('description', elements.descriptionInput.value.trim());
+        formData.append('tokenSymbol', elements.tokenSymbol.value);
+        
+        // 根据资产类型添加特定字段
+        if (elements.type.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
+            const area = parseFloat(elements.area.value);
+            const tokenCount = Math.floor(area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER);
+            formData.append('area', area);
+            formData.append('totalValue', elements.totalValue.value);
+            formData.append('expectedAnnualRevenue', elements.expectedAnnualRevenue.value);
+            formData.append('tokenCount', tokenCount);  // 添加计算后的代币数量
+        } else {
+            const tokenCount = parseInt(elements.tokenCount.value);
+            formData.append('tokenCount', tokenCount);
+            formData.append('totalValue', elements.totalValueSimilar.value);
+            formData.append('expectedAnnualRevenue', elements.expectedAnnualRevenueSimilar.value);
         }
+
+        // 添加图片文件
+        uploadedImages.forEach((file, index) => {
+            formData.append('images[]', file);
+        });
+
+        // 添加文档文件
+        uploadedDocuments.forEach((file, index) => {
+            formData.append('documents[]', file);
+        });
 
         // 发送请求
         const response = await fetch('/api/assets/create', {
             method: 'POST',
             headers: {
-                'X-Eth-Address': ethAddress
+                'X-Eth-Address': userAddress  // 确保使用正确的地址
             },
             body: formData
         });
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error || '提交失败');
+            throw new Error(errorData.error || '创建资产失败');
         }
 
         const result = await response.json();
-        showToast('资产创建成功！');
         
-        // 延迟2秒后跳转
+        // 清除草稿
+        localStorage.removeItem('assetDraft');
+        
+        // 显示成功消息并跳转
+        showToast('资产创建成功！');
         setTimeout(() => {
             window.location.href = `/assets/${result.assetId}`;
-        }, 2000);
+        }, 1500);
 
     } catch (error) {
         console.error('提交表单失败:', error);
-        showError(error.message);
+        showError(error.message || '创建资产失败');
     }
 } 

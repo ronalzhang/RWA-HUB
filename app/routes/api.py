@@ -163,10 +163,10 @@ def create_asset():
         location = request.form.get('location')
         description = request.form.get('description')
         total_value = float(request.form.get('totalValue', 0))
-        token_price = float(request.form.get('tokenPrice', 0))
+        token_count = int(request.form.get('tokenCount', 0))  # 从前端获取token_count
         
         # 验证必填字段
-        if not all([name, asset_type, location, description, total_value]):
+        if not all([name, asset_type, location, description, total_value, token_count]):
             return jsonify({'error': '请填写所有必要字段'}), 400
             
         # 根据资产类型处理特定字段
@@ -174,12 +174,19 @@ def create_asset():
             area = float(request.form.get('area', 0))
             if area <= 0:
                 return jsonify({'error': '不动产面积必须大于0'}), 400
-            token_count = int(area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER)
+            # 验证token_count是否与面积计算结果一致
+            expected_token_count = int(area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER)
+            if token_count != expected_token_count:
+                return jsonify({'error': '代币数量计算错误'}), 400
         else:  # 类不动产
             area = None
-            token_count = int(request.form.get('tokenCount', 0))
             if token_count <= 0:
                 return jsonify({'error': '代币数量必须大于0'}), 400
+                
+        # 计算代币价格
+        token_price = total_value / token_count if token_count > 0 else 0
+        if token_price <= 0:
+            return jsonify({'error': '代币价格必须大于0'}), 400
         
         # 创建资产记录
         asset = Asset(
@@ -189,10 +196,10 @@ def create_asset():
             description=description,
             area=area,
             total_value=total_value,
-            token_count=token_count,
-            token_price=token_price,  # 使用前端传来的价格
-            token_symbol=request.form.get('tokenSymbol'),  # 保存代币符号
-            annual_revenue=float(request.form.get('expectedAnnualRevenue', 0)),  # 保存预期年收益
+            token_supply=token_count,  # 使用token_supply字段
+            token_price=token_price,
+            token_symbol=request.form.get('tokenSymbol'),
+            annual_revenue=float(request.form.get('expectedAnnualRevenue', 0)),
             owner_address=g.eth_address,
             creator_address=g.eth_address,
             status=AssetStatus.PENDING.value
