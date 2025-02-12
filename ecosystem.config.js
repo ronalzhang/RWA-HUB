@@ -12,13 +12,17 @@ module.exports = {
       QINIU_BUCKET_NAME: "rwa-hub",
       QINIU_DOMAIN: "sqbw3uvy8.sabkt.gdipper.com",
       PORT: "10000",
-      WAITRESS_THREADS: "8"
+      WAITRESS_THREADS: "8",
+      NODE_ENV: "development"
     },
     exec_mode: "fork",
     instances: 1,
     autorestart: true,
     watch: false,
     max_memory_restart: "1G",
+    restart_delay: 3000,
+    max_restarts: 3,
+    min_uptime: "30s",
     env_production: {
       NODE_ENV: "production"
     }
