@@ -1191,6 +1191,12 @@ function previewAsset() {
 // 添加提交资产函数
 async function submitAsset() {
     try {
+        // 检查钱包连接状态
+        const ethAddress = localStorage.getItem('userAddress');
+        if (!ethAddress) {
+            throw new Error('请先连接钱包');
+        }
+
         const errors = validateForm();
         if (errors.length > 0) {
             showError(errors.join('\n'));
@@ -1198,6 +1204,9 @@ async function submitAsset() {
         }
 
         const formData = new FormData(form);
+        
+        // 添加钱包地址到表单数据
+        formData.append('eth_address', ethAddress);
         
         // 根据资产类型处理不同字段
         if (typeInput.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
