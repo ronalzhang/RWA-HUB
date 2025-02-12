@@ -40,7 +40,15 @@ def create_app(config_name='development'):
     # 添加安全头
     @app.after_request
     def add_security_headers(response):
-        response.headers['Content-Security-Policy'] = "default-src 'self'; img-src * 'self' data: blob: http: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; font-src 'self' https://cdnjs.cloudflare.com data:; connect-src 'self' https://api.rwa-hub.com;"
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "img-src * 'self' data: blob: http: https:; "
+            "media-src 'self' data: blob: *; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; "
+            "font-src 'self' https://cdnjs.cloudflare.com data:; "
+            "connect-src 'self' http://localhost:* http://127.0.0.1:* https://api.rwa-hub.com;"
+        )
         return response
     
     # 确保日志目录存在

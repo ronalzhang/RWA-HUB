@@ -12,7 +12,9 @@ from flask import Blueprint
 import random
 from app.models.dividend import DividendRecord
 from app.utils.storage import storage
+from app.config import Config as CONFIG
 import time
+import re
 
 api_bp = Blueprint('api', __name__)
 
@@ -30,9 +32,13 @@ def is_admin_address(address):
     admin_config = current_app.config['ADMIN_CONFIG']
     current_app.logger.info(f'管理员配置: {admin_config}')
     current_app.logger.info(f'检查地址: {address}')
-    # 将所有地址转换为小写进行比较
+    
+    # 将所有地址和待检查地址转换为小写进行比较
+    address = address.lower()
     admin_addresses = {addr.lower(): config for addr, config in admin_config.items()}
-    is_admin = address.lower() in admin_addresses
+    
+    # 检查地址是否在管理员列表中
+    is_admin = address in admin_addresses
     current_app.logger.info(f'检查结果: {is_admin}')
     return is_admin
 
@@ -156,185 +162,152 @@ def create_asset():
     """创建资产"""
     try:
         current_app.logger.info('开始处理资产创建请求')
+        current_app.logger.info(f'请求头: {dict(request.headers)}')
+        current_app.logger.info(f'表单数据: {dict(request.form)}')
         
         # 获取表单数据
         name = request.form.get('name')
-        asset_type = request.form.get('type')
+        asset_type = request.form.get('type')  # 这里获取的是字符串类型
         location = request.form.get('location')
         description = request.form.get('description')
         total_value = float(request.form.get('totalValue', 0))
-        token_count = int(request.form.get('tokenCount', 0))  # 从前端获取token_count
+        token_symbol = request.form.get('tokenSymbol')
+        expected_annual_revenue = float(request.form.get('expectedAnnualRevenue', 0))
+        
+        # 初始化area变量
+        area = None
+        token_count = 0
+        
+        current_app.logger.info(f'解析的表单数据: name={name}, type={asset_type}, location={location}, total_value={total_value}, token_symbol={token_symbol}')
         
         # 验证必填字段
-        if not all([name, asset_type, location, description, total_value, token_count]):
-            return jsonify({'error': '请填写所有必要字段'}), 400
+        if not all([name, asset_type, location, description, token_symbol]):
+            missing_fields = []
+            if not name: missing_fields.append('name')
+            if not asset_type: missing_fields.append('type')
+            if not location: missing_fields.append('location')
+            if not description: missing_fields.append('description')
+            if not token_symbol: missing_fields.append('tokenSymbol')
+            error_msg = f'缺少必要字段: {", ".join(missing_fields)}'
+            current_app.logger.error(error_msg)
+            return jsonify({'error': error_msg}), 400
             
-        # 根据资产类型处理特定字段
+        # 验证资产类型
+        if not isinstance(asset_type, str) or asset_type not in ['10', '20']:
+            current_app.logger.error(f'无效的资产类型: {asset_type}, 类型: {type(asset_type)}')
+            return jsonify({'error': f'无效的资产类型: {asset_type}'}), 400
+            
+        # 验证token_symbol格式
+        pattern = r'^RH-(?:10|20)\d{4}$'
+        if not re.match(pattern, token_symbol):
+            current_app.logger.error(f'无效的token_symbol格式: {token_symbol}')
+            return jsonify({'error': 'token_symbol格式无效，必须为RH-XXYYYY格式，其中XX为10或20，YYYY为4位数字'}), 400
+            
+        # 根据资产类型获取代币数量
         if asset_type == '10':  # 不动产
-            area = float(request.form.get('area', 0))
-            if area <= 0:
-                return jsonify({'error': '不动产面积必须大于0'}), 400
-            # 验证token_count是否与面积计算结果一致
-            expected_token_count = int(area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER)
-            if token_count != expected_token_count:
-                return jsonify({'error': '代币数量计算错误'}), 400
+            try:
+                area = float(request.form.get('area', 0))
+                if area <= 0:
+                    return jsonify({'error': '不动产面积必须大于0'}), 400
+                token_count = int(area * 10000)  # 1平方米 = 10000代币
+            except (ValueError, TypeError) as e:
+                return jsonify({'error': '面积格式无效'}), 400
         else:  # 类不动产
-            area = None
-            if token_count <= 0:
-                return jsonify({'error': '代币数量必须大于0'}), 400
-                
-        # 计算代币价格
-        token_price = total_value / token_count if token_count > 0 else 0
-        if token_price <= 0:
-            return jsonify({'error': '代币价格必须大于0'}), 400
+            try:
+                token_count = int(request.form.get('tokenCount', 0))
+                if token_count <= 0:
+                    return jsonify({'error': '代币数量必须大于0'}), 400
+            except (ValueError, TypeError) as e:
+                return jsonify({'error': '代币数量格式无效'}), 400
         
+        # 验证总价值
+        if total_value <= 0:
+            return jsonify({'error': '总价值必须大于0'}), 400
+            
+        # 计算代币价格
+        try:
+            token_price = total_value / token_count if token_count > 0 else 0
+            if token_price <= 0:
+                return jsonify({'error': '代币价格必须大于0'}), 400
+        except ZeroDivisionError:
+            return jsonify({'error': '代币数量不能为0'}), 400
+            
         # 创建资产记录
         asset = Asset(
             name=name,
-            asset_type=asset_type,
+            asset_type=int(asset_type),  # 将字符串类型转换为整数
             location=location,
             description=description,
             area=area,
             total_value=total_value,
-            token_supply=token_count,  # 使用token_supply字段
+            token_supply=token_count,
             token_price=token_price,
-            token_symbol=request.form.get('tokenSymbol'),
-            annual_revenue=float(request.form.get('expectedAnnualRevenue', 0)),
+            token_symbol=token_symbol,
+            annual_revenue=expected_annual_revenue,
             owner_address=g.eth_address,
             creator_address=g.eth_address,
-            status=AssetStatus.PENDING.value
+            status=AssetStatus.PENDING.value  # 使用枚举值
         )
         
-        # 保存资产记录以获取ID
-        db.session.add(asset)
-        db.session.commit()
-        
-        # 移动文件到正式目录
-        final_image_paths = []
-        final_doc_paths = []
-        
+        # 保存资产记录
         try:
-            # 移动图片
-            if 'images' in request.files:
-                images = request.files.getlist('images')
-                for i, image in enumerate(images):
-                    if image and image.filename and allowed_file(image.filename):
-                        try:
-                            # 构建临时文件名
-                            ext = image.filename.rsplit('.', 1)[1].lower()
-                            temp_filename = f'{asset_type.lower()}/temp/images/image_{i+1}_{int(time.time())}_{random.randint(1000, 9999)}.{ext}'
-                            
-                            # 上传到七牛云临时目录
-                            file_data = image.read()
-                            url = storage.upload(file_data, temp_filename)
-                            
-                            if url:
-                                temp_image_paths.append({
-                                    'temp_url': url,
-                                    'temp_key': temp_filename,
-                                    'filename': f'image_{i+1}.{ext}'
-                                })
-                                current_app.logger.info(f'图片上传到临时目录成功: {url}')
-                            else:
-                                raise Exception("七牛云返回空URL")
-                        except Exception as e:
-                            current_app.logger.error(f'上传图片到临时目录失败: {str(e)}')
-                            # 清理已上传的临时文件
-                            for temp_file in temp_image_paths:
-                                try:
-                                    storage.delete(temp_file['temp_key'])
-                                except:
-                                    pass
-                            return jsonify({'error': f'上传图片 {image.filename} 失败'}), 500
+            db.session.add(asset)
+            db.session.commit()
+            current_app.logger.info(f'资产记录创建成功，ID: {asset.id}')
             
-            # 处理文档
-            if 'documents' in request.files:
-                documents = request.files.getlist('documents')
-                for i, doc in enumerate(documents):
-                    if doc and doc.filename and allowed_file(doc.filename):
-                        try:
-                            # 构建临时文件名
-                            ext = doc.filename.rsplit('.', 1)[1].lower()
-                            temp_filename = f'{asset_type.lower()}/temp/documents/doc_{i+1}_{int(time.time())}_{random.randint(1000, 9999)}.{ext}'
-                            
-                            # 上传到七牛云临时目录
-                            file_data = doc.read()
-                            url = storage.upload(file_data, temp_filename)
-                            
-                            if url:
-                                temp_doc_paths.append({
-                                    'temp_url': url,
-                                    'temp_key': temp_filename,
-                                    'filename': f'doc_{i+1}.{ext}'
-                                })
-                                current_app.logger.info(f'文档上传到临时目录成功: {url}')
-                            else:
-                                raise Exception("七牛云返回空URL")
-                        except Exception as e:
-                            current_app.logger.error(f'上传文档到临时目录失败: {str(e)}')
-                            # 清理所有临时文件
-                            for temp_file in temp_image_paths + temp_doc_paths:
-                                try:
-                                    storage.delete(temp_file['temp_key'])
-                                except:
-                                    pass
-                            return jsonify({'error': f'上传文档 {doc.filename} 失败'}), 500
-            
-            # 移动文件到正式目录
-            try:
-                # 移动图片
-                for temp_file in temp_image_paths:
-                    final_key = f'{asset_type.lower()}/{asset.id}/images/{temp_file["filename"]}'
-                    storage.move(temp_file['temp_key'], final_key)
-                    final_url = storage.get_url(final_key)
-                    final_image_paths.append(final_url)
-                
-                # 移动文档
-                for temp_file in temp_doc_paths:
-                    final_key = f'{asset_type.lower()}/{asset.id}/documents/{temp_file["filename"]}'
-                    storage.move(temp_file['temp_key'], final_key)
-                    final_url = storage.get_url(final_key)
-                    final_doc_paths.append(final_url)
-                
-                # 更新资产记录的文件路径
-                if final_image_paths:
-                    asset.images = json.dumps(final_image_paths)
-                if final_doc_paths:
-                    asset.documents = json.dumps(final_doc_paths)
+            # 处理图片上传
+            if 'images[]' in request.files:
+                images = request.files.getlist('images[]')
+                if images and any(image.filename for image in images):
+                    image_paths = []
+                    asset_type_folder = 'real_estate' if asset_type == '10' else 'similar_assets'
                     
-                db.session.commit()
-                
-                return jsonify({
-                    'message': '资产创建成功',
-                    'assetId': asset.id
-                }), 201
-                
-            except Exception as e:
-                current_app.logger.error(f'移动文件到正式目录失败: {str(e)}')
-                # 清理所有文件
-                for url in final_image_paths + final_doc_paths:
-                    try:
-                        storage.delete(url)
-                    except:
-                        pass
-                # 删除资产记录
-                db.session.delete(asset)
-                db.session.commit()
-                raise
-                
+                    for image in images:
+                        if image and image.filename and allowed_file(image.filename, ['jpg', 'jpeg', 'png']):
+                            try:
+                                # 构建文件名
+                                ext = image.filename.rsplit(".", 1)[1].lower()
+                                filename = f'{asset_type_folder}/{asset.id}/image_{len(image_paths)+1}.{ext}'
+                                
+                                # 读取文件内容
+                                file_data = image.read()
+                                
+                                # 检查七牛云存储是否初始化
+                                if storage is None:
+                                    raise Exception("七牛云存储未初始化")
+                                    
+                                # 上传到七牛云
+                                current_app.logger.info(f'开始上传图片到七牛云: {filename}')
+                                url = storage.upload(file_data, filename)
+                                
+                                if url:
+                                    image_paths.append(url)
+                                    current_app.logger.info(f'图片上传成功: {url}')
+                                else:
+                                    current_app.logger.error('七牛云返回的URL为空')
+                                    
+                            except Exception as e:
+                                current_app.logger.error(f'上传图片失败: {str(e)}')
+                                continue
+                    
+                    if image_paths:
+                        asset.images = json.dumps(image_paths)
+                        db.session.commit()
+                        current_app.logger.info(f'更新资产图片成功: {image_paths}')
+            
+            return jsonify({
+                'message': '资产创建成功',
+                'assetId': asset.id
+            })
+            
         except Exception as e:
-            # 清理所有临时文件
-            for temp_file in temp_image_paths + temp_doc_paths:
-                try:
-                    storage.delete(temp_file['temp_key'])
-                except:
-                    pass
-            raise
+            db.session.rollback()
+            current_app.logger.error(f'保存资产记录失败: {str(e)}')
+            return jsonify({'error': '保存资产记录失败'}), 500
             
     except Exception as e:
-        current_app.logger.error(f'创建资产失败: {str(e)}')
-        db.session.rollback()
-        return jsonify({'error': '创建资产失败'}), 500
+        current_app.logger.error(f'创建资产失败: {str(e)}', exc_info=True)
+        return jsonify({'error': f'创建资产失败: {str(e)}'}), 500
 
 @api_bp.route('/assets/<int:asset_id>', methods=['PUT'])
 def update_asset(asset_id):
@@ -360,11 +333,11 @@ def update_asset(asset_id):
         asset.location = request.form.get('location')
         asset.description = request.form.get('description', asset.description)
         asset.area = float(request.form.get('area')) if request.form.get('area') else None
-        asset.total_value = float(request.form.get('total_value'))
-        asset.annual_revenue = float(request.form.get('annual_revenue'))
-        asset.token_price = float(request.form.get('token_price'))
-        asset.token_count = int(request.form.get('token_count'))
-        asset.token_symbol = request.form.get('token_symbol')
+        asset.total_value = float(request.form.get('totalValue', 0))
+        asset.annual_revenue = float(request.form.get('expectedAnnualRevenue', 0))
+        asset.token_price = float(request.form.get('tokenPrice', 0))
+        asset.token_supply = int(request.form.get('tokenCount', 0))
+        asset.token_symbol = request.form.get('tokenSymbol')
         
         # 处理图片和文档
         if 'images' in request.files:
@@ -533,22 +506,27 @@ def check_admin():
         if not data or 'address' not in data:
             return jsonify({'error': 'Missing address parameter'}), 400
             
-        address = data['address']
+        address = data['address'].lower()  # 转换为小写
         # 使用 is_admin_address 函数检查是否是管理员
         is_admin = is_admin_address(address)
         
         if is_admin:
             # 获取管理员配置信息
             admin_config = current_app.config['ADMIN_CONFIG']
-            admin_info = admin_config.get(address.lower()) or admin_config.get(address)
+            # 尝试用小写和原始地址获取配置
+            admin_info = admin_config.get(address) or next(
+                (config for key, config in admin_config.items() if key.lower() == address),
+                None
+            )
             
-            return jsonify({
-                'is_admin': True,
-                'role': admin_info['role'],
-                'name': admin_info.get('name', ''),
-                'level': admin_info.get('level', 1),
-                'permissions': admin_info['permissions']
-            })
+            if admin_info:
+                return jsonify({
+                    'is_admin': True,
+                    'role': admin_info['role'],
+                    'name': admin_info.get('name', ''),
+                    'level': admin_info.get('level', 1),
+                    'permissions': admin_info['permissions']
+                })
         
         return jsonify({
             'is_admin': False,
