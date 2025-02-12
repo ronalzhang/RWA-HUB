@@ -20,23 +20,42 @@ api_bp = Blueprint('api', __name__)
 # 允许的文件扩展名
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
 
-# 1. 初始化 Redis 客户端
-try:
-    redis_client = redis.Redis(
-        host=current_app.config.get('REDIS_HOST', 'localhost'),
-        port=current_app.config.get('REDIS_PORT', 6379),
-        db=current_app.config.get('REDIS_DB', 0),
-        decode_responses=True
-    )
-except Exception as e:
-    current_app.logger.error(f"Redis连接失败: {str(e)}")
-    redis_client = None
+def get_redis_client():
+    """获取Redis客户端实例"""
+    if not hasattr(g, 'redis_client'):
+        try:
+            # 确保在应用程序上下文中运行
+            if not current_app:
+                return None
+            g.redis_client = redis.Redis(
+                host=current_app.config.get('REDIS_HOST', 'localhost'),
+                port=current_app.config.get('REDIS_PORT', 6379),
+                db=current_app.config.get('REDIS_DB', 0),
+                decode_responses=True
+            )
+            # 测试连接
+            g.redis_client.ping()
+        except Exception as e:
+            if current_app:
+                current_app.logger.error(f"Redis连接失败: {str(e)}")
+            g.redis_client = None
+    return g.redis_client
+
+@api_bp.before_request
+def init_redis():
+    """在每个请求之前初始化Redis客户端"""
+    get_redis_client()
 
 # 缓存装饰器
 def cache_permission(timeout=300):  # 默认缓存5分钟
     def decorator(f):
         @wraps(f)
         def wrapped(*args, **kwargs):
+            # 确保在请求上下文中运行
+            if not current_app:
+                return f(*args, **kwargs)
+
+            redis_client = get_redis_client()
             if not redis_client:
                 return f(*args, **kwargs)
 
@@ -45,10 +64,13 @@ def cache_permission(timeout=300):  # 默认缓存5分钟
                 return jsonify({'error': '未提供钱包地址'}), 401
 
             cache_key = f"permission:{eth_address.lower()}"
-            cached_data = redis_client.get(cache_key)
-
-            if cached_data:
-                return jsonify(json.loads(cached_data))
+            try:
+                cached_data = redis_client.get(cache_key)
+                if cached_data:
+                    return jsonify(json.loads(cached_data))
+            except Exception as e:
+                current_app.logger.error(f"获取缓存数据失败: {str(e)}")
+                return f(*args, **kwargs)
 
             result = f(*args, **kwargs)
             if getattr(result, 'status_code', 200) == 200:
@@ -416,6 +438,7 @@ def check_admin():
             }), 200
 
         # 添加缓存统计
+        redis_client = get_redis_client()
         if redis_client:
             try:
                 redis_client.incr('admin_check_count')
