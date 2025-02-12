@@ -39,10 +39,20 @@ const descriptionInput = document.getElementById('description');
 const areaInput = document.getElementById('area');
 const totalValueInput = document.getElementById('totalValue');
 const tokenCountInput = document.getElementById('tokenCount');
-const tokenPriceInput = document.getElementById('tokenPrice');
 const expectedAnnualRevenueInput = document.getElementById('expectedAnnualRevenue');
 const imageDropzone = document.getElementById('imageDropzone');
 const documentDropzone = document.getElementById('documentDropzone');
+
+// 计算结果元素
+const calculatedElements = {
+    realEstate: {
+        tokenCount: document.getElementById('calculatedTokenCount'),
+        tokenPrice: document.getElementById('calculatedTokenPrice')
+    },
+    similarAssets: {
+        tokenPrice: document.getElementById('calculatedTokenPriceSimilar')
+    }
+};
 
 // 错误提示模态框
 const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
@@ -62,10 +72,9 @@ const documentUploadPercent = document.getElementById('documentUploadPercent');
 
 // 草稿相关元素
 const draftInfo = document.getElementById('draftInfo');
-const draftTime = document.getElementById('draftTime');
-const loadDraftBtn = document.getElementById('loadDraft');
-const discardDraftBtn = document.getElementById('discardDraft');
-const saveDraftBtn = document.getElementById('saveDraft');
+if (draftInfo) {
+    draftInfo.style.display = 'none';  // 默认隐藏草稿信息
+}
 
 // 资产类型相关元素
 const realEstateFields = document.querySelectorAll('.asset-type-field.real-estate');
@@ -138,9 +147,9 @@ function toggleAssetTypeFields(type) {
 
 // 重置计算结果
 function resetCalculations() {
-    calculatedTokenCount.textContent = '0';
-    calculatedTokenPrice.textContent = '0.000000';
-    tokenPriceInput.value = '';
+    calculatedElements.realEstate.tokenCount.textContent = '0';
+    calculatedElements.realEstate.tokenPrice.textContent = '0.000000';
+    calculatedElements.similarAssets.tokenPrice.textContent = '0.000000';
 }
 
 // 计算代币数量（不动产）
@@ -148,10 +157,10 @@ function calculateRealEstateTokens() {
     const area = parseFloat(areaInput.value) || 0;
     if (area > 0) {
         const tokenCount = Math.floor(area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER);
-        calculatedTokenCount.textContent = formatNumber(tokenCount);
+        calculatedElements.realEstate.tokenCount.textContent = formatNumber(tokenCount);
         return tokenCount;
     }
-    calculatedTokenCount.textContent = '0';
+    calculatedElements.realEstate.tokenCount.textContent = '0';
     return 0;
 }
 
@@ -162,24 +171,24 @@ function calculateTokenPrice() {
     
     if (typeInput.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
         tokenCount = calculateRealEstateTokens();
-    } else {
-        tokenCount = parseInt(tokenCountInput.value) || 0;
-    }
-    
-    if (totalValue > 0 && tokenCount > 0) {
-        const tokenPrice = totalValue / tokenCount;
-        const formattedPrice = formatNumber(tokenPrice, CONFIG.CALCULATION.PRICE_DECIMALS);
-        calculatedTokenPrice.textContent = formattedPrice;
-        tokenPriceInput.value = tokenPrice.toFixed(CONFIG.CALCULATION.PRICE_DECIMALS);
-        
-        // 更新显示
-        if (typeInput.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
-            calculatedTokenCount.textContent = formatNumber(tokenCount);
+        if (totalValue > 0 && tokenCount > 0) {
+            const tokenPrice = totalValue / tokenCount;
+            const formattedPrice = formatNumber(tokenPrice, CONFIG.CALCULATION.PRICE_DECIMALS);
+            calculatedElements.realEstate.tokenPrice.textContent = formattedPrice;
+            calculatedElements.realEstate.tokenCount.textContent = formatNumber(tokenCount);
+        } else {
+            calculatedElements.realEstate.tokenPrice.textContent = '0.000000';
+            calculatedElements.realEstate.tokenCount.textContent = '0';
         }
     } else {
-        calculatedTokenPrice.textContent = '0.000000';
-        tokenPriceInput.value = '';
-        calculatedTokenCount.textContent = '0';
+        tokenCount = parseInt(tokenCountInput.value) || 0;
+        if (totalValue > 0 && tokenCount > 0) {
+            const tokenPrice = totalValue / tokenCount;
+            const formattedPrice = formatNumber(tokenPrice, CONFIG.CALCULATION.PRICE_DECIMALS);
+            calculatedElements.similarAssets.tokenPrice.textContent = formattedPrice;
+        } else {
+            calculatedElements.similarAssets.tokenPrice.textContent = '0.000000';
+        }
     }
 }
 
@@ -224,7 +233,12 @@ async function compressImage(file) {
 
 // 文件验证函数
 function validateFiles(files, type) {
-    const config = CONFIG[type];
+    if (!files || !type || !CONFIG[type.toUpperCase()]) {
+        console.error('无效的文件验证参数');
+        return ['文件验证失败'];
+    }
+    
+    const config = CONFIG[type.toUpperCase()];
     const errors = [];
     
     if (files.length > config.MAX_FILES) {
@@ -264,7 +278,10 @@ function showProgress(type, loaded, total) {
 
 // 处理文件函数
 async function handleFiles(files, type) {
-    const errors = validateFiles(files, type);
+    // 转换type为大写
+    const fileType = type.toUpperCase();
+    
+    const errors = validateFiles(files, fileType);
     if (errors.length > 0) {
         showError(errors.join('\n'));
         return;
@@ -278,16 +295,16 @@ async function handleFiles(files, type) {
         totalSize += file.size;
         try {
             let processedFile = file;
-            if (type === 'IMAGE') {
+            if (fileType === 'IMAGE') {
                 processedFile = await compressImage(file);
             }
             
             const reader = new FileReader();
             reader.onload = function(e) {
                 loadedSize += processedFile.size;
-                showProgress(type, loadedSize, totalSize);
+                showProgress(fileType, loadedSize, totalSize);
                 
-                if (type === 'IMAGE') {
+                if (fileType === 'IMAGE') {
                     uploadedImages.push({
                         name: processedFile.name,
                         type: processedFile.type,
@@ -308,6 +325,7 @@ async function handleFiles(files, type) {
             reader.readAsDataURL(processedFile);
             processedFiles.push(processedFile);
         } catch (error) {
+            console.error(`处理文件 ${file.name} 失败:`, error);
             showError(`处理文件 ${file.name} 失败: ${error.message}`);
         }
     }
@@ -383,33 +401,35 @@ function saveDraft() {
 }
 
 function loadDraft() {
-    const draft = JSON.parse(localStorage.getItem(CONFIG.DRAFT.KEY));
-    if (!draft) return;
-    
-    // 填充表单数据
-    Object.entries(draft.data).forEach(([key, value]) => {
-        const input = form.elements[key];
-        if (input) input.value = value;
-    });
-    
-    // 加载图片和文档
-    uploadedImages = draft.images || [];
-    uploadedDocuments = draft.documents || [];
-    updateImagePreview();
-    updateDocumentList();
-    
-    // 触发计算
-    calculateTokenPrice();
-    
-    draftInfo.style.display = 'none';
+    try {
+        const draft = JSON.parse(localStorage.getItem(CONFIG.DRAFT.KEY));
+        if (!draft || !draft.data) return;
+        
+        // 填充表单数据
+        Object.entries(draft.data).forEach(([key, value]) => {
+            const input = form.elements[key];
+            if (input) input.value = value;
+        });
+        
+        // 加载图片和文档
+        uploadedImages = draft.images || [];
+        uploadedDocuments = draft.documents || [];
+        updateImagePreview();
+        updateDocumentList();
+        
+        // 触发计算
+        calculateTokenPrice();
+        
+        draftInfo.style.display = 'none';
+    } catch (error) {
+        console.error('加载草稿失败:', error);
+        localStorage.removeItem(CONFIG.DRAFT.KEY);
+    }
 }
 
 function checkDraft() {
-    const draft = JSON.parse(localStorage.getItem(CONFIG.DRAFT.KEY));
-    if (draft) {
-        draftInfo.style.display = 'block';
-        draftTime.textContent = new Date(draft.timestamp).toLocaleString();
-    }
+    // 暂时禁用草稿检查功能
+    return;
 }
 
 // 表单验证增强
@@ -497,11 +517,26 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 处理文件选择
     document.getElementById('imageInput').addEventListener('change', e => {
-        handleFiles(e.target.files, 'image');
+        if (e.target.files && e.target.files.length > 0) {
+            handleFiles(e.target.files, 'image');
+            e.target.value = ''; // 清空input，允许重复选择相同文件
+        }
     });
     
     document.getElementById('documentInput').addEventListener('change', e => {
-        handleFiles(e.target.files, 'document');
+        if (e.target.files && e.target.files.length > 0) {
+            handleFiles(e.target.files, 'document');
+            e.target.value = ''; // 清空input，允许重复选择相同文件
+        }
+    });
+    
+    // 点击拖放区域触发文件选择
+    imageDropzone.addEventListener('click', () => {
+        document.getElementById('imageInput').click();
+    });
+    
+    documentDropzone.addEventListener('click', () => {
+        document.getElementById('documentInput').click();
     });
     
     // 资产类型切换
@@ -517,22 +552,20 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // 类不动产计算触发器
-    tokenCountInput.addEventListener('input', function() {
-        if (typeInput.value === CONFIG.ASSET_TYPE.SIMILAR_ASSETS) {
-            calculateTokenPrice();
-        }
-    });
+    document.getElementById('totalValueSimilar').addEventListener('input', calculateTokenPrice);
+    document.getElementById('tokenCount').addEventListener('input', calculateTokenPrice);
     
     // 总价值变化触发器
     totalValueInput.addEventListener('input', calculateTokenPrice);
     
-    // 自动保存
-    let autoSaveTimer = setInterval(saveDraft, CONFIG.DRAFT.AUTO_SAVE_INTERVAL);
+    // 注释掉草稿相关的事件监听
+    // let autoSaveTimer = setInterval(saveDraft, CONFIG.DRAFT.AUTO_SAVE_INTERVAL);
     
     // 检查草稿
-    checkDraft();
+    // checkDraft();
     
     // 草稿按钮事件
+    /*
     loadDraftBtn.addEventListener('click', loadDraft);
     discardDraftBtn.addEventListener('click', () => {
         localStorage.removeItem(CONFIG.DRAFT.KEY);
@@ -542,6 +575,7 @@ document.addEventListener('DOMContentLoaded', function() {
         saveDraft();
         showToast('草稿已保存');
     });
+    */
     
     // 表单提交增强
     form.addEventListener('submit', async function(e) {
@@ -558,24 +592,33 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('type', typeInput.value);
         formData.append('location', locationInput.value);
         formData.append('description', descriptionInput.value);
-        formData.append('area', areaInput.value);
-        formData.append('totalValue', totalValueInput.value);
-        formData.append('expectedAnnualRevenue', expectedAnnualRevenueInput.value);
         
-        // 添加图片和文档
-        uploadedImages.forEach((image, index) => {
-            formData.append(`images[${index}]`, dataURLtoBlob(image.data), image.name);
-        });
-        
-        uploadedDocuments.forEach((doc, index) => {
-            formData.append(`documents[${index}]`, dataURLtoBlob(doc.data), doc.name);
-        });
-        
-        // 添加计算结果
+        // 根据资产类型处理不同字段
         if (typeInput.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
-            formData.append('tokenCount', calculatedTokenCount.textContent.replace(/,/g, ''));
+            formData.append('area', areaInput.value);
+            formData.append('totalValue', totalValueInput.value);
+            formData.append('tokenCount', calculatedElements.realEstate.tokenCount.textContent.replace(/,/g, ''));
+            formData.append('tokenPrice', calculatedElements.realEstate.tokenPrice.textContent.replace(/,/g, ''));
+            formData.append('expectedAnnualRevenue', expectedAnnualRevenueInput.value);
+        } else {
+            formData.append('tokenCount', tokenCountInput.value);
+            formData.append('totalValue', document.getElementById('totalValueSimilar').value);
+            formData.append('tokenPrice', calculatedElements.similarAssets.tokenPrice.textContent.replace(/,/g, ''));
+            formData.append('expectedAnnualRevenue', document.getElementById('expectedAnnualRevenueSimilar').value);
         }
-        formData.append('tokenPrice', tokenPriceInput.value);
+        
+        // 添加图片和文档（可选）
+        if (uploadedImages.length > 0) {
+            uploadedImages.forEach((image, index) => {
+                formData.append(`images[${index}]`, dataURLtoBlob(image.data), image.name);
+            });
+        }
+        
+        if (uploadedDocuments.length > 0) {
+            uploadedDocuments.forEach((doc, index) => {
+                formData.append(`documents[${index}]`, dataURLtoBlob(doc.data), doc.name);
+            });
+        }
         
         try {
             const response = await fetch('/api/assets/create', {
@@ -591,7 +634,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             // 清除草稿
             localStorage.removeItem(CONFIG.DRAFT.KEY);
-            clearInterval(autoSaveTimer);
             
             window.location.href = `/assets/${result.assetId}`;
         } catch (error) {
@@ -652,9 +694,11 @@ function updateAssetTypeDisplay() {
     const type = typeInput.value;
     const realEstateFields = document.querySelectorAll('.asset-type-field.real-estate');
     const similarAssetsFields = document.querySelectorAll('.asset-type-field.similar-assets');
-    const realEstateInfo = document.querySelector('.real-estate-info');
     
+    // 生成并显示代币代码
+    const tokenSymbolInput = document.getElementById('tokenSymbol');
     if (type === CONFIG.ASSET_TYPE.REAL_ESTATE) {
+        tokenSymbolInput.value = `10${new Date().getFullYear()}`;
         realEstateFields.forEach(field => {
             field.classList.remove('hidden');
             field.querySelectorAll('input, select').forEach(input => input.required = true);
@@ -666,9 +710,9 @@ function updateAssetTypeDisplay() {
                 input.value = '';
             });
         });
-        realEstateInfo.classList.remove('hidden');
         calculateRealEstateTokens();
-    } else {
+    } else if (type === CONFIG.ASSET_TYPE.SIMILAR_ASSETS) {
+        tokenSymbolInput.value = `20${new Date().getFullYear()}`;
         realEstateFields.forEach(field => {
             field.classList.add('hidden');
             field.querySelectorAll('input, select').forEach(input => {
@@ -680,8 +724,8 @@ function updateAssetTypeDisplay() {
             field.classList.remove('hidden');
             field.querySelectorAll('input, select').forEach(input => input.required = true);
         });
-        realEstateInfo.classList.add('hidden');
-        calculatedTokenCount.textContent = '0';
+    } else {
+        tokenSymbolInput.value = '';
     }
     
     calculateTokenPrice();

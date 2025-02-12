@@ -12,6 +12,7 @@ from flask import Blueprint
 import random
 from app.models.dividend import DividendRecord
 from app.utils.storage import storage
+import time
 
 api_bp = Blueprint('api', __name__)
 
@@ -181,93 +182,152 @@ def create_asset():
             if token_supply <= 0:
                 return jsonify({'error': '代币数量必须大于0'}), 400
         
-        # 创建资产记录
-        asset = Asset(
-            name=name,
-            asset_type=asset_type,
-            location=location,
-            description=description,
-            area=area,
-            total_value=total_value,
-            token_price=token_price,
-            token_supply=token_supply,
-            annual_revenue=annual_revenue,
-            owner_address=g.eth_address,
-            creator_address=g.eth_address,
-            status=AssetStatus.PENDING.value
-        )
+        # 处理文件上传到临时目录
+        temp_image_paths = []
+        temp_doc_paths = []
+        asset_type_folder = 'real_estate' if asset_type == '10' else 'quasi_real_estate'
         
-        # 处理图片
-        image_paths = []
-        if 'images' in request.files:
-            images = request.files.getlist('images')
-            for i, image in enumerate(images):
-                if image and image.filename and allowed_file(image.filename):
-                    try:
-                        # 构建文件名
-                        ext = image.filename.rsplit('.', 1)[1].lower()
-                        asset_type_folder = 'real_estate' if asset_type == '10' else 'quasi_real_estate'
-                        filename = f'{asset_type_folder}/temp/image_{i+1}.{ext}'
-                        
-                        # 上传到七牛云
-                        file_data = image.read()
-                        url = storage.upload(file_data, filename)
-                        
-                        if url:
-                            image_paths.append(url)
-                            current_app.logger.info(f'图片上传成功: {url}')
-                    except Exception as e:
-                        current_app.logger.error(f'上传图片失败: {str(e)}')
-                        continue
-                        
-        if image_paths:
-            asset.images = json.dumps(image_paths)
+        try:
+            # 处理图片
+            if 'images' in request.files:
+                images = request.files.getlist('images')
+                for i, image in enumerate(images):
+                    if image and image.filename and allowed_file(image.filename):
+                        try:
+                            # 构建临时文件名
+                            ext = image.filename.rsplit('.', 1)[1].lower()
+                            temp_filename = f'{asset_type_folder}/temp/images/image_{i+1}_{int(time.time())}_{random.randint(1000, 9999)}.{ext}'
+                            
+                            # 上传到七牛云临时目录
+                            file_data = image.read()
+                            url = storage.upload(file_data, temp_filename)
+                            
+                            if url:
+                                temp_image_paths.append({
+                                    'temp_url': url,
+                                    'temp_key': temp_filename,
+                                    'filename': f'image_{i+1}.{ext}'
+                                })
+                                current_app.logger.info(f'图片上传到临时目录成功: {url}')
+                            else:
+                                raise Exception("七牛云返回空URL")
+                        except Exception as e:
+                            current_app.logger.error(f'上传图片到临时目录失败: {str(e)}')
+                            # 清理已上传的临时文件
+                            for temp_file in temp_image_paths:
+                                try:
+                                    storage.delete(temp_file['temp_key'])
+                                except:
+                                    pass
+                            return jsonify({'error': f'上传图片 {image.filename} 失败'}), 500
             
-        # 处理文档
-        doc_paths = []
-        if 'documents' in request.files:
-            documents = request.files.getlist('documents')
-            for i, doc in enumerate(documents):
-                if doc and doc.filename and allowed_file(doc.filename):
-                    try:
-                        # 构建文件名
-                        ext = doc.filename.rsplit('.', 1)[1].lower()
-                        asset_type_folder = 'real_estate' if asset_type == '10' else 'quasi_real_estate'
-                        filename = f'{asset_type_folder}/temp/document_{i+1}.{ext}'
-                        
-                        # 上传到七牛云
-                        file_data = doc.read()
-                        url = storage.upload(file_data, filename)
-                        
-                        if url:
-                            doc_paths.append(url)
-                            current_app.logger.info(f'文档上传成功: {url}')
-                    except Exception as e:
-                        current_app.logger.error(f'上传文档失败: {str(e)}')
-                        continue
-                        
-        if doc_paths:
-            asset.documents = json.dumps(doc_paths)
+            # 处理文档
+            if 'documents' in request.files:
+                documents = request.files.getlist('documents')
+                for i, doc in enumerate(documents):
+                    if doc and doc.filename and allowed_file(doc.filename):
+                        try:
+                            # 构建临时文件名
+                            ext = doc.filename.rsplit('.', 1)[1].lower()
+                            temp_filename = f'{asset_type_folder}/temp/documents/doc_{i+1}_{int(time.time())}_{random.randint(1000, 9999)}.{ext}'
+                            
+                            # 上传到七牛云临时目录
+                            file_data = doc.read()
+                            url = storage.upload(file_data, temp_filename)
+                            
+                            if url:
+                                temp_doc_paths.append({
+                                    'temp_url': url,
+                                    'temp_key': temp_filename,
+                                    'filename': f'doc_{i+1}.{ext}'
+                                })
+                                current_app.logger.info(f'文档上传到临时目录成功: {url}')
+                            else:
+                                raise Exception("七牛云返回空URL")
+                        except Exception as e:
+                            current_app.logger.error(f'上传文档到临时目录失败: {str(e)}')
+                            # 清理所有临时文件
+                            for temp_file in temp_image_paths + temp_doc_paths:
+                                try:
+                                    storage.delete(temp_file['temp_key'])
+                                except:
+                                    pass
+                            return jsonify({'error': f'上传文档 {doc.filename} 失败'}), 500
             
-        # 保存到数据库
-        db.session.add(asset)
-        db.session.commit()
-        
-        # 移动临时文件到正式目录
-        if image_paths or doc_paths:
+            # 创建资产记录
+            asset = Asset(
+                name=name,
+                asset_type=asset_type,
+                location=location,
+                description=description,
+                area=area,
+                total_value=total_value,
+                token_price=token_price,
+                token_supply=token_supply,
+                annual_revenue=annual_revenue,
+                owner_address=g.eth_address,
+                creator_address=g.eth_address,
+                status=AssetStatus.PENDING.value
+            )
+            
+            # 保存资产记录以获取ID
+            db.session.add(asset)
+            db.session.commit()
+            
+            # 移动文件到正式目录
+            final_image_paths = []
+            final_doc_paths = []
+            
             try:
-                for path in image_paths + doc_paths:
-                    old_key = path.split('/')[-1]
-                    new_key = path.replace('temp', str(asset.id))
-                    storage.move(old_key, new_key)
+                # 移动图片
+                for temp_file in temp_image_paths:
+                    final_key = f'{asset_type_folder}/{asset.id}/images/{temp_file["filename"]}'
+                    storage.move(temp_file['temp_key'], final_key)
+                    final_url = storage.get_url(final_key)
+                    final_image_paths.append(final_url)
+                
+                # 移动文档
+                for temp_file in temp_doc_paths:
+                    final_key = f'{asset_type_folder}/{asset.id}/documents/{temp_file["filename"]}'
+                    storage.move(temp_file['temp_key'], final_key)
+                    final_url = storage.get_url(final_key)
+                    final_doc_paths.append(final_url)
+                
+                # 更新资产记录的文件路径
+                if final_image_paths:
+                    asset.images = json.dumps(final_image_paths)
+                if final_doc_paths:
+                    asset.documents = json.dumps(final_doc_paths)
+                    
+                db.session.commit()
+                
+                return jsonify({
+                    'message': '资产创建成功',
+                    'assetId': asset.id
+                }), 201
+                
             except Exception as e:
-                current_app.logger.error(f'移动文件失败: {str(e)}')
-        
-        return jsonify({
-            'message': '资产创建成功',
-            'assetId': asset.id
-        }), 201
-        
+                current_app.logger.error(f'移动文件到正式目录失败: {str(e)}')
+                # 清理所有文件
+                for url in final_image_paths + final_doc_paths:
+                    try:
+                        storage.delete(url)
+                    except:
+                        pass
+                # 删除资产记录
+                db.session.delete(asset)
+                db.session.commit()
+                raise
+                
+        except Exception as e:
+            # 清理所有临时文件
+            for temp_file in temp_image_paths + temp_doc_paths:
+                try:
+                    storage.delete(temp_file['temp_key'])
+                except:
+                    pass
+            raise
+            
     except Exception as e:
         current_app.logger.error(f'创建资产失败: {str(e)}')
         db.session.rollback()
@@ -536,7 +596,7 @@ def get_asset_holders(asset_id):
         
         # 检查请求者是否是资产所有者
         eth_address = request.headers.get('X-Eth-Address')
-        if not eth_address or eth_address.lower() != asset.owner.lower():
+        if not eth_address or eth_address.lower() != asset.owner_address.lower():
             return jsonify({'error': '无权访问'}), 403
             
         # 模拟返回持有人数据
@@ -558,7 +618,7 @@ def create_dividend(asset_id):
         
         # 检查请求者是否是资产所有者
         eth_address = request.headers.get('X-Eth-Address')
-        if not eth_address or eth_address.lower() != asset.owner.lower():
+        if not eth_address or eth_address.lower() != asset.owner_address.lower():
             return jsonify({'error': '无权访问'}), 403
             
         # 获取请求数据

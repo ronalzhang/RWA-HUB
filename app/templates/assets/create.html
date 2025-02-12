@@ -11,18 +11,82 @@
         text-align: center;
         cursor: pointer;
         transition: border-color 0.3s ease;
+        background-color: #f8f9fa;
     }
     
     .dropzone:hover,
     .dropzone.border-primary {
         border-color: #0d6efd;
+        background-color: #fff;
     }
     
     .dropzone i {
         font-size: 2rem;
-        color: #6c757d;
+        color: #adb5bd;
         margin-bottom: 1rem;
         display: block;
+        transition: color 0.3s ease;
+    }
+    
+    .dropzone:hover i {
+        color: #0d6efd;
+    }
+    
+    .form-control.bg-light {
+        background-color: #f8f9fa !important;
+        border: 1px solid #e9ecef;
+        color: #495057;
+        font-weight: 500;
+    }
+    
+    .token-info {
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .token-info .form-label {
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+    
+    .token-info .form-control {
+        font-size: 1.125rem;
+        font-weight: 500;
+    }
+    
+    .document-suggestion {
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .document-suggestion h6 {
+        color: #6c757d;
+        margin-bottom: 0.75rem;
+    }
+    
+    .document-suggestion ul li {
+        margin-bottom: 0.5rem;
+        color: #6c757d;
+    }
+    
+    .document-suggestion ul li i {
+        color: #adb5bd;
+    }
+    
+    .input-group-text {
+        background-color: #e9ecef;
+        color: #495057;
+        font-weight: 500;
+    }
+    
+    #tokenSymbol {
+        font-weight: 500;
+        color: #495057;
+        background-color: #f8f9fa;
     }
     
     #imagePreview img {
@@ -183,50 +247,75 @@
                         <h5 class="card-title mb-0">{{ _('Asset Details') }}</h5>
                     </div>
                     <div class="card-body">
-                        <div class="row">
-                            <!-- 不动产特有字段 -->
-                            <div class="col-md-6 mb-3 asset-type-field real-estate">
-                                <label for="area" class="form-label">{{ _('Asset Area (㎡)') }} <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" id="area" name="area" 
-                                       step="0.01" min="0.01" placeholder="0.00">
-                                <div class="invalid-feedback">{{ _('Please enter valid asset area (greater than 0)') }}</div>
-                                <small class="form-text text-muted">{{ _('Each square meter equals 10,000 tokens') }}</small>
-                            </div>
-                            
-                            <!-- 总价值字段 -->
-                            <div class="col-md-6 mb-3">
-                                <label for="totalValue" class="form-label">{{ _('Total Value (USDC)') }} <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" id="totalValue" name="totalValue" 
-                                       step="0.01" min="0.01" placeholder="0.00" required>
-                                <div class="invalid-feedback">{{ _('Please enter valid total value (greater than 0)') }}</div>
-                            </div>
-                            
-                            <!-- 类不动产特有字段 -->
-                            <div class="col-md-6 mb-3 asset-type-field similar-assets hidden">
-                                <label for="tokenCount" class="form-label">{{ _('Token Count') }} <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" id="tokenCount" name="tokenCount" 
-                                       step="1" min="1" placeholder="0">
-                                <div class="invalid-feedback">{{ _('Please enter valid token count (greater than 0)') }}</div>
-                            </div>
-                            
-                            <!-- 代币价格显示 -->
-                            <div class="col-md-6 mb-3">
-                                <label for="tokenPrice" class="form-label">{{ _('Token Price (USDC)') }}</label>
-                                <input type="number" class="form-control" id="tokenPrice" name="tokenPrice" 
-                                       step="0.000001" min="0" placeholder="0.000000" readonly>
-                                <small class="form-text text-muted">{{ _('Automatically calculated based on total value and token count') }}</small>
+                        <!-- 代币代码 -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="tokenSymbol" class="form-label">{{ _('Token Symbol') }}</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">RH-</span>
+                                    <input type="text" class="form-control" id="tokenSymbol" name="tokenSymbol" readonly>
+                                </div>
+                                <small class="form-text text-muted">{{ _('Automatically generated based on asset type') }}</small>
                             </div>
                         </div>
-                        
-                        <!-- 计算结果显示 -->
-                        <div class="alert alert-info mt-3">
-                            <div class="mb-2 real-estate-info">{{ _('Token Count') }}: <strong><span id="calculatedTokenCount">0</span></strong></div>
-                            <div>{{ _('Token Price') }}: <strong><span id="calculatedTokenPrice">0.000000</span> USDC</strong></div>
+
+                        <!-- 不动产字段 -->
+                        <div class="asset-type-field real-estate">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="area" class="form-label">{{ _('Asset Area (㎡)') }} <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" id="area" name="area" step="0.01" min="0.01" placeholder="0.00">
+                                    <div class="invalid-feedback">{{ _('Please enter valid asset area (greater than 0)') }}</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="totalValue" class="form-label">{{ _('Total Value (USDC)') }} <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" id="totalValue" name="totalValue" step="0.01" min="0.01" placeholder="0.00">
+                                    <div class="invalid-feedback">{{ _('Please enter valid total value (greater than 0)') }}</div>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ _('Token Count') }}</label>
+                                    <div class="form-control bg-light" id="calculatedTokenCount">0</div>
+                                    <small class="form-text text-muted">{{ _('1 square meter = 10,000 tokens') }}</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ _('Token Price (USDC)') }}</label>
+                                    <div class="form-control bg-light" id="calculatedTokenPrice">0.000000</div>
+                                    <small class="form-text text-muted">{{ _('Total Value / Token Count') }}</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="expectedAnnualRevenue" class="form-label">{{ _('Expected Annual Revenue (%)') }}</label>
+                                    <input type="number" class="form-control" id="expectedAnnualRevenue" name="expectedAnnualRevenue" step="0.01" min="0" placeholder="0.00">
+                                </div>
+                            </div>
                         </div>
-                        
-                        <!-- 错误提示区域 -->
-                        <div class="alert alert-danger mt-3 d-none" id="validationErrors">
-                            <ul class="mb-0" id="errorList"></ul>
+
+                        <!-- 类不动产字段 -->
+                        <div class="asset-type-field similar-assets hidden">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="tokenCount" class="form-label">{{ _('Token Count') }} <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" id="tokenCount" name="tokenCount" step="1" min="1" placeholder="0">
+                                    <div class="invalid-feedback">{{ _('Please enter valid token count (greater than 0)') }}</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="totalValueSimilar" class="form-label">{{ _('Total Value (USDC)') }} <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" id="totalValueSimilar" name="totalValue" step="0.01" min="0.01" placeholder="0.00">
+                                    <div class="invalid-feedback">{{ _('Please enter valid total value (greater than 0)') }}</div>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ _('Token Price (USDC)') }}</label>
+                                    <div class="form-control bg-light" id="calculatedTokenPriceSimilar">0.000000</div>
+                                    <small class="form-text text-muted">{{ _('Total Value / Token Count') }}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="expectedAnnualRevenueSimilar" class="form-label">{{ _('Expected Annual Revenue (%)') }}</label>
+                                    <input type="number" class="form-control" id="expectedAnnualRevenueSimilar" name="expectedAnnualRevenue" step="0.01" min="0" placeholder="0.00">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -234,12 +323,12 @@
                 <!-- 图片上传 -->
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="card-title mb-0">{{ _('Asset Images') }}</h5>
+                        <h5 class="card-title mb-0">{{ _('Asset Images') }} <small class="text-muted">{{ _('(Optional)') }}</small></h5>
                     </div>
                     <div class="card-body">
                         <div class="dropzone" id="imageDropzone">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                            <p class="mb-0">{{ _('Drag and drop images here or click to select') }}</p>
+                            <i class="fas fa-cloud-upload-alt text-muted"></i>
+                            <p class="mb-0 text-muted">{{ _('Drag and drop images here or click to select') }}</p>
                             <small class="text-muted d-block mt-2">{{ _('Maximum 5 files, 5MB each. Supported formats: JPG, PNG') }}</small>
                             <input type="file" id="imageInput" multiple accept="image/*" class="d-none">
                         </div>
@@ -256,38 +345,38 @@
                     </div>
                 </div>
                 
-                <!-- 文件上传 -->
+                <!-- 文档上传 -->
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="card-title mb-0">{{ _('Asset Documents') }}</h5>
+                        <h5 class="card-title mb-0">{{ _('Asset Documents') }} <small class="text-muted">{{ _('(Optional)') }}</small></h5>
                     </div>
                     <div class="card-body">
                         <div class="row mb-4">
                             <div class="col-md-6">
                                 <div class="real-estate-docs">
-                                    <h6>{{ _('For Real Estate') }}:</h6>
-                                    <ul class="list-unstyled">
-                                        <li><i class="fas fa-check-circle text-success me-2"></i>{{ _('Property Certificate') }}</li>
-                                        <li><i class="fas fa-check-circle text-success me-2"></i>{{ _('Land Certificate') }}</li>
-                                        <li><i class="fas fa-check-circle text-success me-2"></i>{{ _('Assessment Report') }}</li>
+                                    <h6 class="text-muted">{{ _('Suggested Documents for Real Estate') }}:</h6>
+                                    <ul class="list-unstyled text-muted">
+                                        <li><i class="far fa-circle me-2"></i>{{ _('Property Certificate') }}</li>
+                                        <li><i class="far fa-circle me-2"></i>{{ _('Land Certificate') }}</li>
+                                        <li><i class="far fa-circle me-2"></i>{{ _('Assessment Report') }}</li>
                                     </ul>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="similar-assets-docs">
-                                    <h6>{{ _('For Similar Assets') }}:</h6>
-                                    <ul class="list-unstyled">
-                                        <li><i class="fas fa-check-circle text-success me-2"></i>{{ _('Auction Certificate') }}</li>
-                                        <li><i class="fas fa-check-circle text-success me-2"></i>{{ _('Exhibition Documents') }}</li>
-                                        <li><i class="fas fa-check-circle text-success me-2"></i>{{ _('Asset Proof') }}</li>
+                                    <h6 class="text-muted">{{ _('Suggested Documents for Similar Assets') }}:</h6>
+                                    <ul class="list-unstyled text-muted">
+                                        <li><i class="far fa-circle me-2"></i>{{ _('Auction Certificate') }}</li>
+                                        <li><i class="far fa-circle me-2"></i>{{ _('Exhibition Documents') }}</li>
+                                        <li><i class="far fa-circle me-2"></i>{{ _('Asset Proof') }}</li>
                                     </ul>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="dropzone" id="documentDropzone">
-                            <i class="fas fa-file-upload"></i>
-                            <p class="mb-0">{{ _('Drag and drop documents here or click to select') }}</p>
+                            <i class="fas fa-file-upload text-muted"></i>
+                            <p class="mb-0 text-muted">{{ _('Drag and drop documents here or click to select') }}</p>
                             <small class="text-muted d-block mt-2">{{ _('Maximum 10 files, 10MB each. Supported formats: PDF, DOC, DOCX') }}</small>
                             <input type="file" id="documentInput" multiple accept=".pdf,.doc,.docx" class="d-none">
                         </div>
