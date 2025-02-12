@@ -2,7 +2,12 @@
 document.addEventListener('DOMContentLoaded', async function() {
     // 检查钱包连接状态
     if (!window.walletState || !window.walletState.isConnected || !window.walletState.currentAccount) {
-        showError('Please connect your wallet first');
+        showError('请先连接钱包');
+        // 禁用表单
+        const form = document.getElementById('assetForm');
+        Array.from(form.elements).forEach(element => {
+            element.disabled = true;
+        });
         return;
     }
 
@@ -59,52 +64,74 @@ document.addEventListener('DOMContentLoaded', async function() {
     };
     
     // Add field validation
-    ['name', 'location', 'description', 'totalValue', 'tokenPrice', 'annualRevenue', 'area', 'tokenAmount'].forEach(field => {
+    const fields = ['name', 'location', 'description', 'totalValue', 'tokenPrice', 'annualRevenue', 'area', 'tokenAmount'];
+    fields.forEach(field => {
         const element = document.getElementById(field);
         if (element) {
             element.addEventListener('input', () => {
-                const value = element.value.trim();
-                if (!validateField(field, value)) {
-                    let errorMessage = `Invalid ${field.replace(/([A-Z])/g, ' $1').toLowerCase()}`;
-                    switch(field) {
-                        case 'name':
-                            errorMessage = 'Name must be between 2 and 100 characters';
-                            break;
-                        case 'location':
-                            errorMessage = 'Location must be between 5 and 200 characters';
-                            break;
-                        case 'description':
-                            errorMessage = 'Description must be between 10 and 1000 characters';
-                            break;
-                        case 'totalValue':
-                            errorMessage = 'Total value must be greater than 0 and not exceed 1 trillion';
-                            break;
-                        case 'annualRevenue':
-                            errorMessage = 'Annual revenue must be greater than 0 and not exceed total value';
-                            break;
-                        case 'area':
-                            errorMessage = 'Area must be greater than 0 and not exceed 1,000,000';
-                            break;
-                        case 'tokenAmount':
-                            errorMessage = 'Token amount must be greater than 0';
-                            break;
-                    }
-                    element.setCustomValidity(errorMessage);
-                } else {
-                    element.setCustomValidity('');
-                }
-                element.reportValidity();
-                
-                // 如果是影响计算的字段，更新计算结果
-                if (['area', 'totalValue', 'tokenAmount'].includes(field)) {
-                    updateTokenCalculation();
-                }
+                validateAndUpdateField(element, field);
+            });
+
+            // 添加失去焦点时的验证
+            element.addEventListener('blur', () => {
+                validateAndUpdateField(element, field);
             });
         }
     });
 
+    function validateAndUpdateField(element, field) {
+        const value = element.value.trim();
+        let errorMessage = '';
+
+        if (!validateField(field, value)) {
+            switch(field) {
+                case 'name':
+                    errorMessage = '名称必须在2-100个字符之间';
+                    break;
+                case 'location':
+                    errorMessage = '位置必须在5-200个字符之间';
+                    break;
+                case 'description':
+                    errorMessage = '描述必须在10-1000个字符之间';
+                    break;
+                case 'totalValue':
+                    errorMessage = '总价值必须大于0且不超过1万亿';
+                    break;
+                case 'annualRevenue':
+                    errorMessage = '年收益必须大于0且不超过总价值';
+                    break;
+                case 'area':
+                    errorMessage = '面积必须大于0且不超过1,000,000';
+                    break;
+                case 'tokenAmount':
+                    errorMessage = '代币数量必须大于0';
+                    break;
+            }
+        }
+
+        element.setCustomValidity(errorMessage);
+        
+        // 更新验证状态样式
+        if (errorMessage) {
+            element.classList.add('is-invalid');
+            element.classList.remove('is-valid');
+        } else {
+            element.classList.remove('is-invalid');
+            element.classList.add('is-valid');
+        }
+
+        // 如果是影响计算的字段，更新计算结果
+        if (['area', 'totalValue', 'tokenAmount'].includes(field)) {
+            updateTokenCalculation();
+        }
+    }
+
     // 资产类型切换处理
     typeSelect.addEventListener('change', function() {
+        handleAssetTypeChange(this.value);
+    });
+
+    function handleAssetTypeChange(type) {
         // 清空所有计算相关的输入值
         areaInput.value = '';
         tokenAmountInput.value = '';
@@ -118,39 +145,41 @@ document.addEventListener('DOMContentLoaded', async function() {
             input.classList.remove('is-invalid', 'is-valid');
         });
 
-        if (this.value === '10') { // 不动产
-            // 显示面积输入，隐藏代币数量输入
-            areaGroup.style.display = 'block';
-            tokenAmountGroup.style.display = 'none';
-            areaInput.required = true;
-            tokenAmountInput.required = false;
-            
-            // 显示不动产相关文档要求
-            document.querySelector('.real-estate-docs').style.display = 'block';
-            document.querySelector('.similar-assets-docs').style.display = 'none';
-            
-            // 更新帮助文本
-            document.querySelector('#tokenPrice').nextElementSibling.textContent = 
-                'Automatically calculated based on area (10,000 tokens per square meter)';
-        } else if (this.value === '20') { // 类不动产
-            // 显示代币数量输入，隐藏面积输入
-            areaGroup.style.display = 'none';
-            tokenAmountGroup.style.display = 'block';
-            areaInput.required = false;
-            tokenAmountInput.required = true;
-            
-            // 显示类不动产相关文档要求
-            document.querySelector('.real-estate-docs').style.display = 'none';
-            document.querySelector('.similar-assets-docs').style.display = 'block';
-            
-            // 更新帮助文本
-            document.querySelector('#tokenPrice').nextElementSibling.textContent = 
-                'Automatically calculated based on total value and token amount';
+        if (type === '10') { // 不动产
+            setupRealEstateFields();
+        } else if (type === '20') { // 类不动产
+            setupSimilarAssetFields();
         }
         
         // 触发表单验证
         form.classList.add('was-validated');
-    });
+    }
+
+    function setupRealEstateFields() {
+        areaGroup.style.display = 'block';
+        tokenAmountGroup.style.display = 'none';
+        areaInput.required = true;
+        tokenAmountInput.required = false;
+        
+        document.querySelector('.real-estate-docs').style.display = 'block';
+        document.querySelector('.similar-assets-docs').style.display = 'none';
+        
+        document.querySelector('#tokenPrice').nextElementSibling.textContent = 
+            '根据面积自动计算（每平方米10,000个代币）';
+    }
+
+    function setupSimilarAssetFields() {
+        areaGroup.style.display = 'none';
+        tokenAmountGroup.style.display = 'block';
+        areaInput.required = false;
+        tokenAmountInput.required = true;
+        
+        document.querySelector('.real-estate-docs').style.display = 'none';
+        document.querySelector('.similar-assets-docs').style.display = 'block';
+        
+        document.querySelector('#tokenPrice').nextElementSibling.textContent = 
+            '根据总价值和代币数量自动计算';
+    }
 
     // 代币数量计算和显示
     function updateTokenCalculation() {
@@ -159,67 +188,80 @@ document.addEventListener('DOMContentLoaded', async function() {
         let tokenAmount = 0;
         let calculatedTokenPrice = 0;
         
-        if (assetType === '10') { // 不动产
-            const area = parseFloat(areaInput.value) || 0;
-            if (area > 0 && totalValue > 0) {
-                tokenAmount = area * 10000; // 每平米10000个代币
-                calculatedTokenPrice = totalValue / tokenAmount;
-                
-                calculationInfo.innerHTML = `
-                    <div class="mb-2">
-                        <div>Total Tokens: <span class="value">${tokenAmount.toLocaleString()}</span></div>
-                        <div>Tokens per Square Meter: <span class="value">10,000</span></div>
-                        <div>Token Price: <span class="value">${calculatedTokenPrice.toFixed(6)} U</span></div>
-                        <div>Total Value: <span class="value">${totalValue.toLocaleString()} U</span></div>
-                    </div>
-                `;
-                calculationInfo.style.display = 'block';
+        try {
+            if (assetType === '10') { // 不动产
+                const area = parseFloat(areaInput.value) || 0;
+                if (area > 0 && totalValue > 0) {
+                    tokenAmount = area * 10000; // 每平米10000个代币
+                    calculatedTokenPrice = totalValue / tokenAmount;
+                    updateCalculationInfo(tokenAmount, calculatedTokenPrice, totalValue, area);
+                }
+            } else if (assetType === '20') { // 类不动产
+                tokenAmount = parseFloat(tokenAmountInput.value) || 0;
+                if (tokenAmount > 0 && totalValue > 0) {
+                    calculatedTokenPrice = totalValue / tokenAmount;
+                    updateCalculationInfo(tokenAmount, calculatedTokenPrice, totalValue);
+                }
             }
-        } else if (assetType === '20') { // 类不动产
-            tokenAmount = parseFloat(tokenAmountInput.value) || 0;
-            if (tokenAmount > 0 && totalValue > 0) {
-                calculatedTokenPrice = totalValue / tokenAmount;
-                
-                calculationInfo.innerHTML = `
-                    <div class="mb-2">
-                        <div>Total Tokens: <span class="value">${tokenAmount.toLocaleString()}</span></div>
-                        <div>Token Price: <span class="value">${calculatedTokenPrice.toFixed(6)} U</span></div>
-                        <div>Total Value: <span class="value">${totalValue.toLocaleString()} U</span></div>
-                    </div>
-                `;
-                calculationInfo.style.display = 'block';
+            
+            // 更新代币价格输入框
+            if (calculatedTokenPrice > 0) {
+                tokenPriceInput.value = calculatedTokenPrice.toFixed(6);
+                tokenPriceInput.classList.add('is-valid');
+                tokenPriceInput.classList.remove('is-invalid');
+            } else {
+                tokenPriceInput.value = '';
+                calculationInfo.style.display = 'none';
             }
-        }
-        
-        // 更新代币价格输入框
-        if (calculatedTokenPrice > 0) {
-            tokenPriceInput.value = calculatedTokenPrice.toFixed(6);
-        } else {
-            tokenPriceInput.value = '';
-            calculationInfo.style.display = 'none';
+        } catch (error) {
+            console.error('计算错误:', error);
+            showError('计算代币价格时出错');
         }
     }
 
-    // 图片上传处理
+    function updateCalculationInfo(tokenAmount, tokenPrice, totalValue, area = null) {
+        let html = `
+            <div class="mb-2">
+                <div>总代币数量: <span class="value">${tokenAmount.toLocaleString()}</span></div>
+                <div>代币价格: <span class="value">${tokenPrice.toFixed(6)} U</span></div>
+                <div>总价值: <span class="value">${totalValue.toLocaleString()} U</span></div>
+        `;
+        
+        if (area !== null) {
+            html += `<div>每平方米代币数: <span class="value">10,000</span></div>`;
+        }
+        
+        html += `</div>`;
+        calculationInfo.innerHTML = html;
+        calculationInfo.style.display = 'block';
+    }
+
+    // 文件上传处理
     setupFileUpload(imageUpload, imagePreview, ['image/jpeg', 'image/png', 'image/gif'], true);
-    
-    // 文档上传处理
     setupFileUpload(documentUpload, documentPreview, ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'], false);
 
     // 保存草稿
     saveDraftBtn.addEventListener('click', async function() {
         try {
+            if (!validateForm()) {
+                return;
+            }
+
             const formData = collectFormData();
             formData.append('is_draft', 'true');
             
             updateSubmitStatus(true, saveDraftBtn);
             const response = await submitData(formData);
+            
             if (response.ok) {
                 const result = await response.json();
-                showSuccess('Draft saved successfully');
+                showSuccess('草稿保存成功');
                 setTimeout(() => {
                     window.location.href = `/assets/${result.id}`;
                 }, 1500);
+            } else {
+                const error = await response.json();
+                throw new Error(error.message || '保存草稿失败');
             }
         } catch (error) {
             showError(error.message);
@@ -233,31 +275,24 @@ document.addEventListener('DOMContentLoaded', async function() {
         e.preventDefault();
         
         try {
-            // 基础表单验证
-            if (!form.checkValidity()) {
-                e.stopPropagation();
-                form.classList.add('was-validated');
+            if (!validateForm()) {
                 return;
             }
 
-            // 更新提交状态
             updateSubmitStatus(true, submitBtn);
-
-            // 自定义验证
-            await validateForm();
-
-            // 收集并提交数据
             const formData = collectFormData();
             const response = await submitData(formData);
-            const result = await response.json();
-
-            // 显示成功消息
-            showSuccess('Asset created successfully');
             
-            // 延迟跳转以显示成功消息
-            setTimeout(() => {
-                window.location.href = `/assets/${result.id}`;
-            }, 1500);
+            if (response.ok) {
+                const result = await response.json();
+                showSuccess('资产创建成功');
+                setTimeout(() => {
+                    window.location.href = `/assets/${result.id}`;
+                }, 1500);
+            } else {
+                const error = await response.json();
+                throw new Error(error.message || '创建资产失败');
+            }
         } catch (error) {
             showError(error.message);
         } finally {
@@ -265,147 +300,115 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     });
 
-    // 更新提交状态
+    // 辅助函数
+    function validateForm() {
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return false;
+        }
+
+        // 检查必要的文件上传
+        const assetType = typeSelect.value;
+        const images = imagePreview.querySelectorAll('.preview-item').length;
+        
+        if (images === 0) {
+            showError('请至少上传一张资产图片');
+            return false;
+        }
+
+        if (assetType === '10' || assetType === '20') {
+            const documents = documentPreview.querySelectorAll('.preview-item').length;
+            if (documents === 0) {
+                showError('请上传必要的资产文件');
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     function updateSubmitStatus(isSubmitting, button) {
+        const originalText = button.innerHTML;
         if (isSubmitting) {
             button.disabled = true;
-            button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>提交中...';
         } else {
             button.disabled = false;
-            button.innerHTML = button.id === 'saveDraft' ? 
-                '<i class="fas fa-save me-1"></i>Save Draft' : 
-                '<i class="fas fa-check me-1"></i>Create Asset';
+            button.innerHTML = originalText;
         }
     }
 
-    // 显示成功消息
     function showSuccess(message) {
-        const successDiv = document.createElement('div');
-        successDiv.className = 'alert alert-success alert-dismissible fade show fixed-top m-3';
-        successDiv.innerHTML = `
-            <i class="fas fa-check-circle me-2"></i>${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        const toast = new bootstrap.Toast(document.createElement('div'));
+        toast._element.classList.add('toast', 'bg-success', 'text-white');
+        toast._element.innerHTML = `
+            <div class="toast-body">
+                <i class="fas fa-check-circle me-2"></i>${message}
+            </div>
         `;
-        document.body.appendChild(successDiv);
-        
-        // 3秒后自动关闭
-        setTimeout(() => {
-            successDiv.remove();
-        }, 3000);
+        document.body.appendChild(toast._element);
+        toast.show();
     }
 
-    // 显示错误信息
     function showError(message) {
-        if (errorModal && errorMessage) {
-            errorMessage.innerHTML = `<i class="fas fa-exclamation-circle text-danger me-2"></i>${message}`;
-            errorModal.show();
-        } else {
-            alert(message);
-        }
+        errorMessage.textContent = message;
+        errorModal.show();
     }
 
-    // 收集表单数据
     function collectFormData() {
         const formData = new FormData();
         
-        // 添加基本字段
+        // 基本信息
         formData.append('name', document.getElementById('name').value.trim());
-        formData.append('asset_type', typeSelect.value);
+        formData.append('type', typeSelect.value);
         formData.append('location', document.getElementById('location').value.trim());
         formData.append('description', document.getElementById('description').value.trim());
+        
+        // 价值信息
         formData.append('total_value', totalValueInput.value);
         formData.append('token_price', tokenPriceInput.value);
         formData.append('annual_revenue', annualRevenueInput.value);
         
-        // 根据资产类型添加特定字段
         if (typeSelect.value === '10') {
             formData.append('area', areaInput.value);
-            formData.append('token_amount', parseFloat(areaInput.value) * 10000);
+            formData.append('token_amount', (parseFloat(areaInput.value) * 10000).toString());
         } else {
             formData.append('token_amount', tokenAmountInput.value);
         }
         
-        // 添加图片文件（必须）
-        const imageFiles = Array.from(imagePreview.querySelectorAll('img')).map(img => {
-            return dataURLtoFile(img.src, `image_${Date.now()}.jpg`);
+        // 文件
+        const images = imagePreview.querySelectorAll('.preview-item img');
+        images.forEach((img, index) => {
+            const file = dataURLtoFile(img.src, `image_${index}.jpg`);
+            formData.append('images', file);
         });
-        if (imageFiles.length === 0) {
-            throw new Error('Please upload at least one asset image');
-        }
-        imageFiles.forEach(file => formData.append('images[]', file));
         
-        // 添加文档文件（可选）
-        const documentFiles = Array.from(documentPreview.querySelectorAll('.document-item')).map(item => {
-            return item.file;
+        const documents = documentPreview.querySelectorAll('.preview-item');
+        documents.forEach((doc, index) => {
+            const file = doc.file;
+            if (file) {
+                formData.append('documents', file);
+            }
         });
-        documentFiles.forEach(file => formData.append('documents[]', file));
-
+        
         return formData;
     }
 
-    // 提交数据到服务器
     async function submitData(formData) {
-        if (!window.walletState || !window.walletState.isConnected || !window.walletState.currentAccount) {
-            throw new Error('Please connect your wallet first');
-        }
-
-        const response = await fetch('/api/assets', {
+        const response = await fetch('/api/assets/create', {
             method: 'POST',
-            body: formData,
             headers: {
                 'X-Eth-Address': window.walletState.currentAccount
-            }
+            },
+            body: formData
         });
-
+        
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || 'Failed to create asset');
+            throw new Error(error.message || '提交失败');
         }
-
+        
         return response;
-    }
-
-    // 表单提交验证
-    async function validateForm() {
-        // 验证图片上传
-        const imageCount = imagePreview.querySelectorAll('img').length;
-        if (imageCount === 0) {
-            throw new Error('Please upload at least one asset image');
-        }
-        
-        // 验证不动产类型特定字段
-        if (typeSelect.value === '10') {
-            const area = parseFloat(areaInput.value) || 0;
-            const totalValue = parseFloat(totalValueInput.value) || 0;
-            if (area <= 0) {
-                throw new Error('Please enter valid building area');
-            }
-            if (totalValue <= 0) {
-                throw new Error('Please enter valid total value');
-            }
-        }
-        
-        // 验证类不动产类型特定字段
-        if (typeSelect.value === '20') {
-            const tokenAmount = parseFloat(tokenAmountInput.value) || 0;
-            const totalValue = parseFloat(totalValueInput.value) || 0;
-            if (tokenAmount <= 0) {
-                throw new Error('Please enter valid token amount');
-            }
-            if (totalValue <= 0) {
-                throw new Error('Please enter valid total value');
-            }
-        }
-        
-        // 验证年收入
-        const annualRevenue = parseFloat(annualRevenueInput.value) || 0;
-        const totalValue = parseFloat(totalValueInput.value) || 0;
-        if (annualRevenue <= 0) {
-            throw new Error('Annual revenue must be greater than 0');
-        }
-        if (annualRevenue > totalValue) {
-            throw new Error('Annual revenue cannot exceed total value');
-        }
     }
 });
 
@@ -424,103 +427,106 @@ function dataURLtoFile(dataurl, filename) {
 
 // 文件上传处理
 function setupFileUpload(dropZone, previewZone, allowedTypes, isImage) {
-    function validateFile(file) {
-        if (file.size > FILE_SIZE_LIMIT) {
-            throw new Error(`File size exceeds ${FILE_SIZE_LIMIT / 1024 / 1024}MB limit`);
-        }
-        
-        if (isImage) {
-            const imageCount = previewZone.querySelectorAll('img').length;
-            if (imageCount >= IMAGE_COUNT_LIMIT) {
-                throw new Error(`Maximum ${IMAGE_COUNT_LIMIT} images allowed`);
-            }
-        } else {
-            const docCount = previewZone.querySelectorAll('.document-item').length;
-            if (docCount >= DOC_COUNT_LIMIT) {
-                throw new Error(`Maximum ${DOC_COUNT_LIMIT} documents allowed`);
-            }
-        }
-        
-        if (!allowedTypes.includes(file.type)) {
-            throw new Error(`Unsupported file type: ${file.type}`);
-        }
-    }
-
-    function handleFiles(files) {
-        Array.from(files).forEach(file => {
-            try {
-                validateFile(file);
-                processFile(file);
-            } catch (error) {
-                showError(error.message);
-            }
-        });
-    }
-
-    function processFile(file) {
-        if (isImage) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'col-4 position-relative';
-                
-                const img = document.createElement('img');
-                img.src = e.target.result;
-                img.className = 'img-thumbnail';
-                img.style.objectFit = 'cover';
-                img.style.height = '200px';
-                
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-danger btn-sm position-absolute top-0 end-0 m-2';
-                deleteBtn.innerHTML = '<i class="fas fa-times"></i>';
-                deleteBtn.onclick = () => wrapper.remove();
-                
-                wrapper.appendChild(img);
-                wrapper.appendChild(deleteBtn);
-                previewZone.appendChild(wrapper);
-            };
-            reader.readAsDataURL(file);
-        } else {
-            const div = document.createElement('div');
-            div.className = 'document-item mb-2 d-flex align-items-center justify-content-between';
-            div.innerHTML = `
-                <div>
-                    <i class="fas fa-file me-2"></i>
-                    <span>${file.name}</span>
-                </div>
-                <button type="button" class="btn btn-danger btn-sm">
-                    <i class="fas fa-times"></i>
-                </button>
-            `;
-            div.querySelector('button').onclick = () => div.remove();
-            div.file = file;
-            previewZone.appendChild(div);
-        }
-    }
-
-    // 拖拽上传处理
+    let fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.multiple = true;
+    fileInput.accept = allowedTypes.join(',');
+    fileInput.style.display = 'none';
+    dropZone.parentNode.appendChild(fileInput);
+    
+    // 点击上传区域触发文件选择
+    dropZone.addEventListener('click', () => fileInput.click());
+    
+    // 拖放处理
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
         dropZone.classList.add('dragover');
     });
-
+    
     dropZone.addEventListener('dragleave', () => {
         dropZone.classList.remove('dragover');
     });
-
+    
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropZone.classList.remove('dragover');
         handleFiles(e.dataTransfer.files);
     });
-
-    // 点击上传处理
-    dropZone.addEventListener('click', () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.multiple = true;
-        input.accept = allowedTypes.join(',');
-        input.onchange = (e) => handleFiles(e.target.files);
-        input.click();
+    
+    fileInput.addEventListener('change', () => {
+        handleFiles(fileInput.files);
+        fileInput.value = ''; // 清空选择，允许重复选择相同文件
     });
+    
+    function handleFiles(files) {
+        const validFiles = Array.from(files).filter(file => {
+            if (!validateFile(file)) {
+                return false;
+            }
+            
+            const currentCount = previewZone.querySelectorAll('.preview-item').length;
+            const limit = isImage ? IMAGE_COUNT_LIMIT : DOC_COUNT_LIMIT;
+            
+            if (currentCount >= limit) {
+                showError(`最多只能上传${limit}个${isImage ? '图片' : '文档'}`);
+                return false;
+            }
+            
+            return true;
+        });
+        
+        validFiles.forEach(processFile);
+    }
+    
+    function validateFile(file) {
+        if (!allowedTypes.includes(file.type)) {
+            showError(`不支持的文件类型: ${file.type}`);
+            return false;
+        }
+        
+        if (file.size > FILE_SIZE_LIMIT) {
+            showError(`文件大小超过限制: ${(file.size / 1024 / 1024).toFixed(2)}MB > 6MB`);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    function processFile(file) {
+        const reader = new FileReader();
+        const previewItem = document.createElement('div');
+        previewItem.className = 'preview-item col-md-3 mb-3';
+        previewItem.file = file;
+        
+        if (isImage) {
+            reader.onload = (e) => {
+                previewItem.innerHTML = `
+                    <div class="position-relative">
+                        <img src="${e.target.result}" class="img-fluid rounded" alt="Preview">
+                        <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-1">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+            };
+            reader.readAsDataURL(file);
+        } else {
+            previewItem.innerHTML = `
+                <div class="document-item">
+                    <i class="fas fa-file me-2"></i>${file.name}
+                    <button type="button" class="btn btn-danger btn-sm float-end">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        }
+        
+        previewZone.appendChild(previewItem);
+        
+        // 添加删除按钮事件
+        const deleteBtn = previewItem.querySelector('.btn-danger');
+        deleteBtn.addEventListener('click', () => {
+            previewItem.remove();
+        });
+    }
 }

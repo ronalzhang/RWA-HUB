@@ -47,7 +47,7 @@
                         <a class="nav-link" href="{{ url_for('assets.list_assets_page') }}">{{ _('All Assets') }}</a>
                     </li>
                     <li class="nav-item d-none" id="adminEntry">
-                        <a class="nav-link" href="#" id="adminLink">
+                        <a class="nav-link" href="{{ url_for('admin.dashboard') }}" id="adminLink">
                             <i class="fas fa-user-shield me-1"></i>管理后台
                         </a>
                     </li>
@@ -241,18 +241,35 @@
     }
 
     // 处理账户变更
-    function handleAccountsChanged(accounts) {
+    async function handleAccountsChanged(accounts) {
         if (accounts.length === 0) {
             clearWalletState();
         } else if (accounts[0] !== window.walletState.currentAccount) {
             window.walletState.currentAccount = accounts[0];
             window.walletState.isConnected = true;
             localStorage.setItem('walletConnected', 'true');
-            localStorage.setItem('userAddress', window.walletState.currentAccount);
-            updateWalletUI(window.walletState.currentAccount);
+            localStorage.setItem('userAddress', accounts[0]);
+            updateWalletUI(accounts[0]);
             
-            // 检查是否是管理员
-            checkIsAdmin(accounts[0]);
+            // 检查管理员权限
+            try {
+                const response = await fetch('/api/admin/check', {
+                    headers: {
+                        'X-Eth-Address': accounts[0]
+                    }
+                });
+                const data = await response.json();
+                window.walletState.isAdmin = data.is_admin;
+                window.walletState.permissions = data.permissions || [];
+                
+                // 显示/隐藏管理入口
+                const adminEntry = document.getElementById('adminEntry');
+                if (adminEntry) {
+                    adminEntry.classList.toggle('d-none', !data.is_admin);
+                }
+            } catch (error) {
+                console.error('检查管理员权限失败:', error);
+            }
         }
     }
 
@@ -282,56 +299,6 @@
             if (adminEntry) {
                 adminEntry.classList.add('d-none');
             }
-        }
-    }
-
-    // 检查是否是管理员
-    async function checkIsAdmin(address) {
-        try {
-            console.log('开始检查管理员权限:', address);
-            const response = await fetch(`/api/admin/check`, {
-                headers: {
-                    'X-Eth-Address': address
-                }
-            });
-            
-            if (!response.ok) {
-                throw new Error('检查管理员状态失败');
-            }
-            
-            const data = await response.json();
-            console.log('管理员检查响应:', data);
-            
-            const adminEntry = document.getElementById('adminEntry');
-            
-            if (data.is_admin && adminEntry) {
-                console.log('确认为管理员账户:', data.role);
-                adminEntry.classList.remove('d-none');
-                const adminLink = document.getElementById('adminLink');
-                if (adminLink) {
-                    adminLink.href = '/admin';
-                }
-                // 更新全局状态
-                window.walletState.isAdmin = true;
-                window.walletState.permissions = data.permissions || [];
-            } else {
-                console.log('非管理员账户');
-                if (adminEntry) {
-                    adminEntry.classList.add('d-none');
-                }
-                // 更新全局状态
-                window.walletState.isAdmin = false;
-                window.walletState.permissions = [];
-            }
-        } catch (error) {
-            console.error('检查管理员状态失败:', error);
-            const adminEntry = document.getElementById('adminEntry');
-            if (adminEntry) {
-                adminEntry.classList.add('d-none');
-            }
-            // 更新全局状态
-            window.walletState.isAdmin = false;
-            window.walletState.permissions = [];
         }
     }
 
@@ -368,7 +335,7 @@
                     updateWalletUI(accounts[0]);
                     
                     // 检查管理员权限
-                    await checkIsAdmin(accounts[0]);
+                    await handleAccountsChanged(accounts);
                     
                     // 刷新页面以确保所有状态都正确更新
                     window.location.reload();
