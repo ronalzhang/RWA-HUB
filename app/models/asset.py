@@ -1,22 +1,23 @@
-import enum
-import json
+from enum import IntEnum
 from datetime import datetime
-from .. import db
-from sqlalchemy.orm import validates
-from sqlalchemy import Index, CheckConstraint
+from app import db
+import json
 import re
 
-class AssetType(enum.Enum):
-    REAL_ESTATE = 10        # 不动产
+class AssetType(IntEnum):
+    """资产类型枚举"""
+    REAL_ESTATE = 10  # 不动产
     SEMI_REAL_ESTATE = 20  # 类不动产
 
-class AssetStatus(enum.Enum):
-    PENDING = 1    # 待审核
-    APPROVED = 2  # 已通过
+class AssetStatus(IntEnum):
+    """资产状态枚举"""
+    PENDING = 1  # 待审核
+    APPROVED = 2  # 已审核
     REJECTED = 3  # 已拒绝
-    DELETED = 4    # 已删除
+    DELETED = 4  # 已删除
 
 class Asset(db.Model):
+    """资产模型"""
     __tablename__ = 'assets'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -24,15 +25,15 @@ class Asset(db.Model):
     description = db.Column(db.Text)
     asset_type = db.Column(db.Integer, nullable=False)
     location = db.Column(db.String(200), nullable=False)
-    area = db.Column(db.Float)
-    total_value = db.Column(db.Float)
-    token_symbol = db.Column(db.String(20), nullable=False, unique=True)
+    area = db.Column(db.Float)  # 仅不动产需要
+    total_value = db.Column(db.Float, nullable=False)
     token_price = db.Column(db.Float, nullable=False)
     token_supply = db.Column(db.Integer)
-    token_address = db.Column(db.String(42), unique=True)
+    token_symbol = db.Column(db.String(20))
+    token_address = db.Column(db.String(42))  # 上链后的合约地址
     annual_revenue = db.Column(db.Float, nullable=False)
-    images = db.Column(db.Text)
-    documents = db.Column(db.Text)
+    images = db.Column(db.Text)  # JSON格式存储图片URL列表
+    documents = db.Column(db.Text)  # JSON格式存储文档URL列表
     status = db.Column(db.Integer, nullable=False, default=AssetStatus.PENDING.value)
     reject_reason = db.Column(db.String(200))
     owner_address = db.Column(db.String(42), nullable=False)
@@ -43,91 +44,8 @@ class Asset(db.Model):
     deleted_by = db.Column(db.String(42))
 
     # 添加关联
-    dividend_records = db.relationship('app.models.dividend.DividendRecord', backref=db.backref('related_asset', lazy=True), lazy=True, cascade='all, delete-orphan')
-    trades = db.relationship('app.models.trade.Trade', backref=db.backref('related_asset', lazy=True), lazy=True)
-
-    # 添加索引
-    __table_args__ = (
-        Index('ix_assets_name', 'name'),  # 名称索引
-        Index('ix_assets_location', 'location'),  # 位置索引
-        Index('ix_assets_asset_type', 'asset_type'),  # 资产类型索引
-        Index('ix_assets_status', 'status'),  # 状态索引
-        Index('ix_assets_created_at', 'created_at'),  # 创建时间索引
-        CheckConstraint('token_price > 0', name='ck_token_price_positive'),  # 代币价格必须大于0
-        CheckConstraint('token_supply > 0', name='ck_token_supply_positive'),  # 代币供应量必须大于0
-        CheckConstraint('annual_revenue > 0', name='ck_annual_revenue_positive'),  # 年收益必须大于0
-        CheckConstraint('area > 0', name='ck_area_positive'),  # 面积必须大于0
-        CheckConstraint('total_value > 0', name='ck_total_value_positive'),  # 总价值必须大于0
-        CheckConstraint('status IN (1, 2, 3, 4)', name='ck_status_valid'),  # 状态必须在有效范围内
-    )
-
-    @validates('asset_type')
-    def validate_asset_type(self, key, value):
-        if value not in [t.value for t in AssetType]:
-            raise ValueError('Invalid asset type')
-        return value
-
-    @validates('status')
-    def validate_status(self, key, value):
-        if value not in [s.value for s in AssetStatus]:
-            raise ValueError('Invalid status')
-        return value
-
-    @validates('token_symbol')
-    def validate_token_symbol(self, key, value):
-        pattern = r'^RH-(?:10|20)\d{4}$'
-        if not re.match(pattern, value):
-            raise ValueError('Invalid token symbol format. Must be RH-XXYYYY where XX is 10 or 20 and YYYY is 4 digits')
-        return value
-
-    @validates('token_address')
-    def validate_token_address(self, key, value):
-        if value:
-            if not re.match(r'^0x[a-fA-F0-9]{40}$', value):
-                raise ValueError('Invalid token address format')
-        return value
-
-    @validates('owner_address')
-    def validate_owner_address(self, key, value):
-        if not re.match(r'^0x[a-fA-F0-9]{40}$', value):
-            raise ValueError('Invalid owner address format')
-        return value
-
-    @validates('creator_address')
-    def validate_creator_address(self, key, value):
-        if not re.match(r'^0x[a-fA-F0-9]{40}$', value):
-            raise ValueError('Invalid creator address format')
-        return value
-
-    @validates('token_price')
-    def validate_token_price(self, key, value):
-        if value <= 0:
-            raise ValueError('Token price must be greater than 0')
-        return value
-
-    @validates('token_supply')
-    def validate_token_supply(self, key, value):
-        if value <= 0:
-            raise ValueError('Token supply must be greater than 0')
-        return value
-
-    @validates('area')
-    def validate_area(self, key, value):
-        if value is not None and value <= 0:
-            raise ValueError('Area must be greater than 0')
-        return value
-
-    @validates('total_value')
-    def validate_total_value(self, key, value):
-        if value is not None and value <= 0:
-            raise ValueError('Total value must be greater than 0')
-        return value
-
-    @validates('annual_revenue')
-    def validate_annual_revenue(self, key, value):
-        if value <= 0:
-            raise ValueError('Annual revenue must be greater than 0')
-        return value
+    dividend_records = db.relationship('DividendRecord', backref='asset', lazy=True, cascade='all, delete-orphan')
+    trades = db.relationship('Trade', backref='asset', lazy=True)
 
     def __init__(self, **kwargs):
         super(Asset, self).__init__(**kwargs)
@@ -140,68 +58,141 @@ class Asset(db.Model):
             
         # 如果是不动产，根据面积计算代币发行量
         if self.asset_type == AssetType.REAL_ESTATE.value and self.area:
-            self.token_supply = int(self.area * 10000)
+            self.token_supply = int(self.area * 10000)  # 每平方米10000个代币
+
+    @property
+    def image_list(self):
+        """获取图片URL列表"""
+        if not self.images:
+            return []
+        try:
+            return json.loads(self.images)
+        except:
+            return []
+
+    @property
+    def document_list(self):
+        """获取文档URL列表"""
+        if not self.documents:
+            return []
+        try:
+            return json.loads(self.documents)
+        except:
+            return []
 
     def to_dict(self):
-        """转换为字典格式"""
-        data = {
+        """转换为字典"""
+        return {
             'id': self.id,
             'name': self.name,
             'description': self.description,
             'asset_type': self.asset_type,
             'location': self.location,
-            'token_symbol': self.token_symbol,
+            'area': self.area,
+            'total_value': self.total_value,
             'token_price': self.token_price,
             'token_supply': self.token_supply,
+            'token_symbol': self.token_symbol,
             'token_address': self.token_address,
             'annual_revenue': self.annual_revenue,
+            'images': self.image_list,
+            'documents': self.document_list,
             'status': self.status,
             'reject_reason': self.reject_reason,
             'owner_address': self.owner_address,
             'creator_address': self.creator_address,
-            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None,
-            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else None,
-            'deleted_at': self.deleted_at.strftime('%Y-%m-%d %H:%M:%S') if self.deleted_at else None,
-            'deleted_by': self.deleted_by
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
-        # 处理图片和文档路径
-        try:
-            data['images'] = json.loads(self.images) if self.images else []
-        except:
-            data['images'] = []
-            
-        try:
-            data['documents'] = json.loads(self.documents) if self.documents else []
-        except:
-            data['documents'] = []
+    @validates('name')
+    def validate_name(self, key, value):
+        """验证资产名称"""
+        if not value:
+            raise ValueError('资产名称不能为空')
+        if len(value) < 2 or len(value) > 100:
+            raise ValueError('资产名称长度必须在2-100个字符之间')
+        return value
 
-        # 根据资产类型添加特定字段
-        if self.asset_type == AssetType.REAL_ESTATE.value:
-            data['area'] = self.area
-        elif self.asset_type == AssetType.SEMI_REAL_ESTATE.value:
-            data['total_value'] = self.total_value
+    @validates('description')
+    def validate_description(self, key, value):
+        """验证资产描述"""
+        if value and (len(value) < 10 or len(value) > 1000):
+            raise ValueError('资产描述长度必须在10-1000个字符之间')
+        return value
 
-        return data
+    @validates('location')
+    def validate_location(self, key, value):
+        """验证资产位置"""
+        if not value:
+            raise ValueError('资产位置不能为空')
+        if len(value) < 5 or len(value) > 200:
+            raise ValueError('资产位置长度必须在5-200个字符之间')
+        return value
 
-    @staticmethod
-    def from_dict(data):
-        """从字典创建实例"""
-        # 验证必填字段
-        required_fields = ['name', 'asset_type', 'location', 'token_price', 'annual_revenue', 'owner_address']
-        for field in required_fields:
-            if field not in data:
-                raise ValueError(f'缺少必填字段: {field}')
-        
-        # 验证资产类型特定字段
-        asset_type = data['asset_type']
-        if asset_type == AssetType.REAL_ESTATE.value:
-            if 'area' not in data:
-                raise ValueError('不动产类型必须提供面积')
-        else:
-            if 'total_value' not in data:
-                raise ValueError('类不动产必须提供总价值')
-            if 'token_supply' not in data:
-                raise ValueError('类不动产必须提供代币发行量')
-                
-        return Asset(**data)
+    @validates('area')
+    def validate_area(self, key, value):
+        """验证建筑面积"""
+        if value is not None:
+            if value <= 0:
+                raise ValueError('建筑面积必须大于0')
+            if value > 1000000:
+                raise ValueError('建筑面积不能超过1,000,000平方米')
+        return value
+
+    @validates('total_value')
+    def validate_total_value(self, key, value):
+        """验证总价值"""
+        if not value or value <= 0:
+            raise ValueError('总价值必须大于0')
+        if value > 1000000000000:  # 1万亿
+            raise ValueError('总价值不能超过1万亿')
+        return value
+
+    @validates('token_price')
+    def validate_token_price(self, key, value):
+        """验证代币价格"""
+        if not value or value <= 0:
+            raise ValueError('代币价格必须大于0')
+        return value
+
+    @validates('token_supply')
+    def validate_token_supply(self, key, value):
+        """验证代币发行量"""
+        if value is not None and value <= 0:
+            raise ValueError('代币发行量必须大于0')
+        return value
+
+    @validates('annual_revenue')
+    def validate_annual_revenue(self, key, value):
+        """验证年收益"""
+        if not value or value <= 0:
+            raise ValueError('年收益必须大于0')
+        if hasattr(self, 'total_value') and self.total_value and value > self.total_value:
+            raise ValueError('年收益不能超过总价值')
+        return value
+
+    @validates('owner_address')
+    def validate_owner_address(self, key, value):
+        """验证所有者地址"""
+        if not value:
+            raise ValueError('所有者地址不能为空')
+        if not re.match(r'^0x[a-fA-F0-9]{40}$', value):
+            raise ValueError('无效的所有者地址格式')
+        return value.lower()
+
+    @validates('creator_address')
+    def validate_creator_address(self, key, value):
+        """验证创建者地址"""
+        if not value:
+            raise ValueError('创建者地址不能为空')
+        if not re.match(r'^0x[a-fA-F0-9]{40}$', value):
+            raise ValueError('无效的创建者地址格式')
+        return value.lower()
+
+    @validates('token_address')
+    def validate_token_address(self, key, value):
+        """验证代币合约地址"""
+        if value and not re.match(r'^0x[a-fA-F0-9]{40}$', value):
+            raise ValueError('无效的代币合约地址格式')
+        return value.lower() if value else None

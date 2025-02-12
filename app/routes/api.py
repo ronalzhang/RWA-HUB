@@ -217,11 +217,142 @@ def get_asset(asset_id):
         current_app.logger.error(f'获取资产详情失败: {str(e)}', exc_info=True)
         return jsonify({'error': '获取资产详情失败'}), 500
 
-# @api_bp.route('/assets/create', methods=['POST'])
-# @eth_address_required
-# def create_asset():
-#     """创建资产（本地存储版本）"""
-#     pass  # 注释掉整个函数体
+@api_bp.route('/assets/create', methods=['POST'])
+@eth_address_required
+def create_asset():
+    """创建资产"""
+    try:
+        eth_address = g.eth_address
+        if not eth_address:
+            current_app.logger.warning('创建资产时未提供钱包地址')
+            return jsonify({'error': '请先连接钱包'}), 401
+
+        # 验证必填字段
+        required_fields = ['name', 'type', 'location', 'description', 'total_value', 'token_price', 'annual_revenue']
+        for field in required_fields:
+            if not request.form.get(field):
+                return jsonify({'error': f'请填写{field}字段'}), 400
+
+        # 验证资产类型
+        asset_type = request.form.get('type')
+        if asset_type not in ['10', '20']:
+            return jsonify({'error': '无效的资产类型'}), 400
+
+        # 验证面积（仅对不动产）
+        if asset_type == '10' and not request.form.get('area'):
+            return jsonify({'error': '请填写建筑面积'}), 400
+
+        # 验证图片
+        if 'images' not in request.files:
+            return jsonify({'error': '请至少上传一张资产图片'}), 400
+
+        # 验证文档
+        if 'documents' not in request.files:
+            return jsonify({'error': '请上传必要的资产文档'}), 400
+
+        # 创建资产记录
+        asset = Asset(
+            name=request.form.get('name'),
+            asset_type=int(asset_type),
+            location=request.form.get('location'),
+            description=request.form.get('description'),
+            area=float(request.form.get('area', 0)),
+            total_value=float(request.form.get('total_value')),
+            token_price=float(request.form.get('token_price')),
+            annual_revenue=float(request.form.get('annual_revenue')),
+            owner_address=eth_address,
+            creator_address=eth_address,
+            status=AssetStatus.PENDING.value
+        )
+
+        # 保存到数据库
+        db.session.add(asset)
+        db.session.commit()
+
+        # 处理文件上传
+        try:
+            asset_type_folder = 'real_estate' if asset_type == '10' else 'quasi_real_estate'
+            
+            # 处理图片
+            images = request.files.getlist('images')
+            image_paths = []
+            for image in images:
+                if image and image.filename and allowed_file(image.filename, ['jpg', 'jpeg', 'png', 'gif']):
+                    try:
+                        # 构建文件名
+                        ext = image.filename.rsplit(".", 1)[1].lower()
+                        filename = f'{asset_type_folder}/{asset.id}/images/image_{len(image_paths)+1}.{ext}'
+                        
+                        # 读取文件内容
+                        file_data = image.read()
+                        
+                        # 上传到七牛云
+                        storage = current_app.extensions.get('storage')
+                        if storage is None:
+                            raise Exception("七牛云存储未初始化")
+                            
+                        url = storage.upload(file_data, filename)
+                        if url:
+                            image_paths.append(url)
+                            current_app.logger.info(f'上传图片成功: {url}')
+                        else:
+                            raise Exception("七牛云上传失败")
+                            
+                    except Exception as e:
+                        current_app.logger.error(f'上传图片失败: {str(e)}')
+                        continue
+            
+            if image_paths:
+                asset.images = json.dumps(image_paths)
+            
+            # 处理文档
+            documents = request.files.getlist('documents')
+            doc_paths = []
+            for doc in documents:
+                if doc and doc.filename and allowed_file(doc.filename, ['pdf', 'doc', 'docx']):
+                    try:
+                        # 构建文件名
+                        ext = doc.filename.rsplit(".", 1)[1].lower()
+                        filename = f'{asset_type_folder}/{asset.id}/documents/document_{len(doc_paths)+1}.{ext}'
+                        
+                        # 读取文件内容
+                        file_data = doc.read()
+                        
+                        # 上传到七牛云
+                        storage = current_app.extensions.get('storage')
+                        if storage is None:
+                            raise Exception("七牛云存储未初始化")
+                            
+                        url = storage.upload(file_data, filename)
+                        if url:
+                            doc_paths.append(url)
+                            current_app.logger.info(f'上传文档成功: {url}')
+                        else:
+                            raise Exception("七牛云上传失败")
+                            
+                    except Exception as e:
+                        current_app.logger.error(f'上传文档失败: {str(e)}')
+                        continue
+            
+            if doc_paths:
+                asset.documents = json.dumps(doc_paths)
+            
+            db.session.commit()
+            
+        except Exception as e:
+            current_app.logger.error(f'文件上传失败: {str(e)}')
+            db.session.delete(asset)
+            db.session.commit()
+            return jsonify({'error': '文件上传失败'}), 500
+
+        return jsonify({
+            'message': '资产创建成功',
+            'id': asset.id
+        }), 201
+
+    except Exception as e:
+        current_app.logger.error(f'创建资产失败: {str(e)}')
+        return jsonify({'error': '创建资产失败'}), 500
 
 @api_bp.route('/assets/<int:asset_id>', methods=['PUT'])
 def update_asset(asset_id):

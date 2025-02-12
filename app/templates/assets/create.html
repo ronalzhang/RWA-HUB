@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ _('Create Asset') }} - RWA-HUB{% endblock %}
+{% block title %}创建资产 - RWA-HUB{% endblock %}
 
 {% block head %}
 <style>
@@ -62,85 +62,103 @@
         color: #dc3545;
         margin-left: 4px;
     }
+    .preview-item img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        border-radius: 4px;
+    }
+    .preview-item .document-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem;
+    }
+    .toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1050;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container py-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0">{{ _('Create Asset') }}</h2>
+        <h2 class="mb-0">创建资产</h2>
         <div class="text-muted">
             <i class="fas fa-info-circle me-1"></i>
-            {{ _('All fields marked with * are required') }}
+            带 * 号的字段为必填项
         </div>
     </div>
     
     <form id="assetForm" class="needs-validation" novalidate>
-        <!-- Basic Information Section -->
+        <!-- 基本信息 -->
         <div class="form-section">
-            <div class="form-section-title">{{ _('Basic Information') }}</div>
+            <div class="form-section-title">基本信息</div>
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label for="name" class="form-label required-mark">{{ _('Asset Name') }}</label>
+                    <label for="name" class="form-label required-mark">资产名称</label>
                     <input type="text" class="form-control" id="name" required>
-                    <div class="input-help">{{ _('2-100 characters') }}</div>
+                    <div class="input-help">2-100个字符</div>
                 </div>
                 
                 <div class="col-md-6">
-                    <label for="type" class="form-label required-mark">{{ _('Asset Type') }}</label>
+                    <label for="type" class="form-label required-mark">资产类型</label>
                     <select class="form-select" id="type" required>
-                        <option value="">{{ _('Please select...') }}</option>
-                        <option value="10">{{ _('Real Estate') }}</option>
-                        <option value="20">{{ _('Similar Assets') }}</option>
+                        <option value="">请选择...</option>
+                        <option value="10">不动产</option>
+                        <option value="20">类不动产</option>
                     </select>
                 </div>
                 
                 <div class="col-12">
-                    <label for="location" class="form-label required-mark">{{ _('Asset Location') }}</label>
+                    <label for="location" class="form-label required-mark">资产位置</label>
                     <input type="text" class="form-control" id="location" required>
-                    <div class="input-help">{{ _('5-200 characters') }}</div>
+                    <div class="input-help">5-200个字符</div>
                 </div>
                 
                 <div class="col-12">
-                    <label for="description" class="form-label required-mark">{{ _('Asset Description') }}</label>
+                    <label for="description" class="form-label required-mark">资产描述</label>
                     <textarea class="form-control" id="description" rows="3" required></textarea>
-                    <div class="input-help">{{ _('10-1000 characters') }}</div>
+                    <div class="input-help">10-1000个字符</div>
                 </div>
             </div>
         </div>
         
-        <!-- Value Information Section -->
+        <!-- 价值信息 -->
         <div class="form-section">
-            <div class="form-section-title">{{ _('Value Information') }}</div>
+            <div class="form-section-title">价值信息</div>
             <div class="row g-3">
                 <div class="col-md-6 asset-area-group" style="display: none;">
-                    <label for="area" class="form-label required-mark">{{ _('Building Area') }} (m²)</label>
+                    <label for="area" class="form-label required-mark">建筑面积 (m²)</label>
                     <input type="number" class="form-control" id="area" step="0.01">
-                    <div class="input-help">{{ _('Greater than 0 and not exceeding 1,000,000') }}</div>
+                    <div class="input-help">大于0且不超过1,000,000</div>
                 </div>
                 
                 <div class="col-md-6">
-                    <label for="totalValue" class="form-label required-mark">{{ _('Total Value') }} (U)</label>
+                    <label for="totalValue" class="form-label required-mark">总价值 (U)</label>
                     <input type="number" class="form-control" id="totalValue" required>
-                    <div class="input-help">{{ _('Greater than 0 and not exceeding 1 trillion') }}</div>
+                    <div class="input-help">大于0且不超过1万亿</div>
                 </div>
                 
                 <div class="col-md-6 token-amount-group" style="display: none;">
-                    <label for="tokenAmount" class="form-label required-mark">{{ _('Token Amount') }}</label>
+                    <label for="tokenAmount" class="form-label required-mark">代币数量</label>
                     <input type="number" class="form-control" id="tokenAmount">
-                    <div class="input-help">{{ _('Total number of tokens to be issued') }}</div>
+                    <div class="input-help">发行的代币总数量</div>
                 </div>
                 
                 <div class="col-md-6">
-                    <label for="tokenPrice" class="form-label">{{ _('Token Price') }} (U)</label>
+                    <label for="tokenPrice" class="form-label">代币价格 (U)</label>
                     <input type="number" class="form-control" id="tokenPrice" readonly>
-                    <div class="input-help">{{ _('Automatically calculated based on total value and token amount') }}</div>
+                    <div class="input-help">根据总价值和代币数量自动计算</div>
                 </div>
                 
                 <div class="col-md-6">
-                    <label for="annualRevenue" class="form-label required-mark">{{ _('Expected Annual Revenue') }} (U)</label>
+                    <label for="annualRevenue" class="form-label required-mark">预期年收益 (U)</label>
                     <input type="number" class="form-control" id="annualRevenue" step="0.01" required>
-                    <div class="input-help">{{ _('Expected annual dividend amount (must not exceed total value)') }}</div>
+                    <div class="input-help">预期每年分红金额（不得超过总价值）</div>
                 </div>
                 
                 <div class="col-12">
@@ -149,77 +167,77 @@
             </div>
         </div>
         
-        <!-- File Upload Section -->
+        <!-- 文件上传 -->
         <div class="form-section">
-            <div class="form-section-title">{{ _('Asset Files') }}</div>
+            <div class="form-section-title">资产文件</div>
             
-            <!-- Image Upload -->
+            <!-- 图片上传 -->
             <div class="mb-4">
-                <label class="form-label required-mark">{{ _('Asset Images') }}</label>
+                <label class="form-label required-mark">资产图片</label>
                 <div id="imageUpload" class="upload-area">
                     <i class="fas fa-cloud-upload-alt"></i>
-                    <p class="mb-0">{{ _('Click or drag to upload images') }}</p>
-                    <small class="text-muted">{{ _('Supports jpg, png, gif formats (Max 10 images, 6MB each)') }}</small>
+                    <p class="mb-0">点击或拖拽上传图片</p>
+                    <small class="text-muted">支持jpg、png、gif格式（最多10张，每张不超过6MB）</small>
                 </div>
                 <div id="imagePreview" class="row g-3 mt-2"></div>
             </div>
             
-            <!-- Document Upload -->
+            <!-- 文档上传 -->
             <div>
-                <label class="form-label">{{ _('Asset Documents') }}</label>
+                <label class="form-label">资产文档</label>
                 <div class="real-estate-docs mb-2 alert alert-info" style="display: none;">
-                    <h6 class="alert-heading">{{ _('Required Documents for Real Estate') }}:</h6>
+                    <h6 class="alert-heading">不动产必需文件：</h6>
                     <ul class="mb-0">
-                        <li>{{ _('Property Certificate') }}</li>
-                        <li>{{ _('Land Use Rights Certificate') }}</li>
-                        <li>{{ _('Property Purchase Contract') }}</li>
-                        <li>{{ _('Asset Valuation Report') }}</li>
+                        <li>房产证</li>
+                        <li>土地使用权证</li>
+                        <li>房产购买合同</li>
+                        <li>资产评估报告</li>
                     </ul>
                 </div>
                 <div class="similar-assets-docs mb-2 alert alert-info" style="display: none;">
-                    <h6 class="alert-heading">{{ _('Required Documents for Similar Assets') }}:</h6>
+                    <h6 class="alert-heading">类不动产必需文件：</h6>
                     <ul class="mb-0">
-                        <li>{{ _('Asset Ownership Certificate') }}</li>
-                        <li>{{ _('Asset Usage Rights Certificate') }}</li>
-                        <li>{{ _('Asset Valuation Report') }}</li>
+                        <li>资产所有权证明</li>
+                        <li>资产使用权证明</li>
+                        <li>资产评估报告</li>
                     </ul>
                 </div>
                 <div id="documentUpload" class="upload-area">
                     <i class="fas fa-file-upload"></i>
-                    <p class="mb-0">{{ _('Click or drag to upload documents') }}</p>
-                    <small class="text-muted">{{ _('Supports pdf, doc, docx formats (Max 5 documents, 6MB each)') }}</small>
+                    <p class="mb-0">点击或拖拽上传文档</p>
+                    <small class="text-muted">支持pdf、doc、docx格式（最多5个，每个不超过6MB）</small>
                 </div>
                 <div id="documentPreview" class="mt-2"></div>
             </div>
         </div>
         
-        <!-- Submit Buttons -->
+        <!-- 提交按钮 -->
         <div class="d-flex justify-content-end gap-2 mt-4">
             <button type="button" id="saveDraft" class="btn btn-secondary">
                 <i class="fas fa-save me-1"></i>
-                {{ _('Save Draft') }}
+                保存草稿
             </button>
             <button type="submit" class="btn btn-primary">
                 <i class="fas fa-check me-1"></i>
-                {{ _('Create Asset') }}
+                创建资产
             </button>
         </div>
     </form>
 </div>
 
-<!-- Error Modal -->
+<!-- 错误提示框 -->
 <div class="modal fade" id="errorModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">{{ _('Error') }}</h5>
+                <h5 class="modal-title">错误</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <p id="errorMessage" class="mb-0"></p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('Close') }}</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
             </div>
         </div>
     </div>
