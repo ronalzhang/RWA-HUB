@@ -1,5 +1,12 @@
 // 表单验证和提交处理
 document.addEventListener('DOMContentLoaded', function() {
+    // 检查依赖
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap 未加载');
+        return;
+    }
+
+    // 获取必要的 DOM 元素
     const form = document.getElementById('assetForm');
     const typeSelect = document.getElementById('type');
     const areaGroup = document.querySelector('.asset-area-group');
@@ -7,7 +14,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const documentUpload = document.getElementById('documentUpload');
     const imagePreview = document.getElementById('imagePreview');
     const documentPreview = document.getElementById('documentPreview');
-    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+    
+    // 检查元素是否存在
+    if (!form || !typeSelect || !areaGroup || !imageUpload || !documentUpload || !imagePreview || !documentPreview) {
+        console.error('必要的 DOM 元素未找到');
+        return;
+    }
+
+    // 初始化 Bootstrap Modal
+    let errorModal;
+    try {
+        errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+    } catch (error) {
+        console.error('初始化 Modal 失败:', error);
+        return;
+    }
     const errorMessage = document.getElementById('errorMessage');
 
     // 资产类型切换处理
@@ -38,6 +59,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
+            // 检查钱包连接
+            const userAddress = localStorage.getItem('userAddress');
+            if (!userAddress) {
+                throw new Error('请先连接钱包');
+            }
+
             const formData = new FormData();
             
             // 添加基本字段
@@ -58,6 +85,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const imageFiles = Array.from(imagePreview.querySelectorAll('img')).map(img => {
                 return dataURLtoFile(img.src, `image_${Date.now()}.jpg`);
             });
+            if (imageFiles.length === 0) {
+                throw new Error('请至少上传一张资产图片');
+            }
             imageFiles.forEach(file => formData.append('images[]', file));
             
             // 添加文档文件
@@ -71,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 body: formData,
                 headers: {
-                    'X-Eth-Address': localStorage.getItem('userAddress')
+                    'X-Eth-Address': userAddress
                 }
             });
 
@@ -84,8 +114,13 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = `/assets/${result.id}`;
             
         } catch (error) {
-            errorMessage.textContent = error.message;
-            errorModal.show();
+            console.error('提交表单失败:', error);
+            if (errorModal && errorMessage) {
+                errorMessage.textContent = error.message || '创建资产失败，请重试';
+                errorModal.show();
+            } else {
+                alert(error.message || '创建资产失败，请重试');
+            }
         }
     });
 });

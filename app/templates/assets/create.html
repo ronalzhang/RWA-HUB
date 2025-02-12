@@ -2,6 +2,35 @@
 
 {% block title %}{{ _('Create Asset') }} - RWA-HUB{% endblock %}
 
+{% block head %}
+<style>
+    .upload-area {
+        border: 2px dashed #ddd;
+        border-radius: 8px;
+        padding: 2rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .upload-area:hover, .upload-area.dragover {
+        border-color: #0d6efd;
+        background-color: rgba(13, 110, 253, 0.05);
+    }
+    .upload-area i {
+        font-size: 2rem;
+        color: #6c757d;
+        margin-bottom: 1rem;
+        display: block;
+    }
+    .document-item {
+        padding: 0.5rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container py-5">
     <h2 class="mb-4">{{ _('Create Asset') }}</h2>
@@ -145,5 +174,61 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<!-- 确保 Bootstrap 和其他依赖已加载 -->
+<script>
+// 检查依赖是否加载
+function checkDependencies() {
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap 未加载');
+        return false;
+    }
+    if (typeof localStorage === 'undefined') {
+        console.error('localStorage 不可用');
+        return false;
+    }
+    return true;
+}
+
+// 等待所有依赖加载完成
+function waitForDependencies() {
+    return new Promise((resolve, reject) => {
+        const maxAttempts = 10;
+        let attempts = 0;
+        
+        function check() {
+            attempts++;
+            if (checkDependencies()) {
+                resolve();
+            } else if (attempts >= maxAttempts) {
+                reject(new Error('依赖加载超时'));
+            } else {
+                setTimeout(check, 500);
+            }
+        }
+        
+        check();
+    });
+}
+
+// 初始化页面
+async function initPage() {
+    try {
+        await waitForDependencies();
+        // 加载资产创建脚本
+        const script = document.createElement('script');
+        script.src = "{{ url_for('static', filename='js/assets/create.js') }}";
+        document.body.appendChild(script);
+    } catch (error) {
+        console.error('初始化失败:', error);
+        alert('页面加载失败，请刷新重试');
+    }
+}
+
+// 开始初始化
+initPage();
+</script>
 {% endblock %}
 
