@@ -35,7 +35,11 @@ def create_app(config_name='development'):
     # 配置 Babel
     app.config['BABEL_DEFAULT_LOCALE'] = 'en'
     app.config['BABEL_SUPPORTED_LOCALES'] = ['en', 'zh_Hant']
-    babel.init_app(app, locale_selector=get_locale)
+    babel.init_app(app)
+    
+    @babel.localeselector
+    def select_locale():
+        return get_locale()
     
     # 确保日志目录存在
     if not os.path.exists('logs'):
