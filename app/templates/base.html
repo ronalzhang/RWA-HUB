@@ -56,11 +56,11 @@
                 <!-- 钱包连接 -->
                 <div class="d-flex align-items-center">
                     <div class="dropdown">
-                        <button id="walletBtn" class="btn btn-outline-primary wallet-btn" type="button" onclick="handleWalletClick()">
+                        <button id="walletBtn" class="btn btn-outline-primary wallet-btn" type="button">
                             <i class="fas fa-wallet me-2"></i>
                             <span id="walletBtnText">{{ _('Connect Wallet') }}</span>
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" id="walletMenu">
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" id="walletMenu" style="display: none;">
                             <li><a class="dropdown-item" href="#" id="switchWallet">
                                 <i class="fas fa-exchange-alt me-2"></i>{{ _('Switch Wallet') }}
                             </a></li>
@@ -179,6 +179,13 @@
     async function handleWalletClick() {
         if (!window.walletState.currentAccount) {
             await connectWallet();
+        } else {
+            const dropdownMenu = document.getElementById('walletMenu');
+            if (dropdownMenu.style.display === 'none') {
+                dropdownMenu.style.display = 'block';
+            } else {
+                dropdownMenu.style.display = 'none';
+            }
         }
     }
 
@@ -269,14 +276,13 @@
             walletBtnText.textContent = shortAddress;
             walletBtn.classList.remove('btn-outline-primary');
             walletBtn.classList.add('btn-primary');
-            walletBtn.setAttribute('data-bs-toggle', 'dropdown');
-            walletMenu.style.display = 'block';
+            walletBtn.onclick = handleWalletClick;
         } else {
             // 显示连接按钮
             walletBtnText.textContent = '{{ _("Connect Wallet") }}';
             walletBtn.classList.remove('btn-primary');
             walletBtn.classList.add('btn-outline-primary');
-            walletBtn.removeAttribute('data-bs-toggle');
+            walletBtn.onclick = connectWallet;
             walletMenu.style.display = 'none';
             
             // 隐藏管理员入口
@@ -339,6 +345,7 @@
     // 切换钱包
     document.getElementById('switchWallet').addEventListener('click', async function(e) {
         e.preventDefault();
+        document.getElementById('walletMenu').style.display = 'none';
         if (typeof window.ethereum !== 'undefined') {
             try {
                 // 先断开当前连接
@@ -356,7 +363,7 @@
                     handleAccountsChanged(accounts);
                 }
             } catch (error) {
-                console.error('Failed to switch wallet:', error);
+                console.error('切换钱包失败:', error);
                 alert('切换钱包失败，请重试');
             }
         }
@@ -365,7 +372,17 @@
     // 断开连接
     document.getElementById('disconnectWallet').addEventListener('click', async function(e) {
         e.preventDefault();
+        document.getElementById('walletMenu').style.display = 'none';
         await handleDisconnect();
+    });
+
+    // 点击页面其他地方关闭下拉菜单
+    document.addEventListener('click', function(e) {
+        const walletBtn = document.getElementById('walletBtn');
+        const walletMenu = document.getElementById('walletMenu');
+        if (!walletBtn.contains(e.target) && !walletMenu.contains(e.target)) {
+            walletMenu.style.display = 'none';
+        }
     });
 
     // 页面加载时检查连接状态

@@ -64,6 +64,8 @@ if (!window.walletState) {
             this.permissions = [];
             this.lastError = null;
             this.permissionCache.clear();
+            localStorage.removeItem('walletConnected');
+            localStorage.removeItem('userAddress');
         }
     };
 }
@@ -115,13 +117,19 @@ async function handleAccountsChanged(accounts) {
             window.walletState.clearState();
         } else if (accounts[0] !== window.walletState.currentAccount) {
             window.walletState.currentAccount = accounts[0];
-            window.walletState.connectionStatus = 'connected';
+            window.walletState.setConnectionStatus('connected');
             // 检查新账户的管理员权限
             await window.walletState.checkIsAdmin();
             
             // 保存连接状态
             localStorage.setItem('walletConnectionStatus', 'connected');
             localStorage.setItem('userAddress', accounts[0]);
+            
+            // 关闭下拉菜单
+            const walletMenu = document.getElementById('walletMenu');
+            if (walletMenu) {
+                walletMenu.style.display = 'none';
+            }
         }
     } catch (error) {
         console.error('处理账户变更失败:', error);
@@ -221,6 +229,12 @@ async function connectWallet() {
 // 断开钱包连接
 async function disconnectWallet() {
     window.walletState.clearState();
+    
+    // 关闭下拉菜单
+    const walletMenu = document.getElementById('walletMenu');
+    if (walletMenu) {
+        walletMenu.style.display = 'none';
+    }
     
     // 触发状态变更事件
     window.dispatchEvent(new CustomEvent('walletStateChanged', {
