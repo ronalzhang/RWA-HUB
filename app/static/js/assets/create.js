@@ -722,27 +722,44 @@ async function connectWallet() {
     }
 }
 
+// 修改代币代码生成逻辑
+function generateTokenSymbol(type) {
+    if (!type) return '';
+    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    return `${type}${randomNum}`;
+}
+
 // 初始化表单元素
 function initializeFormElements() {
     const elements = {
         form: document.getElementById('assetForm'),
-        nameInput: document.getElementById('name'),
-        typeInput: document.getElementById('type'),
-        locationInput: document.getElementById('location'),
-        descriptionInput: document.getElementById('description'),
-        areaInput: document.getElementById('area'),
-        totalValueInput: document.getElementById('totalValue'),
-        tokenCountInput: document.getElementById('tokenCount'),
-        expectedAnnualRevenueInput: document.getElementById('expectedAnnualRevenue'),
+        type: document.getElementById('type'),
+        area: document.getElementById('area'),
+        tokenCount: document.getElementById('tokenCount'),
+        imageInput: document.getElementById('imageInput'),
         imageDropzone: document.getElementById('imageDropzone'),
+        documentInput: document.getElementById('documentInput'),
         documentDropzone: document.getElementById('documentDropzone'),
         saveDraftBtn: document.getElementById('saveDraft'),
         previewBtn: document.getElementById('previewForm')
     };
 
-    // 生成初始代币代码
-    const tokenSymbol = generateTokenSymbol();
-    document.getElementById('tokenSymbol').value = tokenSymbol;
+    // 监听资产类型变化
+    elements.type.addEventListener('change', function() {
+        const type = this.value;
+        if (type) {
+            const tokenSymbol = generateTokenSymbol(type);
+            document.getElementById('tokenSymbol').value = tokenSymbol;
+            toggleAssetTypeFields(type);
+        }
+    });
+
+    // 生成初始代币代码（如果已选择类型）
+    const initialType = elements.type.value;
+    if (initialType) {
+        const tokenSymbol = generateTokenSymbol(initialType);
+        document.getElementById('tokenSymbol').value = tokenSymbol;
+    }
 
     return elements;
 }
@@ -817,7 +834,7 @@ function initializeEventListeners(elements) {
     });
     
     // 资产类型切换
-    elements.typeInput.addEventListener('change', function() {
+    elements.type.addEventListener('change', function() {
         const type = this.value;
         if (type) {
             toggleAssetTypeFields(type);
@@ -826,8 +843,8 @@ function initializeEventListeners(elements) {
     });
     
     // 不动产计算触发器
-    elements.areaInput.addEventListener('input', function() {
-        if (elements.typeInput.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
+    elements.area.addEventListener('input', function() {
+        if (elements.type.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
             calculateTokenPrice();
         }
     });
@@ -842,28 +859,9 @@ function initializeEventListeners(elements) {
     });
     
     // 总价值变化触发器
-    elements.totalValueInput.addEventListener('input', function() {
+    elements.totalValue.addEventListener('input', function() {
         calculateTokenPrice();
     });
-    
-    // 注释掉草稿相关的事件监听
-    // let autoSaveTimer = setInterval(saveDraft, CONFIG.DRAFT.AUTO_SAVE_INTERVAL);
-    
-    // 检查草稿
-    // checkDraft();
-    
-    // 草稿按钮事件
-    /*
-    loadDraftBtn.addEventListener('click', loadDraft);
-    discardDraftBtn.addEventListener('click', () => {
-        localStorage.removeItem(CONFIG.DRAFT.KEY);
-        draftInfo.style.display = 'none';
-    });
-    saveDraftBtn.addEventListener('click', () => {
-        saveDraft();
-        showToast('草稿已保存');
-    });
-    */
     
     // 表单提交增强
     elements.form.addEventListener('submit', async function(e) {
@@ -877,19 +875,19 @@ function initializeEventListeners(elements) {
         
         const formData = new FormData();
         formData.append('name', elements.nameInput.value);
-        formData.append('type', elements.typeInput.value);
+        formData.append('type', elements.type.value);
         formData.append('location', elements.locationInput.value);
         formData.append('description', elements.descriptionInput.value);
         
         // 根据资产类型处理不同字段
-        if (elements.typeInput.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
-            formData.append('area', elements.areaInput.value);
-            formData.append('totalValue', elements.totalValueInput.value);
+        if (elements.type.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
+            formData.append('area', elements.area.value);
+            formData.append('totalValue', elements.totalValue.value);
             formData.append('tokenCount', calculatedElements.realEstate.tokenCount.textContent.replace(/,/g, ''));
             formData.append('tokenPrice', calculatedElements.realEstate.tokenPrice.textContent.replace(/,/g, ''));
-            formData.append('expectedAnnualRevenue', elements.expectedAnnualRevenueInput.value);
+            formData.append('expectedAnnualRevenue', elements.expectedAnnualRevenue.value);
         } else {
-            formData.append('tokenCount', elements.tokenCountInput.value);
+            formData.append('tokenCount', elements.tokenCount.value);
             formData.append('totalValue', document.getElementById('totalValueSimilar').value);
             formData.append('tokenPrice', calculatedElements.similarAssets.tokenPrice.textContent.replace(/,/g, ''));
             formData.append('expectedAnnualRevenue', document.getElementById('expectedAnnualRevenueSimilar').value);
@@ -948,7 +946,7 @@ function initializeEventListeners(elements) {
     });
     
     // 更新资产类型显示
-    toggleAssetTypeFields(elements.typeInput.value);
+    toggleAssetTypeFields(elements.type.value);
 
     // 在initializeEventListeners函数中添加预览按钮事件监听
     document.getElementById('previewForm').addEventListener('click', function(e) {
@@ -1227,7 +1225,7 @@ function previewAsset() {
     modal.show();
 }
 
-// 添加提交资产函数
+// 修改提交资产函数
 async function submitAsset() {
     try {
         // 获取当前连接的钱包地址
@@ -1236,72 +1234,29 @@ async function submitAsset() {
             throw new Error('请先连接钱包');
         }
 
-        const errors = validateForm();
-        if (errors.length > 0) {
-            showError(errors.join('\n'));
-            return;
-        }
-
         const formData = new FormData(document.getElementById('assetForm'));
         
-        // 添加钱包地址到表单数据
-        formData.append('eth_address', ethAddress);
-        
-        // 根据资产类型处理不同字段
-        if (typeInput.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
-            formData.append('area', areaInput.value);
-            formData.append('totalValue', totalValueInput.value);
-            formData.append('tokenCount', calculatedElements.realEstate.tokenCount.textContent.replace(/,/g, ''));
-            formData.append('tokenPrice', calculatedElements.realEstate.tokenPrice.textContent.replace(/,/g, ''));
-            formData.append('expectedAnnualRevenue', expectedAnnualRevenueInput.value);
-        } else {
-            formData.append('tokenCount', tokenCountInput.value);
-            formData.append('totalValue', document.getElementById('totalValueSimilar').value);
-            formData.append('tokenPrice', calculatedElements.similarAssets.tokenPrice.textContent.replace(/,/g, ''));
-            formData.append('expectedAnnualRevenue', document.getElementById('expectedAnnualRevenueSimilar').value);
-        }
-
         // 添加图片
         if (uploadedImages.length > 0) {
-            for (let i = 0; i < uploadedImages.length; i++) {
-                const image = uploadedImages[i];
-                try {
-                    const blob = await dataURLtoBlob(image.data);
-                    formData.append('images[]', blob, image.name);
-                } catch (error) {
-                    console.error(`处理图片失败: ${image.name}`, error);
-                    showError(`处理图片 ${image.name} 失败，请重新上传`);
-                    return;
-                }
+            for (const image of uploadedImages) {
+                const blob = await dataURLtoBlob(image.data);
+                formData.append('images[]', blob, image.name);
             }
         }
 
         // 添加文档
         if (uploadedDocuments.length > 0) {
-            for (let i = 0; i < uploadedDocuments.length; i++) {
-                const doc = uploadedDocuments[i];
-                try {
-                    const blob = await dataURLtoBlob(doc.data);
-                    formData.append('documents[]', blob, doc.name);
-                } catch (error) {
-                    console.error(`处理文档失败: ${doc.name}`, error);
-                    showError(`处理文档 ${doc.name} 失败，请重新上传`);
-                    return;
-                }
+            for (const doc of uploadedDocuments) {
+                const blob = await dataURLtoBlob(doc.data);
+                formData.append('documents[]', blob, doc.name);
             }
         }
 
-        // 显示加载状态
-        const submitButton = document.querySelector('#previewModal .btn-primary');
-        const originalText = submitButton.innerHTML;
-        submitButton.disabled = true;
-        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 提交中...';
-
-        // 发送请求时添加钱包地址到请求头
+        // 发送请求
         const response = await fetch('/api/assets/create', {
             method: 'POST',
             headers: {
-                'X-Eth-Address': ethAddress
+                'X-Eth-Address': ethAddress  // 确保在请求头中添加钱包地址
             },
             body: formData
         });
@@ -1312,9 +1267,6 @@ async function submitAsset() {
         }
 
         const result = await response.json();
-        
-        // 提交成功后的处理
-        localStorage.removeItem(CONFIG.DRAFT.KEY);
         showToast('资产创建成功！');
         
         // 延迟2秒后跳转
@@ -1326,12 +1278,4 @@ async function submitAsset() {
         console.error('提交表单失败:', error);
         showError(error.message);
     }
-}
-
-// 修改代币代码生成逻辑
-function generateTokenSymbol() {
-    const type = document.getElementById('type').value;
-    const timestamp = new Date().getTime();
-    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `${type}${randomNum}`;
 } 
