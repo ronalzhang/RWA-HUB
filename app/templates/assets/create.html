@@ -68,19 +68,26 @@
             </div>
             
             <!-- Value Information -->
-            <div class="col-md-4">
-                <label for="totalValue" class="form-label">{{ _('Total Value') }} (CNY)</label>
+            <div class="col-md-6">
+                <label for="totalValue" class="form-label">{{ _('Total Value') }} (U)</label>
                 <input type="number" class="form-control" id="totalValue" required>
             </div>
             
-            <div class="col-md-4">
-                <label for="tokenPrice" class="form-label">{{ _('Token Price') }} (CNY)</label>
-                <input type="number" class="form-control" id="tokenPrice" required>
+            <div class="col-md-6 token-amount-group" style="display: none;">
+                <label for="tokenAmount" class="form-label">{{ _('Token Amount') }}</label>
+                <input type="number" class="form-control" id="tokenAmount">
             </div>
             
-            <div class="col-md-4">
-                <label for="annualRevenue" class="form-label">{{ _('Expected Annual Revenue') }} (%)</label>
+            <div class="col-md-6">
+                <label for="tokenPrice" class="form-label">{{ _('Token Price') }} (U)</label>
+                <input type="number" class="form-control" id="tokenPrice" readonly>
+                <small class="form-text text-muted">Automatically calculated</small>
+            </div>
+            
+            <div class="col-md-6">
+                <label for="annualRevenue" class="form-label">{{ _('Expected Annual Revenue') }} (U)</label>
                 <input type="number" class="form-control" id="annualRevenue" step="0.01" required>
+                <small class="form-text text-muted">Expected annual dividend amount</small>
             </div>
             
             <!-- Image Upload -->

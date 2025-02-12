@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             case 'tokenPrice':
                 return value > 0 && value <= 1000000000;
             case 'annualRevenue':
-                return value > 0 && value <= 100;
+                return value > 0 && value <= totalValueInput.value; // 年收入不能超过总价值
             case 'area':
                 return value > 0 && value <= 1000000;
             default:
@@ -77,25 +77,32 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // 资产类型切换处理
     typeSelect.addEventListener('change', function() {
+        // 清空所有计算相关的输入值
+        areaInput.value = '';
+        document.getElementById('tokenAmount').value = '';
+        tokenPriceInput.value = '';
+        calculationInfo.innerHTML = '';
+
         if (this.value === '10') { // 不动产
             areaGroup.style.display = 'block';
             areaGroup.querySelector('input').required = true;
+            tokenAmountGroup.style.display = 'none';
+            tokenAmountGroup.querySelector('input').required = false;
+            tokenPriceInput.readOnly = true;
+            
             // 显示不动产相关文档要求
             document.querySelector('.real-estate-docs').style.display = 'block';
             document.querySelector('.similar-assets-docs').style.display = 'none';
         } else if (this.value === '20') { // 类不动产
             areaGroup.style.display = 'none';
             areaGroup.querySelector('input').required = false;
-            areaGroup.querySelector('input').value = '';
+            tokenAmountGroup.style.display = 'block';
+            tokenAmountGroup.querySelector('input').required = true;
+            tokenPriceInput.readOnly = true;
+            
             // 显示类不动产相关文档要求
             document.querySelector('.real-estate-docs').style.display = 'none';
             document.querySelector('.similar-assets-docs').style.display = 'block';
-        } else {
-            areaGroup.style.display = 'none';
-            areaGroup.querySelector('input').required = false;
-            // 隐藏所有文档要求
-            document.querySelector('.real-estate-docs').style.display = 'none';
-            document.querySelector('.similar-assets-docs').style.display = 'none';
         }
         updateTokenCalculation();
     });
@@ -127,18 +134,26 @@ document.addEventListener('DOMContentLoaded', async function() {
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
         
-        if (!form.checkValidity()) {
-            e.stopPropagation();
-            form.classList.add('was-validated');
-            return;
-        }
-
         try {
+            // 基础表单验证
+            if (!form.checkValidity()) {
+                e.stopPropagation();
+                form.classList.add('was-validated');
+                return;
+            }
+
+            // 更新提交状态
             updateSubmitStatus(true);
+
+            // 自定义验证
             await validateForm();
+
+            // 收集并提交数据
             const formData = collectFormData();
             const response = await submitData(formData);
             const result = await response.json();
+
+            // 提交成功后跳转
             window.location.href = `/assets/${result.id}`;
         } catch (error) {
             showError(error.message);
@@ -160,18 +175,24 @@ document.addEventListener('DOMContentLoaded', async function() {
         formData.append('token_price', document.getElementById('tokenPrice').value);
         formData.append('annual_revenue', document.getElementById('annualRevenue').value);
         
-        // 根据资产类型添加面积
+        // 根据资产类型添加特定字段
         if (document.getElementById('type').value === '10') {
             formData.append('area', document.getElementById('area').value);
+            formData.append('token_amount', parseFloat(document.getElementById('area').value) * 10000);
+        } else {
+            formData.append('token_amount', document.getElementById('tokenAmount').value);
         }
         
-        // 添加图片文件
+        // 添加图片文件（必须）
         const imageFiles = Array.from(imagePreview.querySelectorAll('img')).map(img => {
             return dataURLtoFile(img.src, `image_${Date.now()}.jpg`);
         });
+        if (imageFiles.length === 0) {
+            throw new Error('Please upload at least one asset image');
+        }
         imageFiles.forEach(file => formData.append('images[]', file));
         
-        // 添加文档文件
+        // 添加文档文件（可选）
         const documentFiles = Array.from(documentPreview.querySelectorAll('.document-item')).map(item => {
             return item.file;
         });
@@ -185,13 +206,21 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!window.walletState || !window.walletState.isConnected || !window.walletState.currentAccount) {
             throw new Error('Please connect your wallet first');
         }
-        return await fetch('/api/assets', {
+
+        const response = await fetch('/api/assets', {
             method: 'POST',
             body: formData,
             headers: {
                 'X-Eth-Address': window.walletState.currentAccount
             }
         });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to create asset');
+        }
+
+        return response;
     }
 
     // 显示错误信息
@@ -211,44 +240,51 @@ document.addEventListener('DOMContentLoaded', async function() {
         const totalValue = parseFloat(totalValueInput.value) || 0;
         const tokenPrice = parseFloat(tokenPriceInput.value) || 0;
         
-        if (assetType === '10' && area > 0) {
-            const tokenAmount = area * 10000;
-            const calculatedTotalValue = tokenAmount * tokenPrice;
-            
-            calculationInfo.innerHTML = `
-                <div class="mb-2">
-                    <div>Total Tokens: ${tokenAmount.toLocaleString()}</div>
-                    <div>Tokens per Square Meter: 10,000</div>
-                    ${tokenPrice > 0 ? `
-                        <div>Token Price: ${tokenPrice.toLocaleString()} CNY</div>
-                        <div>Calculated Total Value: ${calculatedTotalValue.toLocaleString()} CNY</div>
-                        ${totalValue > 0 ? `
-                            <div class="mt-2 ${Math.abs(calculatedTotalValue - totalValue) <= 0.01 ? 'text-success' : 'text-danger'}">
-                                ${Math.abs(calculatedTotalValue - totalValue) <= 0.01 ? 
-                                    '✓ Values match' : 
-                                    '⚠ Values do not match'}
-                            </div>
-                        ` : ''}
-                    ` : ''}
-                </div>
-            `;
-            
-            validatePrices(tokenAmount);
-        } else if (assetType === '20') {
-            if (totalValue > 0 && tokenPrice > 0) {
-                const tokenAmount = Math.floor(totalValue / tokenPrice);
+        if (assetType === '10') { // 不动产
+            // 只允许输入面积和总价值，其他都是计算得出
+            if (area > 0 && totalValue > 0) {
+                const tokenAmount = area * 10000; // 每平米10000个代币
+                const calculatedTokenPrice = totalValue / tokenAmount; // 计算代币价格
+                
+                // 自动设置代币价格
+                tokenPriceInput.value = calculatedTokenPrice.toFixed(6);
+                tokenPriceInput.readOnly = true;
+                
                 calculationInfo.innerHTML = `
                     <div class="mb-2">
-                        <div>Estimated Token Amount: ${tokenAmount.toLocaleString()}</div>
-                        <div>Token Price: ${tokenPrice.toLocaleString()} CNY</div>
-                        <div>Total Value: ${totalValue.toLocaleString()} CNY</div>
+                        <div>Total Tokens: ${tokenAmount.toLocaleString()}</div>
+                        <div>Tokens per Square Meter: 10,000</div>
+                        <div>Token Price: ${calculatedTokenPrice.toLocaleString()} U</div>
+                        <div>Total Value: ${totalValue.toLocaleString()} U</div>
                     </div>
                 `;
             } else {
                 calculationInfo.innerHTML = '';
+                tokenPriceInput.value = '';
+                tokenPriceInput.readOnly = true;
             }
-        } else {
-            calculationInfo.innerHTML = '';
+        } else if (assetType === '20') { // 类不动产
+            // 允许输入总价值和代币数量，代币价格自动计算
+            const tokenAmount = parseFloat(document.getElementById('tokenAmount').value) || 0;
+            if (totalValue > 0 && tokenAmount > 0) {
+                const calculatedTokenPrice = totalValue / tokenAmount;
+                
+                // 自动设置代币价格
+                tokenPriceInput.value = calculatedTokenPrice.toFixed(6);
+                tokenPriceInput.readOnly = true;
+                
+                calculationInfo.innerHTML = `
+                    <div class="mb-2">
+                        <div>Total Tokens: ${tokenAmount.toLocaleString()}</div>
+                        <div>Token Price: ${calculatedTokenPrice.toLocaleString()} U</div>
+                        <div>Total Value: ${totalValue.toLocaleString()} U</div>
+                    </div>
+                `;
+            } else {
+                calculationInfo.innerHTML = '';
+                tokenPriceInput.value = '';
+                tokenPriceInput.readOnly = true;
+            }
         }
     }
     
@@ -264,9 +300,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 totalValueInput.setCustomValidity('Total value does not match calculation from token amount and price');
                 showCalculationError(`Current Settings:
                     <br>- Total Tokens: ${tokenAmount.toLocaleString()}
-                    <br>- Token Price: ${tokenPrice.toLocaleString()} CNY
-                    <br>- Calculated Total: ${calculatedTotalValue.toLocaleString()} CNY
-                    <br>- Input Total: ${totalValue.toLocaleString()} CNY`);
+                    <br>- Token Price: ${tokenPrice.toLocaleString()} U
+                    <br>- Calculated Total: ${calculatedTotalValue.toLocaleString()} U
+                    <br>- Input Total: ${totalValue.toLocaleString()} U`);
             } else {
                 totalValueInput.setCustomValidity('');
                 hideCalculationError();
@@ -315,8 +351,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
     annualRevenueInput.addEventListener('input', () => {
         const value = parseFloat(annualRevenueInput.value) || 0;
-        if (value > 100) {
-            annualRevenueInput.setCustomValidity('Annual revenue rate cannot exceed 100%');
+        const totalValue = parseFloat(totalValueInput.value) || 0;
+        if (value <= 0) {
+            annualRevenueInput.setCustomValidity('Annual revenue must be greater than 0');
+        } else if (value > totalValue) {
+            annualRevenueInput.setCustomValidity('Annual revenue cannot exceed total value');
         } else {
             annualRevenueInput.setCustomValidity('');
         }
@@ -430,6 +469,39 @@ document.addEventListener('DOMContentLoaded', async function() {
     window.addEventListener('unhandledrejection', function(event) {
         showError('An unexpected error occurred: ' + event.reason);
     });
+
+    // 表单提交验证
+    async function validateForm() {
+        // 验证图片上传
+        const imageCount = imagePreview.querySelectorAll('img').length;
+        if (imageCount === 0) {
+            throw new Error('Please upload at least one asset image');
+        }
+        
+        // 验证不动产类型特定字段
+        if (typeSelect.value === '10') {
+            const area = parseFloat(areaInput.value) || 0;
+            const totalValue = parseFloat(totalValueInput.value) || 0;
+            if (area <= 0) {
+                throw new Error('Please enter valid building area');
+            }
+            if (totalValue <= 0) {
+                throw new Error('Please enter valid total value');
+            }
+        }
+        
+        // 验证类不动产类型特定字段
+        if (typeSelect.value === '20') {
+            const tokenAmount = parseFloat(document.getElementById('tokenAmount').value) || 0;
+            const totalValue = parseFloat(totalValueInput.value) || 0;
+            if (tokenAmount <= 0) {
+                throw new Error('Please enter valid token amount');
+            }
+            if (totalValue <= 0) {
+                throw new Error('Please enter valid total value');
+            }
+        }
+    }
 });
 
 // 将 Data URL 转换为 File 对象

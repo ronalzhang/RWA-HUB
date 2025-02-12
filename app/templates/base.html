@@ -263,18 +263,17 @@
             const shortAddress = `${account.slice(0, 6)}...${account.slice(-4)}`;
             walletBtnText.textContent = shortAddress;
             walletBtn.classList.remove('btn-outline-primary');
-            walletBtn.classList.add('btn-primary', 'dropdown-toggle');
+            walletBtn.classList.add('btn-primary');
+            // 只有点击时才显示下拉菜单
+            walletMenu.style.display = 'none';
             walletBtn.setAttribute('data-bs-toggle', 'dropdown');
-            walletMenu.style.display = 'block';
             
             // 检查是否是管理员
             checkIsAdmin(account);
         } else {
             // 显示连接按钮
             walletBtnText.textContent = '{{ _("Connect Wallet") }}';
-            walletBtn.classList.remove('btn-primary', 'dropdown-toggle');
-            walletBtn.classList.add('btn-outline-primary');
-            walletBtn.removeAttribute('data-bs-toggle');
+            walletBtn.classList.remove('btn-primary');
             walletMenu.style.display = 'none';
             
             // 隐藏管理员入口
