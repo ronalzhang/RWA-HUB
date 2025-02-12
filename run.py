@@ -77,9 +77,10 @@ def configure_server():
     threads = int(os.environ.get('WAITRESS_THREADS', 8))
     
     return {
-        'host': '0.0.0.0',
         'port': port,
-        'threads': threads
+        'threads': threads,
+        'host': '0.0.0.0',
+        'url_scheme': 'http'
     }
 
 if __name__ == '__main__':
@@ -95,11 +96,10 @@ if __name__ == '__main__':
         app.config['PROPAGATE_EXCEPTIONS'] = True
         
         server_config = configure_server()
-        port = server_config.pop('port')
         
         print("启动服务器...")
         print("访问地址:")
-        print(f"本地: http://127.0.0.1:{port}")
+        print(f"本地: http://127.0.0.1:{server_config['port']}")
         
         from waitress import serve
         serve(app, **server_config)
