@@ -76,18 +76,10 @@ def configure_server():
     port = int(os.environ.get('PORT', 10000))
     threads = int(os.environ.get('WAITRESS_THREADS', 8))
     
-    adjustments = Adjustments()
-    adjustments.threads = threads
-    adjustments.connection_limit = 1000
-    adjustments.channel_timeout = 300
-    adjustments.cleanup_interval = 30
-    adjustments.url_scheme = 'https'
-    
     return {
         'host': '0.0.0.0',
         'port': port,
-        'threads': threads,
-        '_adjustments': adjustments
+        'threads': threads
     }
 
 if __name__ == '__main__':
