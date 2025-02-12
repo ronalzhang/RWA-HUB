@@ -1,7 +1,7 @@
 // 配置常量
 const CONFIG = {
     IMAGE: {
-        MAX_FILES: 5,
+        MAX_FILES: 10,
         MAX_SIZE: 5 * 1024 * 1024, // 5MB
         ALLOWED_TYPES: ['image/jpeg', 'image/png'],
         COMPRESS: {
@@ -1332,9 +1332,12 @@ async function submitAsset() {
         submitButton.disabled = true;
         submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 提交中...';
 
-        // 发送请求
+        // 发送请求时添加钱包地址到请求头
         const response = await fetch('/api/assets/create', {
             method: 'POST',
+            headers: {
+                'X-Eth-Address': ethAddress
+            },
             body: formData
         });
 
@@ -1344,23 +1347,12 @@ async function submitAsset() {
         }
 
         const result = await response.json();
+        
+        // 提交成功后的处理
         localStorage.removeItem(CONFIG.DRAFT.KEY);
-        
-        // 显示成功提示
-        showToast('资产提交成功！');
-        
-        // 延迟跳转，让用户看到成功提示
-        setTimeout(() => {
-            window.location.href = `/assets/${result.assetId}`;
-        }, 1500);
-
+        window.location.href = `/assets/${result.assetId}`;
     } catch (error) {
-        console.error('提交表单失败:', error);
-        showError(error.message || '提交失败，请稍后重试');
-        
-        // 恢复按钮状态
-        const submitButton = document.querySelector('#previewModal .btn-primary');
-        submitButton.disabled = false;
-        submitButton.innerHTML = '提交审核';
+        console.error('提交失败:', error);
+        showError(error.message || '提交失败');
     }
 } 
