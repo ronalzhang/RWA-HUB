@@ -1,6 +1,7 @@
 from enum import IntEnum
 from datetime import datetime
 from app import db
+from sqlalchemy.orm import validates
 import json
 import re
 
