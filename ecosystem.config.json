@@ -1,0 +1,9 @@
+{
+  "apps": [{
+    "name": "rwa-hub",
+    "script": "run.py",
+    "env": {
+      "PORT": 9000
+    }
+  }]
+} 

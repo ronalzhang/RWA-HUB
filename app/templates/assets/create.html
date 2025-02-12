@@ -31,12 +31,58 @@
         height: 200px;
         object-fit: cover;
     }
+    
+    .upload-progress {
+        display: none;
+        margin-top: 1rem;
+    }
+    
+    .upload-progress .progress {
+        height: 0.5rem;
+    }
+    
+    .draft-info {
+        display: none;
+        margin-bottom: 1rem;
+        padding: 0.5rem;
+        background-color: #e9ecef;
+        border-radius: 0.25rem;
+    }
+    
+    .draft-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .form-control:disabled {
+        background-color: #f8f9fa;
+        cursor: not-allowed;
+    }
+    
+    .asset-type-field {
+        transition: all 0.3s ease;
+    }
+    
+    .asset-type-field.hidden {
+        display: none;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container py-5">
     <h2 class="mb-4">{{ _('Create Asset') }}</h2>
+    
+    <!-- 草稿提示 -->
+    <div id="draftInfo" class="draft-info">
+        <div class="d-flex justify-content-between align-items-center">
+            <span>{{ _('You have an unsaved draft from') }} <span id="draftTime"></span></span>
+            <div class="draft-actions">
+                <button type="button" class="btn btn-sm btn-primary" id="loadDraft">{{ _('Load Draft') }}</button>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="discardDraft">{{ _('Discard') }}</button>
+            </div>
+        </div>
+    </div>
     
     <form id="assetForm" class="needs-validation" novalidate>
         <!-- 基本信息 -->
@@ -81,34 +127,41 @@
                 <h5 class="card-title mb-0">{{ _('Asset Details') }}</h5>
             </div>
             <div class="card-body">
-                <div class="mb-3">
+                <!-- 不动产特有字段 -->
+                <div class="mb-3 asset-type-field real-estate">
                     <label for="area" class="form-label">{{ _('Asset Area (㎡)') }}</label>
-                    <input type="number" class="form-control" id="area" name="area" step="0.01" min="0" required>
-                    <div class="invalid-feedback">{{ _('Please enter asset area') }}</div>
+                    <input type="number" class="form-control" id="area" name="area" 
+                           step="0.01" min="0.01" placeholder="0.00" required>
+                    <div class="invalid-feedback">{{ _('Please enter valid asset area') }}</div>
+                    <small class="form-text text-muted">{{ _('Each square meter equals 10,000 tokens') }}</small>
                 </div>
                 
                 <div class="mb-3">
                     <label for="totalValue" class="form-label">{{ _('Total Value (USDC)') }}</label>
-                    <input type="number" class="form-control" id="totalValue" name="totalValue" step="0.01" min="0" required>
-                    <div class="invalid-feedback">{{ _('Please enter total value') }}</div>
+                    <input type="number" class="form-control" id="totalValue" name="totalValue" 
+                           step="0.01" min="0.01" placeholder="0.00" required>
+                    <div class="invalid-feedback">{{ _('Please enter valid total value') }}</div>
+                </div>
+                
+                <!-- 类不动产特有字段 -->
+                <div class="mb-3 asset-type-field similar-assets hidden">
+                    <label for="tokenCount" class="form-label">{{ _('Token Count') }}</label>
+                    <input type="number" class="form-control" id="tokenCount" name="tokenCount" 
+                           step="1" min="1" placeholder="0" required>
+                    <div class="invalid-feedback">{{ _('Please enter valid token count') }}</div>
                 </div>
                 
                 <div class="mb-3">
                     <label for="tokenPrice" class="form-label">{{ _('Token Price (USDC)') }}</label>
-                    <input type="number" class="form-control" id="tokenPrice" name="tokenPrice" step="0.01" min="0" required>
-                    <div class="invalid-feedback">{{ _('Please enter token price') }}</div>
-                </div>
-                
-                <div class="mb-3">
-                    <label for="expectedAnnualRevenue" class="form-label">{{ _('Expected Annual Revenue (USDC)') }}</label>
-                    <input type="number" class="form-control" id="expectedAnnualRevenue" name="expectedAnnualRevenue" step="0.01" min="0" required>
-                    <div class="invalid-feedback">{{ _('Please enter expected annual revenue') }}</div>
+                    <input type="number" class="form-control" id="tokenPrice" name="tokenPrice" 
+                           step="0.000001" min="0" placeholder="0.000000" disabled>
+                    <small class="form-text text-muted">{{ _('Automatically calculated based on total value and token count') }}</small>
                 </div>
                 
                 <!-- 计算结果显示 -->
                 <div class="alert alert-info">
-                    <div class="mb-2">{{ _('Token Count') }}: <span id="tokenCount">0</span></div>
-                    <div>{{ _('Annualized Return') }}: <span id="annualizedReturn">0%</span></div>
+                    <div class="mb-2 real-estate-info">{{ _('Token Count') }}: <span id="calculatedTokenCount">0</span></div>
+                    <div>{{ _('Token Price') }}: <span id="calculatedTokenPrice">0.000000</span> USDC</div>
                 </div>
             </div>
         </div>
@@ -122,7 +175,18 @@
                 <div class="dropzone" id="imageDropzone">
                     <i class="fas fa-cloud-upload-alt"></i>
                     <p class="mb-0">{{ _('Drag and drop images here or click to select') }}</p>
+                    <small class="text-muted d-block mt-2">{{ _('Maximum 5 files, 5MB each. Supported formats: JPG, PNG') }}</small>
                     <input type="file" id="imageInput" multiple accept="image/*" class="d-none">
+                </div>
+                <!-- 上传进度条 -->
+                <div id="imageUploadProgress" class="upload-progress">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="text-muted" id="imageUploadStatus">{{ _('Uploading...') }}</small>
+                        <small class="text-muted"><span id="imageUploadPercent">0</span>%</small>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
                 </div>
                 <div id="imagePreview" class="row mt-3"></div>
             </div>
@@ -157,7 +221,18 @@
                 <div class="dropzone" id="documentDropzone">
                     <i class="fas fa-file-upload"></i>
                     <p class="mb-0">{{ _('Drag and drop documents here or click to select') }}</p>
+                    <small class="text-muted d-block mt-2">{{ _('Maximum 10 files, 10MB each. Supported formats: PDF, DOC, DOCX') }}</small>
                     <input type="file" id="documentInput" multiple accept=".pdf,.doc,.docx" class="d-none">
+                </div>
+                <!-- 上传进度条 -->
+                <div id="documentUploadProgress" class="upload-progress">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="text-muted" id="documentUploadStatus">{{ _('Uploading...') }}</small>
+                        <small class="text-muted"><span id="documentUploadPercent">0</span>%</small>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
                 </div>
                 <div id="documentList" class="mt-3"></div>
             </div>
@@ -166,7 +241,10 @@
         <!-- 提交按钮 -->
         <div class="d-flex justify-content-between">
             <button type="button" class="btn btn-secondary" id="saveDraft">{{ _('Save Draft') }}</button>
-            <button type="submit" class="btn btn-primary">{{ _('Submit for Review') }}</button>
+            <div>
+                <button type="button" class="btn btn-outline-secondary me-2" id="previewForm">{{ _('Preview') }}</button>
+                <button type="submit" class="btn btn-primary">{{ _('Submit for Review') }}</button>
+            </div>
         </div>
     </form>
 </div>
