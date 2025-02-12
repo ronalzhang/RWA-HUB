@@ -109,7 +109,7 @@ if __name__ == '__main__':
     app.config['DEBUG'] = False
     app.config['PROPAGATE_EXCEPTIONS'] = True
     
-    port = int(os.environ.get('PORT', 10000))
+    port = int(os.environ.get('PORT', 10001))
     
     print("启动服务器...")
     print("访问地址:")
