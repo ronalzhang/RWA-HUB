@@ -199,12 +199,12 @@ function calculateRealEstateTokens() {
 
 // 总价值或面积变化时计算代币价格
 function calculateTokenPrice() {
-    const totalValue = parseFloat(document.getElementById('totalValue').value) || 0;
+    const total_value = parseFloat(document.getElementById('totalValue').value) || 0;
     const area = parseFloat(document.getElementById('area').value) || 0;
-    const tokenCount = area * 10000;  // 使用相同的计算方式
+    const token_supply = area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER;
     
-    if (totalValue > 0 && tokenCount > 0) {
-        const price = totalValue / tokenCount;
+    if (total_value > 0 && token_supply > 0) {
+        const price = total_value / token_supply;
         document.getElementById('calculatedTokenPrice').textContent = formatNumber(price, CONFIG.CALCULATION.PRICE_DECIMALS);
     } else {
         document.getElementById('calculatedTokenPrice').textContent = '0.000000';
@@ -613,9 +613,8 @@ function validateForm() {
 
 // 事件监听器
 document.addEventListener('DOMContentLoaded', async function() {
-    const isConnected = await checkWalletConnection();
-    
-    if (!isConnected) {
+    // 检查钱包连接状态
+    if (!window.ethereum || !window.ethereum.selectedAddress) {
         // 显示连接钱包提示
         const formContent = document.getElementById('assetForm');
         if (formContent) {
@@ -629,7 +628,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         <i class="fas fa-wallet fa-3x text-muted mb-3"></i>
                         <h3 class="mb-3">请先连接钱包</h3>
                         <p class="text-muted mb-4">您需要连接MetaMask钱包才能创建资产</p>
-                        <button class="btn btn-primary" onclick="connectWallet()">
+                        <button class="btn btn-primary" onclick="window.connectWallet()">
                             <i class="fas fa-plug me-2"></i>连接钱包
                         </button>
                     </div>
@@ -644,92 +643,43 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (formContent) {
             formContent.style.display = 'block';
         }
+        const walletPrompt = document.querySelector('.wallet-prompt');
+        if (walletPrompt) {
+            walletPrompt.style.display = 'none';
+        }
         initializeFormElements();
     }
-});
 
-// 添加连接钱包函数
-async function connectWallet() {
-    try {
-        // 请求用户连接钱包
-        const accounts = await window.ethereum.request({
-            method: 'eth_requestAccounts'
-        });
-        
-        if (accounts && accounts.length > 0) {
-            const userAddress = accounts[0];
-            // 保存钱包地址到localStorage
-            localStorage.setItem('userAddress', userAddress);
-            console.log('钱包已连接，地址:', userAddress);
-            
-            // 显示表单内容
+    // 监听钱包状态变化
+    window.ethereum.on('accountsChanged', function(accounts) {
+        if (accounts.length > 0) {
             const formContent = document.getElementById('assetForm');
+            const walletPrompt = document.querySelector('.wallet-prompt');
             if (formContent) {
                 formContent.style.display = 'block';
             }
-            
-            // 隐藏连接钱包提示
-            const walletPrompt = document.querySelector('.wallet-prompt');
             if (walletPrompt) {
                 walletPrompt.style.display = 'none';
             }
-            
-            // 初始化表单元素
             initializeFormElements();
-            
-            // 刷新页面以确保所有状态正确更新
-            window.location.reload();
-        }
-    } catch (error) {
-        console.error('连接钱包失败:', error);
-        showError('连接钱包失败，请重试');
-    }
-}
-
-// 检查钱包连接状态
-async function checkWalletConnection() {
-    try {
-        if (!window.ethereum) {
-            showError('请先安装MetaMask钱包');
-            return false;
-        }
-
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        if (accounts && accounts.length > 0) {
-            const userAddress = accounts[0];
-            localStorage.setItem('userAddress', userAddress);
-            console.log('当前连接的钱包地址:', userAddress);
-            return true;
         } else {
-            console.log('未连接钱包');
-            return false;
-        }
-    } catch (error) {
-        console.error('检查钱包连接失败:', error);
-        return false;
-    }
-}
-
-// 监听钱包账户变化
-if (window.ethereum) {
-    window.ethereum.on('accountsChanged', async function (accounts) {
-        if (accounts.length === 0) {
-            // 用户断开了钱包连接
-            localStorage.removeItem('userAddress');
-            window.location.reload();
-        } else {
-            // 用户切换了账户
-            localStorage.setItem('userAddress', accounts[0]);
-            window.location.reload();
+            const formContent = document.getElementById('assetForm');
+            if (formContent) {
+                formContent.style.display = 'none';
+            }
+            const walletPrompt = document.querySelector('.wallet-prompt');
+            if (walletPrompt) {
+                walletPrompt.style.display = 'block';
+            }
         }
     });
-}
+});
 
 // 修改代币代码生成逻辑
 function generateTokenSymbol(type) {
     if (!type) return '';
     const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `RH${type}${randomNum}`;  // 直接拼接RH，不加连字符
+    return `RH-${type}${randomNum}`;  // 使用RH-作为前缀，确保格式为RH-XXYYYY
 }
 
 // 初始化表单元素和事件监听
@@ -862,9 +812,15 @@ function initializeEventListeners(elements) {
         e.preventDefault();
         
         // 获取钱包地址
-        const ethAddress = localStorage.getItem('userAddress');
+        const ethAddress = window.ethereum.selectedAddress;
         if (!ethAddress) {
             showError('请先连接钱包');
+            return;
+        }
+        
+        // 验证钱包地址格式
+        if (!/^0x[a-fA-F0-9]{40}$/.test(ethAddress)) {
+            showError('无效的钱包地址格式');
             return;
         }
         
@@ -874,25 +830,27 @@ function initializeEventListeners(elements) {
             return;
         }
         
+        // 准备表单数据
         const formData = new FormData();
         formData.append('name', elements.nameInput.value);
-        formData.append('type', elements.type.value);
+        formData.append('type', elements.type.value);  // 确保这里发送的是字符串类型的'10'或'20'
         formData.append('location', elements.locationInput.value);
         formData.append('description', elements.descriptionInput.value);
+        formData.append('tokenSymbol', elements.tokenSymbol.value);
         
         // 根据资产类型处理不同字段
-        if (elements.type.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
+        if (elements.type.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {  // '10'
             const area = parseFloat(elements.area.value);
-            const tokenCount = Math.floor(area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER);
+            const token_supply = Math.floor(area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER);
             formData.append('area', area);
             formData.append('totalValue', elements.totalValue.value);
             formData.append('expectedAnnualRevenue', elements.expectedAnnualRevenue.value);
-            formData.append('tokenCount', tokenCount);  // 添加计算后的代币数量
-        } else {
-            const tokenCount = parseInt(elements.tokenCount.value);
-            formData.append('tokenCount', tokenCount);
-            formData.append('totalValue', elements.totalValueSimilar.value);
-            formData.append('expectedAnnualRevenue', elements.expectedAnnualRevenueSimilar.value);
+            formData.append('tokenCount', token_supply);
+        } else if (elements.type.value === CONFIG.ASSET_TYPE.SIMILAR_ASSETS) {  // '20'
+            const token_supply = parseInt(elements.tokenCount.value);
+            formData.append('tokenCount', token_supply);
+            formData.append('totalValue', elements.totalValue.value);
+            formData.append('expectedAnnualRevenue', elements.expectedAnnualRevenue.value);
         }
         
         try {
@@ -930,7 +888,7 @@ function initializeEventListeners(elements) {
             const response = await fetch('/api/assets/create', {
                 method: 'POST',
                 headers: {
-                    'X-Eth-Address': ethAddress  // 添加以太坊地址到请求头
+                    'X-Eth-Address': window.ethereum.selectedAddress
                 },
                 body: formData
             });
@@ -1046,36 +1004,31 @@ function updateAssetTypeDisplay() {
 
 // 预览功能实现
 function previewAsset() {
-    // 获取表单数据
     const formData = new FormData(form);
     const assetData = {
         name: formData.get('name'),
         type: formData.get('type'),
         location: formData.get('location'),
         description: formData.get('description'),
+        token_symbol: formData.get('token_symbol'),
         images: uploadedImages,
         documents: uploadedDocuments
     };
 
-    // 根据资产类型获取特定字段
     if (assetData.type === CONFIG.ASSET_TYPE.REAL_ESTATE) {
         const area = parseFloat(formData.get('area')) || 0;
         assetData.area = area;
-        assetData.totalValue = formData.get('totalValue');
-        // 使用与calculateRealEstateTokens相同的计算逻辑
-        assetData.tokenCount = area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER;
-        // 计算代币价格
-        assetData.tokenPrice = assetData.tokenCount > 0 ? 
-            (parseFloat(assetData.totalValue) / assetData.tokenCount).toFixed(CONFIG.CALCULATION.PRICE_DECIMALS) : 
+        assetData.total_value = formData.get('total_value');
+        assetData.token_supply = area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER;
+        assetData.token_price = assetData.token_supply > 0 ? 
+            (parseFloat(assetData.total_value) / assetData.token_supply).toFixed(CONFIG.CALCULATION.PRICE_DECIMALS) : 
             '0.000000';
-        assetData.expectedAnnualRevenue = formData.get('expectedAnnualRevenue');
-        assetData.assetTypeName = '不动产';
+        assetData.annual_revenue = formData.get('expectedAnnualRevenue');
     } else {
-        assetData.tokenCount = formData.get('tokenCount');
-        assetData.totalValue = document.getElementById('totalValueSimilar').value;
-        assetData.tokenPrice = calculatedElements.similarAssets.tokenPrice.textContent.replace(/,/g, '');
-        assetData.expectedAnnualRevenue = document.getElementById('expectedAnnualRevenueSimilar').value;
-        assetData.assetTypeName = '类不动产';
+        assetData.token_supply = formData.get('token_supply');
+        assetData.total_value = formData.get('total_value');
+        assetData.token_price = calculatedElements.similarAssets.tokenPrice.textContent.replace(/,/g, '');
+        assetData.annual_revenue = formData.get('expectedAnnualRevenue');
     }
 
     // 创建预览模态框
@@ -1135,7 +1088,7 @@ function previewAsset() {
                                     <div class="card h-100">
                                         <div class="card-body">
                                             <h6 class="card-subtitle mb-2 text-muted">资产类型</h6>
-                                            <p class="card-text h5">${assetData.assetTypeName}</p>
+                                            <p class="card-text h5">${assetData.type === CONFIG.ASSET_TYPE.REAL_ESTATE ? '不动产' : '类不动产'}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1153,7 +1106,7 @@ function previewAsset() {
                                     <div class="card h-100">
                                         <div class="card-body">
                                             <h6 class="card-subtitle mb-2 text-muted">预期年收益</h6>
-                                            <p class="card-text h5">${formatNumber(assetData.expectedAnnualRevenue, 2)} USDC</p>
+                                            <p class="card-text h5">${formatNumber(assetData.annual_revenue, 2)} USDC</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1168,15 +1121,15 @@ function previewAsset() {
                                     <div class="row">
                                         <div class="col-md-3 mb-3">
                                             <h6 class="text-muted">代币总量</h6>
-                                            <p class="h5">${formatNumber(assetData.tokenCount)}</p>
+                                            <p class="h5">${formatNumber(assetData.token_supply)}</p>
                                         </div>
                                         <div class="col-md-3 mb-3">
                                             <h6 class="text-muted">代币价格</h6>
-                                            <p class="h5">${assetData.tokenPrice} USDC</p>
+                                            <p class="h5">${assetData.token_price} USDC</p>
                                         </div>
                                         <div class="col-md-3 mb-3">
                                             <h6 class="text-muted">总价值</h6>
-                                            <p class="h5">${formatNumber(assetData.totalValue, 2)} USDC</p>
+                                            <p class="h5">${formatNumber(assetData.total_value, 2)} USDC</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1238,57 +1191,76 @@ function previewAsset() {
 // 修改提交资产函数
 async function submitAsset() {
     try {
-        // 检查钱包地址
-        const userAddress = localStorage.getItem('userAddress');
-        if (!userAddress) {
+        // 检查钱包连接状态
+        if (!window.ethereum || !window.ethereum.selectedAddress) {
             throw new Error('请先连接钱包');
         }
 
         // 验证表单
-        if (!validateForm()) {
+        const errors = validateForm();
+        if (errors.length > 0) {
+            showError(errors.join('\n'));
             return;
         }
 
         // 准备表单数据
         const formData = new FormData();
-        
-        // 添加基本信息
-        formData.append('name', elements.nameInput.value.trim());
-        formData.append('type', elements.type.value);
-        formData.append('location', elements.locationInput.value.trim());
-        formData.append('description', elements.descriptionInput.value.trim());
+        formData.append('name', elements.nameInput.value);
+        formData.append('type', elements.type.value);  // 确保这里发送的是字符串类型的'10'或'20'
+        formData.append('location', elements.locationInput.value);
+        formData.append('description', elements.descriptionInput.value);
         formData.append('tokenSymbol', elements.tokenSymbol.value);
         
-        // 根据资产类型添加特定字段
-        if (elements.type.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
+        // 根据资产类型处理不同字段
+        if (elements.type.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {  // '10'
             const area = parseFloat(elements.area.value);
-            const tokenCount = Math.floor(area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER);
+            const token_supply = Math.floor(area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER);
             formData.append('area', area);
             formData.append('totalValue', elements.totalValue.value);
             formData.append('expectedAnnualRevenue', elements.expectedAnnualRevenue.value);
-            formData.append('tokenCount', tokenCount);  // 添加计算后的代币数量
-        } else {
-            const tokenCount = parseInt(elements.tokenCount.value);
-            formData.append('tokenCount', tokenCount);
-            formData.append('totalValue', elements.totalValueSimilar.value);
-            formData.append('expectedAnnualRevenue', elements.expectedAnnualRevenueSimilar.value);
+            formData.append('tokenCount', token_supply);
+        } else if (elements.type.value === CONFIG.ASSET_TYPE.SIMILAR_ASSETS) {  // '20'
+            const token_supply = parseInt(elements.tokenCount.value);
+            formData.append('tokenCount', token_supply);
+            formData.append('totalValue', elements.totalValue.value);
+            formData.append('expectedAnnualRevenue', elements.expectedAnnualRevenue.value);
         }
-
-        // 添加图片文件
-        uploadedImages.forEach((file, index) => {
-            formData.append('images[]', file);
-        });
-
-        // 添加文档文件
-        uploadedDocuments.forEach((file, index) => {
-            formData.append('documents[]', file);
-        });
-
+        
+        // 添加图片
+        if (uploadedImages.length > 0) {
+            for (let i = 0; i < uploadedImages.length; i++) {
+                const image = uploadedImages[i];
+                try {
+                    const blob = await dataURLtoBlob(image.data);
+                    formData.append('images[]', blob, image.name);
+                } catch (error) {
+                    console.error(`处理图片失败: ${image.name}`, error);
+                    showError(`处理图片 ${image.name} 失败，请重新上传`);
+                    return;
+                }
+            }
+        }
+        
+        // 添加文档
+        if (uploadedDocuments.length > 0) {
+            for (let i = 0; i < uploadedDocuments.length; i++) {
+                const doc = uploadedDocuments[i];
+                try {
+                    const blob = await dataURLtoBlob(doc.data);
+                    formData.append('documents[]', blob, doc.name);
+                } catch (error) {
+                    console.error(`处理文档失败: ${doc.name}`, error);
+                    showError(`处理文档 ${doc.name} 失败，请重新上传`);
+                    return;
+                }
+            }
+        }
+        
         // 发送请求
         const response = await fetch('/api/assets/create', {
             method: 'POST',
             headers: {
-                'X-Eth-Address': userAddress  // 确保使用正确的地址
+                'X-Eth-Address': window.ethereum.selectedAddress
             },
             body: formData
         });
@@ -1301,7 +1273,7 @@ async function submitAsset() {
         const result = await response.json();
         
         // 清除草稿
-        localStorage.removeItem('assetDraft');
+        localStorage.removeItem(CONFIG.DRAFT.KEY);
         
         // 显示成功消息并跳转
         showToast('资产创建成功！');

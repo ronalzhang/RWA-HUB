@@ -39,6 +39,11 @@ class Config:
         '查看统计': 2   # 副管理员及以上可查看统计
     }
     
+    class CALCULATION:
+        TOKENS_PER_SQUARE_METER = 10000  # 每平方米对应的代币数量
+        PRICE_DECIMALS = 6  # 代币价格小数位数
+        VALUE_DECIMALS = 2  # 价值小数位数
+
     @staticmethod
     def init_app(app):
         # 基础配置初始化
