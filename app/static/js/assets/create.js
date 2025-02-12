@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const annualRevenueInput = document.getElementById('annualRevenue');
     
     // Constants
-    const FILE_SIZE_LIMIT = 10 * 1024 * 1024; // 10MB
+    const FILE_SIZE_LIMIT = 6 * 1024 * 1024; // 6MB
     const IMAGE_COUNT_LIMIT = 10;
     const DOC_COUNT_LIMIT = 5;
     
