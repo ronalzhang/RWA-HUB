@@ -243,6 +243,11 @@ const PermissionManager = {
 // 初始化钱包
 async function initWallet() {
     try {
+        // 等待 MetaMask 注入完成
+        if (document.readyState === 'loading') {
+            await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
+        }
+        
         if (!window.ethereum) {
             throw new Error('请安装 MetaMask 钱包');
         }
@@ -449,6 +454,24 @@ window.disconnectWallet = () => {
 
 // 初始化
 document.addEventListener('DOMContentLoaded', async () => {
+    // 等待 MetaMask 注入完成
+    if (typeof window.ethereum === 'undefined') {
+        await new Promise(resolve => {
+            const checkMetaMask = setInterval(() => {
+                if (typeof window.ethereum !== 'undefined') {
+                    clearInterval(checkMetaMask);
+                    resolve();
+                }
+            }, 100);
+            
+            // 10秒后超时
+            setTimeout(() => {
+                clearInterval(checkMetaMask);
+                resolve();
+            }, 10000);
+        });
+    }
+    
     // 恢复保存的状态
     const savedState = localStorage.getItem('walletState');
     if (savedState) {

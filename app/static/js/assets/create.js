@@ -1,5 +1,61 @@
 // 表单验证和提交处理
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        // 等待 MetaMask 注入完成
+        if (typeof window.ethereum === 'undefined') {
+            await new Promise(resolve => {
+                const checkMetaMask = setInterval(() => {
+                    if (typeof window.ethereum !== 'undefined') {
+                        clearInterval(checkMetaMask);
+                        resolve();
+                    }
+                }, 100);
+                
+                // 10秒后超时
+                setTimeout(() => {
+                    clearInterval(checkMetaMask);
+                    resolve();
+                }, 10000);
+            });
+        }
+        
+        // 检查钱包连接状态
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length === 0) {
+            // 禁用表单
+            document.getElementById('assetForm').classList.add('disabled');
+            // 显示连接钱包提示
+            showToast('warning', '请先连接钱包');
+            return;
+        }
+        
+        // 初始化表单
+        initForm();
+        
+    } catch (error) {
+        console.error('初始化失败:', error);
+        showToast('error', error.message || '页面加载失败');
+    }
+});
+
+// 监听钱包连接状态变化
+if (window.ethereum) {
+    window.ethereum.on('accountsChanged', async (accounts) => {
+        if (accounts.length === 0) {
+            // 禁用表单
+            document.getElementById('assetForm').classList.add('disabled');
+            // 显示连接钱包提示
+            showToast('warning', '请先连接钱包');
+        } else {
+            // 启用表单
+            document.getElementById('assetForm').classList.remove('disabled');
+            // 重新初始化表单
+            initForm();
+        }
+    });
+}
+
+// 获取必要的 DOM 元素
     // 检查钱包连接状态
     if (!window.walletState || !window.walletState.isConnected || !window.walletState.currentAccount) {
         showError('请先连接钱包');

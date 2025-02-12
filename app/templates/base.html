@@ -125,16 +125,21 @@
     
     <!-- 钱包连接脚本 -->
     <script>
-    // 全局钱包状态管理
-    window.walletState = {
-        currentAccount: null,
-        isConnected: false,
-        isAdmin: false,
-        permissions: []
-    };
+    // 等待 MetaMask 注入完成
+    window.addEventListener('load', async () => {
+        // 全局钱包状态管理
+        if (!window.walletState) {
+            window.walletState = {
+                currentAccount: null,
+                isConnected: false,
+                isAdmin: false,
+                permissions: []
+            };
+        }
 
-    // 钱包连接状态管理
-    let walletEventListeners = [];
+        // 检查是否已经连接
+        await checkConnection();
+    });
 
     // 检查是否已经连接
     async function checkConnection() {
@@ -143,7 +148,6 @@
                 const accounts = await window.ethereum.request({ method: 'eth_accounts' });
                 const storedAddress = localStorage.getItem('userAddress');
                 
-                // 只有当前账户存在且与存储的地址匹配时才连接
                 if (accounts.length > 0 && storedAddress && 
                     accounts[0].toLowerCase() === storedAddress.toLowerCase()) {
                     handleAccountsChanged(accounts);
@@ -152,7 +156,7 @@
                     clearWalletState();
                 }
             } catch (error) {
-                console.error('Failed to check wallet connection:', error);
+                console.error('检查钱包连接失败:', error);
                 clearWalletState();
             }
         }
@@ -366,9 +370,6 @@
             walletMenu.style.display = 'none';
         }
     });
-
-    // 页面加载时检查连接状态
-    document.addEventListener('DOMContentLoaded', checkConnection);
     </script>
 
     <!-- 添加语言切换脚本 -->
