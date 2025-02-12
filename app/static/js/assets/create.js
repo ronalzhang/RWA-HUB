@@ -83,31 +83,57 @@ function formatNumber(number, decimals = 0) {
 // 切换资产类型显示
 function toggleAssetTypeFields(type) {
     if (type === CONFIG.ASSET_TYPE.REAL_ESTATE) {
-        realEstateFields.forEach(field => field.classList.remove('hidden'));
-        similarAssetsFields.forEach(field => field.classList.add('hidden'));
-        realEstateInfo.classList.remove('hidden');
+        // 显示不动产字段
+        document.querySelectorAll('.asset-type-field.real-estate').forEach(field => {
+            field.classList.remove('hidden');
+            field.querySelectorAll('input, select, textarea').forEach(input => {
+                input.required = true;
+            });
+        });
+        document.querySelectorAll('.real-estate-docs').forEach(el => el.classList.remove('hidden'));
+        document.querySelectorAll('.similar-assets-docs').forEach(el => el.classList.add('hidden'));
         
-        // 重置并禁用类不动产字段
-        tokenCountInput.value = '';
-        tokenCountInput.required = false;
+        // 隐藏类不动产字段
+        document.querySelectorAll('.asset-type-field.similar-assets').forEach(field => {
+            field.classList.add('hidden');
+            field.querySelectorAll('input, select, textarea').forEach(input => {
+                input.required = false;
+                input.value = '';
+            });
+        });
         
-        // 启用不动产字段
-        areaInput.required = true;
+        // 更新计算显示
+        document.querySelector('.real-estate-info').classList.remove('hidden');
+        calculateRealEstateTokens();
     } else if (type === CONFIG.ASSET_TYPE.SIMILAR_ASSETS) {
-        realEstateFields.forEach(field => field.classList.add('hidden'));
-        similarAssetsFields.forEach(field => field.classList.remove('hidden'));
-        realEstateInfo.classList.add('hidden');
+        // 显示类不动产字段
+        document.querySelectorAll('.asset-type-field.similar-assets').forEach(field => {
+            field.classList.remove('hidden');
+            field.querySelectorAll('input, select, textarea').forEach(input => {
+                input.required = true;
+            });
+        });
+        document.querySelectorAll('.similar-assets-docs').forEach(el => el.classList.remove('hidden'));
+        document.querySelectorAll('.real-estate-docs').forEach(el => el.classList.add('hidden'));
         
-        // 重置并禁用不动产字段
-        areaInput.value = '';
-        areaInput.required = false;
+        // 隐藏不动产字段
+        document.querySelectorAll('.asset-type-field.real-estate').forEach(field => {
+            field.classList.add('hidden');
+            field.querySelectorAll('input, select, textarea').forEach(input => {
+                input.required = false;
+                input.value = '';
+            });
+        });
         
-        // 启用类不动产字段
-        tokenCountInput.required = true;
+        // 更新计算显示
+        document.querySelector('.real-estate-info').classList.add('hidden');
     }
     
     // 重置计算结果
     resetCalculations();
+    
+    // 更新文档要求显示
+    updateDocumentRequirements(type);
 }
 
 // 重置计算结果
@@ -145,9 +171,15 @@ function calculateTokenPrice() {
         const formattedPrice = formatNumber(tokenPrice, CONFIG.CALCULATION.PRICE_DECIMALS);
         calculatedTokenPrice.textContent = formattedPrice;
         tokenPriceInput.value = tokenPrice.toFixed(CONFIG.CALCULATION.PRICE_DECIMALS);
+        
+        // 更新显示
+        if (typeInput.value === CONFIG.ASSET_TYPE.REAL_ESTATE) {
+            calculatedTokenCount.textContent = formatNumber(tokenCount);
+        }
     } else {
         calculatedTokenPrice.textContent = '0.000000';
         tokenPriceInput.value = '';
+        calculatedTokenCount.textContent = '0';
     }
 }
 
@@ -599,4 +631,58 @@ function showToast(message) {
     setTimeout(() => {
         toast.remove();
     }, 3000);
+}
+
+// 更新文档要求显示
+function updateDocumentRequirements(type) {
+    const realEstateDocs = document.querySelector('.real-estate-docs');
+    const similarAssetsDocs = document.querySelector('.similar-assets-docs');
+    
+    if (type === CONFIG.ASSET_TYPE.REAL_ESTATE) {
+        realEstateDocs.style.display = 'block';
+        similarAssetsDocs.style.display = 'none';
+    } else if (type === CONFIG.ASSET_TYPE.SIMILAR_ASSETS) {
+        realEstateDocs.style.display = 'none';
+        similarAssetsDocs.style.display = 'block';
+    }
+}
+
+// 更新资产类型显示
+function updateAssetTypeDisplay() {
+    const type = typeInput.value;
+    const realEstateFields = document.querySelectorAll('.asset-type-field.real-estate');
+    const similarAssetsFields = document.querySelectorAll('.asset-type-field.similar-assets');
+    const realEstateInfo = document.querySelector('.real-estate-info');
+    
+    if (type === CONFIG.ASSET_TYPE.REAL_ESTATE) {
+        realEstateFields.forEach(field => {
+            field.classList.remove('hidden');
+            field.querySelectorAll('input, select').forEach(input => input.required = true);
+        });
+        similarAssetsFields.forEach(field => {
+            field.classList.add('hidden');
+            field.querySelectorAll('input, select').forEach(input => {
+                input.required = false;
+                input.value = '';
+            });
+        });
+        realEstateInfo.classList.remove('hidden');
+        calculateRealEstateTokens();
+    } else {
+        realEstateFields.forEach(field => {
+            field.classList.add('hidden');
+            field.querySelectorAll('input, select').forEach(input => {
+                input.required = false;
+                input.value = '';
+            });
+        });
+        similarAssetsFields.forEach(field => {
+            field.classList.remove('hidden');
+            field.querySelectorAll('input, select').forEach(input => input.required = true);
+        });
+        realEstateInfo.classList.add('hidden');
+        calculatedTokenCount.textContent = '0';
+    }
+    
+    calculateTokenPrice();
 } 
