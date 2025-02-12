@@ -293,214 +293,116 @@ def dividend_page(asset_id):
         flash('访问分红管理页面失败')
         return redirect(url_for('assets.list'))
 
-@assets_api_bp.route('', methods=['POST'])
+@assets_api_bp.route("/create", methods=['POST'])
 @eth_address_required
 def create_asset():
-    """创建资产"""
+    """创建资产API"""
     try:
-        # 记录请求信息
-        current_app.logger.info('开始处理创建资产请求')
-        current_app.logger.info(f'请求方法: {request.method}')
-        current_app.logger.info(f'请求头: {dict(request.headers)}')
-        current_app.logger.info(f'表单数据: {dict(request.form)}')
-        current_app.logger.info(f'文件: {dict(request.files)}')
-        
-        # 获取表单数据
+        # 获取基本信息
         name = request.form.get('name')
-        asset_type = int(request.form.get('asset_type'))  # 转换为整数
-        total_value = request.form.get('total_value')
-        annual_revenue = request.form.get('annual_revenue')
-        description = request.form.get('description')
+        asset_type = request.form.get('type')
         location = request.form.get('location')
-        area = request.form.get('area')
-        token_supply = request.form.get('token_supply')
-        token_price = request.form.get('token_price')
-        
-        # 生成代币符号
-        while True:
-            random_num = ''.join([str(random.randint(0, 9)) for _ in range(4)])
-            token_symbol = f"RH-{asset_type}{random_num}"
-            
-            # 检查代币符号是否已存在
-            existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
-            if not existing_asset:
-                break
-            
-        # 记录获取到的字段值
-        current_app.logger.info('获取到的字段值:')
-        current_app.logger.info(f'name: {name}')
-        current_app.logger.info(f'asset_type: {asset_type}')
-        current_app.logger.info(f'total_value: {total_value}')
-        current_app.logger.info(f'annual_revenue: {annual_revenue}')
-        current_app.logger.info(f'description: {description}')
-        current_app.logger.info(f'location: {location}')
-        current_app.logger.info(f'area: {area}')
-        current_app.logger.info(f'token_supply: {token_supply}')
-        current_app.logger.info(f'token_price: {token_price}')
+        description = request.form.get('description')
         
         # 验证必填字段
-        required_fields = {
-            'name': name,
-            'asset_type': asset_type,
-            'total_value': total_value,
-            'annual_revenue': annual_revenue,
-            'description': description,
-            'location': location
-        }
-        
-        # 根据资产类型添加额外的必填字段
-        if asset_type == 20:  # 类不动产
-            current_app.logger.info('资产类型为类不动产，添加 token_supply 必填字段')
-            required_fields['token_supply'] = token_supply
-        elif asset_type == 10:  # 不动产
-            current_app.logger.info('资产类型为不动产，添加 area 必填字段')
-            required_fields['area'] = area
+        if not all([name, asset_type, location, description]):
+            return jsonify({'error': '缺少必要字段'}), 400
             
-        # 检查必填字段
-        missing_fields = [field for field, value in required_fields.items() if not value]
-        if missing_fields:
-            current_app.logger.warning(f'缺少必填字段: {missing_fields}')
-            current_app.logger.warning('必填字段验证失败，返回400错误')
-            return jsonify({
-                'error': f'缺少必填字段: {", ".join(missing_fields)}',
-                'missing_fields': missing_fields,
-                'received_values': {k: v for k, v in required_fields.items()}
-            }), 400
+        # 获取和验证数值字段
+        try:
+            total_value = float(request.form.get('totalValue', 0))
+            if total_value <= 0:
+                return jsonify({'error': '总价值必须大于0'}), 400
+                
+            # 不动产特有字段
+            if asset_type == '10':
+                area = float(request.form.get('area', 0))
+                if area <= 0:
+                    return jsonify({'error': '面积必须大于0'}), 400
+                token_count = int(area * 10000)  # 1平方米 = 10000代币
+                
+            # 类不动产特有字段
+            else:
+                token_count = int(request.form.get('tokenCount', 0))
+                if token_count <= 0:
+                    return jsonify({'error': '代币数量必须大于0'}), 400
+                    
+            # 计算代币价格
+            token_price = total_value / token_count
             
-        # 检查图片文件
-        images = request.files.getlist('images[]')
-        if not images or not any(image.filename for image in images):
-            current_app.logger.warning('未上传图片文件')
-            return jsonify({'error': '请至少上传一张资产图片'}), 400
+        except (ValueError, TypeError, ZeroDivisionError) as e:
+            current_app.logger.error(f"数值处理错误: {str(e)}")
+            return jsonify({'error': '数值格式错误'}), 400
             
         # 创建资产记录
+        asset = Asset(
+            name=name,
+            asset_type=asset_type,
+            location=location,
+            description=description,
+            area=area if asset_type == '10' else None,
+            total_value=total_value,
+            token_count=token_count,
+            token_price=token_price,
+            owner_address=g.eth_address,
+            status=1  # 待审核状态
+        )
+        
+        # 处理文件上传
         try:
-            current_app.logger.info('开始创建资产记录')
-            current_app.logger.info(f'创建资产参数: name={name}, asset_type={asset_type}, token_symbol={token_symbol}, total_value={total_value}')
-            
-            asset = Asset(
-                name=name,
-                asset_type=asset_type,
-                total_value=float(total_value),
-                token_symbol=token_symbol,
-                token_price=float(token_price) if token_price else 0,
-                token_supply=int(token_supply) if token_supply else None,
-                annual_revenue=float(annual_revenue),
-                description=description,
-                location=location,
-                area=float(area) if area else None,
-                owner_address=g.eth_address,
-                creator_address=g.eth_address,  # 设置创建者地址
-                status=AssetStatus.PENDING.value  # 使用枚举值
-            )
-            
-            # 先添加资产记录并获取ID
-            current_app.logger.info('添加资产记录到数据库')
-            db.session.add(asset)
-            db.session.flush()
-            current_app.logger.info(f'资产记录创建成功，ID: {asset.id}')
-            
-            # 处理图片文件
-            image_paths = []
-            asset_type_folder = 'real_estate' if asset_type == 10 else 'quasi_real_estate'
-            
-            current_app.logger.info(f'开始处理图片上传，资产类型文件夹: {asset_type_folder}')
-            
-            for i, image in enumerate(images):
-                if image and image.filename and allowed_file(image.filename, ['jpg', 'jpeg', 'png']):
-                    try:
-                        # 构建文件名
-                        ext = image.filename.rsplit(".", 1)[1].lower()
-                        filename = f'{asset_type_folder}/{asset.id}/image_{i+1}.{ext}'
-                        
-                        current_app.logger.info(f'处理第 {i+1} 张图片: {image.filename} -> {filename}')
-                        
-                        # 读取文件内容
-                        file_data = image.read()
-                        
-                        # 检查七牛云存储是否初始化
-                        if storage is None:
-                            current_app.logger.error('七牛云存储未初始化')
-                            raise Exception("七牛云存储未初始化")
-                        
-                        # 上传到七牛云
-                        current_app.logger.info(f'开始上传图片到七牛云: {filename}')
-                        url = storage.upload(file_data, filename)
-                        
-                        if url:
-                            # 确保URL不包含@符号
-                            if url.startswith('@'):
-                                url = url[1:]
-                            image_paths.append(url)
-                            current_app.logger.info(f'图片上传成功: {url}')
-                        else:
-                            current_app.logger.error(f'七牛云返回的URL为空: {filename}')
-                            raise Exception("七牛云上传失败")
+            # 处理图片
+            if 'images[]' in request.files:
+                images = request.files.getlist('images[]')
+                if images:
+                    image_paths = []
+                    asset_type_folder = 'real_estate' if asset_type == '10' else 'quasi_real_estate'
+                    
+                    for image in images:
+                        if image and image.filename and allowed_file(image.filename, ['jpg', 'jpeg', 'png']):
+                            filename = f'{asset_type_folder}/{asset.id}/image_{len(image_paths)+1}.{image.filename.rsplit(".", 1)[1].lower()}'
+                            url = storage.upload(image.read(), filename)
+                            if url:
+                                image_paths.append(url)
                             
-                    except Exception as e:
-                        current_app.logger.error(f'上传图片失败: {str(e)}')
-                        current_app.logger.error(f'文件名: {image.filename}, 目标路径: {filename}')
-                        continue
-                else:
-                    current_app.logger.warning(f'跳过无效的图片文件: {image.filename if image else "None"}')
-            
-            # 保存图片路径到资产记录
-            if not image_paths:
-                current_app.logger.error('没有成功上传任何图片')
-                raise Exception('没有成功保存任何图片')
-                
-            current_app.logger.info(f'所有图片上传成功，保存路径列表: {image_paths}')
-            asset.images = json.dumps(image_paths)
-            
-            # 处理文档文件
-            documents = request.files.getlist('documents[]')
-            if documents:
-                doc_paths = []
-                for i, doc in enumerate(documents):
-                    if doc and doc.filename and allowed_file(doc.filename, ['pdf', 'doc', 'docx']):
-                        try:
-                            # 构建文件名
-                            ext = doc.filename.rsplit(".", 1)[1].lower()
-                            filename = f'{asset_type_folder}/{asset.id}/documents/document_{i+1}.{ext}'
-                            
-                            # 读取文件内容
-                            file_data = doc.read()
-                            
-                            # 上传到七牛云
-                            if storage is None:
-                                raise Exception("七牛云存储未初始化")
-                                
-                            url = storage.upload(file_data, filename)
+                    if image_paths:
+                        asset.images = json.dumps(image_paths)
+                        
+            # 处理文档
+            if 'documents[]' in request.files:
+                documents = request.files.getlist('documents[]')
+                if documents:
+                    doc_paths = []
+                    asset_type_folder = 'real_estate' if asset_type == '10' else 'quasi_real_estate'
+                    
+                    for doc in documents:
+                        if doc and doc.filename and allowed_file(doc.filename, ['pdf', 'doc', 'docx']):
+                            filename = f'{asset_type_folder}/{asset.id}/documents/doc_{len(doc_paths)+1}.{doc.filename.rsplit(".", 1)[1].lower()}'
+                            url = storage.upload(doc.read(), filename)
                             if url:
                                 doc_paths.append(url)
-                                current_app.logger.info(f'上传文档成功: {url}')
-                            else:
-                                raise Exception("七牛云上传失败")
                                 
-                        except Exception as e:
-                            current_app.logger.error(f'上传文档失败: {str(e)}')
-                            continue
-                
-                if doc_paths:
-                    asset.documents = json.dumps(doc_paths)
-            
-            # 提交所有更改
-            db.session.commit()
-            current_app.logger.info(f'创建资产成功: id={asset.id}, 图片={image_paths}')
-            
-            return jsonify({
-                'message': '创建资产成功',
-                'id': asset.id
-            }), 201
-            
+                    if doc_paths:
+                        asset.documents = json.dumps(doc_paths)
+                        
         except Exception as e:
-            current_app.logger.error(f'创建资产记录失败: {str(e)}', exc_info=True)
+            current_app.logger.error(f"文件处理错误: {str(e)}")
+            return jsonify({'error': '文件处理失败'}), 500
+            
+        try:
+            db.session.add(asset)
+            db.session.commit()
+            return jsonify({
+                'message': '资产创建成功',
+                'assetId': asset.id
+            })
+        except Exception as e:
             db.session.rollback()
-            return jsonify({'error': f'创建资产失败: {str(e)}'}), 500
+            current_app.logger.error(f"数据库错误: {str(e)}")
+            return jsonify({'error': '保存失败'}), 500
             
     except Exception as e:
-        current_app.logger.error(f'创建资产失败: {str(e)}', exc_info=True)
-        return jsonify({'error': '创建资产失败'}), 500
+        current_app.logger.error(f"创建资产失败: {str(e)}")
+        return jsonify({'error': '创建失败'}), 500
 
 def allowed_file(filename, allowed_extensions):
     """检查文件类型是否允许"""
