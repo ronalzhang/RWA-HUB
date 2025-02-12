@@ -61,7 +61,6 @@ Thumbs.db
 test_*.py
 
 node_modules/
-.env
 
 # Hardhat files
 /cache

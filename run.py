@@ -1,41 +1,48 @@
 import logging
 import os
+import time
 from app import create_app, db
 from sqlalchemy.exc import OperationalError
 from flask_migrate import upgrade
+from waitress.adjustments import Adjustments
 
 # 配置详细的日志格式
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger(__name__)
 
+def wait_for_db(max_retries=5, retry_interval=5):
+    """等待数据库就绪"""
+    for i in range(max_retries):
+        try:
+            app = create_app(os.getenv('FLASK_ENV', 'production'))
+            with app.app_context():
+                db.engine.connect()
+                logger.info("数据库连接成功")
+                return True
+        except Exception as e:
+            logger.warning(f"第 {i + 1} 次尝试连接数据库失败: {e}")
+            if i < max_retries - 1:
+                logger.info(f"等待 {retry_interval} 秒后重试...")
+                time.sleep(retry_interval)
+    return False
+
 def verify_db_tables():
     """验证数据库表是否存在"""
     try:
-        app = create_app(os.getenv('FLASK_ENV', 'production'))  # 默认使用生产环境
+        app = create_app(os.getenv('FLASK_ENV', 'production'))
         with app.app_context():
-            # 检查所有模型的表是否存在
             inspector = db.inspect(db.engine)
             existing_tables = inspector.get_table_names()
-            logger.info(f"现有的数据库表: {existing_tables}")
-            
-            # 获取所有模型类
             required_tables = {table.name for table in db.Model.metadata.tables.values()}
-            logger.info(f"需要的表: {required_tables}")
             
             if not required_tables.issubset(set(existing_tables)):
                 missing_tables = required_tables - set(existing_tables)
                 logger.warning(f"缺少必要的表: {missing_tables}")
                 return False
-                
-            # 检查每个表的列
-            for table_name in required_tables:
-                columns = inspector.get_columns(table_name)
-                logger.info(f"表 {table_name} 的列: {[col['name'] for col in columns]}")
-                
             return True
     except Exception as e:
         logger.error(f"验证数据库表时出错: {e}")
@@ -43,73 +50,67 @@ def verify_db_tables():
 
 def init_db():
     """初始化数据库"""
-    try:
-        # 确保使用正确的配置
-        if not os.environ.get('DATABASE_URL'):
-            raise ValueError("DATABASE_URL 环境变量未设置")
-            
-        app = create_app(os.getenv('FLASK_ENV', 'production'))  # 默认使用生产环境
-        with app.app_context():
-            # 检查数据库连接
-            try:
-                db.engine.connect()
-                logger.info("数据库连接成功")
-                logger.info(f"当前数据库 URL: {app.config['SQLALCHEMY_DATABASE_URI']}")
-            except Exception as e:
-                logger.error(f"数据库连接失败: {e}")
-                raise
-            
-            # 运行数据库迁移
-            try:
-                logger.info("开始运行数据库迁移...")
-                upgrade()
-                logger.info("数据库迁移完成")
-            except Exception as e:
-                logger.error(f"数据库迁移失败: {e}")
-                # 如果迁移失败，尝试直接创建表
-                logger.info("尝试直接创建数据库表...")
-                db.create_all()
-                logger.info("数据库表创建完成")
-            
-            # 验证表是否创建成功
-            if not verify_db_tables():
-                raise Exception("数据库表验证失败")
-                
-    except Exception as e:
-        logger.error(f"初始化数据库时出错: {e}")
-        raise
+    if not os.environ.get('DATABASE_URL'):
+        raise ValueError("DATABASE_URL 环境变量未设置")
+        
+    if not wait_for_db():
+        raise Exception("无法连接到数据库")
+        
+    app = create_app(os.getenv('FLASK_ENV', 'production'))
+    with app.app_context():
+        try:
+            logger.info("开始运行数据库迁移...")
+            upgrade()
+            logger.info("数据库迁移完成")
+        except Exception as e:
+            logger.error(f"数据库迁移失败: {e}")
+            logger.info("尝试直接创建数据库表...")
+            db.create_all()
+            logger.info("数据库表创建完成")
+        
+        if not verify_db_tables():
+            raise Exception("数据库表验证失败")
+
+def configure_server():
+    """配置生产服务器"""
+    port = int(os.environ.get('PORT', 10000))
+    threads = int(os.environ.get('WAITRESS_THREADS', 8))
+    
+    adjustments = Adjustments()
+    adjustments.threads = threads
+    adjustments.connection_limit = 1000
+    adjustments.channel_timeout = 300
+    adjustments.cleanup_interval = 30
+    adjustments.url_scheme = 'https'
+    
+    return {
+        'host': '0.0.0.0',
+        'port': port,
+        'threads': threads,
+        '_adjustments': adjustments
+    }
 
 if __name__ == '__main__':
     logger.info("启动应用...")
     logger.info(f"环境: {os.environ.get('FLASK_ENV', 'production')}")
-    logger.info(f"数据库 URL: {os.environ.get('DATABASE_URL', '未设置')}")
     
-    success = False
-    
-    for attempt in range(3):
-        try:
-            init_db()
-            success = True
-            logger.info("数据库初始化成功")
-            break
-        except Exception as e:
-            logger.error(f"第 {attempt + 1} 次尝试初始化数据库失败: {e}")
-    
-    if not success:
-        logger.error("所有数据库初始化尝试都失败了")
+    try:
+        init_db()
+        logger.info("数据库初始化成功")
         
-    app = create_app(os.getenv('FLASK_ENV', 'production'))
-    
-    # 生产环境配置
-    app.config['DEBUG'] = False
-    app.config['PROPAGATE_EXCEPTIONS'] = True
-    
-    port = int(os.environ.get('PORT', 10000))
-    
-    print("启动服务器...")
-    print("访问地址:")
-    print(f"本地:    http://127.0.0.1:{port}")
-    
-    # 使用waitress作为生产服务器
-    from waitress import serve
-    serve(app, host='0.0.0.0', port=port, threads=4, url_scheme='https')
+        app = create_app(os.getenv('FLASK_ENV', 'production'))
+        app.config['DEBUG'] = False
+        app.config['PROPAGATE_EXCEPTIONS'] = True
+        
+        server_config = configure_server()
+        port = server_config.pop('port')
+        
+        print("启动服务器...")
+        print("访问地址:")
+        print(f"本地: http://127.0.0.1:{port}")
+        
+        from waitress import serve
+        serve(app, **server_config)
+    except Exception as e:
+        logger.error(f"启动失败: {e}")
+        raise
