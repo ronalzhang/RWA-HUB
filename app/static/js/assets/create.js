@@ -281,53 +281,72 @@ async function handleFiles(files, type) {
     // 转换type为大写
     const fileType = type.toUpperCase();
     
-    const errors = validateFiles(files, fileType);
-    if (errors.length > 0) {
-        showError(errors.join('\n'));
-        return;
-    }
-    
-    const processedFiles = [];
-    let totalSize = 0;
-    let loadedSize = 0;
-    
-    for (const file of files) {
-        totalSize += file.size;
-        try {
-            let processedFile = file;
-            if (fileType === 'IMAGE') {
-                processedFile = await compressImage(file);
+    try {
+        // 验证文件
+        const errors = validateFiles(files, fileType);
+        if (errors.length > 0) {
+            showError(errors.join('\n'));
+            return;
+        }
+        
+        const processedFiles = [];
+        let totalSize = 0;
+        let loadedSize = 0;
+        
+        for (const file of files) {
+            if (!file || !file.name) {
+                console.error('无效的文件对象:', file);
+                continue;
             }
             
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                loadedSize += processedFile.size;
-                showProgress(fileType, loadedSize, totalSize);
-                
+            totalSize += file.size;
+            try {
+                let processedFile = file;
                 if (fileType === 'IMAGE') {
-                    uploadedImages.push({
-                        name: processedFile.name,
-                        type: processedFile.type,
-                        data: e.target.result,
-                        size: processedFile.size
-                    });
-                    updateImagePreview();
-                } else {
-                    uploadedDocuments.push({
-                        name: processedFile.name,
-                        type: processedFile.type,
-                        data: e.target.result,
-                        size: processedFile.size
-                    });
-                    updateDocumentList();
+                    processedFile = await compressImage(file);
                 }
-            };
-            reader.readAsDataURL(processedFile);
-            processedFiles.push(processedFile);
-        } catch (error) {
-            console.error(`处理文件 ${file.name} 失败:`, error);
-            showError(`处理文件 ${file.name} 失败: ${error.message}`);
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    if (!e.target || !e.target.result) {
+                        console.error('读取文件失败:', file.name);
+                        return;
+                    }
+                    
+                    loadedSize += processedFile.size;
+                    showProgress(fileType, loadedSize, totalSize);
+                    
+                    const fileData = {
+                        name: processedFile.name,
+                        type: processedFile.type,
+                        data: e.target.result,
+                        size: processedFile.size
+                    };
+                    
+                    if (fileType === 'IMAGE') {
+                        uploadedImages.push(fileData);
+                        updateImagePreview();
+                    } else {
+                        uploadedDocuments.push(fileData);
+                        updateDocumentList();
+                    }
+                };
+                
+                reader.onerror = function(error) {
+                    console.error(`读取文件 ${file.name} 失败:`, error);
+                    showError(`读取文件 ${file.name} 失败`);
+                };
+                
+                reader.readAsDataURL(processedFile);
+                processedFiles.push(processedFile);
+            } catch (error) {
+                console.error(`处理文件 ${file.name} 失败:`, error);
+                showError(`处理文件 ${file.name} 失败: ${error.message || '未知错误'}`);
+            }
         }
+    } catch (error) {
+        console.error('文件处理失败:', error);
+        showError(`文件处理失败: ${error.message || '未知错误'}`);
     }
 }
 
@@ -540,9 +559,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // 资产类型切换
-    typeInput.addEventListener('change', function() {
-        toggleAssetTypeFields(this.value);
-    });
+    typeInput.addEventListener('change', updateAssetTypeDisplay);
     
     // 不动产计算触发器
     areaInput.addEventListener('input', function() {
@@ -640,6 +657,9 @@ document.addEventListener('DOMContentLoaded', function() {
             showError(error.message);
         }
     });
+    
+    // 更新资产类型显示
+    updateAssetTypeDisplay();
 });
 
 // 辅助函数
@@ -697,8 +717,16 @@ function updateAssetTypeDisplay() {
     
     // 生成并显示代币代码
     const tokenSymbolInput = document.getElementById('tokenSymbol');
+    if (type) {
+        const currentYear = new Date().getFullYear();
+        const randomNum = Math.floor(Math.random() * 9000) + 1000; // 生成1000-9999的随机数
+        const assetCode = type === CONFIG.ASSET_TYPE.REAL_ESTATE ? '10' : '20';
+        tokenSymbolInput.value = `${assetCode}${currentYear}${randomNum}`;
+    } else {
+        tokenSymbolInput.value = '';
+    }
+
     if (type === CONFIG.ASSET_TYPE.REAL_ESTATE) {
-        tokenSymbolInput.value = `10${new Date().getFullYear()}`;
         realEstateFields.forEach(field => {
             field.classList.remove('hidden');
             field.querySelectorAll('input, select').forEach(input => input.required = true);
@@ -712,7 +740,6 @@ function updateAssetTypeDisplay() {
         });
         calculateRealEstateTokens();
     } else if (type === CONFIG.ASSET_TYPE.SIMILAR_ASSETS) {
-        tokenSymbolInput.value = `20${new Date().getFullYear()}`;
         realEstateFields.forEach(field => {
             field.classList.add('hidden');
             field.querySelectorAll('input, select').forEach(input => {
@@ -724,9 +751,8 @@ function updateAssetTypeDisplay() {
             field.classList.remove('hidden');
             field.querySelectorAll('input, select').forEach(input => input.required = true);
         });
-    } else {
-        tokenSymbolInput.value = '';
     }
     
     calculateTokenPrice();
+    updateDocumentRequirements(type);
 } 
