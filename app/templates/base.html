@@ -252,90 +252,64 @@
         const adminEntry = document.getElementById('adminEntry');
         
         if (account) {
-            const shortAddress = `${account.substring(0, 6)}...${account.substring(38)}`;
-            walletBtnText.textContent = shortAddress;
-            walletBtn.setAttribute('data-bs-toggle', 'dropdown');
+            // 显示钱包地址
+            walletBtnText.textContent = `${account.substring(0, 6)}...${account.substring(38)}`;
             walletBtn.classList.remove('btn-outline-primary');
-            walletBtn.classList.add('btn-outline-success');
+            walletBtn.classList.add('btn-primary');
+            
+            // 启用下拉菜单
+            walletBtn.setAttribute('data-bs-toggle', 'dropdown');
+            walletBtn.setAttribute('aria-expanded', 'false');
             
             // 检查是否是管理员
-            checkAdminStatus(account);
+            checkIsAdmin(account);
         } else {
+            // 重置为连接钱包状态
             walletBtnText.textContent = '连接钱包';
-            walletBtn.removeAttribute('data-bs-toggle');
-            walletBtn.classList.remove('btn-outline-success');
             walletBtn.classList.add('btn-outline-primary');
+            walletBtn.classList.remove('btn-primary');
+            
+            // 禁用下拉菜单
+            walletBtn.removeAttribute('data-bs-toggle');
+            walletBtn.removeAttribute('aria-expanded');
+            
+            // 隐藏管理员入口
             adminEntry.classList.add('d-none');
         }
     }
 
-    // 检查管理员状态
-    async function checkAdminStatus(address) {
+    // 检查是否是管理员
+    async function checkIsAdmin(address) {
         try {
-            const response = await fetch('/api/admin/check', {
-                headers: {
-                    'X-Eth-Address': address
-                }
-            });
-            
+            const response = await fetch(`/api/check_admin/${address}`);
             if (response.ok) {
                 const data = await response.json();
                 const adminEntry = document.getElementById('adminEntry');
-                const adminLink = document.getElementById('adminLink');
-                
-                if (data.is_admin === true) {
+                if (data.is_admin) {
                     adminEntry.classList.remove('d-none');
-                    adminLink.href = `/admin/?eth_address=${address}`;
+                    const adminLink = document.getElementById('adminLink');
+                    adminLink.href = '/admin';
                 } else {
                     adminEntry.classList.add('d-none');
                 }
             }
         } catch (error) {
-            console.error('检查管理员状态失败:', error);
+            console.error('检查管理员权限失败:', error);
         }
     }
 
-    // 初始化事件监听
-    document.addEventListener('DOMContentLoaded', function() {
-        const switchWallet = document.getElementById('switchWallet');
-        const disconnectWallet = document.getElementById('disconnectWallet');
-        
-        // 切换钱包
-        switchWallet.addEventListener('click', async function(e) {
-            e.preventDefault();
-            try {
-                await window.ethereum.request({
-                    method: 'wallet_requestPermissions',
-                    params: [{ eth_accounts: {} }]
-                });
-            } catch (error) {
-                console.error('切换钱包失败:', error);
-            }
-        });
-        
-        // 断开连接
-        disconnectWallet.addEventListener('click', function(e) {
-            e.preventDefault();
-            handleDisconnect();
-        });
-        
-        // 检查初始状态
-        if (localStorage.getItem('walletConnected') === 'true') {
-            checkConnection();
-        }
-    });
-    </script>
-
-    <!-- 添加语言切换脚本 -->
-    <script>
+    // 语言切换
     function changeLanguage(lang) {
-        // 设置 cookie，有效期一年
         document.cookie = `language=${lang};path=/;max-age=31536000`;
-        // 刷新页面以应用新的语言设置
         window.location.reload();
     }
-    </script>
 
+    // 页面加载完成后检查钱包连接状态
+    document.addEventListener('DOMContentLoaded', checkConnection);
+    </script>
+    
+    <!-- 页面特定脚本 -->
     {% block scripts %}{% endblock %}
 </body>
+</html>
 </html>
