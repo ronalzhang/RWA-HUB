@@ -628,25 +628,99 @@ function validateForm() {
 document.addEventListener('DOMContentLoaded', async function() {
     // 检查钱包连接状态
     if (!window.ethereum) {
-        window.location.href = '/?error=' + encodeURIComponent('请先安装MetaMask钱包');
+        // 显示安装钱包提示
+        const walletPrompt = document.createElement('div');
+        walletPrompt.className = 'container text-center py-5';
+        walletPrompt.innerHTML = `
+            <div class="card shadow-sm">
+                <div class="card-body py-5">
+                    <i class="fas fa-exclamation-circle fa-3x text-warning mb-3"></i>
+                    <h3 class="mb-3">请先安装MetaMask钱包</h3>
+                    <p class="text-muted mb-4">您需要安装MetaMask钱包才能创建资产</p>
+                    <a href="https://metamask.io/download/" target="_blank" class="btn btn-primary">
+                        <i class="fas fa-download me-2"></i>安装MetaMask
+                    </a>
+                </div>
+            </div>
+        `;
+        
+        // 隐藏表单内容
+        const formContent = document.getElementById('assetForm');
+        if (formContent) {
+            formContent.style.display = 'none';
+        }
+        
+        // 在表单前插入提示
+        formContent.parentNode.insertBefore(walletPrompt, formContent);
         return;
     }
     
     try {
         const accounts = await window.ethereum.request({ method: 'eth_accounts' });
         if (!accounts || accounts.length === 0) {
-            window.location.href = '/?error=' + encodeURIComponent('请先连接钱包');
+            // 显示连接钱包提示
+            const walletPrompt = document.createElement('div');
+            walletPrompt.className = 'container text-center py-5';
+            walletPrompt.innerHTML = `
+                <div class="card shadow-sm">
+                    <div class="card-body py-5">
+                        <i class="fas fa-wallet fa-3x text-muted mb-3"></i>
+                        <h3 class="mb-3">请先连接钱包</h3>
+                        <p class="text-muted mb-4">您需要连接MetaMask钱包才能创建资产</p>
+                        <button class="btn btn-primary" onclick="connectWallet()">
+                            <i class="fas fa-plug me-2"></i>连接钱包
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // 隐藏表单内容
+            const formContent = document.getElementById('assetForm');
+            if (formContent) {
+                formContent.style.display = 'none';
+            }
+            
+            // 在表单前插入提示
+            formContent.parentNode.insertBefore(walletPrompt, formContent);
             return;
         }
+        
+        // 如果已连接钱包，显示表单并初始化
+        const formContent = document.getElementById('assetForm');
+        if (formContent) {
+            formContent.style.display = 'block';
+        }
+        
+        // 保存钱包地址到localStorage
+        localStorage.setItem('userAddress', accounts[0]);
+        
+        // 初始化表单元素
+        initializeFormElements();
+        
     } catch (error) {
         console.error('检查钱包连接失败:', error);
-        window.location.href = '/?error=' + encodeURIComponent('钱包连接检查失败');
-        return;
+        showError('钱包连接检查失败');
     }
-
-    // 初始化表单元素
-    initializeFormElements();
 });
+
+// 添加连接钱包函数
+async function connectWallet() {
+    try {
+        const accounts = await window.ethereum.request({
+            method: 'eth_requestAccounts'
+        });
+        
+        if (accounts && accounts.length > 0) {
+            // 保存钱包地址
+            localStorage.setItem('userAddress', accounts[0]);
+            // 刷新页面
+            window.location.reload();
+        }
+    } catch (error) {
+        console.error('连接钱包失败:', error);
+        showError('连接钱包失败，请重试');
+    }
+}
 
 // 初始化表单元素
 function initializeFormElements() {
