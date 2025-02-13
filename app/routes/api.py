@@ -161,8 +161,10 @@ def get_asset(asset_id):
 def create_asset():
     """创建资产"""
     try:
+        current_app.logger.info('开始创建资产...')
         # 获取表单数据
         data = request.form
+        current_app.logger.info(f'表单数据: {data}')
         
         # 添加安全的数值转换函数
         def safe_float(value, default=0.0):
@@ -189,18 +191,21 @@ def create_asset():
             token_price=safe_float(data.get('tokenPrice')),
             token_supply=safe_int(data.get('tokenCount')),
             annual_revenue=safe_float(data.get('annualRevenue')),
-            status=AssetStatus.DRAFT,
+            status=AssetStatus.PENDING.value,  # 直接设置为待审核状态
             owner_address=g.eth_address
         )
         
         db.session.add(asset)
         db.session.commit()
+        current_app.logger.info(f'资产基本信息创建成功，ID: {asset.id}')
         
         # 处理图片上传
+        image_paths = []
         if 'images[]' in request.files:
             files = request.files.getlist('images[]')
+            current_app.logger.info(f'收到 {len(files)} 个图片文件')
+            
             if files and any(file.filename for file in files):
-                image_paths = []
                 asset_type_folder = 'real_estate' if asset.asset_type == '10' else 'similar_assets'
                 
                 for file in files:
@@ -215,32 +220,32 @@ def create_asset():
                             
                             # 检查七牛云存储是否初始化
                             if storage is None:
-                                raise Exception("七牛云存储未初始化")
-                                
+                                current_app.logger.error('七牛云存储未初始化，尝试重新初始化...')
+                                from app.utils.storage import init_storage
+                                if not init_storage(current_app):
+                                    raise Exception("七牛云存储初始化失败")
+                            
                             # 上传到七牛云
                             current_app.logger.info(f'开始上传图片到七牛云: {filename}')
-                            url = storage.upload(file_data, filename)
+                            result = storage.upload(file_data, filename)
                             
-                            if url:
-                                image_paths.append(url)
-                                current_app.logger.info(f'图片上传成功: {url}')
+                            if result and result.get('url'):
+                                image_paths.append(result['url'])
+                                current_app.logger.info(f'图片上传成功: {result["url"]}')
                             else:
-                                current_app.logger.error('七牛云返回的URL为空')
+                                current_app.logger.error(f'七牛云返回的结果无效: {result}')
                                 
                         except Exception as e:
                             current_app.logger.error(f'上传图片失败: {str(e)}')
                             continue
-                
-                if image_paths:
-                    asset.images = json.dumps(image_paths)
-                    db.session.commit()
-                    current_app.logger.info(f'更新资产图片成功: {image_paths}')
         
         # 处理文档上传
+        document_paths = []
         if 'documents[]' in request.files:
             files = request.files.getlist('documents[]')
+            current_app.logger.info(f'收到 {len(files)} 个文档文件')
+            
             if files and any(file.filename for file in files):
-                document_paths = []
                 asset_type_folder = 'real_estate' if asset.asset_type == '10' else 'similar_assets'
                 
                 for file in files:
@@ -255,26 +260,36 @@ def create_asset():
                             
                             # 检查七牛云存储是否初始化
                             if storage is None:
-                                raise Exception("七牛云存储未初始化")
-                                
+                                current_app.logger.error('七牛云存储未初始化，尝试重新初始化...')
+                                from app.utils.storage import init_storage
+                                if not init_storage(current_app):
+                                    raise Exception("七牛云存储初始化失败")
+                            
                             # 上传到七牛云
                             current_app.logger.info(f'开始上传文档到七牛云: {filename}')
-                            url = storage.upload(file_data, filename)
+                            result = storage.upload(file_data, filename)
                             
-                            if url:
-                                document_paths.append(url)
-                                current_app.logger.info(f'文档上传成功: {url}')
+                            if result and result.get('url'):
+                                document_paths.append(result['url'])
+                                current_app.logger.info(f'文档上传成功: {result["url"]}')
                             else:
-                                current_app.logger.error('七牛云返回的URL为空')
+                                current_app.logger.error(f'七牛云返回的结果无效: {result}')
                                 
                         except Exception as e:
                             current_app.logger.error(f'上传文档失败: {str(e)}')
                             continue
-                
-                if document_paths:
-                    asset.documents = json.dumps(document_paths)
-                    db.session.commit()
-                    current_app.logger.info(f'更新资产文档成功: {document_paths}')
+        
+        # 更新资产的图片和文档路径
+        if image_paths:
+            asset.images = json.dumps(image_paths)
+            current_app.logger.info(f'更新资产图片成功: {image_paths}')
+            
+        if document_paths:
+            asset.documents = json.dumps(document_paths)
+            current_app.logger.info(f'更新资产文档成功: {document_paths}')
+            
+        if image_paths or document_paths:
+            db.session.commit()
         
         return jsonify({
             'message': '资产创建成功',
