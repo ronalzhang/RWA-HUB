@@ -6,6 +6,11 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static/uploads')
 
+    # Babel 配置
+    BABEL_DEFAULT_LOCALE = 'en'
+    BABEL_DEFAULT_TIMEZONE = 'UTC'
+    LANGUAGES = ['en', 'zh_Hant']
+
     # 七牛云配置
     QINIU_ACCESS_KEY = 'SGMhwmXf7wRlmsgXU4xfqzDH_DxczWhhoDEjyYE9'
     QINIU_SECRET_KEY = '6JynlQeJEDWt4VIjZV8sDdSAFZMrZ3GFE0fIz07-'
