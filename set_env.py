@@ -1,0 +1,1 @@
+import os; os.environ["DATABASE_URL"] = "postgresql://rwa_hub_user:3YIeu6i1Nuyb6z8wRAxdctbMJVrSseJB@dpg-cu6b270gph6c73c50eag-a.oregon-postgres.render.com/rwa_hub"; os.environ["FLASK_ENV"] = "production"; os.environ["SECRET_KEY"] = "your-secret-key-here";

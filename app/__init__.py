@@ -57,7 +57,8 @@ def create_app(config_name='development'):
             "allow_headers": ["Content-Type", "X-Eth-Address", "Authorization"]
         }
     })
-    babel.init_app(app, locale_selector=get_locale)
+    babel.init_app(app)
+    babel.localeselector(get_locale)
     
     # 设置日志
     if not os.path.exists('logs'):
