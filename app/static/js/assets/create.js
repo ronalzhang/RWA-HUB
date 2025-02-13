@@ -232,10 +232,21 @@ function calculateTokenPrice() {
 // 图片压缩函数
 async function compressImage(file) {
     try {
+        // 检查文件参数
+        if (!file || !(file instanceof File)) {
+            throw new Error('无效的文件对象');
+        }
+
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
+            
             reader.onload = function(e) {
                 try {
+                    if (!e.target || !e.target.result) {
+                        reject(new Error('读取文件失败'));
+                        return;
+                    }
+
                     const img = new Image();
                     img.crossOrigin = "Anonymous";
                     
@@ -277,7 +288,12 @@ async function compressImage(file) {
                             canvas.toBlob(
                                 (blob) => {
                                     if (blob) {
-                                        resolve(blob);
+                                        // 创建新的 File 对象，保留原始文件名
+                                        const compressedFile = new File([blob], file.name, {
+                                            type: 'image/jpeg',
+                                            lastModified: new Date().getTime()
+                                        });
+                                        resolve(compressedFile);
                                     } else {
                                         reject(new Error('转换为Blob失败'));
                                     }
@@ -321,7 +337,10 @@ async function compressImage(file) {
 function validateFiles(files, type) {
     if (!files || !type || !CONFIG[type.toUpperCase()]) {
         console.error('无效的文件验证参数');
-        return ['文件验证失败'];
+        return {
+            isValid: false,
+            errors: ['文件验证失败']
+        };
     }
     
     const config = CONFIG[type.toUpperCase()];
@@ -330,7 +349,10 @@ function validateFiles(files, type) {
     // 检查文件数量
     if (files.length > config.MAX_FILES) {
         errors.push(`最多只能上传${config.MAX_FILES}个文件`);
-        return errors;
+        return {
+            isValid: false,
+            errors: errors
+        };
     }
     
     // 检查每个文件
@@ -353,7 +375,10 @@ function validateFiles(files, type) {
         }
     }
     
-    return errors;
+    return {
+        isValid: errors.length === 0,
+        errors: errors
+    };
 }
 
 // 显示上传进度
@@ -374,190 +399,213 @@ function showProgress(type, loaded, total) {
     }
 }
 
-// 处理文件函数
+// 处理文件上传
 async function handleFiles(files, type) {
     try {
-        // 验证文件
-        const errors = validateFiles(files, type);
-        if (errors.length > 0) {
-            showError(errors.join('<br>'));
+        // 基本验证
+        if (!files || files.length === 0) {
+            showError('请选择要上传的文件');
             return;
         }
 
-        // 显示进度条
-        const progressElement = document.getElementById(`${type}UploadProgress`);
-        const progressBar = progressElement.querySelector('.progress-bar');
-        const progressStatus = document.getElementById(`${type}UploadStatus`);
-        const progressPercent = document.getElementById(`${type}UploadPercent`);
+        // 验证文件类型
+        const fileType = type || 'IMAGE';  // 默认为图片类型
+        const config = CONFIG[fileType.toUpperCase()];
+        if (!config) {
+            showError('无效的文件类型');
+            return;
+        }
+
+        // 检查文件数量限制
+        if (files.length > config.MAX_FILES) {
+            showError(`最多只能上传 ${config.MAX_FILES} 个文件`);
+            return;
+        }
+
+        let successCount = 0;
+        let failureCount = 0;
+        const uploadedUrls = [];
+
+        // 显示上传进度条
+        const progressElement = fileType === 'IMAGE' ? imageUploadProgress : documentUploadProgress;
+        const progressStatus = fileType === 'IMAGE' ? imageUploadStatus : documentUploadStatus;
+        const progressPercent = fileType === 'IMAGE' ? imageUploadPercent : documentUploadPercent;
         
         progressElement.style.display = 'block';
-        progressBar.style.width = '0%';
         progressStatus.textContent = '准备上传...';
-        progressPercent.textContent = '0';
 
-        // 准备表单数据
-        const formData = new FormData();
-        formData.append('asset_type', document.getElementById('type').value);
-        
-        // 处理图片压缩
-        if (type === 'image') {
-            for (let i = 0; i < files.length; i++) {
-                try {
-                    const compressedImage = await compressImage(files[i]);
-                    formData.append('images[]', compressedImage, files[i].name);
-                } catch (error) {
-                    console.error('图片压缩失败:', error);
-                    formData.append('images[]', files[i]);
-                }
-            }
-        } else {
-            // 处理文档
-            for (let i = 0; i < files.length; i++) {
-                formData.append('documents[]', files[i]);
-            }
-        }
-
-        // 发送请求
-        const response = await fetch('/api/assets/upload', {
-            method: 'POST',
-            headers: {
-                'X-Eth-Address': window.ethereum.selectedAddress
-            },
-            body: formData
-        });
-
-        // 检查响应状态
-        if (!response.ok) {
-            let errorMessage = '文件上传失败';
+        // 上传每个文件
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
             try {
-                const errorData = await response.json();
-                errorMessage = errorData.error || errorData.detail || errorMessage;
-            } catch (e) {
-                console.error('解析错误响应失败:', e);
+                // 更新进度
+                const progress = Math.round((i / files.length) * 100);
+                progressPercent.textContent = progress;
+                progressStatus.textContent = `正在上传 ${file.name}...`;
+                progressElement.querySelector('.progress-bar').style.width = `${progress}%`;
+
+                // 验证文件
+                if (!validateFile(file, fileType)) {
+                    failureCount++;
+                    continue;
+                }
+
+                // 准备表单数据
+                const formData = new FormData();
+                formData.append('file', file);
+
+                // 上传文件
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || '上传失败');
+                }
+
+                const result = await response.json();
+                if (result.url) {
+                    uploadedUrls.push({
+                        url: result.url,
+                        name: result.name || file.name
+                    });
+                    successCount++;
+                } else {
+                    throw new Error('服务器返回的URL为空');
+                }
+            } catch (error) {
+                console.error(`文件 ${file.name} 上传失败:`, error);
+                showToast(`文件 ${file.name} 上传失败: ${error.message}`);
+                failureCount++;
             }
-            throw new Error(errorMessage);
         }
 
-        // 解析响应数据
-        const data = await response.json();
-        if (!data || !data.urls || !Array.isArray(data.urls)) {
-            throw new Error('服务器返回的数据格式不正确');
-        }
-
-        // 更新预览
-        if (type === 'image') {
-            uploadedImages = uploadedImages.concat(
-                data.urls.map((url, index) => ({
-                    data: url,
-                    name: files[index]?.name || `图片${uploadedImages.length + index + 1}`
-                }))
-            );
-            updateImagePreview();
-        } else {
-            uploadedDocuments = uploadedDocuments.concat(
-                data.urls.map((url, index) => ({
-                    data: url,
-                    name: files[index]?.name || `文档${uploadedDocuments.length + index + 1}`,
-                    size: files[index]?.size || 0
-                }))
-            );
-            updateDocumentList();
-        }
-
-        // 隐藏进度条
+        // 完成上传，隐藏进度条
+        progressPercent.textContent = '100';
+        progressElement.querySelector('.progress-bar').style.width = '100%';
+        progressStatus.textContent = '上传完成';
         setTimeout(() => {
             progressElement.style.display = 'none';
         }, 1000);
 
-        return data.urls;
+        // 更新UI
+        if (fileType.toLowerCase() === 'image') {
+            uploadedImages = [...uploadedImages, ...uploadedUrls];
+            updateImagePreview();
+        } else {
+            uploadedDocuments = [...uploadedDocuments, ...uploadedUrls];
+            updateDocumentList();
+        }
+
+        // 显示上传结果
+        if (successCount > 0) {
+            showToast(`成功上传 ${successCount} 个文件${failureCount > 0 ? `，${failureCount} 个文件失败` : ''}`);
+        } else if (failureCount > 0) {
+            showToast(`${failureCount} 个文件上传失败`);
+        }
+
     } catch (error) {
-        console.error('文件处理失败:', error);
-        showError(error.message || '文件上传失败，请重试');
-        throw error;
+        console.error('处理文件失败:', error);
+        showError(error.message || '文件上传失败');
     }
+}
+
+// 文件验证
+function validateFile(file, type) {
+    const config = CONFIG[type.toUpperCase()];
+    if (!config) {
+        showToast(`无效的文件类型: ${type}`);
+        return false;
+    }
+
+    // 检查文件大小
+    if (file.size > config.MAX_SIZE) {
+        const maxSize = config.MAX_SIZE / (1024 * 1024);
+        showToast(`文件 ${file.name} 超过大小限制 (${maxSize}MB)`);
+        return false;
+    }
+
+    // 检查文件类型
+    const fileExt = file.name.split('.').pop().toLowerCase();
+    const allowedExts = config.ALLOWED_TYPES.map(type => type.split('/')[1]);
+    if (!allowedExts.includes(fileExt)) {
+        showToast(`文件 ${file.name} 类型不支持 (支持的格式: ${allowedExts.join(', ')})`);
+        return false;
+    }
+
+    return true;
 }
 
 // 更新图片预览
 function updateImagePreview() {
-    const previewContainer = document.getElementById('imagePreview');
-    if (!previewContainer) return;
+    const container = document.getElementById('imagePreview');
+    if (!container) return;
+
+    container.innerHTML = '';
     
-    previewContainer.innerHTML = '';
-    
-    if (uploadedImages.length === 0) {
-        previewContainer.innerHTML = '<div class="text-center text-muted">暂无图片</div>';
+    if (!uploadedImages || uploadedImages.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted">暂无图片</div>';
         return;
     }
-    
+
     uploadedImages.forEach((image, index) => {
-        const col = document.createElement('div');
-        col.className = 'col-md-4';
-        col.innerHTML = `
+        const div = document.createElement('div');
+        div.className = 'col-md-4 mb-3';
+        div.innerHTML = `
             <div class="card h-100">
-                <div class="position-relative">
-                    <img src="${image.data}" 
-                         class="card-img-top" 
-                         alt="${image.name}"
-                         style="height: 200px; object-fit: cover;">
-                    <button type="button" 
-                            class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2"
-                            onclick="removeImage(${index})">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
+                <img src="${image.url}" 
+                     class="card-img-top" 
+                     alt="${image.name}"
+                     style="height: 200px; object-fit: cover;">
                 <div class="card-body">
-                    <p class="card-text small text-muted mb-0 text-truncate">${image.name}</p>
+                    <p class="card-text">${image.name}</p>
+                    <button class="btn btn-sm btn-danger" 
+                            onclick="removeImage(${index})">
+                        删除
+                    </button>
                 </div>
             </div>
         `;
-        previewContainer.appendChild(col);
+        container.appendChild(div);
     });
 }
 
 // 更新文档列表
 function updateDocumentList() {
-    const listContainer = document.getElementById('documentList');
-    if (!listContainer) return;
+    const container = document.getElementById('documentList');
+    if (!container) return;
+
+    container.innerHTML = '';
     
-    listContainer.innerHTML = '';
-    
-    if (uploadedDocuments.length === 0) {
-        listContainer.innerHTML = '<div class="text-center text-muted">暂无文档</div>';
+    if (!uploadedDocuments || uploadedDocuments.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted">暂无文档</div>';
         return;
     }
-    
+
     uploadedDocuments.forEach((doc, index) => {
         const div = document.createElement('div');
         div.className = 'mb-2 p-2 border rounded';
         div.innerHTML = `
             <div class="d-flex align-items-center">
-                <i class="fas fa-file-alt me-2"></i>
-                <div class="flex-grow-1">
-                    <div class="text-truncate">${doc.name}</div>
-                    <small class="text-muted">${formatFileSize(doc.size)}</small>
-                </div>
-                <button type="button" class="btn btn-danger btn-sm ms-2" 
+                <i class="fas fa-file me-2"></i>
+                <span class="flex-grow-1">${doc.name}</span>
+                <button class="btn btn-sm btn-danger" 
                         onclick="removeDocument(${index})">
-                    <i class="fas fa-times"></i>
+                    删除
                 </button>
             </div>
         `;
-        listContainer.appendChild(div);
+        container.appendChild(div);
     });
 }
 
-// 格式化文件大小
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
 function removeImage(index) {
+    console.log('移除图片:', index);
     if (index >= 0 && index < uploadedImages.length) {
         uploadedImages.splice(index, 1);
+        console.log('移除后的图片数组:', uploadedImages);
         updateImagePreview();
     }
 }
@@ -910,13 +958,13 @@ function initializeEventListeners(elements) {
         elements.imageDropzone.addEventListener('drop', e => {
             const dt = e.dataTransfer;
             const files = dt.files;
-            handleFiles(files, 'image');
+            handleFiles(files);
         });
         
         // 文件选择处理
         elements.imageInput.addEventListener('change', e => {
             if (e.target.files && e.target.files.length > 0) {
-                handleFiles(e.target.files, 'image');
+                handleFiles(e.target.files);
                 e.target.value = ''; // 清空input，允许选择相同文件
             }
         });
@@ -935,13 +983,13 @@ function initializeEventListeners(elements) {
         elements.documentDropzone.addEventListener('drop', e => {
             const dt = e.dataTransfer;
             const files = dt.files;
-            handleFiles(files, 'document');
+            handleFiles(files);
         });
         
         // 文件选择处理
         elements.documentInput.addEventListener('change', e => {
             if (e.target.files && e.target.files.length > 0) {
-                handleFiles(e.target.files, 'document');
+                handleFiles(e.target.files);
                 e.target.value = ''; // 清空input，允许选择相同文件
             }
         });
@@ -1115,7 +1163,7 @@ function previewAsset() {
                                 <div class="carousel-inner">
                                     ${assetData.images.map((image, index) => `
                                         <div class="carousel-item ${index === 0 ? 'active' : ''}">
-                                            <img src="${image.data}" class="d-block w-100" alt="${image.name}" 
+                                            <img src="${image.url}" class="d-block w-100" alt="${image.name}" 
                                                  style="height: 400px; object-fit: cover;">
                                         </div>
                                     `).join('')}
@@ -1258,7 +1306,7 @@ form.addEventListener('submit', async (event) => {
         // 添加图片文件
         uploadedImages.forEach(async (image, index) => {
             try {
-                const blob = await dataURLtoBlob(image.data);
+                const blob = await dataURLtoBlob(image.url);
                 formData.append('files[]', blob, image.name);
             } catch (error) {
                 console.error(`转换图片失败: ${image.name}`, error);
