@@ -207,14 +207,13 @@ def create_asset():
             current_app.logger.info(f'收到 {len(files)} 个图片文件')
             
             if files and any(file.filename for file in files):
-                asset_type_folder = 'real_estate' if asset.asset_type == '10' else 'similar_assets'
-                
                 for file in files:
                     if file and file.filename and allowed_file(file.filename):
                         try:
                             # 构建文件名
                             ext = file.filename.rsplit(".", 1)[1].lower()
-                            filename = f'{asset_type_folder}/{asset.id}/image_{len(image_paths)+1}.{ext}'
+                            asset_type_folder = 'real_estate' if str(asset.asset_type) == '10' else 'similar_assets'
+                            filename = f'{asset_type_folder}/{asset.id}/images/image_{len(image_paths)+1}.{ext}'
                             
                             # 读取文件内容
                             file_data = file.read()
@@ -247,14 +246,13 @@ def create_asset():
             current_app.logger.info(f'收到 {len(files)} 个文档文件')
             
             if files and any(file.filename for file in files):
-                asset_type_folder = 'real_estate' if asset.asset_type == '10' else 'similar_assets'
-                
                 for file in files:
                     if file and file.filename and allowed_file(file.filename):
                         try:
                             # 构建文件名
                             ext = file.filename.rsplit(".", 1)[1].lower()
-                            filename = f'{asset_type_folder}/{asset.id}/document_{len(document_paths)+1}.{ext}'
+                            asset_type_folder = 'real_estate' if str(asset.asset_type) == '10' else 'similar_assets'
+                            filename = f'{asset_type_folder}/{asset.id}/documents/document_{len(document_paths)+1}.{ext}'
                             
                             # 读取文件内容
                             file_data = file.read()
