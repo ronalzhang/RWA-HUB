@@ -212,7 +212,7 @@ def create_asset():
                         try:
                             # 构建文件名
                             ext = file.filename.rsplit(".", 1)[1].lower()
-                            asset_type_folder = 'real_estate' if str(asset.asset_type) == '10' else 'similar_assets'
+                            asset_type_folder = str(asset.asset_type)  # 直接使用资产类型的数字作为文件夹名
                             filename = f'{asset_type_folder}/{asset.id}/images/image_{len(image_paths)+1}.{ext}'
                             
                             # 读取文件内容
@@ -251,7 +251,7 @@ def create_asset():
                         try:
                             # 构建文件名
                             ext = file.filename.rsplit(".", 1)[1].lower()
-                            asset_type_folder = 'real_estate' if str(asset.asset_type) == '10' else 'similar_assets'
+                            asset_type_folder = str(asset.asset_type)  # 直接使用资产类型的数字作为文件夹名
                             filename = f'{asset_type_folder}/{asset.id}/documents/document_{len(document_paths)+1}.{ext}'
                             
                             # 读取文件内容
@@ -688,8 +688,17 @@ def upload():
         if len(file_data) > 10 * 1024 * 1024:  # 10MB
             return jsonify({'error': '文件大小超过限制'}), 400
             
+        # 获取资产类型和ID
+        asset_type = request.form.get('asset_type', '10')  # 默认为不动产
+        asset_id = request.form.get('asset_id', 'temp')  # 如果没有asset_id，使用temp目录
+        file_type = request.form.get('file_type', 'images')  # 默认为图片
+        
+        # 构建文件路径
+        ext = file.filename.rsplit(".", 1)[1].lower() if '.' in file.filename else ''
+        filename = f'{asset_type}/{asset_id}/{file_type}/{int(time.time())}_{secure_filename(file.filename)}'
+            
         # 上传文件到存储服务
-        result = upload_file(file)
+        result = storage.upload(file_data, filename)
         if not result:
             return jsonify({'error': '文件上传失败'}), 500
             
