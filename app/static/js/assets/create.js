@@ -380,44 +380,40 @@ async function handleFiles(files, type) {
         // 验证文件
         const errors = validateFiles(files, type);
         if (errors.length > 0) {
-            showError(errors.join('\n'));
+            showError(errors.join('<br>'));
             return;
         }
 
+        // 显示进度条
+        const progressElement = document.getElementById(`${type}UploadProgress`);
+        const progressBar = progressElement.querySelector('.progress-bar');
+        const progressStatus = document.getElementById(`${type}UploadStatus`);
+        const progressPercent = document.getElementById(`${type}UploadPercent`);
+        
+        progressElement.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressStatus.textContent = '准备上传...';
+        progressPercent.textContent = '0';
+
+        // 准备表单数据
         const formData = new FormData();
-        const fieldName = type === 'image' ? 'images[]' : 'documents[]';
+        formData.append('asset_type', document.getElementById('type').value);
         
-        // 添加资产类型
-        const assetType = document.getElementById('type')?.value || '10';
-        formData.append('asset_type', assetType);
-        
-        // 处理每个文件
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            if (type === 'image') {
+        // 处理图片压缩
+        if (type === 'image') {
+            for (let i = 0; i < files.length; i++) {
                 try {
-                    const compressedBlob = await compressImage(file);
-                    formData.append(fieldName, compressedBlob, file.name);
+                    const compressedImage = await compressImage(files[i]);
+                    formData.append('images[]', compressedImage, files[i].name);
                 } catch (error) {
                     console.error('图片压缩失败:', error);
-                    formData.append(fieldName, file);
+                    formData.append('images[]', files[i]);
                 }
-            } else {
-                formData.append(fieldName, file);
             }
-        }
-
-        // 显示上传进度
-        const progressElement = document.getElementById(`${type}UploadProgress`);
-        if (progressElement) {
-            progressElement.style.display = 'block';
-            const progressBar = progressElement.querySelector('.progress-bar');
-            const progressStatus = document.getElementById(`${type}UploadStatus`);
-            const progressPercent = document.getElementById(`${type}UploadPercent`);
-            
-            if (progressBar && progressStatus && progressPercent) {
-                progressBar.style.width = '0%';
-                progressStatus.textContent = '正在上传...';
+        } else {
+            // 处理文档
+            for (let i = 0; i < files.length; i++) {
+                formData.append('documents[]', files[i]);
             }
         }
 
@@ -425,32 +421,33 @@ async function handleFiles(files, type) {
         const response = await fetch('/api/assets/upload', {
             method: 'POST',
             headers: {
-                'X-Eth-Address': window.ethereum?.selectedAddress || '',
-                'Accept': 'application/json'
+                'X-Eth-Address': window.ethereum.selectedAddress
             },
             body: formData
         });
 
-        let result;
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            result = await response.json();
-        } else {
-            throw new Error('服务器返回格式错误');
-        }
-
+        // 检查响应状态
         if (!response.ok) {
-            throw new Error(result.error || `上传失败: ${response.status}`);
+            let errorMessage = '文件上传失败';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorData.detail || errorMessage;
+            } catch (e) {
+                console.error('解析错误响应失败:', e);
+            }
+            throw new Error(errorMessage);
         }
 
-        if (!result.urls || !Array.isArray(result.urls)) {
-            throw new Error('服务器返回数据格式错误');
+        // 解析响应数据
+        const data = await response.json();
+        if (!data || !data.urls || !Array.isArray(data.urls)) {
+            throw new Error('服务器返回的数据格式不正确');
         }
-        
+
         // 更新预览
         if (type === 'image') {
             uploadedImages = uploadedImages.concat(
-                result.urls.map((url, index) => ({
+                data.urls.map((url, index) => ({
                     data: url,
                     name: files[index]?.name || `图片${uploadedImages.length + index + 1}`
                 }))
@@ -458,7 +455,7 @@ async function handleFiles(files, type) {
             updateImagePreview();
         } else {
             uploadedDocuments = uploadedDocuments.concat(
-                result.urls.map((url, index) => ({
+                data.urls.map((url, index) => ({
                     data: url,
                     name: files[index]?.name || `文档${uploadedDocuments.length + index + 1}`,
                     size: files[index]?.size || 0
@@ -468,21 +465,15 @@ async function handleFiles(files, type) {
         }
 
         // 隐藏进度条
-        if (progressElement) {
-            setTimeout(() => {
-                progressElement.style.display = 'none';
-            }, 1000);
-        }
+        setTimeout(() => {
+            progressElement.style.display = 'none';
+        }, 1000);
 
+        return data.urls;
     } catch (error) {
         console.error('文件处理失败:', error);
         showError(error.message || '文件上传失败，请重试');
-        
-        // 隐藏进度条
-        const progressElement = document.getElementById(`${type}UploadProgress`);
-        if (progressElement) {
-            progressElement.style.display = 'none';
-        }
+        throw error;
     }
 }
 
