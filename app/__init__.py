@@ -61,8 +61,7 @@ def create_app(config_name='development'):
     # 初始化 Babel
     app.config['BABEL_DEFAULT_LOCALE'] = 'en'
     app.config['BABEL_DEFAULT_TIMEZONE'] = 'UTC'
-    babel.init_app(app)
-    babel.localeselector(get_locale)
+    babel.init_app(app, locale_selector=get_locale)
     
     # 设置日志
     if not os.path.exists('logs'):
