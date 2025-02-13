@@ -1131,6 +1131,18 @@ function updateAssetTypeDisplay() {
 
 // 预览功能实现
 function previewAsset() {
+    // 移除所有已存在的预览模态框
+    const existingModals = document.querySelectorAll('.preview-modal');
+    existingModals.forEach(modal => {
+        if (modal) {
+            const bsModal = bootstrap.Modal.getInstance(modal);
+            if (bsModal) {
+                bsModal.dispose();
+            }
+            modal.remove();
+        }
+    });
+
     const formData = new FormData(form);
     const assetData = {
         name: formData.get('name'),
@@ -1148,25 +1160,9 @@ function previewAsset() {
         }))
     };
 
-    if (assetData.type === CONFIG.ASSET_TYPE.REAL_ESTATE) {
-        const area = parseFloat(formData.get('area')) || 0;
-        assetData.area = area;
-        assetData.total_value = formData.get('total_value');
-        assetData.token_supply = area * CONFIG.CALCULATION.TOKENS_PER_SQUARE_METER;
-        assetData.token_price = assetData.token_supply > 0 ? 
-            (parseFloat(assetData.total_value) / assetData.token_supply).toFixed(CONFIG.CALCULATION.PRICE_DECIMALS) : 
-            '0.000000';
-        assetData.annual_revenue = formData.get('annual_revenue');
-    } else {
-        assetData.token_supply = formData.get('token_supply');
-        assetData.total_value = formData.get('total_value');
-        assetData.token_price = calculatedElements.similarAssets.tokenPrice.textContent.replace(/,/g, '');
-        assetData.annual_revenue = formData.get('annual_revenue');
-    }
-
     // 创建预览模态框
     const previewModal = document.createElement('div');
-    previewModal.className = 'modal fade';
+    previewModal.className = 'modal fade preview-modal';
     previewModal.id = 'previewModal';
     previewModal.innerHTML = `
         <div class="modal-dialog modal-xl">
@@ -1301,27 +1297,32 @@ function previewAsset() {
         </div>
     `;
 
-    // 移除旧的预览模态框（如果存在）
-    const oldModal = document.getElementById('previewModal');
-    if (oldModal) {
-        oldModal.remove();
-    }
+    // 确保模态框关闭时完全移除
+    previewModal.addEventListener('hidden.bs.modal', function () {
+        const bsModal = bootstrap.Modal.getInstance(this);
+        if (bsModal) {
+            bsModal.dispose();
+        }
+        this.remove();
+    });
 
-    // 添加新的预览模态框到页面
+    // 添加到页面并显示
     document.body.appendChild(previewModal);
-
-    // 显示预览模态框
     const modal = new bootstrap.Modal(previewModal);
     modal.show();
 }
 
-// 表单提交处理
+// 修改表单提交处理
 async function submitForm() {
     try {
-        const form = document.getElementById('assetForm');
-        if (!form) {
-            throw new Error('找不到表单元素');
-        }
+        // 关闭所有预览模态框
+        const existingModals = document.querySelectorAll('.preview-modal');
+        existingModals.forEach(modal => {
+            const bsModal = bootstrap.Modal.getInstance(modal);
+            if (bsModal) {
+                bsModal.hide();
+            }
+        });
 
         // 验证表单
         const errors = validateForm();
@@ -1333,26 +1334,23 @@ async function submitForm() {
         // 准备表单数据
         const formData = new FormData(form);
         
-        // 处理图片
+        // 处理图片和文档
         if (uploadedImages && uploadedImages.length > 0) {
-            formData.delete('images[]'); // 清除原有的图片数据
-            for (let i = 0; i < uploadedImages.length; i++) {
-                const image = uploadedImages[i];
+            formData.delete('images[]');
+            uploadedImages.forEach(image => {
                 if (image.url) {
                     formData.append('images[]', image.url);
                 }
-            }
+            });
         }
         
-        // 处理文档
         if (uploadedDocuments && uploadedDocuments.length > 0) {
-            formData.delete('documents[]'); // 清除原有的文档数据
-            for (let i = 0; i < uploadedDocuments.length; i++) {
-                const doc = uploadedDocuments[i];
+            formData.delete('documents[]');
+            uploadedDocuments.forEach(doc => {
                 if (doc.url) {
                     formData.append('documents[]', doc.url);
                 }
-            }
+            });
         }
 
         // 发送请求
