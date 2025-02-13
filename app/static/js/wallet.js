@@ -46,7 +46,6 @@ if (!window.walletState) {
                     walletBtn.classList.remove('btn-outline-primary');
                     walletBtn.classList.add('btn-primary');
                     walletBtnText.textContent = `${this.currentAccount.slice(0, 6)}...${this.currentAccount.slice(-4)}`;
-                    if (walletMenu) walletMenu.style.display = 'block';
                 } else {
                     walletBtn.classList.add('btn-outline-primary');
                     walletBtn.classList.remove('btn-primary');
