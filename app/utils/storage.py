@@ -44,6 +44,10 @@ class QiniuStorage:
                 # 生成完整的URL
                 url = f"{domain}/{ret['key']}"
                 
+                # 确保URL使用HTTP协议
+                if url.startswith('https://'):
+                    url = 'http://' + url[8:]
+                
                 return {
                     'url': url,
                     'key': ret['key'],
