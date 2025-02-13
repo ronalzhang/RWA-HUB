@@ -408,103 +408,90 @@ async function handleFiles(files, type) {
             return;
         }
 
-        // 验证文件类型
-        const fileType = type || 'IMAGE';  // 默认为图片类型
-        const config = CONFIG[fileType.toUpperCase()];
+        // 验证文件类型和数量
+        const fileType = type || 'IMAGE';
+        const config = CONFIG[fileType];
         if (!config) {
             showError('无效的文件类型');
             return;
         }
 
-        // 检查文件数量限制
         if (files.length > config.MAX_FILES) {
             showError(`最多只能上传 ${config.MAX_FILES} 个文件`);
             return;
         }
 
-        let successCount = 0;
-        let failureCount = 0;
-        const uploadedUrls = [];
-
         // 显示上传进度条
         const progressElement = fileType === 'IMAGE' ? imageUploadProgress : documentUploadProgress;
-        const progressStatus = fileType === 'IMAGE' ? imageUploadStatus : documentUploadStatus;
-        const progressPercent = fileType === 'IMAGE' ? imageUploadPercent : documentUploadPercent;
-        
         progressElement.style.display = 'block';
-        progressStatus.textContent = '准备上传...';
+        progressElement.querySelector('.progress-bar').style.width = '0%';
 
-        // 上传每个文件
+        // 准备上传
+        const uploadPromises = [];
+        const uploadResults = [];
+
+        // 处理每个文件
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            try {
-                // 更新进度
-                const progress = Math.round((i / files.length) * 100);
-                progressPercent.textContent = progress;
-                progressStatus.textContent = `正在上传 ${file.name}...`;
-                progressElement.querySelector('.progress-bar').style.width = `${progress}%`;
+            if (!validateFile(file, fileType)) {
+                continue;
+            }
 
-                // 验证文件
-                if (!validateFile(file, fileType)) {
-                    failureCount++;
-                    continue;
-                }
+            const formData = new FormData();
+            formData.append('file', file);
 
-                // 准备表单数据
-                const formData = new FormData();
-                formData.append('file', file);
-
-                // 上传文件
-                const response = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
+            // 创建上传Promise
+            const uploadPromise = fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            }).then(async response => {
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.error || '上传失败');
                 }
-
-                const result = await response.json();
+                return response.json();
+            }).then(result => {
                 if (result.url) {
-                    // 确保 URL 使用 HTTP 协议
+                    // 确保使用 HTTP 协议
                     let url = result.url;
                     if (url.startsWith('https://')) {
                         url = 'http://' + url.substring(8);
                     }
-                    uploadedUrls.push({
+                    uploadResults.push({
                         url: url,
                         name: result.name || file.name
                     });
-                    successCount++;
-                } else {
-                    throw new Error('服务器返回的URL为空');
+                    
+                    // 更新进度
+                    const progress = ((i + 1) / files.length) * 100;
+                    progressElement.querySelector('.progress-bar').style.width = `${progress}%`;
                 }
-            } catch (error) {
-                console.error(`文件 ${file.name} 上传失败:`, error);
-                showToast(`文件 ${file.name} 上传失败: ${error.message}`);
-                failureCount++;
-            }
+            });
+
+            uploadPromises.push(uploadPromise);
         }
 
-        // 完成上传，隐藏进度条
-        progressPercent.textContent = '100';
-        progressElement.querySelector('.progress-bar').style.width = '100%';
-        progressStatus.textContent = '上传完成';
+        // 等待所有文件上传完成
+        await Promise.all(uploadPromises);
+
+        // 更新UI
+        if (fileType === 'IMAGE') {
+            uploadedImages = [...uploadedImages, ...uploadResults];
+            updateImagePreview();
+        } else {
+            uploadedDocuments = [...uploadedDocuments, ...uploadResults];
+            updateDocumentList();
+        }
+
+        // 隐藏进度条
         setTimeout(() => {
             progressElement.style.display = 'none';
         }, 1000);
 
-        // 更新UI
-        if (fileType.toLowerCase() === 'image') {
-            uploadedImages = [...uploadedImages, ...uploadedUrls];
-            updateImagePreview();
-        } else {
-            uploadedDocuments = [...uploadedDocuments, ...uploadedUrls];
-            updateDocumentList();
-        }
-
         // 显示上传结果
+        const successCount = uploadResults.length;
+        const failureCount = files.length - successCount;
+        
         if (successCount > 0) {
             showToast(`成功上传 ${successCount} 个文件${failureCount > 0 ? `，${failureCount} 个文件失败` : ''}`);
         } else if (failureCount > 0) {
@@ -556,11 +543,17 @@ function updateImagePreview() {
     }
 
     uploadedImages.forEach((image, index) => {
+        // 确保使用 HTTP 协议
+        let imageUrl = image.url;
+        if (imageUrl.startsWith('https://')) {
+            imageUrl = 'http://' + imageUrl.substring(8);
+        }
+        
         const div = document.createElement('div');
         div.className = 'col-md-4 mb-3';
         div.innerHTML = `
             <div class="card h-100">
-                <img src="${image.url}" 
+                <img src="${imageUrl}" 
                      class="card-img-top" 
                      alt="${image.name}"
                      style="height: 200px; object-fit: cover;">
@@ -1130,8 +1123,14 @@ function previewAsset() {
         location: formData.get('location'),
         description: formData.get('description'),
         token_symbol: formData.get('token_symbol'),
-        images: uploadedImages,
-        documents: uploadedDocuments
+        images: uploadedImages.map(image => ({
+            ...image,
+            url: image.url.startsWith('https://') ? 'http://' + image.url.substring(8) : image.url
+        })),
+        documents: uploadedDocuments.map(doc => ({
+            ...doc,
+            url: doc.url.startsWith('https://') ? 'http://' + doc.url.substring(8) : doc.url
+        }))
     };
 
     if (assetData.type === CONFIG.ASSET_TYPE.REAL_ESTATE) {
