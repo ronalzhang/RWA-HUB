@@ -16,10 +16,6 @@ migrate = Migrate()
 cors = CORS()
 babel = Babel()
 
-def get_locale():
-    """从 cookie 中获取用户语言偏好，默认英文"""
-    return request.cookies.get('language', 'en')
-
 def create_app(config_name='development'):
     """创建Flask应用实例"""
     app = Flask(__name__)
@@ -61,7 +57,11 @@ def create_app(config_name='development'):
     # 初始化 Babel
     app.config['BABEL_DEFAULT_LOCALE'] = 'en'
     app.config['BABEL_DEFAULT_TIMEZONE'] = 'UTC'
-    babel.init_app(app, localeselector=get_locale)
+    babel.init_app(app)
+    
+    @babel.localeselector
+    def get_locale():
+        return request.cookies.get('language', 'en')
     
     # 设置日志
     if not os.path.exists('logs'):
