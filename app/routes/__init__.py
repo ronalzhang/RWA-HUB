@@ -7,6 +7,7 @@ assets_bp = Blueprint('assets', __name__, url_prefix='/assets')
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
 # API蓝图
+api_bp = Blueprint('api', __name__)
 auth_api_bp = Blueprint('auth_api', __name__)
 assets_api_bp = Blueprint('assets_api', __name__, url_prefix='/api/assets')
 trades_api_bp = Blueprint('trades_api', __name__)
@@ -28,6 +29,8 @@ from .assets import *
 
 # 注册蓝图函数
 def register_blueprints(app):
+    # 注册所有蓝图
+    app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(main_bp)
     app.register_blueprint(assets_bp)
     app.register_blueprint(assets_api_bp)
