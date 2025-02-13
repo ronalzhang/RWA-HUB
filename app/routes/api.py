@@ -648,9 +648,13 @@ def update_language_preference():
 def upload_files():
     """上传文件"""
     try:
+        current_app.logger.info('开始处理文件上传请求')
+        
         # 检查是否有图片或文档上传
         has_images = 'images[]' in request.files
         has_documents = 'documents[]' in request.files
+        
+        current_app.logger.info(f'请求包含: images={has_images}, documents={has_documents}')
         
         if not has_images and not has_documents:
             return jsonify({'error': '没有文件被上传'}), 400
@@ -659,75 +663,96 @@ def upload_files():
         if not asset_type:
             return jsonify({'error': '缺少资产类型'}), 400
             
+        current_app.logger.info(f'资产类型: {asset_type}')
         file_urls = []
+        
+        # 检查存储服务是否就绪
+        if storage is None:
+            current_app.logger.error("七牛云存储未初始化")
+            return jsonify({'error': '存储服务未就绪，请稍后重试'}), 503
         
         # 处理图片上传
         if has_images:
             files = request.files.getlist('images[]')
+            current_app.logger.info(f'开始处理 {len(files)} 个图片文件')
+            
             for file in files:
-                if file and allowed_file(file.filename):
-                    try:
-                        # 构建文件名
-                        ext = os.path.splitext(secure_filename(file.filename))[1]
-                        filename = f'{asset_type}/images/file_{len(file_urls)+1}{ext}'
+                if not file or not file.filename:
+                    continue
+                    
+                if not allowed_file(file.filename):
+                    current_app.logger.warning(f'不支持的文件类型: {file.filename}')
+                    continue
+                
+                try:
+                    # 构建文件名
+                    ext = os.path.splitext(secure_filename(file.filename))[1]
+                    filename = f'{asset_type}/images/{g.eth_address}/{int(time.time())}_{len(file_urls)+1}{ext}'
+                    
+                    # 读取文件内容
+                    file_data = file.read()
+                    
+                    # 上传到七牛云
+                    current_app.logger.info(f'开始上传图片: {filename}')
+                    url = storage.upload(file_data, filename)
+                    
+                    if url:
+                        file_urls.append(url)
+                        current_app.logger.info(f'图片上传成功: {url}')
+                    else:
+                        current_app.logger.error(f'图片上传失败: {filename}')
                         
-                        # 读取文件内容
-                        file_data = file.read()
-                        
-                        # 上传到七牛云
-                        if storage is None:
-                            current_app.logger.error("七牛云存储未初始化")
-                            raise Exception("存储服务未就绪，请稍后重试")
-                            
-                        url = storage.upload(file_data, filename)
-                        if url:
-                            file_urls.append(url)
-                            current_app.logger.info(f'上传图片成功: {url}')
-                        else:
-                            current_app.logger.error("七牛云返回空URL")
-                            raise Exception("文件上传失败，请重试")
-                            
-                    except Exception as e:
-                        current_app.logger.error(f'上传图片失败: {str(e)}')
-                        raise
+                except Exception as e:
+                    current_app.logger.error(f'处理图片失败: {str(e)}')
+                    continue
         
         # 处理文档上传
         if has_documents:
             files = request.files.getlist('documents[]')
-            for file in files:
-                if file and allowed_file(file.filename):
-                    try:
-                        # 构建文件名
-                        ext = os.path.splitext(secure_filename(file.filename))[1]
-                        filename = f'{asset_type}/documents/file_{len(file_urls)+1}{ext}'
-                        
-                        # 读取文件内容
-                        file_data = file.read()
-                        
-                        # 上传到七牛云
-                        if storage is None:
-                            current_app.logger.error("七牛云存储未初始化")
-                            raise Exception("存储服务未就绪，请稍后重试")
-                            
-                        url = storage.upload(file_data, filename)
-                        if url:
-                            file_urls.append(url)
-                            current_app.logger.info(f'上传文档成功: {url}')
-                        else:
-                            current_app.logger.error("七牛云返回空URL")
-                            raise Exception("文件上传失败，请重试")
-                            
-                    except Exception as e:
-                        current_app.logger.error(f'上传文档失败: {str(e)}')
-                        raise
-                        
-        if not file_urls:
-            return jsonify({'error': '没有文件上传成功'}), 500
+            current_app.logger.info(f'开始处理 {len(files)} 个文档文件')
             
+            for file in files:
+                if not file or not file.filename:
+                    continue
+                    
+                if not allowed_file(file.filename):
+                    current_app.logger.warning(f'不支持的文件类型: {file.filename}')
+                    continue
+                
+                try:
+                    # 构建文件名
+                    ext = os.path.splitext(secure_filename(file.filename))[1]
+                    filename = f'{asset_type}/documents/{g.eth_address}/{int(time.time())}_{len(file_urls)+1}{ext}'
+                    
+                    # 读取文件内容
+                    file_data = file.read()
+                    
+                    # 上传到七牛云
+                    current_app.logger.info(f'开始上传文档: {filename}')
+                    url = storage.upload(file_data, filename)
+                    
+                    if url:
+                        file_urls.append(url)
+                        current_app.logger.info(f'文档上传成功: {url}')
+                    else:
+                        current_app.logger.error(f'文档上传失败: {filename}')
+                        
+                except Exception as e:
+                    current_app.logger.error(f'处理文档失败: {str(e)}')
+                    continue
+                    
+        if not file_urls:
+            return jsonify({'error': '没有文件上传成功'}), 400
+            
+        current_app.logger.info(f'文件上传完成，共 {len(file_urls)} 个文件')
         return jsonify({
-            'urls': file_urls
+            'urls': file_urls,
+            'message': '文件上传成功'
         })
         
     except Exception as e:
-        current_app.logger.error(f'上传文件失败: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.error(f'上传文件失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'error': '文件上传失败，请重试',
+            'detail': str(e)
+        }), 500

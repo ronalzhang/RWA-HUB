@@ -410,12 +410,12 @@ async function handleFiles(files, type) {
         // 显示上传进度
         const progressElement = document.getElementById(`${type}UploadProgress`);
         if (progressElement) {
+            progressElement.style.display = 'block';
             const progressBar = progressElement.querySelector('.progress-bar');
             const progressStatus = document.getElementById(`${type}UploadStatus`);
             const progressPercent = document.getElementById(`${type}UploadPercent`);
             
             if (progressBar && progressStatus && progressPercent) {
-                progressElement.style.display = 'block';
                 progressBar.style.width = '0%';
                 progressStatus.textContent = '正在上传...';
             }
@@ -425,17 +425,27 @@ async function handleFiles(files, type) {
         const response = await fetch('/api/assets/upload', {
             method: 'POST',
             headers: {
-                'X-Eth-Address': window.ethereum?.selectedAddress || ''
+                'X-Eth-Address': window.ethereum?.selectedAddress || '',
+                'Accept': 'application/json'
             },
             body: formData
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || '上传失败');
+        let result;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            result = await response.json();
+        } else {
+            throw new Error('服务器返回格式错误');
         }
 
-        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || `上传失败: ${response.status}`);
+        }
+
+        if (!result.urls || !Array.isArray(result.urls)) {
+            throw new Error('服务器返回数据格式错误');
+        }
         
         // 更新预览
         if (type === 'image') {
@@ -450,7 +460,8 @@ async function handleFiles(files, type) {
             uploadedDocuments = uploadedDocuments.concat(
                 result.urls.map((url, index) => ({
                     data: url,
-                    name: files[index]?.name || `文档${uploadedDocuments.length + index + 1}`
+                    name: files[index]?.name || `文档${uploadedDocuments.length + index + 1}`,
+                    size: files[index]?.size || 0
                 }))
             );
             updateDocumentList();
@@ -458,12 +469,14 @@ async function handleFiles(files, type) {
 
         // 隐藏进度条
         if (progressElement) {
-            progressElement.style.display = 'none';
+            setTimeout(() => {
+                progressElement.style.display = 'none';
+            }, 1000);
         }
 
     } catch (error) {
         console.error('文件处理失败:', error);
-        showError('文件上传失败: ' + error.message);
+        showError(error.message || '文件上传失败，请重试');
         
         // 隐藏进度条
         const progressElement = document.getElementById(`${type}UploadProgress`);
