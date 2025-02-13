@@ -1,8 +1,8 @@
-from flask import Flask, request, session
+from flask import Flask, request, session, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_cors import CORS
-from flask_babel import Babel
+from flask_babel import Babel, gettext as _
 from app.config import config
 import json
 import os
@@ -21,95 +21,83 @@ def get_locale():
     return request.cookies.get('language', 'en')
 
 def create_app(config_name='development'):
+    """创建Flask应用实例"""
     app = Flask(__name__)
     
     # 加载配置
-    if isinstance(config_name, str):
-        config_class = config.get(config_name.lower(), config['default'])
-        app.config.from_object(config_class)
-        # 初始化配置
-        config_class.init_app(app)
-    else:
-        app.config.from_object(config_name)
+    app.config.from_object(config[config_name])
+    config[config_name].init_app(app)
     
-    # 配置 Babel
-    app.config['BABEL_DEFAULT_LOCALE'] = 'en'
-    app.config['BABEL_SUPPORTED_LOCALES'] = ['en', 'zh_Hant']
-    babel.init_app(app)
-    
-    # 添加安全头
-    @app.after_request
-    def add_security_headers(response):
-        response.headers['Content-Security-Policy'] = (
-            "default-src 'self'; "
-            "img-src * 'self' data: blob: http: https:; "
-            "media-src 'self' data: blob: *; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; "
-            "font-src 'self' https://cdnjs.cloudflare.com data:; "
-            "connect-src 'self' http://localhost:* http://127.0.0.1:* https://api.rwa-hub.com;"
-        )
-        return response
-    
-    # 确保日志目录存在
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
-        
-    # 设置日志处理器
-    file_handler = RotatingFileHandler(
-        'logs/rwa_hub.log',
-        maxBytes=10240,  # 10MB
-        backupCount=10
-    )
-    file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s [%(levelname)s] %(message)s [in %(pathname)s:%(lineno)d]'
-    ))
-    file_handler.setLevel(logging.INFO)
-    app.logger.addHandler(file_handler)
-    app.logger.setLevel(logging.INFO)
-    app.logger.info('RWA-HUB 启动')
-    
-    # 确保上传目录存在
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    # 添加自定义过滤器
+    @app.template_filter('number_format')
+    def number_format_filter(value):
+        try:
+            if isinstance(value, (int, float, Decimal)):
+                return "{:,.2f}".format(float(value))
+            return value
+        except (ValueError, TypeError):
+            return value
+            
+    @app.template_filter('from_json')
+    def from_json_filter(value):
+        try:
+            if value:
+                return json.loads(value)
+            return []
+        except:
+            return []
     
     # 初始化扩展
     db.init_app(app)
     migrate.init_app(app, db)
-    cors.init_app(app)
-
-    # 初始化七牛云存储
-    from .utils.storage import init_storage
-    with app.app_context():
-        init_storage()
+    cors.init_app(app, resources={
+        r"/api/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "X-Eth-Address", "Authorization"]
+        }
+    })
+    babel.init_app(app, locale_selector=get_locale)
     
-    # 添加自定义过滤器
-    @app.template_filter('from_json')
-    def from_json_filter(value):
-        try:
-            return json.loads(value) if value else []
-        except:
-            return []
-            
-    @app.template_filter('number_format')
-    def number_format_filter(value):
-        if value is None:
-            return '0'
-        if isinstance(value, (int, float, Decimal)):
-            return "{:,.2f}".format(float(value))
-        return value
+    # 设置日志
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+    
+    file_handler = RotatingFileHandler(
+        'logs/app.log',
+        maxBytes=10240,
+        backupCount=10
+    )
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
+    app.logger.info('应用启动')
+    
+    # 注册错误处理
+    @app.errorhandler(404)
+    def not_found_error(error):
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Not found'}), 404
+        return render_template('errors/404.html'), 404
+
+    @app.errorhandler(500)
+    def internal_error(error):
+        db.session.rollback()
+        app.logger.error('Server Error: %s', error)
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Internal server error'}), 500
+        return render_template('errors/500.html'), 500
     
     # 注册蓝图
-    from .routes import main_bp, auth_bp, assets_bp, api_bp, admin_bp, admin_api_bp, assets_api_bp
+    from .routes import register_blueprints
+    register_blueprints(app)
     
-    # 先注册API路由
-    app.register_blueprint(api_bp, url_prefix='/api')
-    app.register_blueprint(admin_api_bp, url_prefix='/api/admin')
-    app.register_blueprint(assets_api_bp, url_prefix='/api/assets')
-    
-    # 再注册页面路由
-    app.register_blueprint(main_bp)
-    app.register_blueprint(auth_bp, url_prefix='/auth')
-    app.register_blueprint(assets_bp, url_prefix='/assets')
-    app.register_blueprint(admin_bp, url_prefix='/admin')
-    
+    # 初始化存储
+    from .utils.storage import init_storage
+    if not init_storage(app):
+        app.logger.error("七牛云存储初始化失败，应用可能无法正常工作")
+        
     return app

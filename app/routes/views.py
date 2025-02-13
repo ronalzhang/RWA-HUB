@@ -6,41 +6,41 @@ from ..models.asset import AssetStatus
 from sqlalchemy import or_ as db_or
 
 # 主页路由
-@main_bp.route('/')
-def index():
-    """首页"""
-    try:
-        # 获取当前用户的钱包地址
-        eth_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address')
-        current_app.logger.info(f'当前用户钱包地址: {eth_address}')
-        
-        # 构建查询条件
-        current_app.logger.info(f'查询条件: eth_address={eth_address}')
-        
-        # 获取资产列表
-        query = Asset.query
-        
-        # 如果是管理员，显示所有未删除的资产
-        if eth_address and is_admin(eth_address):
-            query = query.filter(Asset.status != AssetStatus.DELETED.value)
-        else:
-            # 非管理员只能看到已审核通过的资产
-            query = query.filter(Asset.status == AssetStatus.APPROVED.value)
-            
-        assets = query.order_by(Asset.created_at.desc()).limit(6).all()
-        
-        current_app.logger.info(f'获取资产列表成功: 找到 {len(assets)} 个资产')
-        current_app.logger.info(f'资产状态: {[asset.status for asset in assets]}')
-        
-        return render_template('index.html', 
-                             assets=assets,
-                             current_user_address=eth_address)
-                             
-    except Exception as e:
-        current_app.logger.error(f'获取资产列表失败: {str(e)}')
-        return render_template('index.html', 
-                             assets=[],
-                             current_user_address=None)
+# @main_bp.route('/')
+# def index():
+#     """首页"""
+#     try:
+#         # 获取当前用户的钱包地址
+#         eth_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address')
+#         current_app.logger.info(f'当前用户钱包地址: {eth_address}')
+#         
+#         # 构建查询条件
+#         current_app.logger.info(f'查询条件: eth_address={eth_address}')
+#         
+#         # 获取资产列表
+#         query = Asset.query
+#         
+#         # 如果是管理员，显示所有未删除的资产
+#         if eth_address and is_admin(eth_address):
+#             query = query.filter(Asset.status != AssetStatus.DELETED.value)
+#         else:
+#             # 非管理员只能看到已审核通过的资产
+#             query = query.filter(Asset.status == AssetStatus.APPROVED.value)
+#             
+#         assets = query.order_by(Asset.created_at.desc()).limit(6).all()
+#         
+#         current_app.logger.info(f'获取资产列表成功: 找到 {len(assets)} 个资产')
+#         current_app.logger.info(f'资产状态: {[asset.status for asset in assets]}')
+#         
+#         return render_template('index.html', 
+#                              assets=assets,
+#                              current_user_address=eth_address)
+#                              
+#     except Exception as e:
+#         current_app.logger.error(f'获取资产列表失败: {str(e)}')
+#         return render_template('index.html', 
+#                              assets=[],
+#                              current_user_address=None)
 
 # 静态文件路由
 @main_bp.route('/static/<path:filename>')

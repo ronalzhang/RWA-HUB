@@ -87,14 +87,15 @@ class QiniuStorage:
 # 创建全局实例
 storage = None
 
-def init_storage():
+def init_storage(app):
     """初始化存储实例"""
     global storage
     try:
-        logger.info("开始初始化七牛云存储...")
-        storage = QiniuStorage()
-        logger.info("七牛云存储初始化成功")
-        return True
+        with app.app_context():
+            logger.info("开始初始化七牛云存储...")
+            storage = QiniuStorage()
+            logger.info("七牛云存储初始化成功")
+            return True
     except Exception as e:
         logger.error(f"七牛云存储初始化失败: {str(e)}")
         storage = None
