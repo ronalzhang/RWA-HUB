@@ -1017,7 +1017,7 @@ function initializeEventListeners(elements) {
                 return;
             }
             
-            await submitForm(e);
+            await submitForm();
         });
     }
     
@@ -1038,28 +1038,43 @@ function initializeEventListeners(elements) {
 // 辅助函数
 async function dataURLtoBlob(dataURL) {
     try {
-        const arr = dataURL.split(',');
-        if (arr.length !== 2) {
-            throw new Error('无效的数据URL格式');
+        // 如果是文件对象，直接返回
+        if (dataURL instanceof File || dataURL instanceof Blob) {
+            return dataURL;
         }
         
-        const mimeMatch = arr[0].match(/:(.*?);/);
-        if (!mimeMatch) {
-            throw new Error('无法解析MIME类型');
+        // 如果是URL字符串，不需要转换
+        if (typeof dataURL === 'string' && (dataURL.startsWith('http://') || dataURL.startsWith('https://'))) {
+            return null;
         }
         
-        const mime = mimeMatch[1];
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        
-        while (n--) {
-            u8arr[n] = bstr.charCodeAt(n);
+        // 处理 base64 数据URL
+        if (typeof dataURL === 'string' && dataURL.startsWith('data:')) {
+            const arr = dataURL.split(',');
+            if (arr.length !== 2) {
+                throw new Error('无效的数据URL格式');
+            }
+            
+            const mimeMatch = arr[0].match(/:(.*?);/);
+            if (!mimeMatch) {
+                throw new Error('无法解析MIME类型');
+            }
+            
+            const mime = mimeMatch[1];
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            
+            while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            
+            return new Blob([u8arr], { type: mime });
         }
         
-        return new Blob([u8arr], { type: mime });
+        throw new Error('不支持的数据格式');
     } catch (error) {
-        console.error('转换dataURL到Blob失败:', error);
+        console.error('转换数据URL到Blob失败:', error);
         throw new Error('文件格式转换失败');
     }
 }
@@ -1301,43 +1316,77 @@ function previewAsset() {
 }
 
 // 表单提交处理
-form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    
+async function submitForm() {
     try {
+        const form = document.getElementById('assetForm');
+        if (!form) {
+            throw new Error('找不到表单元素');
+        }
+
+        // 验证表单
+        const errors = validateForm();
+        if (errors.length > 0) {
+            showError(errors.join('\n'));
+            return;
+        }
+
+        // 准备表单数据
         const formData = new FormData(form);
         
-        // 添加图片文件
-        uploadedImages.forEach(async (image, index) => {
-            try {
-                const blob = await dataURLtoBlob(image.url);
-                formData.append('files[]', blob, image.name);
-            } catch (error) {
-                console.error(`转换图片失败: ${image.name}`, error);
-                throw error;
+        // 处理图片
+        if (uploadedImages && uploadedImages.length > 0) {
+            formData.delete('images[]'); // 清除原有的图片数据
+            for (let i = 0; i < uploadedImages.length; i++) {
+                const image = uploadedImages[i];
+                if (image.url) {
+                    formData.append('images[]', image.url);
+                }
             }
-        });
+        }
         
+        // 处理文档
+        if (uploadedDocuments && uploadedDocuments.length > 0) {
+            formData.delete('documents[]'); // 清除原有的文档数据
+            for (let i = 0; i < uploadedDocuments.length; i++) {
+                const doc = uploadedDocuments[i];
+                if (doc.url) {
+                    formData.append('documents[]', doc.url);
+                }
+            }
+        }
+
         // 发送请求
         const response = await fetch('/api/assets/create', {
             method: 'POST',
-            body: formData
+            body: formData,
+            headers: {
+                'X-Eth-Address': window.walletState.currentAccount
+            }
         });
-        
+
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || '创建资产失败');
         }
-        
+
         const result = await response.json();
-        alert('资产创建成功');
-        window.location.href = `/assets/${result.assetId}`;
         
+        // 清除草稿
+        localStorage.removeItem(CONFIG.DRAFT.KEY);
+        
+        // 显示成功消息
+        showToast('资产创建成功');
+        
+        // 跳转到资产详情页
+        setTimeout(() => {
+            window.location.href = `/assets/${result.assetId}`;
+        }, 1500);
+
     } catch (error) {
         console.error('提交表单失败:', error);
         showError(error.message || '创建资产失败，请重试');
     }
-});
+}
 
 // 修改页面加载完成后的初始化
 document.addEventListener('DOMContentLoaded', () => {
