@@ -202,213 +202,225 @@
                 </div>
             </div>
             
-            <form id="assetForm" class="needs-validation" novalidate>
-                <!-- 基本信息 -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">{{ _('Basic Information') }}</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="name" class="form-label">{{ _('Asset Name') }}</label>
-                                <input type="text" class="form-control" id="name" name="name" required>
-                                <div class="invalid-feedback">{{ _('Please enter asset name') }}</div>
+            <!-- 钱包连接检查 -->
+            <div id="walletCheck" class="alert alert-warning" style="display: none;">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                {{ _('Please connect your wallet first') }}
+                <button class="btn btn-primary btn-sm ms-3" onclick="connectWallet()">
+                    <i class="fas fa-wallet me-2"></i>{{ _('Connect Wallet') }}
+                </button>
+            </div>
+            
+            <!-- 表单内容 -->
+            <div id="formContent" style="display: none;">
+                <form id="assetForm" class="needs-validation" novalidate>
+                    <!-- 基本信息 -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">{{ _('Basic Information') }}</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="name" class="form-label">{{ _('Asset Name') }}</label>
+                                    <input type="text" class="form-control" id="name" name="name" required>
+                                    <div class="invalid-feedback">{{ _('Please enter asset name') }}</div>
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="type" class="form-label">{{ _('Asset Type') }}</label>
+                                    <select class="form-select" id="type" name="type" required>
+                                        <option value="">{{ _('Please select asset type') }}</option>
+                                        <option value="10">{{ _('Real Estate') }}</option>
+                                        <option value="20">{{ _('Similar Assets') }}</option>
+                                    </select>
+                                    <div class="invalid-feedback">{{ _('Please select asset type') }}</div>
+                                </div>
                             </div>
                             
-                            <div class="col-md-6 mb-3">
-                                <label for="type" class="form-label">{{ _('Asset Type') }}</label>
-                                <select class="form-select" id="type" name="type" required>
-                                    <option value="">{{ _('Please select asset type') }}</option>
-                                    <option value="10">{{ _('Real Estate') }}</option>
-                                    <option value="20">{{ _('Similar Assets') }}</option>
-                                </select>
-                                <div class="invalid-feedback">{{ _('Please select asset type') }}</div>
+                            <div class="mb-3">
+                                <label for="location" class="form-label">{{ _('Asset Location') }}</label>
+                                <input type="text" class="form-control" id="location" name="location" required>
+                                <div class="invalid-feedback">{{ _('Please enter asset location') }}</div>
                             </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="location" class="form-label">{{ _('Asset Location') }}</label>
-                            <input type="text" class="form-control" id="location" name="location" required>
-                            <div class="invalid-feedback">{{ _('Please enter asset location') }}</div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="description" class="form-label">{{ _('Asset Description') }}</label>
-                            <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
-                            <div class="invalid-feedback">{{ _('Please enter asset description') }}</div>
+                            
+                            <div class="mb-3">
+                                <label for="description" class="form-label">{{ _('Asset Description') }}</label>
+                                <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
+                                <div class="invalid-feedback">{{ _('Please enter asset description') }}</div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                <!-- 资产详情 -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">{{ _('Asset Details') }}</h5>
-                    </div>
-                    <div class="card-body">
-                        <!-- 代币代码 -->
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <label for="tokenSymbol" class="form-label">{{ _('Token Symbol') }}</label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control" id="tokenSymbol" name="tokenSymbol" readonly>
-                                </div>
-                                <small class="form-text text-muted">{{ _('Automatically generated based on asset type') }}</small>
-                            </div>
+                    
+                    <!-- 资产详情 -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">{{ _('Asset Details') }}</h5>
                         </div>
-
-                        <!-- 不动产字段 -->
-                        <div class="asset-type-field real-estate">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="area" class="form-label">{{ _('Asset Area (㎡)') }} <span class="text-danger">*</span></label>
-                                    <input type="number" class="form-control" id="area" name="area" step="0.01" min="0.01" placeholder="0.00">
-                                    <div class="invalid-feedback">{{ _('Please enter valid asset area (greater than 0)') }}</div>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="totalValue" class="form-label">{{ _('Total Value (USDC)') }} <span class="text-danger">*</span></label>
-                                    <input type="number" class="form-control" id="totalValue" name="totalValue" step="0.01" min="0.01" placeholder="0.00">
-                                    <div class="invalid-feedback">{{ _('Please enter valid total value (greater than 0)') }}</div>
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-md-4">
-                                    <label class="form-label">{{ _('Token Count') }}</label>
-                                    <div class="form-control bg-light" id="calculatedTokenCount">0</div>
-                                    <small class="form-text text-muted">{{ _('1 square meter = 10,000 tokens') }}</small>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">{{ _('Token Price (USDC)') }}</label>
-                                    <div class="form-control bg-light" id="calculatedTokenPrice">0.000000</div>
-                                    <small class="form-text text-muted">{{ _('Total Value / Token Count') }}</small>
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="expectedAnnualRevenue" class="form-label">{{ _('Expected Annual Revenue (USDC)') }}</label>
-                                    <input type="number" class="form-control" id="expectedAnnualRevenue" name="expectedAnnualRevenue" step="0.01" min="0" placeholder="0.00">
-                                    <small class="form-text text-muted">{{ _('Expected annual revenue in USDC') }}</small>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 类不动产字段 -->
-                        <div class="asset-type-field similar-assets hidden">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="tokenCount" class="form-label">{{ _('Token Count') }} <span class="text-danger">*</span></label>
-                                    <input type="number" class="form-control" id="tokenCount" name="tokenCount" step="1" min="1" placeholder="0">
-                                    <div class="invalid-feedback">{{ _('Please enter valid token count (greater than 0)') }}</div>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="totalValueSimilar" class="form-label">{{ _('Total Value (USDC)') }} <span class="text-danger">*</span></label>
-                                    <input type="number" class="form-control" id="totalValueSimilar" name="totalValue" step="0.01" min="0.01" placeholder="0.00">
-                                    <div class="invalid-feedback">{{ _('Please enter valid total value (greater than 0)') }}</div>
-                                </div>
-                            </div>
-                            <div class="row mb-3">
+                        <div class="card-body">
+                            <!-- 代币代码 -->
+                            <div class="row mb-4">
                                 <div class="col-md-6">
-                                    <label class="form-label">{{ _('Token Price (USDC)') }}</label>
-                                    <div class="form-control bg-light" id="calculatedTokenPriceSimilar">0.000000</div>
-                                    <small class="form-text text-muted">{{ _('Total Value / Token Count') }}</small>
+                                    <label for="tokenSymbol" class="form-label">{{ _('Token Symbol') }}</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="tokenSymbol" name="tokenSymbol" readonly>
+                                    </div>
+                                    <small class="form-text text-muted">{{ _('Automatically generated based on asset type') }}</small>
+                                </div>
+                            </div>
+
+                            <!-- 不动产字段 -->
+                            <div class="asset-type-field real-estate">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="area" class="form-label">{{ _('Asset Area (㎡)') }} <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="area" name="area" step="0.01" min="0.01" placeholder="0.00">
+                                        <div class="invalid-feedback">{{ _('Please enter valid asset area (greater than 0)') }}</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="total_value" class="form-label">{{ _('Total Value (USDC)') }} <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="total_value" name="total_value" step="0.01" min="0.01" placeholder="0.00">
+                                        <div class="invalid-feedback">{{ _('Please enter valid total value (greater than 0)') }}</div>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">{{ _('Token Count') }}</label>
+                                        <div class="form-control bg-light" id="token_count">0</div>
+                                        <small class="form-text text-muted">{{ _('1 square meter = 10,000 tokens') }}</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">{{ _('Token Price (USDC)') }}</label>
+                                        <div class="form-control bg-light" id="token_price">0.000000</div>
+                                        <small class="form-text text-muted">{{ _('Total Value / Token Count') }}</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="annual_revenue" class="form-label">{{ _('Expected Annual Revenue (USDC)') }}</label>
+                                        <input type="number" class="form-control" id="annual_revenue" name="annual_revenue" step="0.01" min="0" placeholder="0.00">
+                                        <small class="form-text text-muted">{{ _('Expected annual revenue in USDC') }}</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 类不动产字段 -->
+                            <div class="asset-type-field similar-assets hidden">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="tokenCount" class="form-label">{{ _('Token Count') }} <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="tokenCount" name="tokenCount" step="1" min="1" placeholder="0">
+                                        <div class="invalid-feedback">{{ _('Please enter valid token count (greater than 0)') }}</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="totalValueSimilar" class="form-label">{{ _('Total Value (USDC)') }} <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="totalValueSimilar" name="totalValue" step="0.01" min="0.01" placeholder="0.00">
+                                        <div class="invalid-feedback">{{ _('Please enter valid total value (greater than 0)') }}</div>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">{{ _('Token Price (USDC)') }}</label>
+                                        <div class="form-control bg-light" id="calculatedTokenPriceSimilar">0.000000</div>
+                                        <small class="form-text text-muted">{{ _('Total Value / Token Count') }}</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="expectedAnnualRevenueSimilar" class="form-label">{{ _('Expected Annual Revenue (USDC)') }}</label>
+                                        <input type="number" class="form-control" id="expectedAnnualRevenueSimilar" name="expectedAnnualRevenue" step="0.01" min="0" placeholder="0.00">
+                                        <small class="form-text text-muted">{{ _('Expected annual revenue in USDC') }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 图片上传 -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">{{ _('Asset Images') }} <small class="text-muted">{{ _('(Optional)') }}</small></h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="dropzone" id="imageDropzone">
+                                <i class="fas fa-cloud-upload-alt text-muted"></i>
+                                <p class="mb-0 text-muted">{{ _('Drag and drop images here or click to select') }}</p>
+                                <small class="text-muted d-block mt-2">{{ _('Maximum 5 files, 5MB each. Supported formats: JPG, PNG') }}</small>
+                                <input type="file" id="imageInput" multiple accept="image/*" class="d-none">
+                            </div>
+                            <div id="imageUploadProgress" class="upload-progress">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <small class="text-muted" id="imageUploadStatus">{{ _('Uploading...') }}</small>
+                                    <small class="text-muted"><span id="imageUploadPercent">0</span>%</small>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div id="imagePreview" class="row mt-3 g-3"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 文档上传 -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">{{ _('Asset Documents') }} <small class="text-muted">{{ _('(Optional)') }}</small></h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <div class="real-estate-docs">
+                                        <h6 class="text-muted">{{ _('Suggested Documents for Real Estate') }}:</h6>
+                                        <ul class="list-unstyled text-muted">
+                                            <li><i class="far fa-circle me-2"></i>{{ _('Property Certificate') }}</li>
+                                            <li><i class="far fa-circle me-2"></i>{{ _('Land Certificate') }}</li>
+                                            <li><i class="far fa-circle me-2"></i>{{ _('Assessment Report') }}</li>
+                                        </ul>
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <label for="expectedAnnualRevenueSimilar" class="form-label">{{ _('Expected Annual Revenue (USDC)') }}</label>
-                                    <input type="number" class="form-control" id="expectedAnnualRevenueSimilar" name="expectedAnnualRevenue" step="0.01" min="0" placeholder="0.00">
-                                    <small class="form-text text-muted">{{ _('Expected annual revenue in USDC') }}</small>
+                                    <div class="similar-assets-docs">
+                                        <h6 class="text-muted">{{ _('Suggested Documents for Similar Assets') }}:</h6>
+                                        <ul class="list-unstyled text-muted">
+                                            <li><i class="far fa-circle me-2"></i>{{ _('Auction Certificate') }}</li>
+                                            <li><i class="far fa-circle me-2"></i>{{ _('Exhibition Documents') }}</li>
+                                            <li><i class="far fa-circle me-2"></i>{{ _('Asset Proof') }}</li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 图片上传 -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">{{ _('Asset Images') }} <small class="text-muted">{{ _('(Optional)') }}</small></h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="dropzone" id="imageDropzone">
-                            <i class="fas fa-cloud-upload-alt text-muted"></i>
-                            <p class="mb-0 text-muted">{{ _('Drag and drop images here or click to select') }}</p>
-                            <small class="text-muted d-block mt-2">{{ _('Maximum 5 files, 5MB each. Supported formats: JPG, PNG') }}</small>
-                            <input type="file" id="imageInput" multiple accept="image/*" class="d-none">
-                        </div>
-                        <div id="imageUploadProgress" class="upload-progress">
-                            <div class="d-flex justify-content-between mb-1">
-                                <small class="text-muted" id="imageUploadStatus">{{ _('Uploading...') }}</small>
-                                <small class="text-muted"><span id="imageUploadPercent">0</span>%</small>
+                            
+                            <div class="dropzone" id="documentDropzone">
+                                <i class="fas fa-file-upload text-muted"></i>
+                                <p class="mb-0 text-muted">{{ _('Drag and drop documents here or click to select') }}</p>
+                                <small class="text-muted d-block mt-2">{{ _('Maximum 10 files, 10MB each. Supported formats: PDF, DOC, DOCX') }}</small>
+                                <input type="file" id="documentInput" multiple accept=".pdf,.doc,.docx" class="d-none">
                             </div>
-                            <div class="progress">
-                                <div class="progress-bar" role="progressbar" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div id="imagePreview" class="row mt-3 g-3"></div>
-                    </div>
-                </div>
-                
-                <!-- 文档上传 -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">{{ _('Asset Documents') }} <small class="text-muted">{{ _('(Optional)') }}</small></h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <div class="real-estate-docs">
-                                    <h6 class="text-muted">{{ _('Suggested Documents for Real Estate') }}:</h6>
-                                    <ul class="list-unstyled text-muted">
-                                        <li><i class="far fa-circle me-2"></i>{{ _('Property Certificate') }}</li>
-                                        <li><i class="far fa-circle me-2"></i>{{ _('Land Certificate') }}</li>
-                                        <li><i class="far fa-circle me-2"></i>{{ _('Assessment Report') }}</li>
-                                    </ul>
+                            <div id="documentUploadProgress" class="upload-progress">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <small class="text-muted" id="documentUploadStatus">{{ _('Uploading...') }}</small>
+                                    <small class="text-muted"><span id="documentUploadPercent">0</span>%</small>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="similar-assets-docs">
-                                    <h6 class="text-muted">{{ _('Suggested Documents for Similar Assets') }}:</h6>
-                                    <ul class="list-unstyled text-muted">
-                                        <li><i class="far fa-circle me-2"></i>{{ _('Auction Certificate') }}</li>
-                                        <li><i class="far fa-circle me-2"></i>{{ _('Exhibition Documents') }}</li>
-                                        <li><i class="far fa-circle me-2"></i>{{ _('Asset Proof') }}</li>
-                                    </ul>
-                                </div>
-                            </div>
+                            <div id="documentList" class="document-list mt-3"></div>
                         </div>
-                        
-                        <div class="dropzone" id="documentDropzone">
-                            <i class="fas fa-file-upload text-muted"></i>
-                            <p class="mb-0 text-muted">{{ _('Drag and drop documents here or click to select') }}</p>
-                            <small class="text-muted d-block mt-2">{{ _('Maximum 10 files, 10MB each. Supported formats: PDF, DOC, DOCX') }}</small>
-                            <input type="file" id="documentInput" multiple accept=".pdf,.doc,.docx" class="d-none">
-                        </div>
-                        <div id="documentUploadProgress" class="upload-progress">
-                            <div class="d-flex justify-content-between mb-1">
-                                <small class="text-muted" id="documentUploadStatus">{{ _('Uploading...') }}</small>
-                                <small class="text-muted"><span id="documentUploadPercent">0</span>%</small>
-                            </div>
-                            <div class="progress">
-                                <div class="progress-bar" role="progressbar" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div id="documentList" class="document-list mt-3"></div>
                     </div>
-                </div>
-                
-                <!-- 提交按钮 -->
-                <div class="d-flex justify-content-between">
-                    <button type="button" class="btn btn-secondary" id="saveDraft">
-                        <i class="fas fa-save me-2"></i>{{ _('Save Draft') }}
-                    </button>
-                    <div>
-                        <button type="button" class="btn btn-outline-secondary me-2" id="previewForm">
-                            <i class="fas fa-eye me-2"></i>{{ _('Preview') }}
+                    
+                    <!-- 提交按钮 -->
+                    <div class="d-flex justify-content-between">
+                        <button type="button" class="btn btn-secondary" id="saveDraft">
+                            <i class="fas fa-save me-2"></i>{{ _('Save Draft') }}
                         </button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-paper-plane me-2"></i>{{ _('Submit for Review') }}
-                        </button>
+                        <div>
+                            <button type="button" class="btn btn-outline-secondary me-2" id="previewForm">
+                                <i class="fas fa-eye me-2"></i>{{ _('Preview') }}
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane me-2"></i>{{ _('Submit for Review') }}
+                            </button>
+                        </div>
                     </div>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -430,6 +442,54 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+// 检查钱包连接状态
+async function checkWalletConnection() {
+    const walletCheck = document.getElementById('walletCheck');
+    const formContent = document.getElementById('formContent');
+    
+    if (!window.ethereum || !window.ethereum.selectedAddress) {
+        walletCheck.style.display = 'block';
+        formContent.style.display = 'none';
+        return false;
+    }
+    
+    walletCheck.style.display = 'none';
+    formContent.style.display = 'block';
+    return true;
+}
+
+// 连接钱包
+async function connectWallet() {
+    try {
+        if (!window.ethereum) {
+            throw new Error('{{ _("Please install MetaMask first") }}');
+        }
+        
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        await checkWalletConnection();
+    } catch (error) {
+        console.error('连接钱包失败:', error);
+        showError(error.message);
+    }
+}
+
+// 页面加载时检查钱包状态
+document.addEventListener('DOMContentLoaded', async () => {
+    await checkWalletConnection();
+    
+    // 监听钱包状态变化
+    if (window.ethereum) {
+        window.ethereum.on('accountsChanged', async (accounts) => {
+            if (accounts.length === 0) {
+                await checkWalletConnection();
+            } else {
+                await checkWalletConnection();
+            }
+        });
+    }
+});
+</script>
 <script src="{{ url_for('static', filename='js/assets/create.js') }}"></script>
 {% endblock %}
 

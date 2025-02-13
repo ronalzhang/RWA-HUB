@@ -2,6 +2,11 @@
 
 {% block title %}RWA-HUB - {{ _('Real World Asset Tokenization Platform') }}{% endblock %}
 
+{% block styles %}
+<link href="{{ url_for('static', filename='css/index.css') }}" rel="stylesheet">
+<link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
 <!DOCTYPE html>
 <html>
@@ -89,11 +94,11 @@
                                 
                                 <!-- Status Label -->
                                 <div class="position-absolute top-0 start-0 m-2">
-                                    {% if asset.status == 1 %}
+                                    {% if asset.status == AssetStatus.PENDING.value %}
                                     <span class="badge bg-warning">{{ _('Pending Review') }}</span>
-                                    {% elif asset.status == 2 %}
+                                    {% elif asset.status == AssetStatus.APPROVED.value %}
                                     <span class="badge bg-success">{{ _('On Chain') }}</span>
-                                    {% elif asset.status == 3 %}
+                                    {% elif asset.status == AssetStatus.REJECTED.value %}
                                     <span class="badge bg-danger">{{ _('Rejected') }}</span>
                                     {% endif %}
                                 </div>
@@ -485,7 +490,6 @@
 </style>
 
 <!-- AOS Animation Library -->
-<link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
 <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
 <script>
     AOS.init({

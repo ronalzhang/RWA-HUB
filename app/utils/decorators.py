@@ -1,8 +1,9 @@
 from functools import wraps
-from flask import request, g, jsonify
+from flask import request, g, jsonify, redirect, url_for, flash, session
 import jwt
 from app.models.user import User
 from eth_utils import is_address
+from app.utils.admin import get_admin_permissions
 
 def token_required(f):
     @wraps(f)
@@ -24,23 +25,67 @@ def token_required(f):
     return decorated
 
 def eth_address_required(f):
+    """要求提供以太坊地址的装饰器"""
     @wraps(f)
-    def decorated(*args, **kwargs):
-        eth_address = None
-        # 按优先级依次检查请求头、表单数据和URL参数
-        if 'X-Eth-Address' in request.headers:
-            eth_address = request.headers['X-Eth-Address']
-        elif request.form and 'eth_address' in request.form:
-            eth_address = request.form['eth_address']
-        elif request.args and 'eth_address' in request.args:
-            eth_address = request.args['eth_address']
-        
+    def decorated_function(*args, **kwargs):
+        eth_address = request.headers.get('X-Eth-Address') or \
+                     request.args.get('eth_address') or \
+                     session.get('eth_address')
+                     
         if not eth_address:
-            return jsonify({'error': '缺少以太坊地址'}), 401
+            flash('请先连接钱包', 'error')
+            return redirect(url_for('main.index'))
             
-        if not is_address(eth_address):
-            return jsonify({'error': '无效的以太坊地址'}), 401
-            
-        g.eth_address = eth_address
+        g.eth_address = eth_address.lower()
         return f(*args, **kwargs)
-    return decorated 
+    return decorated_function
+
+def admin_required(f):
+    """要求管理员权限的装饰器"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        eth_address = request.headers.get('X-Eth-Address') or \
+                     request.args.get('eth_address') or \
+                     session.get('admin_eth_address')
+                     
+        if not eth_address:
+            flash('请先连接钱包', 'error')
+            return redirect(url_for('main.index'))
+            
+        admin_info = get_admin_permissions(eth_address.lower())
+        if not admin_info:
+            flash('您没有管理员权限', 'error')
+            return redirect(url_for('main.index'))
+            
+        g.eth_address = eth_address.lower()
+        g.admin_info = admin_info
+        return f(*args, **kwargs)
+    return decorated_function
+
+def permission_required(permission):
+    """要求特定权限的装饰器"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            eth_address = request.headers.get('X-Eth-Address') or \
+                         request.args.get('eth_address') or \
+                         session.get('admin_eth_address')
+                         
+            if not eth_address:
+                flash('请先连接钱包', 'error')
+                return redirect(url_for('main.index'))
+                
+            admin_info = get_admin_permissions(eth_address.lower())
+            if not admin_info:
+                flash('您没有管理员权限', 'error')
+                return redirect(url_for('main.index'))
+                
+            if permission not in admin_info['permissions']:
+                flash(f'您没有{permission}权限', 'error')
+                return redirect(url_for('admin.index'))
+                
+            g.eth_address = eth_address.lower()
+            g.admin_info = admin_info
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator 

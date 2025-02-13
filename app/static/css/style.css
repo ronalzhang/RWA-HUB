@@ -1,1 +1,56 @@
- 
+.dropzone {
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.dropzone:hover {
+    border-color: #aaa;
+    background-color: #f8f9fa;
+}
+
+.dropzone.dragover {
+    border-color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.05);
+}
+
+.dropzone i {
+    font-size: 2rem;
+    color: #aaa;
+    margin-bottom: 1rem;
+}
+
+.upload-progress {
+    display: none;
+    margin-top: 1rem;
+}
+
+.upload-progress .progress {
+    height: 4px;
+    margin-top: 0.25rem;
+}
+
+.image-preview .card {
+    transition: transform 0.2s;
+}
+
+.image-preview .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+}
+
+.image-preview .card-img-top {
+    background-color: #f8f9fa;
+}
+
+.image-preview .btn-danger {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.image-preview .card:hover .btn-danger {
+    opacity: 1;
+} 

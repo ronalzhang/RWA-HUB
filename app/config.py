@@ -7,15 +7,14 @@ class Config:
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static/uploads')
 
     # 七牛云配置
-    QINIU_ACCESS_KEY = os.environ.get('QINIU_ACCESS_KEY', 'your-access-key')
-    QINIU_SECRET_KEY = os.environ.get('QINIU_SECRET_KEY', 'your-secret-key')
-    QINIU_BUCKET_NAME = os.environ.get('QINIU_BUCKET_NAME', 'rwa-hub')
-    QINIU_DOMAIN = os.environ.get('QINIU_DOMAIN', 'sqbw3uvy8.sabkt.gdipper.com')
+    QINIU_ACCESS_KEY = 'SGMhwmXf7wRlmsgXU4xfqzDH_DxczWhhoDEjyYE9'
+    QINIU_SECRET_KEY = '6JynlQeJEDWt4VIjZV8sDdSAFZMrZ3GFE0fIz07-'
+    QINIU_BUCKET_NAME = 'rwa-hub'
+    QINIU_DOMAIN = 'sqbw3uvy8.sabkt.gdipper.com'
     
     # 管理员配置
     ADMIN_CONFIG = {
-        'super_admin': {
-            'address': '0x6394993426DBA3b654eF0052698Fe9E0B6A98870',
+        '0x6394993426DBA3b654eF0052698Fe9E0B6A98870': {
             'role': 'super_admin',
             'name': '超级管理员',
             'level': 1,
@@ -24,8 +23,8 @@ class Config:
         '0x124e5B8A4E6c68eC66e181E0B54817b12D879c57': {
             'role': '副管理员',
             'name': '副管理员',
-            'permissions': ['审核', '编辑', '查看统计'],
-            'level': 2
+            'level': 2,
+            'permissions': ['审核', '编辑', '查看统计']
         }
     }
     

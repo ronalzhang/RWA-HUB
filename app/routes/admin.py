@@ -1,4 +1,4 @@
-from flask import render_template, jsonify, request, g, current_app, redirect, url_for
+from flask import render_template, jsonify, request, g, current_app, redirect, url_for, flash, session
 from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.trade import Trade
 from app import db
@@ -18,16 +18,22 @@ def get_admin_permissions(eth_address):
         
     # 转换为小写进行比较
     eth_address = eth_address.lower()
-    super_admin = current_app.config['ADMIN_CONFIG']['super_admin']
-    super_admin_address = super_admin['address'].lower()
+    admin_config = current_app.config['ADMIN_CONFIG']
+    admin_info = None
     
-    if eth_address == super_admin_address:
+    # 检查地址是否在管理员配置中
+    for admin_address, info in admin_config.items():
+        if eth_address == admin_address.lower():
+            admin_info = info
+            break
+    
+    if admin_info:
         return {
             'is_admin': True,
-            'role': super_admin['role'],
-            'name': super_admin['name'],
-            'level': super_admin['level'],
-            'permissions': super_admin['permissions']
+            'role': admin_info['role'],
+            'name': admin_info['name'],
+            'level': admin_info['level'],
+            'permissions': admin_info['permissions']
         }
     
     return None
@@ -121,7 +127,31 @@ def admin_page_required(f):
 @admin_page_required
 def index():
     """后台管理首页"""
-    return render_template('admin/dashboard.html')
+    try:
+        eth_address = request.args.get('eth_address') or \
+                     request.headers.get('X-Eth-Address') or \
+                     request.cookies.get('eth_address')
+                     
+        if not eth_address:
+            current_app.logger.warning('访问后台管理页面失败：未提供钱包地址')
+            flash('请先连接钱包', 'error')
+            return redirect(url_for('main.index'))
+            
+        admin_info = get_admin_permissions(eth_address)
+        if not admin_info:
+            current_app.logger.warning(f'访问后台管理页面失败：非管理员地址 {eth_address}')
+            flash('您没有管理员权限', 'error')
+            return redirect(url_for('main.index'))
+            
+        # 将管理员信息保存到session中
+        session['admin_eth_address'] = eth_address
+        session['admin_info'] = admin_info
+            
+        return render_template('admin/dashboard.html', admin_info=admin_info)
+    except Exception as e:
+        current_app.logger.error(f'访问后台管理页面失败：{str(e)}')
+        flash('系统错误，请稍后重试', 'error')
+        return redirect(url_for('main.index'))
 
 @admin_bp.route('/dashboard')
 @admin_page_required
@@ -548,25 +578,37 @@ def check_asset_owner(asset_id):
 @admin_api_bp.route('/check')
 def check_admin():
     """检查管理员权限"""
-    eth_address = request.headers.get('X-Eth-Address')
-    current_app.logger.info(f'检查管理员权限 - 地址: {eth_address}')
-    
-    if not eth_address:
-        current_app.logger.warning('未提供钱包地址')
-        return jsonify({'is_admin': False}), 200
+    try:
+        eth_address = request.headers.get('X-Eth-Address') or \
+                     request.args.get('eth_address') or \
+                     session.get('admin_eth_address')
+                     
+        current_app.logger.info(f'检查管理员权限 - 地址: {eth_address}')
         
-    # 转换为小写进行比较
-    eth_address = eth_address.lower()
-    current_app.logger.info(f'检查管理员权限 - 地址(小写): {eth_address}')
-    
-    admin_data = get_admin_permissions(eth_address)
-    is_admin = bool(admin_data)
-    
-    if not is_admin:
-        current_app.logger.warning('未找到管理员权限')
-    
-    current_app.logger.info(f'检查管理员权限 - 结果: {is_admin}')
-    return jsonify({'is_admin': is_admin, **(admin_data or {})}), 200
+        if not eth_address:
+            current_app.logger.warning('未提供钱包地址')
+            return jsonify({'is_admin': False}), 200
+            
+        # 转换为小写进行比较
+        eth_address = eth_address.lower()
+        current_app.logger.info(f'检查管理员权限 - 地址(小写): {eth_address}')
+        
+        admin_data = get_admin_permissions(eth_address)
+        is_admin = bool(admin_data)
+        
+        if not is_admin:
+            current_app.logger.warning('未找到管理员权限')
+            session.pop('admin_eth_address', None)
+            session.pop('admin_info', None)
+        else:
+            session['admin_eth_address'] = eth_address
+            session['admin_info'] = admin_data
+        
+        current_app.logger.info(f'检查管理员权限 - 结果: {is_admin}')
+        return jsonify({'is_admin': is_admin, **(admin_data or {})}), 200
+    except Exception as e:
+        current_app.logger.error(f'检查管理员权限失败: {str(e)}')
+        return jsonify({'is_admin': False, 'error': str(e)}), 500
 
 @admin_api_bp.route('/admins')
 @admin_required

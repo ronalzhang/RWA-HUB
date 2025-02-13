@@ -1,19 +1,18 @@
 from flask import g, current_app
 import os
 from werkzeug.utils import secure_filename
-from .decorators import token_required, eth_address_required 
+from .decorators import token_required, eth_address_required, admin_required, permission_required
+from .admin import is_admin, get_admin_permissions, has_permission
 
-def is_admin(eth_address=None):
-    """检查指定地址或当前用户是否是管理员"""
-    admin_addresses = [
-        '0x6394993426DBA3b654eF0052698Fe9E0B6A98870',
-        '0x124e5B8A4E6c68eC66e181E0B54817b12D879c57',
-        '0x7EF71020630Ee5141F772c8a054d43A88A6919c7'
-    ]
-    
-    if eth_address:
-        return eth_address.lower() in [addr.lower() for addr in admin_addresses]
-    return hasattr(g, 'eth_address') and g.eth_address.lower() in [addr.lower() for addr in admin_addresses] 
+__all__ = [
+    'token_required',
+    'eth_address_required',
+    'admin_required',
+    'permission_required',
+    'is_admin',
+    'get_admin_permissions',
+    'has_permission'
+]
 
 def save_files(files, asset_type, asset_id):
     """保存上传的文件到七牛云

@@ -64,11 +64,11 @@
                 <!-- 钱包连接 -->
                 <div class="d-flex align-items-center">
                     <div class="dropdown">
-                        <button id="walletBtn" class="btn btn-outline-primary wallet-btn" type="button" onclick="handleWalletClick()">
+                        <button id="walletBtn" class="btn btn-outline-primary wallet-btn" type="button">
                             <i class="fas fa-wallet me-2"></i>
                             <span id="walletBtnText">{{ _('Connect Wallet') }}</span>
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" id="walletMenu">
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" id="walletMenu" style="display: none;">
                             <li><a class="dropdown-item" href="#" id="switchWallet">
                                 <i class="fas fa-exchange-alt me-2"></i>{{ _('Switch Wallet') }}
                             </a></li>
@@ -132,197 +132,64 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     
     <!-- 钱包连接脚本 -->
+    <script src="{{ url_for('static', filename='js/wallet.js') }}"></script>
     <script>
-    // 钱包连接状态管理
-    let currentAccount = null;
-    let walletEventListeners = [];
-
-    // 检查是否已经连接
-    async function checkConnection() {
-        if (typeof window.ethereum !== 'undefined') {
-            try {
-                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-                const storedAddress = localStorage.getItem('userAddress');
-                
-                // 只有当前账户存在且与存储的地址匹配时才连接
-                if (accounts.length > 0 && storedAddress && 
-                    accounts[0].toLowerCase() === storedAddress.toLowerCase()) {
-                    handleAccountsChanged(accounts);
-                    setupWalletEventListeners(); // 重新设置事件监听器
-                } else {
-                    clearWalletState();
-                }
-            } catch (error) {
-                console.error('检查钱包连接失败:', error);
-                clearWalletState();
-            }
-        }
-    }
-
-    // 清除钱包状态
-    function clearWalletState() {
-        currentAccount = null;
-        localStorage.removeItem('walletConnected');
-        localStorage.removeItem('userAddress');
-        updateWalletUI(null);
-        
-        // 移除所有事件监听器
-        if (window.ethereum && walletEventListeners.length > 0) {
-            walletEventListeners.forEach(listener => {
-                window.ethereum.removeListener(listener.event, listener.handler);
-            });
-            walletEventListeners = [];
-        }
-    }
-
-    // 处理钱包按钮点击
-    async function handleWalletClick() {
-        if (!currentAccount) {
-            await connectWallet();
-        }
-    }
-
-    // 连接钱包
-    async function connectWallet() {
-        if (typeof window.ethereum !== 'undefined') {
-            try {
-                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                handleAccountsChanged(accounts);
-                setupWalletEventListeners();
-            } catch (error) {
-                console.error('连接钱包失败:', error);
-            }
-        } else {
-            alert('请安装MetaMask钱包');
-        }
-    }
-
-    // 设置钱包事件监听器
-    function setupWalletEventListeners() {
-        if (typeof window.ethereum !== 'undefined') {
-            // 先移除现有的监听器
-            if (walletEventListeners.length > 0) {
-                walletEventListeners.forEach(listener => {
-                    window.ethereum.removeListener(listener.event, listener.handler);
-                });
-                walletEventListeners = [];
-            }
-            
-            // 添加新的监听器
-            const listeners = [
-                { event: 'accountsChanged', handler: handleAccountsChanged },
-                { event: 'chainChanged', handler: () => window.location.reload() },
-                { event: 'disconnect', handler: handleDisconnect }
-            ];
-            
-            listeners.forEach(listener => {
-                window.ethereum.on(listener.event, listener.handler);
-                walletEventListeners.push(listener);
-            });
-        }
-    }
-
-    // 断开钱包
-    async function handleDisconnect() {
-        try {
-            clearWalletState();
-            
-            // 关闭下拉菜单
-            const dropdownInstance = bootstrap.Dropdown.getInstance(document.getElementById('walletBtn'));
-            if (dropdownInstance) {
-                dropdownInstance.hide();
-            }
-            
-            // 刷新页面
-            window.location.reload();
-        } catch (error) {
-            console.error('断开钱包失败:', error);
-        }
-    }
-
-    // 处理账户变更
-    function handleAccountsChanged(accounts) {
-        if (accounts.length === 0) {
-            clearWalletState();
-        } else if (accounts[0] !== currentAccount) {
-            currentAccount = accounts[0];
-            localStorage.setItem('walletConnected', 'true');
-            localStorage.setItem('userAddress', currentAccount);
-            updateWalletUI(currentAccount);
-        }
-    }
-
-    // 更新钱包UI
-    function updateWalletUI(account) {
+    document.addEventListener('DOMContentLoaded', async function() {
+        // 移除原有的事件监听
         const walletBtn = document.getElementById('walletBtn');
-        const walletBtnText = document.getElementById('walletBtnText');
         const walletMenu = document.getElementById('walletMenu');
-        const adminEntry = document.getElementById('adminEntry');
         
-        if (account) {
-            // 显示钱包地址
-            walletBtnText.textContent = `${account.substring(0, 6)}...${account.substring(38)}`;
-            walletBtn.classList.remove('btn-outline-primary');
-            walletBtn.classList.add('btn-primary');
-            
-            // 启用下拉菜单
-            walletBtn.setAttribute('data-bs-toggle', 'dropdown');
-            walletBtn.setAttribute('aria-expanded', 'false');
-            
-            // 检查是否是管理员
-            checkIsAdmin(account);
-        } else {
-            // 重置为连接钱包状态
-            walletBtnText.textContent = '连接钱包';
-            walletBtn.classList.add('btn-outline-primary');
-            walletBtn.classList.remove('btn-primary');
-            
-            // 禁用下拉菜单
-            walletBtn.removeAttribute('data-bs-toggle');
-            walletBtn.removeAttribute('aria-expanded');
-            
-            // 隐藏管理员入口
-            adminEntry.classList.add('d-none');
-        }
-    }
-
-    // 检查是否是管理员
-    async function checkIsAdmin(address) {
-        try {
-            const response = await fetch(`/api/check_admin`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ address: address })
-            });
-            if (response.ok) {
-                const data = await response.json();
-                const adminEntry = document.getElementById('adminEntry');
-                if (data.is_admin) {
-                    adminEntry.classList.remove('d-none');
-                    const adminLink = document.getElementById('adminLink');
-                    adminLink.href = '/admin';
-                } else {
-                    adminEntry.classList.add('d-none');
+        if (walletBtn && walletMenu) {
+            // 点击按钮切换菜单显示状态
+            walletBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (!window.ethereum) {
+                    showError('请安装 MetaMask 钱包');
+                    return;
                 }
-            }
-        } catch (error) {
-            console.error('检查管理员权限失败:', error);
+                
+                if (!window.walletState.isConnected()) {
+                    connectWallet();
+                } else {
+                    const isVisible = walletMenu.style.display === 'block';
+                    walletMenu.style.display = isVisible ? 'none' : 'block';
+                }
+            });
+            
+            // 点击其他地方关闭菜单
+            document.addEventListener('click', function(e) {
+                if (!walletBtn.contains(e.target) && !walletMenu.contains(e.target)) {
+                    walletMenu.style.display = 'none';
+                }
+            });
         }
-    }
+    });
 
     // 语言切换
     function changeLanguage(lang) {
         document.cookie = `language=${lang};path=/;max-age=31536000`;
         window.location.reload();
     }
-
-    // 页面加载完成后检查钱包连接状态
-    document.addEventListener('DOMContentLoaded', checkConnection);
     </script>
     
     <!-- 页面特定脚本 -->
     {% block scripts %}{% endblock %}
+
+    <!-- 错误提示模态框 -->
+    <div class="modal fade" id="errorModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>错误
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="errorMessage"></div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
