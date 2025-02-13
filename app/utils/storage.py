@@ -41,27 +41,40 @@ class QiniuStorage:
         try:
             logger.info(f"开始上传文件: {filename}")
             
+            # 检查七牛云配置
+            if not all([self.access_key, self.secret_key, self.bucket_name, self.domain]):
+                logger.error("七牛云配置不完整")
+                raise ValueError("存储服务配置不完整")
+            
             # 生成上传凭证
-            token = self.auth.upload_token(self.bucket_name)
-            logger.info("成功生成上传凭证")
+            try:
+                token = self.auth.upload_token(self.bucket_name)
+                logger.info("成功生成上传凭证")
+            except Exception as e:
+                logger.error(f"生成上传凭证失败: {str(e)}")
+                raise ValueError("生成上传凭证失败")
             
             # 上传文件
-            ret, info = put_data(token, filename, file_data)
-            
-            logger.info(f"上传响应: status={info.status_code}, ret={ret}")
-            
-            if info.status_code == 200:
-                # 使用代理URL
-                file_url = f"/assets/proxy/image/{ret['key']}"
-                logger.info(f"文件上传成功: {file_url}")
-                return file_url
-            else:
-                logger.error(f"文件上传失败: status={info.status_code}, error={info.error}")
-                return None
+            try:
+                ret, info = put_data(token, filename, file_data)
+                logger.info(f"上传响应: status={info.status_code}, ret={ret}")
                 
+                if info.status_code == 200 and ret:
+                    file_url = f"/assets/proxy/image/{ret['key']}"
+                    logger.info(f"文件上传成功: {file_url}")
+                    return file_url
+                else:
+                    error_msg = f"文件上传失败: status={info.status_code}, error={info.error}"
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
+                
+            except Exception as e:
+                logger.error(f"上传文件时发生错误: {str(e)}")
+                raise ValueError(f"上传文件失败: {str(e)}")
+            
         except Exception as e:
-            logger.error(f"文件上传出错: {str(e)}")
-            return None
+            logger.error(f"文件上传处理失败: {str(e)}")
+            raise ValueError(str(e))
     
     def delete(self, file_url):
         """从七牛云删除文件"""
