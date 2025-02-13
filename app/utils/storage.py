@@ -34,9 +34,9 @@ class QiniuStorage:
             ret, info = qiniu.put_data(token, key, file_data)
             
             if info.status_code == 200:
-                # 确保域名使用 HTTP 协议
-                domain = self.domain
-                if not domain.startswith(('http://', 'https://')):
+                # 强制使用 HTTP 协议
+                domain = self.domain.replace('https://', 'http://')
+                if not domain.startswith('http://'):
                     domain = f'http://{domain}'
                     
                 # 生成完整的URL
