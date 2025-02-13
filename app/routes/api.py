@@ -697,6 +697,13 @@ def upload():
         ext = file.filename.rsplit(".", 1)[1].lower() if '.' in file.filename else ''
         filename = f'{asset_type}/{asset_id}/{file_type}/{int(time.time())}_{secure_filename(file.filename)}'
             
+        # 检查七牛云存储是否初始化
+        if storage is None:
+            current_app.logger.error('七牛云存储未初始化，尝试重新初始化...')
+            from app.utils.storage import init_storage
+            if not init_storage(current_app):
+                raise Exception("七牛云存储初始化失败")
+            
         # 上传文件到存储服务
         result = storage.upload(file_data, filename)
         if not result:
