@@ -30,7 +30,7 @@
     </style>
     
     <!-- Content Security Policy -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' http: https: data: blob: filesystem:; img-src 'self' data: http: https: *;">
+    <meta http-equiv="Content-Security-Policy" content="img-src * 'self' data: http: https:">
     
     <!-- AOS Animation Script -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.1/aos.js"></script>
@@ -138,11 +138,13 @@
     <script src="{{ url_for('static', filename='js/wallet.js') }}"></script>
     <script>
     document.addEventListener('DOMContentLoaded', async function() {
-        // 移除原有的事件监听
         const walletBtn = document.getElementById('walletBtn');
         const walletMenu = document.getElementById('walletMenu');
         
         if (walletBtn && walletMenu) {
+            // 确保菜单默认隐藏
+            walletMenu.style.display = 'none';
+            
             // 点击按钮切换菜单显示状态
             walletBtn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -163,7 +165,14 @@
             
             // 点击其他地方关闭菜单
             document.addEventListener('click', function(e) {
-                if (!walletBtn.contains(e.target) && !walletMenu.contains(e.target)) {
+                if (walletMenu.style.display === 'block' && !walletBtn.contains(e.target) && !walletMenu.contains(e.target)) {
+                    walletMenu.style.display = 'none';
+                }
+            });
+            
+            // 点击菜单项时关闭菜单
+            walletMenu.addEventListener('click', function(e) {
+                if (e.target.closest('.dropdown-item')) {
                     walletMenu.style.display = 'none';
                 }
             });
