@@ -164,19 +164,33 @@ def create_asset():
         # 获取表单数据
         data = request.form
         
+        # 添加安全的数值转换函数
+        def safe_float(value, default=0.0):
+            try:
+                return float(value) if value and value.strip() else default
+            except (ValueError, TypeError):
+                return default
+                
+        def safe_int(value, default=0):
+            try:
+                return int(value) if value and value.strip() else default
+            except (ValueError, TypeError):
+                return default
+        
         # 创建资产记录
         asset = Asset(
             name=data.get('name'),
             description=data.get('description'),
             asset_type=data.get('type'),
             location=data.get('location'),
-            area=float(data.get('area', 0)),
-            total_value=float(data.get('totalValue', 0)),
+            area=safe_float(data.get('area')),
+            total_value=safe_float(data.get('totalValue')),
             token_symbol=data.get('tokenSymbol'),
-            token_price=float(data.get('tokenPrice', 0)),
-            token_supply=int(data.get('tokenCount', 0)),
-            annual_revenue=float(data.get('annualRevenue', 0)),
-            status=AssetStatus.DRAFT
+            token_price=safe_float(data.get('tokenPrice')),
+            token_supply=safe_int(data.get('tokenCount')),
+            annual_revenue=safe_float(data.get('annualRevenue')),
+            status=AssetStatus.DRAFT,
+            owner_address=g.eth_address
         )
         
         db.session.add(asset)
