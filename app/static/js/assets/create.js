@@ -467,8 +467,13 @@ async function handleFiles(files, type) {
 
                 const result = await response.json();
                 if (result.url) {
+                    // 确保 URL 使用 HTTP 协议
+                    let url = result.url;
+                    if (url.startsWith('https://')) {
+                        url = 'http://' + url.substring(8);
+                    }
                     uploadedUrls.push({
-                        url: result.url,
+                        url: url,
                         name: result.name || file.name
                     });
                     successCount++;
