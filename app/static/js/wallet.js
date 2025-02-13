@@ -476,4 +476,18 @@ document.addEventListener('DOMContentLoaded', function() {
     initWalletUI();
     setupWalletListeners();
     checkInitialWalletState();
-}); 
+    
+    // 语言切换功能
+    const languageDropdown = document.getElementById('languageDropdown');
+    if (languageDropdown) {
+        const currentLanguage = document.cookie.split(';').find(c => c.trim().startsWith('language='));
+        const lang = currentLanguage ? currentLanguage.split('=')[1].trim() : 'en';
+        languageDropdown.textContent = lang === 'en' ? 'English' : '繁體中文';
+    }
+});
+
+// 语言切换函数
+window.changeLanguage = function(lang) {
+    document.cookie = `language=${lang};path=/;max-age=31536000`;
+    window.location.reload();
+} 
