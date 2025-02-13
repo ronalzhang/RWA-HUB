@@ -10,10 +10,10 @@ logger = logging.getLogger(__name__)
 
 class QiniuStorage:
     def __init__(self):
-        self.access_key = os.getenv('QINIU_ACCESS_KEY')
-        self.secret_key = os.getenv('QINIU_SECRET_KEY')
-        self.bucket_name = os.getenv('QINIU_BUCKET_NAME')
-        self.domain = os.getenv('QINIU_DOMAIN')
+        self.access_key = current_app.config.get('QINIU_ACCESS_KEY')
+        self.secret_key = current_app.config.get('QINIU_SECRET_KEY')
+        self.bucket_name = current_app.config.get('QINIU_BUCKET_NAME')
+        self.domain = current_app.config.get('QINIU_DOMAIN')
         
         if not all([self.access_key, self.secret_key, self.bucket_name, self.domain]):
             raise ValueError("七牛云配置不完整")
@@ -35,9 +35,11 @@ class QiniuStorage:
             
             if info.status_code == 200:
                 # 强制使用 HTTP 协议
-                domain = self.domain.replace('https://', 'http://')
-                if not domain.startswith('http://'):
-                    domain = f'http://{domain}'
+                domain = self.domain
+                if domain.startswith('https://'):
+                    domain = 'http://' + domain[8:]
+                elif not domain.startswith('http://'):
+                    domain = 'http://' + domain
                     
                 # 生成完整的URL
                 url = f"{domain}/{ret['key']}"
