@@ -57,8 +57,16 @@ def create_app(config_name='development'):
             "allow_headers": ["Content-Type", "X-Eth-Address", "Authorization"]
         }
     })
+    
+    # 初始化 Babel
     babel.init_app(app)
-    babel.localeselector(get_locale)
+    app.config['BABEL_DEFAULT_LOCALE'] = 'en'
+    app.config['BABEL_DEFAULT_TIMEZONE'] = 'UTC'
+
+    def get_locale():
+        return request.cookies.get('language', 'en')
+    
+    babel.init_app(app, locale_selector=get_locale)
     
     # 设置日志
     if not os.path.exists('logs'):

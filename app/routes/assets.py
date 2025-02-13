@@ -169,10 +169,30 @@ def edit_asset_page(asset_id):
         flash('系统错误，请稍后重试', 'error')
         return redirect(url_for('assets.list_assets_page'))
 
-# @assets_bp.route("/static/uploads/<path:filename>")
-# def serve_uploaded_file(filename):
-#     """提供上传文件的访问（已弃用，改用七牛云）"""
-#     pass  # 注释掉整个函数体
+@assets_bp.route('/proxy/<string:file_type>/<path:file_path>')
+def proxy_file(file_type, file_path):
+    """代理七牛云文件请求"""
+    try:
+        # 构建七牛云的完整URL
+        qiniu_url = f"http://{current_app.config['QINIU_DOMAIN']}/{file_path}"
+        current_app.logger.info(f"代理{file_type}请求: {qiniu_url}")
+        
+        # 请求七牛云文件
+        response = requests.get(qiniu_url, stream=True)
+        
+        if response.status_code == 200:
+            # 返回文件内容
+            return Response(
+                response.raw.read(),
+                content_type=response.headers['content-type']
+            )
+        else:
+            current_app.logger.error(f"获取文件失败: {response.status_code}")
+            abort(404)
+            
+    except Exception as e:
+        current_app.logger.error(f"代理文件请求失败: {str(e)}")
+        abort(500)
 
 @assets_bp.route('/<int:asset_id>/dividend')
 def dividend_page(asset_id):
