@@ -41,7 +41,7 @@ class QiniuStorage:
                 elif not domain.startswith('http://'):
                     domain = 'http://' + domain
                     
-                # 生成完整的URL
+                # 生成完整的URL，保留文件路径
                 url = f"{domain}/{ret['key']}"
                 
                 # 确保URL使用HTTP协议
@@ -51,7 +51,7 @@ class QiniuStorage:
                 return {
                     'url': url,
                     'key': ret['key'],
-                    'name': key
+                    'name': key.split('/')[-1]  # 只返回文件名部分
                 }
             else:
                 raise ValueError(f"上传失败: {info.error}")
