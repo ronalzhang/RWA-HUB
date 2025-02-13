@@ -183,7 +183,7 @@ def create_asset():
         asset = Asset(
             name=data.get('name'),
             description=data.get('description'),
-            asset_type=data.get('type'),
+            asset_type=int(data.get('type')),  # 确保转换为整数
             location=data.get('location'),
             area=safe_float(data.get('area')),
             total_value=safe_float(data.get('totalValue')),
@@ -191,8 +191,9 @@ def create_asset():
             token_price=safe_float(data.get('tokenPrice')),
             token_supply=safe_int(data.get('tokenCount')),
             annual_revenue=safe_float(data.get('annualRevenue')),
-            status=AssetStatus.PENDING.value,  # 直接设置为待审核状态
-            owner_address=g.eth_address
+            status=AssetStatus.PENDING.value,
+            owner_address=g.eth_address,
+            creator_address=g.eth_address  # 添加创建者地址
         )
         
         db.session.add(asset)
