@@ -24,16 +24,17 @@
     <!-- 图片轮播 -->
     <div class="row mb-4">
         <div class="col-md-8">
-            {% if asset.images %}
+            {% set asset_dict = asset.to_dict() %}
+            {% if asset_dict.images %}
             <div id="assetCarousel" class="carousel slide" data-bs-ride="carousel">
                 <div class="carousel-inner">
-                    {% for image in asset.images %}
+                    {% for image in asset_dict.images %}
                     <div class="carousel-item {% if loop.first %}active{% endif %}">
                         <img src="{{ image }}" class="d-block w-100" alt="Asset image {{ loop.index }}" style="max-height: 500px; object-fit: contain;">
                     </div>
                     {% endfor %}
                 </div>
-                {% if asset.images|length > 1 %}
+                {% if asset_dict.images|length > 1 %}
                 <button class="carousel-control-prev" type="button" data-bs-target="#assetCarousel" data-bs-slide="prev">
                     <span class="carousel-control-prev-icon" aria-hidden="true"></span>
                     <span class="visually-hidden">Previous</span>
@@ -45,9 +46,9 @@
                 {% endif %}
             </div>
             <!-- 缩略图导航 -->
-            {% if asset.images|length > 1 %}
+            {% if asset_dict.images|length > 1 %}
             <div class="d-flex gap-2 mt-2 overflow-auto">
-                {% for image in asset.images %}
+                {% for image in asset_dict.images %}
                 <img src="{{ image }}" 
                      class="img-thumbnail" 
                      alt="缩略图" 
