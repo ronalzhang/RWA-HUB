@@ -3,17 +3,11 @@
 {% block title %}{{ asset.name }} - RWA-HUB{% endblock %}
 
 {% block head %}
+{{ super() }}
 <meta http-equiv="Content-Security-Policy" content="img-src * 'self' data: http: https:">
 {% endblock %}
 
 {% block content %}
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body>
 <div class="container mt-4">
     <!-- 返回按钮 -->
     <a href="{{ url_for('assets.list_assets_page') }}" class="btn btn-link text-muted mb-3">
@@ -414,6 +408,4 @@ async function startDividend() {
     }
 }
 </script>
-</body>
-</html>
 {% endblock %}
