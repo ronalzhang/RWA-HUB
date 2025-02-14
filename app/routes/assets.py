@@ -205,33 +205,6 @@ def dividend_page(asset_id):
         flash('访问分红管理页面失败')
         return redirect(url_for('assets.list'))
 
-@assets_api_bp.route('/create', methods=['POST'])
-@eth_address_required
-def create_asset():
-    """创建资产API"""
-    try:
-        # 检查钱包连接状态
-        if not g.eth_address:
-            return jsonify({'error': '请先连接钱包'}), 401
-            
-        # 获取表单数据
-        data = request.form.to_dict()
-        data['owner_address'] = g.eth_address
-        
-        # 创建资产
-        asset = Asset(**data)
-        db.session.add(asset)
-        db.session.commit()
-        
-        return jsonify({
-            'message': '资产创建成功',
-            'asset_id': asset.id
-        }), 200
-    except Exception as e:
-        current_app.logger.error(f'创建资产失败: {str(e)}')
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
 def allowed_file(filename, allowed_extensions):
     """检查文件类型是否允许"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions

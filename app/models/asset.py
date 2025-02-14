@@ -32,8 +32,8 @@ class Asset(db.Model):
     token_supply = db.Column(db.Integer)
     token_address = db.Column(db.String(42), unique=True)
     annual_revenue = db.Column(db.Float, nullable=False)
-    images = db.Column(db.Text)
-    documents = db.Column(db.Text)
+    _images = db.Column('images', db.Text)
+    _documents = db.Column('documents', db.Text)
     status = db.Column(db.Integer, nullable=False, default=AssetStatus.PENDING.value)
     reject_reason = db.Column(db.String(200))
     owner_address = db.Column(db.String(42), nullable=False)
@@ -76,9 +76,10 @@ class Asset(db.Model):
 
     @validates('token_symbol')
     def validate_token_symbol(self, key, value):
+        # 修改验证规则，接受 RH-XXYYYY 格式
         pattern = r'^RH-(?:10|20)\d{4}$'
         if not re.match(pattern, value):
-            raise ValueError('Invalid token symbol format. Must be RH-XXYYYY where XX is 10 or 20 and YYYY is 4 digits')
+            raise ValueError('代币符号格式无效，必须为 RH-10YYYY 或 RH-20YYYY 格式，其中 YYYY 为4位数字')
         return value
 
     @validates('token_address')
@@ -130,15 +131,69 @@ class Asset(db.Model):
             raise ValueError('Annual revenue must be greater than 0')
         return value
 
+    @property
+    def images(self) -> list:
+        """获取图片列表"""
+        try:
+            if not self._images:
+                return []
+            if isinstance(self._images, list):
+                return self._images
+            if isinstance(self._images, str):
+                try:
+                    images = json.loads(self._images)
+                    return images if isinstance(images, list) else []
+                except json.JSONDecodeError:
+                    return [self._images] if self._images.strip() else []
+            return []
+        except Exception as e:
+            current_app.logger.error(f'解析图片路径失败: {str(e)}')
+            return []
+
+    @images.setter
+    def images(self, value):
+        """设置图片列表"""
+        try:
+            if value is None:
+                self._images = None
+            elif isinstance(value, str):
+                # 如果是JSON字符串，尝试解析
+                try:
+                    json.loads(value)
+                    self._images = value
+                except json.JSONDecodeError:
+                    # 如果不是有效的JSON，则假设是单个URL
+                    self._images = json.dumps([value])
+            elif isinstance(value, list):
+                self._images = json.dumps(value)
+            else:
+                self._images = None
+        except Exception as e:
+            current_app.logger.error(f'设置图片路径失败: {str(e)}')
+            self._images = None
+
+    @property
+    def documents(self) -> list:
+        """获取文档列表"""
+        try:
+            if isinstance(self._documents, str):
+                return json.loads(self._documents)
+            return self._documents or []
+        except Exception as e:
+            current_app.logger.error(f'解析文档路径失败: {str(e)}')
+            return []
+
+    @documents.setter
+    def documents(self, value):
+        """设置文档列表"""
+        if isinstance(value, str):
+            self._documents = value
+        else:
+            self._documents = json.dumps(value) if value else None
+
     def __init__(self, **kwargs):
         super(Asset, self).__init__(**kwargs)
         
-        # 处理图片和文档路径
-        if isinstance(self.images, list):
-            self.images = json.dumps(self.images)
-        if isinstance(self.documents, list):
-            self.documents = json.dumps(self.documents)
-            
         # 如果是不动产，根据面积计算代币发行量
         if self.asset_type == AssetType.REAL_ESTATE.value and self.area:
             self.token_supply = int(self.area * 10000)
@@ -163,25 +218,10 @@ class Asset(db.Model):
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None,
             'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else None,
             'deleted_at': self.deleted_at.strftime('%Y-%m-%d %H:%M:%S') if self.deleted_at else None,
-            'deleted_by': self.deleted_by
+            'deleted_by': self.deleted_by,
+            'images': self.images,
+            'documents': self.documents
         }
-
-        # 处理图片和文档路径
-        try:
-            images = json.loads(self.images) if self.images else []
-            # 确保所有图片URL使用HTTPS
-            data['images'] = [url.replace('http://', 'https://') if url.startswith('http://') else url for url in images]
-        except Exception as e:
-            current_app.logger.error(f'解析图片路径失败: {str(e)}')
-            data['images'] = []
-            
-        try:
-            documents = json.loads(self.documents) if self.documents else []
-            # 确保所有文档URL使用HTTPS
-            data['documents'] = [url.replace('http://', 'https://') if url.startswith('http://') else url for url in documents]
-        except Exception as e:
-            current_app.logger.error(f'解析文档路径失败: {str(e)}')
-            data['documents'] = []
 
         # 根据资产类型添加特定字段
         if self.asset_type == AssetType.REAL_ESTATE.value:
