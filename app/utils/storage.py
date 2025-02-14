@@ -39,19 +39,19 @@ class QiniuStorage:
             ret, info = put_data(token, key, file_data)
             
             if info.status_code == 200:
-                # 强制使用 HTTPS 协议
+                # 使用 HTTP 协议
                 domain = self.domain
-                if domain.startswith('http://'):
-                    domain = 'https://' + domain[7:]
-                elif not domain.startswith('https://'):
-                    domain = 'https://' + domain
+                if domain.startswith('https://'):
+                    domain = 'http://' + domain[8:]
+                elif not domain.startswith('http://'):
+                    domain = 'http://' + domain
                     
                 # 生成完整的URL，保留文件路径
                 url = f"{domain}/{ret['key']}"
                 
-                # 确保URL使用HTTPS协议
-                if url.startswith('http://'):
-                    url = 'https://' + url[7:]
+                # 确保URL使用HTTP协议
+                if url.startswith('https://'):
+                    url = 'http://' + url[8:]
                 
                 return {
                     'url': url,
@@ -59,7 +59,8 @@ class QiniuStorage:
                     'name': key.split('/')[-1]  # 只返回文件名部分
                 }
             else:
-                raise ValueError(f"上传失败: {info.error}")
+                logger.error(f"上传失败: {info.error}")
+                return None
                 
         except Exception as e:
             logger.error(f"文件上传失败: {str(e)}")

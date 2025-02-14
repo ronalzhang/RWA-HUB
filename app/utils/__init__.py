@@ -109,15 +109,11 @@ def save_files(files, asset_type, asset_id):
                 
                 # 上传到七牛云
                 current_app.logger.info(f'尝试上传文件 (第{retry_count + 1}次): {filename}')
-                url = storage.upload(file_data, filename)
+                result = storage.upload(file_data, filename)
                 
-                if url:
-                    file_urls.append({
-                        'url': url,
-                        'name': file.filename,
-                        'size': file_size
-                    })
-                    current_app.logger.info(f'文件上传成功: {url}')
+                if result and result.get('url'):
+                    file_urls.append(result['url'])
+                    current_app.logger.info(f'文件上传成功: {result["url"]}')
                     break
                 else:
                     raise Exception("七牛云返回空URL")
@@ -141,13 +137,8 @@ def save_files(files, asset_type, asset_id):
                 file.seek(0)
     
     # 返回结果
-    result = {
-        'urls': file_urls,
-        'failed_files': failed_files,
-        'total': len(files),
-        'success': len(file_urls),
-        'failed': len(failed_files)
-    }
+    if failed_files:
+        current_app.logger.warning(f'部分文件上传失败: {failed_files}')
     
-    current_app.logger.info(f'文件上传结果: {result}')
-    return result
+    current_app.logger.info(f'文件上传完成，成功: {len(file_urls)}，失败: {len(failed_files)}')
+    return file_urls

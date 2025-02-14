@@ -216,34 +216,18 @@ function initializeEventListeners() {
             if (!type) return;
             
             try {
-                let symbol;
-                let isSymbolValid = false;
-                let retryCount = 0;
-                const maxRetries = 10;
-
-                while (!isSymbolValid && retryCount < maxRetries) {
-                    symbol = await generateTokenSymbol(type, retryCount);
-                    
-                    const response = await fetch(`/api/check_token_symbol?symbol=${symbol}`);
-                    const data = await response.json();
-                    
-                    if (!data.exists) {
-                        isSymbolValid = true;
-                    } else {
-                        retryCount++;
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-                }
-
+                const symbol = await generateTokenSymbol(type);
+                const isSymbolValid = await checkTokenSymbol(symbol);
+                
                 if (!isSymbolValid) {
                     throw new Error('无法生成唯一的代币代码，请稍后重试');
                 }
-
+                
                 if (!tokenSymbolInput) {
                     console.error('代币代码输入框未找到');
                     throw new Error('代币代码输入框未找到');
                 }
-
+                
                 tokenSymbolInput.value = symbol;
                 
                 let successMsg = document.getElementById('tokenSymbolSuccess');
@@ -260,8 +244,13 @@ function initializeEventListeners() {
                 }
                 successMsg.innerHTML = '<i class="fas fa-check-circle me-1"></i>代币代码可用';
                 
+                // 切换资产类型字段
                 toggleAssetTypeFields(type);
+                
+                // 重置相关计算
                 resetCalculations();
+                
+                // 更新文档要求
                 updateDocumentRequirements(type);
             } catch (error) {
                 console.error('资产类型变更处理失败:', error);
@@ -352,35 +341,38 @@ function initializeEventListeners() {
 function toggleAssetTypeFields(type) {
     const realEstateFields = document.querySelectorAll('.asset-type-field.real-estate');
     const similarAssetsFields = document.querySelectorAll('.asset-type-field.similar-assets');
-    const tokenCountElement = document.getElementById('token_count');
-
+    
     if (type === CONFIG.ASSET_TYPE.REAL_ESTATE) {
         realEstateFields.forEach(el => el.classList.remove('hidden'));
         similarAssetsFields.forEach(el => el.classList.add('hidden'));
         
-        if (tokenCountElement) {
-            tokenCountElement.value = '';
-        }
+        // 清空类不动产字段
+        const tokenSupplyInput = document.getElementById('token_supply');
+        const totalValueSimilarInput = document.getElementById('total_value');
+        if (tokenSupplyInput) tokenSupplyInput.value = '';
+        if (totalValueSimilarInput) totalValueSimilarInput.value = '';
         
+        // 重新计算不动产代币数量
         calculateRealEstateTokens();
-    } else {
+    } else if (type === CONFIG.ASSET_TYPE.SIMILAR_ASSETS) {
         realEstateFields.forEach(el => el.classList.add('hidden'));
         similarAssetsFields.forEach(el => el.classList.remove('hidden'));
         
-        const areaElement = document.getElementById('area');
+        // 清空不动产字段
+        const areaInput = document.getElementById('area');
+        const totalValueInput = document.getElementById('total_value');
+        if (areaInput) areaInput.value = '';
+        if (totalValueInput) totalValueInput.value = '';
+        
+        // 重置计算结果
         const tokenCountDisplay = document.getElementById('token_count');
         const tokenPriceDisplay = document.getElementById('token_price');
-        
-        if (areaElement) {
-            areaElement.value = '';
-        }
-        if (tokenCountDisplay) {
-            tokenCountDisplay.textContent = '0';
-        }
-        if (tokenPriceDisplay) {
-            tokenPriceDisplay.textContent = '0.000000';
-        }
+        if (tokenCountDisplay) tokenCountDisplay.textContent = '0';
+        if (tokenPriceDisplay) tokenPriceDisplay.textContent = '0.000000';
     }
+    
+    // 更新文档要求显示
+    updateDocumentRequirements(type);
 }
 
 // 计算不动产代币数量
@@ -624,150 +616,69 @@ async function handleFiles(files, type) {
             return;
         }
 
-        const fileType = type || 'IMAGE';
-        const config = CONFIG[fileType];
-        if (!config) {
-            showError('无效的文件类型');
-            return;
-        }
-
-        // 显示进度条
-        const progressElement = fileType === 'IMAGE' ? imageUploadProgress : documentUploadProgress;
-        const progressBar = progressElement.querySelector('.progress-bar');
-        const progressStatus = fileType === 'IMAGE' ? imageUploadStatus : documentUploadStatus;
-        const progressPercent = fileType === 'IMAGE' ? imageUploadPercent : documentUploadPercent;
+        const fileType = type.toLowerCase();
         
+        // 显示进度条
+        const progressElement = fileType === 'image' ? imageUploadProgress : documentUploadProgress;
         progressElement.style.display = 'block';
-        progressBar.style.width = '0%';
-        progressStatus.textContent = '准备上传...';
-        progressPercent.textContent = '0';
-
-        const totalFiles = files.length;
-        let completedFiles = 0;
-        let totalSize = 0;
-        let uploadedSize = 0;
-
-        // 计算总大小
-        for (const file of files) {
-            totalSize += file.size;
+        
+        // 初始化全局数组（如果不存在）
+        if (fileType === 'image') {
+            if (!window.uploadedImages) window.uploadedImages = [];
+        } else {
+            if (!window.uploadedDocuments) window.uploadedDocuments = [];
         }
 
-        // 创建上传任务数组
-        const uploadTasks = Array.from(files).map(async (file, index) => {
-            if (!validateFile(file, fileType)) {
-                return null;
-            }
-
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
             const formData = new FormData();
             formData.append('file', file);
             formData.append('asset_type', document.getElementById('type').value);
-            formData.append('file_type', fileType.toLowerCase());
+            formData.append('file_type', fileType);
 
             try {
-                const xhr = new XMLHttpRequest();
-                await new Promise((resolve, reject) => {
-                    xhr.upload.onprogress = (e) => {
-                        if (e.lengthComputable) {
-                            // 更新当前文件的进度
-                            const currentFileProgress = (e.loaded / e.total) * 100;
-                            const overallProgress = ((uploadedSize + e.loaded) / totalSize) * 100;
-                            
-                            progressBar.style.width = `${Math.round(overallProgress)}%`;
-                            progressStatus.textContent = `正在上传第 ${index + 1}/${totalFiles} 个文件 (${Math.round(currentFileProgress)}%)`;
-                            progressPercent.textContent = Math.round(overallProgress);
-                        }
-                    };
-
-                    xhr.onload = () => {
-                        if (xhr.status === 200) {
-                            completedFiles++;
-                            uploadedSize += file.size;
-                            resolve(JSON.parse(xhr.responseText));
-                        } else {
-                            reject(new Error(`上传失败: ${xhr.statusText}`));
-                        }
-                    };
-
-                    xhr.onerror = () => reject(new Error('网络错误'));
-                    xhr.open('POST', '/api/upload');
-                    xhr.setRequestHeader('X-Eth-Address', window.ethereum?.selectedAddress || '');
-                    xhr.send(formData);
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    headers: {
+                        'X-Eth-Address': window.ethereum?.selectedAddress || ''
+                    },
+                    body: formData
                 });
 
-                const result = JSON.parse(xhr.responseText);
-                if (result.url) {
-                    let url = result.url;
-                    if (url.startsWith('https://')) {
-                        url = 'http://' + url.substring(8);
-                    }
-
-                    if (fileType === 'IMAGE') {
-                        uploadedImages.push({
-                            url: url,
-                            name: result.name || file.name
-                        });
-                        updateImagePreview();
-                    } else {
-                        uploadedDocuments.push({
-                            url: url,
-                            name: result.name || file.name
-                        });
-                        updateDocumentList();
-                    }
+                if (!response.ok) {
+                    throw new Error(`上传失败: ${response.statusText}`);
                 }
 
-                return result;
+                const result = await response.json();
+                console.log('上传结果:', result);  // 添加日志
+
+                if (result && result.url) {
+                    if (fileType === 'image') {
+                        window.uploadedImages.push(result.url);
+                        console.log('当前上传的图片:', window.uploadedImages);  // 添加日志
+                        updateImagePreview();
+                    } else {
+                        window.uploadedDocuments.push(result.url);
+                        updateDocumentList();
+                    }
+                } else {
+                    throw new Error('上传失败：服务器返回无效的URL');
+                }
             } catch (error) {
-                console.error(`上传文件 ${file.name} 失败:`, error);
+                console.error('上传文件失败:', error);
                 showError(`文件 ${file.name} 上传失败: ${error.message}`);
-                return null;
             }
-        });
+        }
 
-        // 并发上传文件
-        const results = await Promise.all(uploadTasks);
-        const successCount = results.filter(Boolean).length;
-
-        // 更新最终状态
-        progressStatus.textContent = `上传完成: ${successCount}/${totalFiles} 个文件成功`;
-        progressBar.style.width = '100%';
-        progressPercent.textContent = '100';
-
-        // 3秒后隐藏进度条
+        // 上传完成后隐藏进度条
         setTimeout(() => {
             progressElement.style.display = 'none';
-        }, 3000);
+        }, 1000);
 
     } catch (error) {
         console.error('处理文件失败:', error);
-        showError(error.message || '文件上传失败');
+        showError(error.message);
     }
-}
-
-// 文件验证
-function validateFile(file, type) {
-    const config = CONFIG[type.toUpperCase()];
-    if (!config) {
-        showToast(`无效的文件类型: ${type}`);
-        return false;
-    }
-
-    // 检查文件大小
-    if (file.size > config.MAX_SIZE) {
-        const maxSize = config.MAX_SIZE / (1024 * 1024);
-        showToast(`文件 ${file.name} 超过大小限制 (${maxSize}MB)`);
-        return false;
-    }
-
-    // 检查文件类型
-    const fileExt = file.name.split('.').pop().toLowerCase();
-    const allowedExts = config.ALLOWED_TYPES.map(type => type.split('/')[1]);
-    if (!allowedExts.includes(fileExt)) {
-        showToast(`文件 ${file.name} 类型不支持 (支持的格式: ${allowedExts.join(', ')})`);
-        return false;
-    }
-
-    return true;
 }
 
 // 更新图片预览
@@ -776,29 +687,23 @@ function updateImagePreview() {
     if (!container) return;
 
     container.innerHTML = '';
+    console.log('更新图片预览，当前图片:', window.uploadedImages);  // 添加日志
     
-    if (!uploadedImages || uploadedImages.length === 0) {
+    if (!window.uploadedImages || window.uploadedImages.length === 0) {
         container.innerHTML = '<div class="text-center text-muted">暂无图片</div>';
         return;
     }
 
-    uploadedImages.forEach((image, index) => {
-        // 确保使用 HTTP 协议
-        let imageUrl = image.url;
-        if (imageUrl.startsWith('https://')) {
-            imageUrl = 'http://' + imageUrl.substring(8);
-        }
-        
+    window.uploadedImages.forEach((imageUrl, index) => {
         const div = document.createElement('div');
         div.className = 'col-md-4 mb-3';
         div.innerHTML = `
             <div class="card h-100">
                 <img src="${imageUrl}" 
                      class="card-img-top" 
-                     alt="${image.name}"
+                     alt="上传的图片"
                      style="height: 200px; object-fit: cover;">
                 <div class="card-body">
-                    <p class="card-text">${image.name}</p>
                     <button class="btn btn-sm btn-danger" 
                             onclick="removeImage(${index})">
                         删除
@@ -817,18 +722,18 @@ function updateDocumentList() {
 
     container.innerHTML = '';
     
-    if (!uploadedDocuments || uploadedDocuments.length === 0) {
+    if (!window.uploadedDocuments || window.uploadedDocuments.length === 0) {
         container.innerHTML = '<div class="text-center text-muted">暂无文档</div>';
         return;
     }
 
-    uploadedDocuments.forEach((doc, index) => {
+    window.uploadedDocuments.forEach((docUrl, index) => {
         const div = document.createElement('div');
         div.className = 'mb-2 p-2 border rounded';
         div.innerHTML = `
             <div class="d-flex align-items-center">
                 <i class="fas fa-file me-2"></i>
-                <span class="flex-grow-1">${doc.name}</span>
+                <span class="flex-grow-1">${docUrl.split('/').pop()}</span>
                 <button class="btn btn-sm btn-danger" 
                         onclick="removeDocument(${index})">
                     删除
@@ -841,16 +746,18 @@ function updateDocumentList() {
 
 function removeImage(index) {
     console.log('移除图片:', index);
-    if (index >= 0 && index < uploadedImages.length) {
-        uploadedImages.splice(index, 1);
-        console.log('移除后的图片数组:', uploadedImages);
+    if (index >= 0 && index < window.uploadedImages.length) {
+        window.uploadedImages.splice(index, 1);
+        console.log('移除后的图片数组:', window.uploadedImages);
         updateImagePreview();
     }
 }
 
 function removeDocument(index) {
-    uploadedDocuments.splice(index, 1);
-    updateDocumentList();
+    if (index >= 0 && index < window.uploadedDocuments.length) {
+        window.uploadedDocuments.splice(index, 1);
+        updateDocumentList();
+    }
 }
 
 function showError(message) {
@@ -961,80 +868,73 @@ async function submitForm() {
             return;
         }
 
-        // 检查钱包地址
-        if (!window.ethereum?.selectedAddress) {
-            throw new Error('请先连接钱包');
+        const formData = new FormData();
+        
+        // 添加基本字段
+        formData.append('name', document.getElementById('name').value);
+        formData.append('type', document.getElementById('type').value);
+        formData.append('location', document.getElementById('location').value);
+        formData.append('description', document.getElementById('description').value);
+        formData.append('token_symbol', document.getElementById('tokensymbol').value);
+        
+        // 根据资产类型添加特定字段
+        const assetType = document.getElementById('type').value;
+        if (assetType === '10') {  // 不动产
+            formData.append('area', document.getElementById('area').value);
+            formData.append('total_value', document.getElementById('total_value').value);
+            formData.append('annual_revenue', document.getElementById('annual_revenue').value);
+            formData.append('token_supply', document.getElementById('token_count').textContent.replace(/,/g, ''));
+            formData.append('token_price', document.getElementById('token_price').textContent);
+        } else {  // 类不动产
+            formData.append('token_supply', document.getElementById('token_supply').value);
+            formData.append('total_value', document.getElementById('total_value').value);
+            formData.append('annual_revenue', document.getElementById('annual_revenue').value);
+            formData.append('token_price', document.getElementById('calculatedTokenPriceSimilar').textContent);
         }
 
-        const formData = new FormData(document.getElementById('assetForm'));
-        const type = formData.get('type');
-        
-        // 确保代币符号字段名称正确
-        const tokenSymbol = formData.get('tokensymbol');
-        formData.delete('tokensymbol');
-        formData.append('token_symbol', tokenSymbol);
-        
-        // 显示加载状态
-        const submitBtn = document.querySelector('button[type="submit"]');
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>提交中...';
+        // 添加图片URL
+        console.log('提交前的图片列表:', window.uploadedImages);  // 添加日志
+        if (window.uploadedImages && window.uploadedImages.length > 0) {
+            window.uploadedImages.forEach(imageUrl => {
+                formData.append('images[]', imageUrl);
+            });
         }
-        
-        // 添加计算得到的值
-        if (type === '10') {
-            const tokenCount = document.getElementById('token_count').textContent.replace(/,/g, '');
-            formData.set('token_supply', tokenCount);
-            formData.set('token_price', document.getElementById('token_price').textContent);
-        } else {
-            formData.set('token_price', document.getElementById('calculatedTokenPriceSimilar').textContent);
+
+        // 添加文档URL
+        if (window.uploadedDocuments && window.uploadedDocuments.length > 0) {
+            window.uploadedDocuments.forEach(docUrl => {
+                formData.append('documents[]', docUrl);
+            });
         }
-        
-        // 添加图片和文档数据
-        if (uploadedImages && uploadedImages.length > 0) {
-            formData.append('images', JSON.stringify(uploadedImages));
-        }
-        if (uploadedDocuments && uploadedDocuments.length > 0) {
-            formData.append('documents', JSON.stringify(uploadedDocuments));
-        }
-        
+
         // 发送请求
         const response = await fetch('/api/assets/create', {
             method: 'POST',
             headers: {
-                'X-Eth-Address': window.ethereum.selectedAddress
+                'X-Eth-Address': window.ethereum?.selectedAddress || ''
             },
             body: formData
         });
-        
+
         if (!response.ok) {
-            const result = await response.json();
-            throw new Error(result.error || '创建资产失败');
+            const error = await response.json();
+            throw new Error(error.error || '创建资产失败');
         }
-        
+
         const result = await response.json();
-        
-        // 显示成功消息
-        showToast('资产创建成功，等待审核');
+        showToast('资产创建成功');
         
         // 清除草稿
-        localStorage.removeItem(CONFIG.DRAFT.KEY);
+        localStorage.removeItem('assetDraft');
         
-        // 延迟2秒后跳转
+        // 跳转到资产列表页
         setTimeout(() => {
             window.location.href = '/assets';
-        }, 2000);
+        }, 1500);
         
     } catch (error) {
         console.error('提交表单失败:', error);
         showError(error.message);
-    } finally {
-        // 恢复提交按钮状态
-        const submitBtn = document.querySelector('button[type="submit"]');
-        if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>提交审核';
-        }
     }
 }
 
@@ -1137,24 +1037,12 @@ async function generateTokenSymbol(type, retryCount = 0) {
         const timestamp = now.getTime();
         const random = Math.floor(Math.random() * 10000);
         
-        // 使用时间戳的不同部分来增加随机性
-        const timestampPart1 = Math.floor((timestamp % 1000000) / 100); // 取毫秒的中间部分
-        const timestampPart2 = timestamp % 100; // 取最后两位
+        // 使用时间戳的最后4位数字
+        const timestampLast4 = timestamp % 10000;
         
-        // 组合不同来源的随机数
-        const uniqueNum = (
-            (timestampPart1 * 37 + // 使用质数乘法
-            timestampPart2 * 17 +
-            random * 7 +
-            retryCount * 13) // 加入重试次数
-        ) % 10000;
-        
-        const combinedNum = uniqueNum.toString().padStart(4, '0');
-        
-        // 根据资产类型生成前缀
-        const prefix = type === CONFIG.ASSET_TYPE.REAL_ESTATE ? 'RH-10' : 'RH-20';
         // 组合代币符号
-        const symbol = `${prefix}${combinedNum}`;
+        const prefix = type === CONFIG.ASSET_TYPE.REAL_ESTATE ? 'RH-10' : 'RH-20';
+        const symbol = `${prefix}${timestampLast4.toString().padStart(4, '0')}`;
         
         console.log(`尝试生成代币代码: ${symbol}, 重试次数: ${retryCount}`);
         
@@ -1173,19 +1061,20 @@ async function generateTokenSymbol(type, retryCount = 0) {
                 throw new Error(data.error);
             }
             
-            // 如果代币已存在，增加等待时间后重试
+            // 如果代币已存在，立即重试
             if (data.exists) {
                 console.log(`代币代码 ${symbol} 已存在，准备重试`);
-                await new Promise(resolve => setTimeout(resolve, 200 * (retryCount + 1))); // 随重试次数增加等待时间
+                await new Promise(resolve => setTimeout(resolve, 100)); // 短暂延迟
                 return generateTokenSymbol(type, retryCount + 1);
             }
+            
+            console.log(`成功生成代币代码: ${symbol}`);
+            return symbol;
+            
         } catch (error) {
             console.error('验证代币代码时出错:', error);
             throw new Error(`验证代币代码失败: ${error.message}`);
         }
-        
-        console.log(`成功生成代币代码: ${symbol}`);
-        return symbol;
         
     } catch (error) {
         console.error('生成代币代码失败:', error);
@@ -1328,8 +1217,8 @@ function previewAsset() {
             location: formData.get('location'),
             description: formData.get('description'),
             tokenSymbol: formData.get('tokensymbol'),
-            images: uploadedImages || [],
-            documents: uploadedDocuments || []
+            images: window.uploadedImages || [],  // 使用全局变量中的图片数组
+            documents: window.uploadedDocuments || []
         };
 
         // 根据资产类型添加特定字段
@@ -1347,15 +1236,17 @@ function previewAsset() {
             assetData.annualRevenue = formData.get('annual_revenue');
         }
 
+        console.log('预览数据:', assetData); // 添加日志
+
         // 创建预览内容
         const previewContent = `
             <div class="container-fluid">
-                ${assetData.images.length > 0 ? `
+                ${assetData.images && assetData.images.length > 0 ? `
                     <div id="previewCarousel" class="carousel slide mb-4" data-bs-ride="carousel">
                         <div class="carousel-inner">
-                            ${assetData.images.map((image, index) => `
+                            ${assetData.images.map((imageUrl, index) => `
                                 <div class="carousel-item ${index === 0 ? 'active' : ''}">
-                                    <img src="${image.url}" class="d-block w-100" alt="${image.name}" 
+                                    <img src="${imageUrl}" class="d-block w-100" alt="资产图片 ${index + 1}" 
                                          style="height: 400px; object-fit: cover;">
                                 </div>
                             `).join('')}
@@ -1369,7 +1260,7 @@ function previewAsset() {
                             </button>
                         ` : ''}
                     </div>
-                ` : ''}
+                ` : '<div class="alert alert-info mb-4">暂无图片</div>'}
 
                 <div class="row mb-4">
                     <div class="col-md-8">
@@ -1513,5 +1404,27 @@ function calculateTokenPrice() {
         calculateRealEstateTokens();
     } else if (type === '20') {
         calculateSimilarAssetsTokenPrice();
+    }
+}
+
+// 检查代币符号是否可用
+async function checkTokenSymbol(symbol) {
+    try {
+        const response = await fetch(`/api/check_token_symbol?symbol=${symbol}`);
+        if (!response.ok) {
+            throw new Error(`API请求失败: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            console.error('验证代币代码失败:', data.error);
+            return false;
+        }
+        
+        return !data.exists;
+    } catch (error) {
+        console.error('检查代币代码失败:', error);
+        return false;
     }
 } 

@@ -162,31 +162,32 @@ def get_asset(asset_id):
 def create_asset():
     """创建资产"""
     try:
-        current_app.logger.info('开始创建资产...')
+        # 检查钱包连接状态
+        if not g.eth_address:
+            return jsonify({'error': '请先连接钱包'}), 401
+            
         # 获取表单数据
-        data = request.form
-        current_app.logger.info(f'表单数据: {data}')
+        data = request.form.to_dict()
         
-        # 记录关键字段的值和类型
-        for field in ['total_value', 'area', 'token_price', 'token_supply', 'annual_revenue']:
-            value = data.get(field)
-            current_app.logger.info(f'字段 {field}: 值 = {value}, 类型 = {type(value)}')
-            
+        # 验证必填字段
+        required_fields = ['name', 'type', 'location', 'token_symbol']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'缺少必填字段: {field}'}), 400
+                
         # 验证代币符号
-        token_symbol = data.get('token_symbol')
+        token_symbol = data.get('token_symbol', '').strip().upper()
         if not token_symbol:
-            raise ValueError("代币符号不能为空")
+            return jsonify({'error': '代币符号不能为空'}), 400
             
-        # 使用check_token_symbol API验证代币符号
-        with current_app.test_client() as client:
-            response = client.get(f'/api/check_token_symbol?symbol={token_symbol}')
-            if response.status_code != 200:
-                raise ValueError("代币符号验证失败")
-            result = response.get_json()
-            if result.get('exists'):
-                raise ValueError(f"代币符号 {token_symbol} 已存在")
-
-        # 添加安全的数值转换函数
+        if not re.match(r'^RH-(?:10|20)\d{4}$', token_symbol):
+            return jsonify({'error': '代币符号格式无效，必须为 RH-10YYYY 或 RH-20YYYY 格式，其中 YYYY 为4位数字'}), 400
+            
+        # 检查代币符号是否已存在
+        existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+        if existing_asset:
+            return jsonify({'error': '代币符号已被使用'}), 400
+                
         def safe_float(value, field_name):
             try:
                 # 如果是None或空字符串，则报错
@@ -249,82 +250,16 @@ def create_asset():
         
         # 处理图片上传
         image_paths = []
-        if 'images[]' in request.files:
-            files = request.files.getlist('images[]')
-            current_app.logger.info(f'收到 {len(files)} 个图片文件')
-            
-            if files and any(file.filename for file in files):
-                for file in files:
-                    if file and file.filename and allowed_file(file.filename):
-                        try:
-                            # 构建文件名
-                            ext = file.filename.rsplit(".", 1)[1].lower()
-                            asset_type_folder = str(asset.asset_type)  # 直接使用资产类型的数字作为文件夹名
-                            filename = f'{asset_type_folder}/{asset.id}/images/image_{len(image_paths)+1}.{ext}'
-                            
-                            # 读取文件内容
-                            file_data = file.read()
-                            
-                            # 检查七牛云存储是否初始化
-                            if storage is None:
-                                current_app.logger.error('七牛云存储未初始化，尝试重新初始化...')
-                                from app.utils.storage import init_storage
-                                if not init_storage(current_app):
-                                    raise Exception("七牛云存储初始化失败")
-                            
-                            # 上传到七牛云
-                            current_app.logger.info(f'开始上传图片到七牛云: {filename}')
-                            result = storage.upload(file_data, filename)
-                            
-                            if result and result.get('url'):
-                                image_paths.append(result['url'])
-                                current_app.logger.info(f'图片上传成功: {result["url"]}')
-                            else:
-                                current_app.logger.error(f'七牛云返回的结果无效: {result}')
-                                
-                        except Exception as e:
-                            current_app.logger.error(f'上传图片失败: {str(e)}')
-                            continue
-        
+        if 'images[]' in request.form:
+            image_paths = request.form.getlist('images[]')
+            current_app.logger.info(f'收到 {len(image_paths)} 个图片URL')
+
         # 处理文档上传
         document_paths = []
-        if 'documents[]' in request.files:
-            files = request.files.getlist('documents[]')
-            current_app.logger.info(f'收到 {len(files)} 个文档文件')
-            
-            if files and any(file.filename for file in files):
-                for file in files:
-                    if file and file.filename and allowed_file(file.filename):
-                        try:
-                            # 构建文件名
-                            ext = file.filename.rsplit(".", 1)[1].lower()
-                            asset_type_folder = str(asset.asset_type)  # 直接使用资产类型的数字作为文件夹名
-                            filename = f'{asset_type_folder}/{asset.id}/documents/document_{len(document_paths)+1}.{ext}'
-                            
-                            # 读取文件内容
-                            file_data = file.read()
-                            
-                            # 检查七牛云存储是否初始化
-                            if storage is None:
-                                current_app.logger.error('七牛云存储未初始化，尝试重新初始化...')
-                                from app.utils.storage import init_storage
-                                if not init_storage(current_app):
-                                    raise Exception("七牛云存储初始化失败")
-                            
-                            # 上传到七牛云
-                            current_app.logger.info(f'开始上传文档到七牛云: {filename}')
-                            result = storage.upload(file_data, filename)
-                            
-                            if result and result.get('url'):
-                                document_paths.append(result['url'])
-                                current_app.logger.info(f'文档上传成功: {result["url"]}')
-                            else:
-                                current_app.logger.error(f'七牛云返回的结果无效: {result}')
-                                
-                        except Exception as e:
-                            current_app.logger.error(f'上传文档失败: {str(e)}')
-                            continue
-        
+        if 'documents[]' in request.form:
+            document_paths = request.form.getlist('documents[]')
+            current_app.logger.info(f'收到 {len(document_paths)} 个文档URL')
+
         # 更新资产的图片和文档路径
         if image_paths:
             asset.images = json.dumps(image_paths)
