@@ -215,18 +215,12 @@ function initializeEventListeners() {
             const type = this.value;
             if (!type) return;
             
-            try {
-                const symbol = await generateTokenSymbol(type);
-                const isSymbolValid = await checkTokenSymbol(symbol);
-                
-                if (!isSymbolValid) {
-                    throw new Error('无法生成唯一的代币代码，请稍后重试');
-                }
-                
-                if (!tokenSymbolInput) {
-                    console.error('代币代码输入框未找到');
-                    throw new Error('代币代码输入框未找到');
-                }
+            // 先切换显示字段，提高响应速度
+            toggleAssetTypeFields(type);
+            
+            // 异步生成代币符号
+            generateTokenSymbol(type).then(async symbol => {
+                if (!tokenSymbolInput) return;
                 
                 tokenSymbolInput.value = symbol;
                 
@@ -243,67 +237,41 @@ function initializeEventListeners() {
                     }
                 }
                 successMsg.innerHTML = '<i class="fas fa-check-circle me-1"></i>代币代码可用';
-                
-                // 切换资产类型字段
-                toggleAssetTypeFields(type);
-                
-                // 重置相关计算
-                resetCalculations();
-                
-                // 更新文档要求
-                updateDocumentRequirements(type);
-            } catch (error) {
-                console.error('资产类型变更处理失败:', error);
-                showError('代币代码生成失败: ' + error.message);
-                
-                if (tokenSymbolInput) {
-                    tokenSymbolInput.value = '';
-                }
-                
-                const successMsg = document.getElementById('tokenSymbolSuccess');
-                if (successMsg) {
-                    successMsg.remove();
-                }
-            }
+            }).catch(error => {
+                console.error('生成代币代码失败:', error);
+                showError(error.message);
+            });
+            
+            // 重置相关计算
+            resetCalculations();
+            
+            // 更新文档要求
+            updateDocumentRequirements(type);
         });
     }
 
+    // 添加类不动产相关字段的事件监听
+    const tokenSupplyInput = document.getElementById('token_supply');
+    const totalValueSimilarInput = document.getElementById('total_value');
+    
+    if (tokenSupplyInput) {
+        tokenSupplyInput.addEventListener('input', calculateSimilarAssetsTokenPrice);
+    }
+    
+    if (totalValueSimilarInput) {
+        totalValueSimilarInput.addEventListener('input', calculateSimilarAssetsTokenPrice);
+    }
+
+    // 不动产相关字段的事件监听
+    const areaInput = document.getElementById('area');
+    const totalValueInput = document.getElementById('total_value');
+    
     if (areaInput) {
         areaInput.addEventListener('input', calculateRealEstateTokens);
     }
-
+    
     if (totalValueInput) {
-        totalValueInput.addEventListener('input', calculateTokenPrice);
-    }
-
-    const areaElement = document.getElementById('area');
-    if (areaElement) {
-        areaElement.addEventListener('input', async function() {
-            if (document.getElementById('type').value === '10') {
-                calculateRealEstateTokens();
-            }
-        });
-    }
-
-    const totalValueElement = document.getElementById('total_value');
-    if (totalValueElement) {
-        totalValueElement.addEventListener('input', function() {
-            calculateTokenPrice();
-        });
-    }
-
-    const tokenCountElement = document.getElementById('token_count');
-    if (tokenCountElement) {
-        tokenCountElement.addEventListener('input', function() {
-            calculateSimilarAssetsTokenPrice();
-        });
-    }
-
-    const totalValueSimilarElement = document.getElementById('totalValueSimilar');
-    if (totalValueSimilarElement) {
-        totalValueSimilarElement.addEventListener('input', function() {
-            calculateSimilarAssetsTokenPrice();
-        });
+        totalValueInput.addEventListener('input', calculateRealEstateTokens);
     }
 
     // 添加预览按钮事件监听器
@@ -1084,11 +1052,14 @@ async function generateTokenSymbol(type, retryCount = 0) {
 
 // 计算类不动产代币价格
 async function calculateSimilarAssetsTokenPrice() {
-    const tokenCount = parseInt(document.getElementById('token_supply').value) || 0;
-    const totalValue = parseFloat(document.getElementById('total_value').value) || 0;
+    const tokenSupplyInput = document.getElementById('token_supply');
+    const totalValueInput = document.getElementById('total_value');
     const tokenPriceElement = document.getElementById('calculatedTokenPriceSimilar');
     
-    if (!tokenPriceElement) return;
+    if (!tokenPriceElement || !tokenSupplyInput || !totalValueInput) return;
+    
+    const tokenCount = parseInt(tokenSupplyInput.value) || 0;
+    const totalValue = parseFloat(totalValueInput.value) || 0;
     
     if (tokenCount <= 0) {
         tokenPriceElement.textContent = '0.000000';
