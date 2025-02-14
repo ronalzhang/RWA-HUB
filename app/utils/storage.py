@@ -9,17 +9,22 @@ import qiniu
 logger = logging.getLogger(__name__)
 
 class QiniuStorage:
-    def __init__(self):
-        self.access_key = current_app.config.get('QINIU_ACCESS_KEY')
-        self.secret_key = current_app.config.get('QINIU_SECRET_KEY')
-        self.bucket_name = current_app.config.get('QINIU_BUCKET_NAME')
-        self.domain = current_app.config.get('QINIU_DOMAIN')
+    def __init__(self, access_key, secret_key, bucket_name, domain):
+        self.access_key = access_key
+        self.secret_key = secret_key
+        self.bucket_name = bucket_name
+        self.domain = domain
         
         if not all([self.access_key, self.secret_key, self.bucket_name, self.domain]):
             raise ValueError("七牛云配置不完整")
             
-        self.auth = qiniu.Auth(self.access_key, self.secret_key)
-        self.bucket = BucketManager(self.auth)
+        try:
+            self.auth = Auth(self.access_key, self.secret_key)
+            self.bucket = BucketManager(self.auth)
+            logger.info("七牛云存储初始化成功")
+        except Exception as e:
+            logger.error(f"七牛云存储初始化失败: {str(e)}")
+            raise
     
     def upload(self, file_data, key):
         """上传文件到七牛云"""
@@ -31,22 +36,22 @@ class QiniuStorage:
             token = self.auth.upload_token(self.bucket_name)
             
             # 上传文件
-            ret, info = qiniu.put_data(token, key, file_data)
+            ret, info = put_data(token, key, file_data)
             
             if info.status_code == 200:
-                # 强制使用 HTTP 协议
+                # 强制使用 HTTPS 协议
                 domain = self.domain
-                if domain.startswith('https://'):
-                    domain = 'http://' + domain[8:]
-                elif not domain.startswith('http://'):
-                    domain = 'http://' + domain
+                if domain.startswith('http://'):
+                    domain = 'https://' + domain[7:]
+                elif not domain.startswith('https://'):
+                    domain = 'https://' + domain
                     
                 # 生成完整的URL，保留文件路径
                 url = f"{domain}/{ret['key']}"
                 
-                # 确保URL使用HTTP协议
-                if url.startswith('https://'):
-                    url = 'http://' + url[8:]
+                # 确保URL使用HTTPS协议
+                if url.startswith('http://'):
+                    url = 'https://' + url[7:]
                 
                 return {
                     'url': url,
@@ -75,16 +80,52 @@ storage = None
 def init_storage(app):
     """初始化存储实例"""
     global storage
+    
+    # 如果已经初始化，直接返回
+    if storage is not None:
+        return True
+        
     try:
         with app.app_context():
             logger.info("开始初始化七牛云存储...")
-            storage = QiniuStorage()
+            
+            # 从配置中获取七牛云参数
+            access_key = app.config.get('QINIU_ACCESS_KEY')
+            secret_key = app.config.get('QINIU_SECRET_KEY')
+            bucket_name = app.config.get('QINIU_BUCKET_NAME')
+            domain = app.config.get('QINIU_DOMAIN')
+            
+            # 如果配置中没有，使用默认值
+            if not all([access_key, secret_key, bucket_name, domain]):
+                access_key = 'SGMhwmXf7wRlmsgXU4xfqzDH_DxczWhhoDEjyYE9'
+                secret_key = '6JynlQeJEDWt4VIjZV8sDdSAFZMrZ3GFE0fIz07-'
+                bucket_name = 'rwa-hub'
+                domain = 'sqbw3uvy8.sabkt.gdipper.com'
+                logger.info("使用默认七牛云配置")
+            
+            # 创建存储实例
+            storage = QiniuStorage(
+                access_key=access_key,
+                secret_key=secret_key,
+                bucket_name=bucket_name,
+                domain=domain
+            )
+            
+            # 测试上传以验证配置是否正确
+            test_result = storage.upload(b"test", "test.txt")
+            if not test_result:
+                raise ValueError("存储配置测试失败")
+            
+            # 删除测试文件
+            storage.delete("test.txt")
+            
             logger.info("七牛云存储初始化成功")
             return True
+            
     except Exception as e:
         logger.error(f"七牛云存储初始化失败: {str(e)}")
         storage = None
-        return False 
+        return False
 
 def upload_file(file):
     """统一的文件上传处理函数"""

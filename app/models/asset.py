@@ -5,6 +5,7 @@ from .. import db
 from sqlalchemy.orm import validates
 from sqlalchemy import Index, CheckConstraint
 import re
+from flask import current_app
 
 class AssetType(enum.Enum):
     REAL_ESTATE = 10        # 不动产
@@ -167,13 +168,19 @@ class Asset(db.Model):
 
         # 处理图片和文档路径
         try:
-            data['images'] = json.loads(self.images) if self.images else []
-        except:
+            images = json.loads(self.images) if self.images else []
+            # 确保所有图片URL使用HTTPS
+            data['images'] = [url.replace('http://', 'https://') if url.startswith('http://') else url for url in images]
+        except Exception as e:
+            current_app.logger.error(f'解析图片路径失败: {str(e)}')
             data['images'] = []
             
         try:
-            data['documents'] = json.loads(self.documents) if self.documents else []
-        except:
+            documents = json.loads(self.documents) if self.documents else []
+            # 确保所有文档URL使用HTTPS
+            data['documents'] = [url.replace('http://', 'https://') if url.startswith('http://') else url for url in documents]
+        except Exception as e:
+            current_app.logger.error(f'解析文档路径失败: {str(e)}')
             data['documents'] = []
 
         # 根据资产类型添加特定字段

@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy" content="img-src * 'self' data: http: https:">
     <title>{% block title %}{% endblock %}</title>
     
     <!-- Bootstrap CSS -->
@@ -28,9 +30,6 @@
             font-family: monospace;
         }
     </style>
-    
-    <!-- Content Security Policy -->
-    <meta http-equiv="Content-Security-Policy" content="img-src * 'self' data: http: https:">
     
     <!-- AOS Animation Script -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.1/aos.js"></script>

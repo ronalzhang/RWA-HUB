@@ -15,6 +15,7 @@ from app.utils.storage import storage, upload_file
 from app.config import Config as CONFIG
 import time
 import re
+from sqlalchemy.exc import OperationalError
 
 api_bp = Blueprint('api', __name__)
 
@@ -166,34 +167,80 @@ def create_asset():
         data = request.form
         current_app.logger.info(f'表单数据: {data}')
         
+        # 记录关键字段的值和类型
+        for field in ['total_value', 'area', 'token_price', 'token_supply', 'annual_revenue']:
+            value = data.get(field)
+            current_app.logger.info(f'字段 {field}: 值 = {value}, 类型 = {type(value)}')
+            
+        # 验证代币符号
+        token_symbol = data.get('tokenSymbol')
+        if not token_symbol:
+            raise ValueError("代币符号不能为空")
+            
+        # 使用check_token_symbol API验证代币符号
+        with current_app.test_client() as client:
+            response = client.get(f'/api/check_token_symbol?symbol={token_symbol}')
+            if response.status_code != 200:
+                raise ValueError("代币符号验证失败")
+            result = response.get_json()
+            if result.get('exists'):
+                raise ValueError(f"代币符号 {token_symbol} 已存在")
+
         # 添加安全的数值转换函数
-        def safe_float(value, default=0.0):
+        def safe_float(value, field_name):
             try:
-                return float(value) if value and value.strip() else default
-            except (ValueError, TypeError):
-                return default
+                # 如果是None或空字符串，则报错
+                if value is None or (isinstance(value, str) and not value.strip()):
+                    raise ValueError(f"{field_name} 不能为空")
+                    
+                # 转换为float
+                float_value = float(value)
+                if float_value <= 0:
+                    raise ValueError(f"{field_name} 必须大于0")
+                return float_value
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"{field_name} 无效: {str(e)}")
                 
-        def safe_int(value, default=0):
+        def safe_int(value, field_name):
             try:
-                return int(value) if value and value.strip() else default
-            except (ValueError, TypeError):
-                return default
+                # 如果是None或空字符串，则报错
+                if value is None or (isinstance(value, str) and not value.strip()):
+                    raise ValueError(f"{field_name} 不能为空")
+                    
+                # 转换为int
+                int_value = int(float(value))  # 先转float再转int，以支持字符串形式的小数
+                if int_value <= 0:
+                    raise ValueError(f"{field_name} 必须大于0")
+                return int_value
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"{field_name} 无效: {str(e)}")
         
+        # 获取资产类型
+        asset_type = int(data.get('type', '10'))
+        
+        # 获取并验证total_value
+        total_value = safe_float(data.get('total_value'), '总价值')
+        
+        # 验证面积（仅对不动产类型）
+        area = None
+        if asset_type == 10:  # 不动产类型
+            area = safe_float(data.get('area'), '面积')
+            
         # 创建资产记录
         asset = Asset(
             name=data.get('name'),
             description=data.get('description'),
-            asset_type=int(data.get('type')),  # 确保转换为整数
+            asset_type=asset_type,
             location=data.get('location'),
-            area=safe_float(data.get('area')),
-            total_value=safe_float(data.get('totalValue')),
-            token_symbol=data.get('tokenSymbol'),
-            token_price=safe_float(data.get('tokenPrice')),
-            token_supply=safe_int(data.get('tokenCount')),
-            annual_revenue=safe_float(data.get('annualRevenue')),
+            area=area,
+            total_value=total_value,
+            token_symbol=token_symbol,
+            token_price=safe_float(data.get('token_price'), '代币价格'),
+            token_supply=safe_int(data.get('token_supply'), '代币数量'),
+            annual_revenue=safe_float(data.get('annual_revenue'), '年收益'),
             status=AssetStatus.PENDING.value,
             owner_address=g.eth_address,
-            creator_address=g.eth_address  # 添加创建者地址
+            creator_address=g.eth_address
         )
         
         db.session.add(asset)
@@ -703,11 +750,14 @@ def upload():
             from app.utils.storage import init_storage
             if not init_storage(current_app):
                 raise Exception("七牛云存储初始化失败")
+                
+        if storage is None:
+            raise Exception("七牛云存储未正确初始化")
             
         # 上传文件到存储服务
         result = storage.upload(file_data, filename)
         if not result:
-            return jsonify({'error': '文件上传失败'}), 500
+            raise Exception("文件上传失败")
             
         return jsonify({
             'url': result.get('url'),
@@ -717,3 +767,50 @@ def upload():
     except Exception as e:
         current_app.logger.error(f'文件上传失败: {str(e)}')
         return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/check_token_symbol', methods=['GET'])
+def check_token_symbol():
+    """检查代币符号是否已存在"""
+    try:
+        symbol = request.args.get('symbol')
+        current_app.logger.info(f'检查代币符号: {symbol}')
+        
+        if not symbol:
+            return jsonify({'error': '缺少代币符号参数'}), 400
+            
+        # 检查符号格式
+        if not re.match(r'^RH-(?:10|20)\d{4}$', symbol):
+            current_app.logger.warning(f'无效的代币符号格式: {symbol}')
+            return jsonify({'error': '无效的代币符号格式'}), 400
+            
+        # 查询数据库，排除已删除的资产
+        try:
+            exists = db.session.query(db.exists().where(
+                db.and_(
+                    Asset.token_symbol == symbol,
+                    Asset.deleted_at.is_(None)  # 只检查未删除的资产
+                )
+            )).scalar()
+            current_app.logger.info(f'代币符号 {symbol} 查询结果: {"存在" if exists else "不存在"}')
+            
+            # 如果存在，记录当前数据库中的所有未删除资产的代币符号
+            if exists:
+                existing_symbols = db.session.query(Asset.token_symbol).filter(
+                    Asset.deleted_at.is_(None)
+                ).all()
+                current_app.logger.info(f'当前数据库中的代币符号: {[s[0] for s in existing_symbols]}')
+            
+            return jsonify({
+                'exists': exists,
+                'symbol': symbol
+            })
+        except OperationalError as e:
+            current_app.logger.error(f'数据库连接错误: {str(e)}')
+            return jsonify({'error': '数据库连接错误，请稍后重试'}), 503
+        except Exception as e:
+            current_app.logger.error(f'数据库查询失败: {str(e)}')
+            return jsonify({'error': '数据库查询失败，请稍后重试'}), 500
+            
+    except Exception as e:
+        current_app.logger.error(f'检查代币符号失败: {str(e)}')
+        return jsonify({'error': '服务器内部错误'}), 500
