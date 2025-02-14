@@ -59,9 +59,10 @@ def create_app(config_name='development'):
     app.config['BABEL_DEFAULT_TIMEZONE'] = 'UTC'
     babel.init_app(app)
     
-    @babel.localeselector
     def get_locale():
         return request.cookies.get('language', 'en')
+    
+    babel.locale_selector_func = get_locale
     
     # 设置日志
     if not os.path.exists('logs'):
@@ -95,13 +96,14 @@ def create_app(config_name='development'):
             return jsonify({'error': 'Internal server error'}), 500
         return render_template('errors/500.html'), 500
     
+    # 初始化存储（在注册蓝图之前）
+    from .utils.storage import init_storage
+    if not init_storage(app):
+        app.logger.error("七牛云存储初始化失败，应用可能无法正常工作")
+        raise RuntimeError("七牛云存储初始化失败")
+    
     # 注册蓝图
     from .routes import register_blueprints
     register_blueprints(app)
     
-    # 初始化存储
-    from .utils.storage import init_storage
-    if not init_storage(app):
-        app.logger.error("七牛云存储初始化失败，应用可能无法正常工作")
-        
     return app

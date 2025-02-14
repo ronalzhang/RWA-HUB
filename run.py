@@ -105,11 +105,21 @@ if __name__ == '__main__':
     app.config['PROPAGATE_EXCEPTIONS'] = True
     
     port = int(os.environ.get('PORT', 9000))
+    host = '0.0.0.0'  # 允许外部访问
     
     print("启动服务器...")
     print("访问地址:")
     print(f"本地:    http://127.0.0.1:{port}")
+    print(f"外部:    http://{host}:{port}")
     
-    # 使用waitress作为生产服务器
+    # 使用waitress作为生产服务器，增加配置选项
     from waitress import serve
-    serve(app, host='0.0.0.0', port=port, threads=4, url_scheme='https')
+    serve(app, 
+          host=host, 
+          port=port, 
+          threads=8,  # 增加线程数
+          url_scheme='http',  # 修改为http
+          channel_timeout=300,  # 增加超时时间
+          cleanup_interval=30,  # 清理间隔
+          max_request_body_size=1073741824  # 最大请求体大小（1GB）
+    )
