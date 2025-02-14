@@ -173,7 +173,7 @@ def create_asset():
             current_app.logger.info(f'字段 {field}: 值 = {value}, 类型 = {type(value)}')
             
         # 验证代币符号
-        token_symbol = data.get('tokenSymbol')
+        token_symbol = data.get('token_symbol')
         if not token_symbol:
             raise ValueError("代币符号不能为空")
             
