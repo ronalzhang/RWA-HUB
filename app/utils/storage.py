@@ -39,19 +39,13 @@ class QiniuStorage:
             ret, info = put_data(token, key, file_data)
             
             if info.status_code == 200:
-                # 使用 HTTP 协议
+                # 使用 HTTPS 协议
                 domain = self.domain
-                if domain.startswith('https://'):
-                    domain = 'http://' + domain[8:]
-                elif not domain.startswith('http://'):
-                    domain = 'http://' + domain
+                if not domain.startswith('https://'):
+                    domain = 'https://' + domain.replace('http://', '')
                     
                 # 生成完整的URL，保留文件路径
                 url = f"{domain}/{ret['key']}"
-                
-                # 确保URL使用HTTP协议
-                if url.startswith('https://'):
-                    url = 'http://' + url[8:]
                 
                 return {
                     'url': url,
