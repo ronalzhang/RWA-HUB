@@ -3,6 +3,7 @@ import os
 from werkzeug.utils import secure_filename
 from .decorators import token_required, eth_address_required, admin_required, permission_required
 from .admin import is_admin, get_admin_permissions, has_permission
+from .storage import storage, init_storage, get_storage
 
 __all__ = [
     'token_required',
@@ -25,7 +26,6 @@ def save_files(files, asset_type, asset_id):
     Returns:
         保存的文件 URL 列表
     """
-    from .storage import storage
     import time
     
     # 允许的文件扩展名
@@ -36,9 +36,11 @@ def save_files(files, asset_type, asset_id):
     def allowed_file(filename):
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
     
-    # 检查存储服务
-    if storage is None:
-        current_app.logger.error('七牛云存储服务未初始化')
+    # 获取存储服务实例
+    try:
+        storage = get_storage()
+    except Exception as e:
+        current_app.logger.error(f'获取存储服务失败: {str(e)}')
         raise ValueError('存储服务未准备就绪')
     
     # 检查参数
@@ -62,13 +64,17 @@ def save_files(files, asset_type, asset_id):
     
     for i, file in enumerate(files):
         if not file or not file.filename:
+            current_app.logger.error(f'文件 {i} 无效')
             failed_files.append({
                 'name': f'file_{i}',
                 'error': '无效的文件'
             })
             continue
             
+        current_app.logger.info(f'处理文件 {i+1}: {file.filename}')
+            
         if not allowed_file(file.filename):
+            current_app.logger.error(f'文件类型不支持: {file.filename}')
             failed_files.append({
                 'name': file.filename,
                 'error': '不支持的文件类型'
@@ -87,25 +93,28 @@ def save_files(files, asset_type, asset_id):
                 
                 current_app.logger.info(f'处理文件 {i+1}/{len(files)}: {filename}')
                 
-                # 读取文件内容
-                file_data = file.read()
-                if not file_data:
-                    current_app.logger.error(f'文件内容为空: {filename}')
-                    failed_files.append({
-                        'name': file.filename,
-                        'error': '文件内容为空'
-                    })
-                    break
-                
-                # 检查文件大小
-                file_size = len(file_data)
-                if file_size > 100 * 1024 * 1024:  # 100MB
-                    current_app.logger.error(f'文件大小超过限制: {filename} ({file_size} bytes)')
-                    failed_files.append({
-                        'name': file.filename,
-                        'error': '文件大小超过限制(100MB)'
-                    })
-                    break
+                # 读取文件内容（只读取一次）
+                if retry_count == 0:
+                    file_data = file.read()
+                    if not file_data:
+                        current_app.logger.error(f'文件内容为空: {filename}')
+                        failed_files.append({
+                            'name': file.filename,
+                            'error': '文件内容为空'
+                        })
+                        break
+                    
+                    # 检查文件大小
+                    file_size = len(file_data)
+                    current_app.logger.info(f'文件大小: {file_size} bytes')
+                    
+                    if file_size > 10 * 1024 * 1024:  # 10MB
+                        current_app.logger.error(f'文件大小超过限制: {filename} ({file_size} bytes)')
+                        failed_files.append({
+                            'name': file.filename,
+                            'error': '文件大小超过限制(10MB)'
+                        })
+                        break
                 
                 # 上传到七牛云
                 current_app.logger.info(f'尝试上传文件 (第{retry_count + 1}次): {filename}')

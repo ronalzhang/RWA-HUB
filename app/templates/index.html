@@ -74,17 +74,11 @@
                         <div class="asset-card h-100">
                             <!-- Asset Image -->
                             <div class="position-relative">
-                                {% if asset.images %}
-                                {% set images = asset.images|from_json %}
-                                {% if images %}
-                                <img src="{{ images[0] }}" 
+                                {% if asset.images and asset.images|length > 0 %}
+                                <img src="{{ asset.images[0] }}" 
                                      class="img-cover" 
-                                     alt="{{ asset.name }}">
-                                {% else %}
-                                <div class="img-placeholder">
-                                    <i class="fas fa-image"></i>
-                                </div>
-                                {% endif %}
+                                     alt="{{ asset.name }}"
+                                     onerror="this.onerror=null; this.src='/static/images/placeholder.png';">
                                 {% else %}
                                 <div class="img-placeholder">
                                     <i class="fas fa-image"></i>

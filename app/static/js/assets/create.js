@@ -621,9 +621,13 @@ async function handleFiles(files, type) {
                 }
             }
             
+            // 构建 FormData
             formData.append('file', processedFile);
-            formData.append('asset_type', document.getElementById('type').value);
+            formData.append('asset_type', document.getElementById('type').value || '10');
             formData.append('file_type', fileType);
+            // 如果已经创建了资产，使用实际的资产ID
+            const assetId = document.querySelector('input[name="asset_id"]')?.value || 'temp';
+            formData.append('asset_id', assetId);
 
             try {
                 // 使用 XMLHttpRequest 来获取上传进度
@@ -639,51 +643,46 @@ async function handleFiles(files, type) {
                     }
                 };
 
-                // 返回Promise以支持async/await
-                const response = await new Promise((resolve, reject) => {
-                    xhr.onload = () => {
-                        if (xhr.status >= 200 && xhr.status < 300) {
-                            try {
-                                const result = JSON.parse(xhr.responseText);
-                                resolve(result);
-                            } catch (error) {
-                                reject(new Error('解析响应失败'));
+                // 处理上传完成
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.urls && response.urls.length > 0) {
+                            if (fileType === 'image') {
+                                window.uploadedImages = window.uploadedImages || [];
+                                window.uploadedImages.push(response.urls[0]);
+                                updateImagePreview();
+                            } else {
+                                window.uploadedDocuments = window.uploadedDocuments || [];
+                                window.uploadedDocuments.push(response.urls[0]);
+                                updateDocumentList();
                             }
-                        } else {
-                            reject(new Error(`上传失败: ${xhr.statusText}`));
                         }
-                    };
-                    
-                    xhr.onerror = () => reject(new Error('网络错误'));
-                    
-                    xhr.open('POST', '/api/upload', true);
-                    xhr.setRequestHeader('X-Eth-Address', window.ethereum?.selectedAddress || '');
-                    xhr.send(formData);
-                });
-
-                if (response && response.url) {
-                    if (fileType === 'image') {
-                        window.uploadedImages.push(response.url);
-                        console.log('图片上传成功:', response.url);
-                        updateImagePreview();
+                        completedFiles++;
+                        
+                        if (completedFiles === totalFiles) {
+                            progressElement.style.display = 'none';
+                            showToast(`${fileType === 'image' ? '图片' : '文档'}上传完成`);
+                        }
                     } else {
-                        window.uploadedDocuments.push(response.url);
-                        updateDocumentList();
+                        showError(`文件上传失败: ${xhr.statusText}`);
                     }
-                    completedFiles++;
-                }
+                };
+
+                // 处理上传错误
+                xhr.onerror = function() {
+                    showError('文件上传失败，请重试');
+                };
+
+                // 发送请求
+                xhr.open('POST', '/api/upload', true);
+                xhr.send(formData);
+
             } catch (error) {
                 console.error('上传文件失败:', error);
-                showError(`文件 ${file.name} 上传失败: ${error.message}`);
+                showError(`上传文件失败: ${error.message}`);
             }
         }
-
-        // 上传完成后延迟隐藏进度条
-        setTimeout(() => {
-            progressElement.style.display = 'none';
-            progressElement.querySelector('.progress-bar').style.width = '0%';
-            percentElement.textContent = '0';
-        }, 1000);
 
     } catch (error) {
         console.error('处理文件失败:', error);
@@ -693,40 +692,39 @@ async function handleFiles(files, type) {
 
 // 更新图片预览
 function updateImagePreview() {
-    const container = document.getElementById('imagePreview');
-    if (!container) return;
+    const previewContainer = document.getElementById('imagePreview');
+    previewContainer.innerHTML = '';
 
-    container.innerHTML = '';
-    console.log('更新图片预览，当前图片:', window.uploadedImages);
-    
-    if (!window.uploadedImages || window.uploadedImages.length === 0) {
-        container.innerHTML = '<div class="text-center text-muted">暂无图片</div>';
-        return;
+    if (window.uploadedImages && window.uploadedImages.length > 0) {
+        window.uploadedImages.forEach((url, index) => {
+            const col = document.createElement('div');
+            col.className = 'col-md-4 mb-3';
+            
+            const card = document.createElement('div');
+            card.className = 'card h-100';
+            
+            const img = document.createElement('img');
+            img.src = url;
+            img.className = 'card-img-top';
+            img.style.height = '200px';
+            img.style.objectFit = 'cover';
+            img.alt = `预览图片 ${index + 1}`;
+            
+            const cardBody = document.createElement('div');
+            cardBody.className = 'card-body';
+            
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'btn btn-danger btn-sm w-100';
+            removeBtn.innerHTML = '<i class="fas fa-trash-alt me-2"></i>删除';
+            removeBtn.onclick = () => removeImage(index);
+            
+            cardBody.appendChild(removeBtn);
+            card.appendChild(img);
+            card.appendChild(cardBody);
+            col.appendChild(card);
+            previewContainer.appendChild(col);
+        });
     }
-
-    const row = document.createElement('div');
-    row.className = 'row g-3';
-    container.appendChild(row);
-
-    window.uploadedImages.forEach((imageUrl, index) => {
-        const col = document.createElement('div');
-        col.className = 'col-md-4';
-        col.innerHTML = `
-            <div class="card h-100">
-                <div class="position-relative">
-                    <img src="${imageUrl}" 
-                         class="card-img-top" 
-                         alt="上传的图片"
-                         style="height: 200px; object-fit: cover;">
-                    <button class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2" 
-                            onclick="removeImage(${index})">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-        row.appendChild(col);
-    });
 }
 
 // 更新文档列表
@@ -919,6 +917,21 @@ async function submitForm() {
             formData.append('token_price', document.getElementById('calculatedTokenPriceSimilar').textContent);
         }
 
+        // 添加图片和文档路径
+        if (window.uploadedImages && window.uploadedImages.length > 0) {
+            window.uploadedImages.forEach(url => {
+                formData.append('images[]', url);
+            });
+            console.log('添加图片路径:', window.uploadedImages);
+        }
+
+        if (window.uploadedDocuments && window.uploadedDocuments.length > 0) {
+            window.uploadedDocuments.forEach(url => {
+                formData.append('documents[]', url);
+            });
+            console.log('添加文档路径:', window.uploadedDocuments);
+        }
+
         // 打印所有表单数据
         console.log('表单数据:');
         for (let pair of formData.entries()) {
@@ -946,9 +959,9 @@ async function submitForm() {
         // 清除草稿
         localStorage.removeItem('assetDraft');
         
-        // 跳转到资产列表页
+        // 跳转到资产详情页
         setTimeout(() => {
-            window.location.href = '/assets';
+            window.location.href = `/assets/${result.assetId}`;
         }, 1500);
         
     } catch (error) {
