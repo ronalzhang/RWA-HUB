@@ -5,7 +5,8 @@ from .. import db
 from sqlalchemy.orm import validates
 from sqlalchemy import Index, CheckConstraint
 import re
-from flask import current_app
+from flask import current_app, url_for
+from urllib.parse import urlparse
 
 class AssetType(enum.Enum):
     REAL_ESTATE = 10        # 不动产
@@ -132,56 +133,45 @@ class Asset(db.Model):
         return value
 
     @property
-    def images(self) -> list:
-        """获取图片列表"""
+    def images(self):
+        """获取资产图片列表"""
         try:
             if not self._images:
                 return []
-            if isinstance(self._images, list):
-                return self._images
-            if isinstance(self._images, str):
-                try:
-                    # 尝试解析 JSON
-                    images = json.loads(self._images)
-                    if isinstance(images, list):
-                        return [img for img in images if img and isinstance(img, str)]
-                    elif isinstance(images, str):
-                        return [images]
-                    return []
-                except json.JSONDecodeError:
-                    # 如果不是 JSON，检查是否为单个 URL
-                    return [self._images] if self._images.strip() else []
-            return []
+            
+            # 尝试解析 JSON
+            images = json.loads(self._images)
+            if not isinstance(images, list):
+                return []
+            
+            # 如果URL已经是完整的，直接返回
+            return [img for img in images if img and isinstance(img, str)]
+            
         except Exception as e:
-            current_app.logger.error(f'解析图片路径失败: {str(e)}')
+            current_app.logger.error(f'解析图片列表失败: {str(e)}')
             return []
 
     @images.setter
     def images(self, value):
-        """设置图片列表"""
-        try:
-            if value is None:
-                self._images = None
-            elif isinstance(value, str):
-                # 如果是 JSON 字符串，尝试解析
-                try:
-                    parsed = json.loads(value)
-                    if isinstance(parsed, list):
-                        self._images = json.dumps([img for img in parsed if img and isinstance(img, str)])
-                    else:
-                        self._images = json.dumps([value])
-                except json.JSONDecodeError:
-                    # 如果不是有效的 JSON，则假设是单个 URL
-                    self._images = json.dumps([value])
-            elif isinstance(value, list):
-                # 过滤掉无效的图片 URL
-                valid_images = [img for img in value if img and isinstance(img, str)]
-                self._images = json.dumps(valid_images)
-            else:
-                self._images = None
-        except Exception as e:
-            current_app.logger.error(f'设置图片路径失败: {str(e)}')
-            self._images = None
+        """设置资产图片列表"""
+        if value is None:
+            self._images = '[]'
+            return
+        
+        if isinstance(value, str):
+            try:
+                # 尝试解析 JSON
+                json.loads(value)
+                self._images = value
+            except:
+                # 如果不是有效的 JSON，假设是单个 URL
+                self._images = json.dumps([value])
+        elif isinstance(value, list):
+            # 过滤空值和无效值
+            valid_images = [img for img in value if img and isinstance(img, str)]
+            self._images = json.dumps(valid_images)
+        else:
+            self._images = '[]'
 
     @property
     def documents(self) -> list:
