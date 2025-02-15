@@ -174,11 +174,11 @@ def proxy_file(file_type, file_path):
     """代理七牛云文件请求"""
     try:
         # 构建七牛云的完整URL
-        qiniu_url = f"http://{current_app.config['QINIU_DOMAIN']}/{file_path}"
+        qiniu_url = f"https://{current_app.config['QINIU_DOMAIN']}/{file_path}"
         current_app.logger.info(f"代理{file_type}请求: {qiniu_url}")
         
         # 请求七牛云文件
-        response = requests.get(qiniu_url, stream=True)
+        response = requests.get(qiniu_url, stream=True, verify=True)
         
         if response.status_code == 200:
             # 返回文件内容
