@@ -218,32 +218,30 @@ function initializeEventListeners() {
             // 先切换显示字段，提高响应速度
             toggleAssetTypeFields(type);
             
-            // 异步生成代币符号
-            generateTokenSymbol(type).then(async symbol => {
-                if (!tokenSymbolInput) return;
-                
-                tokenSymbolInput.value = symbol;
-                
-                let successMsg = document.getElementById('tokenSymbolSuccess');
-                if (!successMsg) {
-                    successMsg = document.createElement('div');
-                    successMsg.id = 'tokenSymbolSuccess';
-                    successMsg.className = 'text-success mt-1';
-                    const parentElement = tokenSymbolInput.closest('.input-group');
-                    if (parentElement) {
-                        parentElement.insertAdjacentElement('afterend', successMsg);
-                    } else {
-                        tokenSymbolInput.parentNode.appendChild(successMsg);
+            try {
+                // 立即生成代币符号
+                const symbol = await generateTokenSymbol(type);
+                if (tokenSymbolInput) {
+                    tokenSymbolInput.value = symbol;
+                    
+                    let successMsg = document.getElementById('tokenSymbolSuccess');
+                    if (!successMsg) {
+                        successMsg = document.createElement('div');
+                        successMsg.id = 'tokenSymbolSuccess';
+                        successMsg.className = 'text-success mt-1';
+                        const parentElement = tokenSymbolInput.closest('.input-group');
+                        if (parentElement) {
+                            parentElement.insertAdjacentElement('afterend', successMsg);
+                        } else {
+                            tokenSymbolInput.parentNode.appendChild(successMsg);
+                        }
                     }
+                    successMsg.innerHTML = '<i class="fas fa-check-circle me-1"></i>代币代码可用';
                 }
-                successMsg.innerHTML = '<i class="fas fa-check-circle me-1"></i>代币代码可用';
-            }).catch(error => {
+            } catch (error) {
                 console.error('生成代币代码失败:', error);
                 showError(error.message);
-            });
-            
-            // 重置相关计算
-            resetCalculations();
+            }
             
             // 更新文档要求
             updateDocumentRequirements(type);
@@ -252,14 +250,18 @@ function initializeEventListeners() {
 
     // 添加类不动产相关字段的事件监听
     const tokenSupplyInput = document.getElementById('token_supply');
-    const totalValueSimilarInput = document.querySelector('.similar-assets #total_value');
+    const totalValueSimilarInput = document.getElementById('total_value_similar');
     
     if (tokenSupplyInput) {
-        tokenSupplyInput.addEventListener('input', calculateSimilarAssetsTokenPrice);
+        tokenSupplyInput.addEventListener('input', function() {
+            calculateSimilarAssetsTokenPrice();
+        });
     }
     
     if (totalValueSimilarInput) {
-        totalValueSimilarInput.addEventListener('input', calculateSimilarAssetsTokenPrice);
+        totalValueSimilarInput.addEventListener('input', function() {
+            calculateSimilarAssetsTokenPrice();
+        });
     }
 
     // 不动产相关字段的事件监听
@@ -267,11 +269,15 @@ function initializeEventListeners() {
     const totalValueInput = document.getElementById('total_value');
     
     if (areaInput) {
-        areaInput.addEventListener('input', calculateRealEstateTokens);
+        areaInput.addEventListener('input', function() {
+            calculateRealEstateTokens();
+        });
     }
     
     if (totalValueInput) {
-        totalValueInput.addEventListener('input', calculateRealEstateTokens);
+        totalValueInput.addEventListener('input', function() {
+            calculateRealEstateTokens();
+        });
     }
 
     // 添加预览按钮事件监听器
@@ -316,7 +322,7 @@ function toggleAssetTypeFields(type) {
         
         // 清空类不动产字段
         const tokenSupplyInput = document.getElementById('token_supply');
-        const totalValueSimilarInput = document.querySelector('.similar-assets #total_value');
+        const totalValueSimilarInput = document.getElementById('total_value_similar');
         if (tokenSupplyInput) tokenSupplyInput.value = '';
         if (totalValueSimilarInput) totalValueSimilarInput.value = '';
         
@@ -585,52 +591,86 @@ async function handleFiles(files, type) {
         }
 
         const fileType = type.toLowerCase();
-        
-        // 显示进度条
         const progressElement = fileType === 'image' ? imageUploadProgress : documentUploadProgress;
+        const percentElement = fileType === 'image' ? imageUploadPercent : documentUploadPercent;
+        
         progressElement.style.display = 'block';
         
-        // 初始化全局数组（如果不存在）
+        // 初始化全局数组
         if (fileType === 'image') {
             if (!window.uploadedImages) window.uploadedImages = [];
         } else {
             if (!window.uploadedDocuments) window.uploadedDocuments = [];
         }
 
+        const totalFiles = files.length;
+        let completedFiles = 0;
+
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const formData = new FormData();
-            formData.append('file', file);
+            
+            // 如果是图片，先压缩
+            let processedFile = file;
+            if (fileType === 'image') {
+                try {
+                    processedFile = await compressImage(file);
+                    console.log('图片压缩完成:', file.name);
+                } catch (error) {
+                    console.warn('图片压缩失败，使用原始文件:', error);
+                }
+            }
+            
+            formData.append('file', processedFile);
             formData.append('asset_type', document.getElementById('type').value);
             formData.append('file_type', fileType);
 
             try {
-                const response = await fetch('/api/upload', {
-                    method: 'POST',
-                    headers: {
-                        'X-Eth-Address': window.ethereum?.selectedAddress || ''
-                    },
-                    body: formData
+                // 使用 XMLHttpRequest 来获取上传进度
+                const xhr = new XMLHttpRequest();
+                
+                // 处理单个文件的上传进度
+                xhr.upload.onprogress = (event) => {
+                    if (event.lengthComputable) {
+                        const fileProgress = (event.loaded / event.total) * 100;
+                        const totalProgress = ((completedFiles + fileProgress / 100) / totalFiles) * 100;
+                        percentElement.textContent = Math.round(totalProgress);
+                        progressElement.querySelector('.progress-bar').style.width = `${totalProgress}%`;
+                    }
+                };
+
+                // 返回Promise以支持async/await
+                const response = await new Promise((resolve, reject) => {
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            try {
+                                const result = JSON.parse(xhr.responseText);
+                                resolve(result);
+                            } catch (error) {
+                                reject(new Error('解析响应失败'));
+                            }
+                        } else {
+                            reject(new Error(`上传失败: ${xhr.statusText}`));
+                        }
+                    };
+                    
+                    xhr.onerror = () => reject(new Error('网络错误'));
+                    
+                    xhr.open('POST', '/api/upload', true);
+                    xhr.setRequestHeader('X-Eth-Address', window.ethereum?.selectedAddress || '');
+                    xhr.send(formData);
                 });
 
-                if (!response.ok) {
-                    throw new Error(`上传失败: ${response.statusText}`);
-                }
-
-                const result = await response.json();
-                console.log('上传结果:', result);  // 添加日志
-
-                if (result && result.url) {
+                if (response && response.url) {
                     if (fileType === 'image') {
-                        window.uploadedImages.push(result.url);
-                        console.log('当前上传的图片:', window.uploadedImages);  // 添加日志
+                        window.uploadedImages.push(response.url);
+                        console.log('图片上传成功:', response.url);
                         updateImagePreview();
                     } else {
-                        window.uploadedDocuments.push(result.url);
+                        window.uploadedDocuments.push(response.url);
                         updateDocumentList();
                     }
-                } else {
-                    throw new Error('上传失败：服务器返回无效的URL');
+                    completedFiles++;
                 }
             } catch (error) {
                 console.error('上传文件失败:', error);
@@ -638,9 +678,11 @@ async function handleFiles(files, type) {
             }
         }
 
-        // 上传完成后隐藏进度条
+        // 上传完成后延迟隐藏进度条
         setTimeout(() => {
             progressElement.style.display = 'none';
+            progressElement.querySelector('.progress-bar').style.width = '0%';
+            percentElement.textContent = '0';
         }, 1000);
 
     } catch (error) {
@@ -655,31 +697,35 @@ function updateImagePreview() {
     if (!container) return;
 
     container.innerHTML = '';
-    console.log('更新图片预览，当前图片:', window.uploadedImages);  // 添加日志
+    console.log('更新图片预览，当前图片:', window.uploadedImages);
     
     if (!window.uploadedImages || window.uploadedImages.length === 0) {
         container.innerHTML = '<div class="text-center text-muted">暂无图片</div>';
         return;
     }
 
+    const row = document.createElement('div');
+    row.className = 'row g-3';
+    container.appendChild(row);
+
     window.uploadedImages.forEach((imageUrl, index) => {
-        const div = document.createElement('div');
-        div.className = 'col-md-4 mb-3';
-        div.innerHTML = `
+        const col = document.createElement('div');
+        col.className = 'col-md-4';
+        col.innerHTML = `
             <div class="card h-100">
-                <img src="${imageUrl}" 
-                     class="card-img-top" 
-                     alt="上传的图片"
-                     style="height: 200px; object-fit: cover;">
-                <div class="card-body">
-                    <button class="btn btn-sm btn-danger" 
+                <div class="position-relative">
+                    <img src="${imageUrl}" 
+                         class="card-img-top" 
+                         alt="上传的图片"
+                         style="height: 200px; object-fit: cover;">
+                    <button class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2" 
                             onclick="removeImage(${index})">
-                        删除
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
         `;
-        container.appendChild(div);
+        row.appendChild(col);
     });
 }
 
@@ -793,7 +839,7 @@ function validateForm() {
     const requiredFields = {
         common: ['name', 'description', 'tokensymbol'],
         '10': ['area', 'total_value'],
-        '20': ['token_supply', 'total_value']
+        '20': ['token_supply', 'total_value_similar']
     };
     
     // 验证必填字段
@@ -823,6 +869,7 @@ function getFieldLabel(field) {
         'tokensymbol': '代币代码',
         'area': '资产面积',
         'total_value': '总价值',
+        'total_value_similar': '总价值',
         'token_supply': '代币数量',
         'annual_revenue': '预期年收益'
     };
@@ -847,32 +894,35 @@ async function submitForm() {
         
         // 根据资产类型添加特定字段
         const assetType = document.getElementById('type').value;
+        console.log('资产类型:', assetType);  // 添加日志
+
         if (assetType === '10') {  // 不动产
-            formData.append('area', document.getElementById('area').value);
-            formData.append('total_value', document.getElementById('total_value').value);
-            formData.append('annual_revenue', document.getElementById('annual_revenue').value);
+            const area = document.getElementById('area').value;
+            const totalValue = document.getElementById('total_value').value;
+            const annualRevenue = document.getElementById('annual_revenue').value;
+            console.log('不动产字段:', { area, totalValue, annualRevenue });  // 添加日志
+
+            formData.append('area', area);
+            formData.append('total_value', totalValue);
+            formData.append('annual_revenue', annualRevenue);
             formData.append('token_supply', document.getElementById('token_count').textContent.replace(/,/g, ''));
             formData.append('token_price', document.getElementById('token_price').textContent);
         } else {  // 类不动产
-            formData.append('token_supply', document.getElementById('token_supply').value);
-            formData.append('total_value', document.getElementById('total_value').value);
-            formData.append('annual_revenue', document.getElementById('annual_revenue').value);
+            const tokenSupply = document.getElementById('token_supply').value;
+            const totalValue = document.getElementById('total_value_similar').value;
+            const annualRevenue = document.getElementById('expectedAnnualRevenueSimilar').value;
+            console.log('类不动产字段:', { tokenSupply, totalValue, annualRevenue });  // 添加日志
+
+            formData.append('token_supply', tokenSupply);
+            formData.append('total_value', totalValue);
+            formData.append('annual_revenue', annualRevenue);
             formData.append('token_price', document.getElementById('calculatedTokenPriceSimilar').textContent);
         }
 
-        // 添加图片URL
-        console.log('提交前的图片列表:', window.uploadedImages);  // 添加日志
-        if (window.uploadedImages && window.uploadedImages.length > 0) {
-            window.uploadedImages.forEach(imageUrl => {
-                formData.append('images[]', imageUrl);
-            });
-        }
-
-        // 添加文档URL
-        if (window.uploadedDocuments && window.uploadedDocuments.length > 0) {
-            window.uploadedDocuments.forEach(docUrl => {
-                formData.append('documents[]', docUrl);
-            });
+        // 打印所有表单数据
+        console.log('表单数据:');
+        for (let pair of formData.entries()) {
+            console.log(pair[0] + ': ' + pair[1]);
         }
 
         // 发送请求
@@ -890,6 +940,7 @@ async function submitForm() {
         }
 
         const result = await response.json();
+        console.log('创建资产成功:', result);  // 添加日志
         showToast('资产创建成功');
         
         // 清除草稿
@@ -1053,7 +1104,7 @@ async function generateTokenSymbol(type, retryCount = 0) {
 // 计算类不动产代币价格
 function calculateSimilarAssetsTokenPrice() {
     const tokenSupplyInput = document.getElementById('token_supply');
-    const totalValueInput = document.querySelector('.similar-assets #total_value');
+    const totalValueInput = document.getElementById('total_value_similar');
     const tokenPriceElement = document.getElementById('calculatedTokenPriceSimilar');
     
     if (!tokenPriceElement || !tokenSupplyInput || !totalValueInput) {
@@ -1215,13 +1266,13 @@ function previewAsset() {
         // 创建预览内容
         const previewContent = `
             <div class="container-fluid">
+                <!-- 图片轮播 -->
                 ${assetData.images && assetData.images.length > 0 ? `
                     <div id="previewCarousel" class="carousel slide mb-4" data-bs-ride="carousel">
                         <div class="carousel-inner">
                             ${assetData.images.map((imageUrl, index) => `
                                 <div class="carousel-item ${index === 0 ? 'active' : ''}">
-                                    <img src="${imageUrl}" class="d-block w-100" alt="资产图片 ${index + 1}" 
-                                         style="height: 400px; object-fit: cover;">
+                                    <img src="${imageUrl}" class="d-block w-100" alt="Asset Image" style="height: 300px; object-fit: cover;">
                                 </div>
                             `).join('')}
                         </div>
@@ -1234,171 +1285,127 @@ function previewAsset() {
                             </button>
                         ` : ''}
                     </div>
-                ` : '<div class="alert alert-info mb-4">暂无图片</div>'}
+                ` : '<div class="text-center p-4 bg-light mb-4"><i class="fas fa-image fa-3x text-muted"></i><p class="mt-2">暂无图片</p></div>'}
 
-                <div class="row mb-4">
-                    <div class="col-md-8">
-                        <h2 class="mb-2">${assetData.name || '未命名资产'}</h2>
-                        <p class="text-muted mb-0">
-                            <i class="fas fa-map-marker-alt me-2"></i>${assetData.location || '暂无位置信息'}
-                        </p>
-                    </div>
-                    <div class="col-md-4 text-end">
-                        <span class="badge bg-secondary">预览模式</span>
-                    </div>
-                </div>
-
-                <div class="row mb-4">
-                    <div class="col-md-4">
-                        <div class="card h-100">
+                <!-- 资产信息 -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
                             <div class="card-body">
-                                <h6 class="text-muted mb-2">资产类型</h6>
-                                <p class="h5 mb-0">${assetData.type === '10' ? '不动产' : '类不动产'}</p>
-                            </div>
-                        </div>
-                    </div>
-                    ${assetData.type === '10' ? `
-                        <div class="col-md-4">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h6 class="text-muted mb-2">资产面积</h6>
-                                    <p class="h5 mb-0">${formatNumber(assetData.area, 2)} ㎡</p>
+                                <h5 class="card-title mb-4">${assetData.name}</h5>
+                                
+                                <div class="row g-3">
+                                    <!-- 基本信息 -->
+                                    <div class="col-md-6">
+                                        <div class="bg-light rounded p-3">
+                                            <small class="text-muted d-block mb-1">资产类型</small>
+                                            <h6 class="mb-0">${assetData.type === '10' ? '不动产' : '类不动产'}</h6>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="bg-light rounded p-3">
+                                            <small class="text-muted d-block mb-1">位置</small>
+                                            <h6 class="mb-0">${assetData.location}</h6>
+                                        </div>
+                                    </div>
+
+                                    <!-- 资产特定信息 -->
+                                    ${assetData.type === '10' ? `
+                                        <div class="col-md-6">
+                                            <div class="bg-light rounded p-3">
+                                                <small class="text-muted d-block mb-1">面积</small>
+                                                <h6 class="mb-0">${assetData.area} ㎡</h6>
+                                            </div>
+                                        </div>
+                                    ` : `
+                                        <div class="col-md-6">
+                                            <div class="bg-light rounded p-3">
+                                                <small class="text-muted d-block mb-1">总价值</small>
+                                                <h6 class="mb-0">${assetData.totalValue} USDC</h6>
+                                            </div>
+                                        </div>
+                                    `}
+                                    
+                                    <!-- 代币信息 -->
+                                    <div class="col-md-6">
+                                        <div class="bg-light rounded p-3">
+                                            <small class="text-muted d-block mb-1">代币代码</small>
+                                            <h6 class="mb-0">${assetData.tokenSymbol}</h6>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="bg-light rounded p-3">
+                                            <small class="text-muted d-block mb-1">代币数量</small>
+                                            <h6 class="mb-0">${assetData.tokenSupply}</h6>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="bg-light rounded p-3">
+                                            <small class="text-muted d-block mb-1">代币价格</small>
+                                            <h6 class="mb-0">${assetData.tokenPrice} USDC</h6>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="bg-light rounded p-3">
+                                            <small class="text-muted d-block mb-1">预期年收益</small>
+                                            <h6 class="mb-0">${assetData.annualRevenue} USDC</h6>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 资产描述 -->
+                                <div class="mt-4">
+                                    <h6 class="text-muted mb-2">资产描述</h6>
+                                    <p class="mb-0">${assetData.description}</p>
                                 </div>
                             </div>
                         </div>
-                    ` : ''}
-                    <div class="col-md-4">
-                        <div class="card h-100">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-2">预期年收益</h6>
-                                <p class="h5 mb-0">${formatNumber(assetData.annualRevenue, 2)} USDC</p>
-                            </div>
-                        </div>
                     </div>
                 </div>
-
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">代币信息</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-3">
-                                <h6 class="text-muted mb-2">代币代码</h6>
-                                <p class="h5 mb-0">${assetData.tokenSymbol}</p>
-                            </div>
-                            <div class="col-md-3">
-                                <h6 class="text-muted mb-2">代币总量</h6>
-                                <p class="h5 mb-0">${formatNumber(assetData.tokenSupply)}</p>
-                            </div>
-                            <div class="col-md-3">
-                                <h6 class="text-muted mb-2">代币价格</h6>
-                                <p class="h5 mb-0">${assetData.tokenPrice} USDC</p>
-                            </div>
-                            <div class="col-md-3">
-                                <h6 class="text-muted mb-2">总价值</h6>
-                                <p class="h5 mb-0">${formatNumber(assetData.totalValue, 2)} USDC</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">资产描述</h5>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-text">${assetData.description || '暂无描述'}</p>
-                    </div>
-                </div>
-
-                ${assetData.documents.length > 0 ? `
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">相关文档</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="list-group list-group-flush">
-                                ${assetData.documents.map(doc => `
-                                    <div class="list-group-item">
-                                        <i class="fas fa-file-alt me-2"></i>
-                                        ${doc.name}
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    </div>
-                ` : ''}
             </div>
         `;
 
-        // 获取预览模态框
-        const previewModal = document.getElementById('previewModal');
-        if (!previewModal) {
-            throw new Error('预览模态框不存在');
-        }
+        // 创建预览模态框
+        const previewModal = document.createElement('div');
+        previewModal.className = 'modal fade';
+        previewModal.innerHTML = `
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">资产预览</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        ${previewContent}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                        <button type="button" class="btn btn-primary" onclick="submitPreview(event)">提交</button>
+                    </div>
+                </div>
+            </div>
+        `;
 
-        // 设置预览内容
-        const modalBody = previewModal.querySelector('.modal-body');
-        if (modalBody) {
-            modalBody.innerHTML = previewContent;
-        }
-
-        // 显示模态框
-        const modal = new bootstrap.Modal(previewModal);
-        modal.show();
-
+        // 添加到页面
+        document.body.appendChild(previewModal);
+        new bootstrap.Modal(previewModal).show();
     } catch (error) {
-        console.error('生成预览失败:', error);
-        showError('生成预览失败: ' + error.message);
+        console.error('预览资产失败:', error);
+        showError('预览资产失败，请稍后重试');
     }
 }
 
-// 重置计算结果
-function resetCalculations() {
-    const tokenCountElement = document.getElementById('token_count');
-    const tokenPriceElement = document.getElementById('token_price');
-    const calculatedTokenPriceSimilarElement = document.getElementById('calculatedTokenPriceSimilar');
-    
-    if (tokenCountElement) {
-        tokenCountElement.textContent = '0';
+// 提交预览
+function submitPreview(event) {
+    event.preventDefault(); // 阻止默认行为
+    const previewModal = document.querySelector('.modal.fade');
+    if (previewModal) {
+        previewModal.classList.remove('show');
+        previewModal.classList.add('d-none');
+        setTimeout(() => {
+            previewModal.remove();
+        }, 300);
     }
-    if (tokenPriceElement) {
-        tokenPriceElement.textContent = '0.000000';
-    }
-    if (calculatedTokenPriceSimilarElement) {
-        calculatedTokenPriceSimilarElement.textContent = '0.000000';
-    }
+    // 提交表单
+    submitForm();
 }
-
-// 计算代币价格
-function calculateTokenPrice() {
-    const type = document.getElementById('type')?.value;
-    if (type === '10') {
-        calculateRealEstateTokens();
-    } else if (type === '20') {
-        calculateSimilarAssetsTokenPrice();
-    }
-}
-
-// 检查代币符号是否可用
-async function checkTokenSymbol(symbol) {
-    try {
-        const response = await fetch(`/api/check_token_symbol?symbol=${symbol}`);
-        if (!response.ok) {
-            throw new Error(`API请求失败: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.error) {
-            console.error('验证代币代码失败:', data.error);
-            return false;
-        }
-        
-        return !data.exists;
-    } catch (error) {
-        console.error('检查代币代码失败:', error);
-        return false;
-    }
-} 
