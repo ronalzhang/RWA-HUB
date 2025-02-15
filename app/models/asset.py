@@ -141,9 +141,15 @@ class Asset(db.Model):
                 return self._images
             if isinstance(self._images, str):
                 try:
+                    # 尝试解析 JSON
                     images = json.loads(self._images)
-                    return images if isinstance(images, list) else []
+                    if isinstance(images, list):
+                        return [img for img in images if img and isinstance(img, str)]
+                    elif isinstance(images, str):
+                        return [images]
+                    return []
                 except json.JSONDecodeError:
+                    # 如果不是 JSON，检查是否为单个 URL
                     return [self._images] if self._images.strip() else []
             return []
         except Exception as e:
@@ -157,15 +163,20 @@ class Asset(db.Model):
             if value is None:
                 self._images = None
             elif isinstance(value, str):
-                # 如果是JSON字符串，尝试解析
+                # 如果是 JSON 字符串，尝试解析
                 try:
-                    json.loads(value)
-                    self._images = value
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        self._images = json.dumps([img for img in parsed if img and isinstance(img, str)])
+                    else:
+                        self._images = json.dumps([value])
                 except json.JSONDecodeError:
-                    # 如果不是有效的JSON，则假设是单个URL
+                    # 如果不是有效的 JSON，则假设是单个 URL
                     self._images = json.dumps([value])
             elif isinstance(value, list):
-                self._images = json.dumps(value)
+                # 过滤掉无效的图片 URL
+                valid_images = [img for img in value if img and isinstance(img, str)]
+                self._images = json.dumps(valid_images)
             else:
                 self._images = None
         except Exception as e:

@@ -24,12 +24,16 @@
     <!-- 图片轮播 -->
     <div class="row mb-4">
         <div class="col-md-8">
-            {% if asset.images %}
+            {% if asset.images and asset.images|length > 0 %}
             <div id="assetCarousel" class="carousel slide" data-bs-ride="carousel">
                 <div class="carousel-inner">
                     {% for image in asset.images %}
                     <div class="carousel-item {% if loop.first %}active{% endif %}">
-                        <img src="{{ image }}" class="d-block w-100" alt="Asset image {{ loop.index }}" style="max-height: 500px; object-fit: contain;">
+                        <img src="{{ image }}" 
+                             class="d-block w-100" 
+                             alt="Asset image {{ loop.index }}" 
+                             style="max-height: 500px; object-fit: contain;"
+                             onerror="this.onerror=null; this.src='/static/images/placeholder.png';">
                     </div>
                     {% endfor %}
                 </div>
@@ -52,7 +56,8 @@
                      style="width: 80px; height: 60px; object-fit: cover; cursor: pointer;"
                      data-bs-target="#assetCarousel"
                      data-bs-slide-to="{{ loop.index0 }}"
-                     {% if loop.first %}class="active"{% endif %}>
+                     {% if loop.first %}class="active"{% endif %}
+                     onerror="this.onerror=null; this.src='/static/images/placeholder.png';">
                 {% endfor %}
             </div>
             {% endif %}
