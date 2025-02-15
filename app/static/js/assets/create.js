@@ -415,104 +415,68 @@ function formatNumber(number, decimals = 0) {
 // 图片压缩函数
 async function compressImage(file) {
     try {
-        // 检查文件参数
         if (!file || !(file instanceof File)) {
             throw new Error('无效的文件对象');
         }
 
+        // 如果文件小于1MB且是JPEG/PNG，跳过压缩
+        if (file.size < 1024 * 1024 && (file.type === 'image/jpeg' || file.type === 'image/png')) {
+            return file;
+        }
+
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
-            
             reader.onload = function(e) {
-                try {
-                    if (!e.target || !e.target.result) {
-                        reject(new Error('读取文件失败'));
-                        return;
-                    }
-
-                    const img = new Image();
-                    img.crossOrigin = "Anonymous";
-                    
-                    img.onload = () => {
-                        try {
-                            const canvas = document.createElement('canvas');
-                            let width = img.width;
-                            let height = img.height;
-                            
-                            // 优化缩放比例计算
-                            const maxWidth = CONFIG.IMAGE.COMPRESS.MAX_WIDTH;
-                            const maxHeight = CONFIG.IMAGE.COMPRESS.MAX_HEIGHT;
-                            const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
-                            
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        let { width, height } = img;
+                        
+                        // 只有当图片尺寸超过限制时才进行缩放
+                        const maxWidth = CONFIG.IMAGE.COMPRESS.MAX_WIDTH;
+                        const maxHeight = CONFIG.IMAGE.COMPRESS.MAX_HEIGHT;
+                        if (width > maxWidth || height > maxHeight) {
+                            const ratio = Math.min(maxWidth / width, maxHeight / height);
                             width = Math.floor(width * ratio);
                             height = Math.floor(height * ratio);
-                            
-                            canvas.width = width;
-                            canvas.height = height;
-                            
-                            const ctx = canvas.getContext('2d');
-                            if (!ctx) {
-                                reject(new Error('无法创建Canvas上下文'));
-                                return;
-                            }
-                            
-                            // 设置白色背景
-                            ctx.fillStyle = '#FFFFFF';
-                            ctx.fillRect(0, 0, width, height);
-                            
-                            // 使用更好的图像平滑算法
-                            ctx.imageSmoothingEnabled = true;
-                            ctx.imageSmoothingQuality = 'high';
-                            
-                            // 绘制图片
-                            ctx.drawImage(img, 0, 0, width, height);
-                            
-                            // 转换为blob
-                            canvas.toBlob(
-                                (blob) => {
-                                    if (blob) {
-                                        // 创建新的 File 对象，保留原始文件名
-                                        const compressedFile = new File([blob], file.name, {
-                                            type: 'image/jpeg',
-                                            lastModified: new Date().getTime()
-                                        });
-                                        resolve(compressedFile);
-                                    } else {
-                                        reject(new Error('转换为Blob失败'));
-                                    }
-                                },
-                                'image/jpeg',
-                                CONFIG.IMAGE.COMPRESS.QUALITY
-                            );
-                            
-                        } catch (error) {
-                            console.error('Canvas处理图片失败:', error);
-                            reject(error);
                         }
-                    };
-                    
-                    img.onerror = (error) => {
-                        console.error('图片加载失败:', error);
-                        reject(new Error('图片加载失败'));
-                    };
-                    
-                    img.src = e.target.result;
-                } catch (error) {
-                    console.error('创建图片对象失败:', error);
-                    reject(error);
-                }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        canvas.toBlob(
+                            (blob) => {
+                                if (blob) {
+                                    const compressedFile = new File([blob], file.name, {
+                                        type: 'image/jpeg',
+                                        lastModified: Date.now()
+                                    });
+                                    resolve(compressedFile);
+                                } else {
+                                    reject(new Error('压缩失败'));
+                                }
+                            },
+                            'image/jpeg',
+                            CONFIG.IMAGE.COMPRESS.QUALITY
+                        );
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                img.onerror = reject;
+                img.src = e.target.result;
             };
-            
-            reader.onerror = (error) => {
-                console.error('读取文件失败:', error);
-                reject(new Error('读取文件失败'));
-            };
-            
+            reader.onerror = reject;
             reader.readAsDataURL(file);
         });
     } catch (error) {
         console.error('压缩图片失败:', error);
-        throw error;
+        return file; // 如果压缩失败，返回原始文件
     }
 }
 
@@ -593,100 +557,133 @@ async function handleFiles(files, type) {
         const fileType = type.toLowerCase();
         const progressElement = fileType === 'image' ? imageUploadProgress : documentUploadProgress;
         const percentElement = fileType === 'image' ? imageUploadPercent : documentUploadPercent;
+        const statusElement = fileType === 'image' ? imageUploadStatus : documentUploadStatus;
         
         progressElement.style.display = 'block';
         
-        // 初始化全局数组
-        if (fileType === 'image') {
-            if (!window.uploadedImages) window.uploadedImages = [];
-        } else {
-            if (!window.uploadedDocuments) window.uploadedDocuments = [];
+        // 初始化或获取上传数组
+        const uploadArray = fileType === 'image' ? (window.uploadedImages = window.uploadedImages || []) : (window.uploadedDocuments = window.uploadedDocuments || []);
+
+        // 验证文件
+        const validation = validateFiles(files, type);
+        if (!validation.isValid) {
+            showError(validation.errors.join('\n'));
+            return;
         }
 
-        const totalFiles = files.length;
+        // 初始化进度变量
         let completedFiles = 0;
+        let failedFiles = 0;
+        const totalFiles = files.length;
 
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const formData = new FormData();
+        // 更新进度的函数
+        const updateProgress = () => {
+            const progress = ((completedFiles + failedFiles) / totalFiles) * 100;
+            percentElement.textContent = Math.round(progress);
+            progressElement.querySelector('.progress-bar').style.width = `${progress}%`;
             
-            // 如果是图片，先压缩
-            let processedFile = file;
-            if (fileType === 'image') {
-                try {
-                    processedFile = await compressImage(file);
-                    console.log('图片压缩完成:', file.name);
-                } catch (error) {
-                    console.warn('图片压缩失败，使用原始文件:', error);
-                }
+            // 更新状态文本
+            statusElement.textContent = `上传中... (${completedFiles}/${totalFiles})`;
+            
+            if (progress === 100) {
+                setTimeout(() => {
+                    progressElement.style.display = 'none';
+                }, 1000);
             }
-            
-            // 构建 FormData
-            formData.append('file', processedFile);
-            formData.append('asset_type', document.getElementById('type').value || '10');
-            formData.append('file_type', fileType);
-            // 如果已经创建了资产，使用实际的资产ID
-            const assetId = document.querySelector('input[name="asset_id"]')?.value || 'temp';
-            formData.append('asset_id', assetId);
+        };
 
+        // 创建上传队列
+        const uploadQueue = Array.from(files).map(async (file, index) => {
             try {
-                // 使用 XMLHttpRequest 来获取上传进度
-                const xhr = new XMLHttpRequest();
+                // 处理文件（压缩图片或直接使用文档）
+                const processedFile = fileType === 'image' ? await compressImage(file) : file;
                 
-                // 处理单个文件的上传进度
-                xhr.upload.onprogress = (event) => {
-                    if (event.lengthComputable) {
-                        const fileProgress = (event.loaded / event.total) * 100;
-                        const totalProgress = ((completedFiles + fileProgress / 100) / totalFiles) * 100;
-                        percentElement.textContent = Math.round(totalProgress);
-                        progressElement.querySelector('.progress-bar').style.width = `${totalProgress}%`;
-                    }
-                };
+                const formData = new FormData();
+                formData.append('file', processedFile);
+                formData.append('asset_type', document.getElementById('type').value || '10');
+                formData.append('file_type', fileType);
+                formData.append('asset_id', document.querySelector('input[name="asset_id"]')?.value || 'temp');
 
-                // 处理上传完成
-                xhr.onload = function() {
-                    if (xhr.status === 200) {
-                        const response = JSON.parse(xhr.responseText);
-                        if (response.urls && response.urls.length > 0) {
-                            if (fileType === 'image') {
-                                window.uploadedImages = window.uploadedImages || [];
-                                window.uploadedImages.push(response.urls[0]);
-                                updateImagePreview();
-                            } else {
-                                window.uploadedDocuments = window.uploadedDocuments || [];
-                                window.uploadedDocuments.push(response.urls[0]);
-                                updateDocumentList();
-                            }
+                // 使用 Promise 包装 XMLHttpRequest
+                const uploadResult = await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    
+                    xhr.upload.onprogress = (event) => {
+                        if (event.lengthComputable) {
+                            const fileProgress = (event.loaded / event.total) * 100;
+                            const totalProgress = ((completedFiles + fileProgress / 100) / totalFiles) * 100;
+                            percentElement.textContent = Math.round(totalProgress);
+                            progressElement.querySelector('.progress-bar').style.width = `${totalProgress}%`;
                         }
-                        completedFiles++;
-                        
-                        if (completedFiles === totalFiles) {
-                            progressElement.style.display = 'none';
-                            showToast(`${fileType === 'image' ? '图片' : '文档'}上传完成`);
+                    };
+
+                    xhr.onload = () => {
+                        if (xhr.status === 200) {
+                            resolve(JSON.parse(xhr.responseText));
+                        } else {
+                            reject(new Error(xhr.statusText));
                         }
-                    } else {
-                        showError(`文件上传失败: ${xhr.statusText}`);
-                    }
-                };
+                    };
+                    
+                    xhr.onerror = () => reject(new Error('上传失败'));
+                    xhr.open('POST', '/api/upload', true);
+                    xhr.send(formData);
+                });
 
-                // 处理上传错误
-                xhr.onerror = function() {
-                    showError('文件上传失败，请重试');
-                };
-
-                // 发送请求
-                xhr.open('POST', '/api/upload', true);
-                xhr.send(formData);
-
+                if (uploadResult.urls && uploadResult.urls.length > 0) {
+                    uploadArray.push(uploadResult.urls[0]);
+                }
+                
+                completedFiles++;
+                updateProgress();
+                
             } catch (error) {
-                console.error('上传文件失败:', error);
-                showError(`上传文件失败: ${error.message}`);
+                console.error(`文件 ${file.name} 上传失败:`, error);
+                failedFiles++;
+                updateProgress();
             }
+        });
+
+        // 等待所有上传完成
+        await Promise.all(uploadQueue);
+
+        // 更新UI
+        if (fileType === 'image') {
+            updateImagePreview();
+        } else {
+            updateDocumentList();
+        }
+
+        // 隐藏进度条
+        progressElement.style.display = 'none';
+
+        // 显示结果消息
+        if (failedFiles > 0) {
+            showToast(`上传完成，${completedFiles}个成功，${failedFiles}个失败`);
+        } else {
+            showToast(`${fileType === 'image' ? '图片' : '文档'}上传完成`);
         }
 
     } catch (error) {
         console.error('处理文件失败:', error);
         showError(error.message);
+    }
+}
+
+// 更新上传进度
+function updateProgress() {
+    const elements = type === 'IMAGE' 
+        ? { container: imageUploadProgress, status: imageUploadStatus, percent: imageUploadPercent }
+        : { container: documentUploadProgress, status: documentUploadStatus, percent: documentUploadPercent };
+    
+    const progress = ((completedFiles + failedFiles) / totalFiles) * 100;
+    elements.percent.textContent = Math.round(progress);
+    elements.container.querySelector('.progress-bar').style.width = `${progress}%`;
+    
+    if (progress === 100) {
+        setTimeout(() => {
+            elements.container.style.display = 'none';
+        }, 1000);
     }
 }
 
@@ -1255,7 +1252,7 @@ function previewAsset() {
             location: formData.get('location'),
             description: formData.get('description'),
             tokenSymbol: formData.get('tokensymbol'),
-            images: window.uploadedImages || [],  // 使用全局变量中的图片数组
+            images: window.uploadedImages || [],
             documents: window.uploadedDocuments || []
         };
 
@@ -1269,19 +1266,24 @@ function previewAsset() {
             assetData.annualRevenue = formData.get('annual_revenue');
         } else { // 类不动产
             assetData.tokenSupply = formData.get('token_supply');
-            assetData.totalValue = formData.get('total_value');
+            assetData.totalValue = formData.get('total_value_similar');
             assetData.tokenPrice = document.getElementById('calculatedTokenPriceSimilar').textContent;
-            assetData.annualRevenue = formData.get('annual_revenue');
+            assetData.annualRevenue = formData.get('expectedAnnualRevenueSimilar');
         }
 
-        console.log('预览数据:', assetData); // 添加日志
+        console.log('Preview data:', assetData);
 
         // 创建预览内容
         const previewContent = `
             <div class="container-fluid">
-                <!-- 图片轮播 -->
+                <!-- Image Carousel -->
                 ${assetData.images && assetData.images.length > 0 ? `
                     <div id="previewCarousel" class="carousel slide mb-4" data-bs-ride="carousel">
+                        <div class="carousel-indicators">
+                            ${assetData.images.map((_, index) => `
+                                <button type="button" data-bs-target="#previewCarousel" data-bs-slide-to="${index}" ${index === 0 ? 'class="active"' : ''}></button>
+                            `).join('')}
+                        </div>
                         <div class="carousel-inner">
                             ${assetData.images.map((imageUrl, index) => `
                                 <div class="carousel-item ${index === 0 ? 'active' : ''}">
@@ -1298,9 +1300,9 @@ function previewAsset() {
                             </button>
                         ` : ''}
                     </div>
-                ` : '<div class="text-center p-4 bg-light mb-4"><i class="fas fa-image fa-3x text-muted"></i><p class="mt-2">暂无图片</p></div>'}
+                ` : '<div class="text-center p-4 bg-light mb-4"><i class="fas fa-image fa-3x text-muted"></i><p class="mt-2">No Images</p></div>'}
 
-                <!-- 资产信息 -->
+                <!-- Asset Information -->
                 <div class="row">
                     <div class="col-12">
                         <div class="card">
@@ -1308,67 +1310,66 @@ function previewAsset() {
                                 <h5 class="card-title mb-4">${assetData.name}</h5>
                                 
                                 <div class="row g-3">
-                                    <!-- 基本信息 -->
+                                    <!-- Basic Information -->
                                     <div class="col-md-6">
                                         <div class="bg-light rounded p-3">
-                                            <small class="text-muted d-block mb-1">资产类型</small>
-                                            <h6 class="mb-0">${assetData.type === '10' ? '不动产' : '类不动产'}</h6>
+                                            <small class="text-muted d-block mb-1">Asset Type</small>
+                                            <h6 class="mb-0">${assetData.type === '10' ? 'Real Estate' : 'Similar Assets'}</h6>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="bg-light rounded p-3">
-                                            <small class="text-muted d-block mb-1">位置</small>
+                                            <small class="text-muted d-block mb-1">Location</small>
                                             <h6 class="mb-0">${assetData.location}</h6>
                                         </div>
                                     </div>
 
-                                    <!-- 资产特定信息 -->
+                                    <!-- Asset Specific Information -->
                                     ${assetData.type === '10' ? `
                                         <div class="col-md-6">
                                             <div class="bg-light rounded p-3">
-                                                <small class="text-muted d-block mb-1">面积</small>
-                                                <h6 class="mb-0">${assetData.area} ㎡</h6>
+                                                <small class="text-muted d-block mb-1">Area</small>
+                                                <h6 class="mb-0">${assetData.area} m²</h6>
                                             </div>
                                         </div>
-                                    ` : `
-                                        <div class="col-md-6">
-                                            <div class="bg-light rounded p-3">
-                                                <small class="text-muted d-block mb-1">总价值</small>
-                                                <h6 class="mb-0">${assetData.totalValue} USDC</h6>
-                                            </div>
-                                        </div>
-                                    `}
-                                    
-                                    <!-- 代币信息 -->
+                                    ` : ''}
                                     <div class="col-md-6">
                                         <div class="bg-light rounded p-3">
-                                            <small class="text-muted d-block mb-1">代币代码</small>
+                                            <small class="text-muted d-block mb-1">Total Value</small>
+                                            <h6 class="mb-0">${assetData.totalValue} USDC</h6>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Token Information -->
+                                    <div class="col-md-6">
+                                        <div class="bg-light rounded p-3">
+                                            <small class="text-muted d-block mb-1">Token Symbol</small>
                                             <h6 class="mb-0">${assetData.tokenSymbol}</h6>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="bg-light rounded p-3">
-                                            <small class="text-muted d-block mb-1">代币数量</small>
+                                            <small class="text-muted d-block mb-1">Token Supply</small>
                                             <h6 class="mb-0">${assetData.tokenSupply}</h6>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="bg-light rounded p-3">
-                                            <small class="text-muted d-block mb-1">代币价格</small>
+                                            <small class="text-muted d-block mb-1">Token Price</small>
                                             <h6 class="mb-0">${assetData.tokenPrice} USDC</h6>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="bg-light rounded p-3">
-                                            <small class="text-muted d-block mb-1">预期年收益</small>
+                                            <small class="text-muted d-block mb-1">Expected Annual Revenue</small>
                                             <h6 class="mb-0">${assetData.annualRevenue} USDC</h6>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- 资产描述 -->
+                                <!-- Asset Description -->
                                 <div class="mt-4">
-                                    <h6 class="text-muted mb-2">资产描述</h6>
+                                    <h6 class="text-muted mb-2">Description</h6>
                                     <p class="mb-0">${assetData.description}</p>
                                 </div>
                             </div>
@@ -1385,15 +1386,15 @@ function previewAsset() {
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">资产预览</h5>
+                        <h5 class="modal-title">Asset Preview</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         ${previewContent}
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-                        <button type="button" class="btn btn-primary" onclick="submitPreview(event)">提交</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" onclick="submitPreview(event)">Submit</button>
                     </div>
                 </div>
             </div>
@@ -1401,10 +1402,22 @@ function previewAsset() {
 
         // 添加到页面
         document.body.appendChild(previewModal);
-        new bootstrap.Modal(previewModal).show();
+        const modal = new bootstrap.Modal(previewModal);
+        modal.show();
+
+        // 初始化轮播
+        if (assetData.images && assetData.images.length > 0) {
+            setTimeout(() => {
+                const carousel = new bootstrap.Carousel(document.getElementById('previewCarousel'), {
+                    interval: 5000,
+                    wrap: true,
+                    keyboard: true
+                });
+            }, 100);
+        }
     } catch (error) {
-        console.error('预览资产失败:', error);
-        showError('预览资产失败，请稍后重试');
+        console.error('Failed to preview asset:', error);
+        showError('Failed to preview asset, please try again');
     }
 }
 

@@ -494,7 +494,7 @@ async function checkWalletConnection() {
     const walletCheck = document.getElementById('walletCheck');
     const formContent = document.getElementById('formContent');
     
-    if (!window.ethereum || !window.ethereum.selectedAddress) {
+    if (!window.walletState || !window.walletState.getConnectionStatus()) {
         walletCheck.style.display = 'block';
         formContent.style.display = 'none';
         return false;
@@ -527,11 +527,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 监听钱包状态变化
     if (window.ethereum) {
         window.ethereum.on('accountsChanged', async (accounts) => {
-            if (accounts.length === 0) {
-                await checkWalletConnection();
-            } else {
-                await checkWalletConnection();
-            }
+            await checkWalletConnection();
+        });
+        
+        window.ethereum.on('disconnect', async () => {
+            await checkWalletConnection();
         });
     }
 });
