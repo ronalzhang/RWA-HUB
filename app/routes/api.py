@@ -253,6 +253,9 @@ def create_asset():
         if 'images[]' in request.form:
             image_paths = request.form.getlist('images[]')
             current_app.logger.info(f'收到 {len(image_paths)} 个图片URL')
+            # 确保图片路径是有效的
+            image_paths = [path for path in image_paths if path and isinstance(path, str)]
+            current_app.logger.info(f'有效的图片路径: {image_paths}')
 
         # 处理文档上传
         document_paths = []
@@ -260,10 +263,15 @@ def create_asset():
             document_paths = request.form.getlist('documents[]')
             current_app.logger.info(f'收到 {len(document_paths)} 个文档URL')
 
-        # 更新资产的图片和文档路径
+        # 更新资产的图片路径
         if image_paths:
-            asset.images = json.dumps(image_paths)
-            current_app.logger.info(f'更新资产图片成功: {image_paths}')
+            try:
+                asset.images = json.dumps(image_paths)
+                current_app.logger.info(f'更新资产图片成功: {image_paths}')
+                db.session.commit()
+            except Exception as e:
+                current_app.logger.error(f'保存图片路径失败: {str(e)}')
+                raise
             
         if document_paths:
             asset.documents = json.dumps(document_paths)
@@ -679,24 +687,26 @@ def upload():
         ext = file.filename.rsplit(".", 1)[1].lower() if '.' in file.filename else ''
         filename = f'{asset_type}/{asset_id}/{file_type}/{int(time.time())}_{secure_filename(file.filename)}'
             
-        # 检查七牛云存储是否初始化
-        if storage is None:
-            current_app.logger.error('七牛云存储未初始化，尝试重新初始化...')
-            from app.utils.storage import init_storage
-            if not init_storage(current_app):
-                raise Exception("七牛云存储初始化失败")
+        # 获取存储服务实例
+        from app.utils.storage import get_storage
+        try:
+            storage = get_storage()
+            if not storage:
+                raise ValueError('存储服务未初始化')
+        except Exception as e:
+            current_app.logger.error(f'获取存储服务失败: {str(e)}')
+            raise ValueError('存储服务未准备就绪')
                 
-        if storage is None:
-            raise Exception("七牛云存储未正确初始化")
-            
         # 上传文件到存储服务
         result = storage.upload(file_data, filename)
-        if not result:
+        if not result or 'url' not in result:
             raise Exception("文件上传失败")
             
+        # 返回包含urls数组的响应
         return jsonify({
-            'url': result.get('url'),
-            'name': file.filename
+            'urls': [result['url']],
+            'name': file.filename,
+            'message': '上传成功'
         })
         
     except Exception as e:

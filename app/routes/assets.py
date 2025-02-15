@@ -217,22 +217,28 @@ def proxy_image(image_path):
         qiniu_url = f"http://{current_app.config['QINIU_DOMAIN']}/{image_path}"
         current_app.logger.info(f"代理图片请求: {qiniu_url}")
         
-        # 请求七牛云图片
+        # 请求七牛云文件
         response = requests.get(qiniu_url, stream=True)
         
         if response.status_code == 200:
-            # 返回图片内容
+            # 返回文件内容，并设置缓存控制
+            headers = {
+                'Cache-Control': 'public, max-age=31536000',
+                'Content-Type': response.headers.get('content-type', 'image/jpeg')
+            }
             return Response(
                 response.raw.read(),
-                content_type=response.headers['content-type']
+                headers=headers
             )
         else:
             current_app.logger.error(f"获取图片失败: {response.status_code}")
-            abort(404)
+            # 返回默认图片
+            return send_from_directory('static/images', 'placeholder.png')
             
     except Exception as e:
         current_app.logger.error(f"代理图片请求失败: {str(e)}")
-        abort(500)
+        # 返回默认图片
+        return send_from_directory('static/images', 'placeholder.png')
 
 @assets_api_bp.route('/generate-token-symbol', methods=['POST'])
 def generate_token_symbol():
@@ -284,31 +290,37 @@ def calculate_tokens():
 def upload_files():
     """上传文件"""
     try:
-        # 检查是否有图片或文档上传
-        has_images = 'images[]' in request.files
-        has_documents = 'documents[]' in request.files
-        
-        if not has_images and not has_documents:
+        # 检查是否有文件上传
+        if 'file' not in request.files:
+            current_app.logger.error('没有文件被上传')
             return jsonify({'error': '没有文件被上传'}), 400
             
-        files = []
-        if has_images:
-            files.extend(request.files.getlist('images[]'))
-        if has_documents:
-            files.extend(request.files.getlist('documents[]'))
+        file = request.files['file']
+        if not file:
+            current_app.logger.error('文件无效')
+            return jsonify({'error': '文件无效'}), 400
             
         asset_type = request.form.get('asset_type')
+        file_type = request.form.get('file_type', 'image')
         asset_id = request.form.get('asset_id', 'temp')
         
+        current_app.logger.info(f'开始上传文件: {file.filename}')
+        current_app.logger.info(f'资产类型: {asset_type}')
+        current_app.logger.info(f'文件类型: {file_type}')
+        current_app.logger.info(f'资产ID: {asset_id}')
+        
         if not asset_type:
+            current_app.logger.error('缺少资产类型')
             return jsonify({'error': '缺少资产类型'}), 400
             
         # 保存文件
-        file_urls = save_files(files, asset_type, asset_id)
+        file_urls = save_files([file], asset_type, asset_id)
         
         if not file_urls:
+            current_app.logger.error('文件上传失败')
             return jsonify({'error': '文件上传失败'}), 500
             
+        current_app.logger.info(f'文件上传成功: {file_urls}')
         return jsonify({
             'urls': file_urls
         })
