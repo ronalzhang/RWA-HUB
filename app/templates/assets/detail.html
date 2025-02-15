@@ -24,31 +24,28 @@
     <!-- 图片轮播 -->
     <div class="row mb-4">
         <div class="col-md-8">
-            {% set asset_dict = asset.to_dict() %}
-            {% if asset_dict.images %}
+            {% if asset.images %}
             <div id="assetCarousel" class="carousel slide" data-bs-ride="carousel">
                 <div class="carousel-inner">
-                    {% for image in asset_dict.images %}
+                    {% for image in asset.images %}
                     <div class="carousel-item {% if loop.first %}active{% endif %}">
                         <img src="{{ image }}" class="d-block w-100" alt="Asset image {{ loop.index }}" style="max-height: 500px; object-fit: contain;">
                     </div>
                     {% endfor %}
                 </div>
-                {% if asset_dict.images|length > 1 %}
+                {% if asset.images|length > 1 %}
                 <button class="carousel-control-prev" type="button" data-bs-target="#assetCarousel" data-bs-slide="prev">
-                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                    <span class="visually-hidden">Previous</span>
+                    <span class="carousel-control-prev-icon"></span>
                 </button>
                 <button class="carousel-control-next" type="button" data-bs-target="#assetCarousel" data-bs-slide="next">
-                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                    <span class="visually-hidden">Next</span>
+                    <span class="carousel-control-next-icon"></span>
                 </button>
                 {% endif %}
             </div>
             <!-- 缩略图导航 -->
-            {% if asset_dict.images|length > 1 %}
+            {% if asset.images|length > 1 %}
             <div class="d-flex gap-2 mt-2 overflow-auto">
-                {% for image in asset_dict.images %}
+                {% for image in asset.images %}
                 <img src="{{ image }}" 
                      class="img-thumbnail" 
                      alt="缩略图" 
@@ -60,8 +57,9 @@
             </div>
             {% endif %}
             {% else %}
-            <div class="text-center p-4">
-                <p>暂无图片</p>
+            <div class="text-center p-4 bg-light">
+                <i class="fas fa-image fa-3x text-muted"></i>
+                <p class="mt-2 text-muted">暂无图片</p>
             </div>
             {% endif %}
         </div>
