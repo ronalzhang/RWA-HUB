@@ -252,7 +252,7 @@ function initializeEventListeners() {
 
     // 添加类不动产相关字段的事件监听
     const tokenSupplyInput = document.getElementById('token_supply');
-    const totalValueSimilarInput = document.getElementById('total_value');
+    const totalValueSimilarInput = document.querySelector('.similar-assets #total_value');
     
     if (tokenSupplyInput) {
         tokenSupplyInput.addEventListener('input', calculateSimilarAssetsTokenPrice);
@@ -316,7 +316,7 @@ function toggleAssetTypeFields(type) {
         
         // 清空类不动产字段
         const tokenSupplyInput = document.getElementById('token_supply');
-        const totalValueSimilarInput = document.getElementById('total_value');
+        const totalValueSimilarInput = document.querySelector('.similar-assets #total_value');
         if (tokenSupplyInput) tokenSupplyInput.value = '';
         if (totalValueSimilarInput) totalValueSimilarInput.value = '';
         
@@ -1051,12 +1051,15 @@ async function generateTokenSymbol(type, retryCount = 0) {
 }
 
 // 计算类不动产代币价格
-async function calculateSimilarAssetsTokenPrice() {
+function calculateSimilarAssetsTokenPrice() {
     const tokenSupplyInput = document.getElementById('token_supply');
-    const totalValueInput = document.getElementById('total_value');
+    const totalValueInput = document.querySelector('.similar-assets #total_value');
     const tokenPriceElement = document.getElementById('calculatedTokenPriceSimilar');
     
-    if (!tokenPriceElement || !tokenSupplyInput || !totalValueInput) return;
+    if (!tokenPriceElement || !tokenSupplyInput || !totalValueInput) {
+        console.warn('类不动产计算元素未找到');
+        return;
+    }
     
     const tokenCount = parseInt(tokenSupplyInput.value) || 0;
     const totalValue = parseFloat(totalValueInput.value) || 0;
