@@ -144,7 +144,9 @@ def create_asset_page():
             flash('请先连接钱包', 'error')
             return redirect(url_for('main.index'))
             
-        return render_template('assets/create.html')
+        # 记录创建者地址
+        current_app.logger.info(f'用户 {g.eth_address} 访问创建资产页面')
+        return render_template('assets/create.html', creator_address=g.eth_address)
     except Exception as e:
         current_app.logger.error(f'加载创建资产页面失败: {str(e)}')
         flash('系统错误，请稍后重试', 'error')
