@@ -28,14 +28,17 @@
                     </h1>
                     <p class="lead text-white-75 mb-5">{{ _('Start your asset tokenization journey now') }}<br>{{ _('Secure, transparent, and efficient blockchain asset management platform') }}</p>
                     <div class="d-flex gap-3 flex-wrap">
-                        <button type="button" class="btn btn-gradient btn-lg px-4 py-3" onclick="window.location.href='{{ url_for('assets.create_asset_page') }}'">
+                        <button type="button" class="btn btn-primary btn-lg px-4 py-3 me-3" onclick="window.location.href='{{ url_for('assets.create_asset_page') }}'">
                             <i class="fas fa-plus me-2"></i>{{ _('Publish Asset') }}
                         </button>
-                        <a href="http://sqbw3uvy8.sabkt.gdipper.com/docs/whitpaper.pdf" 
-                           class="btn btn-outline-light btn-lg px-4 py-3" 
-                           target="_blank">
+                        <a href="{{ url_for('static', filename='docs/whitpaper.pdf') }}" class="btn btn-outline-light btn-lg px-4 py-3" target="_blank">
                             {{ _('White Paper') }} <i class="fas fa-file-pdf ms-2"></i>
                         </a>
+                        <div class="d-flex justify-content-center mt-4">
+                            <a href="#" class="btn btn-outline-primary me-3" target="_blank">
+                                <i class="fas fa-book me-2"></i>{{ _('Documentation') }}
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
