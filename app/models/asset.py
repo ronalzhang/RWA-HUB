@@ -41,12 +41,10 @@ class Asset(db.Model):
     creator_address = db.Column(db.String(42), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
-    deleted_at = db.Column(db.DateTime)
-    deleted_by = db.Column(db.String(42))
 
     # 添加关联
-    dividend_records = db.relationship('app.models.dividend.DividendRecord', backref=db.backref('related_asset', lazy=True), lazy=True, cascade='all, delete-orphan')
-    trades = db.relationship('app.models.trade.Trade', backref=db.backref('related_asset', lazy=True), lazy=True)
+    dividend_records = db.relationship('DividendRecord', backref='asset', lazy=True, cascade='all, delete-orphan')
+    trades = db.relationship('Trade', backref='asset', lazy=True, cascade='all, delete-orphan')
 
     # 添加索引
     __table_args__ = (
@@ -60,7 +58,7 @@ class Asset(db.Model):
         CheckConstraint('annual_revenue > 0', name='ck_annual_revenue_positive'),  # 年收益必须大于0
         CheckConstraint('area > 0', name='ck_area_positive'),  # 面积必须大于0
         CheckConstraint('total_value > 0', name='ck_total_value_positive'),  # 总价值必须大于0
-        CheckConstraint('status IN (1, 2, 3, 4)', name='ck_status_valid'),  # 状态必须在有效范围内
+        CheckConstraint('status IN (1, 2, 3)', name='ck_status_valid'),  # 状态必须在有效范围内
     )
 
     @validates('asset_type')
@@ -218,8 +216,6 @@ class Asset(db.Model):
             'creator_address': self.creator_address,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None,
             'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else None,
-            'deleted_at': self.deleted_at.strftime('%Y-%m-%d %H:%M:%S') if self.deleted_at else None,
-            'deleted_by': self.deleted_by,
             'images': self.images,
             'documents': self.documents
         }

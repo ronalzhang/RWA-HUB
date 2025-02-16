@@ -106,19 +106,31 @@ def list_assets_page():
                              is_admin=is_admin_user)
 
 @assets_bp.route("/<int:asset_id>")
+@eth_address_required  # 添加钱包地址检查装饰器
 def asset_detail_page(asset_id):
     """资产详情页面"""
     try:
         # 获取资产信息
         asset = Asset.query.get_or_404(asset_id)
+        current_app.logger.info(f'获取资产信息成功: {asset.id}')
         
         # 获取分红历史
         dividend_records = asset.dividend_records if asset.dividend_records else []
+        current_app.logger.info(f'获取分红记录: {len(dividend_records)} 条')
         
-        # 获取当前用户的钱包地址
-        eth_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address')
+        # 使用全局钱包地址
+        current_user_address = g.eth_address.lower() if g.eth_address else None
+        current_app.logger.info(f'当前用户钱包地址: {current_user_address}')
         
-        # 计算剩余可售数量（如果已上链则从合约获取，否则等于发行总量）
+        # 检查是否是管理员
+        is_admin_user = is_admin(current_user_address)
+        current_app.logger.info(f'是否是管理员: {is_admin_user}')
+        
+        # 检查是否是资产所有者
+        is_owner = current_user_address and current_user_address == asset.owner_address.lower()
+        current_app.logger.info(f'是否是资产所有者: {is_owner}')
+        
+        # 计算剩余可售数量
         remaining_supply = asset.token_supply
         if asset.token_address:
             # TODO: 从合约获取实际剩余数量
@@ -128,8 +140,9 @@ def asset_detail_page(asset_id):
                              asset=asset,
                              dividend_records=dividend_records,
                              remaining_supply=remaining_supply,
-                             current_user_address=eth_address,
-                             is_admin=is_admin(eth_address))
+                             current_user_address=current_user_address,
+                             is_admin_user=is_admin_user,
+                             is_owner=is_owner)
     except Exception as e:
         current_app.logger.error(f"获取资产详情失败: {str(e)}")
         abort(404)
@@ -161,7 +174,10 @@ def edit_asset_page(asset_id):
         asset = Asset.query.get_or_404(asset_id)
         
         # 检查权限
-        if asset.owner_address.lower() != g.eth_address and not is_admin(g.eth_address):
+        is_owner = g.eth_address.lower() == asset.owner_address.lower()
+        is_admin_user = is_admin(g.eth_address)
+        
+        if not (is_owner or is_admin_user):
             flash('您没有权限编辑此资产', 'error')
             return redirect(url_for('assets.list_assets_page'))
             
@@ -192,15 +208,31 @@ def proxy_file(file_type, file_path):
         abort(500)
 
 @assets_bp.route('/<int:asset_id>/dividend')
+@eth_address_required
 def dividend_page(asset_id):
     """资产分红管理页面"""
     try:
+        # 获取资产信息
         asset = Asset.query.get_or_404(asset_id)
+        
+        # 检查权限
+        if not g.eth_address:
+            flash('请先连接钱包', 'error')
+            return redirect(url_for('assets.asset_detail_page', asset_id=asset_id))
+            
+        # 检查是否是管理员或资产所有者
+        is_admin_user = is_admin(g.eth_address)
+        is_owner = g.eth_address.lower() == asset.owner_address.lower()
+        
+        if not (is_admin_user or is_owner):
+            flash('您没有权限访问分红管理页面', 'error')
+            return redirect(url_for('assets.asset_detail_page', asset_id=asset_id))
+            
         return render_template('assets/dividend.html', asset=asset)
     except Exception as e:
         current_app.logger.error(f'访问分红管理页面失败: {str(e)}')
         flash('访问分红管理页面失败')
-        return redirect(url_for('assets.list'))
+        return redirect(url_for('assets.asset_detail_page', asset_id=asset_id))
 
 def allowed_file(filename, allowed_extensions):
     """检查文件类型是否允许"""
