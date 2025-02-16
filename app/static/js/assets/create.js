@@ -594,124 +594,55 @@ function showProgress(type, loaded, total) {
 // 处理文件上传
 async function handleFiles(files, type) {
     try {
-        if (!files || files.length === 0) {
-            showError('请选择要上传的文件');
-            return;
+        if (!files || files.length === 0) return;
+
+        const formData = new FormData();
+        formData.append('asset_type', document.getElementById('type').value);
+        formData.append('file_type', type);
+        formData.append('asset_id', 'temp');
+
+        // 添加文件
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            formData.append('file', file);
         }
 
-        const fileType = type.toLowerCase();
-        const progressElement = fileType === 'image' ? imageUploadProgress : documentUploadProgress;
-        const percentElement = fileType === 'image' ? imageUploadPercent : documentUploadPercent;
-        const statusElement = fileType === 'image' ? imageUploadStatus : documentUploadStatus;
-        
-        progressElement.style.display = 'block';
-        
-        // 初始化或获取上传数组
-        const uploadArray = fileType === 'image' ? (window.uploadedImages = window.uploadedImages || []) : (window.uploadedDocuments = window.uploadedDocuments || []);
+        // 显示上传进度
+        const progressContainer = document.getElementById(`${type}UploadProgress`);
+        progressContainer.style.display = 'block';
 
-        // 验证文件
-        const validation = validateFiles(files, type);
-        if (!validation.isValid) {
-            showError(validation.errors.join('\n'));
-            return;
-        }
-
-        // 初始化进度变量
-        let completedFiles = 0;
-        let failedFiles = 0;
-        const totalFiles = files.length;
-
-        // 更新进度的函数
-        const updateProgress = () => {
-            const progress = ((completedFiles + failedFiles) / totalFiles) * 100;
-            percentElement.textContent = Math.round(progress);
-            progressElement.querySelector('.progress-bar').style.width = `${progress}%`;
-            
-            // 更新状态文本
-            statusElement.textContent = `上传中... (${completedFiles}/${totalFiles})`;
-            
-            if (progress === 100) {
-                setTimeout(() => {
-                    progressElement.style.display = 'none';
-                }, 1000);
-            }
-        };
-
-        // 创建上传队列
-        const uploadQueue = Array.from(files).map(async (file, index) => {
-            try {
-                // 处理文件（压缩图片或直接使用文档）
-                const processedFile = fileType === 'image' ? await compressImage(file) : file;
-                
-                const formData = new FormData();
-                formData.append('file', processedFile);
-                formData.append('asset_type', document.getElementById('type').value || '10');
-                formData.append('file_type', fileType);
-                formData.append('asset_id', document.querySelector('input[name="asset_id"]')?.value || 'temp');
-
-                // 使用 Promise 包装 XMLHttpRequest
-                const uploadResult = await new Promise((resolve, reject) => {
-                    const xhr = new XMLHttpRequest();
-                    
-                    xhr.upload.onprogress = (event) => {
-                        if (event.lengthComputable) {
-                            const fileProgress = (event.loaded / event.total) * 100;
-                            const totalProgress = ((completedFiles + fileProgress / 100) / totalFiles) * 100;
-                            percentElement.textContent = Math.round(totalProgress);
-                            progressElement.querySelector('.progress-bar').style.width = `${totalProgress}%`;
-                        }
-                    };
-
-                    xhr.onload = () => {
-                        if (xhr.status === 200) {
-                            resolve(JSON.parse(xhr.responseText));
-                        } else {
-                            reject(new Error(xhr.statusText));
-                        }
-                    };
-                    
-                    xhr.onerror = () => reject(new Error('上传失败'));
-                    xhr.open('POST', '/api/upload', true);
-                    xhr.send(formData);
-                });
-
-                if (uploadResult.urls && uploadResult.urls.length > 0) {
-                    uploadArray.push(uploadResult.urls[0]);
-                }
-                
-                completedFiles++;
-                updateProgress();
-                
-            } catch (error) {
-                console.error(`文件 ${file.name} 上传失败:`, error);
-                failedFiles++;
-                updateProgress();
-            }
+        const response = await fetch('/api/assets/upload', {
+            method: 'POST',
+            body: formData
         });
 
-        // 等待所有上传完成
-        await Promise.all(uploadQueue);
+        if (!response.ok) {
+            throw new Error('上传失败');
+        }
 
-        // 更新UI
-        if (fileType === 'image') {
+        const result = await response.json();
+        
+        // 更新预览
+        if (type === 'image') {
+            window.uploadedImages = window.uploadedImages || [];
+            window.uploadedImages.push(...result.urls);
             updateImagePreview();
         } else {
+            window.uploadedDocuments = window.uploadedDocuments || [];
+            window.uploadedDocuments.push(...result.urls);
             updateDocumentList();
         }
 
         // 隐藏进度条
-        progressElement.style.display = 'none';
-
-        // 显示结果消息
-        if (failedFiles > 0) {
-            showToast(`上传完成，${completedFiles}个成功，${failedFiles}个失败`);
-        } else {
-            showToast(`${fileType === 'image' ? '图片' : '文档'}上传完成`);
-        }
+        progressContainer.style.display = 'none';
 
     } catch (error) {
-        console.error('处理文件失败:', error);
-        showError(error.message);
+        console.error('文件处理失败:', error);
+        showError('文件上传失败: ' + error.message);
+        
+        // 隐藏进度条
+        const progressContainer = document.getElementById(`${type}UploadProgress`);
+        progressContainer.style.display = 'none';
     }
 }
 
