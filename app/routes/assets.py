@@ -171,27 +171,22 @@ def edit_asset_page(asset_id):
 
 @assets_bp.route('/proxy/<string:file_type>/<path:file_path>')
 def proxy_file(file_type, file_path):
-    """代理七牛云文件请求"""
+    """处理文件请求"""
     try:
-        # 构建七牛云的完整URL
-        qiniu_url = f"http://{current_app.config['QINIU_DOMAIN']}/{file_path}"
-        current_app.logger.info(f"代理{file_type}请求: {qiniu_url}")
-        
-        # 请求七牛云文件
-        response = requests.get(qiniu_url, stream=True)
-        
-        if response.status_code == 200:
-            # 返回文件内容
-            return Response(
-                response.raw.read(),
-                content_type=response.headers['content-type']
-            )
-        else:
-            current_app.logger.error(f"获取文件失败: {response.status_code}")
-            abort(404)
+        # 检查是否是静态资源路径
+        if file_path.startswith('static/'):
+            return send_from_directory('static', file_path[7:])
+            
+        # 检查是否是上传的文件
+        if file_path.startswith('uploads/'):
+            return send_from_directory('static/uploads', file_path[8:])
+            
+        # 如果都不是，返回404
+        current_app.logger.error(f"文件不存在: {file_path}")
+        abort(404)
             
     except Exception as e:
-        current_app.logger.error(f"代理文件请求失败: {str(e)}")
+        current_app.logger.error(f"文件请求失败: {str(e)}")
         abort(500)
 
 @assets_bp.route('/<int:asset_id>/dividend')
@@ -211,34 +206,22 @@ def allowed_file(filename, allowed_extensions):
 
 @assets_bp.route('/proxy/image/<path:image_path>')
 def proxy_image(image_path):
-    """代理七牛云图片请求"""
+    """处理图片请求"""
     try:
-        # 构建七牛云的完整URL
-        qiniu_url = f"http://{current_app.config['QINIU_DOMAIN']}/{image_path}"
-        current_app.logger.info(f"代理图片请求: {qiniu_url}")
-        
-        # 请求七牛云文件
-        response = requests.get(qiniu_url, stream=True)
-        
-        if response.status_code == 200:
-            # 返回文件内容，并设置缓存控制
-            headers = {
-                'Cache-Control': 'public, max-age=31536000',
-                'Content-Type': response.headers.get('content-type', 'image/jpeg')
-            }
-            return Response(
-                response.raw.read(),
-                headers=headers
-            )
-        else:
-            current_app.logger.error(f"获取图片失败: {response.status_code}")
-            # 返回默认图片
-            return send_from_directory('static/images', 'placeholder.png')
+        # 检查是否是静态资源路径
+        if image_path.startswith('static/'):
+            return send_from_directory('static', image_path[7:])
+            
+        # 检查是否是上传的文件
+        if image_path.startswith('uploads/'):
+            return send_from_directory('static/uploads', image_path[8:])
+            
+        # 如果都不是，返回默认图片
+        return send_from_directory('static/images', 'placeholder.jpg')
             
     except Exception as e:
-        current_app.logger.error(f"代理图片请求失败: {str(e)}")
-        # 返回默认图片
-        return send_from_directory('static/images', 'placeholder.png')
+        current_app.logger.error(f"图片请求失败: {str(e)}")
+        return send_from_directory('static/images', 'placeholder.jpg')
 
 @assets_api_bp.route('/generate-token-symbol', methods=['POST'])
 def generate_token_symbol():
