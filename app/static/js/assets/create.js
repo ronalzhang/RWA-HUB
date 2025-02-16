@@ -1328,7 +1328,7 @@ function previewAsset() {
                                     <div class="col-md-6">
                                         <div class="bg-light rounded p-3">
                                             <small class="text-muted d-block mb-1">Total Value</small>
-                                            <h6 class="mb-0">${assetData.totalValue} USDC</h6>
+                                            <h6 class="mb-0">${formatNumber(assetData.totalValue, 2)} USDC</h6>
                                         </div>
                                     </div>
                                     
@@ -1342,19 +1342,19 @@ function previewAsset() {
                                     <div class="col-md-6">
                                         <div class="bg-light rounded p-3">
                                             <small class="text-muted d-block mb-1">Token Supply</small>
-                                            <h6 class="mb-0">${assetData.tokenSupply}</h6>
+                                            <h6 class="mb-0">${formatNumber(assetData.tokenSupply)}</h6>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="bg-light rounded p-3">
                                             <small class="text-muted d-block mb-1">Token Price</small>
-                                            <h6 class="mb-0">${assetData.tokenPrice} USDC</h6>
+                                            <h6 class="mb-0">${formatNumber(assetData.tokenPrice, 6)} USDC</h6>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="bg-light rounded p-3">
                                             <small class="text-muted d-block mb-1">Expected Annual Revenue</small>
-                                            <h6 class="mb-0">${assetData.annualRevenue} USDC</h6>
+                                            <h6 class="mb-0">${formatNumber(assetData.annualRevenue, 2)} USDC</h6>
                                         </div>
                                     </div>
                                 </div>
