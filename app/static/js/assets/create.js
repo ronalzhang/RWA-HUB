@@ -45,6 +45,42 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     try {
+        // 等待钱包状态初始化
+        if (!window.ethereum) {
+            console.error('MetaMask not installed');
+            showWalletPrompt();
+            return;
+        }
+
+        // 检查钱包连接状态
+        const walletCheck = document.getElementById('walletCheck');
+        const formContent = document.getElementById('formContent');
+        
+        // 注册钱包状态变化的处理函数
+        window.walletState.onStateChange((state) => {
+            console.log('Wallet state changed:', state);
+            if (state.isConnected) {
+                walletCheck.style.display = 'none';
+                formContent.style.display = 'block';
+            } else {
+                walletCheck.style.display = 'block';
+                formContent.style.display = 'none';
+            }
+        });
+
+        // 初始检查
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length === 0) {
+            console.log('No wallet connected');
+            showWalletPrompt();
+            return;
+        }
+
+        // 有连接的钱包，显示表单
+        console.log('Wallet connected:', accounts[0]);
+        walletCheck.style.display = 'none';
+        formContent.style.display = 'block';
+        
         await initializeFormElements();
         await initializeEventListeners();
         console.log('Form initialization completed');
@@ -53,6 +89,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         showError('页面初始化失败，请刷新重试');
     }
 });
+
+// 显示钱包提示
+function showWalletPrompt() {
+    const walletCheck = document.getElementById('walletCheck');
+    const formContent = document.getElementById('formContent');
+    
+    walletCheck.style.display = 'block';
+    formContent.style.display = 'none';
+}
 
 // 初始化表单元素
 async function initializeFormElements() {
@@ -878,7 +923,16 @@ async function submitForm() {
             return;
         }
 
+        // 检查钱包连接状态
+        if (!window.ethereum || !window.walletState.getConnectionStatus()) {
+            showError('请先连接钱包');
+            return;
+        }
+
         const formData = new FormData();
+        
+        // 添加创建者地址
+        formData.append('creator_address', window.walletState.getAddress());
         
         // 添加基本字段
         formData.append('name', document.getElementById('name').value);
@@ -939,7 +993,7 @@ async function submitForm() {
         const response = await fetch('/api/assets/create', {
             method: 'POST',
             headers: {
-                'X-Eth-Address': window.ethereum?.selectedAddress || ''
+                'X-Eth-Address': window.walletState.getAddress()
             },
             body: formData
         });
@@ -950,7 +1004,7 @@ async function submitForm() {
         }
 
         const result = await response.json();
-        console.log('创建资产成功:', result);  // 添加日志
+        console.log('Asset creation successful:', result);
         showToast('资产创建成功');
         
         // 清除草稿
@@ -962,88 +1016,26 @@ async function submitForm() {
         }, 1500);
         
     } catch (error) {
-        console.error('提交表单失败:', error);
+        console.error('Failed to submit form:', error);
         showError(error.message);
     }
 }
 
-// 事件监听器
-document.addEventListener('DOMContentLoaded', async function() {
-    // 检查钱包连接状态
-    if (!window.ethereum || !window.ethereum.selectedAddress) {
-        // 显示连接钱包提示
-        const formContent = document.getElementById('assetForm');
-        if (formContent) {
-            formContent.style.display = 'none';
-            
-            const walletPrompt = document.createElement('div');
-            walletPrompt.className = 'wallet-prompt container text-center py-5';
-            walletPrompt.innerHTML = `
-                <div class="card shadow-sm">
-                    <div class="card-body py-5">
-                        <i class="fas fa-wallet fa-3x text-muted mb-3"></i>
-                        <h3 class="mb-3">请先连接钱包</h3>
-                        <p class="text-muted mb-4">您需要连接MetaMask钱包才能创建资产</p>
-                        <button class="btn btn-primary" onclick="connectWallet(event)">
-                            <i class="fas fa-plug me-2"></i>连接钱包
-                        </button>
-                    </div>
-                </div>
-            `;
-            
-            formContent.parentNode.insertBefore(walletPrompt, formContent);
-        }
-    } else {
-        // 如果已连接钱包，显示表单并初始化
-        const formContent = document.getElementById('assetForm');
-        if (formContent) {
-            formContent.style.display = 'block';
-        }
-        const walletPrompt = document.querySelector('.wallet-prompt');
-        if (walletPrompt) {
-            walletPrompt.style.display = 'none';
-        }
-        initializeFormElements();
+// 连接钱包
+async function connectWallet(event) {
+    if (event) {
+        event.preventDefault();
     }
 
-    // 监听钱包状态变化
-    window.ethereum.on('accountsChanged', function(accounts) {
-        if (accounts.length > 0) {
-            const formContent = document.getElementById('assetForm');
-            const walletPrompt = document.querySelector('.wallet-prompt');
-            if (formContent) {
-                formContent.style.display = 'block';
-            }
-            if (walletPrompt) {
-                walletPrompt.style.display = 'none';
-            }
-            initializeFormElements();
-        } else {
-            const formContent = document.getElementById('assetForm');
-            if (formContent) {
-                formContent.style.display = 'none';
-            }
-            const walletPrompt = document.querySelector('.wallet-prompt');
-            if (walletPrompt) {
-                walletPrompt.style.display = 'block';
-            }
+    try {
+        if (!window.ethereum) {
+            throw new Error('请安装MetaMask钱包');
         }
-    });
-});
 
-// 添加新的钱包连接函数
-async function connectWallet(event) {
-    event.preventDefault(); // 阻止默认行为
-    if (window.ethereum) {
-        try {
-            await window.ethereum.request({ method: 'eth_requestAccounts' });
-            location.reload(); // 连接成功后刷新页面
-        } catch (error) {
-            console.error('连接钱包失败:', error);
-            showError('连接钱包失败，请重试');
-        }
-    } else {
-        showError('请安装MetaMask钱包');
+        await window.walletState.connect();
+    } catch (error) {
+        console.error('Failed to connect wallet:', error);
+        showError(error.message);
     }
 }
 

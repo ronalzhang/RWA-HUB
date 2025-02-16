@@ -27,6 +27,39 @@
         .wallet-address {
             font-family: monospace;
         }
+
+        #walletMenu {
+            display: none;
+            position: absolute;
+            background-color: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+            min-width: 200px;
+            padding: 0.5rem 0;
+            z-index: 1000;
+        }
+
+        #walletMenu.show {
+            display: block;
+        }
+
+        #walletMenu .dropdown-item {
+            padding: 0.5rem 1rem;
+            color: #212529;
+            text-decoration: none;
+            display: block;
+            clear: both;
+            font-weight: 400;
+            text-align: inherit;
+            white-space: nowrap;
+            background-color: transparent;
+            border: 0;
+        }
+
+        #walletMenu .dropdown-item:hover {
+            background-color: #f8f9fa;
+        }
     </style>
     
     <!-- AOS Animation Script -->

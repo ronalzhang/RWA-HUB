@@ -244,6 +244,9 @@
                             <h5 class="card-title mb-0">{{ _('Basic Information') }}</h5>
                         </div>
                         <div class="card-body">
+                            <!-- 创建者地址 -->
+                            <input type="hidden" id="creator_address" name="creator_address" value="{{ creator_address }}">
+                            
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label for="name" class="form-label">{{ _('Asset Name') }}</label>
@@ -494,15 +497,37 @@ async function checkWalletConnection() {
     const walletCheck = document.getElementById('walletCheck');
     const formContent = document.getElementById('formContent');
     
-    if (!window.walletState || !window.walletState.getConnectionStatus()) {
+    try {
+        // 检查是否安装了 MetaMask
+        if (!window.ethereum) {
+            console.error('MetaMask not installed');
+            walletCheck.style.display = 'block';
+            formContent.style.display = 'none';
+            return false;
+        }
+
+        // 获取当前连接的账户
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        console.log('Current accounts:', accounts);
+
+        if (accounts.length === 0) {
+            console.log('No wallet connected');
+            walletCheck.style.display = 'block';
+            formContent.style.display = 'none';
+            return false;
+        }
+
+        // 有连接的钱包，显示表单
+        console.log('Wallet connected:', accounts[0]);
+        walletCheck.style.display = 'none';
+        formContent.style.display = 'block';
+        return true;
+    } catch (error) {
+        console.error('Failed to check wallet connection:', error);
         walletCheck.style.display = 'block';
         formContent.style.display = 'none';
         return false;
     }
-    
-    walletCheck.style.display = 'none';
-    formContent.style.display = 'block';
-    return true;
 }
 
 // 连接钱包
@@ -512,10 +537,14 @@ async function connectWallet() {
             throw new Error('{{ _("Please install MetaMask first") }}');
         }
         
-        await window.ethereum.request({ method: 'eth_requestAccounts' });
-        await checkWalletConnection();
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        console.log('Connected accounts:', accounts);
+        
+        if (accounts.length > 0) {
+            location.reload(); // 连接成功后刷新页面
+        }
     } catch (error) {
-        console.error('连接钱包失败:', error);
+        console.error('Failed to connect wallet:', error);
         showError(error.message);
     }
 }
@@ -527,11 +556,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 监听钱包状态变化
     if (window.ethereum) {
         window.ethereum.on('accountsChanged', async (accounts) => {
-            await checkWalletConnection();
+            console.log('Accounts changed:', accounts);
+            location.reload(); // 账户变更时刷新页面
         });
         
         window.ethereum.on('disconnect', async () => {
-            await checkWalletConnection();
+            console.log('Wallet disconnected');
+            location.reload(); // 断开连接时刷新页面
         });
     }
 });
