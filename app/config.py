@@ -10,12 +10,6 @@ class Config:
     BABEL_DEFAULT_LOCALE = 'en'
     BABEL_DEFAULT_TIMEZONE = 'UTC'
     LANGUAGES = ['en', 'zh_Hant']
-
-    # 七牛云配置
-    QINIU_ACCESS_KEY = 'SGMhwmXf7wRlmsgXU4xfqzDH_DxczWhhoDEjyYE9'
-    QINIU_SECRET_KEY = '6JynlQeJEDWt4VIjZV8sDdSAFZMrZ3GFE0fIz07-'
-    QINIU_BUCKET_NAME = 'rwa-hub'
-    QINIU_DOMAIN = 'sqbw3uvy8.sabkt.gdipper.com'
     
     # 管理员配置
     ADMIN_CONFIG = {

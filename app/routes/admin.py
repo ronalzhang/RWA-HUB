@@ -486,7 +486,7 @@ def batch_delete_assets():
             return jsonify({'error': '未找到要删除的资产'}), 404
             
         if storage is None:
-            return jsonify({'error': '七牛云存储未初始化'}), 500
+            return jsonify({'error': '存储服务未初始化'}), 500
             
         # 批量删除文件和标记资产
         for asset in assets:
