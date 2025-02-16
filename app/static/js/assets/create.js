@@ -1321,7 +1321,7 @@ function previewAsset() {
                                         <div class="col-md-6">
                                             <div class="bg-light rounded p-3">
                                                 <small class="text-muted d-block mb-1">Area</small>
-                                                <h6 class="mb-0">${assetData.area} m²</h6>
+                                                <h6 class="mb-0">${assetData.area.toFixed(2)} m²</h6>
                                             </div>
                                         </div>
                                     ` : ''}
@@ -1362,8 +1362,32 @@ function previewAsset() {
                                 <!-- Asset Description -->
                                 <div class="mt-4">
                                     <h6 class="text-muted mb-2">Description</h6>
-                                    <p class="mb-0">${assetData.description}</p>
+                                    <div class="bg-light rounded p-3">
+                                        <p class="mb-0" style="white-space: pre-wrap;">${assetData.description}</p>
+                                    </div>
                                 </div>
+
+                                <!-- Documents -->
+                                ${assetData.documents && assetData.documents.length > 0 ? `
+                                    <div class="mt-4">
+                                        <h6 class="text-muted mb-2">Documents</h6>
+                                        <div class="bg-light rounded p-3">
+                                            <div class="list-group list-group-flush">
+                                                ${assetData.documents.map((docUrl, index) => `
+                                                    <div class="list-group-item bg-transparent px-0">
+                                                        <div class="d-flex align-items-center">
+                                                            <i class="fas fa-file-alt me-2 text-primary"></i>
+                                                            <span class="flex-grow-1">${docUrl.split('/').pop()}</span>
+                                                            <a href="${docUrl}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                                <i class="fas fa-external-link-alt"></i>
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
