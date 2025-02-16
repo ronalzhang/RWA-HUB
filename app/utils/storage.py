@@ -67,40 +67,35 @@ def get_storage():
             raise ValueError("存储服务初始化失败")
     return storage
 
-def save_files(files, asset_type, asset_id):
-    """保存多个文件"""
+def upload_file(file):
+    """统一的文件上传处理函数"""
     try:
-        if not files:
-            return []
-
+        if not file:
+            return None
+            
         # 确保storage已初始化
         if not storage:
             init_storage(current_app)
-
+            
         if not storage:
             current_app.logger.error('存储服务未初始化')
-            return []
-
-        saved_urls = []
-        for file in files:
-            # 生成安全的文件名
-            timestamp = int(time.time() * 1000)
-            filename = f"{timestamp}_{secure_filename(file.filename)}"
+            return None
             
-            # 构建存储路径
-            key = f"{asset_type}/{asset_id}/image/{filename}"
+        # 生成安全的文件名
+        timestamp = int(time.time() * 1000)
+        filename = f"{timestamp}_{secure_filename(file.filename)}"
+        
+        # 读取文件数据
+        file_data = file.read()
+        
+        # 上传到存储服务
+        result = storage.upload(file_data, f"uploads/{filename}")
+        if result:
+            current_app.logger.info(f'文件上传成功: {result}')
+            return result
             
-            # 读取文件数据
-            file_data = file.read()
-            
-            # 上传到存储服务
-            result = storage.upload(file_data, key)
-            if result:
-                saved_urls.append(result['url'])
-                current_app.logger.info(f'文件上传成功: {result}')
-
-        return saved_urls
-
+        return None
+        
     except Exception as e:
-        current_app.logger.error(f'文件保存失败: {str(e)}')
-        return [] 
+        current_app.logger.error(f'文件上传处理失败: {str(e)}')
+        return None 
