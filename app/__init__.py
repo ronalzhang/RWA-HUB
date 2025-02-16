@@ -99,8 +99,8 @@ def create_app(config_name='development'):
     # 初始化存储（在注册蓝图之前）
     from .utils.storage import init_storage
     if not init_storage(app):
-        app.logger.error("七牛云存储初始化失败，应用可能无法正常工作")
-        raise RuntimeError("七牛云存储初始化失败")
+        app.logger.error("存储初始化失败，应用可能无法正常工作")
+        raise RuntimeError("存储初始化失败")
     
     # 注册蓝图
     from .routes import register_blueprints

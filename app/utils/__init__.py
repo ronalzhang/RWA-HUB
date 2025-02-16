@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 def save_files(files, asset_type, asset_id):
-    """保存上传的文件到七牛云
+    """保存上传的文件到本地存储
     
     Args:
         files: 文件列表
