@@ -10,6 +10,7 @@ from functools import wraps
 import json
 import os
 from app.utils.storage import storage
+from ..models import DividendRecord
 
 def get_admin_permissions(eth_address):
     """获取管理员权限"""
@@ -413,121 +414,88 @@ def list_all_assets():
 def delete_asset(asset_id):
     """删除资产"""
     try:
-        # 获取当前用户地址
-        eth_address = request.headers.get('X-Eth-Address')
-        if not eth_address:
-            return jsonify({'error': '请先连接钱包'}), 401
-            
-        # 检查管理员权限
-        if not is_admin(eth_address):
-            return jsonify({'error': '没有删除权限'}), 403
-            
-        # 获取资产
+        current_app.logger.info(f'删除资产请求: asset_id={asset_id}')
+        
+        # 查找资产
         asset = Asset.query.get_or_404(asset_id)
         
         # 如果资产已上链，不允许删除
         if asset.token_address:
-            return jsonify({'error': '已上链资产无法删除'}), 400
+            return jsonify({'error': '已上链资产不可删除'}), 400
             
         try:
-            # 删除资产相关的文件
-            if asset.images:
-                images = json.loads(asset.images) if isinstance(asset.images, str) else asset.images
-                for image_path in images:
-                    try:
-                        full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], image_path.lstrip('/'))
-                        if os.path.exists(full_path):
-                            os.remove(full_path)
-                    except Exception as e:
-                        current_app.logger.error(f'删除图片失败: {str(e)}')
+            # 删除关联的分红记录
+            DividendRecord.query.filter_by(asset_id=asset_id).delete()
             
-            if asset.documents:
-                documents = json.loads(asset.documents) if isinstance(asset.documents, str) else asset.documents
-                for doc_path in documents:
-                    try:
-                        full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], doc_path.lstrip('/'))
-                        if os.path.exists(full_path):
-                            os.remove(full_path)
-                    except Exception as e:
-                        current_app.logger.error(f'删除文档失败: {str(e)}')
+            # 删除关联的交易记录
+            Trade.query.filter_by(asset_id=asset_id).delete()
+            
+            # 删除资产记录
+            db.session.delete(asset)
+            db.session.commit()
+            
+            current_app.logger.info(f'资产已删除: {asset_id}')
+            return jsonify({'message': '资产已删除'})
+            
         except Exception as e:
-            current_app.logger.error(f'删除资产文件失败: {str(e)}')
+            db.session.rollback()
+            current_app.logger.error(f'删除资产失败: {str(e)}')
+            return jsonify({'error': f'删除资产失败: {str(e)}'}), 500
             
-        # 标记资产为已删除
-        asset.status = AssetStatus.DELETED.value
-        asset.deleted_at = datetime.utcnow()
-        asset.deleted_by = eth_address
-        db.session.commit()
-        
-        return jsonify({'message': '资产已删除'}), 200
-        
     except Exception as e:
-        current_app.logger.error(f'删除资产失败: {str(e)}', exc_info=True)
-        db.session.rollback()
-        return jsonify({
-            'error': '删除资产失败',
-            'message': str(e)
-        }), 500
+        current_app.logger.error(f'删除资产失败: {str(e)}')
+        return jsonify({'error': str(e)}), 500
 
 @admin_api_bp.route('/assets/batch-delete', methods=['POST'])
 @admin_required
 def batch_delete_assets():
     """批量删除资产"""
     try:
-        # 获取要删除的资产ID列表
-        asset_ids = request.json.get('asset_ids', [])
-        if not asset_ids:
-            return jsonify({'error': '未选择要删除的资产'}), 400
+        data = request.get_json()
+        if not data or 'asset_ids' not in data:
+            return jsonify({'error': '请提供要删除的资产ID列表'}), 400
             
-        eth_address = g.eth_address
-        assets = Asset.query.filter(Asset.id.in_(asset_ids)).all()
+        asset_ids = data['asset_ids']
+        current_app.logger.info(f'批量删除资产请求: asset_ids={asset_ids}')
         
-        if not assets:
-            return jsonify({'error': '未找到要删除的资产'}), 404
-            
-        if storage is None:
-            return jsonify({'error': '存储服务未初始化'}), 500
-            
-        # 批量删除文件和标记资产
-        for asset in assets:
+        success_count = 0
+        failed_ids = []
+        
+        for asset_id in asset_ids:
             try:
-                # 删除资产相关的文件
-                if asset.images:
-                    images = json.loads(asset.images) if isinstance(asset.images, str) else asset.images
-                    for image_url in images:
-                        try:
-                            storage.delete(image_url)
-                        except Exception as e:
-                            current_app.logger.error(f'删除图片失败: {str(e)}')
+                asset = Asset.query.get(asset_id)
+                if not asset:
+                    failed_ids.append(asset_id)
+                    continue
+                    
+                if asset.token_address:
+                    failed_ids.append(asset_id)
+                    continue
+                    
+                # 删除关联记录
+                DividendRecord.query.filter_by(asset_id=asset_id).delete()
+                Trade.query.filter_by(asset_id=asset_id).delete()
                 
-                if asset.documents:
-                    documents = json.loads(asset.documents) if isinstance(asset.documents, str) else asset.documents
-                    for doc_url in documents:
-                        try:
-                            storage.delete(doc_url)
-                        except Exception as e:
-                            current_app.logger.error(f'删除文档失败: {str(e)}')
+                # 删除资产
+                db.session.delete(asset)
+                success_count += 1
+                
             except Exception as e:
-                current_app.logger.error(f'删除资产 {asset.id} 的文件失败: {str(e)}')
-            
-            # 标记资产为已删除
-            asset.status = AssetStatus.DELETED.value
-            asset.deleted_at = datetime.utcnow()
-            asset.deleted_by = eth_address
-            
+                current_app.logger.error(f'删除资产 {asset_id} 失败: {str(e)}')
+                failed_ids.append(asset_id)
+                continue
+                
         db.session.commit()
+        
         return jsonify({
-            'message': '资产已删除',
-            'deleted_count': len(assets)
-        }), 200
+            'message': f'成功删除 {success_count} 个资产',
+            'failed_ids': failed_ids
+        })
         
     except Exception as e:
-        current_app.logger.error(f'批量删除资产失败: {str(e)}', exc_info=True)
         db.session.rollback()
-        return jsonify({
-            'error': '批量删除资产失败',
-            'message': str(e)
-        }), 500
+        current_app.logger.error(f'批量删除资产失败: {str(e)}')
+        return jsonify({'error': str(e)}), 500
 
 @admin_api_bp.route('/check_asset/<int:asset_id>', methods=['GET', 'OPTIONS'])
 def check_asset_owner(asset_id):
@@ -634,10 +602,15 @@ def get_dividend_stats(asset_id):
         asset = Asset.query.get_or_404(asset_id)
         
         # 获取分红统计信息
+        total_amount = db.session.query(db.func.sum(DividendRecord.amount))\
+            .filter(DividendRecord.asset_id == asset_id)\
+            .scalar() or 0
+            
+        count = DividendRecord.query.filter_by(asset_id=asset_id).count()
+        
         stats = {
-            'count': 0,  # 分红次数
-            'total_amount': 0,  # 总分红金额
-            'holder_count': 0,  # 持有人数量
+            'count': count,  # 分红次数
+            'total_amount': float(total_amount),  # 总分红金额
         }
         
         return jsonify(stats)
@@ -655,9 +628,16 @@ def get_dividend_history(asset_id):
         asset = Asset.query.get_or_404(asset_id)
         
         # 获取分红历史记录
+        records = DividendRecord.query\
+            .filter_by(asset_id=asset_id)\
+            .order_by(DividendRecord.created_at.desc())\
+            .all()
+            
+        total_amount = sum(record.amount for record in records)
+        
         history = {
-            'total_amount': 0,  # 累计分红金额
-            'records': []  # 分红记录列表
+            'total_amount': float(total_amount),  # 累计分红金额
+            'records': [record.to_dict() for record in records]  # 分红记录列表
         }
         
         return jsonify(history)
@@ -666,7 +646,7 @@ def get_dividend_history(asset_id):
         return jsonify({
             'error': '获取分红历史失败',
             'message': str(e)
-        }), 500 
+        }), 500
 
 @admin_api_bp.route('/assets/approve', methods=['POST'])
 @admin_required

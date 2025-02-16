@@ -13,12 +13,26 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div class="d-flex align-items-center gap-3">
             <h2 class="mb-0">{{ asset.name }}</h2>
-            {% if (asset.owner_address and asset.owner_address|lower == current_user_address|lower) or is_admin %}
-            <a href="{{ url_for('assets.dividend_page', asset_id=asset.id) }}" class="btn btn-outline-primary">
+            {% if asset.status == 1 %}
+            <span class="badge bg-warning">{{ _('Pending Review') }}</span>
+            {% elif asset.status == 2 %}
+            <span class="badge bg-success">{{ _('On Chain') }}</span>
+            {% elif asset.status == 3 %}
+            <span class="badge bg-danger">{{ _('Rejected') }}</span>
+            {% endif %}
+            <!-- 分红入口 -->
+            {% if is_owner or is_admin_user %}
+            <a href="{{ url_for('assets.dividend_page', asset_id=asset.id) }}" class="btn btn-primary">
                 <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
             </a>
             {% endif %}
         </div>
+        <!-- 编辑按钮 -->
+        {% if is_owner or is_admin_user %}
+        <a href="{{ url_for('assets.edit_asset_page', asset_id=asset.id) }}" class="btn btn-outline-primary">
+            <i class="fas fa-edit me-2"></i>{{ _('Edit Asset') }}
+        </a>
+        {% endif %}
     </div>
 
     <!-- 图片轮播 -->
@@ -163,8 +177,6 @@
                         <tr>
                             <th>{{ _('Time') }}</th>
                             <th>{{ _('Dividend Amount') }}</th>
-                            <th>{{ _('Per Token Dividend') }}</th>
-                            <th>{{ _('Status') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -172,16 +184,6 @@
                         <tr>
                             <td>{{ record.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                             <td>{{ record.amount|number_format }} USDC</td>
-                            <td>{{ record.per_token_amount|number_format }} USDC</td>
-                            <td>
-                                {% if record.status == 1 %}
-                                <span class="badge bg-warning">{{ _('Pending Confirmation') }}</span>
-                                {% elif record.status == 2 %}
-                                <span class="badge bg-success">{{ _('Completed') }}</span>
-                                {% elif record.status == 3 %}
-                                <span class="badge bg-danger">{{ _('Cancelled') }}</span>
-                                {% endif %}
-                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
