@@ -33,7 +33,7 @@
                              class="d-block w-100" 
                              alt="Asset image {{ loop.index }}" 
                              style="max-height: 500px; object-fit: contain;"
-                             onerror="this.onerror=null; this.src='/static/images/placeholder.png';">
+                             onerror="this.onerror=null; this.src='/static/images/placeholder.jpg';">
                     </div>
                     {% endfor %}
                 </div>
@@ -57,7 +57,7 @@
                      data-bs-target="#assetCarousel"
                      data-bs-slide-to="{{ loop.index0 }}"
                      {% if loop.first %}class="active"{% endif %}
-                     onerror="this.onerror=null; this.src='/static/images/placeholder.png';">
+                     onerror="this.onerror=null; this.src='/static/images/placeholder.jpg';">
                 {% endfor %}
             </div>
             {% endif %}
