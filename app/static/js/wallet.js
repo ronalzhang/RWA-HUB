@@ -3,41 +3,65 @@ const walletState = {
     address: null,
     isConnected: false,
     isAdmin: false,
-    currentAccount: null,
+    eventCallbacks: new Set(), // 用于存储状态变化的回调函数
     
     // 初始化钱包状态
-    init() {
-        // 从localStorage获取保存的状态
-        const savedAddress = localStorage.getItem('walletAddress');
-        if (savedAddress) {
-            this.address = savedAddress;
-            this.currentAccount = savedAddress;
-            this.isConnected = true;
-            this.updateUI();
-            this.checkIsAdmin(); // 检查管理员权限
+    async init() {
+        console.log('Initializing wallet state...');
+        if (!window.ethereum) {
+            console.warn('MetaMask not installed');
+            return;
         }
-        
-        // 监听钱包事件
-        if (window.ethereum) {
-            window.ethereum.on('accountsChanged', (accounts) => {
-                if (accounts.length === 0) {
-                    this.disconnect();
-                } else {
-                    this.address = accounts[0];
-                    this.isConnected = true;
-                    this.updateUI();
-                    this.saveState();
-                }
-            });
 
-            window.ethereum.on('disconnect', () => {
-                this.disconnect();
-            });
+        try {
+            // 获取当前连接的账户
+            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+            if (accounts.length > 0) {
+                this.address = accounts[0].toLowerCase();
+                this.isConnected = true;
+                this.updateUI();
+                await this.checkIsAdmin();
+                this.notifyStateChange();
+            }
+        } catch (error) {
+            console.error('Failed to initialize wallet state:', error);
         }
+
+        // 监听钱包事件
+        this.setupEventListeners();
+    },
+
+    // 设置事件监听器
+    setupEventListeners() {
+        if (!window.ethereum) return;
+
+        window.ethereum.on('accountsChanged', async (accounts) => {
+            console.log('Accounts changed:', accounts);
+            if (accounts.length === 0) {
+                await this.disconnect();
+            } else {
+                this.address = accounts[0].toLowerCase();
+                this.isConnected = true;
+                await this.checkIsAdmin();
+                this.updateUI();
+                this.notifyStateChange();
+            }
+        });
+
+        window.ethereum.on('disconnect', async () => {
+            console.log('Wallet disconnected');
+            await this.disconnect();
+        });
+
+        window.ethereum.on('chainChanged', () => {
+            console.log('Chain changed, reloading...');
+            window.location.reload();
+        });
     },
     
     // 连接钱包
     async connect() {
+        console.log('Connecting wallet...');
         try {
             if (!window.ethereum) {
                 throw new Error('请安装MetaMask钱包');
@@ -48,52 +72,45 @@ const walletState = {
             });
             
             if (accounts.length > 0) {
-                this.address = accounts[0];
+                this.address = accounts[0].toLowerCase();
                 this.isConnected = true;
+                await this.checkIsAdmin();
                 this.updateUI();
-                this.saveState();
+                this.notifyStateChange();
                 return true;
             }
             return false;
         } catch (error) {
-            console.error('连接钱包失败:', error);
+            console.error('Failed to connect wallet:', error);
             throw error;
         }
     },
     
     // 断开钱包连接
-    disconnect() {
+    async disconnect() {
+        console.log('Disconnecting wallet...');
         this.address = null;
         this.isConnected = false;
+        this.isAdmin = false;
         this.updateUI();
+        this.notifyStateChange();
+        
+        // 清除状态
         this.clearState();
     },
     
     // 切换钱包
     async switchWallet() {
+        console.log('Switching wallet...');
         try {
             await window.ethereum.request({
                 method: 'wallet_requestPermissions',
                 params: [{ eth_accounts: {} }]
             });
         } catch (error) {
-            console.error('切换钱包失败:', error);
+            console.error('Failed to switch wallet:', error);
             throw error;
         }
-    },
-    
-    // 保存状态到localStorage
-    saveState() {
-        if (this.address) {
-            localStorage.setItem('walletAddress', this.address);
-            document.cookie = `eth_address=${this.address}; path=/; max-age=86400`;
-        }
-    },
-    
-    // 清除保存的状态
-    clearState() {
-        localStorage.removeItem('walletAddress');
-        document.cookie = 'eth_address=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     },
     
     // 更新UI显示
@@ -101,21 +118,33 @@ const walletState = {
         const walletBtn = document.getElementById('walletBtn');
         const walletMenu = document.getElementById('walletMenu');
         const walletBtnText = document.getElementById('walletBtnText');
+        const adminEntry = document.getElementById('adminEntry');
+        const adminLink = document.getElementById('adminLink');
         
-        if (!walletBtn || !walletMenu || !walletBtnText) return;
+        if (!walletBtn || !walletBtnText) return;
         
         if (this.isConnected && this.address) {
-            // 显示简短的钱包地址
             const shortAddress = `${this.address.substring(0, 6)}...${this.address.substring(38)}`;
             walletBtnText.textContent = shortAddress;
             walletBtn.classList.remove('btn-outline-primary');
             walletBtn.classList.add('btn-primary');
-            walletMenu.style.display = 'none';
+            
+            // 更新管理员入口
+            if (adminEntry && adminLink) {
+                if (this.isAdmin) {
+                    adminEntry.classList.remove('d-none');
+                    adminLink.href = `/admin?eth_address=${this.address}`;
+                } else {
+                    adminEntry.classList.add('d-none');
+                }
+            }
         } else {
             walletBtnText.textContent = '连接钱包';
             walletBtn.classList.remove('btn-primary');
             walletBtn.classList.add('btn-outline-primary');
-            walletMenu.style.display = 'none';
+            if (walletMenu) {
+                walletMenu.classList.remove('show');
+            }
         }
     },
     
@@ -131,12 +160,12 @@ const walletState = {
     
     // 检查管理员权限
     async checkIsAdmin() {
-        if (!this.currentAccount) return false;
+        if (!this.address) return false;
         
         try {
             const response = await fetch('/api/admin/check', {
                 headers: {
-                    'X-Eth-Address': this.currentAccount
+                    'X-Eth-Address': this.address
                 }
             });
             
@@ -146,66 +175,50 @@ const walletState = {
             
             const data = await response.json();
             this.isAdmin = data.is_admin;
-            
-            // 更新管理员入口
-            const adminEntry = document.getElementById('adminEntry');
-            const adminLink = document.getElementById('adminLink');
-            
-            if (adminEntry && adminLink) {
-                if (this.isAdmin) {
-                    adminEntry.classList.remove('d-none');
-                    adminLink.href = `/admin?eth_address=${this.currentAccount}`;
-                    adminLink.onclick = function(e) {
-                        e.preventDefault();
-                        window.location.href = this.href;
-                    };
-                } else {
-                    adminEntry.classList.add('d-none');
-                }
-            }
+            this.updateUI();
             
             return data.is_admin;
         } catch (error) {
-            console.error('检查管理员权限失败:', error);
+            console.error('Failed to check admin status:', error);
             return false;
         }
+    },
+
+    // 注册状态变化回调
+    onStateChange(callback) {
+        this.eventCallbacks.add(callback);
+    },
+
+    // 移除状态变化回调
+    offStateChange(callback) {
+        this.eventCallbacks.delete(callback);
+    },
+
+    // 通知所有注册的回调
+    notifyStateChange() {
+        const state = {
+            address: this.address,
+            isConnected: this.isConnected,
+            isAdmin: this.isAdmin
+        };
+        this.eventCallbacks.forEach(callback => callback(state));
+    },
+
+    // 清除状态
+    clearState() {
+        document.cookie = 'eth_address=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     }
 };
 
-// 初始化钱包UI
-function initWalletUI() {
-    const walletBtn = document.getElementById('walletBtn');
-    const walletMenu = document.getElementById('walletMenu');
-    const walletBtnText = document.getElementById('walletBtnText');
-    
-    if (!walletBtn || !walletMenu || !walletBtnText) return;
-    
-    // 初始化UI状态
-    if (window.walletState && window.walletState.getConnectionStatus()) {
-        const address = window.walletState.getAddress();
-        if (address) {
-            walletBtnText.textContent = `${address.slice(0, 6)}...${address.slice(-4)}`;
-            walletBtn.classList.remove('btn-outline-primary');
-            walletBtn.classList.add('btn-primary');
-        }
-    } else {
-        walletBtnText.textContent = '连接钱包';
-        walletBtn.classList.remove('btn-primary');
-        walletBtn.classList.add('btn-outline-primary');
-        walletMenu.style.display = 'none';
-    }
-}
-
 // 初始化
+let walletInitialized = false;
 document.addEventListener('DOMContentLoaded', async function() {
-    // 初始化钱包状态
+    if (walletInitialized) return;
+    walletInitialized = true;
+
+    console.log('Initializing wallet...');
     window.walletState = walletState;
-    walletState.init();
-    
-    // 初始化UI和事件监听
-    initWalletUI();
-    setupWalletListeners();
-    await checkInitialWalletState();
+    await walletState.init();
     
     // 绑定钱包按钮事件
     const walletBtn = document.getElementById('walletBtn');
@@ -230,7 +243,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                     showError(error.message);
                 }
             } else {
-                walletMenu.style.display = walletMenu.style.display === 'block' ? 'none' : 'block';
+                // 切换菜单显示状态
+                if (walletMenu) {
+                    walletMenu.classList.toggle('show');
+                }
             }
         });
     }
@@ -241,7 +257,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             e.preventDefault();
             try {
                 await walletState.switchWallet();
-                walletMenu.style.display = 'none';
+                if (walletMenu) {
+                    walletMenu.classList.remove('show');
+                }
             } catch (error) {
                 showError(error.message);
             }
@@ -250,35 +268,38 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // 断开连接
     if (disconnectWalletBtn) {
-        disconnectWalletBtn.addEventListener('click', (e) => {
+        disconnectWalletBtn.addEventListener('click', async (e) => {
             e.preventDefault();
-            walletState.disconnect();
-            walletMenu.style.display = 'none';
+            await walletState.disconnect();
+            if (walletMenu) {
+                walletMenu.classList.remove('show');
+            }
         });
     }
     
     // 点击其他地方关闭菜单
     document.addEventListener('click', (e) => {
-        if (walletMenu && walletMenu.style.display === 'block' && 
+        if (walletMenu && walletMenu.classList.contains('show') && 
             !walletBtn.contains(e.target) && !walletMenu.contains(e.target)) {
-            walletMenu.style.display = 'none';
+            walletMenu.classList.remove('show');
         }
     });
-    
-    // 语言切换功能
-    const languageDropdown = document.getElementById('languageDropdown');
-    if (languageDropdown) {
-        const currentLanguage = document.cookie.split(';').find(c => c.trim().startsWith('language='));
-        const lang = currentLanguage ? currentLanguage.split('=')[1].trim() : 'en';
-        languageDropdown.textContent = lang === 'en' ? 'English' : '繁體中文';
-    }
 });
 
 // 显示错误信息
 function showError(message) {
-    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
-    document.getElementById('errorMessage').textContent = message;
-    errorModal.show();
+    const errorModal = document.getElementById('errorModal');
+    if (errorModal) {
+        const errorMessage = document.getElementById('errorMessage');
+        if (errorMessage) {
+            errorMessage.textContent = message;
+        }
+        const modal = new bootstrap.Modal(errorModal);
+        modal.show();
+    } else {
+        console.error(message);
+        alert(message);
+    }
 }
 
 // 支持的网络配置
@@ -294,66 +315,6 @@ const SUPPORTED_NETWORKS = {
         explorerUrl: 'https://goerli.etherscan.io'
     }
 };
-
-// 检查初始钱包状态
-async function checkInitialWalletState() {
-    if (typeof window.ethereum !== 'undefined') {
-        try {
-            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-            if (accounts.length > 0) {
-                window.walletState.currentAccount = accounts[0];
-                window.walletState.address = accounts[0];
-                await window.walletState.checkIsAdmin();
-                updateWalletUI(true);
-            }
-        } catch (error) {
-            console.error('检查钱包状态失败:', error);
-        }
-    }
-}
-
-// 监听钱包事件
-function setupWalletListeners() {
-    if (typeof window.ethereum !== 'undefined') {
-        window.ethereum.on('accountsChanged', async function(accounts) {
-            if (accounts.length === 0) {
-                await window.walletState.clearState();
-                updateWalletUI(false);
-            } else {
-                window.walletState.currentAccount = accounts[0];
-                window.walletState.address = accounts[0];
-                await window.walletState.checkIsAdmin();
-                updateWalletUI(true);
-            }
-        });
-
-        window.ethereum.on('disconnect', async function() {
-            await window.walletState.clearState();
-            updateWalletUI(false);
-        });
-    }
-}
-
-// 更新钱包UI显示
-function updateWalletUI(connected) {
-    const walletBtnText = document.getElementById('walletBtnText');
-    const walletBtn = document.getElementById('walletBtn');
-    const walletMenu = document.getElementById('walletMenu');
-    
-    if (!walletBtnText || !walletBtn || !walletMenu) return;
-
-    if (connected) {
-        const address = window.walletState.currentAccount;
-        walletBtnText.textContent = `${address.slice(0, 6)}...${address.slice(-4)}`;
-        walletBtn.classList.remove('btn-outline-primary');
-        walletBtn.classList.add('btn-primary');
-    } else {
-        walletBtnText.textContent = '连接钱包';
-        walletBtn.classList.remove('btn-primary');
-        walletBtn.classList.add('btn-outline-primary');
-        walletMenu.classList.remove('show');
-    }
-}
 
 // 语言切换函数
 window.changeLanguage = function(lang) {
