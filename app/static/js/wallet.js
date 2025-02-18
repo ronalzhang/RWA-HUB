@@ -4,6 +4,7 @@ const walletState = {
     isConnected: false,
     isAdmin: false,
     eventCallbacks: new Set(), // 用于存储状态变化的回调函数
+    connecting: false,
     
     // 初始化钱包状态
     async init() {
@@ -183,20 +184,71 @@ const walletState = {
     // 连接钱包
     async connect(showPrompt = true) {
         console.log('Connecting wallet...');
+        
+        if (!window.ethereum) {
+            throw new Error('请安装MetaMask钱包');
+        }
+        
+        // 如果已经连接，直接返回
+        if (this.isConnected && this.address) {
+            return true;
+        }
+        
+        // 防止重复连接
+        if (this.connecting) {
+            throw new Error('正在处理连接请求，请稍候...');
+        }
+        
+        this.connecting = true;
+        const walletBtn = document.getElementById('walletBtn');
+        const walletBtnText = document.getElementById('walletBtnText');
+        const originalText = walletBtnText ? walletBtnText.textContent : '连接钱包';
+        
         try {
-            if (!window.ethereum) {
-                throw new Error('请安装MetaMask钱包');
+            // 更新按钮状态
+            if (walletBtnText) {
+                walletBtnText.textContent = '连接中...';
             }
-            
+            if (walletBtn) {
+                walletBtn.disabled = true;
+            }
+
             // 先检查并切换网络
             const chainId = await window.ethereum.request({ method: 'eth_chainId' });
             await this.checkAndSwitchNetwork(chainId);
             
+            // 请求连接
             const accounts = await window.ethereum.request({ 
                 method: showPrompt ? 'eth_requestAccounts' : 'eth_accounts'
+            }).catch(error => {
+                const actualError = error.err || error;
+                
+                if (actualError.code === 4001) {
+                    throw new Error('用户拒绝了连接请求');
+                }
+                
+                if (actualError.code === -32002) {
+                    // 更新按钮状态
+                    if (walletBtnText) {
+                        walletBtnText.textContent = '请打开MetaMask...';
+                    }
+                    // 等待一段时间后恢复按钮状态
+                    setTimeout(() => {
+                        if (walletBtnText) {
+                            walletBtnText.textContent = originalText;
+                        }
+                        if (walletBtn) {
+                            walletBtn.disabled = false;
+                        }
+                        this.connecting = false;
+                    }, 3000);
+                    throw new Error('请打开MetaMask完成操作后重试');
+                }
+                
+                throw error;
             });
             
-            if (accounts.length > 0) {
+            if (accounts && accounts.length > 0) {
                 this.address = accounts[0].toLowerCase();
                 this.isConnected = true;
                 localStorage.setItem('walletConnected', 'true');
@@ -205,10 +257,30 @@ const walletState = {
                 this.notifyStateChange();
                 return true;
             }
+            
             return false;
         } catch (error) {
-            console.error('Failed to connect wallet:', error);
-            throw error;
+            // 重置状态
+            this.connecting = false;
+            this.isConnected = false;
+            this.address = null;
+            
+            // 恢复按钮状态
+            if (walletBtnText) {
+                walletBtnText.textContent = originalText;
+            }
+            if (walletBtn) {
+                walletBtn.disabled = false;
+            }
+            
+            // 如果是已经处理过的错误，直接抛出
+            if (error instanceof Error && error.message) {
+                throw error;
+            }
+            
+            // 处理其他未知错误
+            console.error('Connection failed:', error);
+            throw new Error('连接钱包失败，请重试');
         }
     },
     
