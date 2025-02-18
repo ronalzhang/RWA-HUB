@@ -1250,17 +1250,17 @@ function previewAsset() {
 
         // 根据资产类型添加特定字段
         if (assetType === '10') { // 不动产
-            assetData.area = formData.get('area');
-            assetData.totalValue = formData.get('total_value');
+            assetData.area = parseFloat(formData.get('area')) || 0;
+            assetData.totalValue = parseFloat(formData.get('total_value')) || 0;
             const tokenCountText = document.getElementById('token_count').textContent.replace(/,/g, '');
-            assetData.tokenSupply = tokenCountText;
-            assetData.tokenPrice = document.getElementById('token_price').textContent;
-            assetData.annualRevenue = formData.get('annual_revenue');
+            assetData.tokenSupply = parseInt(tokenCountText) || 0;
+            assetData.tokenPrice = parseFloat(document.getElementById('token_price').textContent) || 0;
+            assetData.annualRevenue = parseFloat(formData.get('annual_revenue')) || 0;
         } else { // 类不动产
-            assetData.tokenSupply = formData.get('token_supply');
-            assetData.totalValue = formData.get('total_value_similar');
-            assetData.tokenPrice = document.getElementById('calculatedTokenPriceSimilar').textContent;
-            assetData.annualRevenue = formData.get('expectedAnnualRevenueSimilar');
+            assetData.tokenSupply = parseInt(formData.get('token_supply')) || 0;
+            assetData.totalValue = parseFloat(formData.get('total_value_similar')) || 0;
+            assetData.tokenPrice = parseFloat(document.getElementById('calculatedTokenPriceSimilar').textContent) || 0;
+            assetData.annualRevenue = parseFloat(formData.get('expectedAnnualRevenueSimilar')) || 0;
         }
 
         console.log('Preview data:', assetData);
@@ -1321,7 +1321,7 @@ function previewAsset() {
                                         <div class="col-md-6">
                                             <div class="bg-light rounded p-3">
                                                 <small class="text-muted d-block mb-1">Area</small>
-                                                <h6 class="mb-0">${assetData.area.toFixed(2)} m²</h6>
+                                                <h6 class="mb-0">${formatNumber(assetData.area, 2)} m²</h6>
                                             </div>
                                         </div>
                                     ` : ''}
@@ -1424,12 +1424,38 @@ function previewAsset() {
         // 初始化轮播
         if (assetData.images && assetData.images.length > 0) {
             setTimeout(() => {
-                const carousel = new bootstrap.Carousel(document.getElementById('previewCarousel'), {
-                    interval: 5000,
-                    wrap: true,
-                    keyboard: true
-                });
-            }, 100);
+                const carouselElement = document.getElementById('previewCarousel');
+                if (carouselElement) {
+                    try {
+                        const carousel = new bootstrap.Carousel(carouselElement, {
+                            interval: 5000,
+                            wrap: true,
+                            keyboard: true,
+                            touch: true
+                        });
+                        
+                        // 添加手势支持
+                        let touchStartX = 0;
+                        let touchEndX = 0;
+                        
+                        carouselElement.addEventListener('touchstart', e => {
+                            touchStartX = e.touches[0].clientX;
+                        });
+                        
+                        carouselElement.addEventListener('touchend', e => {
+                            touchEndX = e.changedTouches[0].clientX;
+                            if (touchEndX < touchStartX) {
+                                carousel.next();
+                            }
+                            if (touchEndX > touchStartX) {
+                                carousel.prev();
+                            }
+                        });
+                    } catch (error) {
+                        console.error('Failed to initialize carousel:', error);
+                    }
+                }
+            }, 300); // 增加延迟时间以确保 DOM 完全加载
         }
     } catch (error) {
         console.error('Failed to preview asset:', error);
