@@ -733,7 +733,7 @@ def check_token_symbol():
             exists = db.session.query(db.exists().where(
                 db.and_(
                     Asset.token_symbol == symbol,
-                    Asset.deleted_at.is_(None)  # 只检查未删除的资产
+                    Asset.status != AssetStatus.DELETED.value  # 使用状态字段检查
                 )
             )).scalar()
             current_app.logger.info(f'代币符号 {symbol} 查询结果: {"存在" if exists else "不存在"}')
@@ -741,7 +741,7 @@ def check_token_symbol():
             # 如果存在，记录当前数据库中的所有未删除资产的代币符号
             if exists:
                 existing_symbols = db.session.query(Asset.token_symbol).filter(
-                    Asset.deleted_at.is_(None)
+                    Asset.status != AssetStatus.DELETED.value
                 ).all()
                 current_app.logger.info(f'当前数据库中的代币符号: {[s[0] for s in existing_symbols]}')
             
@@ -749,13 +749,11 @@ def check_token_symbol():
                 'exists': exists,
                 'symbol': symbol
             })
-        except OperationalError as e:
-            current_app.logger.error(f'数据库连接错误: {str(e)}')
-            return jsonify({'error': '数据库连接错误，请稍后重试'}), 503
+            
         except Exception as e:
             current_app.logger.error(f'数据库查询失败: {str(e)}')
-            return jsonify({'error': '数据库查询失败，请稍后重试'}), 500
+            return jsonify({'error': '数据库查询失败'}), 500
             
     except Exception as e:
         current_app.logger.error(f'检查代币符号失败: {str(e)}')
-        return jsonify({'error': '服务器内部错误'}), 500
+        return jsonify({'error': str(e)}), 500
