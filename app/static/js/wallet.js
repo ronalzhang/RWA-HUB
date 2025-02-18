@@ -181,6 +181,33 @@ const walletState = {
         });
     },
     
+    // 检查是否正在处理连接请求
+    async checkProcessingState() {
+        try {
+            // 检查 MetaMask 是否已解锁
+            const isUnlocked = await window.ethereum._metamask.isUnlocked();
+            if (!isUnlocked) {
+                return true; // MetaMask 未解锁，需要用户操作
+            }
+
+            // 检查是否有正在处理的请求
+            try {
+                await window.ethereum.request({
+                    method: 'eth_accounts'
+                });
+                return false;
+            } catch (error) {
+                if (error.code === -32002) {
+                    return true;
+                }
+                return false;
+            }
+        } catch (error) {
+            console.warn('Failed to check processing state:', error);
+            return false;
+        }
+    },
+    
     // 连接钱包
     async connect(showPrompt = true) {
         console.log('Connecting wallet...');
@@ -205,6 +232,31 @@ const walletState = {
         const originalText = walletBtnText ? walletBtnText.textContent : '连接钱包';
         
         try {
+            // 检查是否有正在处理的请求
+            const isProcessing = await this.checkProcessingState();
+            if (isProcessing) {
+                // 更新按钮状态
+                if (walletBtnText) {
+                    walletBtnText.textContent = '请打开MetaMask...';
+                }
+                if (walletBtn) {
+                    walletBtn.disabled = true;
+                }
+                
+                // 等待一段时间后恢复按钮状态
+                setTimeout(() => {
+                    if (walletBtnText) {
+                        walletBtnText.textContent = originalText;
+                    }
+                    if (walletBtn) {
+                        walletBtn.disabled = false;
+                    }
+                    this.connecting = false;
+                }, 3000);
+                
+                throw new Error('请打开MetaMask完成操作后重试');
+            }
+            
             // 更新按钮状态
             if (walletBtnText) {
                 walletBtnText.textContent = '连接中...';
@@ -218,9 +270,12 @@ const walletState = {
             await this.checkAndSwitchNetwork(chainId);
             
             // 请求连接
-            const accounts = await window.ethereum.request({ 
-                method: showPrompt ? 'eth_requestAccounts' : 'eth_accounts'
-            }).catch(error => {
+            let accounts;
+            try {
+                accounts = await window.ethereum.request({ 
+                    method: showPrompt ? 'eth_requestAccounts' : 'eth_accounts'
+                });
+            } catch (error) {
                 const actualError = error.err || error;
                 
                 if (actualError.code === 4001) {
@@ -228,25 +283,11 @@ const walletState = {
                 }
                 
                 if (actualError.code === -32002) {
-                    // 更新按钮状态
-                    if (walletBtnText) {
-                        walletBtnText.textContent = '请打开MetaMask...';
-                    }
-                    // 等待一段时间后恢复按钮状态
-                    setTimeout(() => {
-                        if (walletBtnText) {
-                            walletBtnText.textContent = originalText;
-                        }
-                        if (walletBtn) {
-                            walletBtn.disabled = false;
-                        }
-                        this.connecting = false;
-                    }, 3000);
                     throw new Error('请打开MetaMask完成操作后重试');
                 }
                 
                 throw error;
-            });
+            }
             
             if (accounts && accounts.length > 0) {
                 this.address = accounts[0].toLowerCase();
@@ -255,6 +296,13 @@ const walletState = {
                 await this.checkIsAdmin();
                 this.updateUI();
                 this.notifyStateChange();
+                
+                // 连接成功后关闭钱包菜单
+                const walletMenu = document.getElementById('walletMenu');
+                if (walletMenu) {
+                    walletMenu.classList.remove('show');
+                }
+                
                 return true;
             }
             
