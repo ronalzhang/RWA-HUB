@@ -15,22 +15,24 @@
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     
     <style>
+        /* 钱包按钮样式 */
         .wallet-btn {
             min-width: 160px;
             text-align: center;
         }
         
-        .dropdown-menu {
-            min-width: 160px;
+        /* 钱包下拉容器 */
+        .wallet-dropdown {
+            position: relative;
+            display: inline-block;
         }
         
-        .wallet-address {
-            font-family: monospace;
-        }
-
-        #walletMenu {
+        /* 钱包下拉菜单 */
+        .wallet-menu {
             display: none;
             position: absolute;
+            right: 0;
+            top: 100%;
             background-color: #fff;
             border: 1px solid #dee2e6;
             border-radius: 0.375rem;
@@ -38,27 +40,61 @@
             min-width: 200px;
             padding: 0.5rem 0;
             z-index: 1000;
+            margin-top: 0.5rem;
+            transition: opacity 0.15s ease-in-out;
+            opacity: 0;
         }
-
-        #walletMenu.show {
+        
+        .wallet-menu.show {
             display: block;
+            opacity: 1;
         }
-
-        #walletMenu .dropdown-item {
+        
+        /* 钱包菜单项 */
+        .wallet-menu-item {
+            display: block;
+            width: 100%;
             padding: 0.5rem 1rem;
-            color: #212529;
-            text-decoration: none;
-            display: block;
             clear: both;
             font-weight: 400;
+            color: #212529;
             text-align: inherit;
+            text-decoration: none;
             white-space: nowrap;
             background-color: transparent;
             border: 0;
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+        }
+        
+        .wallet-menu-item:hover {
+            background-color: #f8f9fa;
+            color: #0d6efd;
+        }
+        
+        /* 钱包菜单头部 */
+        .wallet-menu-header {
+            padding: 0.5rem 1rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid #dee2e6;
+            color: #6c757d;
+            font-size: 0.875rem;
+        }
+        
+        /* 钱包地址显示 */
+        .wallet-address {
+            font-family: monospace;
         }
 
-        #walletMenu .dropdown-item:hover {
+        /* 语言切换下拉菜单 */
+        .language-dropdown .dropdown-item {
+            padding: 0.5rem 1rem;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .language-dropdown .dropdown-item:hover {
             background-color: #f8f9fa;
+            color: #0d6efd;
         }
     </style>
     
@@ -97,7 +133,7 @@
                 <!-- 钱包连接 -->
                 <div class="d-flex align-items-center">
                     <!-- 语言切换 -->
-                    <div class="dropdown me-3">
+                    <div class="dropdown me-3 language-dropdown">
                         <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="languageDropdown" data-bs-toggle="dropdown">
                             <i class="fas fa-globe me-1"></i>
                             <span>{{ _('Language') }}</span>
@@ -109,19 +145,19 @@
                     </div>
                     
                     <!-- 钱包按钮和下拉菜单 -->
-                    <div class="dropdown">
-                        <button id="walletBtn" class="btn btn-outline-primary" type="button">
+                    <div class="wallet-dropdown">
+                        <button id="walletBtn" class="btn btn-outline-primary wallet-btn" type="button">
                             <i class="fas fa-wallet me-2"></i>
                             <span id="walletBtnText">连接钱包</span>
                         </button>
-                        <div id="walletMenu" class="dropdown-menu dropdown-menu-end" style="display: none;">
-                            <div class="px-3 py-2 text-muted small border-bottom">
+                        <div id="walletMenu" class="wallet-menu">
+                            <div class="wallet-menu-header">
                                 <span>当前连接</span>
                             </div>
-                            <button class="dropdown-item" type="button" id="switchWallet">
+                            <button class="wallet-menu-item" type="button" id="switchWallet">
                                 <i class="fas fa-exchange-alt me-2"></i>切换钱包
                             </button>
-                            <button class="dropdown-item" type="button" id="disconnectWallet">
+                            <button class="wallet-menu-item" type="button" id="disconnectWallet">
                                 <i class="fas fa-sign-out-alt me-2"></i>断开连接
                             </button>
                         </div>
@@ -168,48 +204,6 @@
     <!-- 钱包连接脚本 -->
     <script src="{{ url_for('static', filename='js/wallet.js') }}"></script>
     <script>
-    document.addEventListener('DOMContentLoaded', async function() {
-        const walletBtn = document.getElementById('walletBtn');
-        const walletMenu = document.getElementById('walletMenu');
-        
-        if (walletBtn && walletMenu) {
-            // 确保菜单默认隐藏
-            walletMenu.style.display = 'none';
-            
-            // 点击按钮切换菜单显示状态
-            walletBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                if (!window.ethereum) {
-                    showError('请安装 MetaMask 钱包');
-                    return;
-                }
-                
-                if (!window.walletState.getConnectionStatus()) {
-                    connectWallet();
-                } else {
-                    const isVisible = walletMenu.style.display === 'block';
-                    walletMenu.style.display = isVisible ? 'none' : 'block';
-                }
-            });
-            
-            // 点击其他地方关闭菜单
-            document.addEventListener('click', function(e) {
-                if (walletMenu.style.display === 'block' && !walletBtn.contains(e.target) && !walletMenu.contains(e.target)) {
-                    walletMenu.style.display = 'none';
-                }
-            });
-            
-            // 点击菜单项时关闭菜单
-            walletMenu.addEventListener('click', function(e) {
-                if (e.target.closest('.dropdown-item')) {
-                    walletMenu.style.display = 'none';
-                }
-            });
-        }
-    });
-
     // 语言切换
     function changeLanguage(lang) {
         document.cookie = `language=${lang};path=/;max-age=31536000`;
