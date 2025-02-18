@@ -181,9 +181,30 @@ const walletState = {
         });
     },
     
+    // 检查网络连接
+    async checkNetworkConnectivity() {
+        try {
+            // 尝试连接以太坊主网
+            const response = await fetch('https://api.etherscan.io/api', {
+                method: 'HEAD',
+                mode: 'no-cors'
+            });
+            return true;
+        } catch (error) {
+            console.warn('Network connectivity check failed:', error);
+            return false;
+        }
+    },
+
     // 检查是否正在处理连接请求
     async checkProcessingState() {
         try {
+            // 首先检查网络连接
+            const isNetworkConnected = await this.checkNetworkConnectivity();
+            if (!isNetworkConnected) {
+                throw new Error('无法连接到以太坊网络，请检查网络连接或使用VPN');
+            }
+
             // 检查 MetaMask 是否已解锁
             const isUnlocked = await window.ethereum._metamask.isUnlocked();
             if (!isUnlocked) {
@@ -204,6 +225,9 @@ const walletState = {
             }
         } catch (error) {
             console.warn('Failed to check processing state:', error);
+            if (error.message.includes('VPN')) {
+                throw error; // 如果是网络连接问题，直接抛出
+            }
             return false;
         }
     },
@@ -233,28 +257,36 @@ const walletState = {
         
         try {
             // 检查是否有正在处理的请求
-            const isProcessing = await this.checkProcessingState();
-            if (isProcessing) {
-                // 更新按钮状态
-                if (walletBtnText) {
-                    walletBtnText.textContent = '请打开MetaMask...';
-                }
-                if (walletBtn) {
-                    walletBtn.disabled = true;
-                }
-                
-                // 等待一段时间后恢复按钮状态
-                setTimeout(() => {
+            try {
+                const isProcessing = await this.checkProcessingState();
+                if (isProcessing) {
+                    // 更新按钮状态
                     if (walletBtnText) {
-                        walletBtnText.textContent = originalText;
+                        walletBtnText.textContent = '请打开MetaMask...';
                     }
                     if (walletBtn) {
-                        walletBtn.disabled = false;
+                        walletBtn.disabled = true;
                     }
+                    
+                    // 等待一段时间后恢复按钮状态
+                    setTimeout(() => {
+                        if (walletBtnText) {
+                            walletBtnText.textContent = originalText;
+                        }
+                        if (walletBtn) {
+                            walletBtn.disabled = false;
+                        }
+                        this.connecting = false;
+                    }, 3000);
+                    
+                    throw new Error('请打开MetaMask完成操作后重试');
+                }
+            } catch (error) {
+                if (error.message.includes('VPN')) {
+                    // 如果是网络连接问题，显示特定的错误信息
                     this.connecting = false;
-                }, 3000);
-                
-                throw new Error('请打开MetaMask完成操作后重试');
+                    throw error;
+                }
             }
             
             // 更新按钮状态
@@ -266,8 +298,16 @@ const walletState = {
             }
 
             // 先检查并切换网络
-            const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-            await this.checkAndSwitchNetwork(chainId);
+            try {
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                await this.checkAndSwitchNetwork(chainId);
+            } catch (error) {
+                if (error.message.includes('网络连接') || error.message.includes('VPN')) {
+                    throw error;
+                }
+                console.error('Network check failed:', error);
+                throw new Error('网络连接失败，请检查网络连接或使用VPN');
+            }
             
             // 请求连接
             let accounts;
@@ -284,6 +324,14 @@ const walletState = {
                 
                 if (actualError.code === -32002) {
                     throw new Error('请打开MetaMask完成操作后重试');
+                }
+                
+                if (actualError.message && (
+                    actualError.message.includes('网络连接') || 
+                    actualError.message.includes('VPN') ||
+                    actualError.message.includes('Network Error')
+                )) {
+                    throw new Error('无法连接到以太坊网络，请检查网络连接或使用VPN');
                 }
                 
                 throw error;
