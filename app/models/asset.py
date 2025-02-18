@@ -41,6 +41,7 @@ class Asset(db.Model):
     creator_address = db.Column(db.String(42), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    deleted_at = db.Column(db.DateTime, nullable=True)  # 软删除标记
 
     # 添加关联
     dividend_records = db.relationship('DividendRecord', backref='asset', lazy=True, cascade='all, delete-orphan')

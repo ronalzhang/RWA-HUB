@@ -2,7 +2,7 @@ import os
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'postgresql://rwa_hub_user:3YIeu6i1Nuyb6z8wRAxdctbMJVrSseJB@dpg-cu6b270gph6c73c50eag-a/rwa_hub'
+    SQLALCHEMY_DATABASE_URI = 'postgresql://rwa_hub_user:password@localhost/rwa_hub'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static/uploads')
 
