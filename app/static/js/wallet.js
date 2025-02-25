@@ -15,6 +15,9 @@ const walletState = {
         }
 
         try {
+            // 确保清理之前的状态
+            this.clearAllStates();
+            
             // 设置事件监听
             this.setupEventListeners();
             
@@ -29,14 +32,14 @@ const walletState = {
             }
             
             // 检查当前是否有账户连接
-            const accounts = await window.ethereum.request({ 
-                method: 'eth_accounts'
-            });
-            
-            // 只有当真实有账户连接时才恢复连接
-            if (accounts && accounts.length > 0) {
-                // 验证连接状态
-                try {
+            try {
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_accounts'
+                });
+                
+                // 只有当真实有账户连接时才恢复连接
+                if (accounts && accounts.length > 0) {
+                    // 验证连接状态
                     const chainId = await window.ethereum.request({ method: 'eth_chainId' });
                     if (!chainId) {
                         throw new Error('Unable to get chain ID');
@@ -46,18 +49,42 @@ const walletState = {
                     await this.checkIsAdmin();
                     this.updateUI();
                     this.notifyStateChange();
-                } catch (error) {
-                    console.error('Failed to verify connection:', error);
+                } else {
+                    // 如果没有实际连接的账户，清除存储的状态
                     await this.disconnect(true);
                 }
-            } else {
-                // 如果没有实际连接的账户，清除存储的状态
+            } catch (error) {
+                console.error('Failed to initialize wallet:', error);
+                // 发生错误时也清除存储的状态
                 await this.disconnect(true);
             }
         } catch (error) {
             console.error('Failed to initialize wallet state:', error);
             // 发生错误时也清除存储的状态
             await this.disconnect(true);
+        }
+    },
+
+    // 清理所有状态
+    clearAllStates() {
+        this.address = null;
+        this.isConnected = false;
+        this.isAdmin = false;
+        this.connecting = false;
+        this.eventCallbacks.clear();
+        
+        // 清除本地存储
+        localStorage.removeItem('walletConnected');
+        sessionStorage.removeItem('walletAddress');
+        
+        // 清除所有相关的 cookie
+        this.clearState();
+        
+        // 移除所有事件监听器
+        if (window.ethereum) {
+            window.ethereum.removeAllListeners('accountsChanged');
+            window.ethereum.removeAllListeners('disconnect');
+            window.ethereum.removeAllListeners('chainChanged');
         }
     },
 
@@ -256,39 +283,6 @@ const walletState = {
         const originalText = walletBtnText ? walletBtnText.textContent : '连接钱包';
         
         try {
-            // 检查是否有正在处理的请求
-            try {
-                const isProcessing = await this.checkProcessingState();
-                if (isProcessing) {
-                    // 更新按钮状态
-                    if (walletBtnText) {
-                        walletBtnText.textContent = '请打开MetaMask...';
-                    }
-                    if (walletBtn) {
-                        walletBtn.disabled = true;
-                    }
-                    
-                    // 等待一段时间后恢复按钮状态
-                    setTimeout(() => {
-                        if (walletBtnText) {
-                            walletBtnText.textContent = originalText;
-                        }
-                        if (walletBtn) {
-                            walletBtn.disabled = false;
-                        }
-                        this.connecting = false;
-                    }, 3000);
-                    
-                    throw new Error('请打开MetaMask完成操作后重试');
-                }
-            } catch (error) {
-                if (error.message.includes('VPN')) {
-                    // 如果是网络连接问题，显示特定的错误信息
-                    this.connecting = false;
-                    throw error;
-                }
-            }
-            
             // 更新按钮状态
             if (walletBtnText) {
                 walletBtnText.textContent = '连接中...';
@@ -297,18 +291,17 @@ const walletState = {
                 walletBtn.disabled = true;
             }
 
-            // 先检查并切换网络
+            // 先尝试获取当前账户，如果有正在处理的请求会在这里失败
             try {
-                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-                await this.checkAndSwitchNetwork(chainId);
+                await window.ethereum.request({ method: 'eth_accounts' });
             } catch (error) {
-                if (error.message.includes('网络连接') || error.message.includes('VPN')) {
-                    throw error;
+                if (error.code === -32002) {
+                    // 重置所有状态
+                    this.clearAllStates();
+                    throw new Error('请打开MetaMask完成操作后重试');
                 }
-                console.error('Network check failed:', error);
-                throw new Error('网络连接失败，请检查网络连接或使用VPN');
             }
-            
+
             // 请求连接
             let accounts;
             try {
@@ -323,21 +316,19 @@ const walletState = {
                 }
                 
                 if (actualError.code === -32002) {
+                    // 重置所有状态
+                    this.clearAllStates();
                     throw new Error('请打开MetaMask完成操作后重试');
-                }
-                
-                if (actualError.message && (
-                    actualError.message.includes('网络连接') || 
-                    actualError.message.includes('VPN') ||
-                    actualError.message.includes('Network Error')
-                )) {
-                    throw new Error('无法连接到以太坊网络，请检查网络连接或使用VPN');
                 }
                 
                 throw error;
             }
             
             if (accounts && accounts.length > 0) {
+                // 获取并检查网络
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                await this.checkAndSwitchNetwork(chainId);
+                
                 this.address = accounts[0].toLowerCase();
                 this.isConnected = true;
                 localStorage.setItem('walletConnected', 'true');
