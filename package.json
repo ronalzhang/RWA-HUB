@@ -1,5 +1,5 @@
 {
-  "name": "58hub",
+  "name": "rwa-hub",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -8,6 +8,7 @@
     "test": "tests"
   },
   "scripts": {
+    "start": "python app.py",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

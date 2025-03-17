@@ -10,7 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
-<div class="container mt-4">
+<div class="container py-5">
     <!-- 标题和创建按钮 -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">{{ _('Asset List') }}</h2>
@@ -24,7 +24,7 @@
         {% if assets %}
             {% for asset in assets %}
             <div class="col-md-4">
-                <a href="{{ url_for('assets.asset_detail_page', asset_id=asset.id) }}" class="text-decoration-none">
+                <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" class="text-decoration-none">
                     <div class="card h-100">
                         <!-- 资产图片 -->
                         <div class="position-relative">
@@ -111,7 +111,7 @@
 
     <!-- 分页 -->
     {% if pagination and pagination.pages > 1 %}
-    <nav class="mt-4">
+    <nav class="mt-5 mb-4">
         <ul class="pagination justify-content-center">
             {% for page in range(1, pagination.pages + 1) %}
             <li class="page-item {% if page == pagination.page %}active{% endif %}">
@@ -169,6 +169,17 @@
 .pagination .page-item.active .page-link {
     background-color: var(--bs-primary);
     color: white;
+}
+
+/* 页面容器 */
+.container.py-5 {
+    min-height: calc(100vh - 200px);
+}
+
+/* 无资产时的提示框 */
+.col-12 .text-center.py-5 {
+    margin-top: 50px;
+    margin-bottom: 50px;
 }
 </style>
 </body>
