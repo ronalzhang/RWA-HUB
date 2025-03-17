@@ -20,6 +20,9 @@ from . import api
 from . import admin
 from . import assets
 
+# 导入全局处理器
+from .assets import register_global_handlers
+
 # 确保所有路由都已注册
 from .main import *
 from .views import *
@@ -36,3 +39,7 @@ def register_blueprints(app):
     app.register_blueprint(assets_api_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(admin_api_bp)
+    
+    # 注册全局URL前缀修正处理器
+    register_global_handlers(app)
+    app.logger.info('已注册全局URL前缀修正处理器')

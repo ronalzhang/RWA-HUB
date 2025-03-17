@@ -6,10 +6,18 @@ def get_admin_permissions(eth_address):
         if not eth_address:
             current_app.logger.warning('未提供钱包地址')
             return None
-            
-        # 转换为小写进行比较
-        eth_address = eth_address.lower()
-        current_app.logger.info(f'检查管理员权限 - 地址: {eth_address}')
+        
+        current_app.logger.info(f'检查管理员权限 - 原始地址: {eth_address}')
+        
+        # 区分ETH和SOL地址处理
+        # ETH地址以0x开头，需要转换为小写
+        # SOL地址不以0x开头，保持原样（大小写敏感）
+        if eth_address.startswith('0x'):
+            normalized_address = eth_address.lower()
+            current_app.logger.info(f'ETH地址，转换为小写: {normalized_address}')
+        else:
+            normalized_address = eth_address
+            current_app.logger.info(f'非ETH地址（可能是SOL），保持原样: {normalized_address}')
         
         admin_config = current_app.config.get('ADMIN_CONFIG', {})
         if not admin_config:
@@ -21,8 +29,14 @@ def get_admin_permissions(eth_address):
         
         # 检查地址是否在管理员配置中
         for admin_address, info in admin_config.items():
-            current_app.logger.debug(f'比较地址: {admin_address.lower()} vs {eth_address}')
-            if eth_address == admin_address.lower():
+            # 同样区分ETH和SOL地址处理
+            if admin_address.startswith('0x'):
+                config_address = admin_address.lower()
+            else:
+                config_address = admin_address
+                
+            current_app.logger.debug(f'比较地址: {config_address} vs {normalized_address}')
+            if normalized_address == config_address:
                 admin_info = info
                 current_app.logger.info(f'找到管理员信息: {info}')
                 break

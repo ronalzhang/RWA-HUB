@@ -27,6 +27,11 @@ const CONFIG = {
         TOKENS_PER_SQUARE_METER: 10000,
         PRICE_DECIMALS: 6,
         VALUE_DECIMALS: 2
+    },
+    FEES: {
+        BASE_FEE: 3.25, // 基础上链费用（USDC）
+        PLATFORM_FEE_RATE: 0.025, // 平台佣金比例（2.5%）
+        MIN_FEE: 10 // 最低收费（USDC）
     }
 };
 
@@ -35,6 +40,9 @@ let form, nameInput, typeInput, locationInput, descriptionInput, areaInput,
     totalValueInput, tokenCountInput, tokenSymbolInput, annualRevenueInput, 
     imageDropzone, documentDropzone, errorModal, errorMessageElement,
     uploadedImages = [], uploadedDocuments = [];
+
+// 管理员状态
+let isAdminUser = false;
 
 // DOM 加载完成后初始化
 document.addEventListener('DOMContentLoaded', async function() {
@@ -46,8 +54,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     try {
         // 等待钱包状态初始化
-        if (!window.ethereum) {
-            console.error('MetaMask not installed');
+        if (!window.solana) {
+            console.error('Phantom not installed');
             showWalletPrompt();
             return;
         }
@@ -57,19 +65,28 @@ document.addEventListener('DOMContentLoaded', async function() {
         const formContent = document.getElementById('formContent');
         
         // 注册钱包状态变化的处理函数
-        window.walletState.onStateChange((state) => {
-            console.log('Wallet state changed:', state);
-            if (state.isConnected) {
-                walletCheck.style.display = 'none';
-                formContent.style.display = 'block';
+        try {
+            if (window.walletState && typeof window.walletState.onStateChange === 'function') {
+                window.walletState.onStateChange((state) => {
+                    console.log('Wallet state changed:', state);
+                    if (state.isConnected) {
+                        walletCheck.style.display = 'none';
+                        formContent.style.display = 'block';
+                    } else {
+                        walletCheck.style.display = 'block';
+                        formContent.style.display = 'none';
+                    }
+                });
             } else {
-                walletCheck.style.display = 'block';
-                formContent.style.display = 'none';
+                console.warn('钱包状态变化处理函数不可用，使用备选方案');
+                // 不依赖于钱包状态变化处理函数
             }
-        });
+        } catch (error) {
+            console.warn('注册钱包状态变化处理函数失败:', error);
+        }
 
         // 初始检查
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        const accounts = await window.solana.connect();
         if (accounts.length === 0) {
             console.log('No wallet connected');
             showWalletPrompt();
@@ -80,6 +97,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.log('Wallet connected:', accounts[0]);
         walletCheck.style.display = 'none';
         formContent.style.display = 'block';
+        
+        // 检查是否是管理员
+        await checkAdminStatus();
         
         await initializeFormElements();
         await initializeEventListeners();
@@ -181,6 +201,40 @@ async function initializeFormElements() {
     }
 
     console.log('Form elements initialized successfully');
+
+    // 添加事件监听器
+    if (typeInput) {
+        typeInput.addEventListener('change', handleAssetTypeChange);
+    }
+    
+    if (areaInput) {
+        areaInput.addEventListener('input', handleAreaChange);
+    }
+    
+    if (totalValueInput) {
+        totalValueInput.addEventListener('input', function() {
+            updateTokenPrice();
+            calculateFees(); // 添加费用计算
+        });
+    }
+    
+    // 类不动产字段的事件监听
+    const tokenSupplyInput = document.getElementById('token_supply');
+    const totalValueSimilarInput = document.getElementById('total_value_similar');
+    
+    if (tokenSupplyInput) {
+        tokenSupplyInput.addEventListener('input', function() {
+            updateTokenPriceSimilar();
+            calculateFees(); // 添加费用计算
+        });
+    }
+    
+    if (totalValueSimilarInput) {
+        totalValueSimilarInput.addEventListener('input', function() {
+            updateTokenPriceSimilar();
+            calculateFees(); // 添加费用计算
+        });
+    }
 }
 
 // 初始化事件监听器
@@ -290,38 +344,6 @@ function initializeEventListeners() {
             
             // 更新文档要求
             updateDocumentRequirements(type);
-        });
-    }
-
-    // 添加类不动产相关字段的事件监听
-    const tokenSupplyInput = document.getElementById('token_supply');
-    const totalValueSimilarInput = document.getElementById('total_value_similar');
-    
-    if (tokenSupplyInput) {
-        tokenSupplyInput.addEventListener('input', function() {
-            calculateSimilarAssetsTokenPrice();
-        });
-    }
-    
-    if (totalValueSimilarInput) {
-        totalValueSimilarInput.addEventListener('input', function() {
-            calculateSimilarAssetsTokenPrice();
-        });
-    }
-
-    // 不动产相关字段的事件监听
-    const areaInput = document.getElementById('area');
-    const totalValueInput = document.getElementById('total_value');
-    
-    if (areaInput) {
-        areaInput.addEventListener('input', function() {
-            calculateRealEstateTokens();
-        });
-    }
-    
-    if (totalValueInput) {
-        totalValueInput.addEventListener('input', function() {
-            calculateRealEstateTokens();
         });
     }
 
@@ -924,7 +946,7 @@ async function submitForm() {
         }
 
         // 检查钱包连接状态
-        if (!window.ethereum || !window.walletState.getConnectionStatus()) {
+        if (!window.solana || !window.walletState.getConnectionStatus()) {
             showError('请先连接钱包');
             return;
         }
@@ -1012,7 +1034,7 @@ async function submitForm() {
         
         // 跳转到资产详情页
         setTimeout(() => {
-            window.location.href = `/assets/${result.assetId}`;
+            window.location.href = `/assets/${result.tokenSymbol}`;
         }, 1500);
         
     } catch (error) {
@@ -1028,11 +1050,20 @@ async function connectWallet(event) {
     }
 
     try {
-        if (!window.ethereum) {
-            throw new Error('请安装MetaMask钱包');
+        if (!window.solana) {
+            throw new Error('请安装Phantom钱包');
         }
 
-        await window.walletState.connect();
+        // 使用全局钱包函数，支持旧的walletState和新的walletFunctions
+        if (window.walletFunctions) {
+            await window.walletFunctions.connect();
+        } else if (window.walletState) {
+            await window.walletState.connect();
+        } else {
+            // 直接连接
+            const resp = await window.solana.connect();
+            console.log('钱包连接成功:', resp);
+        }
     } catch (error) {
         console.error('Failed to connect wallet:', error);
         showError(error.message);
@@ -1476,4 +1507,274 @@ function submitPreview(event) {
     }
     // 提交表单
     submitForm();
+}
+
+// 检查管理员状态
+async function checkAdminStatus() {
+    try {
+        // 获取当前用户地址
+        let address = await getCurrentUserAddress();
+        
+        if (!address) {
+            console.log('无法获取钱包地址');
+            return false;
+        }
+        
+        console.log('使用地址检查管理员状态:', address);
+        
+        // 确保地址是小写的
+        address = address.toLowerCase();
+        
+        const response = await fetch('/api/check_admin', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Eth-Address': address
+            },
+            body: JSON.stringify({ address: address })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            isAdminUser = data.is_admin === true;
+            console.log('Admin status:', isAdminUser);
+            
+            // 更新佣金说明文本
+            const platformFeeNote = document.getElementById('platformFeeNote');
+            if (platformFeeNote) {
+                if (isAdminUser) {
+                    platformFeeNote.textContent = '管理员用户仅支付基础上链费用';
+                } else {
+                    platformFeeNote.textContent = '资产总价值的2.5%';
+                }
+            }
+        } else {
+            console.error('管理员状态检查失败:', response.status);
+            // 如果检查失败，默认为非管理员
+            isAdminUser = false;
+            
+            if (response.status === 400) {
+                const errorData = await response.json();
+                console.error('错误详情:', errorData);
+            }
+        }
+        
+        return isAdminUser;
+    } catch (error) {
+        console.error('Failed to check admin status:', error);
+        return false;
+    }
+}
+
+// 获取当前用户的钱包地址
+async function getCurrentUserAddress() {
+    // 首先从cookie中获取
+    const cookieValue = `; ${document.cookie}`;
+    let parts = cookieValue.split(`; eth_address=`);
+    if (parts.length === 2) {
+        let address = parts.pop().split(';').shift();
+        if (address) {
+            console.log('从cookie获取地址:', address);
+            return address;
+        }
+    }
+    
+    // 尝试从Solana钱包获取
+    parts = cookieValue.split(`; solana_address=`);
+    if (parts.length === 2) {
+        let address = parts.pop().split(';').shift();
+        if (address) {
+            console.log('从cookie获取Solana地址:', address);
+            return address;
+        }
+    }
+    
+    // 从localStorage获取
+    const storedAddress = localStorage.getItem('walletAddress');
+    if (storedAddress) {
+        console.log('从localStorage获取地址:', storedAddress);
+        return storedAddress;
+    }
+    
+    // 尝试连接钱包
+    if (window.solana) {
+        try {
+            console.log('尝试连接Solana钱包...');
+            const response = await window.solana.connect();
+            const address = response.publicKey?.toString();
+            if (address) {
+                console.log('已连接Solana钱包，地址:', address);
+                localStorage.setItem('walletAddress', address);
+                return address;
+            }
+        } catch (e) {
+            console.warn('连接Solana钱包失败:', e.message);
+        }
+    } else if (window.ethereum) {
+        try {
+            console.log('尝试连接以太坊钱包...');
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            if (accounts && accounts.length > 0) {
+                console.log('已连接以太坊钱包，地址:', accounts[0]);
+                localStorage.setItem('walletAddress', accounts[0]);
+                return accounts[0];
+            }
+        } catch (e) {
+            console.warn('连接以太坊钱包失败:', e.message);
+        }
+    }
+    
+    console.error('无法获取用户钱包地址');
+    return null;
+}
+
+// 计算上链费用和平台佣金
+function calculateFees() {
+    const assetType = document.getElementById('asset-type').value;
+    const area = document.getElementById('area').value;
+    const tokenPrice = parseFloat(document.getElementById('token-price').value) || 0;
+    const tokenSupply = parseInt(document.getElementById('token-supply').value) || 0;
+    const assetValue = tokenPrice * tokenSupply;
+    
+    let baseFee = 0;
+    let platformFee = 0;
+    
+    // 检查管理员状态 - 从正确的本地存储键获取
+    const isAdmin = localStorage.getItem('isAdmin') === 'true';
+    
+    // 根据资产类型设置基础费用
+    if (assetType === 'real-estate') {
+        baseFee = 500;
+    } else if (assetType === 'art') {
+        baseFee = 300;
+    } else if (assetType === 'collectible') {
+        baseFee = 100;
+    } else if (assetType === 'other') {
+        baseFee = 200;
+    }
+    
+    // 调整基于地区的基础费用
+    if (area === 'america') {
+        baseFee *= 1.2;
+    } else if (area === 'europe') {
+        baseFee *= 1.1;
+    } else if (area === 'asia') {
+        baseFee *= 0.9;
+    }
+    
+    // 计算平台费用 (非管理员用户支付2.5%的平台费用)
+    if (!isAdmin) {
+        platformFee = assetValue * 0.025;
+        // 确保平台费不低于50 USDC
+        platformFee = Math.max(platformFee, 50);
+    }
+    
+    // 计算总费用
+    const totalFee = baseFee + platformFee;
+    
+    // 更新UI
+    document.getElementById('base-fee').textContent = baseFee.toFixed(2);
+    document.getElementById('platform-fee').textContent = platformFee.toFixed(2);
+    document.getElementById('total-fee').textContent = totalFee.toFixed(2);
+    
+    // 更新费用说明文本
+    const platformFeeNote = document.getElementById('platform-fee-note');
+    if (platformFeeNote) {
+        if (isAdmin) {
+            platformFeeNote.textContent = '(管理员免除平台费)';
+        } else {
+            // 使用文本字符串"2.5%"而不是模板字符串
+            platformFeeNote.textContent = '(2.5% 资产总价值)';
+        }
+    }
+    
+    // 显示明细
+    console.log('费用计算:', {
+        资产类型: assetType,
+        地区: area,
+        代币价格: tokenPrice,
+        代币供应量: tokenSupply,
+        资产总价值: assetValue,
+        基础费用: baseFee,
+        平台费用: platformFee,
+        总费用: totalFee,
+        是否管理员: isAdmin
+    });
+    
+    return totalFee;
+}
+
+// 处理资产类型变化
+function handleAssetTypeChange() {
+    // ... existing code ...
+    
+    // 更新费用计算
+    calculateFees();
+}
+
+// 处理面积变化
+function handleAreaChange() {
+    // ... existing code ...
+    
+    // 更新费用计算
+    calculateFees();
+}
+
+// 更新代币价格
+function updateTokenPrice() {
+    // ... existing code ...
+    
+    // 更新费用计算
+    calculateFees();
+}
+
+// 更新类不动产代币价格
+function updateTokenPriceSimilar() {
+    // ... existing code ...
+    
+    // 更新费用计算
+    calculateFees();
+}
+
+async function checkIfAdmin() {
+    try {
+        // 使用通用函数获取用户地址
+        let address = await getCurrentUserAddress();
+        
+        if (!address) {
+            console.log('无法获取钱包地址');
+            return false;
+        }
+        
+        // 确保地址是小写的
+        address = address.toLowerCase();
+        console.log('使用地址检查管理员权限:', address);
+        
+        // 使用正确的API端点
+        const response = await fetch('/api/check_admin', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Eth-Address': address
+            },
+            body: JSON.stringify({ address: address })
+        });
+        
+        if (!response.ok) {
+            console.log('管理员检查失败:', response.status);
+            
+            if (response.status === 400) {
+                const errorData = await response.json();
+                console.error('错误详情:', errorData);
+            }
+            
+            return false;
+        }
+        
+        const data = await response.json();
+        return data.is_admin === true;
+    } catch (error) {
+        console.error('管理员检查失败:', error);
+        return false;
+    }
 }

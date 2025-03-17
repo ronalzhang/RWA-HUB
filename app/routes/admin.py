@@ -1,30 +1,54 @@
-from flask import render_template, jsonify, request, g, current_app, redirect, url_for, flash, session
+from flask import render_template, jsonify, request, g, current_app, redirect, url_for, flash, session, after_this_request
 from app.models.asset import Asset, AssetStatus, AssetType
-from app.models.trade import Trade
-from app import db
+from app.models.trade import Trade, TradeStatus
+from app.models.income import PlatformIncome as DBPlatformIncome, IncomeType
+from app.extensions import db
 from . import admin_bp, admin_api_bp
 from app.utils.decorators import eth_address_required
-from sqlalchemy import func
-from datetime import datetime, timedelta
+from sqlalchemy import func, text, literal
+from datetime import datetime, timedelta, time, date
 from functools import wraps
 import json
 import os
 from app.utils.storage import storage
 from ..models import DividendRecord
+import re
+import logging
+from urllib.parse import urlparse, parse_qs
+import random
+from app.models.user import User
+from app.models.platform_income import PlatformIncome
+from app.models.dividend import Dividend
+from dateutil.relativedelta import relativedelta
+from app.models.admin import AdminUser
+from app.models.commission import Commission
+from app.models.admin import DashboardStats
 
-def get_admin_permissions(eth_address):
+def get_admin_info(eth_address):
     """获取管理员权限"""
     if not eth_address:
         return None
         
-    # 转换为小写进行比较
-    eth_address = eth_address.lower()
+    # 区分ETH和SOL地址处理
+    # ETH地址以0x开头，需要转换为小写
+    # SOL地址不以0x开头，保持原样（大小写敏感）
+    if eth_address.startswith('0x'):
+        normalized_address = eth_address.lower()
+    else:
+        normalized_address = eth_address
+    
     admin_config = current_app.config['ADMIN_CONFIG']
     admin_info = None
     
     # 检查地址是否在管理员配置中
     for admin_address, info in admin_config.items():
-        if eth_address == admin_address.lower():
+        # 同样区分ETH和SOL地址处理
+        if admin_address.startswith('0x'):
+            config_address = admin_address.lower()
+        else:
+            config_address = admin_address
+            
+        if normalized_address == config_address:
             admin_info = info
             break
     
@@ -42,12 +66,12 @@ def get_admin_permissions(eth_address):
 def is_admin(eth_address=None):
     """检查指定地址或当前用户是否是管理员"""
     target_address = eth_address if eth_address else g.eth_address if hasattr(g, 'eth_address') else None
-    return get_admin_permissions(target_address) is not None
+    return get_admin_info(target_address) is not None
 
 def has_permission(permission, eth_address=None):
     """检查管理员是否有特定权限"""
     target_address = eth_address if eth_address else g.eth_address if hasattr(g, 'eth_address') else None
-    admin_info = get_admin_permissions(target_address)
+    admin_info = get_admin_info(target_address)
     
     if not admin_info:
         return False
@@ -63,7 +87,7 @@ def has_permission(permission, eth_address=None):
 def get_admin_role(eth_address=None):
     """获取管理员角色信息"""
     target_address = eth_address if eth_address else g.eth_address if hasattr(g, 'eth_address') else None
-    admin_info = get_admin_permissions(target_address)
+    admin_info = get_admin_info(target_address)
     if admin_info:
         return {
             'role': admin_info['role'],
@@ -77,8 +101,12 @@ def admin_required(f):
     """管理员权限装饰器"""
     @eth_address_required
     def admin_check(*args, **kwargs):
-        if not is_admin():
-            return jsonify({'error': '需要管理员权限'}), 403
+        # 检查是否为管理员
+        admin = AdminUser.query.filter_by(wallet_address=g.eth_address).first()
+        if not admin:
+            flash('需要管理员权限')
+            return redirect(url_for('main.index'))
+        g.admin = admin
         return f(*args, **kwargs)
     admin_check.__name__ = f.__name__
     return admin_check
@@ -86,40 +114,108 @@ def admin_required(f):
 def permission_required(permission):
     """特定权限装饰器"""
     def decorator(f):
-        @eth_address_required
+        @admin_required
         def permission_check(*args, **kwargs):
-            if not has_permission(permission):
-                return jsonify({'error': f'需要{permission}权限'}), 403
+            admin = g.admin
+            if not admin.has_permission(permission) and not admin.is_super_admin():
+                flash(f'需要{permission}权限')
+                return redirect(url_for('admin.dashboard'))
             return f(*args, **kwargs)
         permission_check.__name__ = f.__name__
         return permission_check
     return decorator
 
 def admin_page_required(f):
-    """管理员页面权限装饰器"""
+    """管理页面需要验证管理员身份的装饰器"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 优先从URL参数获取钱包地址
-        eth_address = request.args.get('eth_address') or \
-                     request.headers.get('X-Eth-Address') or \
-                     request.cookies.get('eth_address')
-                     
-        current_app.logger.info(f'管理后台访问 - 钱包地址: {eth_address}')
+        # 记录详细的请求信息，帮助排查问题
+        current_app.logger.info("管理后台访问 - 请求信息:")
+        current_app.logger.info(f"- 请求URL: {request.url}")
+        current_app.logger.info(f"- 请求方法: {request.method}")
+        current_app.logger.info(f"- 请求参数: {request.args.to_dict()}")
+        current_app.logger.info(f"- 请求头: {dict(request.headers)}")
+        current_app.logger.info(f"- 请求Cookies: {request.cookies}")
+        
+        # 按照优先级依次从不同来源获取钱包地址
+        eth_address = None
+        
+        # 1. 从请求头获取
+        header_address = request.headers.get('X-Eth-Address')
+        
+        # 2. 从Cookie获取
+        cookie_address = request.cookies.get('eth_address')
+        
+        # 3. 从会话获取
+        session_address = session.get('eth_address')
+        
+        # 4. 从URL参数获取
+        param_address = request.args.get('eth_address')
+        
+        # 记录获取钱包地址的所有来源
+        current_app.logger.info("管理后台访问 - 钱包地址来源:")
+        current_app.logger.info(f"- Header: {header_address}")
+        current_app.logger.info(f"- Cookie: {cookie_address}")
+        current_app.logger.info(f"- Session: {session_address}")
+        current_app.logger.info(f"- URL参数: {param_address}")
+        
+        # 按优先级选择: URL参数 > 会话 > Cookie > 请求头
+        eth_address = param_address or session_address or cookie_address or header_address
         
         if not eth_address:
-            current_app.logger.warning('管理后台访问被拒绝 - 未提供钱包地址')
-            return redirect(url_for('main.index'))
-            
-        admin_info = get_admin_permissions(eth_address)
-        current_app.logger.info(f'管理员信息: {admin_info}')
+            current_app.logger.warning("管理后台访问失败 - 未提供钱包地址")
+            flash('请先连接钱包', 'warning')
+            return redirect('/')
         
-        if not admin_info:
-            current_app.logger.warning(f'管理后台访问被拒绝 - 非管理员地址: {eth_address}')
-            return redirect(url_for('main.index'))
-            
+        # 确认钱包地址大小写
+        if eth_address.startswith('0x'):
+            eth_address = eth_address.lower()
+            current_app.logger.info(f"转换ETH地址为小写: {eth_address}")
+        else:
+            current_app.logger.info(f"保留SOL地址大小写: {eth_address}")
+        
+        # 设置全局钱包地址变量，供后续使用
         g.eth_address = eth_address
-        g.admin_info = admin_info  # 保存管理员信息到g对象
-        current_app.logger.info(f'管理后台访问成功 - 管理员: {eth_address}')
+        
+        # 首先检查会话是否已有管理员状态 - 优先使用会话记录的身份，避免重复验证
+        if session.get('is_admin') and session.get('eth_address') == eth_address:
+            current_app.logger.info(f"会话中已有管理员身份: {eth_address}")
+            return f(*args, **kwargs)
+        
+        # 检查cookie是否已有管理员状态
+        if request.cookies.get('is_admin') == 'true' and cookie_address == eth_address:
+            current_app.logger.info(f"Cookie中已有管理员身份: {eth_address}")
+            # 更新会话
+            session['eth_address'] = eth_address
+            session['is_admin'] = True
+            return f(*args, **kwargs)
+        
+        # 从配置中验证管理员身份
+        admin_info = get_admin_info(eth_address)
+        
+        if not admin_info or not admin_info.get('is_admin', False):
+            current_app.logger.warning(f"管理后台访问被拒绝 - 地址不是管理员: {eth_address}")
+            flash('您没有管理员权限', 'error')
+            return redirect('/')
+        
+        current_app.logger.info(f"管理员信息: {admin_info}")
+        
+        # 设置会话变量
+        session['eth_address'] = eth_address
+        session['is_admin'] = True
+        session['admin_role'] = admin_info.get('role')
+        session['admin_level'] = admin_info.get('level')
+        session['admin_permissions'] = admin_info.get('permissions', [])
+        
+        # 设置Cookie以便后续请求使用
+        current_app.logger.info(f"管理后台访问成功 - 管理员: {eth_address}")
+        
+        @after_this_request
+        def set_cookie(response):
+            response.set_cookie('eth_address', eth_address, max_age=86400)  # 24小时
+            response.set_cookie('is_admin', 'true', max_age=86400)          # 24小时
+            return response
+            
         return f(*args, **kwargs)
     return decorated_function
 
@@ -129,25 +225,12 @@ def admin_page_required(f):
 def index():
     """后台管理首页"""
     try:
-        eth_address = request.args.get('eth_address') or \
-                     request.headers.get('X-Eth-Address') or \
-                     request.cookies.get('eth_address')
-                     
-        if not eth_address:
-            current_app.logger.warning('访问后台管理页面失败：未提供钱包地址')
-            flash('请先连接钱包', 'error')
-            return redirect(url_for('main.index'))
-            
-        admin_info = get_admin_permissions(eth_address)
-        if not admin_info:
-            current_app.logger.warning(f'访问后台管理页面失败：非管理员地址 {eth_address}')
-            flash('您没有管理员权限', 'error')
-            return redirect(url_for('main.index'))
-            
-        # 将管理员信息保存到session中
-        session['admin_eth_address'] = eth_address
-        session['admin_info'] = admin_info
-            
+        # 直接使用g对象中的管理员信息
+        admin_info = g.admin_info
+        eth_address = g.eth_address
+        
+        current_app.logger.info(f'管理员访问后台首页: {eth_address}')
+        
         return render_template('admin/dashboard.html', admin_info=admin_info)
     except Exception as e:
         current_app.logger.error(f'访问后台管理页面失败：{str(e)}')
@@ -159,6 +242,30 @@ def index():
 def dashboard():
     """后台管理仪表板"""
     return render_template('admin/dashboard.html')
+
+@admin_bp.route('/distribution')
+@admin_page_required
+def distribution():
+    """分销管理页面"""
+    return render_template('admin/distribution.html')
+
+@admin_bp.route('/commission_settings')
+@admin_page_required
+def commission_settings():
+    """佣金设置页面"""
+    return render_template('admin/commission_settings.html')
+
+@admin_bp.route('/commission_records')
+@admin_page_required
+def commission_records():
+    """佣金记录页面"""
+    return render_template('admin/commission_records.html')
+
+@admin_bp.route('/operation_logs')
+@admin_page_required
+def operation_logs():
+    """操作日志页面"""
+    return render_template('admin/operation_logs.html')
 
 @admin_bp.route('/assets/<int:asset_id>/edit')
 @admin_page_required
@@ -172,60 +279,141 @@ def edit_asset(asset_id):
         current_app.logger.error(f'加载编辑资产页面失败: {str(e)}')
         return redirect(url_for('admin.dashboard', eth_address=g.eth_address))
 
+@admin_bp.route('/assets')
+@admin_page_required
+def assets():
+    """资产管理页面"""
+    return render_template('admin/assets.html')
+
+@admin_bp.route('/users')
+@admin_page_required
+def users():
+    """用户管理页面"""
+    return render_template('admin/users.html')
+
+@admin_bp.route('/logout')
+def logout():
+    """退出登录，重定向到首页"""
+    try:
+        return redirect(url_for('main.index'))
+    except Exception as e:
+        current_app.logger.error(f'退出登录失败: {str(e)}')
+        return redirect('/')
+
 # API路由
 @admin_api_bp.route('/stats')
-@admin_required
+@eth_address_required
 def get_admin_stats():
-    """获取管理统计数据"""
+    """获取管理仪表盘统计数据"""
     try:
-        current_app.logger.info('开始获取管理统计数据...')
+        # 获取总用户数（所有连接过钱包的用户）
+        # 从连接过钱包的所有地址中统计
+        wallet_addresses = set()
         
-        # 获取用户数量（根据唯一的owner_address计数）
-        total_users = db.session.query(db.func.count(db.func.distinct(Asset.owner_address))).scalar() or 0
+        # 从交易记录中获取钱包地址
+        trade_addresses = db.session.query(func.distinct(Trade.trader_address)).all()
+        for (address,) in trade_addresses:
+            if address:
+                wallet_addresses.add(address.lower() if address.startswith('0x') else address)
         
-        # 获取各状态资产数量和总价值
-        asset_stats = db.session.query(
-            Asset.status,
-            db.func.count(Asset.id).label('count'),
-            db.func.coalesce(db.func.sum(Asset.total_value), 0).label('total_value')
-        ).group_by(Asset.status).all()
+        # 从用户表中获取钱包地址
+        user_addresses = db.session.query(func.distinct(User.eth_address)).filter(
+            User.eth_address.isnot(None)
+        ).all()
+        for (address,) in user_addresses:
+            if address:
+                wallet_addresses.add(address.lower() if address.startswith('0x') else address)
         
-        # 初始化状态计数和价值
-        status_counts = {
-            AssetStatus.PENDING.value: 0,
-            AssetStatus.APPROVED.value: 0,
-            AssetStatus.REJECTED.value: 0
-        }
-        approved_value = 0  # 已通过资产的总价值
+        # 总连接钱包数量
+        total_users = len(wallet_addresses)
         
-        # 更新实际计数和价值
-        for status, count, value in asset_stats:
-            if status in status_counts:
-                status_counts[status] = count
-                if status == AssetStatus.APPROVED.value:
-                    approved_value = float(value)
+        # 获取总交易数
+        total_trades = db.session.query(func.count(Trade.id)).scalar() or 0
         
-        # 获取实际交易总金额
-        total_trades = db.session.query(
-            db.func.coalesce(db.func.sum(Trade.amount), 0)
+        # 获取总交易金额（仅完成的交易）
+        total_trade_amount = db.session.query(func.sum(Trade.total)).filter(
+            Trade.status == TradeStatus.COMPLETED.value
         ).scalar() or 0
         
-        response_data = {
-            'total_users': total_users,
-            'pending_assets': status_counts[AssetStatus.PENDING.value],
-            'approved_assets': status_counts[AssetStatus.APPROVED.value],
-            'rejected_assets': status_counts[AssetStatus.REJECTED.value],
-            'total_value': float(total_trades),  # 使用实际交易总额
-            'approved_assets_value': approved_value  # 已通过资产的总价值
+        # 获取总资产数
+        total_assets = db.session.query(func.count(Asset.id)).scalar() or 0
+        
+        # 获取总资产价值
+        total_asset_value = db.session.query(func.sum(Asset.total_value)).scalar() or 0
+        
+        # 获取本周新增用户数
+        today = date.today()
+        start_of_week = today - timedelta(days=today.weekday())
+        start_of_week_dt = datetime.combine(start_of_week, datetime.min.time())
+        
+        # 从本周交易记录中获取钱包地址
+        week_wallet_addresses = set()
+        
+        # 本周交易中的地址
+        week_trade_addresses = db.session.query(func.distinct(Trade.trader_address)).filter(
+            Trade.created_at >= start_of_week_dt
+        ).all()
+        for (address,) in week_trade_addresses:
+            if address:
+                week_wallet_addresses.add(address.lower() if address.startswith('0x') else address)
+        
+        # 本周注册的用户
+        week_user_addresses = db.session.query(func.distinct(User.eth_address)).filter(
+            User.eth_address.isnot(None),
+            User.created_at >= start_of_week_dt
+        ).all()
+        for (address,) in week_user_addresses:
+            if address:
+                week_wallet_addresses.add(address.lower() if address.startswith('0x') else address)
+        
+        # 本周新增连接钱包数量
+        new_users_week = len(week_wallet_addresses)
+        
+        # 获取资产类型分布
+        asset_type_distribution = db.session.query(
+            Asset.asset_type,
+            func.count(Asset.id).label('count'),
+            func.sum(Asset.total_value).label('value')
+        ).group_by(Asset.asset_type).all()
+        
+        distribution = []
+        color_map = {
+            10: '#4e73df',  # 蓝色 - 不动产
+            20: '#1cc88a',  # 绿色 - 类不动产
         }
         
-        current_app.logger.info(f'返回数据: {response_data}')
-        return jsonify(response_data)
+        asset_type_names = {
+            10: '不动产',
+            20: '类不动产'
+        }
         
-    except Exception as e:
-        current_app.logger.error(f'获取统计数据失败: {str(e)}', exc_info=True)
+        for type_id, count, value in asset_type_distribution:
+            distribution.append({
+                'type': type_id,
+                'name': asset_type_names.get(type_id, f'类型{type_id}'),
+                'count': count,
+                'value': float(value) if value else 0,
+                'color': color_map.get(type_id, '#36b9cc')  # 默认颜色
+            })
+        
+        # 返回数据
         return jsonify({
-            'error': '获取统计数据失败',
+            'success': True,
+            'total_users': total_users,
+            'total_trades': total_trades,
+            'total_trade_amount': float(total_trade_amount),
+            'total_assets': total_assets,
+            'total_asset_value': float(total_asset_value),
+            'new_users_week': new_users_week,
+            'asset_type_distribution': distribution,
+            'total_commission': 0,
+            'commission_by_type': {}
+        })
+    except Exception as e:
+        current_app.logger.error(f"获取管理表格统计数据失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': '获取管理表格统计数据失败',
             'message': str(e)
         }), 500
 
@@ -320,23 +508,16 @@ def reject_admin_asset(asset_id):
 @admin_api_bp.route('/assets', methods=['GET'])
 @admin_required
 def list_all_assets():
-    """获取所有资产列表"""
+    """列出所有资产"""
     try:
-        current_app.logger.info('开始获取资产列表...')
-        current_app.logger.info(f'请求头: {dict(request.headers)}')
-        
         page = request.args.get('page', 1, type=int)
-        page_size = request.args.get('page_size', 10, type=int)
+        limit = request.args.get('limit', 10, type=int)
         search = request.args.get('search', '')
         
-        current_app.logger.info(f'查询参数: page={page}, page_size={page_size}, search={search}')
-
-        # 构建查询
+        # 查询资产
         query = Asset.query
-        current_app.logger.info('初始查询构建完成')
-
-        # 过滤掉已删除的资产 - 使用明确的条件
-        current_app.logger.info(f'删除状态值: {AssetStatus.DELETED.value}')
+        
+        # 过滤掉已删除的资产
         query = query.filter(
             Asset.status.in_([
                 AssetStatus.PENDING.value,
@@ -344,64 +525,40 @@ def list_all_assets():
                 AssetStatus.REJECTED.value
             ])
         )
-        current_app.logger.info('添加状态过滤条件')
-
-        # 验证过滤是否生效
-        test_query = query.all()
-        current_app.logger.info('过滤后的资产状态:')
-        for asset in test_query:
-            current_app.logger.info(f'资产ID: {asset.id}, 状态: {asset.status}')
-
+        
         # 搜索条件
         if search:
             query = query.filter(
                 db.or_(
-                    Asset.name.ilike(f'%{search}%'),
-                    Asset.location.ilike(f'%{search}%'),
-                    Asset.token_symbol.ilike(f'%{search}%')
+                    Asset.name.like(f'%{search}%'),
+                    Asset.description.like(f'%{search}%'),
+                    Asset.token_symbol.like(f'%{search}%')
                 )
             )
-
-        # 获取总数
-        total = query.count()
-        current_app.logger.info(f'符合条件的资产总数: {total}')
-
-        # 分页并按创建时间倒序排序
-        pagination = query.order_by(Asset.created_at.desc()).paginate(
-            page=page, per_page=page_size, error_out=False
-        )
-
-        # 转换为字典格式
-        assets = []
-        for asset in pagination.items:
+        
+        # 获取分页数据
+        paginated_assets = query.order_by(Asset.id.desc()).paginate(page=page, per_page=limit, error_out=False)
+        
+        # 转换为JSON格式
+        assets_list = []
+        for asset in paginated_assets.items:
             try:
                 asset_dict = asset.to_dict()
-                # 添加额外的状态文本
-                status_text = {
-                    1: '待审核',
-                    2: '已通过',
-                    3: '已拒绝',
-                    4: '已删除'
-                }.get(asset.status, '未知状态')
-                asset_dict['status_text'] = status_text
-                assets.append(asset_dict)
+                # 添加销售额字段
+                sold_tokens = (asset.token_supply or 0) - (asset.remaining_supply or 0)
+                asset_dict['sales_volume'] = float(sold_tokens * (asset.token_price or 0))
+                assets_list.append(asset_dict)
             except Exception as e:
                 current_app.logger.error(f'转换资产数据失败 (ID: {asset.id}): {str(e)}')
                 continue
-
-        current_app.logger.info(f'成功获取 {len(assets)} 个资产数据')
         
-        response_data = {
-            'total': total,
-            'current_page': page,
-            'page_size': page_size,
-            'total_pages': pagination.pages,
-            'assets': assets
-        }
+        return jsonify({
+            'page': page,
+            'limit': limit,
+            'total': paginated_assets.total,
+            'assets': assets_list
+        })
         
-        current_app.logger.info(f'返回数据: {response_data}')
-        return jsonify(response_data)
-
     except Exception as e:
         current_app.logger.error(f'获取资产列表失败: {str(e)}', exc_info=True)
         return jsonify({
@@ -543,7 +700,7 @@ def check_asset_owner(asset_id):
         }), 500
 
 # 优化现有的 check_admin 端点
-@admin_api_bp.route('/check')
+@admin_api_bp.route('/check', methods=['POST', 'GET'])
 def check_admin():
     """检查管理员权限"""
     try:
@@ -551,17 +708,21 @@ def check_admin():
                      request.args.get('eth_address') or \
                      session.get('admin_eth_address')
                      
-        current_app.logger.info(f'检查管理员权限 - 地址: {eth_address}')
+        current_app.logger.info(f'检查管理员权限 - 原始地址: {eth_address}')
         
         if not eth_address:
             current_app.logger.warning('未提供钱包地址')
             return jsonify({'is_admin': False}), 200
             
-        # 转换为小写进行比较
-        eth_address = eth_address.lower()
-        current_app.logger.info(f'检查管理员权限 - 地址(小写): {eth_address}')
+        # 区分ETH和SOL地址处理，ETH地址转小写，SOL地址保持原样
+        if eth_address.startswith('0x'):
+            normalized_address = eth_address.lower()
+            current_app.logger.info(f'检查管理员权限 - ETH地址(小写): {normalized_address}')
+        else:
+            normalized_address = eth_address
+            current_app.logger.info(f'检查管理员权限 - 非ETH地址(原样): {normalized_address}')
         
-        admin_data = get_admin_permissions(eth_address)
+        admin_data = get_admin_info(normalized_address)
         is_admin = bool(admin_data)
         
         if not is_admin:
@@ -569,7 +730,7 @@ def check_admin():
             session.pop('admin_eth_address', None)
             session.pop('admin_info', None)
         else:
-            session['admin_eth_address'] = eth_address
+            session['admin_eth_address'] = normalized_address
             session['admin_info'] = admin_data
         
         current_app.logger.info(f'检查管理员权限 - 结果: {is_admin}')
@@ -708,7 +869,7 @@ def batch_approve_assets():
         
         if not assets:
             return jsonify({'error': '未找到要审核的资产'}), 404
-            
+
         # 批量审核资产
         for asset in assets:
             if asset.status != AssetStatus.PENDING.value:
@@ -749,3 +910,1519 @@ def get_admin_asset(asset_id):
             'error': '获取资产信息失败',
             'message': str(e)
         }), 500 
+
+@admin_bp.route('/admin_addresses', methods=['GET'])
+@admin_required
+@permission_required('管理用户')
+def admin_addresses_page():
+    """管理员地址管理页面"""
+    admin_config = current_app.config.get('ADMIN_CONFIG', {})
+    return render_template('admin/admin_addresses.html', admin_config=admin_config)
+
+@admin_bp.route('/api/admin_addresses', methods=['GET'])
+@admin_required
+@permission_required('管理用户')
+def get_admin_addresses():
+    """获取管理员地址列表"""
+    admin_config = current_app.config.get('ADMIN_CONFIG', {})
+    admin_list = []
+    
+    for address, info in admin_config.items():
+        admin_list.append({
+            'address': address,
+            'name': info.get('name', '管理员'),
+            'role': info.get('role', 'admin'),
+            'level': info.get('level', 1),
+            'permissions': info.get('permissions', [])
+        })
+    
+    return jsonify({'admin_addresses': admin_list})
+
+@admin_bp.route('/api/admin_addresses', methods=['POST'])
+@admin_required
+@permission_required('管理用户')
+def add_admin_address():
+    """添加管理员地址"""
+    data = request.json
+    
+    if not data or 'address' not in data:
+        return jsonify({'error': '请提供管理员地址'}), 400
+    
+    address = data['address'].lower()
+    name = data.get('name', '管理员')
+    role = data.get('role', 'admin')
+    level = data.get('level', 2)  # 默认为二级管理员
+    permissions = data.get('permissions', ['审核', '编辑', '查看统计'])
+    
+    # 验证地址格式
+    if not re.match(r'^0x[a-fA-F0-9]{40}$', address):
+        return jsonify({'error': '无效的以太坊地址格式'}), 400
+    
+    # 检查地址是否已存在
+    admin_config = current_app.config.get('ADMIN_CONFIG', {})
+    if address in [addr.lower() for addr in admin_config.keys()]:
+        return jsonify({'error': '该地址已是管理员'}), 400
+    
+    # 添加新管理员
+    admin_config[address] = {
+        'name': name,
+        'role': role,
+        'level': level,
+        'permissions': permissions
+    }
+    
+    # 更新配置
+    current_app.config['ADMIN_CONFIG'] = admin_config
+    
+    # 在实际应用中，这里应该将更新持久化到数据库或配置文件
+    # 这里仅为示例，实际实现需要根据应用架构调整
+    
+    return jsonify({
+        'success': True,
+        'message': '管理员地址添加成功',
+        'admin': {
+            'address': address,
+            'name': name,
+            'role': role,
+            'level': level,
+            'permissions': permissions
+        }
+    })
+
+@admin_bp.route('/api/admin_addresses/<address>', methods=['DELETE'])
+@admin_required
+@permission_required('管理用户')
+def remove_admin_address(address):
+    """删除管理员地址"""
+    address = address.lower()
+    
+    # 获取当前管理员配置
+    admin_config = current_app.config.get('ADMIN_CONFIG', {})
+    
+    # 检查地址是否存在
+    address_found = False
+    for admin_address in list(admin_config.keys()):
+        if admin_address.lower() == address:
+            address_found = True
+            # 不允许删除超级管理员
+            if admin_config[admin_address].get('level') == 1:
+                return jsonify({'error': '不能删除超级管理员'}), 403
+            
+            # 删除管理员
+            del admin_config[admin_address]
+            break
+    
+    if not address_found:
+        return jsonify({'error': '管理员地址不存在'}), 404
+    
+    # 更新配置
+    current_app.config['ADMIN_CONFIG'] = admin_config
+    
+    # 在实际应用中，这里应该将更新持久化到数据库或配置文件
+    # 这里仅为示例，实际实现需要根据应用架构调整
+    
+    return jsonify({
+        'success': True,
+        'message': '管理员地址删除成功'
+    })
+
+@admin_api_bp.route('/visit-stats', methods=['GET'])
+@admin_required
+def get_visit_stats():
+    """获取系统访问量统计数据"""
+    try:
+        # 获取传入的时间周期参数
+        period = request.args.get('period', 'daily')
+        
+        # 当前日期时间
+        now = datetime.utcnow()
+        today = now.date()
+        
+        labels = []
+        values = []
+        
+        # 使用Trade或Asset创建记录作为访问量的替代指标
+        # 在实际系统中，应该使用专门的访问日志表
+        if period == 'daily':
+            # 获取最近24小时的数据
+            for i in range(24):
+                # 计算小时时间段
+                # 从当前时间减去i小时
+                delta_hours = i
+                hour_start = now - timedelta(hours=delta_hours)
+                hour_start = hour_start.replace(minute=0, second=0, microsecond=0)
+                hour_end = hour_start.replace(minute=59, second=59, microsecond=999999)
+                
+                # 小时标签
+                hour_label = hour_start.strftime('%H:00')
+                labels.append(hour_label)
+                
+                # 统计该小时的交易或资产创建数量作为访问量的替代指标
+                count_trades = db.session.query(func.count(Trade.id))\
+                    .filter(Trade.created_at.between(hour_start, hour_end))\
+                    .scalar() or 0
+                    
+                count_assets = db.session.query(func.count(Asset.id))\
+                    .filter(Asset.created_at.between(hour_start, hour_end))\
+                    .scalar() or 0
+                
+                # 合并作为访问量
+                visit_count = count_trades + count_assets
+                values.append(visit_count)
+                
+        elif period == 'weekly':
+            # 获取最近7天的数据
+            for i in range(6, -1, -1):
+                day_date = today - timedelta(days=i)
+                day_start = datetime.combine(day_date, datetime.min.time())
+                day_end = datetime.combine(day_date, datetime.max.time())
+                
+                # 日期标签
+                day_label = day_date.strftime('%m-%d')
+                labels.append(day_label)
+                
+                # 统计当天的交易或资产创建数量
+                count_trades = db.session.query(db.func.count(Trade.id))\
+                    .filter(Trade.created_at.between(day_start, day_end))\
+                    .scalar() or 0
+                    
+                count_assets = db.session.query(db.func.count(Asset.id))\
+                    .filter(Asset.created_at.between(day_start, day_end))\
+                    .scalar() or 0
+                
+                # 合并并乘以因子作为访问量估计值(访问量通常是交易量的倍数)
+                visit_count = (count_trades + count_assets) * 5  # 假设访问量是交易和资产创建总数的5倍
+                values.append(visit_count)
+                
+        elif period == 'monthly':
+            # 获取最近30天的数据，按周聚合
+            for i in range(3, -1, -1):
+                # 计算周的起止时间
+                week_start = today - timedelta(days=today.weekday() + i*7)
+                week_end = week_start + timedelta(days=6)
+                
+                week_start_dt = datetime.combine(week_start, datetime.min.time())
+                week_end_dt = datetime.combine(week_end, datetime.max.time())
+                
+                # 避免未来的日期
+                if week_end > today:
+                    week_end = today
+                    week_end_dt = datetime.combine(week_end, datetime.max.time())
+                
+                # 周标签
+                week_label = f"{week_start.strftime('%m-%d')}~{week_end.strftime('%m-%d')}"
+                labels.append(week_label)
+                
+                # 统计该周的交易或资产创建数量
+                count_trades = db.session.query(db.func.count(Trade.id))\
+                    .filter(Trade.created_at.between(week_start_dt, week_end_dt))\
+                    .scalar() or 0
+                    
+                count_assets = db.session.query(db.func.count(Asset.id))\
+                    .filter(Asset.created_at.between(week_start_dt, week_end_dt))\
+                    .scalar() or 0
+                
+                # 合并并乘以因子作为访问量估计值
+                visit_count = (count_trades + count_assets) * 10  # 假设访问量是交易和资产创建总数的10倍
+                values.append(visit_count)
+        
+        # 如果没有数据，提供空数据结构
+        if not labels or sum(values) == 0:
+            if period == 'daily':
+                labels = [f"{i:02d}:00" for i in range(24)]
+                values = [0] * 24
+            elif period == 'weekly':
+                labels = [(today - timedelta(days=i)).strftime('%m-%d') for i in range(6, -1, -1)]
+                values = [0] * 7
+            else:
+                labels = ['暂无数据']
+                values = [0]
+        
+        return jsonify({
+            'labels': labels,
+            'values': values
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取访问量统计失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'error': '获取访问量统计失败',
+            'message': str(e)
+        }), 500
+
+@admin_api_bp.route('/income-stats')
+@admin_required
+def get_income_stats():
+    """获取平台收入统计数据"""
+    try:
+        current_app.logger.info("获取平台收入统计数据")
+        
+        # 获取总交易手续费
+        total_trade_fee = db.session.query(func.sum(DBPlatformIncome.amount))\
+            .filter(DBPlatformIncome.type == IncomeType.TRANSACTION.value)\
+            .scalar() or 0
+            
+        # 获取总链上服务费
+        total_onchain_fee = db.session.query(func.sum(DBPlatformIncome.amount))\
+            .filter(DBPlatformIncome.type == IncomeType.ASSET_ONCHAIN.value)\
+            .scalar() or 0
+            
+        # 获取总分红手续费
+        total_dividend_fee = db.session.query(func.sum(DBPlatformIncome.amount))\
+            .filter(DBPlatformIncome.type == IncomeType.DIVIDEND.value)\
+            .scalar() or 0
+            
+        # 计算总收入
+        total_income = total_trade_fee + total_onchain_fee + total_dividend_fee
+        
+        # 计算各类收入占比
+        trade_fee_percent = round((total_trade_fee / total_income * 100) if total_income > 0 else 0, 2)
+        onchain_fee_percent = round((total_onchain_fee / total_income * 100) if total_income > 0 else 0, 2)
+        dividend_fee_percent = round((total_dividend_fee / total_income * 100) if total_income > 0 else 0, 2)
+        
+        # 获取今日交易手续费
+        today = datetime.utcnow().date()
+        today_start = datetime.combine(today, datetime.min.time())
+        today_end = datetime.combine(today, datetime.max.time())
+        
+        today_trade_fee = db.session.query(func.sum(DBPlatformIncome.amount))\
+            .filter(
+                DBPlatformIncome.type == IncomeType.TRANSACTION.value,
+                DBPlatformIncome.created_at.between(today_start, today_end)
+            )\
+            .scalar() or 0
+            
+        # 获取昨日交易手续费，用于计算环比
+        yesterday = today - timedelta(days=1)
+        yesterday_start = datetime.combine(yesterday, datetime.min.time())
+        yesterday_end = datetime.combine(yesterday, datetime.max.time())
+        
+        yesterday_trade_fee = db.session.query(func.sum(DBPlatformIncome.amount))\
+            .filter(
+                DBPlatformIncome.type == IncomeType.TRANSACTION.value,
+                DBPlatformIncome.created_at.between(yesterday_start, yesterday_end)
+            )\
+            .scalar() or 0
+            
+        # 计算环比
+        day_over_day = 0
+        if yesterday_trade_fee > 0:
+            day_over_day = round((today_trade_fee - yesterday_trade_fee) / yesterday_trade_fee * 100, 2)
+        
+        # 获取当前费率设置
+        fee_settings = get_current_fee_settings()
+        
+        # 获取近30天收入趋势
+        income_trend = get_income_trend(30)
+        
+        return jsonify({
+            'total_income': round(total_income, 2),
+            'total_trade_fee': round(total_trade_fee, 2),
+            'total_onchain_fee': round(total_onchain_fee, 2),
+            'total_dividend_fee': round(total_dividend_fee, 2),
+            'trade_fee_percent': trade_fee_percent,
+            'onchain_fee_percent': onchain_fee_percent,
+            'dividend_fee_percent': dividend_fee_percent,
+            'today_trade_fee': round(today_trade_fee, 2),
+            'day_over_day': day_over_day,
+            'current_settings': fee_settings,
+            'income_trend': income_trend
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取平台收入统计失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'error': '获取平台收入统计失败',
+            'message': str(e)
+        }), 500
+        
+def get_income_trend(days=30):
+    """获取近期收入趋势
+    
+    Args:
+        days: 天数，默认30天
+        
+    Returns:
+        dict: 包含标签和数值的字典
+    """
+    labels = []
+    values = []
+    
+    today = datetime.utcnow().date()
+    
+    # 按天统计收入
+    for i in range(days-1, -1, -1):
+        day_date = today - timedelta(days=i)
+        day_start = datetime.combine(day_date, datetime.min.time())
+        day_end = datetime.combine(day_date, datetime.max.time())
+        
+        # 日期标签
+        day_label = day_date.strftime('%m-%d')
+        labels.append(day_label)
+        
+        # 查询当天总收入
+        day_income = db.session.query(func.sum(DBPlatformIncome.amount))\
+            .filter(DBPlatformIncome.created_at.between(day_start, day_end))\
+            .scalar() or 0
+            
+        values.append(round(day_income, 2))
+    
+    return {
+        'labels': labels,
+        'values': values
+    }
+
+@admin_api_bp.route('/income-list')
+@admin_required
+def get_income_list():
+    """获取平台收入明细"""
+    try:
+        # 获取查询参数
+        period = request.args.get('period', 'today')
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+        
+        # 当前日期时间
+        now = datetime.utcnow()
+        today = now.date()
+        
+        # 构建查询条件
+        query = db.session.query(
+            DBPlatformIncome.id,
+            DBPlatformIncome.type,
+            DBPlatformIncome.amount,
+            literal('USDC').label('currency'),
+            DBPlatformIncome.created_at,
+            DBPlatformIncome.description,
+            DBPlatformIncome.tx_hash.label('transaction_hash'),
+            DBPlatformIncome.asset_id,
+            Asset.name.label('asset_name'),
+            Asset.token_symbol.label('asset_symbol')
+        ).outerjoin(Asset, DBPlatformIncome.asset_id == Asset.id)
+        
+        # 根据时间筛选
+        if period == 'today':
+            day_start = datetime.combine(today, datetime.min.time())
+            day_end = datetime.combine(today, datetime.max.time())
+            query = query.filter(DBPlatformIncome.created_at.between(day_start, day_end))
+            
+        elif period == 'week':
+            # 本周开始（周一）
+            week_start = today - timedelta(days=today.weekday())
+            week_start = datetime.combine(week_start, datetime.min.time())
+            query = query.filter(DBPlatformIncome.created_at >= week_start)
+            
+        elif period == 'month':
+            # 本月开始
+            month_start = today.replace(day=1)
+            month_start = datetime.combine(month_start, datetime.min.time())
+            query = query.filter(DBPlatformIncome.created_at >= month_start)
+            
+        elif period == 'year':
+            # 本年开始
+            year_start = today.replace(month=1, day=1)
+            year_start = datetime.combine(year_start, datetime.min.time())
+            query = query.filter(DBPlatformIncome.created_at >= year_start)
+        
+        # 按时间降序排序
+        query = query.order_by(DBPlatformIncome.created_at.desc())
+        
+        # 获取总记录数和总金额
+        total_records = query.count()
+        total_amount = db.session.query(func.sum(DBPlatformIncome.amount))\
+            .filter(DBPlatformIncome.id.in_([item.id for item in query]))\
+            .scalar() or 0
+        
+        # 计算总页数
+        total_pages = (total_records + per_page - 1) // per_page
+        
+        # 分页
+        items = query.limit(per_page).offset((page - 1) * per_page).all()
+        
+        # 转换为JSON格式
+        income_list = []
+        for item in items:
+            income_data = {
+                'id': item.id,
+                'income_type': item.type,
+                'income_type_text': get_income_type_text(item.type),
+                'amount': round(item.amount, 6),
+                'currency': item.currency,
+                'created_at': item.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'description': item.description,
+                'transaction_hash': item.transaction_hash,
+                'asset_id': item.asset_id,
+                'asset_name': item.asset_name or '未关联资产',
+                'asset_symbol': item.asset_symbol or '--'
+            }
+            income_list.append(income_data)
+        
+        # 如果没有数据，返回空列表
+        if not income_list and page == 1:
+            return jsonify({
+                'total_records': 0,
+                'total_pages': 0,
+                'current_page': 1,
+                'total_amount': 0,
+                'income_list': []
+            })
+        
+        return jsonify({
+            'total_records': total_records,
+            'total_pages': total_pages,
+            'current_page': page,
+            'total_amount': round(total_amount, 6),
+            'income_list': income_list
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取平台收入明细失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'error': '获取平台收入明细失败',
+            'message': str(e)
+        }), 500
+
+def get_income_type_text(income_type):
+    """获取收入类型的中文名称"""
+    income_type_map = {
+        IncomeType.ASSET_ONCHAIN.value: '链上服务费',
+        IncomeType.TRANSACTION.value: '交易手续费',
+        IncomeType.DIVIDEND.value: '分红手续费',
+        IncomeType.OTHER.value: '其他收入'
+    }
+    return income_type_map.get(income_type, '未知类型')
+
+@admin_api_bp.route('/update-fees', methods=['POST'])
+@admin_required
+def update_fees():
+    """更新平台费率设置"""
+    try:
+        current_app.logger.info('更新平台费率设置...')
+        
+        # 获取请求数据
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '请求数据无效'}), 400
+        
+        # 验证必要字段
+        required_fields = [
+            'standard_fee', 'large_fee', 'self_fee', 
+            'large_threshold', 'onchain_fee', 'min_onchain_fee', 
+            'dividend_fee', 'contract_fee'
+        ]
+        
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'缺少必要字段: {field}'}), 400
+        
+        # 验证值范围
+        if not (0 <= float(data['standard_fee']) <= 1):
+            return jsonify({'error': '标准交易费率应在0-1%范围内'}), 400
+        
+        if not (0 <= float(data['large_fee']) <= 0.5):
+            return jsonify({'error': '大额交易费率应在0-0.5%范围内'}), 400
+        
+        if not (0 <= float(data['self_fee']) <= 0.3):
+            return jsonify({'error': '自持交易费率应在0-0.3%范围内'}), 400
+        
+        if not (1000 <= int(data['large_threshold']) <= 100000):
+            return jsonify({'error': '大额交易阈值应在1,000-100,000范围内'}), 400
+        
+        if not (0.0001 <= float(data['onchain_fee']) <= 10):
+            return jsonify({'error': '上链费率应在0.0001-10范围内'}), 400
+        
+        if not (10 <= int(data['min_onchain_fee']) <= 1000):
+            return jsonify({'error': '最低上链费用应在10-1,000范围内'}), 400
+        
+        if not (0.1 <= float(data['dividend_fee']) <= 5):
+            return jsonify({'error': '分红手续费率应在0.1%-5%范围内'}), 400
+        
+        if not (0.1 <= float(data['contract_fee']) <= 5):
+            return jsonify({'error': '智能合约费率应在0.1%-5%范围内'}), 400
+        
+        # 保存费率设置到系统配置表
+        save_fee_settings(data)
+        
+        current_app.logger.info('平台费率设置已更新')
+        return jsonify({'success': True, 'message': '费率设置已更新'})
+        
+    except Exception as e:
+        current_app.logger.error(f'更新平台费率设置失败: {str(e)}', exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+def get_current_fee_settings():
+    """获取当前费率设置"""
+    # 这里应该从系统配置表中读取，现在暂时返回默认值
+    return {
+        "standard_fee": 0.5,  # 0.5%
+        "large_fee": 0.3,     # 0.3%
+        "self_fee": 0.1,      # 0.1%
+        "large_threshold": 10000,     # 10,000 USDC
+        "onchain_fee": 1,        # 万分之一，前端会除以100显示为0.01%
+        "min_onchain_fee": 100,       # 100 USDC
+        "dividend_fee": 1,         # 1%
+        "contract_fee": 2.5,        # 2.5%
+        "promotion": {
+            "enabled": False,
+            "start_date": datetime.utcnow().date().isoformat(),
+            "end_date": (datetime.utcnow().date() + timedelta(days=7)).isoformat(),
+            "description": "七日促销",
+            "trade_discount": 20,     # 20%折扣
+            "onchain_discount": 15    # 15%折扣
+        }
+    }
+
+def save_fee_settings(settings):
+    """保存费率设置"""
+    # 这里应该将设置保存到系统配置表中
+    # 现在暂时只打印日志
+    current_app.logger.info(f'保存费率设置: {settings}')
+    
+    # TODO: 保存到数据库系统配置表
+    
+    # 在实际应用中，我们可以使用以下SQL创建配置表：
+    # CREATE TABLE system_settings (
+    #     key VARCHAR(50) PRIMARY KEY,
+    #     value TEXT NOT NULL,
+    #     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    # ); 
+
+@admin_api_bp.route('/asset-type-stats')
+@eth_address_required
+def get_asset_type_stats():
+    """获取资产类型分布统计"""
+    try:
+        current_app.logger.info("获取资产类型分布统计...")
+        
+        # 获取各类型资产的数量和总价值
+        asset_types = db.session.query(
+            Asset.asset_type,
+            func.count(Asset.id).label('count'),
+            func.sum(Asset.total_value).label('total_value')
+        ).group_by(Asset.asset_type).all()
+        
+        # 资产类型中文名称映射
+        type_names = {
+            AssetType.REAL_ESTATE.value: '不动产',
+            AssetType.COMMERCIAL.value: '类不动产',
+            AssetType.INDUSTRIAL.value: '工业地产',
+            AssetType.LAND.value: '土地资产',
+            AssetType.SECURITIES.value: '证券资产',
+            AssetType.ART.value: '艺术品',
+            AssetType.COLLECTIBLES.value: '收藏品',
+            AssetType.OTHER.value: '其他资产'
+        }
+        
+        # 准备返回数据
+        result = []
+        for asset_type, count, total_value in asset_types:
+            type_name = type_names.get(asset_type, f'未知类型({asset_type})')
+            result.append({
+                'asset_type': asset_type,
+                'type_name': type_name,
+                'count': count,
+                'total_value': float(total_value) if total_value else 0
+            })
+            
+        return jsonify(result)
+        
+    except Exception as e:
+        current_app.logger.error(f'获取资产类型分布统计失败: {str(e)}', exc_info=True)
+        return jsonify({'error': '获取资产类型分布失败', 'message': str(e)}), 500
+
+@admin_api_bp.route('/user-growth')
+@admin_required
+def get_user_growth():
+    """获取用户增长趋势数据"""
+    try:
+        current_app.logger.info('获取用户增长趋势数据...')
+        
+        # 获取周期参数
+        period = request.args.get('period', 'daily')
+        
+        # 当前日期
+        today = datetime.utcnow().date()
+        
+        labels = []
+        values = []
+        
+        # 根据周期生成不同的日期范围和格式
+        if period == 'daily':
+            # 过去7天的数据
+            for i in range(6, -1, -1):
+                date = today - timedelta(days=i)
+                date_str = date.strftime('%m-%d')
+                labels.append(date_str)
+                
+                # 统计该日期创建的用户数量
+                start_date = datetime.combine(date, datetime.min.time())
+                end_date = datetime.combine(date, datetime.max.time())
+                
+                count = db.session.query(db.func.count(db.func.distinct(Asset.owner_address)))\
+                    .filter(Asset.created_at.between(start_date, end_date))\
+                    .scalar() or 0
+                
+                values.append(count)
+                
+        elif period == 'monthly':
+            # 过去12个月的数据
+            for i in range(11, -1, -1):
+                # 计算月份
+                year = today.year
+                month = today.month - i
+                
+                if month <= 0:
+                    month += 12
+                    year -= 1
+                
+                # 构建月份的起止日期
+                start_date = datetime(year, month, 1)
+                if month == 12:
+                    end_date = datetime(year + 1, 1, 1) - timedelta(days=1)
+                else:
+                    end_date = datetime(year, month + 1, 1) - timedelta(days=1)
+                end_date = datetime.combine(end_date, datetime.max.time())
+                
+                # 月份标签
+                date_str = start_date.strftime('%Y-%m')
+                labels.append(date_str)
+                
+                # 统计该月创建的用户数量
+                count = db.session.query(db.func.count(db.func.distinct(Asset.owner_address)))\
+                    .filter(Asset.created_at.between(start_date, end_date))\
+                    .scalar() or 0
+                
+                values.append(count)
+        
+        # 如果没有数据，返回一个有意义的默认值
+        if not labels or sum(values) == 0:
+            if period == 'daily':
+                labels = [date.strftime('%m-%d') for date in [(today - timedelta(days=i)) for i in range(6, -1, -1)]]
+                values = [0] * 7
+            else:
+                labels = ['暂无数据']
+                values = [0]
+        
+        return jsonify({
+            'labels': labels,
+            'values': values
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取用户增长趋势数据失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'error': '获取用户增长趋势数据失败',
+            'message': str(e)
+        }), 500
+
+@admin_api_bp.route('/user-stats', methods=['GET'])
+@eth_address_required
+def get_user_stats():
+    """获取用户统计数据"""
+    try:
+        # 获取传入的时间周期参数
+        period = request.args.get('period', 'weekly')
+        
+        # 当前日期时间
+        now = datetime.utcnow()
+        today = now.date()
+        
+        # 返回数据格式调整为前端期望的格式
+        result = []
+        
+        if period == 'weekly':
+            # 获取最近7天的数据
+            for i in range(6, -1, -1):
+                day_date = today - timedelta(days=i)
+                day_start = datetime.combine(day_date, datetime.min.time())
+                day_end = datetime.combine(day_date, datetime.max.time())
+                
+                # 日期标签
+                day_label = day_date.strftime('%m-%d')
+                
+                # 新注册用户数
+                new_user_count = db.session.query(db.func.count(User.id))\
+                    .filter(User.created_at.between(day_start, day_end))\
+                    .scalar() or 0
+                
+                # 活跃用户数（以交易或查看资产作为活跃指标）
+                # 修复：使用trader_address替代不存在的user_id
+                active_trade_users = db.session.query(db.func.count(db.distinct(Trade.trader_address)))\
+                    .filter(Trade.created_at.between(day_start, day_end))\
+                    .scalar() or 0
+                
+                # 统计当天有资产查看记录的用户数量
+                # 为简化，这里仅以资产创建者作为访问记录替代
+                active_asset_users = db.session.query(db.func.count(db.distinct(Asset.creator_address)))\
+                    .filter(Asset.updated_at.between(day_start, day_end))\
+                    .scalar() or 0
+                
+                # 合并去重
+                active_user_count = active_trade_users + active_asset_users
+                
+                # 使用前端期望的格式
+                result.append({
+                    "date": day_label,
+                    "count": new_user_count,
+                    "visits": active_user_count  # 添加访问量数据
+                })
+                
+        elif period == 'monthly':
+            # 获取最近30天的数据，按周聚合
+            for i in range(4, 0, -1):
+                week_start = today - timedelta(days=7*i)
+                week_end = week_start + timedelta(days=6)
+                week_start_dt = datetime.combine(week_start, datetime.min.time())
+                week_end_dt = datetime.combine(week_end, datetime.max.time())
+                
+                # 周标签
+                week_label = f"{week_start.strftime('%m-%d')}~{week_end.strftime('%m-%d')}"
+                
+                # 新注册用户数
+                new_user_count = db.session.query(db.func.count(User.id))\
+                    .filter(User.created_at.between(week_start_dt, week_end_dt))\
+                    .scalar() or 0
+                
+                # 活跃用户数（修复：使用trader_address替代不存在的user_id）
+                active_trade_users = db.session.query(db.func.count(db.distinct(Trade.trader_address)))\
+                    .filter(Trade.created_at.between(week_start_dt, week_end_dt))\
+                    .scalar() or 0
+                
+                active_asset_users = db.session.query(db.func.count(db.distinct(Asset.creator_address)))\
+                    .filter(Asset.updated_at.between(week_start_dt, week_end_dt))\
+                    .scalar() or 0
+                
+                active_user_count = active_trade_users + active_asset_users
+                
+                # 使用前端期望的格式
+                result.append({
+                    "date": week_label,
+                    "count": new_user_count,
+                    "visits": active_user_count  # 添加访问量数据
+                })
+                
+        elif period == 'yearly':
+            # 获取最近12个月的数据
+            for i in range(11, -1, -1):
+                month_start = date(today.year if today.month - i > 0 else today.year - 1, 
+                               ((today.month - i - 1) % 12) + 1, 1)
+                
+                if month_start.month == 12:
+                    month_end = date(month_start.year, month_start.month, 31)
+                else:
+                    month_end = date(month_start.year, month_start.month + 1, 1) - timedelta(days=1)
+                
+                month_start_dt = datetime.combine(month_start, datetime.min.time())
+                month_end_dt = datetime.combine(month_end, datetime.max.time())
+                
+                # 月标签
+                month_label = month_start.strftime('%Y-%m')
+                
+                # 新注册用户数
+                new_user_count = db.session.query(db.func.count(User.id))\
+                    .filter(User.created_at.between(month_start_dt, month_end_dt))\
+                    .scalar() or 0
+                
+                # 活跃用户数（修复：使用trader_address替代不存在的user_id）
+                active_trade_users = db.session.query(db.func.count(db.distinct(Trade.trader_address)))\
+                    .filter(Trade.created_at.between(month_start_dt, month_end_dt))\
+                    .scalar() or 0
+                
+                active_asset_users = db.session.query(db.func.count(db.distinct(Asset.creator_address)))\
+                    .filter(Asset.updated_at.between(month_start_dt, month_end_dt))\
+                    .scalar() or 0
+                
+                active_user_count = active_trade_users + active_asset_users
+                
+                # 使用前端期望的格式
+                result.append({
+                    "date": month_label,
+                    "count": new_user_count,
+                    "visits": active_user_count  # 添加访问量数据
+                })
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        current_app.logger.error(f"获取用户统计失败: {str(e)}", exc_info=True)
+        return jsonify({'error': '获取用户统计失败'}), 500
+
+@admin_api_bp.route('/billing/list', methods=['GET'])
+def get_billing_list():
+    """获取账单列表"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        page_size = request.args.get('page_size', 10, type=int)
+        
+        # 获取过滤条件
+        status = request.args.get('status')
+        billing_type = request.args.get('type')
+        date_from = request.args.get('date_from')
+        date_to = request.args.get('date_to')
+        
+        # 构建查询
+        query = db.session.query(DBPlatformIncome)
+        
+        # 应用过滤条件
+        if status:
+            # 在描述中查找状态
+            query = query.filter(DBPlatformIncome.description.like(f'%[状态:{status}]%'))
+        if billing_type:
+            if billing_type == 'trade_fee':
+                query = query.filter(DBPlatformIncome.type == IncomeType.TRANSACTION.value)
+            elif billing_type == 'onchain_fee':
+                query = query.filter(DBPlatformIncome.type == IncomeType.ASSET_ONCHAIN.value)
+            elif billing_type == 'dividend_fee':
+                query = query.filter(DBPlatformIncome.type == IncomeType.DIVIDEND.value)
+        if date_from:
+            query = query.filter(DBPlatformIncome.created_at >= date_from)
+        if date_to:
+            query = query.filter(DBPlatformIncome.created_at <= date_to)
+        
+        # 分页处理
+        pagination = query.order_by(DBPlatformIncome.created_at.desc()).paginate(
+            page=page, per_page=page_size, error_out=False
+        )
+        
+        # 格式化数据
+        records = []
+        for item in pagination.items:
+            # 映射income_type到前端需要的type
+            income_type_mapping = {
+                IncomeType.TRANSACTION.value: 'trade_fee',
+                IncomeType.ASSET_ONCHAIN.value: 'onchain_fee',
+                IncomeType.DIVIDEND.value: 'dividend_fee',
+                IncomeType.OTHER.value: 'other'
+            }
+            
+            # 提取状态信息 - 从描述中解析
+            status = 'pending'  # 默认状态
+            if item.description and '[状态:' in item.description:
+                status_match = re.search(r'\[状态:([^\]]+)\]', item.description)
+                if status_match:
+                    status = status_match.group(1)
+            
+            income_type = income_type_mapping.get(item.type, 'other')
+            
+            # 获取用户钱包地址（如果有关联）
+            # 这里需要处理未关联用户的情况
+            user_id = None
+            wallet_address = '-'
+            
+            # 构建记录
+            records.append({
+                "id": item.id,
+                "bill_no": f"B{item.id:08d}",
+                "type": income_type,
+                "amount": str(item.amount),
+                "currency": "USDC",
+                "status": status,
+                "created_at": item.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                "asset_id": item.asset_id,
+                "asset_name": item.asset.name if hasattr(item, 'asset') and item.asset else "未知资产",
+                "user_id": user_id,
+                "wallet_address": wallet_address
+            })
+        
+        return jsonify({
+            "total": pagination.total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": pagination.pages,
+            "records": records
+        })
+    
+    except Exception as e:
+        current_app.logger.error(f'获取账单列表失败: {str(e)}', exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@admin_api_bp.route('/billing/stats', methods=['GET'])
+def get_billing_stats():
+    """获取账单统计信息"""
+    try:
+        # 获取今日账单总额
+        today = datetime.utcnow().date()
+        today_start = datetime.combine(today, time.min)
+        today_end = datetime.combine(today, time.max)
+        
+        today_total = db.session.query(func.sum(DBPlatformIncome.amount)).filter(
+            DBPlatformIncome.created_at.between(today_start, today_end)
+        ).scalar() or 0
+        
+        # 获取本月账单总额
+        month_start = datetime(today.year, today.month, 1)
+        month_end = datetime.combine(today, time.max)
+        
+        month_total = db.session.query(func.sum(DBPlatformIncome.amount)).filter(
+            DBPlatformIncome.created_at.between(month_start, month_end)
+        ).scalar() or 0
+        
+        # 获取总账单金额
+        all_time_total = db.session.query(func.sum(DBPlatformIncome.amount)).scalar() or 0
+        
+        # 获取不同类型账单的分布
+        type_distribution = db.session.query(
+            DBPlatformIncome.type,
+            func.sum(DBPlatformIncome.amount)
+        ).group_by(
+            DBPlatformIncome.type
+        ).all()
+        
+        type_data = {}
+        income_type_mapping = {
+            IncomeType.TRANSACTION.value: 'trade_fee',
+            IncomeType.ASSET_ONCHAIN.value: 'onchain_fee',
+            IncomeType.DIVIDEND.value: 'dividend_fee',
+            IncomeType.OTHER.value: 'other'
+        }
+        
+        for income_type, amount in type_distribution:
+            type_key = income_type_mapping.get(income_type, 'other')
+            type_data[type_key] = str(amount)
+        
+        # 获取近30天的账单趋势
+        trend_data = []
+        for i in range(30, 0, -1):
+            date = today - timedelta(days=i-1)
+            date_start = datetime.combine(date, time.min)
+            date_end = datetime.combine(date, time.max)
+            
+            daily_amount = db.session.query(func.sum(DBPlatformIncome.amount)).filter(
+                DBPlatformIncome.created_at.between(date_start, date_end)
+            ).scalar() or 0
+            
+            trend_data.append({
+                "date": date.strftime('%m-%d'),
+                "amount": str(daily_amount)
+            })
+        
+        return jsonify({
+            "today_total": str(today_total),
+            "month_total": str(month_total),
+            "all_time_total": str(all_time_total),
+            "type_distribution": type_data,
+            "trend": trend_data
+        })
+    
+    except Exception as e:
+        current_app.logger.error(f'获取账单统计信息失败: {str(e)}', exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@admin_api_bp.route('/billing/update', methods=['POST'])
+def update_billing_status():
+    """更新账单状态"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'id' not in data or 'status' not in data:
+            return jsonify({'error': '缺少必要的参数'}), 400
+        
+        billing_id = data['id']
+        new_status = data['status']
+        
+        # 验证状态是否有效
+        if new_status not in ['pending', 'processing', 'completed', 'failed', 'cancelled']:
+            return jsonify({'error': '无效的状态值'}), 400
+        
+        # 查找账单
+        billing = DBPlatformIncome.query.get(billing_id)
+        if not billing:
+            return jsonify({'error': '账单不存在'}), 404
+        
+        # 在描述字段中记录状态信息
+        status_text = f"[状态:{new_status}]"
+        if billing.description:
+            if "[状态:" in billing.description:
+                billing.description = re.sub(r'\[状态:[^\]]+\]', status_text, billing.description)
+            else:
+                billing.description = f"{billing.description} {status_text}"
+        else:
+            billing.description = status_text
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '账单状态已更新',
+            'billing': {
+                'id': billing.id,
+                'status': new_status,
+                'updated_at': billing.updated_at.strftime('%Y-%m-%d %H:%M:%S') if hasattr(billing, 'updated_at') and billing.updated_at else None
+            }
+        })
+    
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'更新账单状态失败: {str(e)}', exc_info=True)
+        return jsonify({'error': str(e)}), 500 
+
+@admin_bp.route('/v2/dashboard')
+@admin_required
+def dashboard_v2():
+    """管理后台V2版本仪表板"""
+    return render_template('admin_v2/dashboard.html')
+
+@admin_bp.route('/v2/users')
+@admin_required
+def users_v2():
+    """管理后台V2版本用户管理页面"""
+    return render_template('admin_v2/users.html')
+
+@admin_bp.route('/v2/assets')
+@admin_required
+def assets_v2():
+    """管理后台V2版本资产管理页面"""
+    return render_template('admin_v2/assets.html')
+
+@admin_bp.route('/v2/commission')
+@admin_required
+def commission_v2():
+    """管理后台V2版本佣金管理页面"""
+    return render_template('admin_v2/commission.html')
+
+@admin_bp.route('/v2/trades')
+@admin_required
+def trades_v2():
+    """管理后台V2版本交易管理页面"""
+    return render_template('admin_v2/trades.html')
+
+@admin_bp.route('/v2/settings')
+@admin_required
+def settings_v2():
+    """管理后台V2版本系统设置页面"""
+    return render_template('admin_v2/settings.html')
+
+@admin_bp.route('/v2/admin-users')
+@admin_required
+def admin_users_v2():
+    """管理后台V2版本管理员用户页面"""
+    return render_template('admin_v2/admin_users.html')
+
+@admin_bp.route('/v2')
+@admin_required
+def admin_v2_index():
+    """管理后台V2版本首页"""
+    admin = None
+    eth_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address') or session.get('eth_address')
+    
+    if eth_address:
+        # 尝试从新管理员表中获取信息
+        admin = AdminUser.query.filter_by(wallet_address=eth_address).first()
+        
+        # 如果在新表中没有找到，则使用旧配置
+        if not admin and eth_address in current_app.config['ADMIN_CONFIG']:
+            admin = {'wallet_address': eth_address}
+    
+    if not admin:
+        return redirect(url_for('admin.login'))
+    
+    return render_template('admin_v2/index.html', admin=admin)
+
+@admin_bp.route('/v2/api/check-auth')
+def check_auth_v2():
+    """检查管理员身份验证状态"""
+    eth_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address') or session.get('eth_address')
+    
+    if not eth_address:
+        return jsonify({'authenticated': False}), 401
+    
+    # 尝试从新管理员表中获取信息
+    admin = AdminUser.query.filter_by(wallet_address=eth_address).first()
+    
+    # 如果在新表中没有找到，则使用旧配置
+    if not admin and eth_address not in current_app.config['ADMIN_CONFIG']:
+        return jsonify({'authenticated': False}), 401
+    
+    return jsonify({'authenticated': True})
+
+@admin_bp.route('/v2/api/logout', methods=['POST'])
+def logout_v2():
+    """管理员退出登录"""
+    session.pop('eth_address', None)
+    response = jsonify({'success': True})
+    response.delete_cookie('eth_address')
+    return response
+
+@admin_bp.route('/v2/api/assets', methods=['GET'])
+@admin_required
+def api_assets_v2():
+    """管理后台V2版本资产列表API"""
+    # 模拟分页和筛选
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 10, type=int)
+    
+    # 模拟资产数据
+    mock_assets = [
+        {
+            'id': 1,
+            'name': '上海市中心豪华公寓',
+            'description': '位于上海市中心的高档豪华公寓，视野开阔，配套设施完善。',
+            'type': 'real_estate',
+            'type_name': '房地产',
+            'price': 3800000.00,
+            'location': '上海市黄浦区',
+            'image_url': 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2',
+            'status': 'approved',
+            'created_at': '2023-01-10T08:30:00',
+            'updated_at': '2023-01-15T14:20:00',
+            'owner_address': '0x1234567890abcdef1234567890abcdef12345678',
+            'attributes': [
+                {'key': '面积', 'value': '120平方米'},
+                {'key': '房间数', 'value': '3室2厅'},
+                {'key': '楼层', 'value': '18层/36层'}
+            ]
+        },
+        {
+            'id': 2,
+            'name': '梵高限量版画',
+            'description': '梵高向日葵系列限量版画，编号23/100，附权威机构认证。',
+            'type': 'artwork',
+            'type_name': '艺术品',
+            'price': 258000.00,
+            'location': '北京市朝阳区',
+            'image_url': 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119',
+            'status': 'pending',
+            'created_at': '2023-02-05T10:15:00',
+            'updated_at': '2023-02-05T10:15:00',
+            'owner_address': '0xabcdef1234567890abcdef1234567890abcdef12',
+            'attributes': [
+                {'key': '尺寸', 'value': '60cm x 80cm'},
+                {'key': '材质', 'value': '进口艺术纸'},
+                {'key': '版本', 'value': '23/100'}
+            ]
+        },
+        {
+            'id': 3,
+            'name': '罗伊斯古董手表',
+            'description': '1956年制造的罗伊斯古董手表，黄金表壳，运行状况良好。',
+            'type': 'collectible',
+            'type_name': '收藏品',
+            'price': 120000.00,
+            'location': '广州市天河区',
+            'image_url': 'https://images.unsplash.com/photo-1587836374828-4dbafa94cf0e',
+            'status': 'listed',
+            'created_at': '2023-01-20T15:45:00',
+            'updated_at': '2023-01-25T09:30:00',
+            'owner_address': '0x7890abcdef1234567890abcdef1234567890abcd',
+            'attributes': [
+                {'key': '年代', 'value': '1956年'},
+                {'key': '材质', 'value': '18K黄金'},
+                {'key': '直径', 'value': '38mm'}
+            ]
+        },
+        {
+            'id': 4,
+            'name': '1.5克拉天然蓝钻石',
+            'description': '极为稀有的1.5克拉天然蓝钻石，净度VS1，切工完美，附国际宝石学院证书。',
+            'type': 'jewelry',
+            'type_name': '珠宝',
+            'price': 1500000.00,
+            'location': '深圳市罗湖区',
+            'image_url': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f',
+            'status': 'approved',
+            'created_at': '2023-03-01T13:20:00',
+            'updated_at': '2023-03-05T16:10:00',
+            'owner_address': '0xef1234567890abcdef1234567890abcdef123456',
+            'attributes': [
+                {'key': '重量', 'value': '1.5克拉'},
+                {'key': '颜色', 'value': '鲜艳蓝色'},
+                {'key': '净度', 'value': 'VS1'},
+                {'key': '切工', 'value': '完美'}
+            ]
+        },
+        {
+            'id': 5,
+            'name': '1967年法拉利275 GTB/4',
+            'description': '1967年产法拉利275 GTB/4，红色车身，完全原厂状态，行驶里程仅12,000公里。',
+            'type': 'vehicle',
+            'type_name': '车辆',
+            'price': 25000000.00,
+            'location': '上海市浦东新区',
+            'image_url': 'https://images.unsplash.com/photo-1592198084033-aade902d1aae',
+            'status': 'pending',
+            'created_at': '2023-02-15T09:00:00',
+            'updated_at': '2023-02-15T09:00:00',
+            'owner_address': '0x567890abcdef1234567890abcdef1234567890ab',
+            'attributes': [
+                {'key': '年份', 'value': '1967年'},
+                {'key': '里程', 'value': '12,000公里'},
+                {'key': '颜色', 'value': '红色'},
+                {'key': '发动机', 'value': 'V12, 3.3升'}
+            ]
+        }
+    ]
+    
+    # 计算总数和分页
+    total = len(mock_assets)
+    start_idx = (page - 1) * limit
+    end_idx = min(start_idx + limit, total)
+    
+    items = mock_assets[start_idx:end_idx]
+    
+    return jsonify({
+        'items': items,
+        'total': total,
+        'page': page,
+        'limit': limit
+    })
+
+@admin_bp.route('/v2/api/assets/stats', methods=['GET'])
+@admin_required
+def api_assets_stats_v2():
+    """管理后台V2版本资产统计API"""
+    # 模拟统计数据
+    mock_stats = {
+        'totalAssets': 58,
+        'totalValue': 89562000.00,
+        'pendingAssets': 12,
+        'assetTypes': 7,
+        'type_distribution': {
+            'real_estate': 18,
+            'artwork': 12,
+            'collectible': 9,
+            'jewelry': 6,
+            'vehicle': 5,
+            'luxury_goods': 4,
+            'other': 4
+        },
+        'status_distribution': {
+            'pending': 12,
+            'approved': 10,
+            'rejected': 3,
+            'listed': 28,
+            'sold': 5
+        }
+    }
+    
+    return jsonify(mock_stats)
+
+@admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['PUT'])
+@admin_required
+def api_edit_asset_v2(asset_id):
+    """管理后台V2版本编辑资产API"""
+    # 模拟成功响应
+    return jsonify({'success': True, 'message': '资产更新成功'})
+
+@admin_bp.route('/v2/api/assets', methods=['POST'])
+@admin_required
+def api_create_asset_v2():
+    """管理后台V2版本创建资产API"""
+    # 模拟成功响应
+    return jsonify({'success': True, 'message': '资产创建成功', 'id': 100})
+
+@admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['DELETE'])
+@admin_required
+def api_delete_asset_v2(asset_id):
+    """管理后台V2版本删除资产API"""
+    # 模拟成功响应
+    return jsonify({'success': True, 'message': '资产删除成功'})
+
+@admin_bp.route('/v2/api/assets/<int:asset_id>/approve', methods=['POST'])
+@admin_required
+def api_approve_asset_v2(asset_id):
+    """管理后台V2版本批准资产API"""
+    # 模拟成功响应
+    return jsonify({'success': True, 'message': '资产批准成功'})
+
+@admin_bp.route('/v2/api/assets/<int:asset_id>/reject', methods=['POST'])
+@admin_required
+def api_reject_asset_v2(asset_id):
+    """管理后台V2版本拒绝资产API"""
+    # 模拟成功响应
+    return jsonify({'success': True, 'message': '资产拒绝成功'})
+
+@admin_bp.route('/v2/api/assets/batch-approve', methods=['POST'])
+@admin_required
+def api_batch_approve_assets_v2():
+    """管理后台V2版本批量批准资产API"""
+    # 模拟成功响应
+    return jsonify({'success': True, 'message': '批量批准资产成功'})
+
+@admin_bp.route('/v2/api/assets/batch-reject', methods=['POST'])
+@admin_required
+def api_batch_reject_assets_v2():
+    """管理后台V2版本批量拒绝资产API"""
+    # 模拟成功响应
+    return jsonify({'success': True, 'message': '批量拒绝资产成功'})
+
+@admin_bp.route('/v2/api/assets/batch-delete', methods=['POST'])
+@admin_required
+def api_batch_delete_assets_v2():
+    """管理后台V2版本批量删除资产API"""
+    # 模拟成功响应
+    return jsonify({'success': True, 'message': '批量删除资产成功'})
+
+@admin_bp.route('/v2/api/assets/export', methods=['GET'])
+@admin_required
+def api_export_assets_v2():
+    """管理后台V2版本导出资产API"""
+    # 在实际实现中，这里应该返回一个CSV或Excel文件
+    # 为了演示，我们只返回一个文本响应
+    return "资产导出功能正在开发中", 200, {'Content-Type': 'text/plain'}
+
+@admin_bp.route('/v2/api/dashboard/stats', methods=['GET'])
+@admin_required
+def api_dashboard_stats_v2():
+    """获取仪表盘统计数据"""
+    try:
+        # 获取用户统计
+        user_stats = get_user_stats()
+        
+        # 获取资产统计
+        asset_stats = {
+            'total_assets': Asset.query.count(),
+            'total_asset_value': db.session.query(func.sum(Asset.price)).scalar() or 0
+        }
+        
+        # 获取交易统计
+        trade_stats = {
+            'total_trades': Trade.query.count(),
+            'total_trade_volume': db.session.query(func.sum(Trade.total_price)).scalar() or 0
+        }
+        
+        # 获取佣金统计
+        commission_stats = {
+            'total_commission': db.session.query(func.sum(Commission.amount)).scalar() or 0,
+            'commission_week': db.session.query(func.sum(Commission.amount)).filter(
+                Commission.created_at >= (datetime.now() - timedelta(days=7))
+            ).scalar() or 0
+        }
+        
+        return jsonify({
+            'total_users': user_stats.get('total_users', 0),
+            'new_users_today': user_stats.get('new_users_today', 0),
+            'total_assets': asset_stats['total_assets'],
+            'total_asset_value': float(asset_stats['total_asset_value']),
+            'total_trades': trade_stats['total_trades'],
+            'total_trade_volume': float(trade_stats['total_trade_volume']),
+            'total_commission': float(commission_stats['total_commission']),
+            'commission_week': float(commission_stats['commission_week'])
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取仪表盘统计数据失败: {str(e)}', exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/v2/api/dashboard/trends', methods=['GET'])
+@admin_required
+def api_dashboard_trends_v2():
+    """获取仪表盘趋势数据"""
+    try:
+        days = int(request.args.get('days', 30))
+        if days not in [7, 30, 90]:
+            days = 30
+            
+        # 获取用户增长趋势
+        user_growth = get_user_growth_trend(days)
+        
+        # 获取交易量趋势
+        trading_volume = get_trading_volume_trend(days)
+        
+        return jsonify({
+            'user_growth': user_growth,
+            'trading_volume': trading_volume
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取仪表盘趋势数据失败: {str(e)}', exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/v2/api/dashboard/recent-trades', methods=['GET'])
+@admin_required
+def api_dashboard_recent_trades_v2():
+    """获取最近交易数据"""
+    try:
+        limit = int(request.args.get('limit', 5))
+        trades = Trade.query.order_by(Trade.created_at.desc()).limit(limit).all()
+        
+        return jsonify([{
+            'id': trade.id,
+            'asset': {
+                'name': trade.asset.name if trade.asset else None,
+                'token_symbol': trade.asset.token_symbol if trade.asset else None
+            },
+            'total_price': float(trade.total_price),
+            'token_amount': trade.token_amount,
+            'status': trade.status,
+            'created_at': trade.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        } for trade in trades])
+        
+    except Exception as e:
+        current_app.logger.error(f'获取最近交易数据失败: {str(e)}', exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+def get_user_growth_trend(days):
+    """获取用户增长趋势数据"""
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    
+    # 按日期分组统计新增用户数
+    daily_stats = db.session.query(
+        func.date(User.created_at).label('date'),
+        func.count(User.id).label('count')
+    ).filter(
+        User.created_at >= start_date,
+        User.created_at <= end_date
+    ).group_by(
+        func.date(User.created_at)
+    ).all()
+    
+    # 生成日期标签和数据
+    dates = [(start_date + timedelta(days=x)).strftime('%Y-%m-%d') for x in range(days)]
+    counts = [0] * days
+    
+    # 填充实际数据
+    date_dict = {stat.date.strftime('%Y-%m-%d'): stat.count for stat in daily_stats}
+    for i, date in enumerate(dates):
+        counts[i] = date_dict.get(date, 0)
+    
+    return {
+        'labels': dates,
+        'values': counts
+    }
+
+def get_trading_volume_trend(days):
+    """获取交易量趋势数据"""
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    
+    # 按日期分组统计交易量
+    daily_stats = db.session.query(
+        func.date(Trade.created_at).label('date'),
+        func.sum(Trade.total_price).label('volume')
+    ).filter(
+        Trade.created_at >= start_date,
+        Trade.created_at <= end_date
+    ).group_by(
+        func.date(Trade.created_at)
+    ).all()
+    
+    # 生成日期标签和数据
+    dates = [(start_date + timedelta(days=x)).strftime('%Y-%m-%d') for x in range(days)]
+    volumes = [0] * days
+    
+    # 填充实际数据
+    date_dict = {stat.date.strftime('%Y-%m-%d'): float(stat.volume) for stat in daily_stats}
+    for i, date in enumerate(dates):
+        volumes[i] = date_dict.get(date, 0)
+    
+    return {
+        'labels': dates,
+        'values': volumes
+    }
+
+@admin_api_bp.route('/update-dashboard-stats', methods=['POST'])
+@admin_required
+def update_dashboard_stats():
+    """强制更新仪表盘统计数据"""
+    try:
+        # 尝试使用直接从数据库更新的方法
+        if DashboardStats.update_stats_from_db():
+            current_app.logger.info("仪表盘统计数据已成功更新")
+            return jsonify({'success': True, 'message': '统计数据已成功更新'})
+        else:
+            current_app.logger.error("更新仪表盘统计数据失败")
+            return jsonify({'success': False, 'message': '更新统计数据失败'}), 500
+    except Exception as e:
+        current_app.logger.error(f"更新仪表盘统计数据时发生错误: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'message': f'更新统计数据时发生错误: {str(e)}'}), 500

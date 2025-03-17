@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RWA-HUB 管理后台{% endblock %}</title>
+    <!-- TailwindCSS CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Vue.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"></script>
+    <!-- Axios CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+    <!-- Alpine.js CDN -->
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        .sidebar {
+            height: calc(100vh - 4rem);
+            transition: transform 0.3s ease-in-out;
+        }
+        
+        .main-content {
+            margin-left: 16rem;
+            min-height: calc(100vh - 4rem);
+            transition: margin-left 0.3s ease-in-out;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+        
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s;
+        }
+        .fade-enter, .fade-leave-to {
+            opacity: 0;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-100">
+    <div id="app">
+        <!-- 顶部导航栏 -->
+        <nav class="bg-indigo-600 text-white shadow-md h-16 fixed top-0 left-0 right-0 z-30">
+            <div class="container mx-auto px-4 h-full flex items-center justify-between">
+                <div class="flex items-center">
+                    <button @click="toggleSidebar" class="md:hidden mr-4">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <span class="text-xl font-bold">RWA-HUB 管理系统</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="relative" v-click-outside="closeNotifications">
+                        <button @click="toggleNotifications" class="p-2 rounded hover:bg-indigo-700">
+                            <i class="fas fa-bell"></i>
+                        </button>
+                        <transition name="fade">
+                            <div v-if="showNotifications" class="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg py-1 z-50">
+                                <div class="px-4 py-2 text-sm text-gray-700 border-b border-gray-200">
+                                    <span class="font-bold">系统通知</span>
+                                </div>
+                                <div class="max-h-64 overflow-y-auto">
+                                    <div class="px-4 py-2 hover:bg-gray-100 border-b border-gray-100">
+                                        <p class="text-sm text-gray-700">暂无新通知</p>
+                                    </div>
+                                </div>
+                                <div class="px-4 py-2 text-xs text-center text-blue-600 hover:bg-gray-100">
+                                    <a href="#">查看所有通知</a>
+                                </div>
+                            </div>
+                        </transition>
+                    </div>
+                    <div class="relative" v-click-outside="closeUserMenu">
+                        <button @click="toggleUserMenu" class="flex items-center p-2 rounded hover:bg-indigo-700">
+                            <span class="hidden md:inline mr-2">管理员</span>
+                            <i class="fas fa-user-circle"></i>
+                        </button>
+                        <transition name="fade">
+                            <div v-if="showUserMenu" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">个人资料</a>
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">修改密码</a>
+                                <div class="border-t border-gray-100"></div>
+                                <a href="#" @click.prevent="logout" class="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">退出登录</a>
+                            </div>
+                        </transition>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 左侧导航栏 -->
+        <aside :class="['sidebar bg-white shadow-md fixed left-0 top-16 bottom-0 w-64 z-20 overflow-y-auto', {'open': sidebarOpen}]">
+            <div class="py-4">
+                <div class="px-4 mb-6">
+                    <div class="text-sm font-medium text-gray-500">当前角色</div>
+                    <div class="text-base font-semibold text-gray-800">超级管理员</div>
+                </div>
+                <nav>
+                    <ul>
+                        <li>
+                            <a href="{{ url_for('admin.admin_v2_index') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.admin_v2_index' }}">
+                                <i class="fas fa-home w-5 text-center"></i>
+                                <span class="ml-3">首页</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ url_for('admin.dashboard_v2') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.dashboard_v2' }}">
+                                <i class="fas fa-tachometer-alt w-5 text-center"></i>
+                                <span class="ml-3">仪表盘</span>
+                            </a>
+                        </li>
+                        <li class="border-t border-gray-200 mt-2 pt-2">
+                            <a href="{{ url_for('admin.assets_v2') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.assets_v2' }}">
+                                <i class="fas fa-cubes w-5 text-center"></i>
+                                <span class="ml-3">资产管理</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ url_for('admin.users_v2') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.users_v2' }}">
+                                <i class="fas fa-users w-5 text-center"></i>
+                                <span class="ml-3">用户管理</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ url_for('admin.trades_v2') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.trades_v2' }}">
+                                <i class="fas fa-exchange-alt w-5 text-center"></i>
+                                <span class="ml-3">交易管理</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ url_for('admin.commission_v2') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.commission_v2' }}">
+                                <i class="fas fa-money-bill-wave w-5 text-center"></i>
+                                <span class="ml-3">佣金管理</span>
+                            </a>
+                        </li>
+                        <li class="border-t border-gray-200 mt-2 pt-2">
+                            <a href="{{ url_for('admin.settings_v2') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.settings_v2' }}">
+                                <i class="fas fa-cog w-5 text-center"></i>
+                                <span class="ml-3">系统设置</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ url_for('admin.admin_users_v2') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.admin_users_v2' }}">
+                                <i class="fas fa-user-shield w-5 text-center"></i>
+                                <span class="ml-3">管理员用户</span>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main :class="['main-content pt-20 pb-8 px-6', {'ml-0': !sidebarOpen, 'ml-64': sidebarOpen}]">
+            <!-- 页面标题 -->
+            <div class="mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">{% block page_title %}{% endblock %}</h1>
+                <p class="text-sm text-gray-600 mt-1">{% block page_subtitle %}{% endblock %}</p>
+                
+                <!-- 面包屑导航 -->
+                <nav class="flex mt-4" aria-label="Breadcrumb">
+                    <ol class="flex items-center space-x-1 text-sm">
+                        <li>
+                            <a href="{{ url_for('admin.admin_v2_index') }}" class="text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-home"></i>
+                                <span class="sr-only">首页</span>
+                            </a>
+                        </li>
+                        {% block breadcrumb %}{% endblock %}
+                    </ol>
+                </nav>
+            </div>
+            
+            <!-- 页面内容 -->
+            <div>
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // 全局Vue实例
+        new Vue({
+            el: '#app',
+            data: {
+                sidebarOpen: true,
+                showNotifications: false,
+                showUserMenu: false
+            },
+            methods: {
+                toggleSidebar() {
+                    this.sidebarOpen = !this.sidebarOpen;
+                },
+                toggleNotifications() {
+                    this.showNotifications = !this.showNotifications;
+                    this.showUserMenu = false;
+                },
+                toggleUserMenu() {
+                    this.showUserMenu = !this.showUserMenu;
+                    this.showNotifications = false;
+                },
+                closeNotifications() {
+                    this.showNotifications = false;
+                },
+                closeUserMenu() {
+                    this.showUserMenu = false;
+                },
+                async logout() {
+                    try {
+                        await axios.post('/api/admin/v2/logout');
+                        window.location.href = '/admin/v2/login';
+                    } catch (error) {
+                        console.error('退出登录失败:', error);
+                        alert('退出登录失败，请重试');
+                    }
+                }
+            },
+            directives: {
+                'click-outside': {
+                    bind(el, binding, vnode) {
+                        el.clickOutsideEvent = function(event) {
+                            if (!(el === event.target || el.contains(event.target))) {
+                                vnode.context[binding.expression](event);
+                            }
+                        };
+                        document.body.addEventListener('click', el.clickOutsideEvent);
+                    },
+                    unbind(el) {
+                        document.body.removeEventListener('click', el.clickOutsideEvent);
+                    }
+                }
+            }
+        });
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html> 

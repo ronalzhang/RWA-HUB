@@ -1,11 +1,13 @@
-from flask import render_template, send_from_directory, current_app, abort, request, redirect, url_for, jsonify, g, Response, flash
+from flask import render_template, send_from_directory, current_app, abort, request, redirect, url_for, jsonify, g, Response, flash, session
 from . import assets_bp, assets_api_bp
-from .. import db  # 直接从应用实例导入 db
-from ..models import Asset
-from ..models.asset import AssetStatus
-from ..utils import is_admin, save_files
-from ..utils.decorators import eth_address_required, admin_required, permission_required
-from ..utils.storage import storage
+from app.extensions import db  # 从扩展模块导入 db
+from app.models import Asset
+from app.models.asset import AssetStatus, AssetType
+from app.models.trade import Trade, TradeType, TradeStatus  # 添加Trade和交易状态枚举
+from app.models.referral import UserReferral as NewUserReferral  # 使用新版UserReferral
+from app.utils import is_admin, save_files
+from app.utils.decorators import eth_address_required, admin_required, permission_required
+from app.utils.storage import storage
 import os
 import json
 from datetime import datetime
@@ -106,46 +108,115 @@ def list_assets_page():
                              is_admin=is_admin_user)
 
 @assets_bp.route("/<int:asset_id>")
-@eth_address_required  # 添加钱包地址检查装饰器
 def asset_detail_page(asset_id):
-    """资产详情页面"""
+    """资产详情页面 - 使用ID (旧版,保留兼容性)"""
     try:
+        current_app.logger.info(f'通过ID访问资产详情，ID: {asset_id}')
+        
         # 获取资产信息
         asset = Asset.query.get_or_404(asset_id)
-        current_app.logger.info(f'获取资产信息成功: {asset.id}')
         
-        # 获取分红历史
-        dividend_records = asset.dividend_records if asset.dividend_records else []
-        current_app.logger.info(f'获取分红记录: {len(dividend_records)} 条')
+        # 转向新格式URL
+        return redirect(url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol), code=301)
+    except Exception as e:
+        current_app.logger.error(f'获取资产详情失败: {str(e)}')
+        flash('获取资产详情失败，请稍后重试', 'error')
+        return redirect(url_for('assets.list_assets_page'))
+
+@assets_bp.route("/<string:token_symbol>")
+def asset_detail_by_symbol(token_symbol):
+    """资产详情页面 - 使用token_symbol"""
+    try:
+        current_app.logger.info(f'访问资产详情页面，Token Symbol: {token_symbol}')
         
-        # 使用全局钱包地址
-        current_user_address = g.eth_address.lower() if g.eth_address else None
-        current_app.logger.info(f'当前用户钱包地址: {current_user_address}')
+        # 获取资产信息
+        asset = Asset.query.filter_by(token_symbol=token_symbol).first_or_404()
+        
+        # 获取用户钱包地址
+        current_user_address = get_eth_address()
+        
+        # 处理推荐人参数
+        referrer = request.args.get('ref') or request.args.get('referrer')
+        if referrer and current_user_address and referrer != current_user_address:
+            try:
+                # 记录推荐关系
+                # 检查是否已存在推荐关系，避免重复记录
+                existing_referral = NewUserReferral.query.filter_by(
+                    user_address=current_user_address
+                ).first()
+                
+                if not existing_referral:
+                    # 创建新的推荐关系
+                    new_referral = NewUserReferral(
+                        user_address=current_user_address,
+                        referrer_address=referrer,
+                        referral_time=datetime.now(),
+                        asset_id=asset.id,
+                        status='active'
+                    )
+                    db.session.add(new_referral)
+                    db.session.commit()
+                    current_app.logger.info(f'已创建推荐关系: {referrer} -> {current_user_address}')
+            except Exception as e:
+                current_app.logger.error(f'记录推荐关系失败: {str(e)}')
         
         # 检查是否是管理员
-        is_admin_user = is_admin(current_user_address)
+        is_admin_user = is_admin(current_user_address) if current_user_address else False
         current_app.logger.info(f'是否是管理员: {is_admin_user}')
         
         # 检查是否是资产所有者
-        is_owner = current_user_address and current_user_address == asset.owner_address.lower()
-        current_app.logger.info(f'是否是资产所有者: {is_owner}')
-        
-        # 计算剩余可售数量
-        remaining_supply = asset.token_supply
-        if asset.token_address:
-            # TODO: 从合约获取实际剩余数量
-            pass
+        is_owner = False
+        if current_user_address and asset.owner_address:
+            # 区分ETH和SOL地址处理
+            if current_user_address.startswith('0x') and asset.owner_address.startswith('0x'):
+                # ETH地址比较（不区分大小写）
+                is_owner = current_user_address.lower() == asset.owner_address.lower()
+            else:
+                # SOL地址比较（区分大小写）
+                is_owner = current_user_address == asset.owner_address
             
-        return render_template("assets/detail.html", 
-                             asset=asset,
-                             dividend_records=dividend_records,
-                             remaining_supply=remaining_supply,
-                             current_user_address=current_user_address,
-                             is_admin_user=is_admin_user,
-                             is_owner=is_owner)
+            current_app.logger.info(f'是否是资产所有者: {is_owner}')
+        
+        # 计算剩余供应量
+        if asset.remaining_supply is not None:
+            # 优先使用数据库存储的剩余供应量
+            remaining_supply = asset.remaining_supply
+        else:
+            # 如果没有剩余供应量数据，使用总供应量
+            remaining_supply = asset.token_supply
+        
+        current_app.logger.info(f'资产 {asset.id} 剩余供应量: {remaining_supply}')
+        
+        # 获取资产累计分红数据
+        try:
+            from app.models import Dividend
+            
+            # 查询所有已确认的分红记录
+            dividends = Dividend.query.filter_by(
+                asset_id=asset.id, 
+                status='confirmed'
+            ).all()
+            
+            # 计算累计分红金额
+            total_dividends = sum(dividend.amount for dividend in dividends)
+            current_app.logger.info(f'资产 {asset.id} 累计分红: {total_dividends} USDC')
+        except Exception as e:
+            current_app.logger.error(f'获取累计分红数据失败: {str(e)}')
+            total_dividends = 0
+        
+        # 渲染详情页面
+        return render_template('assets/detail.html', 
+                              asset=asset, 
+                              remaining_supply=remaining_supply,
+                              is_owner=is_owner,
+                              is_admin_user=is_admin_user,
+                              current_user_address=current_user_address,
+                              total_dividends=total_dividends)
+                              
     except Exception as e:
-        current_app.logger.error(f"获取资产详情失败: {str(e)}")
-        abort(404)
+        current_app.logger.error(f"访问资产详情页面失败: {str(e)}", exc_info=True)
+        flash(_('Failed to access asset detail page'), 'danger')
+        return redirect(url_for('assets.list_assets_page'))
 
 @assets_bp.route('/create')
 @eth_address_required
@@ -166,25 +237,78 @@ def create_asset_page():
         return redirect(url_for('main.index'))
 
 @assets_bp.route('/<int:asset_id>/edit')
-@eth_address_required
 def edit_asset_page(asset_id):
-    """编辑资产页面"""
+    """资产编辑页面 - 使用ID（旧版，保留兼容性）"""
+    try:
+        current_app.logger.info(f"使用ID访问资产编辑页面，ID: {asset_id}")
+        # 重定向到新的URL格式
+        asset = Asset.query.get_or_404(asset_id)
+        return redirect(url_for('assets.edit_asset_by_symbol', token_symbol=asset.token_symbol))
+    except Exception as e:
+        current_app.logger.error(f"访问资产编辑页面失败: {str(e)}", exc_info=True)
+        flash('访问资产编辑页面失败', 'danger')
+        return redirect(url_for('assets.list_assets_page'))
+
+@assets_bp.route("/<string:token_symbol>/edit")
+def edit_asset_by_symbol(token_symbol):
+    """编辑资产页面 - 使用token_symbol"""
     try:
         # 获取资产信息
-        asset = Asset.query.get_or_404(asset_id)
+        asset = Asset.query.filter_by(token_symbol=token_symbol).first_or_404()
         
-        # 检查权限
-        is_owner = g.eth_address.lower() == asset.owner_address.lower()
-        is_admin_user = is_admin(g.eth_address)
+        # 获取用户钱包地址（多来源）
+        eth_address_header = request.headers.get('X-Eth-Address')
+        eth_address_cookie = request.cookies.get('eth_address')
+        eth_address_session = session.get('eth_address')
+        eth_address_arg = request.args.get('eth_address')
         
-        if not (is_owner or is_admin_user):
-            flash('您没有权限编辑此资产', 'error')
-            return redirect(url_for('assets.list_assets_page'))
+        # 按优先级获取钱包地址
+        eth_address = eth_address_header or eth_address_cookie or eth_address_session or eth_address_arg
+        
+        # 记录所有来源的钱包地址
+        current_app.logger.info(f'编辑页面 - 钱包地址来源:')
+        current_app.logger.info(f'- Header: {eth_address_header}')
+        current_app.logger.info(f'- Cookie: {eth_address_cookie}')
+        current_app.logger.info(f'- Session: {eth_address_session}')
+        current_app.logger.info(f'- URL参数: {eth_address_arg}')
+        current_app.logger.info(f'- 最终使用: {eth_address}')
+        
+        if not eth_address:
+            current_app.logger.warning(f"访问编辑页面被拒绝：未提供钱包地址")
+            flash('请先连接钱包以编辑资产', 'warning')
+            return redirect(url_for('assets.asset_detail_by_symbol', token_symbol=token_symbol))
             
-        return render_template('assets/edit.html', asset=asset)
+        # 检查是否是管理员或资产所有者
+        is_admin_user = is_admin(eth_address)
+        
+        # 检查是否是资产所有者，区分ETH和SOL地址
+        is_owner = False
+        if asset.owner_address:
+            # 对ETH地址（0x开头）忽略大小写比较
+            if eth_address.startswith('0x') and asset.owner_address.startswith('0x'):
+                is_owner = eth_address.lower() == asset.owner_address.lower()
+            # 对SOL地址严格区分大小写
+            else:
+                is_owner = eth_address == asset.owner_address
+        
+        current_app.logger.info(f'用户 {eth_address} 访问编辑页面: 是管理员={is_admin_user}, 是所有者={is_owner}')
+        
+        if not (is_admin_user or is_owner):
+            current_app.logger.warning(f"非管理员或所有者访问尝试：{eth_address}")
+            flash('您没有权限编辑此资产', 'danger')
+            return redirect(url_for('assets.asset_detail_by_symbol', token_symbol=token_symbol))
+        
+        # 如果资产已上链，不允许编辑
+        if asset.token_address:
+            flash('已上链资产无法修改', 'warning')
+            return redirect(url_for('assets.asset_detail_by_symbol', token_symbol=token_symbol))
+        
+        # 渲染编辑页面
+        return render_template('assets/edit.html', asset=asset, can_edit=True)
+        
     except Exception as e:
-        current_app.logger.error(f'加载编辑资产页面失败: {str(e)}')
-        flash('系统错误，请稍后重试', 'error')
+        current_app.logger.error(f"访问资产编辑页面失败: {str(e)}", exc_info=True)
+        flash('访问资产编辑页面失败', 'danger')
         return redirect(url_for('assets.list_assets_page'))
 
 @assets_bp.route('/proxy/<string:file_type>/<path:file_path>')
@@ -206,37 +330,6 @@ def proxy_file(file_type, file_path):
     except Exception as e:
         current_app.logger.error(f"文件请求失败: {str(e)}")
         abort(500)
-
-@assets_bp.route('/<int:asset_id>/dividend')
-@eth_address_required
-def dividend_page(asset_id):
-    """资产分红管理页面"""
-    try:
-        # 获取资产信息
-        asset = Asset.query.get_or_404(asset_id)
-        
-        # 检查权限
-        if not g.eth_address:
-            flash('请先连接钱包', 'error')
-            return redirect(url_for('assets.asset_detail_page', asset_id=asset_id))
-            
-        # 检查是否是管理员或资产所有者
-        is_admin_user = is_admin(g.eth_address)
-        is_owner = g.eth_address.lower() == asset.owner_address.lower()
-        
-        if not (is_admin_user or is_owner):
-            flash('您没有权限访问分红管理页面', 'error')
-            return redirect(url_for('assets.asset_detail_page', asset_id=asset_id))
-            
-        return render_template('assets/dividend.html', asset=asset)
-    except Exception as e:
-        current_app.logger.error(f'访问分红管理页面失败: {str(e)}')
-        flash('访问分红管理页面失败')
-        return redirect(url_for('assets.asset_detail_page', asset_id=asset_id))
-
-def allowed_file(filename, allowed_extensions):
-    """检查文件类型是否允许"""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
 
 @assets_bp.route('/proxy/image/<path:image_path>')
 def proxy_image(image_path):
@@ -344,3 +437,154 @@ def upload_files():
     except Exception as e:
         current_app.logger.error(f'上传文件失败: {str(e)}')
         return jsonify({'error': str(e)}), 500
+
+@assets_api_bp.route('/<int:asset_id>/check_owner')
+@eth_address_required
+def check_asset_owner(asset_id):
+    """检查用户是否是资产所有者或管理员"""
+    try:
+        # 获取资产信息
+        asset = Asset.query.get_or_404(asset_id)
+        
+        # 检查权限
+        if not g.eth_address:
+            return jsonify({
+                'is_owner': False,
+                'is_admin': False,
+                'error': '未提供钱包地址'
+            }), 200
+            
+        # 检查是否是管理员或资产所有者
+        is_admin_user = is_admin(g.eth_address)
+        
+        owner_address = asset.owner_address
+        user_address = g.eth_address
+        
+        # 区分ETH和SOL地址的比较
+        if owner_address.startswith('0x') and user_address.startswith('0x'):
+            # ETH地址比较时都转为小写
+            is_owner = user_address.lower() == owner_address.lower()
+        else:
+            # SOL地址或其他类型地址直接比较（大小写敏感）
+            is_owner = user_address == owner_address
+        
+        return jsonify({
+            'is_owner': is_owner,
+            'is_admin': is_admin_user
+        }), 200
+    except Exception as e:
+        current_app.logger.error(f'检查资产所有权失败: {str(e)}')
+        return jsonify({
+            'is_owner': False,
+            'is_admin': False,
+            'error': str(e)
+        }), 500
+
+def allowed_file(filename, allowed_extensions):
+    """检查文件类型是否允许"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
+
+@assets_bp.route('/<string:token_symbol>/dividend')
+def dividend_page_by_symbol(token_symbol):
+    """资产分红页面 - 使用token_symbol"""
+    try:
+        # 获取资产信息
+        asset = Asset.query.filter_by(token_symbol=token_symbol).first_or_404()
+        
+        # 获取用户钱包地址（多来源）
+        eth_address_header = request.headers.get('X-Eth-Address')
+        eth_address_cookie = request.cookies.get('eth_address')
+        eth_address_session = session.get('eth_address')
+        eth_address_arg = request.args.get('eth_address')
+        
+        # 按优先级获取钱包地址
+        eth_address = eth_address_header or eth_address_cookie or eth_address_session or eth_address_arg
+        
+        # 记录所有来源的钱包地址
+        current_app.logger.info(f'分红页面 - 钱包地址来源:')
+        current_app.logger.info(f'- Header: {eth_address_header}')
+        current_app.logger.info(f'- Cookie: {eth_address_cookie}')
+        current_app.logger.info(f'- Session: {eth_address_session}')
+        current_app.logger.info(f'- URL参数: {eth_address_arg}')
+        current_app.logger.info(f'- 最终使用: {eth_address}')
+        
+        if not eth_address:
+            current_app.logger.warning(f"访问分红页面被拒绝：未提供钱包地址")
+            flash('请先连接钱包以管理分红', 'warning')
+            return redirect(url_for('assets.asset_detail_by_symbol', token_symbol=token_symbol))
+            
+        # 检查是否是管理员或资产所有者
+        is_admin_user = is_admin(eth_address)
+        
+        # 检查是否是资产所有者，区分ETH和SOL地址
+        is_owner = False
+        if asset.owner_address:
+            # 对ETH地址（0x开头）忽略大小写比较
+            if eth_address.startswith('0x') and asset.owner_address.startswith('0x'):
+                is_owner = eth_address.lower() == asset.owner_address.lower()
+            # 对SOL地址严格区分大小写
+            else:
+                is_owner = eth_address == asset.owner_address
+        
+        current_app.logger.info(f'用户 {eth_address} 访问分红页面: 是管理员={is_admin_user}, 是所有者={is_owner}')
+        
+        if not (is_admin_user or is_owner):
+            current_app.logger.warning(f"非管理员或所有者访问尝试：{eth_address}")
+            flash('您没有权限管理此资产的分红', 'danger')
+            return redirect(url_for('assets.asset_detail_by_symbol', token_symbol=token_symbol))
+        
+        # 渲染分红页面
+        return render_template('assets/dividend.html', 
+                              asset=asset, 
+                              can_manage=True)
+                              
+    except Exception as e:
+        current_app.logger.error(f"访问资产分红页面失败: {str(e)}", exc_info=True)
+        flash('访问资产分红页面失败', 'danger')
+        return redirect(url_for('assets.list_assets_page'))
+
+# 全局前置处理器，确保在所有处理之前捕获重复前缀问题
+def register_global_handlers(app):
+    """注册全局处理器"""
+    @app.before_request
+    def check_duplicate_assets_prefix():
+        """捕获所有请求中的重复assets前缀问题"""
+        if request.path and '/assets/assets/' in request.path:
+            current_app.logger.warning(f'全局检测到重复assets路径: {request.path}')
+            # 将/assets/assets/替换为/assets/
+            corrected_path = request.path.replace('/assets/assets/', '/assets/')
+            current_app.logger.info(f'全局修正后路径: {corrected_path}')
+            return redirect(corrected_path, code=301)
+        return None
+
+def get_eth_address():
+    """从多个来源获取钱包地址"""
+    # 记录各个来源的钱包地址情况
+    eth_address_header = request.headers.get('X-Eth-Address')
+    eth_address_cookie = request.cookies.get('eth_address')
+    eth_address_session = session.get('eth_address')
+    eth_address_g = g.eth_address if hasattr(g, 'eth_address') else None
+    eth_address_arg = request.args.get('eth_address')
+    
+    current_app.logger.info('钱包地址来源:')
+    current_app.logger.info(f'- Header: {eth_address_header}')
+    current_app.logger.info(f'- Cookie: {eth_address_cookie}')
+    current_app.logger.info(f'- Session: {eth_address_session}')
+    current_app.logger.info(f'- g对象: {eth_address_g}')
+    current_app.logger.info(f'- URL参数: {eth_address_arg}')
+    
+    # 按优先级获取钱包地址
+    eth_address = eth_address_header or eth_address_cookie or eth_address_session or eth_address_g or eth_address_arg
+    
+    if not eth_address:
+        current_app.logger.warning('未提供钱包地址')
+    else:
+        # 处理不同类型的地址
+        if eth_address.startswith('0x'):
+            # ETH地址统一转为小写
+            eth_address = eth_address.lower()
+        # SOL地址保持原样，因为它是大小写敏感的
+        
+        current_app.logger.info(f'最终使用地址: {eth_address}')
+    
+    return eth_address

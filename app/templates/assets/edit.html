@@ -386,7 +386,7 @@ async function submitForm(event) {
         }
         
         alert('保存成功');
-        window.location.href = `/admin?eth_address=${window.currentAccount}`;
+        window.location.href = `/assets/${getTokenSymbol()}`;
     } catch (error) {
         console.error('保存失败:', error);
         alert(error.message || '保存失败，请重试');
@@ -451,14 +451,75 @@ if (window.ethereum) {
                 document.getElementById('editForm').classList.remove('hidden');
                 await loadAssetDetails();  // 当钱包地址变化时重新加载数据
             } else {
-                alert('请使用管理员钱包地址');
-                window.location.href = '/admin/dashboard';
+                alert('请使用管理员或资产所有者钱包地址');
+                window.location.href = `/assets/${getTokenSymbol()}`;
             }
         } else {
             alert('请连接钱包');
-            window.location.href = '/admin/dashboard';
+            window.location.href = `/assets/${getTokenSymbol()}`;
         }
     });
 }
+
+// 获取当前资产ID
+function getAssetId() {
+    // 尝试从URL获取资产ID
+    const pathParts = window.location.pathname.split('/');
+    const idIndex = pathParts.indexOf('edit') - 1;
+    return idIndex >= 0 ? pathParts[idIndex] : 0;
+}
+
+// 获取Cookie函数
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+}
+
+// 检查文档加载完成时的钱包状态
+document.addEventListener('DOMContentLoaded', function() {
+    // 从cookie检查钱包地址
+    const address = getCookie('eth_address');
+    if (address) {
+        // 设置全局钱包地址
+        window.ethereum = window.ethereum || {};
+        window.ethereum.selectedAddress = address;
+        
+        // 初始化页面
+        initializePage();
+    } else {
+        // 显示钱包连接提示
+        document.getElementById('walletAlert').classList.remove('hidden');
+    }
+});
+
+// 获取Token Symbol
+function getTokenSymbol() {
+    return "{{ asset.token_symbol }}";
+}
+
+// 返回资产详情页
+function backToDetail() {
+    window.location.href = `/assets/${getTokenSymbol()}`;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化表单
+    const form = document.getElementById('editForm');
+    if (form) {
+        // 表单始终处于可编辑状态
+        console.log('表单已初始化为可编辑状态');
+        
+        // 设置表单提交事件
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitForm();
+        });
+    }
+    
+    // 初始化文件上传组件
+    setupFileUploads();
+});
 </script>
 {% endblock %} 
