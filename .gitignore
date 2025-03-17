@@ -21,13 +21,27 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-项目开发方案.md
+
+# 项目文档和设计文件（不推送到仓库）
+*.md
+*方案.md
+*需求.md
+*设计.md
+*说明.md
+*.doc
+*.docx
+*.pdf
+*.xls
+*.xlsx
+*.ppt
+*.pptx
 
 # PM2配置文件
 ecosystem.config.js
 
 # 备份文件
 *.bak
+app.db.backup
 
 # 虚拟环境
 venv/
@@ -49,6 +63,7 @@ logs/
 
 # 上传文件
 static/uploads/
+app/static/uploads/
 
 # 环境变量
 .env
@@ -59,9 +74,17 @@ Thumbs.db
 
 # 测试文件
 test_*.py
+tests/
+check_*.py
+summary.py
+setup_*.py
+force_*.py
+update_*.py
+cleanup_*.py
+create_test_*.py
 
+# Node.js
 node_modules/
-.env
 
 # Hardhat files
 /cache
@@ -78,31 +101,5 @@ node_modules/
 # Hardhat Ignition default folder for deployments against a local node
 ignition/deployments/chain-31337
 
-# 依赖
-node_modules/
-.env
-.venv/
-
-# Hardhat
-cache/
-artifacts/
-
-# IDE
-.vscode/
-.idea/
-
-# 编译输出
-dist/
-build/
-
-# 日志
-*.log
-
-# 测试覆盖率
-coverage/
-coverage.json
-
-# 本地开发
-.DS_Store
-*.swp
-*.swo
+# 其他无关文件
+fix_instructions.md
