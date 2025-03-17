@@ -33,52 +33,35 @@ def eth_address_required(f):
     """要求用户已经连接钱包"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 尝试从多个来源获取地址
         eth_address = None
-        
-        # 1. 从 g 对象获取
-        if hasattr(g, 'eth_address'):
-            eth_address = g.eth_address
-        
-        # 2. 从 session 获取
-        elif session.get('eth_address'):
-            eth_address = session.get('eth_address')
-            g.eth_address = eth_address
-        
-        # 3. 从请求头获取
-        elif request.headers.get('X-Eth-Address'):
+
+        # 检查头部参数
+        if 'X-Eth-Address' in request.headers:
             eth_address = request.headers.get('X-Eth-Address')
-            g.eth_address = eth_address
+            if eth_address:
+                g.eth_address = eth_address
+                current_app.logger.info(f"从请求头获取钱包地址: {eth_address}")
         
-        # 4. 从查询参数获取
-        elif request.args.get('eth_address'):
-            eth_address = request.args.get('eth_address')
-            g.eth_address = eth_address
+        # 检查cookie
+        if not eth_address:
+            eth_address = request.cookies.get('eth_address')
+            if eth_address:
+                g.eth_address = eth_address
+                current_app.logger.info(f"从cookie获取钱包地址: {eth_address}")
         
-        # 5. 从请求表单获取
-        elif request.form.get('eth_address'):
-            eth_address = request.form.get('eth_address')
-            g.eth_address = eth_address
-        
-        # 6. 从 JSON 请求体获取
-        elif request.is_json and request.json and request.json.get('eth_address'):
-            eth_address = request.json.get('eth_address')
-            g.eth_address = eth_address
-        
-        # 地址存在，继续执行
-        if eth_address:
-            return f(*args, **kwargs)
-        
-        # 地址不存在，返回错误
-        if request.is_json or request.path.startswith('/api/'):
-            return jsonify({
-                'error': '需要连接钱包',
-                'message': '请连接钱包后再尝试此操作'
-            }), 401
-        
-        # 对于HTML页面，重定向到钱包连接页面
-        return redirect(url_for('auth.connect_wallet', next=request.url))
-    
+        # 检查session
+        if not eth_address and 'eth_address' in session:
+            eth_address = session['eth_address']
+            if eth_address:
+                g.eth_address = eth_address
+                current_app.logger.info(f"从session获取钱包地址: {eth_address}")
+                
+        # 如果都没有找到地址，返回错误
+        if not eth_address:
+            current_app.logger.warning("请求未提供钱包地址")
+            return jsonify({'error': '未提供钱包地址', 'code': 403}), 403
+            
+        return f(*args, **kwargs)
     return decorated_function
 
 def api_eth_address_required(f):

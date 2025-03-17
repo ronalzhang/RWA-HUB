@@ -1,10 +1,11 @@
-from flask import render_template, send_from_directory, current_app, request, redirect, url_for
+from flask import render_template, send_from_directory, current_app, request, redirect, url_for, flash, session
 from . import main_bp, auth_bp, assets_bp
 from .admin import admin_required, is_admin
 from ..models import Asset
 from ..models.asset import AssetStatus
 from sqlalchemy import or_ as db_or
 from app.models.trade import Trade, TradeStatus
+from app.models import ShortLink
 
 # 主页路由
 # @main_bp.route('/')
@@ -76,4 +77,24 @@ def asset_detail(asset_id):
 # 管理页面路由
 @assets_bp.route('/manage')
 def manage_assets():
-    return render_template('assets/manage.html') 
+    return render_template('assets/manage.html')
+
+# 添加短链接处理路由
+@main_bp.route('/s/<code>')
+def shortlink_redirect(code):
+    """处理短链接重定向"""
+    short_link = ShortLink.query.filter_by(code=code).first()
+    
+    if not short_link:
+        flash('无效的短链接', 'error')
+        return redirect(url_for('main.index'))
+    
+    if short_link.is_expired():
+        flash('此链接已过期', 'error')
+        return redirect(url_for('main.index'))
+    
+    # 增加点击计数
+    short_link.increment_click()
+    
+    # 重定向到原始URL
+    return redirect(short_link.original_url) 

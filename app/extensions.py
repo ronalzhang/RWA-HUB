@@ -1,16 +1,28 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_login import LoginManager
+from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_babel import Babel
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from apscheduler.schedulers.background import BackgroundScheduler
+import logging
 
 # 初始化数据库
 db = SQLAlchemy()
 
 # 初始化数据库迁移
 migrate = Migrate()
+
+# 初始化登录管理器
+login_manager = LoginManager()
+login_manager.login_view = 'auth.login'
+login_manager.login_message = '请先登录'
+login_manager.login_message_category = 'info'
+
+# 初始化JWT
+jwt = JWTManager()
 
 # 初始化CORS
 cors = CORS()
@@ -48,4 +60,29 @@ def init_extensions(app):
     limiter.init_app(app)
     
     # 初始化调度器（不需要init_app）
-    scheduler.start() 
+    try:
+        if not scheduler.running:
+            scheduler.start()
+            app.logger.info("调度器已启动")
+        else:
+            app.logger.info("调度器已经在运行中")
+    except Exception as e:
+        app.logger.error(f"启动调度器时出错: {str(e)}")
+
+# 配置日志
+def configure_logging(app):
+    # 设置日志级别
+    app.logger.setLevel(logging.INFO)
+    
+    # 创建控制台处理器
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    
+    # 创建格式化器
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    
+    # 添加处理器
+    app.logger.addHandler(console_handler)
+    
+    app.logger.info("日志系统配置完成") 

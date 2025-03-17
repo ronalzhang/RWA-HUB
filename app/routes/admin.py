@@ -2426,3 +2426,94 @@ def update_dashboard_stats():
     except Exception as e:
         current_app.logger.error(f"更新仪表盘统计数据时发生错误: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'message': f'更新统计数据时发生错误: {str(e)}'}), 500
+
+@admin_api_bp.route('/v2/share-messages', methods=['GET'])
+@admin_required
+def get_share_messages():
+    """获取分享文案列表"""
+    try:
+        # 从数据库或配置文件中获取分享文案
+        # 这里使用简单的JSON文件存储
+        import os
+        import json
+        from flask import current_app
+        
+        # 确定文件路径
+        file_path = os.path.join(current_app.root_path, 'static', 'data', 'share_messages.json')
+        
+        # 如果文件不存在，创建默认文案
+        if not os.path.exists(file_path):
+            default_messages = [
+                "📈 分享赚佣金！邀请好友投资，您可获得高达30%的推广佣金！链接由您独享，佣金终身受益，朋友越多，收益越丰厚！",
+                "🤝 好东西就要和朋友分享！发送您的专属链接，让更多朋友加入这个投资社区，一起交流，共同成长，还能获得持续佣金回报！",
+                "🔥 发现好机会就要分享！邀请好友一起投资这个优质资产，共同见证财富增长！您的专属链接，助力朋友也能抓住这个机会！"
+            ]
+            
+            # 确保目录存在
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            # 保存默认文案
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(default_messages, f, ensure_ascii=False, indent=2)
+        
+        # 读取文件内容
+        with open(file_path, 'r', encoding='utf-8') as f:
+            messages = json.load(f)
+            
+        return jsonify({
+            'success': True,
+            'messages': messages
+        }), 200
+    except Exception as e:
+        current_app.logger.error(f'获取分享文案失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@admin_api_bp.route('/v2/share-messages', methods=['POST'])
+@admin_required
+def update_share_messages():
+    """更新分享文案"""
+    try:
+        import os
+        import json
+        from flask import current_app, request
+        
+        # 从请求中获取新的文案列表
+        data = request.json
+        if not data or 'messages' not in data or not isinstance(data['messages'], list):
+            return jsonify({
+                'success': False,
+                'error': '无效的请求数据'
+            }), 400
+        
+        messages = data['messages']
+        
+        # 验证文案列表
+        if not all(isinstance(msg, str) for msg in messages):
+            return jsonify({
+                'success': False,
+                'error': '所有文案必须是字符串'
+            }), 400
+        
+        # 确定文件路径
+        file_path = os.path.join(current_app.root_path, 'static', 'data', 'share_messages.json')
+        
+        # 确保目录存在
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        # 保存新文案
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(messages, f, ensure_ascii=False, indent=2)
+            
+        return jsonify({
+            'success': True,
+            'message': '分享文案已更新'
+        }), 200
+    except Exception as e:
+        current_app.logger.error(f'更新分享文案失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

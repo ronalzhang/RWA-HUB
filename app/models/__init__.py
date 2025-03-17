@@ -1,6 +1,7 @@
 from app.extensions import db
 from sqlalchemy.ext.declarative import declared_attr
 from datetime import datetime
+from flask_sqlalchemy import SQLAlchemy
 
 # 导入基本模型
 from .user import User, UserRole, UserStatus
@@ -8,6 +9,7 @@ from .asset import Asset, AssetType
 from .trade import Trade, TradeStatus, TradeType
 from .income import PlatformIncome, IncomeType
 from .dividend import Dividend, DividendRecord
+from .shortlink import ShortLink
 
 # 从admin.py导入管理相关模型
 from .admin import (
@@ -28,5 +30,5 @@ __all__ = [
     'Trade', 'TradeType', 'User', 'UserRole', 'UserStatus', 
     'Commission', 'AdminUser', 'SystemConfig', 'CommissionSetting',
     'DistributionLevel', 'UserReferral', 'CommissionRecord', 'AdminOperationLog',
-    'DashboardStats'
+    'DashboardStats', 'ShortLink'
 ]

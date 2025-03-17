@@ -9,7 +9,7 @@ from decimal import Decimal
 import click
 from flask.cli import with_appcontext
 import threading
-from app.extensions import db, babel, limiter, scheduler, migrate
+from app.extensions import db, babel, limiter, scheduler, migrate, cors, configure_logging
 
 def create_app(config_name='development'):
     """创建Flask应用实例"""
@@ -18,6 +18,9 @@ def create_app(config_name='development'):
     # 加载配置
     app.config.from_object(config[config_name])
     config[config_name].init_app(app)
+    
+    # 初始化日志
+    configure_logging(app)
     
     # 添加自定义过滤器
     @app.template_filter('number_format')
