@@ -5,63 +5,88 @@ const walletState = {
     isAdmin: false,
     eventCallbacks: new Set(), // 用于存储状态变化的回调函数
     connecting: false,
+    usdcBalance: '0.00', // 添加USDC余额属性
     
+    // 支持的网络配置
+    NETWORK_CONFIG: {
+        mainnet: {
+            name: 'Solana Mainnet',
+            endpoint: 'https://api.mainnet-beta.solana.com',
+            chainId: '101',
+        },
+        devnet: {
+            name: 'Solana Devnet',
+            endpoint: 'https://api.devnet.solana.com',
+            chainId: '103',
+        },
+        testnet: {
+            name: 'Solana Testnet',
+            endpoint: 'https://api.testnet.solana.com',
+            chainId: '102',
+        }
+    },
+
     // 初始化钱包状态
     async init() {
-        console.log('Initializing wallet state...');
-        if (!window.ethereum) {
-            console.warn('MetaMask not installed');
-            return;
-        }
-
+        console.log('初始化钱包...');
+        
         try {
-            // 确保清理之前的状态
-            this.clearAllStates();
-            
-            // 设置事件监听
-            this.setupEventListeners();
-            
-            // 检查本地存储状态
-            const shouldConnect = localStorage.getItem('walletConnected') === 'true';
-            
-            if (!shouldConnect) {
-                console.log('Wallet was previously disconnected');
-                // 确保完全断开状态
-                await this.disconnect(true);
-                return;
-            }
-            
-            // 检查当前是否有账户连接
-            try {
-                const accounts = await window.ethereum.request({ 
-                    method: 'eth_accounts'
-                });
+            // 检查是否存在Solana钱包
+            if (!window.solana) {
+                console.warn('未检测到Solana钱包，将使用模拟实现');
+                // 这里不抛出错误，因为我们有模拟实现作为备选
+            } else {
+                console.log('检测到Solana钱包');
                 
-                // 只有当真实有账户连接时才恢复连接
-                if (accounts && accounts.length > 0) {
-                    // 验证连接状态
-                    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-                    if (!chainId) {
-                        throw new Error('Unable to get chain ID');
+                // 检查钱包是否已经连接
+                try {
+                    if (window.solana._connected || (window.solana.isConnected && await window.solana.isConnected())) {
+                        console.log('Solana钱包已连接，获取地址');
+                        
+                        // 获取已连接的地址
+                        const publicKey = window.solana._publicKey || 
+                                         (window.solana.publicKey ? window.solana.publicKey : null);
+                        
+                        if (publicKey) {
+                            this.address = publicKey.toString();
+                            this.isConnected = true;
+                            console.log(`检测到已连接的钱包地址: ${this.address}`);
+                            
+                            // 更新UI显示
+                            const walletBtn = document.getElementById('wallet-btn');
+                            if (walletBtn) {
+                                walletBtn.innerText = this.address.slice(0, 4) + '...' + this.address.slice(-4);
+                            }
+                            
+                            // 获取余额
+                            await this.getWalletBalance();
+                            
+                            // 监听断开连接事件
+                            window.solana.on('disconnect', () => {
+                                console.log('钱包断开连接');
+                                this.isConnected = false;
+                                this.address = null;
+                                
+                                const updateElement = document.getElementById('wallet-btn');
+                                if (updateElement) {
+                                    updateElement.innerText = '连接钱包';
+                                }
+                            });
+                            
+                            return true;
+                        }
+                    } else {
+                        console.log('Solana钱包未连接');
                     }
-                    this.address = accounts[0].toLowerCase();
-                    this.isConnected = true;
-                    await this.checkIsAdmin();
-                    this.updateUI();
-                    this.notifyStateChange();
-                } else {
-                    // 如果没有实际连接的账户，清除存储的状态
-                    await this.disconnect(true);
+                } catch (err) {
+                    console.warn('检查钱包连接状态时出错:', err);
                 }
-            } catch (error) {
-                console.error('Failed to initialize wallet:', error);
-                // 发生错误时也清除存储的状态
-                await this.disconnect(true);
             }
+            
+            return false;
         } catch (error) {
-            console.error('Failed to initialize wallet state:', error);
-            // 发生错误时也清除存储的状态
-            await this.disconnect(true);
+            console.error('钱包初始化失败:', error);
+            throw error;
         }
     },
 
@@ -81,130 +106,56 @@ const walletState = {
         this.clearState();
         
         // 移除所有事件监听器
-        if (window.ethereum) {
-            window.ethereum.removeAllListeners('accountsChanged');
-            window.ethereum.removeAllListeners('disconnect');
-            window.ethereum.removeAllListeners('chainChanged');
-        }
-    },
-
-    // 支持的网络配置
-    SUPPORTED_NETWORKS: {
-        1: {
-            name: 'Mainnet',
-            currency: 'ETH',
-            explorerUrl: 'https://etherscan.io',
-            chainId: '0x1',
-            rpcUrls: ['https://mainnet.infura.io/v3/'],
-            nativeCurrency: {
-                name: 'ETH',
-                symbol: 'ETH',
-                decimals: 18
-            }
-        },
-        5: {
-            name: 'Goerli',
-            currency: 'ETH',
-            explorerUrl: 'https://goerli.etherscan.io',
-            chainId: '0x5',
-            rpcUrls: ['https://goerli.infura.io/v3/'],
-            nativeCurrency: {
-                name: 'ETH',
-                symbol: 'ETH',
-                decimals: 18
-            }
+        if (window.solana) {
+            window.solana.removeAllListeners('disconnect');
         }
     },
 
     // 检查并切换网络
     async checkAndSwitchNetwork(chainId) {
-        const networkInfo = this.SUPPORTED_NETWORKS[parseInt(chainId, 16)];
+        const networkInfo = this.NETWORK_CONFIG[chainId];
         if (!networkInfo) {
-            // 如果是不支持的网络，尝试切换到主网
-            try {
-                await window.ethereum.request({
-                    method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: this.SUPPORTED_NETWORKS[1].chainId }]
-                });
-                return true;
-            } catch (switchError) {
-                if (switchError.code === 4902) {
-                    try {
-                        await window.ethereum.request({
-                            method: 'wallet_addEthereumChain',
-                            params: [{
-                                chainId: this.SUPPORTED_NETWORKS[1].chainId,
-                                chainName: this.SUPPORTED_NETWORKS[1].name,
-                                rpcUrls: this.SUPPORTED_NETWORKS[1].rpcUrls,
-                                nativeCurrency: this.SUPPORTED_NETWORKS[1].nativeCurrency,
-                                blockExplorerUrls: [this.SUPPORTED_NETWORKS[1].explorerUrl]
-                            }]
-                        });
-                        return true;
-                    } catch (addError) {
-                        console.error('Failed to add network:', addError);
-                        throw new Error('请手动切换到支持的网络');
+            const supportedNetworks = Object.values(this.NETWORK_CONFIG)
+                .map(n => n.name)
+                .join('、');
+                
+            const message = `当前网络不受支持，请切换到以下网络之一：${supportedNetworks}`;
+            if (confirm(message)) {
+                try {
+                    await window.solana.connect({ cluster: chainId });
+                    console.log('Network switched successfully');
+                    return true;
+                } catch (switchError) {
+                    if (switchError.code === 4902) {
+                        try {
+                            const mainnet = this.NETWORK_CONFIG.mainnet;
+                            await window.solana.connect({ cluster: mainnet.chainId });
+                            console.log('Network added successfully');
+                            return true;
+                        } catch (addError) {
+                            console.error('Failed to add network:', addError);
+                            showError('添加网络失败，请手动切换到支持的网络');
+                            return false;
+                        }
                     }
+                    console.error('Failed to switch network:', switchError);
+                    showError('网络切换失败，请手动切换到支持的网络');
+                    return false;
                 }
-                console.error('Failed to switch network:', switchError);
-                throw new Error('请手动切换到支持的网络');
             }
+            return false;
         }
         return true;
     },
 
     // 设置事件监听器
     setupEventListeners() {
-        if (!window.ethereum) return;
-
-        // 账户变更事件
-        window.ethereum.on('accountsChanged', async (accounts) => {
-            console.log('Accounts changed:', accounts);
-            if (accounts.length === 0) {
-                await this.disconnect();
-            } else {
-                // 验证新账户连接状态
-                try {
-                    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-                    if (!chainId) {
-                        throw new Error('Unable to get chain ID');
-                    }
-                    
-                    // 检查并切换网络
-                    await this.checkAndSwitchNetwork(chainId);
-
-                    this.address = accounts[0].toLowerCase();
-                    this.isConnected = true;
-                    localStorage.setItem('walletConnected', 'true');
-                    await this.checkIsAdmin();
-                    this.updateUI();
-                    this.notifyStateChange();
-                } catch (error) {
-                    console.error('Failed to verify new account:', error);
-                    await this.disconnect();
-                    showError(error.message);
-                }
-            }
-        });
+        if (!window.solana) return;
 
         // 断开连接事件
-        window.ethereum.on('disconnect', async (error) => {
+        window.solana.on('disconnect', async (error) => {
             console.log('Wallet disconnected', error);
             await this.disconnect();
-        });
-
-        // 链变更事件
-        window.ethereum.on('chainChanged', async (chainId) => {
-            console.log('Chain changed:', chainId);
-            try {
-                await this.checkAndSwitchNetwork(chainId);
-            } catch (error) {
-                console.error('Network switch failed:', error);
-                showError(error.message);
-                await this.disconnect();
-                return;
-            }
-            window.location.reload();
         });
     },
     
@@ -222,7 +173,7 @@ const walletState = {
             return false;
         }
     },
-
+    
     // 检查是否正在处理连接请求
     async checkProcessingState() {
         try {
@@ -233,16 +184,14 @@ const walletState = {
             }
 
             // 检查 MetaMask 是否已解锁
-            const isUnlocked = await window.ethereum._metamask.isUnlocked();
+            const isUnlocked = await window.solana._metamask.isUnlocked();
             if (!isUnlocked) {
                 return true; // MetaMask 未解锁，需要用户操作
             }
 
             // 检查是否有正在处理的请求
             try {
-                await window.ethereum.request({
-                    method: 'eth_accounts'
-                });
+                await window.solana.connection.getClusterNodes();
                 return false;
             } catch (error) {
                 if (error.code === -32002) {
@@ -259,115 +208,96 @@ const walletState = {
         }
     },
     
-    // 连接钱包
-    async connect(showPrompt = true) {
-        console.log('Connecting wallet...');
-        
-        if (!window.ethereum) {
-            throw new Error('请安装MetaMask钱包');
-        }
+    /**
+     * 连接钱包
+     */
+    async connect() {
+        console.log('尝试连接钱包...');
         
         // 如果已经连接，直接返回
-        if (this.isConnected && this.address) {
+        if (this.isConnected) {
+            console.log('钱包已经连接，无需重复连接');
             return true;
         }
         
-        // 防止重复连接
+        // 重置连接状态，避免重复连接错误
+        this.connecting = false;
+        
         if (this.connecting) {
+            console.warn('正在处理连接请求，请稍候...');
             throw new Error('正在处理连接请求，请稍候...');
         }
         
-        this.connecting = true;
-        const walletBtn = document.getElementById('walletBtn');
-        const walletBtnText = document.getElementById('walletBtnText');
-        const originalText = walletBtnText ? walletBtnText.textContent : '连接钱包';
-        
         try {
-            // 更新按钮状态
-            if (walletBtnText) {
-                walletBtnText.textContent = '连接中...';
-            }
-            if (walletBtn) {
-                walletBtn.disabled = true;
-            }
-
-            // 先尝试获取当前账户，如果有正在处理的请求会在这里失败
-            try {
-                await window.ethereum.request({ method: 'eth_accounts' });
-            } catch (error) {
-                if (error.code === -32002) {
-                    // 重置所有状态
-                    this.clearAllStates();
-                    throw new Error('请打开MetaMask完成操作后重试');
-                }
+            this.connecting = true;
+            console.log('设置连接状态: connecting = true');
+            
+            // 检查是否存在Solana钱包
+            if (!window.solana) {
+                console.error('未检测到Solana钱包扩展');
+                this.connecting = false;
+                throw new Error('未检测到Solana钱包，请安装Phantom或Solflare等Solana钱包');
             }
 
-            // 请求连接
-            let accounts;
-            try {
-                accounts = await window.ethereum.request({ 
-                    method: showPrompt ? 'eth_requestAccounts' : 'eth_accounts'
-                });
-            } catch (error) {
-                const actualError = error.err || error;
-                
-                if (actualError.code === 4001) {
-                    throw new Error('用户拒绝了连接请求');
-                }
-                
-                if (actualError.code === -32002) {
-                    // 重置所有状态
-                    this.clearAllStates();
-                    throw new Error('请打开MetaMask完成操作后重试');
-                }
-                
-                throw error;
+            console.log('检测到Solana钱包，开始连接...');
+            // 检查是否是Phantom钱包
+            if (window.solana.isPhantom) {
+                console.log('检测到Phantom钱包');
             }
             
-            if (accounts && accounts.length > 0) {
-                // 获取并检查网络
-                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-                await this.checkAndSwitchNetwork(chainId);
+            const updateElement = document.getElementById('walletBtn');
+            if (updateElement) {
+                updateElement.innerText = '连接中...';
+            }
+            
+            try {
+                // 连接Solana钱包
+                console.log('请求连接Solana钱包...');
+                const resp = await window.solana.connect();
+                console.log('Solana钱包连接成功:', resp);
                 
-                this.address = accounts[0].toLowerCase();
+                // 更新地址和连接状态
+                this.address = resp.publicKey.toString();
                 this.isConnected = true;
-                localStorage.setItem('walletConnected', 'true');
-                await this.checkIsAdmin();
-                this.updateUI();
-                this.notifyStateChange();
                 
-                // 连接成功后关闭钱包菜单
-                const walletMenu = document.getElementById('walletMenu');
-                if (walletMenu) {
-                    walletMenu.classList.remove('show');
+                // 更新UI显示
+                if (updateElement) {
+                    updateElement.innerText = this.address.slice(0, 4) + '...' + this.address.slice(-4);
                 }
+                
+                console.log(`钱包已连接，地址: ${this.address}`);
+                
+                // 监听断开连接事件
+                window.solana.on('disconnect', () => {
+                    console.log('钱包断开连接');
+                    this.isConnected = false;
+                    this.address = null;
+                    
+                    if (updateElement) {
+                        updateElement.innerText = '连接钱包';
+                    }
+                });
+                
+                // 尝试获取余额
+                await this.getWalletBalance();
                 
                 return true;
+            } catch (error) {
+                console.error('连接钱包时发生错误:', error);
+                
+                if (updateElement) {
+                    updateElement.innerText = '连接钱包';
+                }
+                
+                throw new Error(`连接钱包失败: ${error.message}`);
+            } finally {
+                this.connecting = false;
+                console.log('重置连接状态: connecting = false');
             }
-            
-            return false;
         } catch (error) {
-            // 重置状态
             this.connecting = false;
-            this.isConnected = false;
-            this.address = null;
-            
-            // 恢复按钮状态
-            if (walletBtnText) {
-                walletBtnText.textContent = originalText;
-            }
-            if (walletBtn) {
-                walletBtn.disabled = false;
-            }
-            
-            // 如果是已经处理过的错误，直接抛出
-            if (error instanceof Error && error.message) {
-                throw error;
-            }
-            
-            // 处理其他未知错误
-            console.error('Connection failed:', error);
-            throw new Error('连接钱包失败，请重试');
+            console.error('钱包连接过程出错:', error);
+            throw error;
         }
     },
     
@@ -375,48 +305,24 @@ const walletState = {
     async disconnect(silent = false) {
         console.log('Disconnecting wallet...');
         try {
-            // 尝试通过 MetaMask 断开连接
-            try {
-                if (window.ethereum && window.ethereum._metamask) {
-                    // 移除所有已授权的账户
-                    await window.ethereum.request({
-                        method: 'wallet_revokePermissions',
-                        params: [{ eth_accounts: {} }]
-                    });
-                }
-            } catch (error) {
-                console.warn('Failed to revoke permissions:', error);
+            if (window.solana) {
+                await window.solana.disconnect();
             }
 
-            // 清除状态
             this.address = null;
             this.isConnected = false;
             this.isAdmin = false;
             
-            // 清除本地存储
             localStorage.removeItem('walletConnected');
             sessionStorage.removeItem('walletAddress');
             
-            // 清除所有相关的 cookie
             this.clearState();
-            
-            // 移除所有事件监听器并重新设置
-            if (window.ethereum) {
-                window.ethereum.removeAllListeners('accountsChanged');
-                window.ethereum.removeAllListeners('disconnect');
-                window.ethereum.removeAllListeners('chainChanged');
-                this.setupEventListeners();
-            }
-            
-            // 更新 UI
             this.updateUI();
             
-            // 只在非静默模式下通知状态变化
             if (!silent) {
                 this.notifyStateChange();
             }
             
-            // 关闭钱包菜单
             const walletMenu = document.getElementById('walletMenu');
             if (walletMenu) {
                 walletMenu.classList.remove('show');
@@ -434,19 +340,14 @@ const walletState = {
         console.log('Switching wallet...');
         try {
             // 请求切换账户
-            await window.ethereum.request({
-                method: 'wallet_requestPermissions',
-                params: [{ eth_accounts: {} }]
-            });
+            await window.solana.connect({ cluster: 'devnet' });
 
             // 获取新的账户
-            const accounts = await window.ethereum.request({
-                method: 'eth_accounts'
-            });
+            const resp = await window.solana.connect();
 
             // 验证新账户
-            if (accounts && accounts.length > 0) {
-                this.address = accounts[0].toLowerCase();
+            if (resp) {
+                this.address = resp.publicKey.toString();
                 this.isConnected = true;
                 localStorage.setItem('walletConnected', 'true');
                 await this.checkIsAdmin();
@@ -470,36 +371,120 @@ const walletState = {
         }
     },
     
-    // 更新UI显示
-    updateUI() {
+    // 获取钱包余额
+    async getWalletBalance() {
+        if (!this.isConnected || !this.address) {
+            console.log('钱包未连接，无法获取余额');
+            return null;
+        }
+        
+        try {
+            // 测试环境下返回模拟数据
+            console.log('获取钱包余额 (模拟)');
+            
+            // 生成随机余额，并保存到对象属性中
+            const mockBalance = (Math.random() * 10000).toFixed(2);
+            this.usdcBalance = mockBalance;
+            console.log('获取到的USDC余额:', mockBalance);
+            
+            return {
+                value: mockBalance,
+                symbol: 'USDC'
+            };
+            
+            // 实际实现 (注释掉)
+            /*
+            // 获取 USDC 代币账户
+            const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // Solana USDC
+            const connection = new solanaWeb3.Connection(this.NETWORK_CONFIG.mainnet.endpoint);
+            const publicKey = new solanaWeb3.PublicKey(this.address);
+            
+            // 查找 USDC 代币账户
+            const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
+                mint: new solanaWeb3.PublicKey(USDC_MINT)
+            });
+            
+            if (tokenAccounts.value.length > 0) {
+                const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
+                this.usdcBalance = balance.toFixed(1);
+                return {
+                    value: this.usdcBalance,
+                    symbol: 'USDC'
+                };
+            }
+            
+            this.usdcBalance = '0.0';
+            return {
+                value: '0.0',
+                symbol: 'USDC'
+            };
+            */
+        } catch (error) {
+            console.error('获取余额失败:', error);
+            return null;
+        }
+    },
+
+    // 更新UI
+    async updateUI() {
+        console.log('更新钱包状态显示');
+        
         const walletBtn = document.getElementById('walletBtn');
         const walletMenu = document.getElementById('walletMenu');
         const walletBtnText = document.getElementById('walletBtnText');
-        const adminEntry = document.getElementById('adminEntry');
-        const adminLink = document.getElementById('adminLink');
+        const balanceDisplay = document.getElementById('walletBalance');
         
-        if (!walletBtn || !walletBtnText) return;
+        if (!walletBtn || !walletBtnText) {
+            console.warn('钱包按钮元素未找到');
+            return;
+        }
+        
+        console.log('连接状态:', this.isConnected, '地址:', this.address);
         
         if (this.isConnected && this.address) {
-            const shortAddress = `${this.address.substring(0, 6)}...${this.address.substring(38)}`;
-            walletBtnText.textContent = shortAddress;
-            walletBtn.classList.remove('btn-outline-primary');
-            walletBtn.classList.add('btn-primary');
-            
-            // 更新管理员入口
-            if (adminEntry && adminLink) {
-                if (this.isAdmin) {
-                    adminEntry.classList.remove('d-none');
-                    adminLink.href = `/admin?eth_address=${this.address}`;
+            // 尝试获取余额
+            try {
+                walletBtnText.textContent = '获取余额中...';
+                const balance = await this.getWalletBalance();
+                
+                if (balance) {
+                    const displayText = `${this.address.substring(0, 4)}...${this.address.substring(this.address.length - 4)} (${balance.value} ${balance.symbol})`;
+                    console.log('显示余额:', displayText);
+                    walletBtnText.textContent = displayText;
                 } else {
-                    adminEntry.classList.add('d-none');
+                    const shortAddress = `${this.address.substring(0, 4)}...${this.address.substring(this.address.length - 4)}`;
+                    console.log('无法获取余额，只显示地址:', shortAddress);
+                    walletBtnText.textContent = shortAddress;
                 }
+                
+                // 更新按钮样式
+                walletBtn.classList.remove('btn-outline-primary');
+                walletBtn.classList.add('btn-primary');
+                
+                // 更新钱包菜单中的地址显示
+                if (walletMenu) {
+                    const addressElem = walletMenu.querySelector('.wallet-address');
+                    if (addressElem) {
+                        addressElem.textContent = this.address;
+                    }
+                    
+                    // 更新余额显示
+                    if (balanceDisplay && balance) {
+                        balanceDisplay.textContent = `${balance.value} ${balance.symbol}`;
+                    }
+                }
+            } catch (error) {
+                console.error('获取余额失败:', error);
+                walletBtnText.textContent = `${this.address.substring(0, 4)}...${this.address.substring(this.address.length - 4)}`;
             }
         } else {
+            console.log('钱包未连接，显示默认文本');
             walletBtnText.textContent = '连接钱包';
             walletBtn.classList.remove('btn-primary');
             walletBtn.classList.add('btn-outline-primary');
-            if (walletMenu) {
+            
+            // 关闭钱包菜单
+            if (walletMenu && walletMenu.classList.contains('show')) {
                 walletMenu.classList.remove('show');
             }
         }
@@ -520,9 +505,14 @@ const walletState = {
         if (!this.address) return false;
         
         try {
+            // 根据地址类型决定是否转换为小写
+            // ETH地址以0x开头，需要转为小写
+            // SOL地址不以0x开头，保持原样（大小写敏感）
+            const addressStr = this.address.startsWith('0x') ? this.address.toLowerCase() : this.address;
+            
             const response = await fetch('/api/admin/check', {
                 headers: {
-                    'X-Eth-Address': this.address
+                    'X-Eth-Address': addressStr
                 }
             });
             
@@ -588,28 +578,30 @@ document.addEventListener('DOMContentLoaded', async function() {
             e.preventDefault();
             e.stopPropagation();
             
-            if (!window.ethereum) {
-                showError('请安装MetaMask钱包');
+            console.log('Wallet button clicked, isConnected:', walletState.isConnected); // 加入状态信息
+            
+            // 在点击连接钱包时检查钱包插件
+            if (typeof window.solana === 'undefined') {
+                const userAgent = navigator.userAgent.toLowerCase();
+                if (userAgent.includes('mobile')) {
+                    alert('请在移动设备上安装支持的钱包插件，如MetaMask或Trust Wallet。');
+                } else {
+                    alert('请安装支持的钱包插件，如MetaMask。');
+                }
                 return;
             }
             
             if (!walletState.getConnectionStatus()) {
                 try {
+                    console.log('Attempting to connect wallet...'); // 添加连接尝试日志
                     await walletState.connect();
                 } catch (error) {
+                    console.error('Connection failed:', error); // 添加错误日志
                     showError(error.message);
                 }
-            } else if (walletMenu) {
-                // 切换菜单显示状态
-                const isVisible = walletMenu.classList.contains('show');
-                if (!isVisible) {
-                    // 关闭所有其他下拉菜单
-                    document.querySelectorAll('.wallet-menu.show').forEach(el => {
-                        if (el !== walletMenu) {
-                            el.classList.remove('show');
-                        }
-                    });
-                }
+            } else {
+                // 如果已连接，显示下拉菜单
+                console.log('Wallet already connected, toggling menu'); // 添加菜单切换日志
                 walletMenu.classList.toggle('show');
             }
         });
@@ -620,6 +612,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         switchWalletBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
+            console.log('Switch wallet button clicked'); // 调试输出
             try {
                 await walletState.switchWallet();
                 if (walletMenu) {
@@ -636,6 +629,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         disconnectWalletBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
+            console.log('Disconnect wallet button clicked'); // 调试输出
             try {
                 await walletState.disconnect();
                 if (walletMenu) {
@@ -649,9 +643,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // 点击其他地方关闭菜单
     document.addEventListener('click', (e) => {
-        const target = e.target;
-        if (walletMenu && walletMenu.classList.contains('show') && 
-            !walletBtn.contains(target) && !walletMenu.contains(target)) {
+        if (walletMenu.classList.contains('show') && 
+            !walletBtn.contains(e.target) && !walletMenu.contains(e.target)) {
             walletMenu.classList.remove('show');
         }
     });
@@ -684,4 +677,19 @@ function showError(message) {
 window.changeLanguage = function(lang) {
     document.cookie = `language=${lang};path=/;max-age=31536000`;
     window.location.reload();
-} 
+}
+
+// 自动检测已安装钱包
+async function detectWallet() {
+    const walletConnectButton = document.getElementById('walletBtn'); // 确保获取到钱包按钮
+    if (window.solana) {
+        // 显示连接选项
+        walletConnectButton.style.display = 'block';
+    } else {
+        // 只在用户点击连接钱包时提示
+        walletConnectButton.style.display = 'none'; // 隐藏按钮
+    }
+}
+
+// 在页面加载时不再调用 detectWallet
+// detectWallet(); // 移除此行 
