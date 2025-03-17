@@ -4,6 +4,7 @@ from app.extensions import db
 from sqlalchemy.orm import validates
 import re
 import json
+from sqlalchemy import func, or_
 
 class UserRole(enum.Enum):
     USER = 'user'          # 普通用户
@@ -14,6 +15,18 @@ class UserStatus(enum.Enum):
     ACTIVE = 'active'    # 活跃
     INACTIVE = 'inactive'  # 未激活
     BANNED = 'banned'    # 禁用
+
+# 辅助函数，比较两个钱包地址是否相同（不区分大小写）
+def is_same_wallet_address(address1, address2):
+    if not address1 or not address2:
+        return False
+    
+    # 如果是以太坊地址（0x开头），则不区分大小写
+    if address1.startswith('0x') and address2.startswith('0x'):
+        return address1.lower() == address2.lower()
+    
+    # 对于其他类型地址（如Solana），需要区分大小写
+    return address1 == address2
 
 class User(db.Model):
     __tablename__ = 'users'

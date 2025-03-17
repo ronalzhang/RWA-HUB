@@ -53,4 +53,81 @@
 
 .image-preview .card:hover .btn-danger {
     opacity: 1;
+}
+
+/* 资产列表样式 */
+.asset-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    border-bottom: 1px solid #eee;
+}
+
+.asset-item:last-child {
+    border-bottom: none;
+}
+
+/* 资产链接样式 */
+.asset-link {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 15px;
+    color: inherit;
+    text-decoration: none;
+    transition: background-color 0.2s;
+}
+
+.asset-link:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: inherit;
+    text-decoration: none;
+}
+
+.asset-name {
+    display: flex;
+    align-items: center;
+}
+
+.asset-icon {
+    width: 24px;
+    height: 24px;
+    margin-right: 10px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.asset-value {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* 新增资产数量和符号样式 */
+.asset-quantity {
+    font-weight: 700;
+    font-size: 14px;
+    color: #333;
+}
+
+.asset-symbol {
+    margin-left: 4px;
+    color: #6c757d;
+    font-size: 12px;
+    font-weight: 400;
+}
+
+/* 分享文案样式 */
+.share-message {
+    font-size: 15px;
+    line-height: 1.5;
+    border-left: 4px solid #4CAF50;
+    padding: 10px 15px;
+    margin-bottom: 20px;
+    background-color: rgba(76, 175, 80, 0.1);
+    border-radius: 4px;
+}
+
+.share-message strong {
+    color: #4CAF50;
 } 

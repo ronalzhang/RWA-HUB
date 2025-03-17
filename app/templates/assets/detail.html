@@ -63,40 +63,73 @@
             try {
                 console.log('页面初始化开始...');
                 
-                // 同步钱包状态
-                syncWalletState();
-                
-                // 设置钱包相关的页面元素
-                setupWalletPageElements();
-                
                 // 设置交易表单
                 setupTradeForm();
                 
-                // 加载交易历史
-                await loadTradeHistory();
-                
                 // 设置资产信息刷新
                 setupAssetInfoRefresh();
-                
-                // 检查是否显示分红管理按钮
-                checkDividendManagementAccess();
-                
-                // 加载累计分红信息
-                loadTotalDividends();
                 
                 // 立即刷新资产信息
                 console.log('初始化完成后刷新数据');
                 refreshAssetInfo();
                 
                 // 更新钱包资产列表 - 使用base.html中的函数
-                if (typeof loadUserAssets === 'function' && window.walletState && window.walletState.isConnected) {
+                if (typeof loadUserAssets === 'function') {
                     console.log('使用全局loadUserAssets函数加载钱包资产');
+                    // 始终调用loadUserAssets，让函数内部处理无资产的情况
                     loadUserAssets();
                 }
                 
+                // 先加载累计分红信息（不依赖钱包状态）
+                await loadTotalDividends();
+                
+                // 立即加载交易历史，现在已确保从cookie或localStorage获取钱包地址
+                console.log('初始化时加载交易历史');
+                loadTradeHistory();
+                
+                // 检查分红管理权限 - 仅在钱包已连接时检查
+                if (window.walletState && window.walletState.isConnected && window.walletState.address) {
+                    checkDividendManagementAccess();
+                } else {
+                    // 确保分红按钮隐藏
+                    const dividendBtn = document.getElementById('dividendManagementBtn');
+                    if (dividendBtn) {
+                        dividendBtn.style.display = 'none';
+                    }
+                }
+                
                 // 添加钱包状态变化事件监听器
-                window.addEventListener('walletConnected', syncWalletState);
-                window.addEventListener('walletDisconnected', syncWalletState);
+                window.addEventListener('walletConnected', function(event) {
+                    console.log('钱包已连接，更新UI');
+                    updateWalletBalance();
+                    
+                    // 重新加载交易历史
+                    console.log('钱包连接事件触发，重新加载交易历史');
+                    loadTradeHistory();
+                    
+                    // 检查分红管理权限
+                    checkDividendManagementAccess();
+                });
+                
+                window.addEventListener('walletDisconnected', function() {
+                    console.log('钱包已断开连接，隐藏分红按钮');
+                    const dividendBtn = document.getElementById('dividendManagementBtn');
+                    if (dividendBtn) {
+                        dividendBtn.style.display = 'none';
+                    }
+                    loadTradeHistory();
+                    updateWalletBalance();
+                });
+                
+                // 使用全局钱包余额更新函数（定义在base.html中）
+                // 初始更新钱包余额
+                if (typeof updateWalletBalance === 'function') {
+                    updateWalletBalance();
+                    
+                    // 监听钱包连接和断开连接事件
+                    window.addEventListener('walletConnected', updateWalletBalance);
+                    window.addEventListener('walletDisconnected', updateWalletBalance);
+                }
                 
                 // 设置每30秒刷新资产信息
                 setInterval(refreshAssetInfo, 30000);
@@ -107,90 +140,51 @@
             }
         });
         
-        // 同步钱包状态
-        function syncWalletState() {
-            console.log('同步全局钱包状态到本地变量');
-            
-            if (window.walletState && window.walletState.isConnected && window.walletState.address) {
-                walletPublicKey = { toString: () => window.walletState.address };
-                console.log('同步后的钱包状态: 已连接,', walletPublicKey.toString());
-            } else {
-                walletPublicKey = null;
-                console.log('同步后的钱包状态: 未连接');
-            }
-            
-            // 更新购买按钮
-            updateBuyButtonState();
-            
-            // 更新详情页钱包UI
-            updateDetailPageWalletUI();
-            
-            // 触发重新加载交易历史
-            loadTradeHistory();
-        }
-
-        // 修改钱包地址获取方法，使用全局walletState
-        function getWalletStatus() {
-            // 优先使用全局walletState检查连接状态
-            if (window.walletState && typeof window.walletState.isConnected !== 'undefined') {
-                console.log('使用全局walletState检查钱包状态:', window.walletState.isConnected);
-                return {
-                    connected: window.walletState.isConnected,
-                    address: window.walletState.address
-                };
-            }
-            
-            // 备用方案：使用本地walletPublicKey变量
-            console.log('使用本地walletPublicKey检查钱包状态:', !!walletPublicKey);
-            return {
-                connected: !!walletPublicKey,
-                address: walletPublicKey ? walletPublicKey.toString() : null
-            };
-        }
-        
-        // 获取钱包地址的辅助函数
-        function getAddressForApi(address) {
-            if (!address) return '';
-            
-            // 处理地址格式，根据需要进行转换
-            if (address.startsWith('0x')) {
-                return address.toLowerCase(); // ETH地址转小写
-            }
-            return address; // 其他地址保持原样
-        }
-
-        // 初始化 Solana 连接 - 这个函数可以删除，使用全局钱包功能
-        async function initializeSolana() {
+        // 检查是否有权限访问分红管理
+        async function checkDividendManagementAccess() {
             try {
-                // 使用全局钱包状态
-                console.log('同步全局钱包状态到本地变量');
+                console.log('检查分红管理权限...');
+                // 先隐藏按钮，避免未授权用户短暂看到
+                const dividendBtn = document.getElementById('dividendManagementBtn');
+                if (dividendBtn) {
+                    dividendBtn.style.display = 'none';
+                }
                 
-                if (window.walletState && window.walletState.isConnected && window.walletState.address) {
-                    walletPublicKey = { toString: () => window.walletState.address };
-                    console.log('使用全局钱包状态:', walletPublicKey.toString());
-                } else {
-                    walletPublicKey = null;
-                    console.log('钱包未连接');
+                // 首先检查钱包连接状态
+                if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
+                    console.log('钱包未连接，隐藏分红管理按钮');
+                    return;
                 }
-
-                // 更新按钮状态
-                updateBuyButtonState();
+                
+                // 前端渲染时的权限判断
+                const isOwnerFrontend = "{{ is_owner|lower }}" === "true";
+                const isAdminFrontend = "{{ is_admin_user|lower }}" === "true";
+                
+                // 如果当前地址不匹配模板渲染时的地址，需要重新检查权限
+                const currentAddress = '{{ current_user_address|default("", true) }}';
+                const connectedAddress = window.walletState.address;
+                
+                if (currentAddress.toLowerCase() !== connectedAddress.toLowerCase()) {
+                    console.log(`地址不匹配: 模板=${currentAddress}, 当前连接=${connectedAddress}`);
+                    // 地址不匹配，需要通过API重新检查权限
+                    await checkOwnershipViaApi(connectedAddress);
+                    return;
+                }
+                
+                // 如果地址匹配且前端渲染已经确认有权限，显示按钮
+                if (isOwnerFrontend || isAdminFrontend) {
+                    console.log('前端模板确认用户有权限访问分红管理功能');
+                    if (dividendBtn) {
+                        const walletAddress = window.walletState.address;
+                        dividendBtn.href = `/assets/${ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${walletAddress}`;
+                        dividendBtn.style.display = 'inline-flex';
+                    }
+                } else {
+                    // 地址匹配但前端渲染确认无权限，确保按钮隐藏
+                    console.log('前端模板确认用户无权限访问分红管理功能');
+                }
             } catch (error) {
-                console.error('同步钱包状态失败:', error);
-            }
-        }
-
-        // 更新购买按钮状态
-        function updateBuyButtonState() {
-            const buyButton = document.getElementById('buy-button');
-            if (buyButton) {
-                if (window.walletState && window.walletState.isConnected) {
-                    buyButton.disabled = false;
-                    buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>购买';
-                } else {
-                    buyButton.disabled = true;
-                    buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
-                }
+                console.error('检查管理权限失败:', error);
             }
         }
 
@@ -215,30 +209,37 @@
             tradeHistoryElement.innerHTML = '';
             tradeHistoryElement.appendChild(loadingElement);
             
-            // 强化钱包连接状态检查
-            console.log('检查钱包连接状态用于交易历史...');
+            console.log('尝试加载交易历史...');
             
-            // 获取钱包状态 - 使用全局对象强制检查
-            const walletStatus = getWalletStatus();
-            const isConnected = walletStatus.connected;
-            console.log('钱包连接状态:', isConnected ? '已连接' : '未连接', walletStatus);
+            // 直接从cookie获取钱包地址
+            function getCookieValue(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
+            }
             
-            if (!isConnected) {
-                console.log('钱包未连接，显示连接提示');
+            // 尝试多个来源获取钱包地址
+            let address = getCookieValue('eth_address');
+            if (!address && localStorage.getItem('walletAddress')) {
+                address = localStorage.getItem('walletAddress');
+            }
+            if (!address && localStorage.getItem('eth_address')) {
+                address = localStorage.getItem('eth_address');
+            }
+            if (!address && window.walletState && window.walletState.isConnected) {
+                address = window.walletState.address;
+            }
+            
+            console.log('获取钱包地址状态:', address ? '成功' : '失败', address);
+            
+            if (!address) {
+                console.log('未能获取钱包地址，显示连接提示');
                 tradeHistoryElement.innerHTML = '<div class="alert alert-warning">请先连接钱包以查看完整交易历史</div>';
                 return;
             }
             
-            // 获取地址
-            const address = walletStatus.address;
-            
-            if (!address) {
-                console.error('无法获取钱包地址，显示错误信息');
-                tradeHistoryElement.innerHTML = '<div class="alert alert-danger">钱包地址获取失败，请重新连接钱包</div>';
-                return;
-            }
-            
-            console.log('钱包已连接，使用地址:', address);
+            console.log('使用钱包地址加载交易历史:', address);
 
             try {
                 console.log(`正在获取交易历史，资产ID: ${ASSET_CONFIG.id}, 页码: ${currentPage}, 每页: ${tradesPerPage}`);
@@ -246,12 +247,15 @@
                 const dbAddress = getAddressForApi(address);
                 console.log('使用地址获取交易历史:', dbAddress, '(原始地址:', address, ')');
                 
+                // 确保添加X-Eth-Address头，强制覆盖任何可能的旧值
+                const headers = new Headers();
+                headers.append('X-Eth-Address', dbAddress);
+                headers.append('Cache-Control', 'no-cache, no-store, must-revalidate');
+                headers.append('Pragma', 'no-cache');
+                
                 const response = await fetch(`/api/trades?asset_id=${ASSET_CONFIG.id}&page=${currentPage}&per_page=${tradesPerPage}`, {
-                    headers: {
-                        'X-Eth-Address': dbAddress
-                    },
-                    // 添加随机参数避免缓存
-                    cache: 'no-cache'
+                    headers: headers,
+                    credentials: 'same-origin' // 确保发送cookies
                 });
                 
                 if (response.redirected) {
@@ -568,68 +572,61 @@
 
         // 设置交易表单
         function setupTradeForm() {
-            const amountInput = document.getElementById('buy-amount');
-            const totalDisplay = document.getElementById('totalPrice');
+            const amountInput = document.getElementById('purchase-amount');
+            const totalPriceDisplay = document.getElementById('totalPrice');
+            const buyButton = document.getElementById('buy-button');
             
-            // 设置初始购买数量为1
-            amountInput.value = "1";
+            if (!amountInput || !totalPriceDisplay || !buyButton) {
+                console.error('找不到交易表单元素');
+                return;
+            }
             
-            // 初始化总价
-            updateTotalPrice();
-            
-            // 监听购买数量变化
-            amountInput.addEventListener('input', updateTotalPrice);
-            
-            function updateTotalPrice() {
-                const amount = document.getElementById('buy-amount').value;
-                const numericAmount = parseInt(amount, 10) || 0;
-                const price = ASSET_CONFIG.tokenPrice;
-                
-                // 更新显示
-                const totalPriceElement = document.getElementById('totalPrice');
-                const totalPrice = numericAmount * price;
-                
-                if (totalPriceElement) {
-                    totalPriceElement.value = new Intl.NumberFormat().format(totalPrice);
+            // 更新购买按钮状态
+            function updateBuyButtonState() {
+                if (window.walletState && window.walletState.isConnected) {
+                    buyButton.disabled = false;
+                    buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>{{ _("Buy") }}';
+                } else {
+                    buyButton.disabled = true;
+                    buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>{{ _("Connect Wallet First") }}';
                 }
+            }
+            
+            // 初始更新按钮状态
+            updateBuyButtonState();
+            
+            // 添加事件监听器
+            window.addEventListener('walletConnected', updateBuyButtonState);
+            window.addEventListener('walletDisconnected', updateBuyButtonState);
+            
+            // 设置输入金额改变时的处理
+            if (amountInput) {
+                amountInput.addEventListener('input', function() {
+                    // 计算总价并更新显示
+                    const amount = parseFloat(this.value) || 0;
+                    const totalPrice = amount * assetPrice;
+                    if (totalPriceDisplay) {
+                        totalPriceDisplay.value = totalPrice.toFixed(2);
+                    }
+                });
                 
-                // 更新错误提示
-                const errorMsgElement = document.getElementById('buy-error');
-                if (!errorMsgElement) return;
-                
-                // 清除错误信息
-                errorMsgElement.textContent = '';
-                errorMsgElement.style.display = 'none';
-                
-                // 验证输入
-                if (numericAmount <= 0) {
-                    return; // 空白输入不显示错误
-                }
-                
-                // 检查是否超出最大可购买数量
-                if (numericAmount > remainingSupply) {
-                    errorMsgElement.textContent = `超出最大可购买数量 ${remainingSupply}`;
-                    errorMsgElement.style.display = 'block';
-                }
+                // 触发一次初始化
+                amountInput.dispatchEvent(new Event('input'));
             }
         }
 
         // 获取钱包状态
         function getWalletStatus() {
-            // 优先使用全局walletState检查连接状态
-            if (window.walletState && typeof window.walletState.isConnected !== 'undefined') {
-                console.log('使用全局walletState检查钱包状态:', window.walletState.isConnected);
-                return {
-                    connected: window.walletState.isConnected,
-                    address: window.walletState.address
-                };
+            // 使用全局getWalletStatus函数
+            if (typeof window.getWalletStatus === 'function') {
+                return window.getWalletStatus();
             }
             
-            // 备用方案：使用本地walletPublicKey变量
-            console.log('使用本地walletPublicKey检查钱包状态:', !!walletPublicKey);
+            // 备用方案：直接访问全局walletState
+            console.log('使用全局walletState检查钱包状态:', window.walletState?.isConnected);
             return {
-                connected: !!walletPublicKey,
-                address: walletPublicKey ? walletPublicKey.toString() : null
+                connected: window.walletState && window.walletState.isConnected,
+                address: window.walletState ? window.walletState.address : null
             };
         }
 
@@ -647,15 +644,33 @@
         // 加载累计分红信息
         async function loadTotalDividends() {
             const totalDividendsElement = document.getElementById('totalDividendsDistributed');
-            if (!totalDividendsElement) return;
+            if (!totalDividendsElement) {
+                console.error('未找到累计分红显示元素');
+                return;
+            }
             
             try {
                 console.log('加载累计分红信息...');
                 
+                // 显示加载中状态
+                totalDividendsElement.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                            <span class="visually-hidden">{{ _('Loading') }}...</span>
+                        </div>
+                        <span>{{ _('Loading') }}...</span>
+                    </div>
+                `;
+                
+                // 获取资产符号
+                const tokenSymbol = ASSET_CONFIG.tokenSymbol || "{{ asset.token_symbol }}";
+                console.log('正在获取资产分红统计信息, 资产符号:', tokenSymbol);
+                
                 // 获取资产分红统计信息
-                const response = await fetch(`/api/assets/symbol/${ASSET_CONFIG.tokenSymbol}/dividend_stats`);
+                const response = await fetch(`/api/assets/symbol/${tokenSymbol}/dividend_stats`);
                 
                 if (!response.ok) {
+                    console.error('分红数据API请求失败:', response.status, response.statusText);
                     throw new Error(`Failed to load dividend stats: ${response.status}`);
                 }
                 
@@ -700,18 +715,12 @@
         // 缩短地址显示
         function shortenAddress(address) {
             if (!address) return '';
-            // 保留原始大小写，不进行任何转换
             return address.substring(0, 6) + '...' + address.substring(address.length - 4);
         }
 
         // 初始化钱包连接 - 简化版
-        function setupWalletConnection() {
-            // 此函数已被新的setupWalletPageElements替代
-            console.warn('旧的setupWalletConnection函数被调用，但它已经被废弃');
-        }
 
         // 辅助函数：更新base.html中的钱包UI
-        // 此函数已不再需要，详情页应该使用base.html中的全局钱包功能
         
         // 获取Cookie
         function getCookie(name) {
@@ -721,70 +730,51 @@
             return null;
         }
 
-        // 检查是否有权限访问分红管理
-        async function checkDividendManagementAccess() {
+        // 通过API检查权限
+        async function checkOwnershipViaApi(address) {
+            console.log(`通过API检查地址 ${address} 的权限...`);
             try {
-                // 首先检查页面上的判断 - 在前端渲染时就已经确定的权限
-                // 如果页面上的is_owner或is_admin_user为true，则按钮已经显示
-                const isOwnerFrontend = "{{ is_owner|lower }}" === "true";
-                const isAdminFrontend = "{{ is_admin_user|lower }}" === "true";
-                const currentAddress = '{{ current_user_address|default("", true) }}';
-                
-                if (isOwnerFrontend || isAdminFrontend) {
-                    console.log('用户有权限访问分红管理功能');
-                    return; // 按钮已经显示，无需进一步处理
-                }
-                
-                // 如果钱包未连接，无需进一步检查
-                if (!walletPublicKey) {
-                    console.log('钱包未连接，无法检查管理权限');
-                    return;
-                }
-                
-                // 如果前端渲染判断不是管理员或所有者，但钱包已连接，通过API二次确认
-                const originalAddress = walletPublicKey.toString();
-                const dbAddress = getAddressForApi(originalAddress);
-                console.log('通过API二次确认权限:', dbAddress, '(原始地址:', originalAddress, ')');
-                
-                // 检查是否是资产所有者或管理员
-                const response = await fetch(`/api/assets/${assetId}/check_owner`, {
+                const response = await fetch(`/api/assets/${ASSET_CONFIG.id}/check_owner`, {
                     headers: {
-                        'X-Eth-Address': dbAddress
+                        'X-Eth-Address': address
                     }
                 });
                 
                 if (!response.ok) {
                     console.warn('检查资产所有权失败:', response.status);
+                    // API请求失败时，隐藏按钮
+                    const dividendBtn = document.getElementById('dividendManagementBtn');
+                    if (dividendBtn) {
+                        dividendBtn.style.display = 'none';
+                    }
                     return;
                 }
                 
                 const data = await response.json();
                 console.log('资产所有权检查结果:', data);
                 
+                const dividendBtn = document.getElementById('dividendManagementBtn');
+                if (!dividendBtn) {
+                    console.log('未找到分红管理按钮');
+                    return;
+                }
+                
                 if (data.is_owner || data.is_admin) {
                     console.log('API确认用户有权限访问分红管理功能');
-                    // 显示分红管理按钮
-                    const dividendBtn = document.getElementById('dividendManagementBtn');
-                    
-                    if (dividendBtn) {
-                        // 更新链接，确保包含钱包地址
-                        dividendBtn.href = `/assets/${ASSET_CONFIG.token_symbol}/dividend?eth_address=${dbAddress}`;
-                        dividendBtn.style.display = 'inline-flex';
-                    } else {
-                        console.log('未找到分红管理按钮，可能需要刷新页面');
-                        // 如果按钮不存在，提示用户刷新页面
-                        const actionArea = document.querySelector('.d-flex.align-items-center.gap-2');
-                        if (actionArea) {
-                            // 创建刷新提示
-                            const refreshAlert = document.createElement('div');
-                            refreshAlert.className = 'alert alert-info mb-0';
-                            refreshAlert.innerHTML = '检测到您有管理权限，<a href="javascript:location.reload()">点击刷新</a>以显示管理选项';
-                            actionArea.appendChild(refreshAlert);
-                        }
-                    }
+                    // 更新链接，确保包含钱包地址
+                    dividendBtn.href = `/assets/${ASSET_CONFIG.token_symbol}/dividend?eth_address=${address}`;
+                    dividendBtn.style.display = 'inline-flex';
+                } else {
+                    console.log('API确认用户无管理权限');
+                    dividendBtn.style.display = 'none';
                 }
             } catch (error) {
-                console.error('检查管理权限失败:', error);
+                console.error('API检查权限失败:', error);
+                // 出错时隐藏按钮
+                const dividendBtn = document.getElementById('dividendManagementBtn');
+                if (dividendBtn) {
+                    dividendBtn.style.display = 'none';
+                }
             }
         }
 
@@ -836,25 +826,39 @@
             }
         };
 
-        // 处理购买
+        // 处理购买按钮点击
         async function handleBuy() {
-            try {
-                // 清除之前的错误消息
-                const errorElement = document.getElementById('buy-error');
+            // 隐藏之前的错误
+            const errorElement = document.getElementById('buy-error');
+            if (errorElement) {
+                errorElement.style.display = 'none';
+            }
+            
+            // 显示错误函数
+            function showError(message) {
                 if (errorElement) {
-                    errorElement.textContent = '';
-                    errorElement.style.display = 'none';
+                    errorElement.textContent = message;
+                    errorElement.style.display = 'block';
+                } else {
+                    alert(message);
                 }
-                
-                // 检查钱包连接
-                const walletStatus = getWalletStatus();
-                if (!walletStatus.connected) {
+            }
+            
+            try {
+                // 检查钱包是否连接
+                if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
                     showError('请先连接钱包');
+                    // 调用全局钱包连接函数
+                    if (typeof toggleWalletMenu === 'function') {
+                        toggleWalletMenu();
+                    }
                     return;
                 }
                 
                 // 获取购买数量
-                const buyAmount = parseInt(document.getElementById('buy-amount').value);
+                const amountInput = document.getElementById('purchase-amount');
+                const buyAmount = parseFloat(amountInput.value);
+                
                 if (isNaN(buyAmount) || buyAmount <= 0) {
                     showError('请输入有效的购买数量');
                     return;
@@ -872,24 +876,23 @@
                 buyButton.disabled = true;
                 buyButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 处理中...';
                 
-                // 创建交易请求 - 保持原始地址格式
-                const originalAddress = walletPublicKey.toString();
-                const dbAddress = getAddressForApi(originalAddress);
+                // 创建交易请求 - 使用全局钱包地址
+                const walletAddress = window.walletState.address;
                 console.log(`正在创建购买请求，数量: ${buyAmount}, 单价: ${assetPrice}, 总价: ${buyAmount * assetPrice}`);
-                console.log(`使用地址: ${dbAddress} (原始地址: ${originalAddress})`);
+                console.log(`使用地址: ${walletAddress}`);
                 
                 const response = await fetch('/api/trades', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Eth-Address': dbAddress
+                        'X-Eth-Address': walletAddress
                     },
                     body: JSON.stringify({
                         asset_id: assetId,
                         type: 'buy',
                         amount: buyAmount,
                         price: assetPrice,
-                        trader_address: dbAddress
+                        trader_address: walletAddress
                     })
                 });
                 
@@ -911,7 +914,7 @@
                 buyButton.innerHTML = '<i class="fas fa-check-circle"></i> 购买成功';
                 
                 // 修改：将购买数量设为1，而不是清空
-                document.getElementById('buy-amount').value = '1';
+                amountInput.value = '1';
                 
                 // 立即手动更新剩余供应量
                 try {
@@ -1169,82 +1172,14 @@
         // 辅助函数：缩短地址显示
         function shortenAddress(address) {
             if (!address) return '';
-            // 保留原始大小写，不进行任何转换
             return address.substring(0, 6) + '...' + address.substring(address.length - 4);
         }
 
         // 设置页面中的钱包相关元素
-        function setupWalletPageElements() {
-            // 获取钱包连接按钮和地址显示元素 - 这些是资产详情页特有的元素
-            const connectWalletBtn = document.getElementById('connect-wallet');
-            const walletAddressDisplay = document.getElementById('wallet-address');
-            
-            // 如果元素不存在，直接返回
-            if (!connectWalletBtn) {
-                console.log('详情页钱包连接按钮不存在');
-                return;
-            }
-            
-            // 立即更新页面元素
-            updateDetailPageWalletUI();
-            
-            // 监听钱包连接事件
-            window.addEventListener('walletConnected', function(e) {
-                console.log('钱包连接事件被触发，更新页面元素');
-                updateDetailPageWalletUI();
-                loadTradeHistory();
-            });
-            
-            // 监听钱包断开连接事件
-            window.addEventListener('walletDisconnected', function(e) {
-                console.log('钱包断开连接事件被触发，更新页面元素');
-                updateDetailPageWalletUI();
-                loadTradeHistory();
-            });
-            
-            // 连接按钮点击事件 - 使用全局钱包功能
-            connectWalletBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation(); // 防止事件冒泡
-                
-                // 使用base.html中的全局钱包方法
-                if (typeof toggleWalletMenu === 'function') {
-                    toggleWalletMenu();
-                } else if (typeof connectPhantomWallet === 'function' && typeof disconnectPhantomWallet === 'function') {
-                    if (window.walletState.isConnected) {
-                        disconnectPhantomWallet();
-                    } else {
-                        connectPhantomWallet();
-                    }
-                }
-            });
-        }
         
         // 更新页面中的钱包UI - 移到外部作为全局函数
-        function updateDetailPageWalletUI() {
-            console.log('更新详情页钱包UI元素');
-            
-            const walletStatus = getWalletStatus();
-            const isConnected = walletStatus.connected;
-            const address = walletStatus.address;
-            
-            console.log('钱包状态:', isConnected ? '已连接' : '未连接', '地址:', address);
-            
-            // 更新余额显示
-            const balanceElement = document.getElementById('wallet-balance');
-            if (balanceElement) {
-                if (isConnected && address) {
-                    // 获取全局余额数据
-                    const balance = window.walletState.usdcBalance || '0.00';
-                    balanceElement.innerHTML = `${balance} USDC`;
-                } else {
-                    balanceElement.innerHTML = '- USDC';
-                }
-            }
-            
             // 更新其他元素...
             // ... 其他代码保持不变
-        }
 
         // 获取Cookie
         function getCookie(name) {
@@ -1269,12 +1204,28 @@
             // 获取当前用户的钱包地址
             const address = window.walletState.address;
             
-            // 生成不同格式的分享链接
-            const currentUrl = window.location.origin + window.location.pathname;
-            const shareUrl1 = `${currentUrl}?ref=${encodeURIComponent(address)}`;
-            const shareUrl2 = `${currentUrl}?referrer=${encodeURIComponent(address)}`;
-            
-            // 创建分享模态框
+            // 从服务器获取分享文案，如果失败则使用默认文案
+            fetch('/api/share-messages/random')
+                .then(response => response.json())
+                .catch(error => {
+                    console.error('获取分享文案失败:', error);
+                    // 使用默认文案
+                    return {
+                        success: true,
+                        message: "📈 分享赚佣金！邀请好友投资，您可获得高达30%的推广佣金！链接由您独享，佣金终身受益，朋友越多，收益越丰厚！"
+                    };
+                })
+                .then(data => {
+                    const shareMessage = data.message || "🔥 发现好机会就要分享！邀请好友一起投资这个优质资产，共同见证财富增长！";
+                    
+                    // 生成分享链接模态框
+                    showShareModal(address, shareMessage);
+                });
+        }
+        
+        // 显示分享模态框
+        function showShareModal(address, shareMessage) {
+            // 生成分享链接模态框
             const modalHtml = `
                 <div class="modal fade" id="shareModal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog">
@@ -1284,32 +1235,41 @@
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
-                                <p>分享此链接给朋友，当他们连接钱包后，将自动成为您的一级下线：</p>
-                                <div class="mb-3">
-                                    <label class="form-label">分享链接格式1:</label>
-                                    <div class="input-group">
-                                        <input type="text" class="form-control" id="shareLink1" value="${shareUrl1}" readonly>
-                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('shareLink1')">
-                                            <i class="fas fa-copy"></i>
+                                <div id="shareLoading" class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2">正在生成安全的分享链接...</p>
+                                </div>
+                                
+                                <div id="shareContent" style="display:none;">
+                                    <div class="share-message">
+                                        ${shareMessage}
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">您的专属分享链接:</label>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" id="shareLink" readonly>
+                                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('shareLink')">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                        <small class="form-text text-muted">此链接已加密您的钱包地址，保护您的隐私</small>
+                                    </div>
+                                    <div class="d-flex gap-2 mt-4">
+                                        <button class="btn btn-success flex-grow-1" onclick="copyToClipboard('shareLink')">
+                                            <i class="fas fa-copy me-2"></i>复制链接
+                                        </button>
+                                        <button class="btn btn-primary flex-grow-1" onclick="shareViaWhatsApp()">
+                                            <i class="fab fa-whatsapp me-2"></i>WhatsApp
+                                        </button>
+                                        <button class="btn btn-info flex-grow-1" onclick="shareViaTwitter()">
+                                            <i class="fab fa-twitter me-2"></i>Twitter
                                         </button>
                                     </div>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label">分享链接格式2:</label>
-                                    <div class="input-group">
-                                        <input type="text" class="form-control" id="shareLink2" value="${shareUrl2}" readonly>
-                                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('shareLink2')">
-                                            <i class="fas fa-copy"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="d-flex gap-2 mt-3">
-                                    <button class="btn btn-primary flex-grow-1" onclick="shareViaWhatsApp()">
-                                        <i class="fab fa-whatsapp me-2"></i>分享到WhatsApp
-                                    </button>
-                                    <button class="btn btn-info flex-grow-1" onclick="shareViaTwitter()">
-                                        <i class="fab fa-twitter me-2"></i>分享到Twitter
-                                    </button>
+                                
+                                <div id="shareError" class="alert alert-danger mt-3" style="display:none;">
                                 </div>
                             </div>
                         </div>
@@ -1325,6 +1285,57 @@
             // 显示模态框
             const modal = new bootstrap.Modal(document.getElementById('shareModal'));
             modal.show();
+            
+            // 生成短链接
+            generateShortLink(address);
+        }
+        
+        // 生成短链接
+        function generateShortLink(address) {
+            // 显示加载状态
+            document.getElementById('shareLoading').style.display = 'block';
+            document.getElementById('shareContent').style.display = 'none';
+            document.getElementById('shareError').style.display = 'none';
+            
+            // 构建带钱包地址的原始URL
+            const currentUrl = window.location.origin + window.location.pathname;
+            const originalUrl = `${currentUrl}?ref=${encodeURIComponent(address)}`;
+            
+            // 调用短链接API
+            fetch('/api/shortlink/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Eth-Address': address
+                },
+                body: JSON.stringify({
+                    url: originalUrl,
+                    expires_days: 365  // 链接一年后过期
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // 隐藏加载状态
+                document.getElementById('shareLoading').style.display = 'none';
+                
+                if (data.success) {
+                    // 设置分享链接并显示内容
+                    document.getElementById('shareLink').value = data.short_url;
+                    document.getElementById('shareContent').style.display = 'block';
+                } else {
+                    // 显示错误
+                    const errorElement = document.getElementById('shareError');
+                    errorElement.style.display = 'block';
+                    errorElement.textContent = data.error || '生成分享链接失败';
+                }
+            })
+            .catch(error => {
+                // 隐藏加载状态，显示错误
+                document.getElementById('shareLoading').style.display = 'none';
+                const errorElement = document.getElementById('shareError');
+                errorElement.style.display = 'block';
+                errorElement.textContent = '生成分享链接失败: ' + error.message;
+            });
         }
         
         // 复制到剪贴板
@@ -1345,7 +1356,7 @@
         
         // 分享到WhatsApp
         function shareViaWhatsApp() {
-            const shareText = `查看这个有趣的资产: ${document.getElementById('shareLink1').value}`;
+            const shareText = `查看这个有趣的资产: ${document.getElementById('shareLink').value}`;
             window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
         }
         
@@ -1353,7 +1364,7 @@
         function shareViaTwitter() {
             const assetName = "{{ asset.name }}";
             const shareText = `我发现了一个很棒的资产 ${assetName}，感兴趣的朋友可以来看看: `;
-            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(document.getElementById('shareLink1').value)}`, '_blank');
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(document.getElementById('shareLink').value)}`, '_blank');
         }
     </script>
 
@@ -1376,14 +1387,13 @@
         </div>
         <!-- 分红管理按钮 - 管理员和资产所有者可见 -->
         <div class="d-flex align-items-center gap-2">
-            {% if is_admin_user or is_owner %}
-            <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary" id="dividendManagementBtn" data-token-symbol="{{ asset.token_symbol }}">
-                <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
-            </a>
-            {% else %}
             <button class="btn btn-outline-success" id="shareAssetBtn" onclick="shareAsset()">
                 <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
             </button>
+            {% if is_admin_user or is_owner %}
+            <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary" id="dividendManagementBtn" data-token-symbol="{{ asset.token_symbol }}" style="display: none;">
+                <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
+            </a>
             {% endif %}
         </div>
     </div>
@@ -1524,8 +1534,8 @@
                         <div class="card-body">
                             <h5 class="card-title mb-3">{{ _('Trade') }}</h5>
                             <div class="mb-3">
-                                <label for="buy-amount" class="form-label">{{ _('Amount') }}</label>
-                                <input type="number" class="form-control" id="buy-amount" min="1" max="{{ remaining_supply }}" value="1">
+                                <label for="purchase-amount" class="form-label">{{ _('Amount') }}</label>
+                                <input type="number" class="form-control" id="purchase-amount" min="1" max="{{ remaining_supply }}" value="1">
                                 <small class="text-muted">{{ _('Available') }}: <span id="max-purchase-amount">{{ remaining_supply|default(asset.token_supply)|int }}</span> token</small>
                             </div>
                             <div class="mb-3">
@@ -1991,6 +2001,9 @@ async function refreshAssetInfo() {
         // 更新剩余可购买量
         await updateRemainingSupply();
         
+        // 加载累计分红信息
+        await loadTotalDividends();
+        
     } catch (error) {
         console.error('刷新资产信息失败:', error);
     }
@@ -2070,6 +2083,14 @@ async function updateRemainingSupply() {
         const maxPurchaseElement = document.getElementById('max-purchase-amount');
         if (maxPurchaseElement) {
             maxPurchaseElement.textContent = new Intl.NumberFormat().format(assetData.remaining_supply);
+        }
+        
+        // 确保分红按钮在未连接钱包时保持隐藏状态
+        if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
+            const dividendBtn = document.getElementById('dividendManagementBtn');
+            if (dividendBtn) {
+                dividendBtn.style.display = 'none';
+            }
         }
         
         // 更新 Total Supply / Remaining 显示
@@ -2161,6 +2182,14 @@ function updateBasicAssetInfo(data) {
     } catch (err) {
         console.error('更新资产基本信息出错:', err);
     }
+    
+    // 确保分红按钮在未连接钱包时保持隐藏状态
+    if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
+        const dividendBtn = document.getElementById('dividendManagementBtn');
+        if (dividendBtn) {
+            dividendBtn.style.display = 'none';
+        }
+    }
 }
 
 // 完全重写refreshAssetInfo函数，移除自动刷新按钮功能
@@ -2181,6 +2210,17 @@ function refreshAssetInfo() {
         
         // 使用页面上的数据更新UI
         updateBasicAssetInfo(defaultData);
+        
+        // 确保分红按钮在未连接钱包时保持隐藏状态
+        if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
+            const dividendBtn = document.getElementById('dividendManagementBtn');
+            if (dividendBtn) {
+                dividendBtn.style.display = 'none';
+            }
+        }
+
+        // 加载累计分红信息
+        loadTotalDividends();
     } catch (err) {
         console.error('刷新资产信息函数出错:', err);
     }
@@ -2209,8 +2249,59 @@ $(document).ready(function() {
     console.log('资产详情页面初始化');
     
     try {
+        // 初始化时强制隐藏分红按钮，防止闪现
+        const dividendBtn = document.getElementById('dividendManagementBtn');
+        if (dividendBtn) {
+            dividendBtn.style.display = 'none';
+        }
+        
         // 初始化资产信息刷新
         setupAssetInfoRefresh();
+        
+        // 检查分红管理按钮权限 - 仅在钱包已连接时检查
+        if (window.walletState && window.walletState.isConnected && window.walletState.address) {
+            checkDividendManagementAccess();
+        }
+        
+        // 使用MutationObserver确保分红按钮始终保持正确状态
+        const observer = new MutationObserver(function(mutations) {
+            // 如果钱包未连接，确保分红按钮隐藏
+            if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
+                const dividendBtn = document.getElementById('dividendManagementBtn');
+                if (dividendBtn && dividendBtn.style.display !== 'none') {
+                    console.log('强制隐藏分红按钮 - 由MutationObserver触发');
+                    dividendBtn.style.display = 'none';
+                }
+            }
+        });
+        
+        // 监听整个文档的子树变化
+        observer.observe(document.body, { 
+            childList: true, 
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class']
+        });
+        
+        // 监听钱包状态变化
+        window.addEventListener('walletConnected', function() {
+            console.log('钱包已连接，重新检查分红管理权限');
+            checkDividendManagementAccess();
+        });
+        
+        window.addEventListener('walletDisconnected', function() {
+            console.log('钱包已断开，隐藏分红管理按钮');
+            const dividendBtn = document.getElementById('dividendManagementBtn');
+            if (dividendBtn) {
+                dividendBtn.style.display = 'none';
+            }
+        });
+        
+        // 添加钱包地址变化监听
+        window.addEventListener('walletAddressChanged', function() {
+            console.log('钱包地址已变更，重新检查分红管理权限');
+            checkDividendManagementAccess();
+        });
     } catch (err) {
         console.error('初始化资产信息刷新失败:', err);
     }
