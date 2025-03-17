@@ -1,9 +1,14 @@
 from functools import wraps
-from flask import request, g, jsonify, redirect, url_for, flash, session
+from flask import request, g, jsonify, redirect, url_for, flash, session, current_app
 import jwt
 from app.models.user import User
 from eth_utils import is_address
 from app.utils.admin import get_admin_permissions
+import threading
+from app.extensions import db
+import traceback
+import logging
+from threading import Thread
 
 def token_required(f):
     @wraps(f)
@@ -25,18 +30,77 @@ def token_required(f):
     return decorated
 
 def eth_address_required(f):
-    """要求提供以太坊地址的装饰器"""
+    """要求用户已经连接钱包"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 尝试从多个来源获取地址
+        eth_address = None
+        
+        # 1. 从 g 对象获取
+        if hasattr(g, 'eth_address'):
+            eth_address = g.eth_address
+        
+        # 2. 从 session 获取
+        elif session.get('eth_address'):
+            eth_address = session.get('eth_address')
+            g.eth_address = eth_address
+        
+        # 3. 从请求头获取
+        elif request.headers.get('X-Eth-Address'):
+            eth_address = request.headers.get('X-Eth-Address')
+            g.eth_address = eth_address
+        
+        # 4. 从查询参数获取
+        elif request.args.get('eth_address'):
+            eth_address = request.args.get('eth_address')
+            g.eth_address = eth_address
+        
+        # 5. 从请求表单获取
+        elif request.form.get('eth_address'):
+            eth_address = request.form.get('eth_address')
+            g.eth_address = eth_address
+        
+        # 6. 从 JSON 请求体获取
+        elif request.is_json and request.json and request.json.get('eth_address'):
+            eth_address = request.json.get('eth_address')
+            g.eth_address = eth_address
+        
+        # 地址存在，继续执行
+        if eth_address:
+            return f(*args, **kwargs)
+        
+        # 地址不存在，返回错误
+        if request.is_json or request.path.startswith('/api/'):
+            return jsonify({
+                'error': '需要连接钱包',
+                'message': '请连接钱包后再尝试此操作'
+            }), 401
+        
+        # 对于HTML页面，重定向到钱包连接页面
+        return redirect(url_for('auth.connect_wallet', next=request.url))
+    
+    return decorated_function
+
+def api_eth_address_required(f):
+    """API路由要求提供以太坊地址的装饰器，返回JSON响应"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         eth_address = request.headers.get('X-Eth-Address') or \
                      request.args.get('eth_address') or \
-                     session.get('eth_address')
+                     request.json.get('wallet_address') if request.json else None
+        
+        current_app.logger.info(f"钱包地址来源:")
+        current_app.logger.info(f"- Header: {request.headers.get('X-Eth-Address')}")
+        current_app.logger.info(f"- Args: {request.args.get('eth_address')}")
+        current_app.logger.info(f"- JSON: {request.json.get('wallet_address') if request.json else None}")
                      
         if not eth_address:
-            flash('请先连接钱包', 'error')
-            return redirect(url_for('main.index'))
+            current_app.logger.warning(f"未提供钱包地址")
+            return jsonify({'error': '请先连接钱包', 'code': 'WALLET_REQUIRED'}), 401
             
-        g.eth_address = eth_address.lower()
+        # 区分ETH和SOL地址处理
+        g.eth_address = eth_address.lower() if eth_address.startswith('0x') else eth_address
+        current_app.logger.info(f"最终使用地址: {g.eth_address}")
         return f(*args, **kwargs)
     return decorated_function
 
@@ -89,3 +153,83 @@ def permission_required(permission):
             return f(*args, **kwargs)
         return decorated_function
     return decorator 
+
+def async_task(f):
+    """
+    异步任务装饰器，用于将函数放入后台线程执行
+    
+    使用方法:
+    @async_task
+    def my_long_task():
+        # 耗时操作...
+        return result
+
+    my_long_task()  # 会在后台线程中执行
+    """
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        # 获取当前应用上下文
+        app = current_app._get_current_object()
+        
+        def task_wrapper():
+            # 创建应用上下文
+            with app.app_context():
+                try:
+                    result = f(*args, **kwargs)
+                    return result
+                except Exception as e:
+                    # 记录异常，但不阻止主线程
+                    app.logger.error(f"异步任务出错: {str(e)}")
+                    app.logger.error(traceback.format_exc())
+                    # 确保数据库回滚，防止连接泄露
+                    try:
+                        db.session.rollback()
+                    except:
+                        pass
+        
+        thread = threading.Thread(target=task_wrapper)
+        thread.daemon = True
+        thread.start()
+        return thread
+    
+    return wrapper
+    
+def log_activity(activity_type):
+    """记录用户活动的装饰器"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            # 获取当前用户
+            user_address = getattr(g, 'eth_address', None)
+            
+            # 记录活动开始
+            if user_address:
+                current_app.logger.info(f"用户活动 - {activity_type} - 开始 - 用户: {user_address}")
+            
+            # 执行被装饰的函数
+            result = f(*args, **kwargs)
+            
+            # 记录活动结束
+            if user_address:
+                current_app.logger.info(f"用户活动 - {activity_type} - 结束 - 用户: {user_address}")
+            
+            return result
+        return decorated_function
+    return decorator 
+
+def task_background(f):
+    """后台任务装饰器，用于创建后台线程执行任务"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # 获取当前应用上下文
+        app = current_app._get_current_object()
+        
+        def task_wrapper():
+            with app.app_context():
+                return f(*args, **kwargs)
+        
+        thread = Thread(target=task_wrapper)
+        thread.daemon = True
+        thread.start()
+        return thread
+    return decorated 

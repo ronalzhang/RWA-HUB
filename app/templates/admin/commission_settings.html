@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>佣金设置管理 - RWA-HUB后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💼</text></svg>">
+<style>
+    body {
+        font-family: "Helvetica Neue", Arial, sans-serif;
+        padding: 20px;
+        background-color: #f8f9fc;
+    }
+    .card {
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+    }
+    .card-header {
+        background-color: #fff;
+        border-bottom: 1px solid #e3e6f0;
+        padding: 15px 20px;
+    }
+    .card-body {
+        padding: 20px;
+    }
+    .border-left-primary {
+        border-left: 4px solid #4e73df;
+    }
+    .border-left-success {
+        border-left: 4px solid #1cc88a;
+    }
+    .border-left-warning {
+        border-left: 4px solid #f6c23e;
+    }
+    .text-primary {
+        color: #4e73df !important;
+    }
+    .text-success {
+        color: #1cc88a !important;
+    }
+    .text-warning {
+        color: #f6c23e !important;
+    }
+    .info-panel {
+        background-color: #f8f9fc;
+        border-left: 4px solid #36b9cc;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+</style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1 class="h3 mb-2 text-gray-800">佣金设置管理</h1>
+                <p class="mb-4">管理平台全局佣金设置和不同资产类型的佣金设置</p>
+                
+                <!-- 佣金设置说明 -->
+                <div class="info-panel mb-4">
+                    <h5><i class="fas fa-info-circle text-info"></i> 佣金设置说明</h5>
+                    <p>RWA-HUB平台的佣金收费主要包含两部分：</p>
+                    <ul>
+                        <li><strong>上链佣金</strong>：当资产成功上链时收取，在此页面配置。通常设为较低比例（0.01%）</li>
+                        <li><strong>交易佣金</strong>：资产交易过程中收取，由系统后端处理。包括以下费率：
+                            <ul>
+                                <li>标准费率：3.5%</li>
+                                <li>大额交易优惠费率：2.5%（交易金额≥100,000 USDC）</li>
+                                <li>自持交易优惠费率：0.1%（购买自己创建的资产）</li>
+                            </ul>
+                        </li>
+                    </ul>
+                    <p><strong>注意</strong>：本页面设置的是上链佣金，修改后将立即应用于新的上链资产。</p>
+                </div>
+            
+                <!-- 全局佣金设置 -->
+                <div class="card border-left-primary mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="m-0 font-weight-bold text-primary">全局佣金设置</h5>
+                        <button id="btn-add-global" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#commissionModal">
+                            <i class="fa fa-plus"></i> 添加全局设置
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>佣金比例(%)</th>
+                                        <th>最低金额</th>
+                                        <th>最高金额</th>
+                                        <th>状态</th>
+                                        <th>创建人</th>
+                                        <th>创建时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="global-settings-tbody">
+                                    <!-- JS填充数据 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 资产类型佣金设置 -->
+                <div class="card border-left-success">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="m-0 font-weight-bold text-success">资产类型佣金设置</h5>
+                        <button id="btn-add-type" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#commissionModal">
+                            <i class="fa fa-plus"></i> 添加资产类型设置
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-lightbulb"></i> 资产类型说明：
+                            <ul class="mb-0">
+                                <li><strong>10</strong>: 不动产 - 当前配置：0.01%，最低100，最高2,000,000</li>
+                                <li><strong>20</strong>: 类不动产 - 当前配置：0.01%，最低100，最高3,000,000</li>
+                                <li><strong>30</strong>: 工业地产</li>
+                                <li><strong>40</strong>: 土地资产</li>
+                                <li><strong>50</strong>: 证券资产</li>
+                                <li><strong>60</strong>: 艺术品</li>
+                                <li><strong>70</strong>: 收藏品</li>
+                                <li><strong>99</strong>: 其他</li>
+                            </ul>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>资产类型ID</th>
+                                        <th>佣金比例(%)</th>
+                                        <th>最低金额</th>
+                                        <th>最高金额</th>
+                                        <th>状态</th>
+                                        <th>创建人</th>
+                                        <th>创建时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="type-settings-tbody">
+                                    <!-- JS填充数据 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 佣金设置模态框 -->
+    <div class="modal fade" id="commissionModal" tabindex="-1" aria-labelledby="commissionModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="commissionModalLabel">添加佣金设置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="commission-form">
+                        <input type="hidden" id="commission-id">
+                        <div class="mb-3" id="asset-type-container">
+                            <label for="asset-type-id" class="form-label">资产类型ID</label>
+                            <select class="form-select" id="asset-type-id">
+                                <option value="">全局设置</option>
+                                <!-- JS填充资产类型选项 -->
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="commission-rate" class="form-label">佣金比例 (%)</label>
+                            <input type="number" class="form-control" id="commission-rate" required min="0" max="100" step="0.01">
+                        </div>
+                        <div class="mb-3">
+                            <label for="min-amount" class="form-label">最低金额</label>
+                            <input type="number" class="form-control" id="min-amount" min="0" step="0.01">
+                        </div>
+                        <div class="mb-3">
+                            <label for="max-amount" class="form-label">最高金额</label>
+                            <input type="number" class="form-control" id="max-amount" min="0" step="0.01">
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="is-active" checked>
+                            <label class="form-check-label" for="is-active">启用</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="btn-save-commission">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script>
+        // 页面加载完成后执行
+        $(document).ready(function() {
+            // 获取佣金设置
+            loadCommissionSettings();
+            
+            // 获取资产类型列表
+            loadAssetTypes();
+            
+            // 按钮点击事件
+            $("#btn-add-global").click(() => openCommissionModal(null, true));
+            $("#btn-add-type").click(() => openCommissionModal(null, false));
+            $("#btn-save-commission").click(saveCommissionSetting);
+        });
+        
+        // 加载佣金设置
+        function loadCommissionSettings() {
+            fetch('/api/admin/v2/commission-settings')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        renderCommissionSettings(data.data);
+                    } else {
+                        alert('加载佣金设置失败: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('加载佣金设置失败:', error);
+                    alert('加载佣金设置失败，请检查网络连接');
+                });
+        }
+        
+        // 加载资产类型
+        function loadAssetTypes() {
+            fetch('/api/asset-types')
+                .then(response => response.json())
+                .then(data => {
+                    const select = $("#asset-type-id");
+                    select.empty();
+                    select.append('<option value="">全局设置</option>');
+                    
+                    if (data.success && data.data) {
+                        data.data.forEach(type => {
+                            select.append(`<option value="${type.id}">${type.name} (ID: ${type.id})</option>`);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('加载资产类型失败:', error);
+                });
+        }
+        
+        // 渲染佣金设置
+        function renderCommissionSettings(data) {
+            // 渲染全局设置
+            const globalTbody = $("#global-settings-tbody");
+            globalTbody.empty();
+            
+            if (data.global.length === 0) {
+                globalTbody.append('<tr><td colspan="8" class="text-center">暂无全局佣金设置</td></tr>');
+            } else {
+                data.global.forEach(setting => {
+                    globalTbody.append(`
+                        <tr>
+                            <td>${setting.id}</td>
+                            <td>${setting.commission_rate}%</td>
+                            <td>${setting.min_amount || '-'}</td>
+                            <td>${setting.max_amount || '-'}</td>
+                            <td>${setting.is_active ? '<span class="badge bg-success">启用</span>' : '<span class="badge bg-secondary">禁用</span>'}</td>
+                            <td title="${setting.created_by}">${truncateAddress(setting.created_by)}</td>
+                            <td>${formatDateTime(setting.created_at)}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary btn-edit" data-id="${setting.id}" data-type="global">
+                                    <i class="fa fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger btn-delete" data-id="${setting.id}">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `);
+                });
+            }
+            
+            // 渲染资产类型设置
+            const typeTbody = $("#type-settings-tbody");
+            typeTbody.empty();
+            
+            if (data.asset_types.length === 0) {
+                typeTbody.append('<tr><td colspan="9" class="text-center">暂无资产类型佣金设置</td></tr>');
+            } else {
+                data.asset_types.forEach(setting => {
+                    typeTbody.append(`
+                        <tr>
+                            <td>${setting.id}</td>
+                            <td>${setting.asset_type_id}</td>
+                            <td>${setting.commission_rate}%</td>
+                            <td>${setting.min_amount || '-'}</td>
+                            <td>${setting.max_amount || '-'}</td>
+                            <td>${setting.is_active ? '<span class="badge bg-success">启用</span>' : '<span class="badge bg-secondary">禁用</span>'}</td>
+                            <td title="${setting.created_by}">${truncateAddress(setting.created_by)}</td>
+                            <td>${formatDateTime(setting.created_at)}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary btn-edit" data-id="${setting.id}" data-type="type">
+                                    <i class="fa fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger btn-delete" data-id="${setting.id}">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `);
+                });
+            }
+            
+            // 添加编辑按钮事件
+            $(".btn-edit").click(function() {
+                const id = $(this).data('id');
+                const type = $(this).data('type');
+                const setting = type === 'global' 
+                    ? data.global.find(s => s.id === id)
+                    : data.asset_types.find(s => s.id === id);
+                
+                if (setting) {
+                    openCommissionModal(setting, type === 'global');
+                }
+            });
+            
+            // 添加删除按钮事件
+            $(".btn-delete").click(function() {
+                const id = $(this).data('id');
+                if (confirm('确定要删除此佣金设置吗？')) {
+                    deleteCommissionSetting(id);
+                }
+            });
+        }
+        
+        // 打开佣金设置模态框
+        function openCommissionModal(setting = null, isGlobal = true) {
+            const modal = $("#commissionModal");
+            const modalTitle = $("#commissionModalLabel");
+            
+            // 重置表单
+            $("#commission-form")[0].reset();
+            $("#commission-id").val('');
+            
+            // 控制资产类型选择器显示
+            $("#asset-type-container").toggle(!isGlobal);
+            
+            if (setting) {
+                modalTitle.text('编辑佣金设置');
+                $("#commission-id").val(setting.id);
+                $("#asset-type-id").val(setting.asset_type_id || '');
+                $("#commission-rate").val(setting.commission_rate);
+                $("#min-amount").val(setting.min_amount || '');
+                $("#max-amount").val(setting.max_amount || '');
+                $("#is-active").prop('checked', setting.is_active);
+            } else {
+                modalTitle.text(isGlobal ? '添加全局佣金设置' : '添加资产类型佣金设置');
+                $("#asset-type-id").val(isGlobal ? '' : null);
+            }
+            
+            // 打开模态框
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+        }
+        
+        // 保存佣金设置
+        function saveCommissionSetting() {
+            const id = $("#commission-id").val();
+            const assetTypeId = $("#asset-type-id").val() || null;
+            const commissionRate = parseFloat($("#commission-rate").val());
+            const minAmount = $("#min-amount").val() ? parseFloat($("#min-amount").val()) : null;
+            const maxAmount = $("#max-amount").val() ? parseFloat($("#max-amount").val()) : null;
+            const isActive = $("#is-active").is(':checked');
+            
+            if (isNaN(commissionRate) || commissionRate < 0 || commissionRate > 100) {
+                alert('佣金比例必须是0-100之间的数字');
+                return;
+            }
+            
+            const data = {
+                asset_type_id: assetTypeId,
+                commission_rate: commissionRate,
+                min_amount: minAmount,
+                max_amount: maxAmount,
+                is_active: isActive
+            };
+            
+            let url = '/api/admin/v2/commission-settings';
+            let method = 'POST';
+            
+            if (id) {
+                url += `/${id}`;
+                method = 'PUT';
+            }
+            
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(id ? '佣金设置更新成功' : '佣金设置创建成功');
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('commissionModal'));
+                    modal.hide();
+                    // 重新加载数据
+                    loadCommissionSettings();
+                } else {
+                    alert('操作失败: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('保存佣金设置失败:', error);
+                alert('操作失败，请检查网络连接');
+            });
+        }
+        
+        // 删除佣金设置
+        function deleteCommissionSetting(id) {
+            fetch(`/api/admin/v2/commission-settings/${id}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('佣金设置删除成功');
+                    loadCommissionSettings();
+                } else {
+                    alert('删除失败: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('删除佣金设置失败:', error);
+                alert('删除失败，请检查网络连接');
+            });
+        }
+        
+        // 辅助函数: 格式化日期时间
+        function formatDateTime(timestamp) {
+            if (!timestamp) return '-';
+            const date = new Date(timestamp);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        // 辅助函数: 截断地址
+        function truncateAddress(address) {
+            if (!address) return '-';
+            if (address.length <= 13) return address;
+            return address.substring(0, 6) + '...' + address.substring(address.length - 4);
+        }
+    </script>
+</body>
+</html> 

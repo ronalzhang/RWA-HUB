@@ -1,0 +1,566 @@
+{% extends "admin_v2/base.html" %}
+
+{% block title %}RWA-HUB 管理后台 - 用户管理{% endblock %}
+
+{% block page_title %}用户管理{% endblock %}
+{% block page_subtitle %}管理并监控平台用户{% endblock %}
+
+{% block breadcrumb %}
+<li aria-current="page">
+    <div class="flex items-center">
+        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+        <span class="text-gray-500">用户管理</span>
+    </div>
+</li>
+{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div id="userApp">
+    <!-- 功能区 -->
+    <div class="bg-white p-4 rounded-lg shadow-sm mb-6">
+        <div class="flex flex-wrap items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold">用户列表</h3>
+            <div class="flex space-x-2">
+                <button @click="refreshUsers" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+                    <i class="fas fa-sync-alt mr-1"></i> 刷新
+                </button>
+                <button @click="exportUsers" class="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-sm">
+                    <i class="fas fa-file-export mr-1"></i> 导出
+                </button>
+            </div>
+        </div>
+        
+        <!-- 过滤和搜索 -->
+        <div class="flex flex-wrap gap-4 mb-4">
+            <div class="w-full md:w-1/4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">注册时间</label>
+                <select v-model="filters.registration_time" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" @change="loadUsers">
+                    <option value="">全部时间</option>
+                    <option value="today">今天</option>
+                    <option value="week">本周</option>
+                    <option value="month">本月</option>
+                    <option value="quarter">本季度</option>
+                    <option value="year">本年</option>
+                </select>
+            </div>
+            <div class="w-full md:w-1/4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">用户类型</label>
+                <select v-model="filters.user_type" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" @change="loadUsers">
+                    <option value="">全部用户</option>
+                    <option value="normal">普通用户</option>
+                    <option value="distributor">分销商</option>
+                    <option value="blocked">已冻结</option>
+                </select>
+            </div>
+            <div class="w-full md:w-2/4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
+                <div class="relative">
+                    <input type="text" v-model="filters.search" @keyup.enter="loadUsers(1)" placeholder="搜索钱包地址或用户名..." class="w-full border border-gray-300 rounded px-3 py-2 pl-10 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <div class="absolute left-0 top-0 mt-2 ml-3 text-gray-400">
+                        <i class="fas fa-search"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 mr-4">
+                    <i class="fas fa-users text-blue-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-medium text-gray-500">总用户数</h3>
+                    <p class="text-xl font-bold" v-text="stats.totalUsers || 0"></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 mr-4">
+                    <i class="fas fa-user-clock text-green-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-medium text-gray-500">活跃用户</h3>
+                    <p class="text-xl font-bold" v-text="stats.activeUsers || 0"></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-purple-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100 mr-4">
+                    <i class="fas fa-user-tag text-purple-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-medium text-gray-500">分销商数量</h3>
+                    <p class="text-xl font-bold" v-text="stats.distributors || 0"></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-orange-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-orange-100 mr-4">
+                    <i class="fas fa-user-plus text-orange-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-medium text-gray-500">今日新增</h3>
+                    <p class="text-xl font-bold" v-text="stats.newToday || 0"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 用户表格 -->
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div class="min-w-full divide-y divide-gray-200">
+            <!-- 表头 -->
+            <div class="bg-gray-50">
+                <div class="grid grid-cols-12 gap-4 py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div class="col-span-1">
+                        <input type="checkbox" :checked="selectedAll" @change="toggleSelectAll" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    </div>
+                    <div class="col-span-3">钱包地址/用户名</div>
+                    <div class="col-span-2">注册时间</div>
+                    <div class="col-span-1">交易次数</div>
+                    <div class="col-span-1">持有资产</div>
+                    <div class="col-span-2">状态</div>
+                    <div class="col-span-2 text-right">操作</div>
+                </div>
+            </div>
+            
+            <!-- 表格内容 -->
+            <div class="bg-white divide-y divide-gray-200">
+                <template v-if="loading">
+                    <div class="py-16 text-center text-gray-500">
+                        <i class="fas fa-spinner fa-spin text-2xl"></i>
+                        <p class="mt-2">加载用户数据中...</p>
+                    </div>
+                </template>
+                <template v-else-if="users.length === 0">
+                    <div class="py-16 text-center text-gray-500">
+                        <i class="fas fa-user-slash text-4xl mb-3"></i>
+                        <p>没有找到匹配的用户</p>
+                        <button @click="resetFilters" class="mt-2 text-blue-500 hover:underline text-sm">
+                            清除筛选条件
+                        </button>
+                    </div>
+                </template>
+                <template v-else>
+                    <div v-for="user in users" :key="user.wallet_address" class="grid grid-cols-12 gap-4 py-4 px-4 hover:bg-gray-50">
+                        <div class="col-span-1 flex items-center">
+                            <input type="checkbox" v-model="selectedUsers" :value="user.wallet_address" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        </div>
+                        <div class="col-span-3 flex items-center">
+                            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 mr-3">
+                                <i class="fas" :class="user.username ? 'fa-user' : 'fa-wallet'"></i>
+                            </div>
+                            <div>
+                                <div class="font-medium text-gray-800" v-text="user.username || '未命名用户'"></div>
+                                <div class="text-xs text-gray-500 truncate" v-text="truncateAddress(user.wallet_address)"></div>
+                            </div>
+                        </div>
+                        <div class="col-span-2 flex items-center text-sm text-gray-500">
+                            ${formatDate(user.created_at)}
+                        </div>
+                        <div class="col-span-1 flex items-center">
+                            ${user.trade_count || 0}
+                        </div>
+                        <div class="col-span-1 flex items-center">
+                            ${user.assets_count || 0}
+                        </div>
+                        <div class="col-span-2 flex items-center space-x-2">
+                            <span v-if="user.is_distributor" class="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800">
+                                分销商
+                            </span>
+                            <span v-if="user.is_blocked" class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
+                                已冻结
+                            </span>
+                            <span v-if="!user.is_distributor && !user.is_blocked" class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+                                普通用户
+                            </span>
+                        </div>
+                        <div class="col-span-2 flex justify-end items-center space-x-1">
+                            <button @click="viewUserDetails(user.wallet_address)" class="p-1 text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
+                            <button v-if="!user.is_distributor" @click="setAsDistributor(user.wallet_address)" class="p-1 text-purple-600 hover:text-purple-800">
+                                <i class="fas fa-user-tag"></i>
+                            </button>
+                            <button v-if="!user.is_blocked" @click="blockUser(user.wallet_address)" class="p-1 text-red-600 hover:text-red-800">
+                                <i class="fas fa-ban"></i>
+                            </button>
+                            <button v-else @click="unblockUser(user.wallet_address)" class="p-1 text-green-600 hover:text-green-800">
+                                <i class="fas fa-unlock"></i>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+        
+        <!-- 分页 -->
+        <div v-if="users.length > 0" class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200">
+            <div class="flex-1 flex justify-between sm:hidden">
+                <button @click="loadUsers(currentPage - 1)" :disabled="currentPage === 1" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    上一页
+                </button>
+                <button @click="loadUsers(currentPage + 1)" :disabled="currentPage === totalPages" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    下一页
+                </button>
+            </div>
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-gray-700">
+                        显示 
+                        <span class="font-medium">${(currentPage - 1) * pageSize + 1}</span>
+                        到
+                        <span class="font-medium">${Math.min(currentPage * pageSize, totalItems)}</span>
+                        条，共
+                        <span class="font-medium">${totalItems}</span>
+                        条记录
+                    </p>
+                </div>
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        <button @click="loadUsers(1)" :disabled="currentPage === 1" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">首页</span>
+                            <i class="fas fa-angle-double-left"></i>
+                        </button>
+                        <button @click="loadUsers(currentPage - 1)" :disabled="currentPage === 1" class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">上一页</span>
+                            <i class="fas fa-angle-left"></i>
+                        </button>
+                        <template v-for="page in displayedPages">
+                            <span v-if="page === '...'" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                ...
+                            </span>
+                            <button v-else @click="loadUsers(page)" :class="page === currentPage ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'" class="relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                ${page}
+                            </button>
+                        </template>
+                        <button @click="loadUsers(currentPage + 1)" :disabled="currentPage === totalPages" class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">下一页</span>
+                            <i class="fas fa-angle-right"></i>
+                        </button>
+                        <button @click="loadUsers(totalPages)" :disabled="currentPage === totalPages" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <span class="sr-only">末页</span>
+                            <i class="fas fa-angle-double-right"></i>
+                        </button>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 用户详情模态框 -->
+    <div v-if="showUserModal" class="fixed z-50 inset-0 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div v-if="selectedUser">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">用户详情</h3>
+                        <div class="border-b border-gray-200 pb-4 mb-4">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+                                    <i class="fas fa-user text-xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <h4 class="text-lg font-semibold" v-text="selectedUser.username || '未命名用户'"></h4>
+                                    <p class="text-sm text-gray-500" v-text="selectedUser.wallet_address"></p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 用户基本信息 -->
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <p class="text-sm text-gray-500">注册时间</p>
+                                <p class="font-medium" v-text="formatDate(selectedUser.created_at)"></p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">钱包地址</p>
+                                <p class="font-medium" v-text="selectedUser.wallet_address"></p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">用户类型</p>
+                                <div class="flex space-x-2 mt-1">
+                                    <span v-if="selectedUser.is_distributor" class="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800">分销商</span>
+                                    <span v-if="selectedUser.is_blocked" class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">已冻结</span>
+                                    <span v-if="!selectedUser.is_distributor && !selectedUser.is_blocked" class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">普通用户</span>
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">推荐人</p>
+                                <p class="font-medium" v-text="selectedUser.referrer ? truncateAddress(selectedUser.referrer) : '无'"></p>
+                            </div>
+                        </div>
+                        
+                        <!-- 用户数据统计 -->
+                        <div class="grid grid-cols-3 gap-4 mb-6">
+                            <div class="bg-gray-50 p-3 rounded">
+                                <p class="text-sm text-gray-500">交易次数</p>
+                                <p class="text-lg font-semibold" v-text="selectedUser.trade_count || 0"></p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <p class="text-sm text-gray-500">持有资产</p>
+                                <p class="text-lg font-semibold" v-text="selectedUser.assets_count || 0"></p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <p class="text-sm text-gray-500">佣金收入</p>
+                                <p class="text-lg font-semibold" v-text="formatValue(selectedUser.commission_total || 0)"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button @click="showUserModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 使用Vue创建用户管理应用
+    new Vue({
+        el: '#userApp',
+        delimiters: ['${', '}'],
+        data: {
+            users: [],
+            loading: true,
+            currentPage: 1,
+            pageSize: 10,
+            totalItems: 0,
+            totalPages: 1,
+            selectedUsers: [],
+            filters: {
+                search: '',
+                registration_time: '',
+                user_type: ''
+            },
+            stats: {
+                totalUsers: 0,
+                activeUsers: 0,
+                distributors: 0,
+                newToday: 0
+            },
+            showUserModal: false,
+            selectedUser: null
+        },
+        computed: {
+            selectedAll: {
+                get() {
+                    return this.users.length > 0 && this.selectedUsers.length === this.users.length;
+                },
+                set(value) {
+                    this.selectedUsers = value ? this.users.map(user => user.wallet_address) : [];
+                }
+            },
+            displayedPages() {
+                const pages = [];
+                const totalPages = this.totalPages;
+                const currentPage = this.currentPage;
+                
+                if (totalPages <= 7) {
+                    for (let i = 1; i <= totalPages; i++) {
+                        pages.push(i);
+                    }
+                } else {
+                    pages.push(1);
+                    
+                    if (currentPage > 3) {
+                        pages.push('...');
+                    }
+                    
+                    const start = Math.max(2, currentPage - 1);
+                    const end = Math.min(totalPages - 1, currentPage + 1);
+                    
+                    for (let i = start; i <= end; i++) {
+                        pages.push(i);
+                    }
+                    
+                    if (currentPage < totalPages - 2) {
+                        pages.push('...');
+                    }
+                    
+                    pages.push(totalPages);
+                }
+                
+                return pages;
+            }
+        },
+        mounted() {
+            this.loadUsers(1);
+            this.loadStats();
+        },
+        methods: {
+            loadUsers(page) {
+                if (page < 1 || (page > this.totalPages && this.totalPages > 0)) {
+                    return;
+                }
+                
+                this.loading = true;
+                this.currentPage = page;
+                this.selectedUsers = [];
+                
+                const params = {
+                    page: page,
+                    page_size: this.pageSize
+                };
+                
+                if (this.filters.search) {
+                    params.search = this.filters.search;
+                }
+                
+                if (this.filters.registration_time) {
+                    params.registration_time = this.filters.registration_time;
+                }
+                
+                if (this.filters.user_type) {
+                    params.user_type = this.filters.user_type;
+                }
+                
+                axios.get('/admin/v2/api/users', { params })
+                    .then(response => {
+                        this.users = response.data.users;
+                        this.totalItems = response.data.total;
+                        this.totalPages = response.data.total_pages;
+                        this.loading = false;
+                    })
+                    .catch(error => {
+                        console.error('加载用户失败:', error);
+                        this.loading = false;
+                        alert('加载用户失败，请稍后重试');
+                    });
+            },
+            loadStats() {
+                axios.get('/admin/v2/api/user-stats')
+                    .then(response => {
+                        this.stats = {
+                            totalUsers: response.data.totalUsers || 0,
+                            activeUsers: response.data.activeUsers || response.data.verifiedUsers || 0,
+                            distributors: response.data.distributors || 0,
+                            newToday: response.data.newToday || 0
+                        };
+                    })
+                    .catch(error => {
+                        console.error('加载用户统计失败:', error);
+                    });
+            },
+            refreshUsers() {
+                this.loadUsers(this.currentPage);
+                this.loadStats();
+            },
+            resetFilters() {
+                this.filters = {
+                    search: '',
+                    registration_time: '',
+                    user_type: ''
+                };
+                this.loadUsers(1);
+            },
+            toggleSelectAll() {
+                this.selectedAll = !this.selectedAll;
+            },
+            truncateAddress(address) {
+                if (!address) return '';
+                return address.length > 15 ? 
+                    address.substring(0, 6) + '...' + address.substring(address.length - 6) : 
+                    address;
+            },
+            formatDate(dateString) {
+                if (!dateString) return '';
+                const date = new Date(dateString);
+                return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            },
+            formatValue(value) {
+                return parseFloat(value).toLocaleString('zh-CN', {
+                    maximumFractionDigits: 2
+                });
+            },
+            viewUserDetails(address) {
+                const user = this.users.find(u => u.wallet_address === address);
+                if (user) {
+                    this.selectedUser = user;
+                    this.showUserModal = true;
+                }
+            },
+            setAsDistributor(address) {
+                if (!confirm('确认将此用户设置为分销商？')) return;
+                
+                axios.post(`/admin/v2/api/users/${address}/set-distributor`)
+                    .then(response => {
+                        this.loadUsers(this.currentPage);
+                        alert('用户已设置为分销商');
+                    })
+                    .catch(error => {
+                        console.error('设置分销商失败:', error);
+                        alert('设置分销商失败，请稍后重试');
+                    });
+            },
+            blockUser(address) {
+                if (!confirm('确认冻结此用户？冻结后用户将无法进行交易和其他操作。')) return;
+                
+                axios.post(`/admin/v2/api/users/${address}/block`)
+                    .then(response => {
+                        this.loadUsers(this.currentPage);
+                        alert('用户已冻结');
+                    })
+                    .catch(error => {
+                        console.error('冻结用户失败:', error);
+                        alert('冻结用户失败，请稍后重试');
+                    });
+            },
+            unblockUser(address) {
+                if (!confirm('确认解冻此用户？')) return;
+                
+                axios.post(`/admin/v2/api/users/${address}/unblock`)
+                    .then(response => {
+                        this.loadUsers(this.currentPage);
+                        alert('用户已解冻');
+                    })
+                    .catch(error => {
+                        console.error('解冻用户失败:', error);
+                        alert('解冻用户失败，请稍后重试');
+                    });
+            },
+            exportUsers() {
+                let params = {};
+                
+                if (this.filters.search) {
+                    params.search = this.filters.search;
+                }
+                
+                if (this.filters.registration_time) {
+                    params.registration_time = this.filters.registration_time;
+                }
+                
+                if (this.filters.user_type) {
+                    params.user_type = this.filters.user_type;
+                }
+                
+                const queryString = new URLSearchParams(params).toString();
+                window.open(`/admin/v2/api/users/export?${queryString}`, '_blank');
+            }
+        }
+    });
+</script>
+{% endblock %} 

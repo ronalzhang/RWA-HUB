@@ -18,3 +18,10 @@ web3==6.10.0
 gunicorn==21.2.0 
 PyJWT==2.8.0
 psycopg2-binary==2.9.9
+
+# Solana 相关依赖
+solana==0.30.2
+solders==0.18.1
+solana-py==0.30.2
+anchorpy==0.18.0
+borsh-construct==0.1.0

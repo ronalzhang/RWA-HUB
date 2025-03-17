@@ -7,7 +7,7 @@ async function main() {
 
     // Sepolia测试网上的USDC合约地址
     const USDC_ADDRESS = "0xda9d4f9b69ac6C22e444eD9aF0CfC043b7a7f53f";
-    const PLATFORM_FEE_PERCENT = 500; // 5%
+    const PLATFORM_FEE_PERCENT = 250; // 2.5%
 
     // 部署市场合约
     const RealEstateMarket = await hre.ethers.getContractFactory("RealEstateMarket");

@@ -1,0 +1,224 @@
+{% extends "admin_v2/base.html" %}
+
+{% block title %}RWA-HUB 管理后台{% endblock %}
+
+{% block page_title %}管理后台首页{% endblock %}
+{% block page_subtitle %}欢迎使用 RWA-HUB 管理后台，请选择您要管理的功能{% endblock %}
+
+{% block breadcrumb %}
+<li aria-current="page">
+    <div class="flex items-center">
+        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+        <span class="text-gray-500">首页</span>
+    </div>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded mb-6">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <i class="fas fa-info-circle text-blue-500"></i>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-blue-800">欢迎，{{ admin.username }}！</h3>
+                <div class="mt-2 text-sm text-blue-700">
+                    <p>您当前的角色是 <strong>{{ '超级管理员' if admin.is_super_admin() else admin.role }}</strong>。通过导航菜单或下方的快速链接，您可以访问各项管理功能。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速链接卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- 仪表盘卡片 -->
+        <a href="{{ url_for('admin.dashboard_v2') }}" class="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="p-6 flex items-start">
+                <div class="p-3 rounded-full bg-blue-100 mr-4">
+                    <i class="fas fa-tachometer-alt text-blue-500 text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">仪表盘</h3>
+                    <p class="mt-1 text-sm text-gray-600">查看平台核心数据和统计分析</p>
+                </div>
+            </div>
+        </a>
+        
+        <!-- 资产管理卡片 -->
+        <a href="{{ url_for('admin.assets_v2') }}" class="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="p-6 flex items-start">
+                <div class="p-3 rounded-full bg-green-100 mr-4">
+                    <i class="fas fa-building text-green-500 text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">资产管理</h3>
+                    <p class="mt-1 text-sm text-gray-600">审核、管理和检索平台上的资产</p>
+                </div>
+            </div>
+        </a>
+        
+        <!-- 用户管理卡片 -->
+        <a href="{{ url_for('admin.users_v2') }}" class="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="p-6 flex items-start">
+                <div class="p-3 rounded-full bg-purple-100 mr-4">
+                    <i class="fas fa-users text-purple-500 text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">用户管理</h3>
+                    <p class="mt-1 text-sm text-gray-600">查看和管理用户账户及权限</p>
+                </div>
+            </div>
+        </a>
+        
+        <!-- 交易管理卡片 -->
+        <a href="{{ url_for('admin.trades_v2') }}" class="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="p-6 flex items-start">
+                <div class="p-3 rounded-full bg-yellow-100 mr-4">
+                    <i class="fas fa-exchange-alt text-yellow-500 text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">交易管理</h3>
+                    <p class="mt-1 text-sm text-gray-600">查看和管理平台的交易记录</p>
+                </div>
+            </div>
+        </a>
+        
+        <!-- 佣金管理卡片 -->
+        <a href="{{ url_for('admin.commission_v2') }}" class="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="p-6 flex items-start">
+                <div class="p-3 rounded-full bg-indigo-100 mr-4">
+                    <i class="fas fa-coins text-indigo-500 text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">佣金管理</h3>
+                    <p class="mt-1 text-sm text-gray-600">设置佣金规则和查看佣金记录</p>
+                </div>
+            </div>
+        </a>
+        
+        <!-- 数据报表卡片 -->
+        <a href="{{ url_for('admin.reports_v2') }}" class="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="p-6 flex items-start">
+                <div class="p-3 rounded-full bg-red-100 mr-4">
+                    <i class="fas fa-chart-line text-red-500 text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">数据报表</h3>
+                    <p class="mt-1 text-sm text-gray-600">生成和下载平台运营报表</p>
+                </div>
+            </div>
+        </a>
+        
+        {% if admin.has_permission('管理管理员') or admin.is_super_admin() %}
+        <!-- 管理员管理卡片 -->
+        <a href="{{ url_for('admin.admin_users_v2') }}" class="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="p-6 flex items-start">
+                <div class="p-3 rounded-full bg-gray-100 mr-4">
+                    <i class="fas fa-user-shield text-gray-500 text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">管理员管理</h3>
+                    <p class="mt-1 text-sm text-gray-600">管理平台管理员账户和权限</p>
+                </div>
+            </div>
+        </a>
+        {% endif %}
+        
+        {% if admin.has_permission('管理设置') or admin.is_super_admin() %}
+        <!-- 系统设置卡片 -->
+        <a href="{{ url_for('admin.settings_v2') }}" class="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="p-6 flex items-start">
+                <div class="p-3 rounded-full bg-teal-100 mr-4">
+                    <i class="fas fa-cog text-teal-500 text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">系统设置</h3>
+                    <p class="mt-1 text-sm text-gray-600">配置平台参数和系统选项</p>
+                </div>
+            </div>
+        </a>
+        {% endif %}
+        
+        {% if admin.has_permission('查看日志') or admin.is_super_admin() %}
+        <!-- 系统日志卡片 -->
+        <a href="{{ url_for('admin.logs_v2') }}" class="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="p-6 flex items-start">
+                <div class="p-3 rounded-full bg-pink-100 mr-4">
+                    <i class="fas fa-list-alt text-pink-500 text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">系统日志</h3>
+                    <p class="mt-1 text-sm text-gray-600">查看系统操作日志和事件记录</p>
+                </div>
+            </div>
+        </a>
+        {% endif %}
+    </div>
+    
+    <!-- 系统状态 -->
+    <div class="mt-8 bg-white rounded-lg shadow-sm p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">系统状态</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="p-4 border rounded-lg">
+                <div class="flex items-center">
+                    <i class="fas fa-server text-gray-500 mr-3"></i>
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500">服务器状态</h4>
+                        <p class="font-semibold text-green-500">正常运行</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-4 border rounded-lg">
+                <div class="flex items-center">
+                    <i class="fas fa-database text-gray-500 mr-3"></i>
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500">数据库状态</h4>
+                        <p class="font-semibold text-green-500">连接正常</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-4 border rounded-lg">
+                <div class="flex items-center">
+                    <i class="fas fa-clock text-gray-500 mr-3"></i>
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500">系统时间</h4>
+                        <p class="font-semibold" id="system-time"></p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-4 border rounded-lg">
+                <div class="flex items-center">
+                    <i class="fas fa-code-branch text-gray-500 mr-3"></i>
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-500">系统版本</h4>
+                        <p class="font-semibold">v4.0.0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 更新系统时间
+    function updateSystemTime() {
+        const now = new Date();
+        const timeElement = document.getElementById('system-time');
+        if (timeElement) {
+            timeElement.textContent = now.toLocaleString('zh-CN');
+        }
+    }
+    
+    // 初始化时更新一次
+    updateSystemTime();
+    
+    // 每秒更新一次
+    setInterval(updateSystemTime, 1000);
+</script>
+{% endblock %} 

@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from app import db
+from app.extensions import db
 from sqlalchemy.orm import validates
 import re
 import json
@@ -22,7 +22,7 @@ class User(db.Model):
     username = db.Column(db.String(50), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
-    eth_address = db.Column(db.String(42), unique=True)
+    eth_address = db.Column(db.String(64), unique=True)
     nonce = db.Column(db.String(100))
     role = db.Column(db.String(20), nullable=False, default=UserRole.USER.value)
     status = db.Column(db.String(20), nullable=False, default=UserStatus.ACTIVE.value)

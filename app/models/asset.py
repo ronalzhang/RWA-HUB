@@ -1,7 +1,7 @@
 import enum
 import json
 from datetime import datetime
-from .. import db
+from app.extensions import db
 from sqlalchemy.orm import validates
 from sqlalchemy import Index, CheckConstraint
 import re
@@ -10,7 +10,13 @@ from urllib.parse import urlparse
 
 class AssetType(enum.Enum):
     REAL_ESTATE = 10        # 不动产
-    SEMI_REAL_ESTATE = 20  # 类不动产
+    COMMERCIAL = 20         # 类不动产
+    INDUSTRIAL = 30         # 工业地产
+    LAND = 40               # 土地资产
+    SECURITIES = 50         # 证券资产
+    ART = 60                # 艺术品
+    COLLECTIBLES = 70       # 收藏品
+    OTHER = 99              # 其他资产
 
 class AssetStatus(enum.Enum):
     PENDING = 1    # 待审核
@@ -31,17 +37,18 @@ class Asset(db.Model):
     token_symbol = db.Column(db.String(20), nullable=False, unique=True)
     token_price = db.Column(db.Float, nullable=False)
     token_supply = db.Column(db.Integer)
-    token_address = db.Column(db.String(42), unique=True)
+    token_address = db.Column(db.String(64), unique=True)
     annual_revenue = db.Column(db.Float, nullable=False)
     _images = db.Column('images', db.Text)
     _documents = db.Column('documents', db.Text)
     status = db.Column(db.Integer, nullable=False, default=AssetStatus.PENDING.value)
     reject_reason = db.Column(db.String(200))
-    owner_address = db.Column(db.String(42), nullable=False)
-    creator_address = db.Column(db.String(42), nullable=False)
+    owner_address = db.Column(db.String(64), nullable=False)
+    creator_address = db.Column(db.String(64), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     deleted_at = db.Column(db.DateTime, nullable=True)  # 软删除标记
+    remaining_supply = db.Column(db.Integer)  # 剩余可售数量
 
     # 添加关联
     dividend_records = db.relationship('DividendRecord', backref='asset', lazy=True, cascade='all, delete-orphan')
@@ -85,20 +92,26 @@ class Asset(db.Model):
     @validates('token_address')
     def validate_token_address(self, key, value):
         if value:
-            if not re.match(r'^0x[a-fA-F0-9]{40}$', value):
-                raise ValueError('Invalid token address format')
+            # 修改验证规则，同时接受以太坊地址和 Solana 地址
+            if not (re.match(r'^0x[a-fA-F0-9]{40}$', value) or    # 以太坊地址格式
+                   re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$', value)):  # Solana 地址格式
+                raise ValueError('无效的代币地址格式')
         return value
 
     @validates('owner_address')
     def validate_owner_address(self, key, value):
-        if not re.match(r'^0x[a-fA-F0-9]{40}$', value):
-            raise ValueError('Invalid owner address format')
+        # 修改验证规则，同时接受以太坊地址和 Solana 地址
+        if not (re.match(r'^0x[a-fA-F0-9]{40}$', value) or    # 以太坊地址格式
+               re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$', value)):  # Solana 地址格式
+            raise ValueError('无效的所有者地址格式')
         return value
 
     @validates('creator_address')
     def validate_creator_address(self, key, value):
-        if not re.match(r'^0x[a-fA-F0-9]{40}$', value):
-            raise ValueError('Invalid creator address format')
+        # 修改验证规则，同时接受以太坊地址和 Solana 地址
+        if not (re.match(r'^0x[a-fA-F0-9]{40}$', value) or    # 以太坊地址格式
+               re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$', value)):  # Solana 地址格式
+            raise ValueError('无效的创建者地址格式')
         return value
 
     @validates('token_price')
@@ -208,7 +221,10 @@ class Asset(db.Model):
             'location': self.location,
             'token_symbol': self.token_symbol,
             'token_price': self.token_price,
+            'price': self.token_price,  # 添加price字段，与token_price相同，保证前端兼容性
             'token_supply': self.token_supply,
+            'total_supply': self.token_supply,  # 添加total_supply字段，与token_supply相同，保证前端兼容性
+            'remaining_supply': self.remaining_supply,
             'token_address': self.token_address,
             'annual_revenue': self.annual_revenue,
             'status': self.status,
@@ -224,7 +240,7 @@ class Asset(db.Model):
         # 根据资产类型添加特定字段
         if self.asset_type == AssetType.REAL_ESTATE.value:
             data['area'] = self.area
-        elif self.asset_type == AssetType.SEMI_REAL_ESTATE.value:
+        elif self.asset_type == AssetType.SECURITIES.value:
             data['total_value'] = self.total_value
 
         return data
@@ -243,10 +259,10 @@ class Asset(db.Model):
         if asset_type == AssetType.REAL_ESTATE.value:
             if 'area' not in data:
                 raise ValueError('不动产类型必须提供面积')
-        else:
+        elif asset_type == AssetType.SECURITIES.value:
             if 'total_value' not in data:
-                raise ValueError('类不动产必须提供总价值')
+                raise ValueError('证券资产必须提供总价值')
             if 'token_supply' not in data:
-                raise ValueError('类不动产必须提供代币发行量')
+                raise ValueError('证券资产必须提供代币发行量')
                 
         return Asset(**data)

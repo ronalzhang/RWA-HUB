@@ -296,6 +296,40 @@
                                 </div>
                             </div>
 
+                            <!-- 上链费用计算区域 -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-light">
+                                    <h5 class="card-title mb-0">{{ _('Fee Calculation') }}</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">{{ _('On-chain Base Fee') }}</label>
+                                            <div class="form-control bg-light" id="onchainBaseFee">0.00 USDC</div>
+                                            <small class="form-text text-muted">{{ _('Basic cost for blockchain operations') }}</small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">{{ _('Platform Fee') }}</label>
+                                            <div class="form-control bg-light" id="platformFee">0.00 USDC</div>
+                                            <small class="form-text text-muted" id="platformFeeNote">
+                                                {% if is_admin_user %}
+                                                {{ _('Admin users only pay base fee') }}
+                                                {% else %}
+                                                {{ _('2.5') }}% {{ _('of total asset value') }}
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <label class="form-label">{{ _('Total Fee') }}</label>
+                                            <div class="form-control bg-light" id="totalFee">0.00 USDC</div>
+                                            <small class="form-text text-muted">{{ _('Total amount to be paid for on-chain process') }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <!-- 不动产字段 -->
                             <div class="asset-type-field real-estate">
                                 <div class="row">

@@ -1,0 +1,391 @@
+{% extends "admin_v2/base.html" %}
+
+{% block title %}RWA-HUB 管理后台 - 仪表盘{% endblock %}
+
+{% block page_title %}仪表盘{% endblock %}
+{% block page_subtitle %}系统核心数据概览{% endblock %}
+
+{% block breadcrumb %}
+<li aria-current="page">
+    <div class="flex items-center">
+        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+        <span class="text-gray-500">仪表盘</span>
+    </div>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="dashboardData()" x-init="loadDashboardData()">
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6" x-cloak>
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-blue-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 mr-4">
+                    <i class="fas fa-users text-blue-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-500">用户总数</h3>
+                    <p class="text-2xl font-bold" x-text="stats.total_users || 0"></p>
+                    <p class="text-sm text-gray-500">今日新增: <span x-text="stats.new_users_today || 0"></span></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-green-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 mr-4">
+                    <i class="fas fa-building text-green-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-500">资产总数</h3>
+                    <p class="text-2xl font-bold" x-text="stats.total_assets || 0"></p>
+                    <p class="text-sm text-gray-500">总价值: <span x-text="formatCurrency(stats.total_asset_value)"></span> ETH</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-orange-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-orange-100 mr-4">
+                    <i class="fas fa-exchange-alt text-orange-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-500">交易总数</h3>
+                    <p class="text-2xl font-bold" x-text="stats.total_trades || 0"></p>
+                    <p class="text-sm text-gray-500">交易总额: <span x-text="formatCurrency(stats.total_trade_volume)"></span> ETH</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-purple-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100 mr-4">
+                    <i class="fas fa-coins text-purple-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-500">佣金总额</h3>
+                    <p class="text-2xl font-bold" x-text="formatCurrency(stats.total_commission || 0)"></p>
+                    <p class="text-sm text-gray-500">本周发放: <span x-text="formatCurrency(stats.commission_week || 0)"></span> ETH</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 图表区域 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- 用户增长趋势 -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-700">用户增长趋势</h3>
+                <div>
+                    <select 
+                        x-model="userGrowthPeriod" 
+                        @change="loadUserGrowthChart()"
+                        class="text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                    >
+                        <option value="7">7天</option>
+                        <option value="30">30天</option>
+                        <option value="90">90天</option>
+                    </select>
+                </div>
+            </div>
+            <div class="h-64">
+                <canvas id="userGrowthChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- 交易量趋势 -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-700">交易量趋势</h3>
+                <div>
+                    <select 
+                        x-model="tradingVolumePeriod" 
+                        @change="loadTradingVolumeChart()"
+                        class="text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                    >
+                        <option value="7">7天</option>
+                        <option value="30">30天</option>
+                        <option value="90">90天</option>
+                    </select>
+                </div>
+            </div>
+            <div class="h-64">
+                <canvas id="tradingVolumeChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 资产分布图和最近交易 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- 资产类型分布 -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">资产类型分布</h3>
+            <div class="h-64">
+                <canvas id="assetTypeChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- 最近交易列表 -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-700">最近交易</h3>
+                <a href="{{ url_for('admin.trades_v2') }}" class="text-blue-500 hover:text-blue-700 text-sm">查看全部</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead>
+                        <tr>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">资产</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">金额</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <template x-for="trade in recentTrades" :key="trade.id">
+                            <tr>
+                                <td class="px-3 py-2 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900" x-text="trade.asset?.name || '资产已删除'"></div>
+                                    <div class="text-xs text-gray-500" x-text="trade.asset?.token_symbol || '-'"></div>
+                                </td>
+                                <td class="px-3 py-2 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900" x-text="formatCurrency(trade.total_price) + ' ETH'"></div>
+                                    <div class="text-xs text-gray-500" x-text="trade.token_amount + ' 通证'"></div>
+                                </td>
+                                <td class="px-3 py-2 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900" x-text="formatDate(trade.created_at)"></div>
+                                </td>
+                                <td class="px-3 py-2 whitespace-nowrap">
+                                    <span 
+                                        :class="{
+                                            'bg-green-100 text-green-800': trade.status === 'completed',
+                                            'bg-yellow-100 text-yellow-800': trade.status === 'pending',
+                                            'bg-red-100 text-red-800': trade.status === 'cancelled'
+                                        }" 
+                                        class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                        x-text="trade.status"
+                                    ></span>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="recentTrades.length === 0">
+                            <td colspan="4" class="px-3 py-4 text-center text-gray-500">暂无交易数据</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 底部操作按钮 -->
+    <div class="flex justify-end">
+        <button 
+            @click="refreshDashboard()" 
+            class="flex items-center px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none"
+            :disabled="refreshing"
+        >
+            <i class="fas fa-sync-alt mr-2" :class="{'animate-spin': refreshing}"></i>
+            <span x-text="refreshing ? '刷新中...' : '刷新数据'"></span>
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function dashboardData() {
+        return {
+            stats: {},
+            recentTrades: [],
+            userGrowthPeriod: '30',
+            tradingVolumePeriod: '30',
+            refreshing: false,
+            userGrowthChart: null,
+            tradingVolumeChart: null,
+            assetTypeChart: null,
+            
+            async loadDashboardData() {
+                this.refreshing = true;
+                try {
+                    // 加载仪表盘统计数据
+                    const response = await fetch('/api/admin/v2/dashboard/stats');
+                    if (!response.ok) throw new Error('加载统计数据失败');
+                    this.stats = await response.json();
+                    
+                    // 同时加载多个数据源
+                    await Promise.all([
+                        this.loadUserGrowthChart(),
+                        this.loadTradingVolumeChart(),
+                        this.loadAssetTypeChart(),
+                        this.loadRecentTrades()
+                    ]);
+                } catch (error) {
+                    console.error('加载仪表盘数据失败', error);
+                    alert('加载仪表盘数据失败: ' + error.message);
+                } finally {
+                    this.refreshing = false;
+                }
+            },
+            
+            async loadUserGrowthChart() {
+                try {
+                    const response = await fetch(`/api/admin/v2/dashboard/trends?days=${this.userGrowthPeriod}`);
+                    if (!response.ok) throw new Error('加载用户增长数据失败');
+                    const data = await response.json();
+                    const userGrowthData = data.user_growth;
+                    
+                    if (this.userGrowthChart) {
+                        this.userGrowthChart.destroy();
+                    }
+                    
+                    const ctx = document.getElementById('userGrowthChart').getContext('2d');
+                    this.userGrowthChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: userGrowthData.labels,
+                            datasets: [{
+                                label: '新增用户',
+                                data: userGrowthData.values,
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                borderColor: 'rgba(59, 130, 246, 1)',
+                                borderWidth: 2,
+                                pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        stepSize: 1
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.error('加载用户增长图表失败', error);
+                }
+            },
+            
+            async loadTradingVolumeChart() {
+                try {
+                    const response = await fetch(`/api/admin/v2/dashboard/trends?days=${this.tradingVolumePeriod}`);
+                    if (!response.ok) throw new Error('加载交易量数据失败');
+                    const data = await response.json();
+                    const tradingVolumeData = data.trading_volume;
+                    
+                    if (this.tradingVolumeChart) {
+                        this.tradingVolumeChart.destroy();
+                    }
+                    
+                    const ctx = document.getElementById('tradingVolumeChart').getContext('2d');
+                    this.tradingVolumeChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: tradingVolumeData.labels,
+                            datasets: [{
+                                label: '交易量 (ETH)',
+                                data: tradingVolumeData.values,
+                                backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                                borderColor: 'rgba(16, 185, 129, 1)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.error('加载交易量图表失败', error);
+                }
+            },
+            
+            async loadAssetTypeChart() {
+                try {
+                    const response = await fetch('/api/admin/asset-type-stats');
+                    if (!response.ok) throw new Error('加载资产类型数据失败');
+                    const data = await response.json();
+                    
+                    if (this.assetTypeChart) {
+                        this.assetTypeChart.destroy();
+                    }
+                    
+                    const ctx = document.getElementById('assetTypeChart').getContext('2d');
+                    this.assetTypeChart = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                data: data.values,
+                                backgroundColor: [
+                                    'rgba(59, 130, 246, 0.8)',
+                                    'rgba(16, 185, 129, 0.8)',
+                                    'rgba(245, 158, 11, 0.8)',
+                                    'rgba(239, 68, 68, 0.8)',
+                                    'rgba(139, 92, 246, 0.8)'
+                                ]
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'right'
+                                }
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.error('加载资产类型图表失败', error);
+                }
+            },
+            
+            async loadRecentTrades() {
+                try {
+                    const response = await fetch('/api/admin/v2/dashboard/recent-trades?limit=5');
+                    if (!response.ok) throw new Error('加载最近交易失败');
+                    this.recentTrades = await response.json();
+                } catch (error) {
+                    console.error('加载最近交易失败', error);
+                }
+            },
+            
+            formatCurrency(value) {
+                return parseFloat(value || 0).toFixed(2);
+            },
+            
+            formatDate(dateString) {
+                const date = new Date(dateString);
+                return date.toLocaleDateString('zh-CN') + ' ' + 
+                       date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            },
+            
+            async refreshDashboard() {
+                await this.loadDashboardData();
+            }
+        }
+    }
+</script>
+{% endblock %} 

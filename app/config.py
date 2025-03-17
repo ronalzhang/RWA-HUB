@@ -24,6 +24,12 @@ class Config:
             'name': '副管理员',
             'level': 2,
             'permissions': ['审核', '编辑', '查看统计']
+        },
+        'EeYfRdpGtdTM9pLDrXFq39C2SKYD9SQkijw7keUKJtLR': {
+            'role': 'super_admin',
+            'name': 'SOL超级管理员',
+            'level': 1,
+            'permissions': ['审核', '编辑', '删除', '发布公告', '管理用户', '查看统计']
         }
     }
     

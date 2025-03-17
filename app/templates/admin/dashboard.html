@@ -1,842 +1,939 @@
-{% extends "base.html" %}
-
-{% block title %}后台管理 - RWAHUB{% endblock %}
-
-{% block head %}
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>资产管理后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- 添加jQuery库 -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <!-- 替换为新的FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- 添加一个简单的favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💼</text></svg>">
 <style>
-    #loadingOverlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.9);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-    }
-    
-    .stat-card {
-        border: none;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    }
-    
-    .stat-card .icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .chart-container {
-        position: relative;
-        height: 300px;
-        margin-bottom: 1rem;
-    }
-    
-    .asset-table th {
-        white-space: nowrap;
-    }
-    
-    .status-badge {
-        min-width: 80px;
-        text-align: center;
-    }
+        body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            padding-top: 56px; /* 为固定导航栏留出空间 */
+            background-color: #f8f9fc;
+        }
+        .card {
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid #e3e6f0;
+            padding: 15px 20px;
+        }
+        .card-body {
+            padding: 20px;
+        }
+        .border-left-primary {
+            border-left: 4px solid #4e73df;
+        }
+        .border-left-success {
+            border-left: 4px solid #1cc88a;
+        }
+        .border-left-info {
+            border-left: 4px solid #36b9cc;
+        }
+        .text-primary {
+            color: #4e73df !important;
+        }
+        .text-success {
+            color: #1cc88a !important;
+        }
+        .text-info {
+            color: #36b9cc !important;
+        }
+        .font-weight-bold {
+            font-weight: bold !important;
+        }
+        .stats-card {
+            height: 100%;
+            padding: 15px;
+        }
+        .page-container {
+            padding: 20px;
+        }
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .navbar-nav .nav-link.active {
+            font-weight: bold;
+            color: #4e73df;
+        }
 </style>
-{% endblock %}
-
-{% block content %}
-<!-- 加载遮罩 -->
-<div id="loadingOverlay">
-    <div class="text-center">
-        <div class="spinner-border text-primary mb-3" role="status">
-            <span class="visually-hidden">验证中...</span>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/admin/dashboard">
+                <i class="fas fa-building me-2"></i>RWA-HUB管理系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/admin/dashboard">
+                            <i class="fas fa-tachometer-alt me-1"></i>仪表盘
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/assets">
+                            <i class="fas fa-building me-1"></i>资产管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/users">
+                            <i class="fas fa-users me-1"></i>用户管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/distribution">
+                            <i class="fas fa-network-wired me-1"></i>分销管理
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="commissionDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-percentage me-1"></i>佣金管理
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/admin/commission_settings">佣金设置</a></li>
+                            <li><a class="dropdown-item" href="/admin/commission_records">佣金记录</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/operation_logs">
+                            <i class="fas fa-history me-1"></i>操作日志
+                        </a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <a href="/" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-home me-1"></i>回到首页
+                    </a>
+                </div>
+            </div>
         </div>
-        <h5 class="mb-0">正在验证管理员权限...</h5>
-    </div>
-</div>
+    </nav>
 
-<div class="container-fluid py-4">
-    <!-- 顶部统计数据 -->
-    <div class="row g-4 mb-4">
-        <div class="col-md-4">
-            <div class="card stat-card h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="icon bg-primary bg-opacity-10 text-primary me-3">
-                            <i class="fas fa-users fa-lg"></i>
-                        </div>
-                        <div>
-                            <h6 class="card-title mb-1">总注册用户</h6>
-                            <h3 class="mb-0" id="totalUsers">-</h3>
+    <div class="page-container">
+        <div class="container-fluid">
+            <div class="d-sm-flex align-items-center justify-content-between mb-4">
+                <h1 class="h3 mb-0 text-gray-800">仪表盘</h1>
+                <div>
+                    <!-- 刷新按钮 -->
+                    <button class="btn btn-primary btn-sm me-2" id="refreshBtn">
+                        <i class="fas fa-sync-alt"></i> 刷新数据
+                    </button>
+                    <!-- 强制重新统计按钮 -->
+                    <button class="btn btn-warning btn-sm" id="forceUpdateBtn">
+                        <i class="fas fa-database"></i> 强制更新统计
+                    </button>
+                </div>
+            </div>
+            
+            <div id="alertArea" class="mb-4"></div>
+            
+            <div class="row mt-4">
+                <!-- 用户总数 -->
+                <div class="col-md-3 mb-4">
+                    <div class="card h-100 border-left-primary shadow">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">用户总数</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalUserCount">0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-users fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="text-muted small">
-                        较上月 <span id="userGrowth" class="text-success">+0%</span>
+                </div>
+                
+                <!-- 交易总额 -->
+                <div class="col-md-3 mb-4">
+                    <div class="card h-100 border-left-success shadow">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">交易总额</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalTradeAmount">$0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-money-bill-wave fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 总资产价值 -->
+                <div class="col-md-3 mb-4">
+                    <div class="card h-100 border-left-info shadow">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">总资产价值</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalAssetValue">$0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 佣金总数 -->
+                <div class="col-md-3 mb-4">
+                    <div class="card h-100 border-left-warning shadow">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">佣金总数</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalCommissionAmount">$0</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-percentage fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-        
-        <div class="col-md-4">
-            <div class="card stat-card h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="icon bg-success bg-opacity-10 text-success me-3">
-                            <i class="fas fa-money-bill-wave fa-lg"></i>
-                        </div>
-                        <div>
-                            <h6 class="card-title mb-1">总交易金额</h6>
-                            <h3 class="mb-0" id="totalTrades">-</h3>
-                        </div>
-                    </div>
-                    <div class="text-muted small">
-                        较上月 <span id="tradeGrowth" class="text-success">+0%</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-4">
-            <div class="card stat-card h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="icon bg-warning bg-opacity-10 text-warning me-3">
-                            <i class="fas fa-coins fa-lg"></i>
-                        </div>
-                        <div>
-                            <h6 class="card-title mb-1">总佣金收益</h6>
-                            <h3 class="mb-0" id="totalCommission">-</h3>
-                        </div>
-                    </div>
-                    <div class="small">
-                        <span class="text-muted me-3">资产上链：3%</span>
-                        <span class="text-muted me-3">购买代币：1.5%</span>
-                        <span class="text-muted">分红：1.5%</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- 图表分析 -->
-    <div class="row g-4 mb-4">
-        <div class="col-md-4">
-            <div class="card stat-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="card-title mb-0">资产类型分布</h6>
+        <div class="row">
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">资产类型分布</h6>
                     </div>
-                    <div class="chart-container">
+                    <div class="card-body">
+                        <div style="height: 300px">
                         <canvas id="assetTypeChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-4">
-            <div class="card stat-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="card-title mb-0">资产数据分析</h6>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="assetAnalysisChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-4">
-            <div class="card stat-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="card-title mb-0">用户增长趋势</h6>
-                        <div class="btn-group btn-group-sm">
-                            <button type="button" class="btn btn-outline-primary active" data-period="daily">日</button>
-                            <button type="button" class="btn btn-outline-primary" data-period="monthly">月</button>
                         </div>
                     </div>
-                    <div class="chart-container">
-                        <canvas id="userGrowthChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow">
+                    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                        <h6 class="m-0 font-weight-bold text-primary">注册用户与访问趋势</h6>
+                        <div class="btn-group" role="group" aria-label="用户增长周期">
+                            <button type="button" class="btn btn-sm btn-primary active" id="periodWeek">周</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="periodMonth">月</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="periodYear">年</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div style="height: 300px">
+                            <canvas id="userGrowthChart"></canvas>
+                        </div>
+                        <div class="small text-muted text-center mt-2">
+                            <i class="fas fa-info-circle me-1"></i>显示已注册用户(通过钱包连接)和网站访问量的对比趋势
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- 资产列表 -->
-    <div class="card stat-card">
-        <div class="card-header bg-transparent py-3">
-            <div class="d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">资产管理</h5>
-                <div class="d-flex gap-2">
-                    <div class="input-group input-group-sm" style="width: 250px;">
-                        <input type="text" class="form-control" id="searchInput" placeholder="搜索资产...">
-                        <button class="btn btn-outline-secondary" type="button" id="searchBtn">
-                            <i class="fas fa-search"></i>
-                        </button>
-                    </div>
-                    <button type="button" class="btn btn-primary btn-sm" id="batchApproveBtn" style="display: none;">
-                        <i class="fas fa-check me-1"></i>批量通过
-                    </button>
-                    <button type="button" class="btn btn-danger btn-sm" id="batchRejectBtn" style="display: none;">
-                        <i class="fas fa-times me-1"></i>批量拒绝
-                    </button>
-                </div>
-            </div>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 asset-table">
-                    <thead class="table-light">
+    <script>
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化图表变量
+            window.assetTypeChart = null;
+            window.userGrowthChart = null;
+            
+            // 检查Chart.js是否正确加载
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js库未正确加载，图表可能无法显示');
+                showAlert('图表加载失败: Chart.js库未正确加载，请刷新页面重试', 'danger');
+                return;
+            } else {
+                console.log('Chart.js库已正确加载', Chart.version);
+            }
+            
+            // 清除可能的缓存
+            if (window.performance && window.performance.navigation.type === 0) {
+                console.log('页面刷新，清除缓存数据');
+            }
+            
+            // 初始化当前选中的周期
+            window.currentPeriod = 'weekly';
+            
+            // 设置周期切换按钮事件
+            document.getElementById('periodWeek').addEventListener('click', function() {
+                updatePeriodButtons(this);
+                window.currentPeriod = 'weekly';
+                loadUserGrowthData();
+            });
+            
+            document.getElementById('periodMonth').addEventListener('click', function() {
+                updatePeriodButtons(this);
+                window.currentPeriod = 'monthly';
+                loadUserGrowthData();
+            });
+            
+            document.getElementById('periodYear').addEventListener('click', function() {
+                updatePeriodButtons(this);
+                window.currentPeriod = 'yearly';
+                loadUserGrowthData();
+            });
+            
+            loadDashboardData();
+            
+            // 添加刷新按钮事件
+            document.getElementById('refreshBtn').addEventListener('click', function() {
+                console.log('强制刷新数据');
+                // 销毁已有图表以确保重新创建
+                try {
+                    if (window.assetTypeChart && typeof window.assetTypeChart.destroy === 'function') {
+                        window.assetTypeChart.destroy();
+                        window.assetTypeChart = null;
+                    }
+                } catch(e) {
+                    console.error('销毁资产类型图表出错:', e);
+                    window.assetTypeChart = null;
+                }
+                
+                try {
+                    if (window.userGrowthChart && typeof window.userGrowthChart.destroy === 'function') {
+                        window.userGrowthChart.destroy();
+                        window.userGrowthChart = null;
+                    }
+                } catch(e) {
+                    console.error('销毁用户增长图表出错:', e);
+                    window.userGrowthChart = null;
+                }
+                
+                // 添加时间戳防止缓存
+                loadDashboardData(true);
+            });
+            
+            // 注册强制更新统计按钮事件
+            document.getElementById('forceUpdateBtn').addEventListener('click', function() {
+                if (confirm('确定要强制更新统计数据吗？这将重新计算所有统计指标。')) {
+                    forceUpdateStats();
+                }
+            });
+        });
+        
+        // 格式化函数
+        function formatCurrency(num) {
+            return '$' + parseFloat(num || 0).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+        
+        function numberWithCommas(x) {
+            return parseInt(x || 0).toLocaleString();
+        }
+        
+        // 加载仪表盘数据
+        function loadDashboardData(forceRefresh = false) {
+            showAlert('正在加载数据...', 'info');
+            
+            // 添加时间戳参数防止缓存
+            const cacheBuster = forceRefresh ? `&_t=${new Date().getTime()}` : '';
+            
+            // 加载统计数据
+            fetch(`/api/admin/stats${cacheBuster ? '?' + cacheBuster.substring(1) : ''}`)
+                .then(handleApiError)
+                .then(data => {
+                    updateStats(data);
+                    
+                    // 更新佣金数据
+                    document.getElementById('totalCommissionAmount').textContent = formatCurrency(data.total_commission || 0);
+                    if (data.commission_by_type) {
+                        const type10Percent = data.commission_by_type['10'] ? (data.commission_by_type['10'] / data.total_commission * 100).toFixed(1) : 0;
+                        const type20Percent = data.commission_by_type['20'] ? (data.commission_by_type['20'] / data.total_commission * 100).toFixed(1) : 0;
+                        
+                        // 检查或创建显示佣金百分比的元素
+                        let commissionDetailsDiv = document.getElementById('commissionDetails');
+                        if (!commissionDetailsDiv) {
+                            commissionDetailsDiv = document.createElement('div');
+                            commissionDetailsDiv.id = 'commissionDetails';
+                            commissionDetailsDiv.className = 'small text-muted mt-2';
+                            const commissionCard = document.getElementById('totalCommissionAmount').closest('.card-body');
+                            if (commissionCard) {
+                                commissionCard.appendChild(commissionDetailsDiv);
+                            }
+                        }
+                        
+                        // 更新佣金详情内容
+                        commissionDetailsDiv.innerHTML = `
+                            <div>不动产：${type10Percent}%</div>
+                            <div>类不动产：${type20Percent}%</div>
+                        `;
+                    }
+                    
+                    hideAlert();
+                })
+                .catch(error => {
+                    showAlert('加载统计数据失败: ' + error.message, 'danger');
+                });
+            
+            // 加载资产类型分布
+            fetch(`/api/admin/asset-type-stats${cacheBuster ? '?' + cacheBuster.substring(1) : ''}`)
+                .then(handleApiError)
+                .then(data => {
+                    console.log('资产类型数据:', data); // 添加日志输出
+                    if (data && data.length > 0) {
+                        renderAssetTypeChart(data);
+                    } else {
+                        // 没有数据，显示空数据提示
+                        document.getElementById('assetTypeChart').innerHTML = '<div class="text-center py-5">暂无资产类型数据</div>';
+                        console.log('没有资产类型数据');
+                    }
+                })
+                .catch(error => {
+                    console.error('加载资产类型数据失败:', error);
+                    showAlert('加载资产类型数据失败: ' + error.message, 'warning');
+                    document.getElementById('assetTypeChart').innerHTML = '<div class="text-center py-5">加载资产类型数据失败</div>';
+                });
+            
+            // 加载用户增长趋势
+            loadUserGrowthData(cacheBuster);
+            
+            // 加载资产列表
+            fetch(`/api/admin/v2/assets?page=1&limit=5${cacheBuster ? '&' + cacheBuster.substring(1) : ''}`)
+                .then(handleApiError)
+                .then(data => {
+                    if (data.assets && data.assets.length > 0) {
+                        renderAssetList(data.assets);
+                        hideAlert(); // 数据加载成功后隐藏提示
+                    } else {
+                        document.getElementById('assetListContainer').innerHTML = 
+                            '<div class="alert alert-info">暂无资产数据</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('加载资产列表失败:', error);
+                    showAlert('加载资产列表失败: ' + error.message, 'warning');
+                    document.getElementById('assetListContainer').innerHTML = 
+                        `<div class="alert alert-warning">加载资产列表失败: ${error.message}</div>`;
+                });
+        }
+        
+        // 加载用户增长数据
+        function loadUserGrowthData(cacheBuster = '') {
+            const period = window.currentPeriod || 'weekly';
+            
+            fetch(`/api/admin/user-stats?period=${period}${cacheBuster ? '&' + cacheBuster.substring(1) : ''}`)
+                .then(handleApiError)
+                .then(data => {
+                    console.log(`用户增长数据(${period}):`, data); // 添加日志输出
+                    if (data && data.length > 0) {
+                        renderUserGrowthChart(data, period);
+                    } else {
+                        // 没有数据，显示空数据提示
+                        if (window.userGrowthChart) {
+                            window.userGrowthChart.destroy();
+                            window.userGrowthChart = null;
+                        }
+                        const container = document.getElementById('userGrowthChart').parentNode;
+                        container.innerHTML = '<div class="text-center py-5">暂无注册用户与访问量数据</div>';
+                        console.log(`没有用户增长数据(${period})`);
+                    }
+                })
+                .catch(error => {
+                    console.error('加载用户增长数据失败:', error);
+                    showAlert('加载用户增长数据失败: ' + error.message, 'warning');
+                    if (window.userGrowthChart) {
+                        window.userGrowthChart.destroy();
+                        window.userGrowthChart = null;
+                    }
+                    const container = document.getElementById('userGrowthChart').parentNode;
+                    container.innerHTML = '<div class="text-center py-5">加载用户增长数据失败</div>';
+                });
+        }
+        
+        // 更新周期按钮样式
+        function updatePeriodButtons(activeButton) {
+            // 移除其他按钮的活动状态
+            document.querySelectorAll('.btn-group button').forEach(btn => {
+                btn.classList.remove('btn-primary');
+                btn.classList.remove('active');
+                btn.classList.add('btn-outline-primary');
+            });
+            
+            // 设置当前活动按钮
+            activeButton.classList.remove('btn-outline-primary');
+            activeButton.classList.add('btn-primary');
+            activeButton.classList.add('active');
+        }
+        
+        // 显示警告信息
+        function showAlert(message, type, duration = 3000) {
+            const alertArea = document.getElementById('alertArea');
+            alertArea.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>`;
+            setTimeout(hideAlert, duration);
+        }
+        
+        // 隐藏警告信息
+        function hideAlert() {
+            const alertArea = document.getElementById('alertArea');
+            alertArea.innerHTML = '';
+        }
+        
+        // 处理API错误
+        function handleApiError(response) {
+            if (!response.ok) {
+                throw new Error(`${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        }
+        
+        // 格式化图表数据
+        function formatChartData(data, labelKey = 'date', valueKey = 'count') {
+            return {
+                labels: data.map(item => item[labelKey]),
+                values: data.map(item => item[valueKey])
+            };
+        }
+        
+        // 渲染资产类型分布图表
+        function renderAssetTypeChart(data) {
+            const canvas = document.getElementById('assetTypeChart');
+            
+            // 资产类型名称映射
+            const typeLabels = {
+                10: '不动产',
+                20: '类不动产',
+                30: '工业地产',
+                40: '土地资产',
+                50: '证券资产',
+                60: '艺术品',
+                70: '收藏品',
+                99: '其他'
+            };
+            
+            // 颜色
+            const colors = [
+                '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6f42c1', '#858796'
+            ];
+            
+            // 筛选出类型10和20的资产
+            const filteredData = data.filter(item => {
+                if (item.hasOwnProperty('asset_type')) {
+                    return item.asset_type == 10 || item.asset_type == 20;
+                } else if (item.hasOwnProperty('type')) {
+                    return item.type == 10 || item.type == 20;
+                }
+                return false;
+            });
+            console.log('筛选后的资产类型数据:', filteredData);
+            
+            // 如果筛选后没有数据，显示提示信息
+            if (filteredData.length === 0) {
+                if (window.assetTypeChart) {
+                    window.assetTypeChart.destroy();
+                    window.assetTypeChart = null;
+                }
+                
+                const chartContainer = document.getElementById('assetTypeChart').parentNode;
+                chartContainer.innerHTML = '<div class="text-center py-5">暂无资产类型数据</div>';
+                return;
+            }
+            
+            // 提取数据（确保使用真实数据）
+            const labels = filteredData.map(item => {
+                if (item.name) return item.name;
+                if (item.type_name) return item.type_name;
+                const typeId = item.hasOwnProperty('asset_type') ? item.asset_type : item.type;
+                return typeLabels[typeId] || `类型${typeId}`;
+            });
+            const values = filteredData.map(item => item.count);
+            
+            // 如果已有图表，销毁它
+            try {
+                if (window.assetTypeChart && typeof window.assetTypeChart.destroy === 'function') {
+                    window.assetTypeChart.destroy();
+                }
+            } catch(e) {
+                console.error('销毁旧图表时出错:', e);
+                // 重置图表变量
+                window.assetTypeChart = null;
+            }
+            
+            // 创建新图表 - 改为柱状图
+            window.assetTypeChart = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '资产数量',
+                        data: values,
+                        backgroundColor: colors.slice(0, filteredData.length),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 渲染用户增长趋势图表 - 确保是曲线图
+        function renderUserGrowthChart(data, period) {
+            const canvas = document.getElementById('userGrowthChart');
+            
+            // 提取数据
+            const labels = data.map(item => item.date);
+            const userValues = data.map(item => item.count);
+            const visitValues = data.map(item => item.visits || 0);  // 添加访问量数据，如果不存在则默认为0
+            
+            // 如果已有图表，销毁它
+            try {
+                if (window.userGrowthChart && typeof window.userGrowthChart.destroy === 'function') {
+                    window.userGrowthChart.destroy();
+                }
+            } catch(e) {
+                console.error('销毁旧图表时出错:', e);
+                // 重置图表变量
+                window.userGrowthChart = null;
+            }
+            
+            // 根据不同周期设置不同的图表风格
+            let chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 1000,
+                    easing: 'easeOutQuart'
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        },
+                        ticks: {
+                            font: {
+                                size: 10
+                            }
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            font: {
+                                size: 10
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,  // 显示图例
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 10
+                            },
+                            usePointStyle: true,
+                            padding: 15
+                        }
+                    },
+                    title: {
+                        display: true,
+                        position: 'top',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        padding: {
+                            top: 10,
+                            bottom: 10
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        titleFont: {
+                            size: 13
+                        },
+                        bodyFont: {
+                            size: 12
+                        },
+                        padding: 10,
+                        cornerRadius: 4,
+                        titleColor: '#fff',
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += context.parsed.y;
+                                return label;
+                            }
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                elements: {
+                    line: {
+                        tension: 0.3
+                    },
+                    point: {
+                        radius: 3,
+                        hoverRadius: 5
+                    }
+                }
+            };
+            
+            // 根据不同周期设置图表样式
+            let chartConfig = {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '注册用户(钱包连接)',
+                            data: userValues,
+                            borderWidth: 2,
+                            fill: false,  // 改为不填充，便于区分两条线
+                            yAxisID: 'y'  // 共用Y轴
+                        },
+                        {
+                            label: '网站访问量',
+                            data: visitValues,
+                            borderWidth: 2,
+                            fill: false,
+                            yAxisID: 'y'  // 共用Y轴
+                        }
+                    ]
+                },
+                options: chartOptions
+            };
+            
+            // 根据周期设置不同的图表风格
+            if (period === 'weekly') {
+                // 用户数量线设置
+                chartConfig.data.datasets[0].borderColor = '#4e73df';
+                chartConfig.data.datasets[0].backgroundColor = 'rgba(78, 115, 223, 0.1)';
+                chartConfig.data.datasets[0].pointBackgroundColor = '#4e73df';
+                chartConfig.data.datasets[0].pointBorderColor = '#fff';
+                
+                // 访问量线设置
+                chartConfig.data.datasets[1].borderColor = '#f6c23e';
+                chartConfig.data.datasets[1].backgroundColor = 'rgba(246, 194, 62, 0.1)';
+                chartConfig.data.datasets[1].pointBackgroundColor = '#f6c23e';
+                chartConfig.data.datasets[1].pointBorderColor = '#fff';
+                
+                chartOptions.plugins.title.text = '周数据 - 过去7天注册用户与访问量';
+            } else if (period === 'monthly') {
+                // 用户数量线设置
+                chartConfig.data.datasets[0].borderColor = '#1cc88a';
+                chartConfig.data.datasets[0].backgroundColor = 'rgba(28, 200, 138, 0.1)';
+                chartConfig.data.datasets[0].pointBackgroundColor = '#1cc88a';
+                chartConfig.data.datasets[0].pointBorderColor = '#fff';
+                
+                // 访问量线设置
+                chartConfig.data.datasets[1].borderColor = '#e74a3b';
+                chartConfig.data.datasets[1].backgroundColor = 'rgba(231, 74, 59, 0.1)';
+                chartConfig.data.datasets[1].pointBackgroundColor = '#e74a3b';
+                chartConfig.data.datasets[1].pointBorderColor = '#fff';
+                
+                chartOptions.plugins.title.text = '月数据 - 过去30天注册用户与访问量';
+            } else {
+                // 用户数量线设置
+                chartConfig.data.datasets[0].borderColor = '#36b9cc';
+                chartConfig.data.datasets[0].backgroundColor = 'rgba(54, 185, 204, 0.1)';
+                chartConfig.data.datasets[0].pointBackgroundColor = '#36b9cc';
+                chartConfig.data.datasets[0].pointBorderColor = '#fff';
+                
+                // 访问量线设置
+                chartConfig.data.datasets[1].borderColor = '#6f42c1';
+                chartConfig.data.datasets[1].backgroundColor = 'rgba(111, 66, 193, 0.1)';
+                chartConfig.data.datasets[1].pointBackgroundColor = '#6f42c1';
+                chartConfig.data.datasets[1].pointBorderColor = '#fff';
+                
+                chartOptions.plugins.title.text = '年数据 - 过去12个月注册用户与访问量';
+            }
+            
+            // 数据为空的情况显示提示
+            if ((userValues.length === 0 || userValues.every(val => val === 0)) &&
+                (visitValues.length === 0 || visitValues.every(val => val === 0))) {
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('暂无注册用户与访问量数据', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            // 创建新图表 - 曲线图设置
+            window.userGrowthChart = new Chart(canvas, chartConfig);
+        }
+        
+        // 渲染资产列表
+        function renderAssetList(assets) {
+            const container = document.getElementById('assetListContainer');
+            
+            // 资产类型映射
+            const assetTypeMap = {
+                10: { name: '不动产', badge: 'bg-primary' },
+                20: { name: '类不动产', badge: 'bg-success' },
+                30: { name: '工业地产', badge: 'bg-info' },
+                40: { name: '土地资产', badge: 'bg-warning' },
+                50: { name: '证券资产', badge: 'bg-danger' },
+                60: { name: '艺术品', badge: 'bg-secondary' },
+                70: { name: '收藏品', badge: 'bg-dark' },
+                99: { name: '其他', badge: 'bg-light text-dark' }
+            };
+            
+            // 状态映射
+            const statusMap = {
+                1: { name: '待审核', badge: 'bg-secondary' },
+                2: { name: '已通过', badge: 'bg-success' },
+                3: { name: '已拒绝', badge: 'bg-danger' },
+                4: { name: '已删除', badge: 'bg-dark' }
+            };
+            
+            let html = `
+                <table class="table table-hover">
+                    <thead>
                         <tr>
-                            <th width="40">
-                                <input type="checkbox" class="form-check-input" id="selectAll">
-                            </th>
+                            <th>ID</th>
                             <th>资产名称</th>
                             <th>类型</th>
-                            <th>所有者</th>
-                            <th>价值(USDC)</th>
+                            <th>Token</th>
+                            <th>价格</th>
+                            <th>销售额</th>
                             <th>状态</th>
-                            <th>创建时间</th>
-                            <th>操作</th>
                         </tr>
                     </thead>
-                    <tbody id="assetList">
-                        <tr>
-                            <td colspan="8" class="text-center py-4">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">加载中...</span>
-                                </div>
-                            </td>
-                        </tr>
+                    <tbody>
+            `;
+            
+            assets.forEach(asset => {
+                const type = assetTypeMap[asset.asset_type] || { name: '未知', badge: 'bg-secondary' };
+                const status = statusMap[asset.status] || { name: '未知', badge: 'bg-secondary' };
+                
+                // 计算销售额
+                const soldTokens = (asset.token_supply || 0) - (asset.remaining_supply || 0);
+                const salesVolume = asset.sales_volume !== undefined ? 
+                    asset.sales_volume : 
+                    soldTokens * (asset.token_price || 0);
+                
+                html += `
+                    <tr>
+                        <td>${asset.id}</td>
+                        <td>${asset.name}</td>
+                        <td><span class="badge ${type.badge}">${type.name}</span></td>
+                        <td>${asset.token_symbol || '-'}</td>
+                        <td>${asset.token_price ? asset.token_price.toLocaleString() : '0'} USDT</td>
+                        <td>${salesVolume.toLocaleString()} USDT</td>
+                        <td><span class="badge ${status.badge}">${status.name}</span></td>
+                    </tr>
+                `;
+            });
+            
+            html += `
                     </tbody>
                 </table>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 拒绝原因模态框 -->
-<div class="modal fade" id="rejectModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">拒绝原因</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <textarea class="form-control" id="rejectReason" rows="3" placeholder="请输入拒绝原因..."></textarea>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-danger" id="confirmReject">确认拒绝</button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
-<script>
-// 初始化页面
-async function initializePage() {
-    try {
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        loadingOverlay.style.display = 'flex';
-        
-        // 检查管理员权限
-        const urlParams = new URLSearchParams(window.location.search);
-        const ethAddress = urlParams.get('eth_address');
-        if (!ethAddress) {
-            throw new Error('未找到钱包地址');
+                <div class="small text-muted mb-3">
+                    <i class="fas fa-info-circle"></i> 销售额 = 已售通证数量 × 通证价格（已售通证数量 = 总发行量 - 剩余供应量）
+                </div>
+                <div class="text-center">
+                    <a href="/admin/assets" class="btn btn-sm btn-outline-primary">查看全部资产</a>
+                </div>
+            `;
+            
+            container.innerHTML = html;
         }
-        
-        console.log('开始检查管理员权限');
-        const response = await fetch('/api/admin/check', {
-            headers: {
-                'X-Eth-Address': ethAddress
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error('验证管理员权限失败');
-        }
-        
-        const data = await response.json();
-        console.log('管理员检查结果:', data);
-        
-        if (!data || !data.is_admin) {
-            throw new Error('无管理员权限');
-        }
-        
-        // 初始化图表
-        initCharts();
-        
-        // 加载数据
-        await Promise.all([
-            loadDashboardData(),
-            loadAssets()
-        ]);
-        
-        // 隐藏加载遮罩
-        loadingOverlay.style.display = 'none';
-        
-    } catch (error) {
-        console.error('初始化页面失败:', error);
-        const loadingText = document.querySelector('#loadingOverlay .loading-text');
-        if (loadingText) {
-            loadingText.innerHTML = `<span class="text-danger">
-                <i class="fas fa-exclamation-circle me-2"></i>${error.message}
-            </span>`;
-        }
-        setTimeout(() => {
-            window.location.href = '/';
-        }, 2000);
-    }
-}
-
-// 初始化图表
-function initCharts() {
-    // 资产类型分布图
-    const typeCtx = document.getElementById('assetTypeChart').getContext('2d');
-    window.assetTypeChart = new Chart(typeCtx, {
-        type: 'doughnut',
-        data: {
-            labels: ['已通过资产', '待审核资产'],
-            datasets: [{
-                data: [0, 0],
-                backgroundColor: ['#198754', '#ffc107']  // 使用 Bootstrap 的成功和警告色
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
-            }
-        }
-    });
-    
-    // 资产分析图
-    const analysisCtx = document.getElementById('assetAnalysisChart').getContext('2d');
-    window.assetAnalysisChart = new Chart(analysisCtx, {
-        type: 'bar',
-        data: {
-            labels: ['待审核', '已通过', '已拒绝'],
-            datasets: [{
-                label: '资产数量',
-                data: [0, 0, 0],
-                backgroundColor: ['#ffc107', '#198754', '#dc3545']  // 警告、成功、危险色
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1
-                    }
-                }
-            }
-        }
-    });
-    
-    // 用户增长趋势图
-    const growthCtx = document.getElementById('userGrowthChart').getContext('2d');
-    window.userGrowthChart = new Chart(growthCtx, {
-        type: 'line',
-        data: {
-            labels: ['本月'],
-            datasets: [{
-                label: '用户数',
-                data: [0],
-                borderColor: '#0d6efd',
-                tension: 0.4,
-                fill: false
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1
-                    }
-                }
-            }
-        }
-    });
-}
-
-// 加载仪表盘数据
-async function loadDashboardData() {
-    try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const ethAddress = urlParams.get('eth_address');
-        
-        const response = await fetch('/api/admin/stats', {
-            headers: {
-                'X-Eth-Address': ethAddress
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error('加载数据失败');
-        }
-        
-        const data = await response.json();
-        console.log('统计数据:', data);
         
         // 更新统计数据
-        document.getElementById('totalUsers').textContent = data.total_users.toLocaleString();
-        document.getElementById('totalTrades').textContent = data.total_value.toLocaleString() + ' USDC';
-        
-        // 计算佣金收益（只计算已通过项目）
-        const approvedValue = data.approved_assets_value || 0;  // 使用已通过资产的总价值
-        document.getElementById('totalCommission').textContent = (approvedValue * 0.03).toLocaleString() + ' USDC';  // 总佣金为3%
-        
-        // 更新增长率（暂时使用静态数据）
-        document.getElementById('userGrowth').textContent = '+0%';
-        document.getElementById('tradeGrowth').textContent = '+0%';
-        
-        // 更新图表数据
-        updateCharts({
-            asset_types: {
-                real_estate: data.approved_assets || 0,
-                semi_real_estate: data.pending_assets || 0
-            },
-            asset_analysis: {
-                labels: ['待审核', '已通过', '已拒绝'],
-                values: [
-                    data.pending_assets || 0,
-                    data.approved_assets || 0,
-                    data.rejected_assets || 0
-                ]
-            },
-            user_growth_trend: {
-                labels: ['本月'],
-                values: [data.total_users]
-            }
-        });
-        
-    } catch (error) {
-        console.error('加载统计数据失败:', error);
-        // 显示错误状态
-        ['totalUsers', 'totalTrades', 'totalCommission'].forEach(id => {
-            document.getElementById(id).innerHTML = '<span class="text-danger">加载失败</span>';
-        });
-    }
-}
-
-// 更新图表数据
-function updateCharts(data) {
-    // 更新资产类型分布
-    window.assetTypeChart.data.datasets[0].data = [
-        data.asset_types.real_estate,
-        data.asset_types.semi_real_estate
-    ];
-    window.assetTypeChart.update();
-    
-    // 更新资产分析
-    window.assetAnalysisChart.data.labels = data.asset_analysis.labels;
-    window.assetAnalysisChart.data.datasets[0].data = data.asset_analysis.values;
-    window.assetAnalysisChart.update();
-    
-    // 更新用户增长趋势
-    window.userGrowthChart.data.labels = data.user_growth_trend.labels;
-    window.userGrowthChart.data.datasets[0].data = data.user_growth_trend.values;
-    window.userGrowthChart.update();
-}
-
-// 渲染资产列表
-function renderAssetList(assets) {
-    const tbody = document.getElementById('assetList');
-    tbody.innerHTML = '';
-    
-    if (!assets || assets.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="8" class="text-center py-4">暂无资产数据</td>
-            </tr>
-        `;
-        return;
-    }
-    
-    // 定义资产状态常量
-    const ASSET_STATUS = {
-        PENDING: 1,
-        APPROVED: 2,
-        REJECTED: 3,
-        DELETED: 4
-    };
-    
-    assets.forEach(asset => {
-        // 计算总价值
-        let totalValue = asset.total_value;
-        if (asset.asset_type === 10) { // 不动产
-            totalValue = asset.token_price * asset.token_supply;
+        function updateStats(data) {
+            $('#totalUserCount').text(data.total_users || 0);
+            $('#totalTradeAmount').text('$' + (data.total_trade_amount ? data.total_trade_amount.toLocaleString() : 0));
+            $('#totalAssetValue').text('$' + (data.total_asset_value ? data.total_asset_value.toLocaleString() : 0));
+            $('#totalCommissionAmount').text('$' + (data.total_commission ? data.total_commission.toLocaleString() : 0));
         }
         
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>
-                <input type="checkbox" class="form-check-input asset-checkbox" value="${asset.id}">
-            </td>
-            <td>
-                <a href="/admin/assets/${asset.id}" class="text-decoration-none text-dark">
-                    ${asset.name}
-                </a>
-            </td>
-            <td>${asset.asset_type === 10 ? '不动产' : '类不动产'}</td>
-            <td class="text-nowrap">
-                <span class="wallet-address" title="${asset.owner_address}">
-                    ${asset.owner_address.slice(0, 6)}...${asset.owner_address.slice(-4)}
-                </span>
-            </td>
-            <td class="text-end">${totalValue ? totalValue.toLocaleString() : '-'} USDC</td>
-            <td>
-                <span class="badge ${getStatusBadgeClass(asset.status)} status-badge">
-                    ${asset.status_text}
-                </span>
-            </td>
-            <td class="text-nowrap">${new Date(asset.created_at).toLocaleString('zh-CN')}</td>
-            <td>
-                <div class="btn-group btn-group-sm">
-                    ${asset.status === 1 ? `
-                        <button type="button" class="btn btn-success" onclick="handleApprove(${asset.id})" title="通过">
-                            <i class="fas fa-check"></i>
-                        </button>
-                        <button type="button" class="btn btn-danger" onclick="handleReject(${asset.id})" title="拒绝">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    ` : ''}
-                    <button type="button" class="btn btn-primary" onclick="handleEdit(${asset.id})" title="编辑">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button type="button" class="btn btn-danger" onclick="handleDelete(${asset.id})" title="删除">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
-    
-    updateBatchButtons();
-}
-
-// 处理审核操作
-async function handleApprove(id) {
-    if (!confirm('确定要通过这个资产吗？')) {
-        return;
-    }
-    
-    try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const ethAddress = urlParams.get('eth_address');
-        
-        // 先检查资产状态
-        const assetResponse = await fetch(`/api/admin/assets/${id}`, {
-            headers: {
-                'X-Eth-Address': ethAddress
-            }
-        });
-        
-        if (!assetResponse.ok) {
-            throw new Error('获取资产信息失败');
-        }
-        
-        const assetData = await assetResponse.json();
-        console.log('资产数据:', assetData);
-        console.log('资产当前状态:', assetData.status);
-        console.log('资产状态类型:', typeof assetData.status);
-        
-        // 使用严格相等比较
-        if (assetData.status !== 1) {  // 1 表示待审核状态
-            const statusText = {
-                1: '待审核',
-                2: '已通过',
-                3: '已拒绝',
-                4: '已删除'
-            }[assetData.status] || '未知状态';
-            throw new Error(`该资产当前状态为: ${statusText}，不能审核`);
-        }
-        
-        console.log('开始审核资产:', id);
-        const response = await fetch(`/api/admin/assets/${id}/approve`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Eth-Address': ethAddress
-            }
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || '审核失败');
-        }
-        
-        // 刷新数据
-        await loadDashboardData();
-        await loadAssets();
-        
-        alert('审核通过成功');
-    } catch (error) {
-        console.error('审核失败:', error);
-        alert(error.message || '审核失败，请重试');
-    }
-}
-
-// 处理拒绝操作
-function handleReject(id) {
-    const modal = new bootstrap.Modal(document.getElementById('rejectModal'));
-    const confirmBtn = document.getElementById('confirmReject');
-    
-    // 更新确认按钮的点击事件
-    confirmBtn.onclick = async () => {
-        const reason = document.getElementById('rejectReason').value.trim();
-        if (!reason) {
-            alert('请输入拒绝原因');
-            return;
-        }
-        
-        try {
-            const urlParams = new URLSearchParams(window.location.search);
-            const ethAddress = urlParams.get('eth_address');
+        // 定义强制更新统计数据函数
+        function forceUpdateStats() {
+            showAlert('正在更新统计数据，请稍候...', 'info');
             
-            // 先检查资产状态
-            const assetResponse = await fetch(`/api/admin/assets/${id}`, {
-                headers: {
-                    'X-Eth-Address': ethAddress
-                }
-            });
-            
-            if (!assetResponse.ok) {
-                throw new Error('获取资产信息失败');
-            }
-            
-            const assetData = await assetResponse.json();
-            console.log('资产状态:', assetData.status);
-            
-            if (assetData.status !== 1) {
-                const statusText = {
-                    1: '待审核',
-                    2: '已通过',
-                    3: '已拒绝',
-                    4: '已删除'
-                }[assetData.status] || '未知状态';
-                throw new Error(`该资产当前状态为: ${statusText}，不能拒绝`);
-            }
-            
-            console.log('开始拒绝资产:', id);
-            const response = await fetch(`/api/admin/assets/${id}/reject`, {
+            // 调用更新统计数据的API
+            fetch('/api/admin/update-dashboard-stats', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-Eth-Address': ethAddress
-                },
-                body: JSON.stringify({ reason })
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(handleApiError)
+            .then(data => {
+                showAlert('统计数据更新成功!', 'success', 3000);
+                // 更新成功后刷新页面数据
+                loadDashboardData(true);
+            })
+            .catch(error => {
+                showAlert('更新统计数据失败: ' + error.message, 'danger');
             });
-            
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || '拒绝失败');
-            }
-            
-            // 关闭模态框
-            modal.hide();
-            document.getElementById('rejectReason').value = '';
-            
-            // 刷新数据
-            await loadDashboardData();
-            await loadAssets();
-            
-            alert('已拒绝该资产');
-        } catch (error) {
-            console.error('拒绝失败:', error);
-            alert(error.message || '拒绝失败，请重试');
         }
-    };
+    </script>
     
-    // 清空之前的输入
-    document.getElementById('rejectReason').value = '';
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     
-    // 显示模态框
-    modal.show();
-}
-
-// 处理编辑操作
-function handleEdit(id) {
-    window.location.href = `/admin/assets/${id}/edit`;
-}
-
-// 处理删除操作
-async function handleDelete(id) {
-    if (!confirm('确定要删除这个资产吗？此操作不可恢复！')) {
-        return;
-    }
-    
-    try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const ethAddress = urlParams.get('eth_address');
-        
-        console.log('开始删除资产:', id);
-        const response = await fetch(`/api/admin/assets/${id}`, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Eth-Address': ethAddress
-            }
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || '删除失败');
-        }
-        
-        // 刷新数据
-        await loadDashboardData();
-        await loadAssets();
-        
-        alert('删除成功');
-    } catch (error) {
-        console.error('删除失败:', error);
-        alert(error.message || '删除失败，请重试');
-    }
-}
-
-// 获取状态样式
-function getStatusBadgeClass(status) {
-    switch (status) {
-        case 1: return 'bg-warning';  // 待审核
-        case 2: return 'bg-success';  // 已通过
-        case 3: return 'bg-danger';   // 已拒绝
-        case 4: return 'bg-secondary'; // 已删除
-        default: return 'bg-secondary';
-    }
-}
-
-// 更新批量操作按钮状态
-function updateBatchButtons() {
-    const checkedBoxes = document.querySelectorAll('.asset-checkbox:checked');
-    const batchApproveBtn = document.getElementById('batchApproveBtn');
-    const batchRejectBtn = document.getElementById('batchRejectBtn');
-    
-    if (checkedBoxes.length > 0) {
-        batchApproveBtn.style.display = 'inline-block';
-        batchRejectBtn.style.display = 'inline-block';
-    } else {
-        batchApproveBtn.style.display = 'none';
-        batchRejectBtn.style.display = 'none';
-    }
-}
-
-// 加载资产列表
-async function loadAssets(search = '') {
-    try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const ethAddress = urlParams.get('eth_address');
-        
-        const response = await fetch('/api/admin/assets', {
-            headers: {
-                'X-Eth-Address': ethAddress
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error('加载资产列表失败');
-        }
-        
-        const data = await response.json();
-        console.log('资产列表:', data);
-        
-        // 过滤资产（如果有搜索关键词）
-        let assets = data.assets;
-        if (search) {
-            const keyword = search.toLowerCase();
-            assets = assets.filter(asset => 
-                asset.name.toLowerCase().includes(keyword) ||
-                asset.token_symbol.toLowerCase().includes(keyword) ||
-                asset.location.toLowerCase().includes(keyword)
-            );
-        }
-        
-        renderAssetList(assets);
-    } catch (error) {
-        console.error('加载资产列表失败:', error);
-        document.getElementById('assetList').innerHTML = `
-            <tr>
-                <td colspan="8" class="text-center py-4 text-danger">
-                    <i class="fas fa-exclamation-circle me-2"></i>加载失败，请刷新重试
-                </td>
-            </tr>
-        `;
-    }
-}
-
-// 绑定事件
-document.addEventListener('DOMContentLoaded', function() {
-    // 初始化页面
-    initializePage();
-    
-    // 全选/取消全选
-    document.getElementById('selectAll').addEventListener('change', function() {
-        const checkboxes = document.querySelectorAll('.asset-checkbox');
-        checkboxes.forEach(checkbox => checkbox.checked = this.checked);
-        updateBatchButtons();
-    });
-    
-    // 单个复选框变化
-    document.addEventListener('change', function(e) {
-        if (e.target.classList.contains('asset-checkbox')) {
-            updateBatchButtons();
-        }
-    });
-    
-    // 搜索
-    document.getElementById('searchBtn').addEventListener('click', function() {
-        const keyword = document.getElementById('searchInput').value.trim();
-        loadAssets(keyword);
-    });
-    
-    document.getElementById('searchInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            const keyword = this.value.trim();
-            loadAssets(keyword);
-        }
-    });
-    
-    // 切换用户增长趋势图时间范围
-    document.querySelectorAll('[data-period]').forEach(btn => {
-        btn.addEventListener('click', function() {
-            document.querySelector('[data-period].active').classList.remove('active');
-            this.classList.add('active');
-            loadDashboardData();
-        });
-    });
-});
-</script>
-{% endblock %}
+    <!-- 添加资产列表区域 -->
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                        <h6 class="m-0 font-weight-bold text-primary">最近资产</h6>
+                    </div>
+                    <div class="card-body" id="assetListContainer">
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                            <p class="mt-2">加载资产数据...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

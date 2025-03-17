@@ -1,0 +1,1405 @@
+{% extends "admin_v2/base.html" %}
+
+{% block title %}RWA-HUB 管理后台 - 佣金管理{% endblock %}
+
+{% block page_title %}佣金管理{% endblock %}
+{% block page_subtitle %}管理平台佣金设置与分销体系{% endblock %}
+
+{% block breadcrumb %}
+<li aria-current="page">
+    <div class="flex items-center">
+        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+        <span class="text-gray-500">佣金管理</span>
+    </div>
+</li>
+{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div id="commissionApp">
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 mr-4">
+                    <i class="fas fa-money-bill-wave text-green-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-medium text-gray-500">总佣金收入</h3>
+                    <p class="text-xl font-bold">${formatMoney(stats.totalCommission)}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 mr-4">
+                    <i class="fas fa-handshake text-blue-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-medium text-gray-500">今日佣金</h3>
+                    <p class="text-xl font-bold">${formatMoney(stats.todayCommission)}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-purple-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100 mr-4">
+                    <i class="fas fa-users text-purple-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-medium text-gray-500">分销商数量</h3>
+                    <p class="text-xl font-bold">${stats.distributorCount}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-yellow-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-yellow-100 mr-4">
+                    <i class="fas fa-percentage text-yellow-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-medium text-gray-500">平均佣金率</h3>
+                    <p class="text-xl font-bold">${stats.avgCommissionRate}%</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 选项卡导航 -->
+    <div class="bg-white rounded-lg shadow-sm mb-6">
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex" aria-label="Tabs">
+                <button @click="activeTab = 'settings'" :class="activeTab === 'settings' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm">
+                    <i class="fas fa-cog mr-2"></i> 佣金设置
+                </button>
+                <button @click="activeTab = 'levels'" :class="activeTab === 'levels' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm">
+                    <i class="fas fa-layer-group mr-2"></i> 分销层级
+                </button>
+                <button @click="activeTab = 'records'" :class="activeTab === 'records' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm">
+                    <i class="fas fa-list-alt mr-2"></i> 佣金记录
+                </button>
+                <button @click="activeTab = 'performance'" :class="activeTab === 'performance' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm">
+                    <i class="fas fa-chart-line mr-2"></i> 业绩排行
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- 佣金设置选项卡 -->
+    <div v-show="activeTab === 'settings'" class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-lg font-medium text-gray-900">佣金设置</h3>
+            <button @click="showAddSettingModal = true" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <i class="fas fa-plus mr-2"></i> 添加设置
+            </button>
+        </div>
+
+        <!-- 全局佣金设置卡片 -->
+        <div class="bg-gray-50 rounded-lg p-4 border border-gray-200 mb-6">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h4 class="text-md font-semibold text-gray-800">全局佣金设置</h4>
+                    <p class="text-sm text-gray-600 mt-1">适用于所有未设置特定佣金比例的资产类型</p>
+                </div>
+                <button @click="editGlobalSetting" class="text-blue-600 hover:text-blue-800">
+                    <i class="fas fa-edit"></i> 编辑
+                </button>
+            </div>
+            <div class="grid grid-cols-3 gap-4 mt-4">
+                <div>
+                    <p class="text-sm text-gray-500">佣金比例</p>
+                    <p class="font-semibold">${globalSetting.commission_rate}%</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">最低金额</p>
+                    <p class="font-semibold">${formatMoney(globalSetting.min_amount || 0)}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">最高金额</p>
+                    <p class="font-semibold">${formatMoney(globalSetting.max_amount || '无限制')}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 资产类型佣金设置列表 -->
+        <h4 class="text-md font-medium text-gray-800 mb-4">资产类型佣金设置</h4>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">资产类型</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">佣金比例</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最低金额</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最高金额</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr v-if="commissionSettings.length === 0">
+                        <td colspan="5" class="px-6 py-4 text-sm text-center text-gray-500">
+                            暂无特定资产类型的佣金设置
+                        </td>
+                    </tr>
+                    <tr v-for="setting in commissionSettings" :key="setting.id">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            ${setting.asset_type_name}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${setting.commission_rate}%
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${formatMoney(setting.min_amount || 0)}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${formatMoney(setting.max_amount || '无限制')}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button @click="editSetting(setting)" class="text-blue-600 hover:text-blue-900 mr-3">
+                                <i class="fas fa-edit"></i> 编辑
+                            </button>
+                            <button @click="deleteSetting(setting)" class="text-red-600 hover:text-red-900">
+                                <i class="fas fa-trash"></i> 删除
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 分销层级选项卡 -->
+    <div v-show="activeTab === 'levels'" class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-lg font-medium text-gray-900">分销层级设置</h3>
+            <button @click="showAddLevelModal = true" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <i class="fas fa-plus mr-2"></i> 添加层级
+            </button>
+        </div>
+
+        <!-- 分销层级图示 -->
+        <div class="bg-gray-50 rounded-lg p-6 border border-gray-200 mb-6">
+            <h4 class="text-md font-semibold text-gray-800 mb-4">分销层级关系</h4>
+            <div class="flex justify-center">
+                <div class="flex flex-col items-center">
+                    <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-2">
+                        <i class="fas fa-user-tie text-blue-600 text-xl"></i>
+                    </div>
+                    <div class="text-sm font-medium">平台</div>
+                </div>
+                <div class="w-10 flex items-center justify-center">
+                    <i class="fas fa-arrow-down text-gray-400"></i>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-2">
+                        <i class="fas fa-user-tag text-green-600 text-xl"></i>
+                    </div>
+                    <div class="text-sm font-medium">一级分销</div>
+                    <div class="text-xs text-gray-500">${distributionLevels[0] ? distributionLevels[0].commission_rate + '%' : '未设置'}</div>
+                </div>
+                <div class="w-10 flex items-center justify-center">
+                    <i class="fas fa-arrow-down text-gray-400"></i>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div class="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mb-2">
+                        <i class="fas fa-users text-purple-600 text-xl"></i>
+                    </div>
+                    <div class="text-sm font-medium">二级分销</div>
+                    <div class="text-xs text-gray-500">${distributionLevels[1] ? distributionLevels[1].commission_rate + '%' : '未设置'}</div>
+                </div>
+                <div class="w-10 flex items-center justify-center">
+                    <i class="fas fa-arrow-down text-gray-400"></i>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div class="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mb-2">
+                        <i class="fas fa-user-friends text-yellow-600 text-xl"></i>
+                    </div>
+                    <div class="text-sm font-medium">三级分销</div>
+                    <div class="text-xs text-gray-500">${distributionLevels[2] ? distributionLevels[2].commission_rate + '%' : '未设置'}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分销层级列表 -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">层级</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">佣金比例</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">描述</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr v-if="distributionLevels.length === 0">
+                        <td colspan="5" class="px-6 py-4 text-sm text-center text-gray-500">
+                            暂无分销层级设置
+                        </td>
+                    </tr>
+                    <tr v-for="level in distributionLevels" :key="level.id">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            第${level.level}级
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${level.commission_rate}%
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${level.description || '无描述'}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span :class="level.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
+                                ${level.is_active ? '启用' : '禁用'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button @click="editLevel(level)" class="text-blue-600 hover:text-blue-900 mr-3">
+                                <i class="fas fa-edit"></i> 编辑
+                            </button>
+                            <button v-if="level.level > 1" @click="deleteLevel(level)" class="text-red-600 hover:text-red-900">
+                                <i class="fas fa-trash"></i> 删除
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 佣金记录选项卡 -->
+    <div v-show="activeTab === 'records'" class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-lg font-medium text-gray-900">佣金记录</h3>
+            <div>
+                <button @click="exportCommissionRecords" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 mr-2">
+                    <i class="fas fa-file-export mr-2"></i> 导出
+                </button>
+                <button @click="refreshCommissionRecords" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <i class="fas fa-sync-alt mr-2"></i> 刷新
+                </button>
+            </div>
+        </div>
+
+        <!-- 佣金趋势图 -->
+        <div class="bg-gray-50 rounded-lg p-4 border border-gray-200 mb-6">
+            <h4 class="text-md font-semibold text-gray-800 mb-4">佣金趋势</h4>
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex space-x-4">
+                    <button @click="changeTrendPeriod('week')" :class="trendPeriod === 'week' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                        本周
+                    </button>
+                    <button @click="changeTrendPeriod('month')" :class="trendPeriod === 'month' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                        本月
+                    </button>
+                    <button @click="changeTrendPeriod('quarter')" :class="trendPeriod === 'quarter' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                        本季度
+                    </button>
+                    <button @click="changeTrendPeriod('year')" :class="trendPeriod === 'year' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                        本年
+                    </button>
+                </div>
+                <div class="text-sm text-gray-500">
+                    总佣金: <span class="font-semibold">${formatMoney(trendTotal)}</span>
+                </div>
+            </div>
+            <canvas id="commissionTrendChart" height="200"></canvas>
+        </div>
+
+        <!-- 筛选条件 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">收款人</label>
+                <input type="text" v-model="recordFilters.user" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="搜索钱包地址或用户名">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">佣金类型</label>
+                <select v-model="recordFilters.type" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">全部类型</option>
+                    <option value="direct">直接佣金</option>
+                    <option value="referral">推荐佣金</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">开始日期</label>
+                <input type="date" v-model="recordFilters.startDate" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">结束日期</label>
+                <input type="date" v-model="recordFilters.endDate" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+        </div>
+        <div class="flex justify-end mb-6">
+            <button @click="applyRecordFilters" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <i class="fas fa-filter mr-2"></i> 应用筛选
+            </button>
+        </div>
+
+        <!-- 佣金记录表格 -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">收款人</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易ID</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">资产名称</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">佣金金额</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">佣金类型</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr v-if="loading" class="animate-pulse">
+                        <td colspan="7" class="px-6 py-10 text-center">
+                            <i class="fas fa-spinner fa-spin mr-2"></i> 加载中...
+                        </td>
+                    </tr>
+                    <tr v-else-if="commissionRecords.length === 0">
+                        <td colspan="7" class="px-6 py-4 text-sm text-center text-gray-500">
+                            暂无佣金记录
+                        </td>
+                    </tr>
+                    <tr v-for="record in commissionRecords" :key="record.id" class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">${record.recipient_username || '未命名用户'}</div>
+                            <div class="text-xs text-gray-500">${truncateAddress(record.recipient_address)}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${truncateString(record.transaction_id, 10)}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">${record.asset_name || '-'}</div>
+                            <div class="text-xs text-gray-500">${record.asset_id ? 'ID: ' + record.asset_id : ''}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                            ${formatMoney(record.amount)}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span :class="record.commission_type === 'direct' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
+                                ${record.commission_type === 'direct' ? '直接佣金' : '推荐佣金'}
+                                ${record.referral_level ? ' (L' + record.referral_level + ')' : ''}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${formatDateTime(record.created_at)}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span :class="{
+                                'bg-yellow-100 text-yellow-800': record.status === 'pending',
+                                'bg-green-100 text-green-800': record.status === 'paid',
+                                'bg-red-100 text-red-800': record.status === 'failed'
+                            }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
+                                ${record.status === 'pending' ? '待支付' : record.status === 'paid' ? '已支付' : '失败'}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 分页 -->
+        <div class="mt-4 flex items-center justify-between">
+            <div class="text-sm text-gray-700">
+                显示 ${(recordPage - 1) * recordPageSize + 1} 到 ${Math.min(recordPage * recordPageSize, recordTotal)} 条，共 ${recordTotal} 条记录
+            </div>
+            <div class="flex justify-end">
+                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    <button @click="changePage(1)" :disabled="recordPage === 1" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">第一页</span>
+                        <i class="fas fa-angle-double-left"></i>
+                    </button>
+                    <button @click="changePage(recordPage - 1)" :disabled="recordPage === 1" class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">上一页</span>
+                        <i class="fas fa-angle-left"></i>
+                    </button>
+                    <template v-for="page in displayedPages">
+                        <button v-if="page !== '...'" @click="changePage(page)" :class="page === recordPage ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'" class="relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                            ${page}
+                        </button>
+                        <span v-else class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                            ...
+                        </span>
+                    </template>
+                    <button @click="changePage(recordPage + 1)" :disabled="recordPage === recordTotalPages" class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">下一页</span>
+                        <i class="fas fa-angle-right"></i>
+                    </button>
+                    <button @click="changePage(recordTotalPages)" :disabled="recordPage === recordTotalPages" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">最后一页</span>
+                        <i class="fas fa-angle-double-right"></i>
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 业绩排行选项卡 -->
+    <div v-show="activeTab === 'performance'" class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-lg font-medium text-gray-900">分销商业绩排行</h3>
+            <div>
+                <button @click="exportPerformanceRanking" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 mr-2">
+                    <i class="fas fa-file-export mr-2"></i> 导出
+                </button>
+                <button @click="refreshPerformanceRanking" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <i class="fas fa-sync-alt mr-2"></i> 刷新
+                </button>
+            </div>
+        </div>
+
+        <!-- 时间范围选择 -->
+        <div class="flex items-center space-x-4 mb-6">
+            <span class="text-sm font-medium text-gray-700">时间范围:</span>
+            <button @click="changeRankingPeriod('week')" :class="rankingPeriod === 'week' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                本周
+            </button>
+            <button @click="changeRankingPeriod('month')" :class="rankingPeriod === 'month' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                本月
+            </button>
+            <button @click="changeRankingPeriod('quarter')" :class="rankingPeriod === 'quarter' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                本季度
+            </button>
+            <button @click="changeRankingPeriod('year')" :class="rankingPeriod === 'year' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                本年
+            </button>
+            <button @click="changeRankingPeriod('all')" :class="rankingPeriod === 'all' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                全部
+            </button>
+        </div>
+
+        <!-- 业绩统计图表 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- 佣金分布饼图 -->
+            <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                <h4 class="text-md font-semibold text-gray-800 mb-4">佣金分布</h4>
+                <div class="flex items-center justify-center h-64">
+                    <canvas id="commissionDistributionChart"></canvas>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mt-4">
+                    <div class="text-center">
+                        <p class="text-sm text-gray-500">直接佣金占比</p>
+                        <p class="font-semibold text-lg">${distributionStats.directPercentage}%</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-sm text-gray-500">推荐佣金占比</p>
+                        <p class="font-semibold text-lg">${distributionStats.referralPercentage}%</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 分销层级佣金分布 -->
+            <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                <h4 class="text-md font-semibold text-gray-800 mb-4">层级佣金分布</h4>
+                <div class="flex items-center justify-center h-64">
+                    <canvas id="levelDistributionChart"></canvas>
+                </div>
+                <div class="grid grid-cols-3 gap-4 mt-4">
+                    <div class="text-center">
+                        <p class="text-sm text-gray-500">一级分销</p>
+                        <p class="font-semibold text-lg">${levelStats.level1Percentage}%</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-sm text-gray-500">二级分销</p>
+                        <p class="font-semibold text-lg">${levelStats.level2Percentage}%</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-sm text-gray-500">三级分销</p>
+                        <p class="font-semibold text-lg">${levelStats.level3Percentage}%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分销商业绩排行 -->
+        <div class="mb-6">
+            <h4 class="text-md font-semibold text-gray-800 mb-4">分销商业绩排行 TOP 10</h4>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">排名</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分销商</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">总佣金收入</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">直接佣金</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">推荐佣金</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">下级分销商</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易笔数</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr v-if="loadingRanking" class="animate-pulse">
+                            <td colspan="8" class="px-6 py-10 text-center">
+                                <i class="fas fa-spinner fa-spin mr-2"></i> 加载中...
+                            </td>
+                        </tr>
+                        <tr v-else-if="distributorRanking.length === 0">
+                            <td colspan="8" class="px-6 py-4 text-sm text-center text-gray-500">
+                                暂无分销商业绩数据
+                            </td>
+                        </tr>
+                        <tr v-for="(distributor, index) in distributorRanking" :key="distributor.id" class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <span v-if="index < 3" class="w-6 h-6 rounded-full flex items-center justify-center mr-2" :class="{
+                                        'bg-yellow-100 text-yellow-700': index === 0,
+                                        'bg-gray-100 text-gray-700': index === 1,
+                                        'bg-orange-100 text-orange-700': index === 2
+                                    }">
+                                        <i class="fas" :class="{
+                                            'fa-trophy': index === 0,
+                                            'fa-medal': index === 1 || index === 2
+                                        }"></i>
+                                    </span>
+                                    <span v-else class="text-sm font-medium">${index + 1}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="h-10 w-10 flex-shrink-0">
+                                        <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                            <i class="fas fa-user text-gray-500"></i>
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900">${distributor.username || '未命名用户'}</div>
+                                        <div class="text-xs text-gray-500">${truncateAddress(distributor.address)}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                                ${formatMoney(distributor.total_commission)}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${formatMoney(distributor.direct_commission)}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${formatMoney(distributor.referral_commission)}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${distributor.downline_count}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${distributor.transaction_count}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button @click="viewDistributorDetail(distributor)" class="text-blue-600 hover:text-blue-900">
+                                    <i class="fas fa-eye"></i> 详情
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 交易用户业绩排行 -->
+        <div>
+            <h4 class="text-md font-semibold text-gray-800 mb-4">交易用户排行 TOP 10</h4>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">排名</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易总额</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易笔数</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">平均交易金额</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最近交易</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr v-if="loadingUserRanking" class="animate-pulse">
+                            <td colspan="7" class="px-6 py-10 text-center">
+                                <i class="fas fa-spinner fa-spin mr-2"></i> 加载中...
+                            </td>
+                        </tr>
+                        <tr v-else-if="userRanking.length === 0">
+                            <td colspan="7" class="px-6 py-4 text-sm text-center text-gray-500">
+                                暂无用户交易数据
+                            </td>
+                        </tr>
+                        <tr v-for="(user, index) in userRanking" :key="user.id" class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <span v-if="index < 3" class="w-6 h-6 rounded-full flex items-center justify-center mr-2" :class="{
+                                        'bg-yellow-100 text-yellow-700': index === 0,
+                                        'bg-gray-100 text-gray-700': index === 1,
+                                        'bg-orange-100 text-orange-700': index === 2
+                                    }">
+                                        <i class="fas" :class="{
+                                            'fa-trophy': index === 0,
+                                            'fa-medal': index === 1 || index === 2
+                                        }"></i>
+                                    </span>
+                                    <span v-else class="text-sm font-medium">${index + 1}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="h-10 w-10 flex-shrink-0">
+                                        <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                            <i class="fas fa-user text-gray-500"></i>
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900">${user.username || '未命名用户'}</div>
+                                        <div class="text-xs text-gray-500">${truncateAddress(user.address)}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                                ${formatMoney(user.total_amount)}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${user.transaction_count}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${formatMoney(user.average_amount)}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${formatDateTime(user.last_transaction_date)}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button @click="viewUserDetail(user)" class="text-blue-600 hover:text-blue-900">
+                                    <i class="fas fa-eye"></i> 详情
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分销商详情模态框 -->
+    <div v-if="showDistributorDetailModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" @click="showDistributorDetailModal = false"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                                分销商详情
+                            </h3>
+                            <div v-if="selectedDistributor" class="mt-4">
+                                <div class="flex items-center mb-4">
+                                    <div class="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center mr-4">
+                                        <i class="fas fa-user text-gray-500 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-lg font-medium">${selectedDistributor.username || '未命名用户'}</h4>
+                                        <p class="text-sm text-gray-500">${selectedDistributor.address}</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4 mb-4">
+                                    <div class="bg-gray-50 p-3 rounded">
+                                        <p class="text-sm text-gray-500">总佣金收入</p>
+                                        <p class="font-semibold text-lg text-green-600">${formatMoney(selectedDistributor.total_commission)}</p>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 rounded">
+                                        <p class="text-sm text-gray-500">下级分销商</p>
+                                        <p class="font-semibold text-lg">${selectedDistributor.downline_count}人</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4 mb-4">
+                                    <div class="bg-gray-50 p-3 rounded">
+                                        <p class="text-sm text-gray-500">直接佣金</p>
+                                        <p class="font-semibold">${formatMoney(selectedDistributor.direct_commission)}</p>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 rounded">
+                                        <p class="text-sm text-gray-500">推荐佣金</p>
+                                        <p class="font-semibold">${formatMoney(selectedDistributor.referral_commission)}</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4 mb-4">
+                                    <div class="bg-gray-50 p-3 rounded">
+                                        <p class="text-sm text-gray-500">成为分销商时间</p>
+                                        <p class="font-semibold">${formatDateTime(selectedDistributor.distributor_since)}</p>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 rounded">
+                                        <p class="text-sm text-gray-500">最近佣金收入</p>
+                                        <p class="font-semibold">${formatDateTime(selectedDistributor.last_commission_date)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button @click="showDistributorDetailModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 用户详情模态框 -->
+    <div v-if="showUserDetailModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" @click="showUserDetailModal = false"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                                用户交易详情
+                            </h3>
+                            <div v-if="selectedUser" class="mt-4">
+                                <div class="flex items-center mb-4">
+                                    <div class="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center mr-4">
+                                        <i class="fas fa-user text-gray-500 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-lg font-medium">${selectedUser.username || '未命名用户'}</h4>
+                                        <p class="text-sm text-gray-500">${selectedUser.address}</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4 mb-4">
+                                    <div class="bg-gray-50 p-3 rounded">
+                                        <p class="text-sm text-gray-500">交易总额</p>
+                                        <p class="font-semibold text-lg text-green-600">${formatMoney(selectedUser.total_amount)}</p>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 rounded">
+                                        <p class="text-sm text-gray-500">交易笔数</p>
+                                        <p class="font-semibold text-lg">${selectedUser.transaction_count}笔</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4 mb-4">
+                                    <div class="bg-gray-50 p-3 rounded">
+                                        <p class="text-sm text-gray-500">平均交易金额</p>
+                                        <p class="font-semibold">${formatMoney(selectedUser.average_amount)}</p>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 rounded">
+                                        <p class="text-sm text-gray-500">最近交易时间</p>
+                                        <p class="font-semibold">${formatDateTime(selectedUser.last_transaction_date)}</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4 mb-4">
+                                    <div class="bg-gray-50 p-3 rounded">
+                                        <p class="text-sm text-gray-500">注册时间</p>
+                                        <p class="font-semibold">${formatDateTime(selectedUser.register_time)}</p>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 rounded">
+                                        <p class="text-sm text-gray-500">分销身份</p>
+                                        <p class="font-semibold">${selectedUser.is_distributor ? '是' : '否'}</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-4">
+                                    <h5 class="text-sm font-medium text-gray-700 mb-2">最近交易记录</h5>
+                                    <div v-if="selectedUser.recent_transactions && selectedUser.recent_transactions.length > 0" class="border rounded overflow-hidden">
+                                        <table class="min-w-full divide-y divide-gray-200">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500">时间</th>
+                                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500">资产</th>
+                                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500">金额</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white divide-y divide-gray-200">
+                                                <tr v-for="tx in selectedUser.recent_transactions" :key="tx.id">
+                                                    <td class="px-4 py-2 whitespace-nowrap text-xs text-gray-500">
+                                                        ${formatDateTime(tx.date)}
+                                                    </td>
+                                                    <td class="px-4 py-2 whitespace-nowrap text-xs text-gray-900">
+                                                        ${tx.asset_name}
+                                                    </td>
+                                                    <td class="px-4 py-2 whitespace-nowrap text-xs font-medium text-green-600">
+                                                        ${formatMoney(tx.amount)}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div v-else class="text-sm text-gray-500 text-center p-4 bg-gray-50 rounded">
+                                        暂无交易记录
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button @click="showUserDetailModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+new Vue({
+    el: '#commissionApp',
+    data: {
+        // 选项卡导航
+        activeTab: 'settings',
+        
+        // 统计数据
+        stats: {
+            totalCommission: 25800.50,
+            todayCommission: 1350.25,
+            distributorCount: 86,
+            avgCommissionRate: 5.2
+        },
+        
+        // 佣金设置数据
+        globalSetting: {
+            commission_rate: 5,
+            min_amount: 10,
+            max_amount: null
+        },
+        commissionSettings: [
+            {
+                id: 1,
+                asset_type_name: '房地产',
+                commission_rate: 6,
+                min_amount: 1000,
+                max_amount: 50000
+            },
+            {
+                id: 2,
+                asset_type_name: '艺术品',
+                commission_rate: 8,
+                min_amount: 500,
+                max_amount: null
+            }
+        ],
+        showAddSettingModal: false,
+        
+        // 分销层级数据
+        distributionLevels: [
+            {
+                id: 1,
+                level: 1,
+                commission_rate: 5,
+                description: '一级分销商佣金',
+                is_active: true
+            },
+            {
+                id: 2,
+                level: 2,
+                commission_rate: 2,
+                description: '二级分销商佣金',
+                is_active: true
+            },
+            {
+                id: 3,
+                level: 3,
+                commission_rate: 1,
+                description: '三级分销商佣金',
+                is_active: true
+            }
+        ],
+        showAddLevelModal: false,
+        
+        // 佣金记录数据
+        commissionRecords: [],
+        loading: false,
+        recordFilters: {
+            user: '',
+            type: '',
+            startDate: '',
+            endDate: ''
+        },
+        recordPage: 1,
+        recordPageSize: 10,
+        recordTotal: 56,
+        recordTotalPages: 6,
+        trendPeriod: 'month',
+        trendTotal: 12500.75,
+        
+        // 业绩排行数据
+        rankingPeriod: 'month',
+        loadingRanking: false,
+        distributorRanking: [
+            {
+                id: 1,
+                username: '张三',
+                address: '0x1234567890abcdef1234567890abcdef12345678',
+                total_commission: 5800.50,
+                direct_commission: 3500.25,
+                referral_commission: 2300.25,
+                downline_count: 12,
+                transaction_count: 35,
+                distributor_since: '2023-01-15T10:30:00',
+                last_commission_date: '2023-05-20T14:45:00'
+            },
+            {
+                id: 2,
+                username: '李四',
+                address: '0xabcdef1234567890abcdef1234567890abcdef12',
+                total_commission: 4200.75,
+                direct_commission: 3000.50,
+                referral_commission: 1200.25,
+                downline_count: 8,
+                transaction_count: 28,
+                distributor_since: '2023-02-10T09:15:00',
+                last_commission_date: '2023-05-18T11:30:00'
+            }
+        ],
+        loadingUserRanking: false,
+        userRanking: [
+            {
+                id: 1,
+                username: '王五',
+                address: '0x7890abcdef1234567890abcdef1234567890abcd',
+                total_amount: 58000.00,
+                transaction_count: 12,
+                average_amount: 4833.33,
+                last_transaction_date: '2023-05-19T16:20:00',
+                register_time: '2022-11-05T08:45:00',
+                is_distributor: true,
+                recent_transactions: [
+                    {
+                        id: 101,
+                        date: '2023-05-19T16:20:00',
+                        asset_name: '艺术品 #123',
+                        amount: 12500.00
+                    },
+                    {
+                        id: 102,
+                        date: '2023-05-10T14:15:00',
+                        asset_name: '房地产 #456',
+                        amount: 25000.00
+                    }
+                ]
+            },
+            {
+                id: 2,
+                username: '赵六',
+                address: '0xef1234567890abcdef1234567890abcdef123456',
+                total_amount: 42000.00,
+                transaction_count: 8,
+                average_amount: 5250.00,
+                last_transaction_date: '2023-05-15T10:45:00',
+                register_time: '2022-12-10T13:20:00',
+                is_distributor: false,
+                recent_transactions: [
+                    {
+                        id: 201,
+                        date: '2023-05-15T10:45:00',
+                        asset_name: '珠宝 #789',
+                        amount: 8500.00
+                    }
+                ]
+            }
+        ],
+        
+        // 模态框数据
+        showDistributorDetailModal: false,
+        selectedDistributor: null,
+        showUserDetailModal: false,
+        selectedUser: null,
+        
+        // 饼图统计数据
+        distributionStats: {
+            directPercentage: 65,
+            referralPercentage: 35
+        },
+        levelStats: {
+            level1Percentage: 60,
+            level2Percentage: 30,
+            level3Percentage: 10
+        }
+    },
+    computed: {
+        displayedPages() {
+            const totalPages = this.recordTotalPages;
+            const currentPage = this.recordPage;
+            const pages = [];
+            
+            if (totalPages <= 7) {
+                for (let i = 1; i <= totalPages; i++) {
+                    pages.push(i);
+                }
+            } else {
+                if (currentPage <= 4) {
+                    for (let i = 1; i <= 5; i++) {
+                        pages.push(i);
+                    }
+                    pages.push('...');
+                    pages.push(totalPages);
+                } else if (currentPage >= totalPages - 3) {
+                    pages.push(1);
+                    pages.push('...');
+                    for (let i = totalPages - 4; i <= totalPages; i++) {
+                        pages.push(i);
+                    }
+                } else {
+                    pages.push(1);
+                    pages.push('...');
+                    for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+                        pages.push(i);
+                    }
+                    pages.push('...');
+                    pages.push(totalPages);
+                }
+            }
+            
+            return pages;
+        }
+    },
+    methods: {
+        // 格式化工具方法
+        formatMoney(amount) {
+            if (amount === null || amount === undefined) return '无限制';
+            return Number(amount).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        },
+        formatDateTime(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleString('zh-CN', { 
+                year: 'numeric', 
+                month: '2-digit', 
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        },
+        truncateAddress(address) {
+            if (!address) return '';
+            return address.substring(0, 6) + '...' + address.substring(address.length - 4);
+        },
+        truncateString(str, length) {
+            if (!str) return '';
+            return str.length > length ? str.substring(0, length) + '...' : str;
+        },
+        
+        // 佣金设置方法
+        editGlobalSetting() {
+            // 实现编辑全局设置的逻辑
+            console.log('编辑全局设置');
+        },
+        editSetting(setting) {
+            // 实现编辑特定资产设置的逻辑
+            console.log('编辑设置:', setting);
+        },
+        deleteSetting(setting) {
+            // 实现删除设置的逻辑
+            console.log('删除设置:', setting);
+        },
+        
+        // 分销层级方法
+        editLevel(level) {
+            // 实现编辑层级的逻辑
+            console.log('编辑层级:', level);
+        },
+        deleteLevel(level) {
+            // 实现删除层级的逻辑
+            console.log('删除层级:', level);
+        },
+        
+        // 佣金记录方法
+        refreshCommissionRecords() {
+            this.loading = true;
+            // 模拟加载数据
+            setTimeout(() => {
+                // 这里应该是实际的API调用
+                this.commissionRecords = [
+                    {
+                        id: 1,
+                        recipient_username: '张三',
+                        recipient_address: '0x1234567890abcdef1234567890abcdef12345678',
+                        transaction_id: '0xabcdef1234567890abcdef1234567890abcdef1234567890',
+                        asset_name: '艺术品 #123',
+                        asset_id: 'ART-123',
+                        amount: 350.75,
+                        commission_type: 'direct',
+                        referral_level: null,
+                        created_at: '2023-05-20T14:45:00',
+                        status: 'paid'
+                    },
+                    {
+                        id: 2,
+                        recipient_username: '李四',
+                        recipient_address: '0xabcdef1234567890abcdef1234567890abcdef12',
+                        transaction_id: '0x7890abcdef1234567890abcdef1234567890abcdef1234',
+                        asset_name: '房地产 #456',
+                        asset_id: 'REAL-456',
+                        amount: 250.50,
+                        commission_type: 'referral',
+                        referral_level: 1,
+                        created_at: '2023-05-18T11:30:00',
+                        status: 'pending'
+                    }
+                ];
+                this.loading = false;
+            }, 1000);
+        },
+        exportCommissionRecords() {
+            // 实现导出记录的逻辑
+            console.log('导出佣金记录');
+        },
+        applyRecordFilters() {
+            // 实现应用筛选的逻辑
+            console.log('应用筛选:', this.recordFilters);
+            this.refreshCommissionRecords();
+        },
+        changePage(page) {
+            if (page < 1 || page > this.recordTotalPages) return;
+            this.recordPage = page;
+            this.refreshCommissionRecords();
+        },
+        changeTrendPeriod(period) {
+            this.trendPeriod = period;
+            // 更新趋势图
+            this.updateTrendChart();
+        },
+        updateTrendChart() {
+            // 实现更新趋势图的逻辑
+            console.log('更新趋势图, 期间:', this.trendPeriod);
+            
+            // 模拟更新数据
+            if (this.trendPeriod === 'week') {
+                this.trendTotal = 2500.25;
+            } else if (this.trendPeriod === 'month') {
+                this.trendTotal = 12500.75;
+            } else if (this.trendPeriod === 'quarter') {
+                this.trendTotal = 35800.50;
+            } else if (this.trendPeriod === 'year') {
+                this.trendTotal = 125000.00;
+            }
+            
+            // 初始化Chart.js图表
+            this.initCommissionTrendChart();
+        },
+        initCommissionTrendChart() {
+            // 获取canvas元素
+            const ctx = document.getElementById('commissionTrendChart');
+            
+            // 如果已存在图表，销毁它
+            if (this.trendChart) {
+                this.trendChart.destroy();
+            }
+            
+            // 模拟数据
+            let labels = [];
+            let data = [];
+            
+            if (this.trendPeriod === 'week') {
+                labels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+                data = [350, 450, 320, 480, 410, 250, 240];
+            } else if (this.trendPeriod === 'month') {
+                labels = ['第1周', '第2周', '第3周', '第4周'];
+                data = [2500, 3200, 3800, 3000];
+            } else if (this.trendPeriod === 'quarter') {
+                labels = ['1月', '2月', '3月'];
+                data = [10500, 12000, 13300];
+            } else if (this.trendPeriod === 'year') {
+                labels = ['Q1', 'Q2', 'Q3', 'Q4'];
+                data = [35800, 28500, 32000, 28700];
+            }
+            
+            // 创建新图表
+            this.trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '佣金金额',
+                        data: data,
+                        fill: false,
+                        borderColor: 'rgb(59, 130, 246)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: false
+                        },
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ' 佣金: $' + context.parsed.y.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        },
+        
+        // 业绩排行方法
+        refreshPerformanceRanking() {
+            this.loadingRanking = true;
+            this.loadingUserRanking = true;
+            
+            // 模拟加载数据
+            setTimeout(() => {
+                // 这里应该是实际的API调用
+                this.loadingRanking = false;
+                this.loadingUserRanking = false;
+                
+                // 更新图表
+                this.initDistributionCharts();
+            }, 1000);
+        },
+        exportPerformanceRanking() {
+            // 实现导出排行的逻辑
+            console.log('导出业绩排行');
+        },
+        changeRankingPeriod(period) {
+            this.rankingPeriod = period;
+            this.refreshPerformanceRanking();
+        },
+        viewDistributorDetail(distributor) {
+            this.selectedDistributor = distributor;
+            this.showDistributorDetailModal = true;
+        },
+        viewUserDetail(user) {
+            this.selectedUser = user;
+            this.showUserDetailModal = true;
+        },
+        initDistributionCharts() {
+            // 初始化佣金分布饼图
+            const ctxDist = document.getElementById('commissionDistributionChart');
+            if (this.distributionChart) {
+                this.distributionChart.destroy();
+            }
+            
+            this.distributionChart = new Chart(ctxDist, {
+                type: 'pie',
+                data: {
+                    labels: ['直接佣金', '推荐佣金'],
+                    datasets: [{
+                        data: [this.distributionStats.directPercentage, this.distributionStats.referralPercentage],
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(168, 85, 247, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(59, 130, 246, 1)',
+                            'rgba(168, 85, 247, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.label + ': ' + context.parsed + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // 初始化层级分布饼图
+            const ctxLevel = document.getElementById('levelDistributionChart');
+            if (this.levelChart) {
+                this.levelChart.destroy();
+            }
+            
+            this.levelChart = new Chart(ctxLevel, {
+                type: 'pie',
+                data: {
+                    labels: ['一级分销', '二级分销', '三级分销'],
+                    datasets: [{
+                        data: [
+                            this.levelStats.level1Percentage, 
+                            this.levelStats.level2Percentage, 
+                            this.levelStats.level3Percentage
+                        ],
+                        backgroundColor: [
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(239, 68, 68, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(16, 185, 129, 1)',
+                            'rgba(245, 158, 11, 1)',
+                            'rgba(239, 68, 68, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.label + ': ' + context.parsed + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    },
+    mounted() {
+        // 初始化加载数据
+        this.refreshCommissionRecords();
+        
+        // 初始化佣金趋势图
+        this.$nextTick(() => {
+            this.updateTrendChart();
+            this.initDistributionCharts();
+        });
+    }
+});
+</script>
+{% endblock %} 

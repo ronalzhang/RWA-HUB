@@ -4,6 +4,7 @@ from .admin import admin_required, is_admin
 from ..models import Asset
 from ..models.asset import AssetStatus
 from sqlalchemy import or_ as db_or
+from app.models.trade import Trade, TradeStatus
 
 # 主页路由
 # @main_bp.route('/')
@@ -64,7 +65,13 @@ def create_asset():
 @assets_bp.route('/<int:asset_id>')
 def asset_detail(asset_id):
     asset = Asset.query.get_or_404(asset_id)
-    return render_template('assets/detail.html', asset=asset)
+    
+    # 计算剩余供应量
+    trades = Trade.query.filter_by(asset_id=asset.id, status=TradeStatus.COMPLETED.value).all()
+    completed_amount = sum(trade.amount for trade in trades)
+    remaining_supply = asset.token_supply - completed_amount
+    
+    return render_template('assets/detail.html', asset=asset, remaining_supply=remaining_supply)
 
 # 管理页面路由
 @assets_bp.route('/manage')
