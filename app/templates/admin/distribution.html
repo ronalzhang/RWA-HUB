@@ -58,6 +58,44 @@
             margin-bottom: 20px;
             border-radius: 4px;
         }
+        
+        /* 分享文案管理样式 */
+        .message-card {
+            position: relative;
+            padding: 15px;
+            border: 1px solid #e3e6f0;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            background-color: #fff;
+        }
+        .message-card .btn-delete {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #e74a3b;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .message-card .message-text {
+            font-size: 15px;
+            line-height: 1.5;
+            padding-right: 30px;
+        }
+        .message-add {
+            padding: 15px;
+            border: 2px dashed #e3e6f0;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+            cursor: pointer;
+            background-color: #f8f9fc;
+            transition: background-color 0.2s;
+        }
+        .message-add:hover {
+            background-color: #eaecf4;
+        }
 </style>
 </head>
 <body>
@@ -86,6 +124,35 @@
                         <li>平台留存 = 2,500 × 40% = 1,000 USDC</li>
                     </ul>
                     <p><strong>注意</strong>：修改分销比例设置将立即对新产生的交易生效。</p>
+                </div>
+                
+                <!-- 左侧菜单 -->
+                <div class="container">
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h4 class="m-0 font-weight-bold text-primary">分销管理</h4>
+                                </div>
+                                <div class="card-body">
+                                    <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical">
+                                        <a class="nav-link active" id="v-pills-tree-tab" data-bs-toggle="pill" href="#v-pills-tree" role="tab" aria-controls="v-pills-tree" aria-selected="true">
+                                            <i class="fas fa-sitemap me-2"></i>分销关系
+                                        </a>
+                                        <a class="nav-link" id="v-pills-settings-tab" data-bs-toggle="pill" href="#v-pills-settings" role="tab" aria-controls="v-pills-settings" aria-selected="false">
+                                            <i class="fas fa-cog me-2"></i>分销设置
+                                        </a>
+                                        <a class="nav-link" id="v-pills-commission-tab" data-bs-toggle="pill" href="#v-pills-commission" role="tab" aria-controls="v-pills-commission" aria-selected="false">
+                                            <i class="fas fa-money-bill-wave me-2"></i>佣金记录
+                                        </a>
+                                        <a class="nav-link" id="v-pills-share-messages-tab" data-bs-toggle="pill" href="#v-pills-share-messages" role="tab" aria-controls="v-pills-share-messages" aria-selected="false">
+                                            <i class="fas fa-share-alt me-2"></i>分享文案管理
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- 顶部导航 -->
@@ -247,6 +314,62 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- 佣金记录标签内容 -->
+                    <div class="tab-pane fade" id="v-pills-commission" role="tabpanel" aria-labelledby="v-pills-commission-tab">
+                        <div class="card shadow mb-4">
+                            <!-- 卡片头部 -->
+                            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                                <h6 class="m-0 font-weight-bold text-primary">佣金记录</h6>
+                            </div>
+                            <!-- 卡片内容 -->
+                            <div class="card-body">
+                                <div id="commissionRecords">
+                                    加载中...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 分享文案管理标签内容 -->
+                    <div class="tab-pane fade" id="v-pills-share-messages" role="tabpanel" aria-labelledby="v-pills-share-messages-tab">
+                        <div class="card shadow mb-4">
+                            <!-- 卡片头部 -->
+                            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                                <h6 class="m-0 font-weight-bold text-primary">分享文案管理</h6>
+                                <div class="dropdown no-arrow">
+                                    <button class="btn btn-primary btn-sm" id="addNewMessage">
+                                        <i class="fas fa-plus fa-sm"></i> 添加新文案
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- 卡片内容 -->
+                            <div class="card-body">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>用户在分享资产页面时会随机显示下面的一条文案。添加吸引人的文案可以提高用户分享率！
+                                </div>
+                                
+                                <div id="shareMessagesContainer">
+                                    <div class="text-center py-5">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-3">加载中...</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="message-add" id="messageAddButton" style="display: none;">
+                                    <i class="fas fa-plus"></i> 添加新文案
+                                </div>
+                                
+                                <div class="text-end mt-3">
+                                    <button class="btn btn-primary" id="saveMessages" style="display: none;">
+                                        保存更改
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -344,14 +467,11 @@
             // 加载用户推荐关系
             loadUserReferrals(1);
             
-            // 监听按钮点击事件
-            $("#btn-save-level").click(saveDistributionLevel);
-            $("#btn-save-referral").click(saveUserReferral);
-            $("#btn-search-referrals").click(() => loadUserReferrals(1));
-            $("#btn-reset-referrals").click(resetReferralSearch);
-            $("#btn-search-network").click(searchReferralNetwork);
-            $("#referrals-prev").click(() => loadUserReferrals(currentReferralPage - 1));
-            $("#referrals-next").click(() => loadUserReferrals(currentReferralPage + 1));
+            // 加载用户分销关系
+            loadUserDistribution(1);
+
+            // 准备UI
+            addUIEventListeners();
         });
         
         // 加载分销等级
@@ -808,6 +928,212 @@
             if (!address) return '-';
             if (address.length <= 13) return address;
             return address.substring(0, 6) + '...' + address.substring(address.length - 4);
+        }
+
+        // 分享文案管理JavaScript
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化加载分享文案
+            loadShareMessages();
+            
+            // 添加新文案按钮点击事件
+            document.getElementById('addNewMessage').addEventListener('click', function() {
+                addNewMessage();
+            });
+            
+            // 底部添加按钮点击事件
+            document.getElementById('messageAddButton').addEventListener('click', function() {
+                addNewMessage();
+            });
+            
+            // 保存按钮点击事件
+            document.getElementById('saveMessages').addEventListener('click', function() {
+                saveShareMessages();
+            });
+        });
+
+        // 加载分享文案列表
+        function loadShareMessages() {
+            fetch('/api/admin/v2/share-messages')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        renderShareMessages(data.messages);
+                    } else {
+                        showError('加载分享文案失败: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('获取分享文案失败:', error);
+                    showError('获取分享文案失败: ' + error.message);
+                });
+        }
+
+        // 渲染分享文案列表
+        function renderShareMessages(messages) {
+            const container = document.getElementById('shareMessagesContainer');
+            container.innerHTML = '';
+            
+            if (!messages || messages.length === 0) {
+                container.innerHTML = '<div class="alert alert-warning">暂无分享文案，请添加！</div>';
+            } else {
+                messages.forEach((message, index) => {
+                    const messageCard = document.createElement('div');
+                    messageCard.className = 'message-card';
+                    messageCard.innerHTML = `
+                        <button class="btn-delete" data-index="${index}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <div class="message-text">${message}</div>
+                    `;
+                    container.appendChild(messageCard);
+                    
+                    // 添加删除事件
+                    messageCard.querySelector('.btn-delete').addEventListener('click', function() {
+                        const index = this.getAttribute('data-index');
+                        deleteMessage(index);
+                    });
+                });
+            }
+            
+            // 显示添加按钮和保存按钮
+            document.getElementById('messageAddButton').style.display = 'block';
+            document.getElementById('saveMessages').style.display = 'block';
+        }
+
+        // 添加新文案
+        function addNewMessage() {
+            // 弹出输入框
+            Swal.fire({
+                title: '添加新分享文案',
+                input: 'textarea',
+                inputPlaceholder: '请输入吸引人的分享文案，建议使用表情符号增强效果！',
+                inputAttributes: {
+                    'aria-label': '分享文案内容',
+                    'rows': 5
+                },
+                showCancelButton: true,
+                confirmButtonText: '添加',
+                cancelButtonText: '取消',
+                preConfirm: (text) => {
+                    if (!text || text.trim() === '') {
+                        Swal.showValidationMessage('文案内容不能为空');
+                        return false;
+                    }
+                    return text;
+                }
+            }).then((result) => {
+                if (result.isConfirmed && result.value) {
+                    // 获取当前文案列表
+                    const container = document.getElementById('shareMessagesContainer');
+                    const messageCards = container.querySelectorAll('.message-card');
+                    const messages = [];
+                    
+                    // 收集现有文案
+                    messageCards.forEach(card => {
+                        messages.push(card.querySelector('.message-text').innerText);
+                    });
+                    
+                    // 添加新文案
+                    messages.push(result.value);
+                    
+                    // 重新渲染
+                    renderShareMessages(messages);
+                }
+            });
+        }
+
+        // 删除文案
+        function deleteMessage(index) {
+            // 确认删除
+            Swal.fire({
+                title: '确定删除这条文案吗？',
+                text: '删除后不可恢复，请确认！',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: '确定删除',
+                cancelButtonText: '取消',
+                confirmButtonColor: '#d33'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // 获取当前文案列表
+                    const container = document.getElementById('shareMessagesContainer');
+                    const messageCards = container.querySelectorAll('.message-card');
+                    const messages = [];
+                    
+                    // 收集现有文案（跳过要删除的）
+                    messageCards.forEach((card, i) => {
+                        if (i != index) {
+                            messages.push(card.querySelector('.message-text').innerText);
+                        }
+                    });
+                    
+                    // 重新渲染
+                    renderShareMessages(messages);
+                }
+            });
+        }
+
+        // 保存文案到服务器
+        function saveShareMessages() {
+            // 获取当前文案列表
+            const container = document.getElementById('shareMessagesContainer');
+            const messageCards = container.querySelectorAll('.message-card');
+            const messages = [];
+            
+            // 收集现有文案
+            messageCards.forEach(card => {
+                messages.push(card.querySelector('.message-text').innerText);
+            });
+            
+            // 发送到服务器
+            fetch('/api/admin/v2/share-messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    messages: messages
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        title: '保存成功',
+                        text: '分享文案已成功更新！',
+                        icon: 'success',
+                        confirmButtonText: '确定'
+                    });
+                } else {
+                    showError('保存失败: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('保存分享文案失败:', error);
+                showError('保存失败: ' + error.message);
+            });
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            Swal.fire({
+                title: '操作失败',
+                text: message,
+                icon: 'error',
+                confirmButtonText: '确定'
+            });
+        }
+
+        // 准备UI
+        function addUIEventListeners() {
+            // 监听按钮点击事件
+            $("#btn-save-level").click(saveDistributionLevel);
+            $("#btn-save-referral").click(saveUserReferral);
+            $("#btn-search-referrals").click(() => loadUserReferrals(1));
+            $("#btn-reset-referrals").click(resetReferralSearch);
+            $("#btn-search-network").click(searchReferralNetwork);
+            $("#referrals-prev").click(() => loadUserReferrals(currentReferralPage - 1));
+            $("#referrals-next").click(() => loadUserReferrals(currentReferralPage + 1));
         }
     </script>
 </body>

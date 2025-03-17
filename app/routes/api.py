@@ -1,5 +1,5 @@
 from flask import jsonify, request, g, current_app, session, Blueprint, make_response, redirect, url_for, Response
-from app.models.user import User
+from app.models.user import User, is_same_wallet_address
 from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.trade import Trade, TradeStatus
 from app.extensions import db
@@ -30,6 +30,7 @@ from sqlalchemy import desc, or_, and_, func, text
 # from ..models.history_trade import HistoryTrade
 # from ..models.notice import Notice
 from app.models.referral import UserReferral, CommissionRecord, DistributionSetting
+from app.models import ShortLink
 
 api_bp = Blueprint('api', __name__)
 
@@ -656,6 +657,10 @@ def check_asset_owner(asset_id):
         if not asset:
             return jsonify({'error': '资产不存在'}), 404
 
+        # 检查请求者是否是资产所有者
+        if not is_same_wallet_address(eth_address, asset.owner_address):
+            return jsonify({'error': '无权访问'}), 403
+        
         # 检查是否为资产发布者
         is_owner = eth_address.lower() == asset.publisher_address.lower()
         
@@ -824,17 +829,19 @@ def check_asset_permission(asset_id):
         # 获取资产信息
         asset = Asset.query.get_or_404(asset_id)
         
-        # 检查是否是所有者
-        is_owner = g.eth_address.lower() == asset.owner_address.lower()
+        # 检查请求者是否是资产所有者
+        eth_address = request.headers.get('X-Eth-Address')
+        if not eth_address or not is_same_wallet_address(eth_address, asset.owner_address):
+            return jsonify({'error': '无权访问'}), 403
         
         # 检查是否是管理员
-        is_admin_user = is_admin(g.eth_address)
+        is_admin_user = is_admin(eth_address)
         
         # 检查是否可以管理分红
-        can_manage_dividend = is_owner or is_admin_user
+        can_manage_dividend = is_admin_user
         
         return jsonify({
-            'is_owner': is_owner,
+            'is_owner': True,
             'is_admin': is_admin_user,
             'can_manage_dividend': can_manage_dividend
         }), 200
@@ -857,17 +864,19 @@ def check_asset_permission_by_symbol(token_symbol):
         # 获取资产信息
         asset = Asset.query.filter_by(token_symbol=token_symbol).first_or_404()
         
-        # 检查是否是所有者
-        is_owner = g.eth_address.lower() == asset.owner_address.lower()
+        # 检查请求者是否是资产所有者
+        eth_address = request.headers.get('X-Eth-Address')
+        if not eth_address or not is_same_wallet_address(eth_address, asset.owner_address):
+            return jsonify({'error': '无权访问'}), 403
         
         # 检查是否是管理员
-        is_admin_user = is_admin(g.eth_address)
+        is_admin_user = is_admin(eth_address)
         
         # 检查是否可以管理分红
-        can_manage_dividend = is_owner or is_admin_user
+        can_manage_dividend = is_admin_user
         
         return jsonify({
-            'is_owner': is_owner,
+            'is_owner': True,
             'is_admin': is_admin_user,
             'can_manage_dividend': can_manage_dividend
         }), 200
@@ -890,7 +899,7 @@ def get_asset_holders(asset_id):
         
         # 检查请求者是否是资产所有者
         eth_address = request.headers.get('X-Eth-Address')
-        if not eth_address or eth_address.lower() != asset.owner_address.lower():
+        if not eth_address or not is_same_wallet_address(eth_address, asset.owner_address):
             return jsonify({'error': '无权访问'}), 403
             
         # 模拟返回持有人数据
@@ -910,6 +919,9 @@ def get_user_assets():
     try:
         # 获取用户地址
         user_address = g.eth_address
+        
+        # 记录当前请求的钱包地址，用于调试
+        current_app.logger.info(f'正在为钱包地址获取资产: {user_address}')
         
         # 根据地址类型处理
         if user_address.startswith('0x'):
@@ -1003,3 +1015,112 @@ def get_user_assets():
     except Exception as e:
         current_app.logger.error(f'获取用户资产失败: {str(e)}', exc_info=True)
         return jsonify([]), 200  # 即使发生错误也返回空数组而不是错误信息
+
+# 添加短链接相关API
+@api_bp.route('/shortlink/create', methods=['POST'])
+@eth_address_required
+def create_shortlink():
+    """创建短链接"""
+    data = request.json
+    if not data or 'url' not in data:
+        return jsonify({'success': False, 'error': '缺少URL参数'}), 400
+    
+    original_url = data['url']
+    
+    # 获取创建者地址
+    creator_address = request.headers.get('X-Eth-Address')
+    
+    # 可选参数
+    expires_days = data.get('expires_days')
+    
+    # 创建短链接
+    try:
+        short_link = ShortLink.create_short_link(
+            original_url=original_url,
+            creator_address=creator_address,
+            expires_days=expires_days
+        )
+        
+        # 构建完整的短链接URL
+        base_url = request.host_url.rstrip('/')
+        short_url = f"{base_url}/s/{short_link.code}"
+        
+        return jsonify({
+            'success': True,
+            'code': short_link.code,
+            'short_url': short_url,
+            'original_url': short_link.original_url,
+            'expires_at': short_link.expires_at.isoformat() if short_link.expires_at else None
+        })
+    except Exception as e:
+        current_app.logger.error(f"创建短链接失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'创建短链接失败: {str(e)}'}), 500
+
+@api_bp.route('/shortlink/<code>', methods=['GET'])
+def get_shortlink(code):
+    """获取短链接信息"""
+    short_link = ShortLink.query.filter_by(code=code).first()
+    
+    if not short_link:
+        return jsonify({'success': False, 'error': '短链接不存在'}), 404
+    
+    if short_link.is_expired():
+        return jsonify({'success': False, 'error': '短链接已过期'}), 410
+    
+    return jsonify({
+        'success': True,
+        'code': short_link.code,
+        'original_url': short_link.original_url,
+        'created_at': short_link.created_at.isoformat(),
+        'expires_at': short_link.expires_at.isoformat() if short_link.expires_at else None,
+        'click_count': short_link.click_count
+    })
+
+@api_bp.route('/share-messages/random', methods=['GET'])
+def get_random_share_message():
+    """获取随机分享文案"""
+    try:
+        import os
+        import json
+        import random
+        from flask import current_app
+        
+        # 确定文件路径
+        file_path = os.path.join(current_app.root_path, 'static', 'data', 'share_messages.json')
+        
+        # 默认文案
+        default_messages = [
+            "📈 分享赚佣金！邀请好友投资，您可获得高达30%的推广佣金！链接由您独享，佣金终身受益，朋友越多，收益越丰厚！",
+            "🤝 好东西就要和朋友分享！发送您的专属链接，让更多朋友加入这个投资社区，一起交流，共同成长，还能获得持续佣金回报！",
+            "🔥 发现好机会就要分享！邀请好友一起投资这个优质资产，共同见证财富增长！您的专属链接，助力朋友也能抓住这个机会！"
+        ]
+        
+        # 如果文件存在，从文件读取文案
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    messages = json.load(f)
+                    if messages and isinstance(messages, list) and len(messages) > 0:
+                        # 随机选择一条文案
+                        message = random.choice(messages)
+                        return jsonify({
+                            'success': True,
+                            'message': message
+                        }), 200
+            except Exception as e:
+                current_app.logger.error(f'读取分享文案文件失败: {str(e)}')
+        
+        # 如果文件不存在或读取失败，使用默认文案
+        message = random.choice(default_messages)
+        return jsonify({
+            'success': True,
+            'message': message
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f'获取随机分享文案失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': "发现好机会就要分享！邀请好友一起投资这个优质资产！" # 兜底文案
+        }), 200  # 返回200而不是500，让前端能正常处理
