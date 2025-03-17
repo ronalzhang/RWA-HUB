@@ -1246,6 +1246,38 @@
                                     <div class="share-message">
                                         ${shareMessage}
                                     </div>
+                                    
+                                    <div class="commission-info mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <strong>多级分销收益 </strong>
+                                            <span class="info-icon ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<div class='text-start'>
+                                                <p class='mb-1'>您分享链接的收益说明：</p>
+                                                <ul class='ps-3 mb-0'>
+                                                    <li>直接推荐好友购买：您获得30%佣金</li>
+                                                    <li>好友推荐他人购买：您获得15%佣金</li>
+                                                    <li>二级好友再推荐：您仍获得5%佣金</li>
+                                                </ul>
+                                                <p class='mt-1 mb-0 small'>例：好友通过您的链接购买100,000USDC资产，交易佣金2,500USDC，您立即获得750USDC！</p>
+                                            </div>">
+                                                <i class="fas fa-info-circle text-primary"></i>
+                                            </span>
+                                        </div>
+                                        <div class="commission-tiers mt-2 d-flex justify-content-around text-center">
+                                            <div class="tier">
+                                                <div class="tier-label">一级</div>
+                                                <div class="tier-value">30%</div>
+                                            </div>
+                                            <div class="tier">
+                                                <div class="tier-label">二级</div>
+                                                <div class="tier-value">15%</div>
+                                            </div>
+                                            <div class="tier">
+                                                <div class="tier-label">三级</div>
+                                                <div class="tier-value">5%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
                                     <div class="mb-3">
                                         <label class="form-label">您的专属分享链接:</label>
                                         <div class="input-group">
@@ -1288,6 +1320,15 @@
             
             // 生成短链接
             generateShortLink(address);
+            
+            // 初始化tooltip
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl, {
+                    html: true,
+                    boundary: 'window'
+                });
+            });
         }
         
         // 生成短链接
