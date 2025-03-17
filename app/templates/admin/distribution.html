@@ -111,48 +111,19 @@
                     <p>RWA-HUB平台采用三级分销模式，将交易佣金按特定比例分配给推荐人：</p>
                     <ul>
                         <li><strong>一级分销（直接推荐）</strong>：获得交易佣金的<strong>30%</strong></li>
-                        <li><strong>二级分销（间接推荐）</strong>：获得交易佣金的<strong>20%</strong></li>
-                        <li><strong>三级分销（三级推荐）</strong>：获得交易佣金的<strong>10%</strong></li>
-                        <li><strong>平台留存</strong>：剩余的<strong>40%</strong>作为平台收入</li>
+                        <li><strong>二级分销（间接推荐）</strong>：获得交易佣金的<strong>15%</strong></li>
+                        <li><strong>三级分销（三级推荐）</strong>：获得交易佣金的<strong>5%</strong></li>
+                        <li><strong>平台留存</strong>：剩余的<strong>50%</strong>作为平台收入</li>
                     </ul>
                     <p><strong>佣金计算示例</strong>：对于一笔100,000 USDC的大额交易（佣金率2.5%）</p>
                     <ul>
                         <li>交易佣金总额 = 100,000 × 2.5% = 2,500 USDC</li>
                         <li>一级分销佣金 = 2,500 × 30% = 750 USDC</li>
-                        <li>二级分销佣金 = 2,500 × 20% = 500 USDC</li>
-                        <li>三级分销佣金 = 2,500 × 10% = 250 USDC</li>
-                        <li>平台留存 = 2,500 × 40% = 1,000 USDC</li>
+                        <li>二级分销佣金 = 2,500 × 15% = 375 USDC</li>
+                        <li>三级分销佣金 = 2,500 × 5% = 125 USDC</li>
+                        <li>平台留存 = 2,500 × 50% = 1,250 USDC</li>
                     </ul>
                     <p><strong>注意</strong>：修改分销比例设置将立即对新产生的交易生效。</p>
-                </div>
-                
-                <!-- 左侧菜单 -->
-                <div class="container">
-                    <div class="row mb-4">
-                        <div class="col-md-3">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h4 class="m-0 font-weight-bold text-primary">分销管理</h4>
-                                </div>
-                                <div class="card-body">
-                                    <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical">
-                                        <a class="nav-link active" id="v-pills-tree-tab" data-bs-toggle="pill" href="#v-pills-tree" role="tab" aria-controls="v-pills-tree" aria-selected="true">
-                                            <i class="fas fa-sitemap me-2"></i>分销关系
-                                        </a>
-                                        <a class="nav-link" id="v-pills-settings-tab" data-bs-toggle="pill" href="#v-pills-settings" role="tab" aria-controls="v-pills-settings" aria-selected="false">
-                                            <i class="fas fa-cog me-2"></i>分销设置
-                                        </a>
-                                        <a class="nav-link" id="v-pills-commission-tab" data-bs-toggle="pill" href="#v-pills-commission" role="tab" aria-controls="v-pills-commission" aria-selected="false">
-                                            <i class="fas fa-money-bill-wave me-2"></i>佣金记录
-                                        </a>
-                                        <a class="nav-link" id="v-pills-share-messages-tab" data-bs-toggle="pill" href="#v-pills-share-messages" role="tab" aria-controls="v-pills-share-messages" aria-selected="false">
-                                            <i class="fas fa-share-alt me-2"></i>分享文案管理
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
                 
                 <!-- 顶部导航 -->
@@ -161,6 +132,7 @@
                         <button class="nav-link active" id="nav-levels-tab" data-bs-toggle="tab" data-bs-target="#nav-levels" type="button" role="tab" aria-controls="nav-levels" aria-selected="true">分销等级管理</button>
                         <button class="nav-link" id="nav-referrals-tab" data-bs-toggle="tab" data-bs-target="#nav-referrals" type="button" role="tab" aria-controls="nav-referrals" aria-selected="false">用户推荐关系</button>
                         <button class="nav-link" id="nav-network-tab" data-bs-toggle="tab" data-bs-target="#nav-network" type="button" role="tab" aria-controls="nav-network" aria-selected="false">推荐网络查询</button>
+                        <button class="nav-link" id="nav-share-messages-tab" data-bs-toggle="tab" data-bs-target="#nav-share-messages" type="button" role="tab" aria-controls="nav-share-messages" aria-selected="false">分享文案管理</button>
                     </div>
                 </nav>
                 
@@ -180,8 +152,8 @@
                                     <i class="fas fa-lightbulb"></i> 当前分销比例设置：
                                     <ul class="mb-0">
                                         <li><strong>一级分销（Level 1）</strong>: 佣金比例 30%</li>
-                                        <li><strong>二级分销（Level 2）</strong>: 佣金比例 20%</li>
-                                        <li><strong>三级分销（Level 3）</strong>: 佣金比例 10%</li>
+                                        <li><strong>二级分销（Level 2）</strong>: 佣金比例 15%</li>
+                                        <li><strong>三级分销（Level 3）</strong>: 佣金比例 5%</li>
                                     </ul>
                                 </div>
                                 <div class="table-responsive">
@@ -316,7 +288,7 @@
                     </div>
                     
                     <!-- 佣金记录标签内容 -->
-                    <div class="tab-pane fade" id="v-pills-commission" role="tabpanel" aria-labelledby="v-pills-commission-tab">
+                    <div class="tab-pane fade" id="nav-commission" role="tabpanel" aria-labelledby="nav-commission-tab">
                         <div class="card shadow mb-4">
                             <!-- 卡片头部 -->
                             <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
@@ -332,7 +304,7 @@
                     </div>
                     
                     <!-- 分享文案管理标签内容 -->
-                    <div class="tab-pane fade" id="v-pills-share-messages" role="tabpanel" aria-labelledby="v-pills-share-messages-tab">
+                    <div class="tab-pane fade" id="nav-share-messages" role="tabpanel" aria-labelledby="nav-share-messages-tab">
                         <div class="card shadow mb-4">
                             <!-- 卡片头部 -->
                             <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
@@ -1134,6 +1106,14 @@
             $("#btn-search-network").click(searchReferralNetwork);
             $("#referrals-prev").click(() => loadUserReferrals(currentReferralPage - 1));
             $("#referrals-next").click(() => loadUserReferrals(currentReferralPage + 1));
+            
+            // 分享文案管理按钮事件
+            $("#addNewMessage").click(addNewMessage);
+            $("#messageAddButton").click(addNewMessage);
+            $("#saveMessages").click(saveShareMessages);
+            
+            // 页面加载时初始化分享文案
+            loadShareMessages();
         }
     </script>
 </body>
