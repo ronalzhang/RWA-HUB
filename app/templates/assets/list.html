@@ -3,14 +3,7 @@
 {% block title %}{{ _('Asset List') }} - RWA-HUB{% endblock %}
 
 {% block content %}
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body>
-<div class="container py-5">
+<div class="container py-5 asset-list-page">
     <!-- 标题和创建按钮 -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">{{ _('Asset List') }}</h2>
@@ -72,21 +65,21 @@
                             </p>
                             {% if asset.asset_type == 10 %}
                             <p class="card-text mb-2">
-                                <span class="text-muted">面积：</span>
+                                <span class="text-muted">{{ _('Area') }}：</span>
                                 <span class="fw-bold text-dark">{{ asset.area|number_format }} ㎡</span>
                             </p>
                             {% else %}
                             <p class="card-text mb-2">
-                                <span class="text-muted">总价值：</span>
+                                <span class="text-muted">{{ _('Total Value') }}：</span>
                                 <span class="fw-bold text-dark">{{ asset.total_value|number_format }} USDC</span>
                             </p>
                             {% endif %}
                             <p class="card-text mb-2">
-                                <span class="text-muted">代币价格：</span>
+                                <span class="text-muted">{{ _('Token Price') }}：</span>
                                 <span class="fw-bold text-dark">{{ asset.token_price|number_format }} USDC</span>
                             </p>
                             <p class="card-text">
-                                <span class="text-muted">预期年收益：</span>
+                                <span class="text-muted">{{ _('Expected Annual Revenue') }}：</span>
                                 <span class="fw-bold text-success">{{ asset.annual_revenue|number_format }} USDC</span>
                             </p>
                         </div>
@@ -98,11 +91,11 @@
         <div class="col-12">
             <div class="text-center py-5">
                 <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
-                <h4 class="text-muted">暂无资产</h4>
+                <h4 class="text-muted">{{ _('No Assets') }}</h4>
                 {% if current_user_address %}
-                <p class="text-muted mb-4">点击右上角的"发布资产"按钮开始创建</p>
+                <p class="text-muted mb-4">{{ _('Click the "Publish Asset" button in the top right to create') }}</p>
                 {% else %}
-                <p class="text-muted mb-4">请先连接钱包</p>
+                <p class="text-muted mb-4">{{ _('Please connect wallet first') }}</p>
                 {% endif %}
             </div>
         </div>
@@ -124,28 +117,6 @@
 </div>
 
 <style>
-/* 卡片样式 */
-.card {
-    transition: transform 0.2s;
-    border-radius: 12px;
-    overflow: hidden;
-    cursor: pointer;
-}
-
-.card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-}
-
-/* 图片样式 */
-.card-img-top {
-    border-top-left-radius: 12px;
-    border-top-right-radius: 12px;
-}
-
-/* 标签样式 */
-.badge {
-    font-weight: 500;
     padding: 0.5em 1em;
     border-radius: 6px;
 }
@@ -182,7 +153,5 @@
     margin-bottom: 50px;
 }
 </style>
-</body>
-</html>
 {% endblock %}
 

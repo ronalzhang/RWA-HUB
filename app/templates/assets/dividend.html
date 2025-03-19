@@ -5,9 +5,36 @@
 {% block head %}
 {{ super() }}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
-<script src="/static/js/AssetTokenABI.js"></script>
-<script src="/static/js/USDCABI.js"></script>
+<!-- 不再直接引用Web3.js，由base.html中的动态加载器处理 -->
+<script>
+    // 确保Web3.js可用后再加载其他脚本
+    document.addEventListener('web3Loaded', function() {
+        // Web3.js加载成功后，动态加载其他依赖脚本
+        const scripts = [
+            '/static/js/AssetTokenABI.js',
+            '/static/js/USDCABI.js'
+        ];
+        
+        scripts.forEach(function(src) {
+            const script = document.createElement('script');
+            script.src = src;
+            document.head.appendChild(script);
+        });
+    });
+    
+    // 处理Web3.js加载失败的情况
+    document.addEventListener('web3LoadFailed', function() {
+        console.error('Web3.js加载失败，分红功能可能无法正常工作');
+        // 显示错误信息给用户
+        const container = document.querySelector('.container');
+        if (container) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-danger mt-3';
+            alert.innerHTML = '<strong>错误:</strong> 无法加载Web3.js，分红功能可能无法正常使用。请刷新页面重试。';
+            container.prepend(alert);
+        }
+    });
+</script>
 <style>
     .stats-card {
         background-color: #f8f9fa;

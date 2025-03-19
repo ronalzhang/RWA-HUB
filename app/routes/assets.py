@@ -1,4 +1,8 @@
-from flask import render_template, send_from_directory, current_app, abort, request, redirect, url_for, jsonify, g, Response, flash, session
+from flask import (
+    Blueprint, render_template, request, redirect, url_for, 
+    flash, abort, session, jsonify, current_app, g, 
+    make_response, send_file, stream_with_context, Response, send_from_directory
+)
 from . import assets_bp, assets_api_bp
 from app.extensions import db  # 从扩展模块导入 db
 from app.models import Asset
@@ -13,6 +17,8 @@ import json
 from datetime import datetime
 import random
 import requests
+import re
+import mimetypes
 
 # 页面路由
 @assets_bp.route("/")
@@ -331,24 +337,116 @@ def proxy_file(file_type, file_path):
         current_app.logger.error(f"文件请求失败: {str(e)}")
         abort(500)
 
-@assets_bp.route('/proxy/image/<path:image_path>')
+@assets_bp.route('/proxy-image/<path:image_path>')
 def proxy_image(image_path):
-    """处理图片请求"""
+    """
+    代理图片请求，支持多种路径格式
+    """
     try:
-        # 检查是否是静态资源路径
-        if image_path.startswith('static/'):
-            return send_from_directory('static', image_path[7:])
-            
-        # 检查是否是上传的文件
+        import os
+        from flask import send_file, current_app, request, abort
+        
+        current_app.logger.info(f"请求代理图片: {image_path}")
+        
+        # 正常化路径 (移除多余的斜杠)
+        image_path = os.path.normpath(image_path)
+        
+        # 列出尝试的所有路径，用于调试
+        search_paths = []
+        
+        # 检查image_path是否包含完整的路径信息
         if image_path.startswith('uploads/'):
-            return send_from_directory('static/uploads', image_path[8:])
+            file_path = os.path.join(current_app.static_folder, image_path)
+            search_paths.append(file_path)
+        elif image_path.startswith('projects/'):
+            file_path = os.path.join(current_app.static_folder, 'uploads', image_path)
+            search_paths.append(file_path)
+        elif '/' in image_path:
+            # 可能是旧格式路径，如: 10/temp/image/filename.jpg
+            file_path = os.path.join(current_app.static_folder, 'uploads', image_path)
+            search_paths.append(file_path)
             
-        # 如果都不是，返回默认图片
-        return send_from_directory('static/images', 'placeholder.jpg')
+            # 尝试在projects目录下查找
+            if 'temp/image' in image_path:
+                filename = os.path.basename(image_path)
+                token_symbol = request.args.get('token', '')
+                if token_symbol:
+                    projects_path = os.path.join(current_app.static_folder, 'uploads', 'projects', token_symbol, 'images', filename)
+                    search_paths.append(projects_path)
+        else:
+            # 单一文件名，尝试在多个位置查找
+            filename = image_path
+            token_symbol = request.args.get('token', '')
             
+            # 尝试的路径列表
+            possible_paths = []
+            
+            # 如果提供了token_symbol, 首先在该token的专属目录查找
+            if token_symbol:
+                possible_paths.append(os.path.join(current_app.static_folder, 'uploads', 'projects', token_symbol, 'images', filename))
+            
+            # 其他可能的路径
+            possible_paths.extend([
+                os.path.join(current_app.static_folder, 'uploads', '10', 'temp', 'image', filename),
+                os.path.join(current_app.static_folder, 'uploads', '20', 'temp', 'image', filename),
+                os.path.join(current_app.static_folder, 'uploads', 'temp', 'images', filename),
+                os.path.join(current_app.static_folder, 'uploads', 'projects', 'temp', 'images', filename)
+            ])
+            
+            search_paths.extend(possible_paths)
+            
+            # 查找第一个存在的文件
+            for path in possible_paths:
+                if os.path.isfile(path):
+                    file_path = path
+                    break
+            else:
+                current_app.logger.error(f"找不到图片: {image_path}")
+                current_app.logger.error(f"尝试的路径: {search_paths}")
+                abort(404)
+        
+        current_app.logger.info(f"尝试提供文件: {file_path}")
+        
+        # 检查文件是否存在
+        if not os.path.isfile(file_path):
+            current_app.logger.error(f"文件不存在: {file_path}")
+            
+            # 搜索整个uploads目录
+            import glob
+            filename = os.path.basename(image_path)
+            global_search = glob.glob(os.path.join(current_app.static_folder, 'uploads', '**', filename), recursive=True)
+            
+            if global_search:
+                file_path = global_search[0]
+                current_app.logger.info(f"全局搜索找到文件: {file_path}")
+            else:
+                current_app.logger.error(f"尝试的所有路径: {search_paths}")
+                current_app.logger.error(f"全局搜索未找到文件: {filename}")
+                abort(404)
+        
+        # 检查文件权限
+        if not os.access(file_path, os.R_OK):
+            current_app.logger.error(f"文件无读取权限: {file_path}")
+            abort(403)
+        
+        # 获取MIME类型
+        import mimetypes
+        mime_type = mimetypes.guess_type(file_path)[0] or 'application/octet-stream'
+        
+        # 禁用浏览器缓存
+        response = send_file(file_path, mimetype=mime_type)
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        
+        current_app.logger.info(f"成功代理图片: {image_path} -> {file_path}")
+        return response
+        
     except Exception as e:
-        current_app.logger.error(f"图片请求失败: {str(e)}")
-        return send_from_directory('static/images', 'placeholder.jpg')
+        import traceback
+        current_app.logger.error(f"代理图片错误: {str(e)}")
+        current_app.logger.error(traceback.format_exc())
+        abort(500)
 
 @assets_api_bp.route('/generate-token-symbol', methods=['POST'])
 def generate_token_symbol():
@@ -360,16 +458,35 @@ def generate_token_symbol():
         if not asset_type:
             return jsonify({'error': '缺少资产类型'}), 400
             
-        # 生成随机数
-        random_num = f"{random.randint(0, 9999):04d}"
-        token_symbol = f"RH-{asset_type}{random_num}"
+        # 尝试多次生成唯一的token_symbol
+        max_attempts = 10
+        for attempt in range(max_attempts):
+            # 生成随机数
+            random_num = f"{random.randint(0, 9999):04d}"
+            token_symbol = f"RH-{asset_type}{random_num}"
+            
+            # 检查是否已存在
+            current_app.logger.info(f"尝试生成token_symbol: {token_symbol} (尝试 {attempt+1}/{max_attempts})")
+            existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+            
+            # 如果不存在，则可以使用
+            if not existing_asset:
+                current_app.logger.info(f"生成的token_symbol可用: {token_symbol}")
+                return jsonify({
+                    'success': True,
+                    'token_symbol': token_symbol
+                })
+            else:
+                current_app.logger.warning(f"token_symbol已存在: {token_symbol}，重新生成")
         
+        # 如果达到最大尝试次数仍未生成唯一符号，返回错误
         return jsonify({
-            'token_symbol': token_symbol
-        })
+            'success': False,
+            'error': '无法生成唯一的代币符号，请稍后重试'
+        }), 500
     except Exception as e:
         current_app.logger.error(f'生成代币代码失败: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @assets_api_bp.route('/calculate-tokens', methods=['POST'])
 def calculate_tokens():
@@ -413,18 +530,20 @@ def upload_files():
         asset_type = request.form.get('asset_type')
         file_type = request.form.get('file_type', 'image')
         asset_id = request.form.get('asset_id', 'temp')
+        token_symbol = request.form.get('token_symbol', '')
         
         current_app.logger.info(f'开始上传文件: {file.filename}')
         current_app.logger.info(f'资产类型: {asset_type}')
         current_app.logger.info(f'文件类型: {file_type}')
         current_app.logger.info(f'资产ID: {asset_id}')
+        current_app.logger.info(f'代币符号: {token_symbol}')
         
         if not asset_type:
             current_app.logger.error('缺少资产类型')
             return jsonify({'error': '缺少资产类型'}), 400
             
         # 保存文件
-        file_urls = save_files([file], asset_type, asset_id)
+        file_urls = save_files([file], asset_type, asset_id, token_symbol)
         
         if not file_urls:
             current_app.logger.error('文件上传失败')
@@ -543,6 +662,26 @@ def dividend_page_by_symbol(token_symbol):
         flash('访问资产分红页面失败', 'danger')
         return redirect(url_for('assets.list_assets_page'))
 
+@assets_api_bp.route('/check_token_symbol')
+def check_token_symbol():
+    """检查代币符号是否可用"""
+    symbol = request.args.get('symbol')
+    
+    if not symbol:
+        return jsonify({'error': 'Symbol is required'}), 400
+    
+    # 验证符号格式：必须以RH-开头，后面跟10或20，然后是4位数字
+    if not re.match(r'^RH-(10|20)\d{4}$', symbol):
+        return jsonify({'error': 'Invalid symbol format', 'available': False}), 400
+    
+    # 检查数据库中是否已存在该符号
+    existing_asset = Asset.query.filter_by(token_symbol=symbol).first()
+    
+    return jsonify({
+        'available': existing_asset is None,
+        'exists': existing_asset is not None
+    })
+
 # 全局前置处理器，确保在所有处理之前捕获重复前缀问题
 def register_global_handlers(app):
     """注册全局处理器"""
@@ -556,6 +695,18 @@ def register_global_handlers(app):
             current_app.logger.info(f'全局修正后路径: {corrected_path}')
             return redirect(corrected_path, code=301)
         return None
+    
+    @app.before_request
+    def set_language():
+        """设置当前语言"""
+        # 从cookie获取语言设置，默认为英文
+        lang = request.cookies.get('language', 'en')
+        # 确保只支持英文和繁体中文
+        if lang not in ['en', 'zh_Hant']:
+            lang = 'en'
+        # 设置全局语言变量，供模板使用
+        g.locale = lang
+        current_app.logger.debug(f'当前语言设置为: {lang}')
 
 def get_eth_address():
     """从多个来源获取钱包地址"""

@@ -8,13 +8,7 @@
 {% endblock %}
 
 {% block content %}
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body>
+<div class="index-page">
 <!-- Hero Section -->
 <div class="hero-section position-relative overflow-hidden">
     <div class="hero-bg-pattern"></div>
@@ -107,7 +101,7 @@
                             <!-- Asset Info -->
                             <div class="asset-info">
                                 <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <h5 class="asset-title mb-0">{{ asset.name }}</h5>
+                                    <h5 class="asset-title text-truncate mb-0">{{ asset.name }}</h5>
                                     <span class="badge bg-primary">{{ asset.token_symbol }}</span>
                                 </div>
                                 <div class="asset-details">
@@ -377,29 +371,6 @@
     align-items: center;
 }
 
-/* 资产卡片 */
-.asset-card {
-    border-radius: 1rem;
-    background: white;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
-    transition: all 0.3s ease;
-    overflow: hidden;
-}
-
-.asset-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-}
-
-.asset-image {
-    height: 200px;
-    overflow: hidden;
-}
-
-.img-cover {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
 }
 
 .img-placeholder {
@@ -478,6 +449,15 @@
     object-fit: contain;
     opacity: 0.8;  /* 设置透明度，0.8 = 80%不透明 */
 }
+
+/* 确保首页资产卡片样式与列表页一致 */
+.asset-title.text-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 180px;
+    display: block;
+}
 </style>
 
 <!-- AOS Animation Library -->
@@ -489,6 +469,5 @@
         offset: 100
     });
 </script>
-</body>
-</html>
+</div>
 {% endblock %}
