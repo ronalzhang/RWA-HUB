@@ -15,18 +15,20 @@ __all__ = [
     'has_permission'
 ]
 
-def save_files(files, asset_type, asset_id):
+def save_files(files, asset_type, asset_id, token_symbol=None):
     """保存上传的文件到本地存储
     
     Args:
         files: 文件列表
         asset_type: 资产类型 (real_estate 或 quasi_real_estate)
         asset_id: 资产ID
+        token_symbol: 代币符号 (可选)
         
     Returns:
         保存的文件 URL 列表
     """
     import time
+    import shutil
     
     # 允许的文件扩展名
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
@@ -88,8 +90,19 @@ def save_files(files, asset_type, asset_id):
             try:
                 # 构建文件名
                 ext = os.path.splitext(secure_filename(file.filename))[1]
-                timestamp = int(time.time() * 1000)  # 使用毫秒级时间戳
-                filename = f'{asset_type}/{asset_id}/file_{timestamp}_{i+1}{ext}'
+                timestamp = int(time.time())  # 使用秒级时间戳，便于调试
+                
+                # 根据是否提供token_symbol决定文件路径
+                if token_symbol:
+                    # 使用项目目录结构
+                    file_type = 'images' if ext.lower() in ['.jpg', '.jpeg', '.png', '.gif', '.webp'] else 'documents'
+                    filename = f"projects/{token_symbol}/{file_type}/{timestamp}_{secure_filename(file.filename)}"
+                    current_app.logger.info(f'使用新目录结构: {filename}')
+                else:
+                    # 使用旧的目录结构
+                    file_type = 'image' if ext.lower() in ['.jpg', '.jpeg', '.png', '.gif', '.webp'] else 'document'
+                    filename = f"{asset_id}/temp/{file_type}/{timestamp}_{secure_filename(file.filename)}"
+                    current_app.logger.info(f'使用旧目录结构: {filename}')
                 
                 current_app.logger.info(f'处理文件 {i+1}/{len(files)}: {filename}')
                 
@@ -116,7 +129,7 @@ def save_files(files, asset_type, asset_id):
                         })
                         break
                 
-                # 上传到七牛云
+                # 上传到本地存储
                 current_app.logger.info(f'尝试上传文件 (第{retry_count + 1}次): {filename}')
                 result = storage.upload(file_data, filename)
                 
@@ -125,7 +138,7 @@ def save_files(files, asset_type, asset_id):
                     current_app.logger.info(f'文件上传成功: {result["url"]}')
                     break
                 else:
-                    raise Exception("七牛云返回空URL")
+                    raise Exception("存储返回空URL")
                     
             except Exception as e:
                 last_error = str(e)
@@ -151,3 +164,76 @@ def save_files(files, asset_type, asset_id):
     
     current_app.logger.info(f'文件上传完成，成功: {len(file_urls)}，失败: {len(failed_files)}')
     return file_urls
+
+def move_temp_files_to_project(asset_id, token_symbol):
+    """
+    将临时目录中的文件移动到项目目录
+    
+    Args:
+        asset_id: 资产ID
+        token_symbol: 代币符号
+    
+    Returns:
+        移动成功的文件URL列表
+    """
+    import os
+    import shutil
+    from flask import current_app
+    
+    if not token_symbol:
+        current_app.logger.error('没有提供代币符号，无法移动文件')
+        return []
+    
+    # 获取上传根目录
+    upload_folder = os.path.join(current_app.static_folder, 'uploads')
+    
+    # 临时目录
+    temp_image_dir = os.path.join(upload_folder, f"{asset_id}/temp/image")
+    temp_document_dir = os.path.join(upload_folder, f"{asset_id}/temp/document")
+    
+    # 项目目录
+    project_image_dir = os.path.join(upload_folder, f"projects/{token_symbol}/images")
+    project_document_dir = os.path.join(upload_folder, f"projects/{token_symbol}/documents")
+    
+    # 确保项目目录存在
+    os.makedirs(project_image_dir, exist_ok=True)
+    os.makedirs(project_document_dir, exist_ok=True)
+    
+    moved_files = []
+    
+    # 移动图片
+    if os.path.exists(temp_image_dir):
+        current_app.logger.info(f'准备移动临时图片从 {temp_image_dir} 到 {project_image_dir}')
+        try:
+            for filename in os.listdir(temp_image_dir):
+                src_path = os.path.join(temp_image_dir, filename)
+                dst_path = os.path.join(project_image_dir, filename)
+                
+                if os.path.isfile(src_path):
+                    shutil.copy2(src_path, dst_path)  # 复制而不是移动，保留原始文件
+                    moved_files.append(f'/static/uploads/projects/{token_symbol}/images/{filename}')
+                    current_app.logger.info(f'成功复制文件: {src_path} -> {dst_path}')
+        except Exception as e:
+            current_app.logger.error(f'移动图片时出错: {str(e)}')
+    else:
+        current_app.logger.warning(f'临时图片目录不存在: {temp_image_dir}')
+    
+    # 移动文档
+    if os.path.exists(temp_document_dir):
+        current_app.logger.info(f'准备移动临时文档从 {temp_document_dir} 到 {project_document_dir}')
+        try:
+            for filename in os.listdir(temp_document_dir):
+                src_path = os.path.join(temp_document_dir, filename)
+                dst_path = os.path.join(project_document_dir, filename)
+                
+                if os.path.isfile(src_path):
+                    shutil.copy2(src_path, dst_path)  # 复制而不是移动，保留原始文件
+                    moved_files.append(f'/static/uploads/projects/{token_symbol}/documents/{filename}')
+                    current_app.logger.info(f'成功复制文件: {src_path} -> {dst_path}')
+        except Exception as e:
+            current_app.logger.error(f'移动文档时出错: {str(e)}')
+    else:
+        current_app.logger.warning(f'临时文档目录不存在: {temp_document_dir}')
+    
+    current_app.logger.info(f'总共移动了 {len(moved_files)} 个文件到项目目录')
+    return moved_files

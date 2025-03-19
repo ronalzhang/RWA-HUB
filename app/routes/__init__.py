@@ -12,6 +12,7 @@ auth_api_bp = Blueprint('auth_api', __name__)
 assets_api_bp = Blueprint('assets_api', __name__, url_prefix='/api/assets')
 trades_api_bp = Blueprint('trades_api', __name__)
 admin_api_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
+service_bp = Blueprint('service', __name__, url_prefix='/api/service')
 
 # 导入视图函数
 from . import main
@@ -19,6 +20,7 @@ from . import views
 from . import api
 from . import admin
 from . import assets
+from . import service
 
 # 导入全局处理器
 from .assets import register_global_handlers
@@ -29,6 +31,7 @@ from .views import *
 from .api import *
 from .admin import *
 from .assets import *
+from .service import *
 
 # 注册蓝图函数
 def register_blueprints(app):
@@ -39,6 +42,7 @@ def register_blueprints(app):
     app.register_blueprint(assets_api_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(admin_api_bp)
+    app.register_blueprint(service_bp)
     
     # 注册全局URL前缀修正处理器
     register_global_handlers(app)

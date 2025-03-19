@@ -66,7 +66,32 @@ def get_admin_info(eth_address):
 def is_admin(eth_address=None):
     """检查指定地址或当前用户是否是管理员"""
     target_address = eth_address if eth_address else g.eth_address if hasattr(g, 'eth_address') else None
-    return get_admin_info(target_address) is not None
+    
+    if not target_address:
+        return False
+        
+    # 检查是否已经在会话或cookie中有管理员状态
+    if session.get('is_admin') and session.get('eth_address') == target_address:
+        return True
+        
+    # 检查cookie
+    cookie_address = request.cookies.get('eth_address')
+    if request.cookies.get('is_admin') == 'true' and cookie_address == target_address:
+        # 更新会话状态
+        session['eth_address'] = target_address
+        session['is_admin'] = True
+        return True
+    
+    # 从配置中检查管理员
+    admin_info = get_admin_info(target_address)
+    
+    # 使用兼容的旧方法检查
+    if not admin_info:
+        if hasattr(current_app.config, 'ADMIN_ADDRESSES') and target_address in current_app.config.get('ADMIN_ADDRESSES', []):
+            current_app.logger.info(f'使用ADMIN_ADDRESSES检查成功: {target_address}')
+            return True
+            
+    return admin_info is not None
 
 def has_permission(permission, eth_address=None):
     """检查管理员是否有特定权限"""
@@ -610,10 +635,18 @@ def batch_delete_assets():
     try:
         data = request.get_json()
         if not data or 'asset_ids' not in data:
-            return jsonify({'error': '请提供要删除的资产ID列表'}), 400
+            return jsonify({'success': False, 'error': '请提供要删除的资产ID列表'}), 400
             
         asset_ids = data['asset_ids']
         current_app.logger.info(f'批量删除资产请求: asset_ids={asset_ids}')
+        
+        # 确保ID是整数
+        for i, asset_id in enumerate(asset_ids):
+            if isinstance(asset_id, str):
+                try:
+                    asset_ids[i] = int(asset_id)
+                except ValueError:
+                    pass  # 如果无法转换，保持原样
         
         success_count = 0
         failed_ids = []
@@ -621,14 +654,11 @@ def batch_delete_assets():
         for asset_id in asset_ids:
             try:
                 asset = Asset.query.get(asset_id)
+                
                 if not asset:
-                    failed_ids.append(asset_id)
+                    failed_ids.append({"id": asset_id, "reason": "资产不存在"})
                     continue
-                    
-                if asset.token_address:
-                    failed_ids.append(asset_id)
-                    continue
-                    
+                
                 # 删除关联记录
                 DividendRecord.query.filter_by(asset_id=asset_id).delete()
                 Trade.query.filter_by(asset_id=asset_id).delete()
@@ -639,20 +669,27 @@ def batch_delete_assets():
                 
             except Exception as e:
                 current_app.logger.error(f'删除资产 {asset_id} 失败: {str(e)}')
-                failed_ids.append(asset_id)
+                failed_ids.append({"id": asset_id, "reason": str(e)})
                 continue
                 
         db.session.commit()
         
+        message = f'成功删除 {success_count} 个资产'
+        if failed_ids:
+            message += f'，{len(failed_ids)} 个资产删除失败'
+            
         return jsonify({
-            'message': f'成功删除 {success_count} 个资产',
+            'success': True,
+            'message': message,
+            'success_count': success_count,
+            'failed_count': len(failed_ids),
             'failed_ids': failed_ids
         })
         
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f'批量删除资产失败: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_api_bp.route('/check_asset/<int:asset_id>', methods=['GET', 'OPTIONS'])
 def check_asset_owner(asset_id):
