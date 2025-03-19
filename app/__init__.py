@@ -1,15 +1,16 @@
-from flask import Flask, request, session, jsonify, render_template, current_app
-from flask_babel import gettext as _
-from app.config import config
-import json
 import os
-import logging
-from logging.handlers import RotatingFileHandler
-from decimal import Decimal
+import json
 import click
-from flask.cli import with_appcontext
+import logging
 import threading
+from decimal import Decimal
+from flask import Flask, g, request, session, jsonify, render_template, current_app
+from flask_babel import gettext as _
+from flask.cli import with_appcontext
 from app.extensions import db, babel, limiter, scheduler, migrate, cors, configure_logging
+from pathlib import Path
+from app.config import config
+from logging.handlers import RotatingFileHandler
 
 def create_app(config_name='development'):
     """创建Flask应用实例"""
@@ -19,6 +20,17 @@ def create_app(config_name='development'):
     app.config.from_object(config[config_name])
     config[config_name].init_app(app)
     
+    # 配置静态文件
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # 禁用静态文件缓存
+    app.static_folder = 'static'  # 设置静态文件夹
+    app.static_url_path = '/static'  # 设置静态文件URL前缀
+    
+    # 确保上传目录存在
+    uploads_dir = os.path.join(app.static_folder, 'uploads')
+    if not os.path.exists(uploads_dir):
+        os.makedirs(uploads_dir)
+        app.logger.info(f'创建上传目录: {uploads_dir}')
+    
     # 初始化日志
     configure_logging(app)
     
@@ -27,9 +39,34 @@ def create_app(config_name='development'):
     def number_format_filter(value):
         try:
             if isinstance(value, (int, float, Decimal)):
+                # 简化实现，只检查g对象中的格式化标记
+                if hasattr(g, 'formatting_field_name'):
+                    field_name = g.formatting_field_name
+                    # 重置标志，避免影响后续格式化
+                    delattr(g, 'formatting_field_name')
+                    
+                    # 根据字段名确定格式化精度
+                    # 代币价格: 6位小数
+                    if 'token_price' in field_name or 'price' in field_name:
+                        return "{:,.6f}".format(float(value))
+                    # 面积、总价值、年收益: 2位小数
+                    elif any(field in field_name for field in ['area', 'total_value', 'annual_revenue']):
+                        return "{:,.2f}".format(float(value))
+                    # 代币供应量、剩余供应量: 0位小数
+                    elif any(field in field_name for field in ['token_supply', 'remaining_supply']):
+                        if isinstance(value, int) or value.is_integer():
+                            return "{:,}".format(int(value))
+                        return "{:,.0f}".format(float(value))
+                
+                # 如果无法确定变量名或不在上述规则中，使用默认格式化规则
+                if isinstance(value, int) or value.is_integer():
+                    return "{:,}".format(int(value))
+                
+                # 默认使用2位小数
                 return "{:,.2f}".format(float(value))
             return value
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
+            app.logger.error(f"格式化数字出错: {str(e)}")
             return value
             
     @app.template_filter('from_json')
@@ -48,10 +85,18 @@ def create_app(config_name='development'):
     # 设置Babel配置
     app.config['BABEL_DEFAULT_LOCALE'] = 'en'
     app.config['BABEL_DEFAULT_TIMEZONE'] = 'UTC'
+    app.config['LANGUAGES'] = ['en', 'zh_Hant']
     
     # 设置语言选择函数
     def get_locale():
-        return request.cookies.get('language', 'en')
+        # 从cookie获取语言设置，默认为英文
+        lang = request.cookies.get('language', 'en')
+        # 确保只支持英文和繁体中文
+        if lang not in ['en', 'zh_Hant']:
+            lang = 'en'
+        # 设置全局语言变量，供模板使用
+        g.locale = lang
+        return lang
     
     babel.locale_selector_func = get_locale
     

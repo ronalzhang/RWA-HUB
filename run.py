@@ -110,7 +110,7 @@ if __name__ == '__main__':
     print("启动服务器...")
     print("访问地址:")
     print(f"本地:    http://127.0.0.1:{port}")
-    print(f"外部:    http://{host}:{port}")
+    print(f"局域网:  http://<本机IP>:{port}")
     
     # 使用waitress作为生产服务器，增加配置选项
     from waitress import serve

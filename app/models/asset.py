@@ -49,6 +49,19 @@ class Asset(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     deleted_at = db.Column(db.DateTime, nullable=True)  # 软删除标记
     remaining_supply = db.Column(db.Integer)  # 剩余可售数量
+    
+    # 区块链相关字段
+    blockchain_details = db.Column(db.Text)  # 区块链部署详情，JSON格式
+    deployment_tx_hash = db.Column(db.String(100))  # 部署交易哈希
+    
+    # 支付相关字段
+    payment_details = db.Column(db.Text)  # 支付详情，JSON格式
+    payment_confirmed = db.Column(db.Boolean, default=False)  # 支付是否已确认
+    payment_confirmed_at = db.Column(db.DateTime)  # 支付确认时间
+    
+    # 添加审核信息
+    approved_at = db.Column(db.DateTime)  # 审核通过时间
+    approved_by = db.Column(db.String(64))  # 审核人地址
 
     # 添加关联
     dividend_records = db.relationship('DividendRecord', backref='asset', lazy=True, cascade='all, delete-orphan')

@@ -158,10 +158,27 @@
         box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
     }
     
-    .btn {
+    .btn-gradient-primary {
+        color: #fff;
+        background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+        border-color: #0d6efd;
         padding: 0.75rem 1.5rem;
         font-weight: 500;
-        border-radius: 0.375rem;
+        box-shadow: 0 0.125rem 0.25rem rgba(13, 110, 253, 0.4);
+        transition: all 0.3s ease;
+    }
+    
+    .btn-gradient-primary:hover {
+        background: linear-gradient(135deg, #0b5ed7 0%, #0a58ca 100%);
+        border-color: #0a58ca;
+        transform: translateY(-1px);
+        box-shadow: 0 0.25rem 0.5rem rgba(13, 110, 253, 0.5);
+        color: #fff;
+    }
+    
+    .btn-gradient-primary:active {
+        transform: translateY(0);
+        box-shadow: 0 0.125rem 0.25rem rgba(13, 110, 253, 0.4);
     }
     
     .alert-info {
@@ -238,10 +255,10 @@
             <!-- 表单内容 -->
             <div id="formContent" style="display: none;">
                 <form id="assetForm" class="needs-validation" novalidate>
-                    <!-- 基本信息 -->
+                    <!-- 资产详情 -->
                     <div class="card mb-4">
                         <div class="card-header">
-                            <h5 class="card-title mb-0">{{ _('Basic Information') }}</h5>
+                            <h5 class="card-title mb-0">{{ _('Asset Details') }}</h5>
                         </div>
                         <div class="card-body">
                             <!-- 创建者地址 -->
@@ -276,60 +293,25 @@
                                 <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
                                 <div class="invalid-feedback">{{ _('Please enter asset description') }}</div>
                             </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 资产详情 -->
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">{{ _('Asset Details') }}</h5>
-                        </div>
-                        <div class="card-body">
-                            <!-- 代币代码 -->
+                            
+                            <!-- 代币代码和发行费用 -->
                             <div class="row mb-4">
                                 <div class="col-md-6">
-                                    <label for="tokensymbol" class="form-label">{{ _('Token Symbol') }}</label>
-                                    <div class="input-group">
+                                    <div class="form-group">
+                                        <label for="tokensymbol">{{ _('Token Symbol') }} <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control" id="tokensymbol" name="tokensymbol" readonly>
+                                        <small class="form-text text-muted">{{ _('Token symbol will be automatically generated and cannot be modified') }}</small>
                                     </div>
-                                    <small class="form-text text-muted">{{ _('Automatically generated based on asset type') }}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>{{ _('Publishing Fee') }} <span class="text-danger">*</span></label>
+                                        <div class="form-control bg-light" id="publishingFee">0.00 USDC</div>
+                                        <small class="form-text text-muted">{{ _('0.01%% of total asset value, minimum 100 USDC') }}</small>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- 上链费用计算区域 -->
-                            <div class="card mb-4">
-                                <div class="card-header bg-light">
-                                    <h5 class="card-title mb-0">{{ _('Fee Calculation') }}</h5>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row mb-3">
-                                        <div class="col-md-6">
-                                            <label class="form-label">{{ _('On-chain Base Fee') }}</label>
-                                            <div class="form-control bg-light" id="onchainBaseFee">0.00 USDC</div>
-                                            <small class="form-text text-muted">{{ _('Basic cost for blockchain operations') }}</small>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label">{{ _('Platform Fee') }}</label>
-                                            <div class="form-control bg-light" id="platformFee">0.00 USDC</div>
-                                            <small class="form-text text-muted" id="platformFeeNote">
-                                                {% if is_admin_user %}
-                                                {{ _('Admin users only pay base fee') }}
-                                                {% else %}
-                                                {{ _('2.5') }}% {{ _('of total asset value') }}
-                                                {% endif %}
-                                            </small>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <label class="form-label">{{ _('Total Fee') }}</label>
-                                            <div class="form-control bg-light" id="totalFee">0.00 USDC</div>
-                                            <small class="form-text text-muted">{{ _('Total amount to be paid for on-chain process') }}</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
                             <!-- 不动产字段 -->
                             <div class="asset-type-field real-estate">
                                 <div class="row">
@@ -356,7 +338,7 @@
                                         <small class="form-text text-muted">{{ _('Total Value / Token Count') }}</small>
                                     </div>
                                     <div class="col-md-4">
-                                        <label for="annual_revenue" class="form-label">{{ _('Expected Annual Revenue (USDC)') }}</label>
+                                        <label for="annual_revenue" class="form-label">{{ _('Expected Annual Revenue*') }}</label>
                                         <input type="number" class="form-control" id="annual_revenue" name="annual_revenue" step="0.01" min="0" placeholder="0.00">
                                         <small class="form-text text-muted">{{ _('Expected annual revenue in USDC') }}</small>
                                     </div>
@@ -373,7 +355,7 @@
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label for="total_value_similar" class="form-label">{{ _('Total Value (USDC)') }} <span class="text-danger">*</span></label>
-                                        <input type="number" class="form-control" id="total_value_similar" name="total_value" step="0.01" min="0.01" placeholder="0.00">
+                                        <input type="number" class="form-control" id="total_value_similar" name="total_value_similar" step="0.01" min="0.01" placeholder="0.00">
                                         <div class="invalid-feedback">{{ _('Please enter valid total value (greater than 0)') }}</div>
                                     </div>
                                 </div>
@@ -384,7 +366,7 @@
                                         <small class="form-text text-muted">{{ _('Total Value / Token Count') }}</small>
                                     </div>
                                     <div class="col-md-6">
-                                        <label for="expectedAnnualRevenueSimilar" class="form-label">{{ _('Expected Annual Revenue (USDC)') }}</label>
+                                        <label for="expectedAnnualRevenueSimilar" class="form-label">{{ _('Expected Annual Revenue*') }}</label>
                                         <input type="number" class="form-control" id="expectedAnnualRevenueSimilar" name="annual_revenue" step="0.01" min="0" placeholder="0.00">
                                         <small class="form-text text-muted">{{ _('Expected annual revenue in USDC') }}</small>
                                     </div>
@@ -467,18 +449,13 @@
                     </div>
                     
                     <!-- 提交按钮 -->
-                    <div class="d-flex justify-content-between">
-                        <button type="button" class="btn btn-secondary" id="saveDraft">
-                            <i class="fas fa-save me-2"></i>{{ _('Save Draft') }}
+                    <div class="col-12 text-center mt-4">
+                        <button type="button" class="btn btn-outline-primary me-2" id="previewForm">
+                            <i class="fas fa-eye me-2"></i>{{ _('Preview') }}
                         </button>
-                        <div>
-                            <button type="button" class="btn btn-outline-secondary me-2" id="previewForm">
-                                <i class="fas fa-eye me-2"></i>{{ _('Preview') }}
-                            </button>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-paper-plane me-2"></i>{{ _('Submit for Review') }}
-                            </button>
-                        </div>
+                        <button type="button" class="btn btn-gradient-primary" id="payAndPublish">
+                            <i class="fas fa-credit-card me-2"></i>{{ _('Pay and Publish') }}
+                        </button>
                     </div>
                 </form>
             </div>
@@ -486,19 +463,37 @@
     </div>
 </div>
 
-<!-- 错误提示模态框 -->
+<!-- 成功模态框 -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="successModalLabel">发布成功</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="successMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">确定</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 错误模态框 -->
 <div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="errorModalLabel">错误提示</h5>
+                <h5 class="modal-title" id="errorModalLabel">错误</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p id="errorMessage"></p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">确定</button>
             </div>
         </div>
     </div>
@@ -509,15 +504,61 @@
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="previewModalLabel">Asset Preview</h5>
+                <h5 class="modal-title" id="previewModalLabel">
+                    <i class="fas fa-eye me-2"></i>{{ _('Asset Preview') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <!-- Preview content will be dynamically populated by JavaScript -->
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="submitForm()">Submit</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                <button type="button" class="btn btn-gradient-primary" id="previewPublishBtn">
+                    <i class="fas fa-credit-card me-2"></i>支付并发布
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 加载中遮罩 -->
+<div id="loadingOverlay" class="loading-overlay d-none">
+    <div class="loading-wrapper">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">加载中...</span>
+        </div>
+        <div class="loading-text mt-3">处理中...</div>
+        <div id="progressContainer" class="mt-3 w-100" style="max-width: 400px;">
+            <div class="progress">
+                <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+            </div>
+            <div id="progressSteps" class="d-flex justify-content-between mt-2">
+                <div class="step active">创建</div>
+                <div class="step">支付</div>
+                <div class="step">上链</div>
+                <div class="step">完成</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 成功提示 -->
+<div id="successMessage" class="modal fade" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">成功</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    <i class="fas fa-check-circle text-success" style="font-size: 48px;"></i>
+                </div>
+                <div id="successTitle" class="text-center fs-5 mb-2">操作成功</div>
+                <div id="successContent" class="text-center">您的操作已成功完成。</div>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">确定</button>
             </div>
         </div>
     </div>
@@ -600,6 +641,113 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 });
+
+// 处理图片上传
+function handleFileUpload(event) {
+    event.preventDefault();
+    console.log('开始处理图片上传...');
+    
+    const assetFormData = getAssetFormData();
+    if (!assetFormData) {
+        return;
+    }
+    
+    // 检查是否有图片
+    if (uploadedFiles.length === 0) {
+        showError('请至少上传一张图片');
+        return;
+    }
+    
+    // 验证通过，显示进度指示器
+    showLoadingState('正在创建资产...');
+    
+    // 先获取token symbol，用于创建正确的文件路径
+    fetch('/api/generate-token-symbol', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            asset_type: assetFormData.asset_type,
+            name: assetFormData.name
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.token_symbol) {
+            console.log('获取令牌符号成功:', data.token_symbol);
+            
+            // 设置令牌符号，用于后续上传
+            const tokenSymbol = data.token_symbol;
+            
+            // 上传图片到正确的路径
+            const formData = new FormData();
+            
+            // 添加token_symbol，用于创建正确的目录结构
+            formData.append('token_symbol', tokenSymbol);
+            
+            // 添加所有图片文件
+            uploadedFiles.forEach((file, index) => {
+                formData.append(`file${index}`, file.file);
+            });
+            
+            // 上传图片
+            return fetch('/api/upload-images', {
+                method: 'POST',
+                body: formData
+            });
+        } else {
+            throw new Error(data.message || '获取令牌符号失败');
+        }
+    })
+    .then(response => response.json())
+    .then(uploadResult => {
+        console.log('图片上传结果:', uploadResult);
+        
+        if (!uploadResult.success) {
+            throw new Error(uploadResult.message || '图片上传失败');
+        }
+        
+        // 创建资产时使用上传后的图片路径
+        const assetData = {
+            ...assetFormData,
+            images: uploadResult.image_paths || []
+        };
+        
+        console.log('准备提交的资产数据:', assetData);
+        
+        // 提交创建资产请求
+        return fetch('/api/assets/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(assetData)
+        });
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoadingState();
+        
+        if (data.success) {
+            console.log('资产创建成功:', data);
+            showSuccess('资产创建成功！');
+            
+            // 重定向到资产详情页
+            setTimeout(() => {
+                window.location.href = `/assets/detail/${data.asset_id}`;
+            }, 1500);
+        } else {
+            console.error('资产创建失败:', data);
+            showError(data.message || '资产创建失败，请重试');
+        }
+    })
+    .catch(error => {
+        console.error('处理上传过程出错:', error);
+        hideLoadingState();
+        showError(error.message || '处理上传过程出错，请重试');
+    });
+}
 </script>
 <script src="{{ url_for('static', filename='js/assets/create.js') }}"></script>
 {% endblock %}

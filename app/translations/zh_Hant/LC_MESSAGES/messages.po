@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2025-02-05 14:22+0800\n"
+"POT-Creation-Date: 2025-03-19 16:39+0800\n"
 "PO-Revision-Date: 2025-02-05 13:45+0800\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: zh_Hant\n"
@@ -19,18 +19,50 @@ msgstr ""
 "Generated-By: Babel 2.17.0\n"
 
 #: app/templates/base.html:45
+msgid "English"
+msgstr "英文"
+
+#: app/templates/base.html:45
+msgid "繁體中文"
+msgstr "繁體中文"
+
+#: app/templates/base.html:45
 msgid "All Assets"
 msgstr "全部資產"
 
-#: app/templates/base.html:59
+#: app/templates/base.html:45
+msgid "Current Connection"
+msgstr "當前連接"
+
+#: app/templates/base.html:45
+msgid "Not Connected"
+msgstr "未連接"
+
+#: app/templates/base.html:45
+msgid "USDC Balance"
+msgstr "USDC 餘額"
+
+#: app/templates/base.html:45
+msgid "Loading"
+msgstr "加載中"
+
+#: app/templates/base.html:45
+msgid "My Assets"
+msgstr "我的資產"
+
+#: app/templates/base.html:45
 msgid "Connect Wallet"
 msgstr "連接錢包"
 
-#: app/templates/base.html:63
+#: app/templates/base.html:45
+msgid "Disconnect Wallet"
+msgstr "斷開錢包連接"
+
+#: app/templates/base.html:59
 msgid "Switch Wallet"
 msgstr "切換錢包"
 
-#: app/templates/base.html:67
+#: app/templates/base.html:63
 msgid "Disconnect"
 msgstr "斷開連接"
 
@@ -238,7 +270,7 @@ msgstr "請輸入資產描述"
 
 #: app/templates/assets/create.html:49
 msgid "Asset Details"
-msgstr "資產信息"
+msgstr "資產詳情"
 
 #: app/templates/assets/create.html:53
 msgid "Asset Area (㎡)"
@@ -340,30 +372,6 @@ msgstr "錯誤"
 msgid "Asset List"
 msgstr "資產列表"
 
-#: app/templates/assets/list.html:19
-msgid "Publish Asset"
-msgstr "發布資產"
-
-#: app/templates/assets/list.html:43
-msgid "Pending Review"
-msgstr "待審核"
-
-#: app/templates/assets/list.html:45
-msgid "On Chain"
-msgstr "已上鏈"
-
-#: app/templates/assets/list.html:47
-msgid "Rejected"
-msgstr "已拒絕"
-
-#: app/templates/assets/list.html:53
-msgid "Real Estate"
-msgstr "不動產"
-
-#: app/templates/assets/list.html:55
-msgid "Similar Assets"
-msgstr "類不動產"
-
 #: app/templates/assets/detail.html:19
 msgid "Back to List"
 msgstr "返回列表"
@@ -373,32 +381,12 @@ msgid "Dividend Management"
 msgstr "分紅管理"
 
 #: app/templates/assets/detail.html:73
-msgid "Basic Information"
-msgstr "基本信息"
-
-#: app/templates/assets/detail.html:78
-msgid "Area"
-msgstr "面積"
-
-#: app/templates/assets/detail.html:85
-msgid "Total Value"
-msgstr "總價值"
-
-#: app/templates/assets/detail.html:92
-msgid "Expected Annual Revenue"
-msgstr "預期年收益"
-
-#: app/templates/assets/detail.html:100
 msgid "Token Information"
 msgstr "代幣信息"
 
 #: app/templates/assets/detail.html:105
 msgid "Token Symbol"
 msgstr "代幣符號"
-
-#: app/templates/assets/detail.html:112
-msgid "Token Price"
-msgstr "代幣價格"
 
 #: app/templates/assets/detail.html:119
 msgid "Total Supply / Remaining"
@@ -417,14 +405,10 @@ msgid "Trading function coming soon"
 msgstr "即將開放交易功能"
 
 #: app/templates/assets/detail.html:147
-msgid "Asset Description"
-msgstr "資產描述"
-
-#: app/templates/assets/detail.html:155
 msgid "Dividend History"
 msgstr "分紅歷史"
 
-#: app/templates/assets/detail.html:161
+#: app/templates/assets/detail.html:155
 msgid "Time"
 msgstr "時間"
 
@@ -488,371 +472,211 @@ msgstr "取消"
 msgid "Start Dividend"
 msgstr "發起分紅"
 
-#: venv/lib/python3.13/site-packages/click/_termui_impl.py:556
-#, python-brace-format
-msgid "{editor}: Editing failed"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/_termui_impl.py:560
-#, python-brace-format
-msgid "{editor}: Editing failed: {e}"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/core.py:1124
-msgid "Aborted!"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/core.py:1349
-#: venv/lib/python3.13/site-packages/click/core.py:1379
-#, python-brace-format
-msgid "(Deprecated) {text}"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/core.py:1396
-msgid "Options"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/core.py:1422
-#, python-brace-format
-msgid "Got unexpected extra argument ({args})"
-msgid_plural "Got unexpected extra arguments ({args})"
-msgstr[0] ""
-
-#: venv/lib/python3.13/site-packages/click/core.py:1438
-#, python-brace-format
-msgid "DeprecationWarning: The command {name!r} is deprecated."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/core.py:1645
-msgid "Commands"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/core.py:1677
-msgid "Missing command."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/core.py:1755
-#, python-brace-format
-msgid "No such command {name!r}."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/core.py:2313
-msgid "Value must be an iterable."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/core.py:2334
-#, python-brace-format
-msgid "Takes {nargs} values but 1 was given."
-msgid_plural "Takes {nargs} values but {len} were given."
-msgstr[0] ""
-
-#: venv/lib/python3.13/site-packages/click/core.py:2783
-#, python-brace-format
-msgid "env var: {var}"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/core.py:2813
-msgid "(dynamic)"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/core.py:2828
-#, python-brace-format
-msgid "default: {default}"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/core.py:2841
-msgid "required"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/decorators.py:457
-#, python-format
-msgid "%(prog)s, version %(version)s"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/decorators.py:520
-msgid "Show the version and exit."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/decorators.py:541
-msgid "Show this message and exit."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/exceptions.py:49
-#: venv/lib/python3.13/site-packages/click/exceptions.py:88
-#, python-brace-format
-msgid "Error: {message}"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/exceptions.py:80
-#, python-brace-format
-msgid "Try '{command} {option}' for help."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/exceptions.py:129
-#, python-brace-format
-msgid "Invalid value: {message}"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/exceptions.py:131
-#, python-brace-format
-msgid "Invalid value for {param_hint}: {message}"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/exceptions.py:187
-msgid "Missing argument"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/exceptions.py:189
-msgid "Missing option"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/exceptions.py:191
-msgid "Missing parameter"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/exceptions.py:193
-#, python-brace-format
-msgid "Missing {param_type}"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/exceptions.py:200
-#, python-brace-format
-msgid "Missing parameter: {param_name}"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/exceptions.py:220
-#, python-brace-format
-msgid "No such option: {name}"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/exceptions.py:232
-#, python-brace-format
-msgid "Did you mean {possibility}?"
-msgid_plural "(Possible options: {possibilities})"
-msgstr[0] ""
-
-#: venv/lib/python3.13/site-packages/click/exceptions.py:270
-msgid "unknown error"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/exceptions.py:277
-#, python-brace-format
-msgid "Could not open file {filename!r}: {message}"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/parser.py:233
-#, python-brace-format
-msgid "Argument {name!r} takes {nargs} values."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/parser.py:415
-#, python-brace-format
-msgid "Option {name!r} does not take a value."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/parser.py:476
-#, python-brace-format
-msgid "Option {name!r} requires an argument."
-msgid_plural "Option {name!r} requires {nargs} arguments."
-msgstr[0] ""
-
-#: venv/lib/python3.13/site-packages/click/shell_completion.py:326
-msgid "Shell completion is not supported for Bash versions older than 4.4."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/shell_completion.py:333
-msgid "Couldn't detect Bash version, shell completion is not supported."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/termui.py:158
-msgid "Repeat for confirmation"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/termui.py:174
-msgid "Error: The value you entered was invalid."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/termui.py:176
-#, python-brace-format
-msgid "Error: {e.message}"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/termui.py:187
-msgid "Error: The two entered values do not match."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/termui.py:243
-msgid "Error: invalid input"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/termui.py:773
-msgid "Press any key to continue..."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:267
-#, python-brace-format
-msgid ""
-"Choose from:\n"
-"\t{choices}"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:299
-#, python-brace-format
-msgid "{value!r} is not {choice}."
-msgid_plural "{value!r} is not one of {choices}."
-msgstr[0] ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:393
-#, python-brace-format
-msgid "{value!r} does not match the format {format}."
-msgid_plural "{value!r} does not match the formats {formats}."
-msgstr[0] ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:415
-#, python-brace-format
-msgid "{value!r} is not a valid {number_type}."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:471
-#, python-brace-format
-msgid "{value} is not in the range {range}."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:612
-#, python-brace-format
-msgid "{value!r} is not a valid boolean."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:636
-#, python-brace-format
-msgid "{value!r} is not a valid UUID."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:826
-msgid "file"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:828
-msgid "directory"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:830
-msgid "path"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:881
-#, python-brace-format
-msgid "{name} {filename!r} does not exist."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:890
-#, python-brace-format
-msgid "{name} {filename!r} is a file."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:898
-#, python-brace-format
-msgid "{name} {filename!r} is a directory."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:907
-#, python-brace-format
-msgid "{name} {filename!r} is not readable."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:916
-#, python-brace-format
-msgid "{name} {filename!r} is not writable."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:925
-#, python-brace-format
-msgid "{name} {filename!r} is not executable."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/click/types.py:992
-#, python-brace-format
-msgid "{len_type} values are required, but {len_value} was given."
-msgid_plural "{len_type} values are required, but {len_value} were given."
-msgstr[0] ""
-
-#: venv/lib/python3.13/site-packages/semantic_version/django_fields.py:50
-msgid "Enter a valid version number in X.Y.Z format."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/semantic_version/django_fields.py:52
-msgid "Version"
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/semantic_version/django_fields.py:86
-msgid "Enter a valid version number spec list in ==X.Y.Z,>=A.B.C format."
-msgstr ""
-
-#: venv/lib/python3.13/site-packages/semantic_version/django_fields.py:88
-msgid "Version specification list"
-msgstr ""
-
-#~ msgid "Asset List"
-#~ msgstr "資產列表"
-
-#~ msgid "No assets found"
-#~ msgstr "未找到資產"
-
-#~ msgid "Asset Information"
-#~ msgstr "資產信息"
-
-#~ msgid "Transaction History"
-#~ msgstr "交易歷史"
-
-#~ msgid "No transactions found"
-#~ msgstr "未找到交易記錄"
-
-#~ msgid "Welcome to RWA-HUB"
-#~ msgstr "歡迎來到 RWA-HUB"
-
-#~ msgid "Your Gateway to Digital Asset Management"
-#~ msgstr "您的數字資產管理門戶"
-
-#~ msgid "Secure Asset Management"
-#~ msgstr "安全資產管理"
-
-#~ msgid ""
-#~ "Advanced blockchain technology ensures the "
-#~ "security of your digital assets"
-#~ msgstr "先進的區塊鏈技術確保您的數字資產安全"
-
-#~ msgid "Transparent Transactions"
-#~ msgstr "透明交易"
-
-#~ msgid ""
-#~ "All transactions are recorded on the "
-#~ "blockchain for complete transparency"
-#~ msgstr "所有交易都記錄在區塊鏈上，完全透明"
-
-#~ msgid "Easy Integration"
-#~ msgstr "輕鬆整合"
-
-#~ msgid "Simple integration with existing systems and workflows"
-#~ msgstr "與現有系統和工作流程輕鬆整合"
-
-#~ msgid "Art Collections"
-#~ msgstr "藝術品"
-
-#~ msgid "Precious Metals"
-#~ msgstr "貴金屬"
-
-#~ msgid "Commodities"
-#~ msgstr "大宗商品"
-
-#~ msgid "Page Not Found"
-#~ msgstr "頁面未找到"
-
-#~ msgid "The page you are looking for does not exist."
-#~ msgstr "您要查找的頁面不存在。"
-
-#~ msgid "Internal Server Error"
-#~ msgstr "服務器內部錯誤"
-
-#~ msgid "Something went wrong. Please try again later."
-#~ msgstr "出現錯誤。請稍後再試。"
+#: app/static/js/assets/create.js:100
+msgid "Asset Image"
+msgstr "資產圖片"
+
+#: app/static/js/assets/create.js:105
+msgid "Previous"
+msgstr "上一個"
+
+#: app/static/js/assets/create.js:110
+msgid "Next"
+msgstr "下一個"
+
+#: app/static/js/assets/create.js:115
+msgid "Thumbnail"
+msgstr "縮略圖"
+
+#: app/static/js/assets/create.js:120
+msgid "Preview Mode"
+msgstr "預覽模式"
+
+#: app/static/js/assets/create.js:125
+msgid "Real Estate Details"
+msgstr "不動產詳情"
+
+#: app/static/js/assets/create.js:130
+msgid "Location"
+msgstr "位置"
+
+#: app/static/js/assets/create.js:135
+msgid "sqm"
+msgstr "平方米"
+
+#: app/static/js/assets/create.js:140
+msgid "Related Documents"
+msgstr "相關文檔"
+
+#: app/static/js/assets/create.js:145
+msgid "No documents uploaded"
+msgstr "未上傳文檔"
+
+#: app/static/js/assets/create.js:150
+msgid "Dividend Information"
+msgstr "分紅信息"
+
+#: app/static/js/assets/create.js:155
+msgid "Dividend Frequency"
+msgstr "分紅頻率"
+
+#: app/static/js/assets/create.js:160
+msgid "Quarterly"
+msgstr "季度"
+
+#: app/static/js/assets/create.js:165
+msgid "Total Dividends Paid"
+msgstr "已分紅總額"
+
+#: app/static/js/assets/create.js:170
+msgid "Next Dividend"
+msgstr "下次分紅"
+
+#: app/static/js/assets/create.js:175
+msgid "TBA"
+msgstr "待定"
+
+#: app/static/js/assets/create.js:180
+msgid "Asset Trading"
+msgstr "資產交易"
+
+#: app/static/js/assets/create.js:185
+msgid "Total Supply"
+msgstr "代幣總量"
+
+#: app/static/js/assets/create.js:190
+msgid "Publishing Fee"
+msgstr "發佈費用"
+
+#: app/static/js/assets/create.js:195
+msgid "Purchase Amount"
+msgstr "購買數量"
+
+#: app/static/js/assets/create.js:200
+msgid "Enter amount"
+msgstr "輸入數量"
+
+#: app/static/js/assets/create.js:205
+msgid "tokens"
+msgstr "代幣"
+
+#: app/static/js/assets/create.js:210
+msgid "Available"
+msgstr "可用"
+
+#: app/static/js/assets/create.js:215
+msgid "Not available in preview mode"
+msgstr "預覽模式下不可用"
+
+#: app/static/js/assets/create.js:220
+msgid "Recent Transactions"
+msgstr "近期交易"
+
+#: app/static/js/assets/create.js:225
+msgid "No transaction records yet"
+msgstr "暫無交易記錄"
+
+#: app/static/js/assets/create.js:230
+msgid "Ready to Pay"
+msgstr "準備支付"
+
+#: app/static/js/assets/create.js:235
+msgid "Publishing this asset requires payment of"
+msgstr "發佈此資產需要支付"
+
+#: app/static/js/assets/create.js:240
+msgid "After confirming, the system will connect to your wallet and request payment."
+msgstr "確認後，系統將連接您的錢包並請求支付。"
+
+#: app/static/js/assets/create.js:245
+msgid "Payment Confirmation"
+msgstr "支付確認"
+
+#: app/static/js/assets/create.js:250
+msgid "Confirm Payment"
+msgstr "確認支付"
+
+#: app/static/js/assets/create.js:255
+msgid "Processing..."
+msgstr "處理中..."
+
+#: app/static/js/assets/create.js:260
+msgid "Please fill in"
+msgstr "請填寫"
+
+#: app/static/js/assets/create.js:265
+msgid "Admin users only need to pay the basic transaction fee"
+msgstr "管理員用戶僅需支付基本上鏈費用"
+
+#: app/static/js/assets/create.js:270
+msgid "Regular users need to pay platform fee (2.5% of the asset value)"
+msgstr "普通用戶需支付平台費用（資產價值的2.5%）"
+
+#: app/static/js/assets/create.js:275
+msgid "Loading..."
+msgstr "載入中..."
+
+#: app/static/js/assets/create.js:280
+msgid "No images uploaded"
+msgstr "未上傳圖片"
+
+#: app/static/js/assets/create.js:285
+msgid "Asset Preview"
+msgstr "資產預覽"
+
+#: app/static/js/assets/create.js:290
+msgid "Close"
+msgstr "關閉"
+
+#: app/static/js/assets/create.js:295
+msgid "Publish"
+msgstr "發布"
+
+#: app/static/js/wallet.js:10
+msgid "Connected"
+msgstr "已連接"
+
+#: app/static/js/wallet.js:20
+msgid "Error container not found"
+msgstr "錯誤容器未找到"
+
+#: app/static/js/wallet.js:30
+msgid "No assets found"
+msgstr "未找到資產"
+
+#: app/static/js/assets/detail.js:25
+msgid "Minimum 10,000 USDC required"
+msgstr "最少需要10,000 USDC"
+
+
+#: app/static/js/assets/detail.js:75
+msgid "Dividend initiated successfully"
+msgstr "分紅成功發起"
+
+#: app/static/js/assets/detail.js:81
+msgid "Failed to initiate dividend"
+msgstr "發起分紅失敗"
+
+#: app/static/js/assets/create.js:300
+msgid "Preview"
+msgstr "預覽"
+
+#: app/static/js/assets/create.js:305
+msgid "Support"
+msgstr "支持"
+
+#: app/static/js/assets/create.js:310
+msgid "FAQ"
+msgstr "常見問題"
+
+#: app/static/js/assets/create.js:315
+msgid "Contact Us"
+msgstr "聯繫我們"
+
+#: app/static/js/assets/create.js:320
+msgid "Success"
+msgstr "成功"
+
+#: app/static/js/assets/create.js:325
+
 

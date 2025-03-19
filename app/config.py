@@ -1,4 +1,14 @@
 import os
+from datetime import timedelta
+from dotenv import load_dotenv
+
+# 尝试加载.env文件
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
+    print(f"已加载环境变量文件: {dotenv_path}")
+else:
+    print(f"未找到环境变量文件: {dotenv_path}")
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
@@ -32,6 +42,9 @@ class Config:
             'permissions': ['审核', '编辑', '删除', '发布公告', '管理用户', '查看统计']
         }
     }
+    
+    # 写入ADMIN_ADDRESSES以向后兼容旧代码
+    ADMIN_ADDRESSES = list(ADMIN_CONFIG.keys())
     
     # 权限等级说明
     PERMISSION_LEVELS = {

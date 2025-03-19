@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2025-02-05 14:22+0800\n"
+"POT-Creation-Date: 2025-03-19 16:39+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,338 +17,612 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.17.0\n"
 
-#: app/templates/base.html:45
+#: app/routes/assets.py:224
+msgid "Failed to access asset detail page"
+msgstr ""
+
+#: app/templates/base.html:496
 msgid "All Assets"
 msgstr ""
 
-#: app/templates/base.html:59
+#: app/templates/base.html:500
+msgid "Admin"
+msgstr ""
+
+#: app/templates/base.html:510
+msgid "English"
+msgstr ""
+
+#: app/templates/base.html:510
+msgid "繁體中文"
+msgstr ""
+
+#: app/templates/assets/create.html:251 app/templates/base.html:522
 msgid "Connect Wallet"
 msgstr ""
 
-#: app/templates/base.html:63
+#: app/templates/base.html:526
+msgid "Current Connection"
+msgstr ""
+
+#: app/templates/base.html:527
+msgid "Not Connected"
+msgstr ""
+
+#: app/templates/base.html:530
+msgid "USDC Balance"
+msgstr ""
+
+#: app/templates/base.html:535
+msgid "My Assets"
+msgstr ""
+
+#: app/templates/assets/detail.html:783 app/templates/assets/detail.html:785
+#: app/templates/assets/detail.html:1712 app/templates/assets/detail.html:1804
+#: app/templates/base.html:540 app/templates/base.html:542
+msgid "Loading"
+msgstr ""
+
+#: app/templates/base.html:550
 msgid "Switch Wallet"
 msgstr ""
 
-#: app/templates/base.html:67
-msgid "Disconnect"
+#: app/templates/base.html:553
+msgid "Disconnect Wallet"
 msgstr ""
 
-#: app/templates/base.html:99
+#: app/templates/base.html:575 app/templates/base.html:612
 msgid "Blockchain-based Physical Asset Digitization Platform"
 msgstr ""
 
-#: app/templates/base.html:114
+#: app/templates/base.html:590 app/templates/base.html:614
 msgid "All Rights Reserved"
 msgstr ""
 
 #: app/templates/index.html:3
-msgid "Physical Asset Digitization Platform"
+msgid "Real World Asset Tokenization Platform"
+msgstr ""
+
+#: app/templates/index.html:19
+msgid "Real World Assets"
+msgstr ""
+
+#: app/templates/index.html:20
+msgid "Tokenization Platform"
 msgstr ""
 
 #: app/templates/index.html:22
-msgid "Physical Assets"
+msgid "Start your asset tokenization journey now"
 msgstr ""
 
-#: app/templates/index.html:23
-msgid "Digital Platform"
-msgstr ""
-
-#: app/templates/index.html:25
-msgid "Start your asset digitization journey now"
-msgstr ""
-
-#: app/templates/index.html:25
+#: app/templates/index.html:22
 msgid "Secure, transparent, and efficient blockchain asset management platform"
 msgstr ""
 
-#: app/templates/index.html:28
+#: app/templates/assets/list.html:11 app/templates/index.html:25
 msgid "Publish Asset"
 msgstr ""
 
-#: app/templates/index.html:33
+#: app/templates/index.html:28
 msgid "White Paper"
 msgstr ""
 
-#: app/templates/index.html:54
+#: app/templates/index.html:49
 msgid "Latest Assets"
 msgstr ""
 
-#: app/templates/index.html:55
+#: app/templates/index.html:50
 msgid "Discover quality assets and start your investment journey"
 msgstr ""
 
-#: app/templates/index.html:61
+#: app/templates/index.html:56
 msgid "View All"
 msgstr ""
 
-#: app/templates/index.html:93
+#: app/templates/assets/detail.html:1547 app/templates/assets/detail.html:1575
+#: app/templates/assets/detail.html:1654 app/templates/assets/list.html:39
+#: app/templates/index.html:82
 msgid "Pending Review"
 msgstr ""
 
-#: app/templates/index.html:95
+#: app/templates/assets/detail.html:1549 app/templates/assets/detail.html:1577
+#: app/templates/assets/detail.html:1656 app/templates/assets/list.html:41
+#: app/templates/index.html:84
 msgid "On Chain"
 msgstr ""
 
-#: app/templates/index.html:97
+#: app/templates/assets/detail.html:1551 app/templates/assets/detail.html:1579
+#: app/templates/assets/detail.html:1658 app/templates/assets/list.html:43
+#: app/templates/index.html:86
 msgid "Rejected"
 msgstr ""
 
-#: app/templates/assets/create.html:26 app/templates/index.html:104
-#: app/templates/index.html:217
+#: app/templates/assets/create.html:278 app/templates/assets/list.html:50
+#: app/templates/index.html:93 app/templates/index.html:206
 msgid "Real Estate"
 msgstr ""
 
-#: app/templates/assets/create.html:27 app/templates/index.html:106
-#: app/templates/index.html:230
+#: app/templates/assets/create.html:279 app/templates/assets/list.html:52
+#: app/templates/index.html:95 app/templates/index.html:219
 msgid "Similar Assets"
 msgstr ""
 
-#: app/templates/index.html:123
+#: app/templates/assets/detail.html:1670 app/templates/assets/list.html:68
+#: app/templates/index.html:112
 msgid "Area"
 msgstr ""
 
-#: app/templates/index.html:128
+#: app/templates/assets/detail.html:1678 app/templates/assets/list.html:73
+#: app/templates/index.html:117
 msgid "Total Value"
 msgstr ""
 
-#: app/templates/index.html:133
+#: app/templates/assets/detail.html:1743 app/templates/assets/list.html:78
+#: app/templates/index.html:122
 msgid "Token Price"
 msgstr ""
 
-#: app/templates/index.html:137
+#: app/templates/assets/list.html:82 app/templates/index.html:126
 msgid "Expected Annual Revenue"
 msgstr ""
 
-#: app/templates/index.html:151
+#: app/templates/assets/list.html:94 app/templates/index.html:140
 msgid "No Assets"
 msgstr ""
 
-#: app/templates/index.html:153
+#: app/templates/assets/list.html:96 app/templates/index.html:142
 msgid "Click the \"Publish Asset\" button in the top right to create"
 msgstr ""
 
-#: app/templates/index.html:155
+#: app/templates/assets/list.html:98 app/templates/index.html:144
 msgid "Please connect wallet first"
 msgstr ""
 
-#: app/templates/index.html:169
+#: app/templates/index.html:158
 msgid "Platform Features"
 msgstr ""
 
-#: app/templates/index.html:170
+#: app/templates/index.html:159
 msgid ""
 "Building a secure and transparent asset digitization ecosystem based on "
 "blockchain technology"
 msgstr ""
 
-#: app/templates/index.html:178
+#: app/templates/index.html:167
 msgid "Decentralized Trading"
 msgstr ""
 
-#: app/templates/index.html:179
+#: app/templates/index.html:168
 msgid ""
 "Asset information directly on chain, no registration required, connect "
 "wallet to publish and trade, truly decentralized"
 msgstr ""
 
-#: app/templates/index.html:187
+#: app/templates/index.html:176
 msgid "Asset Security Control"
 msgstr ""
 
-#: app/templates/index.html:188
+#: app/templates/index.html:177
 msgid ""
 "Tokens are always stored in users personal wallets, platform does not "
 "custody any assets, ensuring asset security"
 msgstr ""
 
-#: app/templates/index.html:196
+#: app/templates/index.html:185
 msgid "Transparent Information"
 msgstr ""
 
-#: app/templates/index.html:197
+#: app/templates/index.html:186
 msgid ""
 "All transaction information is recorded on the blockchain, transparent "
 "and immutable, ensuring transaction security"
 msgstr ""
 
-#: app/templates/index.html:208
+#: app/templates/index.html:197
 msgid "Asset Types"
 msgstr ""
 
-#: app/templates/index.html:209
+#: app/templates/index.html:198
 msgid "Supporting two main asset types to meet different needs"
 msgstr ""
 
-#: app/templates/index.html:219
+#: app/templates/index.html:208
 msgid "Token amount = Area × 10000"
 msgstr ""
 
-#: app/templates/index.html:220
+#: app/templates/index.html:209
 msgid "Requires property certificate, land certificate, etc."
 msgstr ""
 
-#: app/templates/index.html:221
+#: app/templates/index.html:210
 msgid "Shows total asset area"
 msgstr ""
 
-#: app/templates/index.html:232
+#: app/templates/index.html:221
 msgid "Customizable token amount"
 msgstr ""
 
-#: app/templates/index.html:233
+#: app/templates/index.html:222
 msgid "Requires auction, exhibition documents, etc."
 msgstr ""
 
-#: app/templates/index.html:234
+#: app/templates/index.html:223
 msgid "Shows total asset value"
 msgstr ""
 
-#: app/templates/assets/create.html:3 app/templates/assets/create.html:7
+#: app/templates/assets/create.html:3 app/templates/assets/create.html:233
 msgid "Create Asset"
 msgstr ""
 
-#: app/templates/assets/create.html:13
-msgid "Basic Information"
+#: app/templates/assets/create.html:238
+msgid "You have an unsaved draft from"
 msgstr ""
 
-#: app/templates/assets/create.html:17
-msgid "Asset Name"
+#: app/templates/assets/create.html:240
+msgid "Load Draft"
 msgstr ""
 
-#: app/templates/assets/create.html:19
-msgid "Please enter asset name"
+#: app/templates/assets/create.html:241
+msgid "Discard"
 msgstr ""
 
-#: app/templates/assets/create.html:23
-msgid "Asset Type"
+#: app/templates/assets/create.html:249
+msgid "Please connect your wallet first"
 msgstr ""
 
-#: app/templates/assets/create.html:25 app/templates/assets/create.html:29
-msgid "Please select asset type"
-msgstr ""
-
-#: app/templates/assets/create.html:33
-msgid "Asset Location"
-msgstr ""
-
-#: app/templates/assets/create.html:35
-msgid "Please enter asset location"
-msgstr ""
-
-#: app/templates/assets/create.html:39
-msgid "Asset Description"
-msgstr ""
-
-#: app/templates/assets/create.html:41
-msgid "Please enter asset description"
-msgstr ""
-
-#: app/templates/assets/create.html:49
+#: app/templates/assets/create.html:261 app/templates/assets/detail.html:1675
 msgid "Asset Details"
 msgstr ""
 
-#: app/templates/assets/create.html:53
+#: app/templates/assets/create.html:269 app/templates/assets/detail.html:1739
+msgid "Asset Name"
+msgstr ""
+
+#: app/templates/assets/create.html:271
+msgid "Please enter asset name"
+msgstr ""
+
+#: app/templates/assets/create.html:275
+msgid "Asset Type"
+msgstr ""
+
+#: app/templates/assets/create.html:277 app/templates/assets/create.html:281
+msgid "Please select asset type"
+msgstr ""
+
+#: app/templates/assets/create.html:286
+msgid "Asset Location"
+msgstr ""
+
+#: app/templates/assets/create.html:288
+msgid "Please enter asset location"
+msgstr ""
+
+#: app/templates/assets/create.html:292 app/templates/assets/detail.html:1650
+msgid "Asset Description"
+msgstr ""
+
+#: app/templates/assets/create.html:294
+msgid "Please enter asset description"
+msgstr ""
+
+#: app/templates/assets/create.html:301
+msgid "Token Symbol"
+msgstr ""
+
+#: app/templates/assets/create.html:303
+msgid "Token symbol will be automatically generated and cannot be modified"
+msgstr ""
+
+#: app/templates/assets/create.html:308
+msgid "Publishing Fee"
+msgstr ""
+
+#: app/templates/assets/create.html:310
+#, python-format
+msgid "0.01%% of total asset value, minimum 100 USDC"
+msgstr ""
+
+#: app/templates/assets/create.html:319
 msgid "Asset Area (㎡)"
 msgstr ""
 
-#: app/templates/assets/create.html:55
-msgid "Please enter asset area"
+#: app/templates/assets/create.html:321
+msgid "Please enter valid asset area (greater than 0)"
 msgstr ""
 
-#: app/templates/assets/create.html:59
+#: app/templates/assets/create.html:324 app/templates/assets/create.html:357
 msgid "Total Value (USDC)"
 msgstr ""
 
-#: app/templates/assets/create.html:61
-msgid "Please enter total value"
+#: app/templates/assets/create.html:326 app/templates/assets/create.html:359
+msgid "Please enter valid total value (greater than 0)"
 msgstr ""
 
-#: app/templates/assets/create.html:65
+#: app/templates/assets/create.html:331 app/templates/assets/create.html:352
+msgid "Token Count"
+msgstr ""
+
+#: app/templates/assets/create.html:333
+msgid "1 square meter = 10,000 tokens"
+msgstr ""
+
+#: app/templates/assets/create.html:336 app/templates/assets/create.html:364
 msgid "Token Price (USDC)"
 msgstr ""
 
-#: app/templates/assets/create.html:67
-msgid "Please enter token price"
+#: app/templates/assets/create.html:338 app/templates/assets/create.html:366
+msgid "Total Value / Token Count"
 msgstr ""
 
-#: app/templates/assets/create.html:71
-msgid "Expected Annual Revenue (USDC)"
+#: app/templates/assets/create.html:341 app/templates/assets/create.html:369
+msgid "Expected Annual Revenue*"
 msgstr ""
 
-#: app/templates/assets/create.html:73
-msgid "Please enter expected annual revenue"
+#: app/templates/assets/create.html:343 app/templates/assets/create.html:371
+msgid "Expected annual revenue in USDC"
 msgstr ""
 
-#: app/templates/assets/create.html:81
+#: app/templates/assets/create.html:354
+msgid "Please enter valid token count (greater than 0)"
+msgstr ""
+
+#: app/templates/assets/create.html:381
 msgid "Asset Images"
 msgstr ""
 
-#: app/templates/assets/create.html:86
+#: app/templates/assets/create.html:381 app/templates/assets/create.html:406
+msgid "(Optional)"
+msgstr ""
+
+#: app/templates/assets/create.html:386
 msgid "Drag and drop images here or click to select"
 msgstr ""
 
-#: app/templates/assets/create.html:95
+#: app/templates/assets/create.html:387
+msgid "Maximum 5 files, 5MB each. Supported formats: JPG, PNG"
+msgstr ""
+
+#: app/templates/assets/create.html:392 app/templates/assets/create.html:440
+msgid "Uploading..."
+msgstr ""
+
+#: app/templates/assets/create.html:406
 msgid "Asset Documents"
 msgstr ""
 
-#: app/templates/assets/create.html:99
-msgid "Required Documents"
+#: app/templates/assets/create.html:412
+msgid "Suggested Documents for Real Estate"
 msgstr ""
 
-#: app/templates/assets/create.html:101
-msgid "For Real Estate"
-msgstr ""
-
-#: app/templates/assets/create.html:103
+#: app/templates/assets/create.html:414
 msgid "Property Certificate"
 msgstr ""
 
-#: app/templates/assets/create.html:104
+#: app/templates/assets/create.html:415
 msgid "Land Certificate"
 msgstr ""
 
-#: app/templates/assets/create.html:105
+#: app/templates/assets/create.html:416
 msgid "Assessment Report"
 msgstr ""
 
-#: app/templates/assets/create.html:109
-msgid "For Similar Assets"
+#: app/templates/assets/create.html:422
+msgid "Suggested Documents for Similar Assets"
 msgstr ""
 
-#: app/templates/assets/create.html:111
+#: app/templates/assets/create.html:424
 msgid "Auction Certificate"
 msgstr ""
 
-#: app/templates/assets/create.html:112
+#: app/templates/assets/create.html:425
 msgid "Exhibition Documents"
 msgstr ""
 
-#: app/templates/assets/create.html:113
+#: app/templates/assets/create.html:426
 msgid "Asset Proof"
 msgstr ""
 
-#: app/templates/assets/create.html:120
+#: app/templates/assets/create.html:434
 msgid "Drag and drop documents here or click to select"
 msgstr ""
 
-#: app/templates/assets/create.html:128
-msgid "Save Draft"
+#: app/templates/assets/create.html:435
+msgid "Maximum 10 files, 10MB each. Supported formats: PDF, DOC, DOCX"
 msgstr ""
 
-#: app/templates/assets/create.html:129
-msgid "Submit for Review"
+#: app/templates/assets/create.html:454
+msgid "Preview"
 msgstr ""
 
-#: app/templates/assets/create.html:140
-msgid "Error"
+#: app/templates/assets/create.html:457
+msgid "Pay and Publish"
 msgstr ""
 
-#: app/templates/assets/list.html:3 app/templates/assets/list.html:17
-msgid "资产列表"
+#: app/templates/assets/create.html:508
+msgid "Asset Preview"
 msgstr ""
 
-#: app/templates/assets/list.html:19
-msgid "发布资产"
+#: app/templates/assets/create.html:612
+msgid "Please install MetaMask first"
+msgstr ""
+
+#: app/templates/assets/detail.html:708 app/templates/assets/detail.html:1776
+msgid "Buy"
+msgstr ""
+
+#: app/templates/assets/detail.html:711
+msgid "Connect Wallet First"
+msgstr ""
+
+#: app/templates/assets/detail.html:813
+msgid "Failed to load"
+msgstr ""
+
+#: app/templates/assets/detail.html:1538
+msgid "Back to List"
+msgstr ""
+
+#: app/templates/assets/detail.html:1557 app/templates/assets/detail.html:1584
+#: app/templates/assets/detail.html:1587
+msgid "Share"
+msgstr ""
+
+#: app/templates/assets/detail.html:1561 app/templates/assets/detail.html:1594
+#: app/templates/assets/dividend.html:3
+msgid "Dividend Management"
+msgstr ""
+
+#: app/templates/assets/detail.html:1591
+msgid "Dividend"
+msgstr ""
+
+#: app/templates/assets/detail.html:1610
+msgid "Asset Image"
+msgstr ""
+
+#: app/templates/assets/detail.html:1624 app/templates/assets/detail.html:1792
+msgid "Previous"
+msgstr ""
+
+#: app/templates/assets/detail.html:1628 app/templates/assets/detail.html:1796
+msgid "Next"
+msgstr ""
+
+#: app/templates/assets/detail.html:1638
+msgid "Thumbnail"
+msgstr ""
+
+#: app/templates/assets/detail.html:1663
+msgid "No description provided"
+msgstr ""
+
+#: app/templates/assets/detail.html:1667
+msgid "Property Details"
+msgstr ""
+
+#: app/templates/assets/detail.html:1669 app/templates/assets/detail.html:1677
+msgid "Location"
+msgstr ""
+
+#: app/templates/assets/detail.html:1679
+msgid "Certification"
+msgstr ""
+
+#: app/templates/assets/detail.html:1687
+msgid "Related Documents"
+msgstr ""
+
+#: app/templates/assets/detail.html:1703
+msgid "Dividend Information"
+msgstr ""
+
+#: app/templates/assets/detail.html:1708
+msgid "Annual Revenue"
+msgstr ""
+
+#: app/templates/assets/detail.html:1709
+msgid "Dividend Frequency"
+msgstr ""
+
+#: app/templates/assets/detail.html:1709
+msgid "Quarterly"
+msgstr ""
+
+#: app/templates/assets/detail.html:1712
+msgid "Total Distributed"
+msgstr ""
+
+#: app/templates/assets/detail.html:1713
+msgid "Next Distribution"
+msgstr ""
+
+#: app/templates/assets/detail.html:1713
+msgid "To be announced"
+msgstr ""
+
+#: app/templates/assets/detail.html:1720
+msgid "Manage Dividends"
+msgstr ""
+
+#: app/templates/assets/detail.html:1732
+msgid "Asset Trading"
+msgstr ""
+
+#: app/templates/assets/detail.html:1747
+msgid "Token Supply"
+msgstr ""
+
+#: app/templates/assets/detail.html:1751
+msgid "Available Tokens"
+msgstr ""
+
+#: app/templates/assets/detail.html:1760
+msgid "Purchase Amount"
+msgstr ""
+
+#: app/templates/assets/detail.html:1762
+msgid "Enter the number of tokens you want to purchase"
+msgstr ""
+
+#: app/templates/assets/detail.html:1766
+msgid "Total Price"
+msgstr ""
+
+#: app/templates/assets/detail.html:1789
+msgid "Transaction History"
+msgstr ""
+
+#: app/templates/assets/detail.html:1794
+msgid "Page"
+msgstr ""
+
+#: app/templates/assets/detail.html:1794
+msgid "of"
+msgstr ""
+
+#: app/templates/assets/detail.html:1806
+msgid "Loading transaction history"
+msgstr ""
+
+#: app/templates/assets/detail.html:1819
+msgid "Initiate Dividend"
+msgstr ""
+
+#: app/templates/assets/detail.html:1824
+msgid "Current Holders Count"
+msgstr ""
+
+#: app/templates/assets/detail.html:1828
+msgid "Dividend Amount (USDC)"
+msgstr ""
+
+#: app/templates/assets/detail.html:1830
+msgid "Minimum dividend amount is 10,000 USDC"
+msgstr ""
+
+#: app/templates/assets/detail.html:1833
+msgid "Estimated Gas Fee"
+msgstr ""
+
+#: app/templates/assets/detail.html:1837
+msgid "Platform Fee"
+msgstr ""
+
+#: app/templates/assets/detail.html:1841
+msgid "Per Token Dividend Amount"
+msgstr ""
+
+#: app/templates/assets/detail.html:1846
+msgid "Cancel"
+msgstr ""
+
+#: app/templates/assets/detail.html:1847
+msgid "Start Dividend"
+msgstr ""
+
+#: app/templates/assets/list.html:3 app/templates/assets/list.html:9
+msgid "Asset List"
 msgstr ""
 
 #: venv/lib/python3.13/site-packages/click/_termui_impl.py:556
