@@ -145,6 +145,15 @@ const walletState = {
             if (!restored) {
                 console.log('无法恢复保存的钱包连接，清除存储');
                 this.clearState();
+            } else {
+                console.log('成功恢复钱包连接:', {
+                    address: this.address ? this.address.substring(0, 8) + '...' : 'none',
+                    walletType: this.walletType,
+                    connected: this.connected
+                });
+                
+                // 成功恢复时，设置标志以便其他组件可以识别恢复的状态
+                this.isRestoredConnection = true;
             }
             
         } catch (error) {
@@ -876,7 +885,7 @@ const walletState = {
                 const emptyItem = document.createElement('li');
                 emptyItem.className = 'text-muted text-center py-1';
                 emptyItem.style.fontSize = '11px';
-                emptyItem.textContent = '暂无资产';
+                emptyItem.textContent = 'No assets found';
                 assetsList.appendChild(emptyItem);
                 return;
             }
@@ -1284,6 +1293,86 @@ const walletState = {
             console.error('[updateDisplay] 更新钱包显示失败:', error);
         }
     },
+
+    /**
+     * 设置以太坊钱包的事件监听器
+     * 这是作为单独函数实现，避免重复代码
+     */
+    setupEthereumListeners() {
+        if (!window.ethereum) {
+            console.warn('无法设置以太坊事件监听器：window.ethereum不存在');
+            return;
+        }
+
+        try {
+            console.log('设置以太坊钱包事件监听器');
+            
+            // 移除现有监听器
+            if (typeof window.ethereum.removeAllListeners === 'function') {
+                try {
+                    window.ethereum.removeAllListeners('accountsChanged');
+                    window.ethereum.removeAllListeners('chainChanged');
+                    window.ethereum.removeAllListeners('disconnect');
+                    console.log('已移除旧的以太坊事件监听器');
+                } catch(e) {
+                    console.warn('移除以太坊事件监听器失败:', e);
+                }
+            }
+            
+            // 账号变更事件
+            window.ethereum.on('accountsChanged', (accounts) => {
+                console.log('MetaMask账户已更改:', accounts);
+                if (accounts.length === 0) {
+                    console.log('MetaMask已断开连接');
+                    this.disconnect(false);
+                } else {
+                    // 切换到新账户
+                    const newAddress = accounts[0]; 
+                    console.log('MetaMask已切换到新账户:', newAddress);
+                    this.address = newAddress;
+                    
+                    // 保存新地址到本地存储
+                    try {
+                        localStorage.setItem('walletType', 'ethereum');
+                        localStorage.setItem('walletAddress', newAddress);
+                        console.log('账户变更: 已保存新地址到本地存储', newAddress);
+                    } catch (error) {
+                        console.warn('账户变更: 保存地址到本地存储失败:', error);
+                    }
+                    
+                    this.getWalletBalance().then(() => {
+                        this.updateUI();
+                        this.notifyStateChange({
+                            type: 'connect',
+                            address: this.address,
+                            walletType: this.walletType,
+                            balance: this.balance,
+                            nativeBalance: this.nativeBalance
+                        });
+                    });
+                }
+            });
+            
+            // 链ID变更事件
+            window.ethereum.on('chainChanged', (chainId) => {
+                console.log('MetaMask链ID已更改:', chainId);
+                // 记录新的链ID
+                this.chainId = chainId;
+                // 刷新页面以确保UI与新链相匹配
+                window.location.reload();
+            });
+            
+            // 断开连接事件
+            window.ethereum.on('disconnect', (error) => {
+                console.log('MetaMask断开连接:', error);
+                this.disconnect(false);
+            });
+            
+            console.log('以太坊钱包事件监听器设置完成');
+        } catch (listenerError) {
+            console.warn('设置以太坊事件监听器失败:', listenerError);
+        }
+    },
 };
 
 /**
@@ -1534,7 +1623,13 @@ walletState.connectEthereum = async function() {
             try {
                 localStorage.setItem('walletType', 'ethereum');
                 localStorage.setItem('walletAddress', address);
-                console.log('[connectEthereum] 钱包信息已保存到本地存储');
+                // 额外记录最后使用的钱包信息
+                localStorage.setItem('lastWalletType', 'ethereum');
+                localStorage.setItem('lastWalletAddress', address);
+                console.log('[connectEthereum] 钱包信息已保存到本地存储:', {
+                    walletType: 'ethereum',
+                    address: address
+                });
             } catch (storageError) {
                 console.warn('[connectEthereum] 保存到本地存储失败:', storageError);
             }
@@ -1587,40 +1682,9 @@ walletState.connectEthereum = async function() {
             
             // 6. 设置MetaMask断开连接监听器
             try {
-                window.ethereum.on('accountsChanged', (accounts) => {
-                    console.log('MetaMask账户已更改');
-                    if (accounts.length === 0) {
-                        console.log('MetaMask已断开连接');
-                        this.disconnect(false);
-                    } else {
-                        // 切换到新账户
-                        console.log('MetaMask已切换到新账户:', accounts[0]);
-                        this.address = accounts[0];
-                        this.getWalletBalance().then(() => {
-                            this.updateUI();
-                            this.notifyStateChange({
-                                type: 'connect',
-                                address: this.address,
-                                walletType: this.walletType,
-                                balance: this.balance,
-                                nativeBalance: this.nativeBalance
-                            });
-                        });
-                    }
-                });
-                
-                window.ethereum.on('chainChanged', (chainId) => {
-                    console.log('MetaMask链ID已更改:', chainId);
-                    // 记录新的链ID
-                    this.chainId = chainId;
-                    // 刷新页面以确保UI与新链相匹配
-                    window.location.reload();
-                });
-                
-                window.ethereum.on('disconnect', (error) => {
-                    console.log('MetaMask断开连接:', error);
-                    this.disconnect(false);
-                });
+                // 使用独立的setupEthereumListeners函数
+                this.setupEthereumListeners();
+                console.log('已设置以太坊钱包事件监听器');
             } catch (listenerError) {
                 console.warn('设置MetaMask事件监听器失败:', listenerError);
             }
@@ -1981,7 +2045,28 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // 立即初始化钱包
         try {
+            console.log('开始初始化钱包...');
             await walletState.init();
+            console.log('钱包初始化完成:', {
+                connected: walletState.connected,
+                address: walletState.address ? walletState.address.substring(0, 8) + '...' : 'none',
+                walletType: walletState.walletType
+            });
+            
+            // 立即派发钱包状态事件 - 这对于页面刷新后恢复状态很重要
+            if (walletState.connected && walletState.address) {
+                console.log('钱包已连接，派发walletConnected事件');
+                // 延迟触发事件，确保页面已完全加载
+                setTimeout(() => {
+                    document.dispatchEvent(new CustomEvent('walletConnected', {
+                        detail: {
+                            address: walletState.address,
+                            walletType: walletState.walletType,
+                            balance: walletState.balance
+                        }
+                    }));
+                }, 500);
+            }
         } catch (err) {
             console.error('钱包初始化失败:', err);
         }
