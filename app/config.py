@@ -35,7 +35,7 @@ class Config:
             'level': 2,
             'permissions': ['审核', '编辑', '查看统计']
         },
-        'EeYfRdpGtdTM9pLDrXFq39C2SKYD9SQkijw7keUKJtLR': {
+        'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd': {
             'role': 'super_admin',
             'name': 'SOL超级管理员',
             'level': 1,
