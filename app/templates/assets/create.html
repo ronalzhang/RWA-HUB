@@ -32,8 +32,8 @@
         color: #0d6efd;
     }
     
-    .form-control.bg-light {
-        background-color: #f8f9fa !important;
+    .form-control {
+        background-color: #fff !important;
         border: 1px solid #e9ecef;
         color: #495057;
         font-weight: 500;
@@ -86,7 +86,7 @@
     #tokenSymbol {
         font-weight: 500;
         color: #495057;
-        background-color: #f8f9fa;
+        background-color: #fff;
     }
     
     #imagePreview img {
@@ -115,7 +115,7 @@
     }
     
     .form-control:disabled {
-        background-color: #f8f9fa;
+        background-color: #fff;
         cursor: not-allowed;
     }
     
@@ -217,7 +217,7 @@
     }
     
     .token-symbol-container .form-control {
-        background-color: #f8f9fa;
+        background-color: #fff;
     }
     
     .token-symbol-container .form-control:disabled {
@@ -306,7 +306,7 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label>{{ _('Publishing Fee') }} <span class="text-danger">*</span></label>
-                                        <div class="form-control bg-light" id="publishingFee">0.00 USDC</div>
+                                        <div class="form-control" id="publishingFee">0.00 USDC</div>
                                         <small class="form-text text-muted">{{ _('0.01%% of total asset value, minimum 100 USDC') }}</small>
                                     </div>
                                 </div>
@@ -329,12 +329,12 @@
                                 <div class="row mb-3">
                                     <div class="col-md-4">
                                         <label class="form-label">{{ _('Token Count') }}</label>
-                                        <div class="form-control bg-light" id="token_count">0</div>
+                                        <div class="form-control" id="token_count">0</div>
                                         <small class="form-text text-muted">{{ _('1 square meter = 10,000 tokens') }}</small>
                                     </div>
                                     <div class="col-md-4">
                                         <label class="form-label">{{ _('Token Price (USDC)') }}</label>
-                                        <div class="form-control bg-light" id="token_price">0.000000</div>
+                                        <div class="form-control" id="token_price">0.000000</div>
                                         <small class="form-text text-muted">{{ _('Total Value / Token Count') }}</small>
                                     </div>
                                     <div class="col-md-4">
@@ -362,7 +362,7 @@
                                 <div class="row mb-3">
                                     <div class="col-md-6">
                                         <label class="form-label">{{ _('Token Price (USDC)') }}</label>
-                                        <div class="form-control bg-light" id="calculatedTokenPriceSimilar">0.000000</div>
+                                        <div class="form-control" id="calculatedTokenPriceSimilar">0.000000</div>
                                         <small class="form-text text-muted">{{ _('Total Value / Token Count') }}</small>
                                     </div>
                                     <div class="col-md-6">
