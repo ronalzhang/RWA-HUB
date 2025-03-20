@@ -29,22 +29,22 @@ class AssetService:
             self.solana_client = solana_client
         else:
             # 检查是否有私钥配置
-            private_key = os.environ.get('SOLANA_PRIVATE_KEY')
+            private_key = os.environ.get('SOLANA_SERVICE_WALLET_PRIVATE_KEY')
             if private_key:
                 logger.info("使用配置的私钥初始化Solana客户端")
                 self.solana_client = SolanaClient(private_key=private_key)
                 return
                 
-            # 检查是否有助记词配置    
+            # 检查是否有助记词配置（已废弃，仅保留向后兼容）    
             mnemonic = os.environ.get('SOLANA_SERVICE_WALLET_MNEMONIC')
             if mnemonic:
-                logger.info("使用配置的助记词初始化Solana客户端")
+                logger.warning("使用助记词初始化Solana客户端，此方法已废弃，建议使用私钥")
                 self.solana_client = SolanaClient(mnemonic=mnemonic)
                 return
                 
             # 如果没有找到私钥或助记词，使用只读模式
             logger.warning("未找到钱包私钥或助记词，回退到只读模式")
-            user_wallet = "EeYfRdpGtdTM9pLDrXFq39C2SKYD9SQkijw7keUKJtLR"
+            user_wallet = "HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd"
             logger.info(f"使用钱包地址（只读模式）: {user_wallet}")
             self.solana_client = SolanaClient(wallet_address=user_wallet)
         
@@ -246,17 +246,18 @@ class AssetService:
             logger.info("开始检查服务钱包状态")
             
             # 检查是否有私钥配置
-            private_key = os.environ.get('SOLANA_PRIVATE_KEY')
+            private_key = os.environ.get('SOLANA_SERVICE_WALLET_PRIVATE_KEY')
             if private_key:
                 solana_client = SolanaClient(private_key=private_key)
             else:
-                # 检查是否有助记词配置
+                # 检查是否有助记词配置（已废弃，仅向后兼容）
                 mnemonic = os.environ.get('SOLANA_SERVICE_WALLET_MNEMONIC')
                 if mnemonic:
+                    logger.warning("使用助记词获取钱包状态，此方法已废弃，建议使用私钥")
                     solana_client = SolanaClient(mnemonic=mnemonic)
                 else:
                     # 如果没有私钥或助记词，使用只读模式
-                    solana_client = SolanaClient(wallet_address="EeYfRdpGtdTM9pLDrXFq39C2SKYD9SQkijw7keUKJtLR")
+                    solana_client = SolanaClient(wallet_address="HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd")
             
             # 检查客户端是否成功初始化了公钥
             if not solana_client.public_key:

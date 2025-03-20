@@ -50,23 +50,12 @@ def load_wallet_from_env():
     从环境变量加载钱包凭证
     
     返回优先顺序:
-    1. SOLANA_SERVICE_WALLET_MNEMONIC (作为助记词)
-    2. SOLANA_SERVICE_WALLET_PRIVATE_KEY (作为私钥)
+    1. SOLANA_SERVICE_WALLET_PRIVATE_KEY (作为私钥)
+    2. SOLANA_SERVICE_WALLET_MNEMONIC (作为助记词，已废弃)
     
     Returns:
         dict: 包含类型和值的字典，如果未找到则返回None
     """
-    # 检查助记词
-    if 'SOLANA_SERVICE_WALLET_MNEMONIC' in os.environ:
-        mnemonic = os.environ.get('SOLANA_SERVICE_WALLET_MNEMONIC')
-        if validate_mnemonic(mnemonic):
-            return {
-                'type': 'mnemonic',
-                'value': mnemonic
-            }
-        else:
-            logger.error("环境变量中的助记词无效")
-            
     # 检查私钥
     if 'SOLANA_SERVICE_WALLET_PRIVATE_KEY' in os.environ:
         private_key = os.environ.get('SOLANA_SERVICE_WALLET_PRIVATE_KEY')
@@ -82,6 +71,18 @@ def load_wallet_from_env():
                 logger.error(f"私钥长度不正确: {len(decoded)}字节，应为64字节")
         except Exception as e:
             logger.error(f"环境变量中的私钥格式无效: {str(e)}")
+            
+    # 检查助记词 (已废弃，仅向后兼容)
+    if 'SOLANA_SERVICE_WALLET_MNEMONIC' in os.environ:
+        mnemonic = os.environ.get('SOLANA_SERVICE_WALLET_MNEMONIC')
+        logger.warning("使用助记词已被废弃，建议使用SOLANA_SERVICE_WALLET_PRIVATE_KEY代替")
+        if validate_mnemonic(mnemonic):
+            return {
+                'type': 'mnemonic',
+                'value': mnemonic
+            }
+        else:
+            logger.error("环境变量中的助记词无效")
     
     # 未找到有效凭证
     logger.warning("环境变量中未找到有效的钱包凭证")
