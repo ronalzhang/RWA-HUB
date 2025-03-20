@@ -45,7 +45,7 @@ class SolanaClient:
         self.mock_mode = os.environ.get('SOLANA_MOCK_MODE', 'false').lower() == 'true'
         if self.mock_mode:
             logger.warning("Solana客户端运行在模拟模式，不会连接真实网络")
-            self.public_key = PublicKey("EeYfRdpGtdTM9pLDrXFq39C2SKYD9SQkijw7keUKJtLR") if wallet_address else None
+            self.public_key = PublicKey(wallet_address or "EeYfRdpGtdTM9pLDrXFq39C2SKYD9SQkijw7keUKJtLR")
             self.keypair = None
             self.network_url = "https://api.mainnet-beta.solana.com"
             self.readonly_mode = wallet_address is not None
