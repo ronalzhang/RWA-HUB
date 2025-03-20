@@ -159,26 +159,26 @@
     }
     
     .btn-gradient-primary[data-page="create-asset"] {
-        color: #fff;
-        background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
-        border-color: #0d6efd;
-        padding: 0.75rem 1.5rem;
-        font-weight: 500;
-        box-shadow: 0 0.125rem 0.25rem rgba(13, 110, 253, 0.4);
-        transition: all 0.3s ease;
+        color: #fff !important;
+        background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%) !important;
+        border-color: #0d6efd !important;
+        padding: 0.75rem 1.5rem !important;
+        font-weight: 500 !important;
+        box-shadow: 0 0.125rem 0.25rem rgba(13, 110, 253, 0.4) !important;
+        transition: all 0.3s ease !important;
     }
     
     .btn-gradient-primary[data-page="create-asset"]:hover {
-        background: linear-gradient(135deg, #0b5ed7 0%, #0a58ca 100%);
-        border-color: #0a58ca;
-        transform: translateY(-1px);
-        box-shadow: 0 0.25rem 0.5rem rgba(13, 110, 253, 0.5);
-        color: #fff;
+        background: linear-gradient(135deg, #0b5ed7 0%, #0a58ca 100%) !important;
+        border-color: #0a58ca !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 0.25rem 0.5rem rgba(13, 110, 253, 0.5) !important;
+        color: #fff !important;
     }
     
     .btn-gradient-primary[data-page="create-asset"]:active {
-        transform: translateY(0);
-        box-shadow: 0 0.125rem 0.25rem rgba(13, 110, 253, 0.4);
+        transform: translateY(0) !important;
+        box-shadow: 0 0.125rem 0.25rem rgba(13, 110, 253, 0.4) !important;
     }
     
     .alert-info {
@@ -222,6 +222,59 @@
     
     .token-symbol-container .form-control:disabled {
         cursor: not-allowed;
+    }
+    
+    /* 预览模态框样式 */
+    .preview-modal .modal-dialog {
+        max-width: 90%;
+    }
+    
+    .preview-modal .carousel-item {
+        height: 400px;
+        background-color: #f8f9fa;
+    }
+    
+    .preview-modal .carousel-item img {
+        object-fit: contain;
+        height: 100%;
+        width: 100%;
+    }
+    
+    .preview-modal .thumbnail img {
+        object-fit: cover;
+        height: 100%;
+        width: 100%;
+    }
+    
+    .preview-modal .card {
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+    
+    .preview-modal .card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        transform: translateY(-5px);
+    }
+    
+    .preview-modal h5.card-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+    
+    .preview-modal .text-muted {
+        color: #6c757d !important;
+    }
+    
+    /* 确保按钮在预览模态框中样式正确 */
+    #previewModal .btn-gradient-primary,
+    #successModal .btn-gradient-primary,
+    #errorModal .btn-gradient-primary {
+        color: #fff !important;
+        background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%) !important;
+        border-color: #0d6efd !important;
     }
 </style>
 {% endblock %}
@@ -475,7 +528,7 @@
                 <p id="successMessage"></p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">确定</button>
+                <button type="button" class="btn btn-gradient-primary" data-page="create-asset" data-bs-dismiss="modal">确定</button>
             </div>
         </div>
     </div>
@@ -493,7 +546,7 @@
                 <p id="errorMessage"></p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">确定</button>
+                <button type="button" class="btn btn-gradient-primary" data-page="create-asset" data-bs-dismiss="modal">确定</button>
             </div>
         </div>
     </div>
