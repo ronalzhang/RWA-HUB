@@ -1041,6 +1041,39 @@
         }
     </style>
     
+    <!-- 按钮样式修复 -->
+    <style>
+        /* 渐变按钮样式修复 - 高优先级覆盖 */
+        .btn-gradient-primary {
+            color: #fff !important;
+            background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%) !important;
+            border-color: #0d6efd !important;
+            padding: 0.75rem 1.5rem !important;
+            font-weight: 500 !important;
+            box-shadow: 0 0.125rem 0.25rem rgba(13, 110, 253, 0.4) !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .btn-gradient-primary:hover {
+            background: linear-gradient(135deg, #0b5ed7 0%, #0a58ca 100%) !important;
+            border-color: #0a58ca !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 0.25rem 0.5rem rgba(13, 110, 253, 0.5) !important;
+        }
+        
+        .btn-gradient-primary:active {
+            transform: translateY(0) !important;
+            box-shadow: 0 0.125rem 0.25rem rgba(13, 110, 253, 0.4) !important;
+        }
+        
+        /* 预览模态框中的按钮修复 */
+        .preview-modal .btn-gradient-primary,
+        #previewFooter .btn-gradient-primary {
+            color: #fff !important;
+            background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%) !important;
+        }
+    </style>
+    
     <!-- 在此处添加其他页面特定的样式 -->
     {% block additional_styles %}{% endblock %}
     

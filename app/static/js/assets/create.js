@@ -961,6 +961,14 @@ function showAssetPreview() {
             });
         }
         
+        // 绑定模态框中的按钮事件
+        const previewPublishBtn = document.getElementById('previewPublishBtn');
+        if (previewPublishBtn) {
+            previewPublishBtn.addEventListener('click', function() {
+                processPaymentAndPublish();
+            });
+        }
+        
         // 显示预览模态框
         const previewModal = new bootstrap.Modal(previewModalEl);
         previewModal.show();
@@ -988,16 +996,10 @@ function closePreview() {
 
 // 生成预览HTML内容
 function generatePreviewHTML(data) {
-    const tokenSymbol = data.token_symbol || "PREVIEW";
-    const totalSupply = data.token_supply || 0;
-    const tokenPrice = data.token_price || "0.000000";
-    const totalValue = data.total_value || data.total_value_similar || 0;
-    const annualRevenue = data.annual_revenue || "N/A";
-    
     return `
         <!-- 预览内容 -->
         <div class="row">
-            <div class="col-md-7">
+            <div class="col-md-8">
                 <!-- 资产图片轮播 -->
                 <div id="previewCarousel" class="carousel slide mb-4" data-bs-ride="carousel">
                     <div class="carousel-inner">
@@ -1008,11 +1010,9 @@ function generatePreviewHTML(data) {
                                 </div>
                             `).join('') : 
                             `<div class="carousel-item active">
-                                <div class="d-flex justify-content-center align-items-center bg-light" style="height: 400px;">
-                                    <div class="text-center">
-                                        <i class="fas fa-image text-muted" style="font-size: 64px;"></i>
-                                        <p class="mt-3 text-muted">${window._("No images uploaded")}</p>
-                                    </div>
+                                <div class="d-block w-100 bg-light text-center py-5" style="height: 300px;">
+                                    <i class="fas fa-image text-muted" style="font-size: 64px;"></i>
+                                    <p class="mt-3 text-muted">${window._("No images uploaded")}</p>
                                 </div>
                             </div>`
                         }
@@ -1031,100 +1031,67 @@ function generatePreviewHTML(data) {
                 
                 <!-- 缩略图导航 -->
                 ${data.images.length > 1 ? `
-                    <div class="d-flex gap-2 mb-4 overflow-auto">
+                    <div class="d-flex gap-2 mb-4">
                         ${data.images.map((img, index) => `
-                            <div class="thumbnail flex-shrink-0" style="width: 80px; height: 60px; cursor: pointer;" 
-                                 onclick="document.querySelector('#previewCarousel').carousel(${index})">
+                            <div class="thumbnail" style="width: 80px; height: 60px; cursor: pointer;" 
+                                onclick="$('#previewCarousel').carousel(${index})">
                                 <img src="${img.url}" class="img-fluid rounded" alt="${window._("Thumbnail")}">
                             </div>
                         `).join('')}
                     </div>
                 ` : ''}
                 
-                <!-- 资产信息卡片 -->
+                <!-- 资产描述 -->
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h3 class="card-title">${data.name}</h3>
+                        <h5 class="card-title">${data.name}</h5>
                         <p class="card-text">${data.description}</p>
                         
                         <div class="row mt-4">
-                            <div class="col-12">
-                                <h6 class="fw-bold">${window._("Asset Details")}</h6>
+                            <div class="col-md-6">
+                                <h6 class="text-muted">${window._("Asset Details")}</h6>
                                 <ul class="list-unstyled">
-                                    <li class="mb-2"><i class="fas fa-tag text-muted me-2"></i> <strong>${window._("Type")}:</strong> ${data.asset_type === 10 ? window._("Real Estate") : window._("Similar Assets")}</li>
-                                    <li class="mb-2"><i class="fas fa-map-marker-alt text-muted me-2"></i> <strong>${window._("Location")}:</strong> ${data.location}</li>
+                                    <li><strong>${window._("Type")}:</strong> ${data.asset_type === 10 ? window._("Real Estate") : window._("Similar Assets")}</li>
+                                    <li><strong>${window._("Location")}:</strong> ${data.location}</li>
                                     ${data.asset_type === 10 ? `
-                                        <li class="mb-2"><i class="fas fa-ruler-combined text-muted me-2"></i> <strong>${window._("Area")}:</strong> ${data.area} ㎡</li>
+                                        <li><strong>${window._("Area")}:</strong> ${data.area} ${window._("sqm")}</li>
                                     ` : ''}
-                                    <li class="mb-2"><i class="fas fa-money-bill-wave text-muted me-2"></i> <strong>${window._("Total Value")}:</strong> ${totalValue} USDC</li>
+                                    <li><strong>${window._("Total Value")}:</strong> ${data.total_value} USDC</li>
                                 </ul>
                             </div>
                         </div>
                         
                         <!-- 相关文档 -->
                         <div class="mt-4">
-                            <h6 class="fw-bold">${window._("Related Documents")}</h6>
+                            <h6 class="text-muted">${window._("Related Documents")}</h6>
                             ${data.documents.length > 0 ? `
-                                <div class="list-group">
+                                <ul class="list-unstyled">
                                     ${data.documents.map(doc => `
-                                        <div class="list-group-item">
-                                            <i class="fas fa-file-alt text-danger me-2"></i>${doc.name}
-                                        </div>
+                                        <li><i class="fas fa-file-alt me-2"></i>${doc.name}</li>
                                     `).join('')}
-                                </div>
+                                </ul>
                             ` : `<p class="text-muted">${window._("No documents uploaded")}</p>`}
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 分红信息卡片 -->
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">${window._("Dividend Information")}</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <p><strong>${window._("Annual Revenue")}:</strong> ${annualRevenue} USDC</p>
-                                <p><strong>${window._("Dividend Frequency")}:</strong> ${window._("Quarterly")}</p>
-                            </div>
-                            <div class="col-md-6">
-                                <p><strong>${window._("Total Distributed")}:</strong> 0 USDC</p>
-                                <p><strong>${window._("Next Distribution")}:</strong> ${window._("To be announced")}</p>
-                            </div>
                         </div>
                     </div>
                 </div>
             </div>
             
             <!-- 右侧交易信息 -->
-            <div class="col-md-5">
-                <div class="card sticky-top" style="top: 20px; z-index: 10;">
-                    <div class="card-header">
-                        <h5 class="mb-0">${window._("Asset Trading")}</h5>
-                    </div>
+            <div class="col-md-4">
+                <div class="card">
                     <div class="card-body">
-                        <!-- 资产基本信息 -->
+                        <h5 class="card-title">${window._("Asset Trading")}</h5>
                         <div class="mb-4">
-                            <h4 class="mb-3">${tokenSymbol}</h4>
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="text-muted">${window._("Asset Name")}:</span>
-                                <span>${data.name}</span>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">${window._("Total Supply")}</span>
+                                <span>${data.token_supply} ${data.token_symbol}</span>
                             </div>
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="text-muted">${window._("Token Price")}:</span>
-                                <span class="fw-bold fs-5">${tokenPrice} USDC</span>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">${window._("Token Price")}</span>
+                                <span>${data.token_price} USDC</span>
                             </div>
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="text-muted">${window._("Token Supply")}:</span>
-                                <span>${totalSupply}</span>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mb-4">
-                                <span class="text-muted">${window._("Available Tokens")}:</span>
-                                <span>${totalSupply}</span>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="text-muted">${window._("Publishing Fee")}:</span>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">${window._("Publishing Fee")}</span>
                                 <span>${data.publishing_fee}</span>
                             </div>
                         </div>
@@ -1138,7 +1105,7 @@ function generatePreviewHTML(data) {
                                     <span class="input-group-text">${window._("tokens")}</span>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-gradient-primary w-100" data-page="create-asset" disabled>
+                            <button type="button" class="btn btn-gradient-primary" data-page="create-asset" disabled>
                                 ${window._("Not available in preview mode")}
                             </button>
                         </form>
@@ -1412,38 +1379,79 @@ function showSuccessMessage(title, message) {
 
 // 禁用或启用发布按钮
 function disablePublishButtons(disabled) {
-    const previewButton = document.getElementById('previewForm');
-    const publishButton = document.getElementById('payAndPublish');
+    const buttons = [
+        document.getElementById('previewForm'),
+        document.getElementById('payAndPublish'),
+        document.getElementById('previewPublishBtn'),
+        document.getElementById('publishFromPreviewBtn')
+    ];
     
-    if (previewButton) {
-        previewButton.disabled = disabled;
-    }
+    buttons.forEach(button => {
+        if (button) {
+            button.disabled = disabled;
+            // 确保禁用状态下的样式变化
+            if (disabled) {
+                button.classList.add('disabled');
+                button.style.opacity = '0.65';
+                button.style.pointerEvents = 'none';
+            } else {
+                button.classList.remove('disabled');
+                button.style.opacity = '';
+                button.style.pointerEvents = '';
+            }
+        }
+    });
     
-    if (publishButton) {
-        publishButton.disabled = disabled;
-    }
+    // 修复按钮样式
+    fixButtonStyles();
 }
+
+// 修复按钮样式函数
+function fixButtonStyles() {
+    const gradientButtons = document.querySelectorAll('.btn-gradient-primary');
+    
+    gradientButtons.forEach(button => {
+        // 确保颜色和背景
+        button.style.color = '#fff';
+        button.style.background = 'linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%)';
+        button.style.borderColor = '#0d6efd';
+        button.style.fontWeight = '500';
+        
+        // 如果按钮在预览模态框中，特别强调
+        if (button.closest('.preview-modal') || button.closest('#previewFooter')) {
+            button.style.background = 'linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%)';
+            button.style.color = '#fff';
+        }
+    });
+}
+
+// 页面加载后修复按钮样式
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(fixButtonStyles, 500);
+});
 
 // 显示加载状态
 function showLoadingState(message) {
-    const loadingElement = document.getElementById('loadingIndicator');
-    const statusElement = document.getElementById('loadingStatus');
+    const loadingOverlay = document.getElementById('loadingOverlay');
     
-    if (loadingElement) {
-        loadingElement.style.display = 'flex';
-    }
-    
-    if (statusElement) {
-        statusElement.textContent = message || 'Processing...';
+    if (loadingOverlay) {
+        loadingOverlay.classList.remove('d-none');
+        const loadingText = loadingOverlay.querySelector('.loading-text');
+        if (loadingText) {
+            loadingText.textContent = message || 'Processing...';
+        }
+    } else {
+        // 如果没有找到加载覆盖层，创建一个
+        showLoadingOverlay(message);
     }
 }
 
 // 隐藏加载状态
 function hideLoadingState() {
-    const loadingElement = document.getElementById('loadingIndicator');
+    const loadingOverlay = document.getElementById('loadingOverlay');
     
-    if (loadingElement) {
-        loadingElement.style.display = 'none';
+    if (loadingOverlay) {
+        loadingOverlay.classList.add('d-none');
     }
 }
 
@@ -1483,8 +1491,7 @@ function getAssetFormData() {
         // 添加上传的文件
         images: uploadedImages || [],
         documents: uploadedDocuments || [],
-        // 添加发布费用
-        publishing_fee: document.getElementById('publishingFee').textContent
+        // 发布费用在后端计算，不从前端传递
     };
     
     // 根据资产类型获取特定字段
