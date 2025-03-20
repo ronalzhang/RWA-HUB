@@ -957,7 +957,8 @@ function showAssetPreview() {
         const publishFromPreviewBtn = document.getElementById('publishFromPreviewBtn');
         if (publishFromPreviewBtn) {
             publishFromPreviewBtn.addEventListener('click', function() {
-                processPaymentAndPublish();
+                // 显示支付确认对话框
+                showPaymentConfirmation();
             });
         }
         
@@ -965,7 +966,8 @@ function showAssetPreview() {
         const previewPublishBtn = document.getElementById('previewPublishBtn');
         if (previewPublishBtn) {
             previewPublishBtn.addEventListener('click', function() {
-                processPaymentAndPublish();
+                // 显示支付确认对话框
+                showPaymentConfirmation();
             });
         }
         
@@ -1122,108 +1124,225 @@ function generatePreviewHTML(data) {
     `;
 }
 
-// 显示支付确认
+// 显示支付确认对话框
 function showPaymentConfirmation() {
     try {
+        // 获取表单数据并验证
+        const formData = getAssetFormData();
+        if (!formData) {
+            throw new Error('获取表单数据失败');
+        }
+        
+        // 获取支付金额
         const publishingFee = document.getElementById('publishingFee').textContent;
         
-        // 构建确认消息
-        const message = `
-            <div class="text-center">
-                <i class="fas fa-credit-card text-primary mb-3" style="font-size: 3rem;"></i>
-                <h4 class="mb-3">Ready to Pay</h4>
-                <p class="mb-4">Publishing this asset requires payment of: <strong>${publishingFee}</strong></p>
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    After confirming, the system will connect to your wallet and request payment.
-                </div>
-            </div>
-        `;
-
-        // 创建确认模态框
-        const confirmModal = document.createElement('div');
-        confirmModal.innerHTML = `
-            <div class="modal fade" id="paymentConfirmModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                            <h5 class="modal-title">Payment Confirmation</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                            ${message}
-                    </div>
-                    <div class="modal-footer">
-                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="button" class="btn btn-gradient-primary" data-page="create-asset" id="confirmPaymentBtn">Pay and Publish</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(confirmModal);
+        // 显示确认模态框
+        const confirmModalEl = document.getElementById('paymentConfirmModal');
+        if (!confirmModalEl) {
+            throw new Error('支付确认模态框不存在');
+        }
+        
+        // 更新确认模态框内容
+        const assetNameEl = document.getElementById('confirmAssetName');
+        const tokenSymbolEl = document.getElementById('confirmTokenSymbol');
+        const feeAmountEl = document.getElementById('confirmFeeAmount');
+        
+        if (assetNameEl) assetNameEl.textContent = formData.name;
+        if (tokenSymbolEl) tokenSymbolEl.textContent = formData.token_symbol;
+        if (feeAmountEl) feeAmountEl.textContent = publishingFee;
         
         // 显示模态框
-        const paymentModal = new bootstrap.Modal(document.getElementById('paymentConfirmModal'));
-        paymentModal.show();
+        const confirmModal = new bootstrap.Modal(confirmModalEl);
+        confirmModal.show();
         
-        // 绑定确认支付按钮事件
-        document.getElementById('confirmPaymentBtn').addEventListener('click', function() {
-            paymentModal.hide();
-            processPaymentAndPublish();
-        });
-        
-        // 模态框关闭时移除元素
-        document.getElementById('paymentConfirmModal').addEventListener('hidden.bs.modal', function() {
-            document.body.removeChild(confirmModal);
+        // 绑定确认按钮事件
+        const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
+        if (confirmPaymentBtn) {
+            // 移除之前的事件监听器
+            confirmPaymentBtn.replaceWith(confirmPaymentBtn.cloneNode(true));
+            const newConfirmBtn = document.getElementById('confirmPaymentBtn');
+            
+            // 添加新的事件监听器
+            newConfirmBtn.addEventListener('click', function() {
+                // 检查并连接钱包
+                checkAndConnectWallet().then(connected => {
+                    if (connected) {
+                        // 隐藏确认模态框
+                        confirmModal.hide();
+                        // 执行支付流程
+                        processPayment().then(paymentResult => {
+                            if (paymentResult.success) {
+                                // 支付成功，发布资产
+                                processAssetCreation(formData, paymentResult.txHash);
+                            } else {
+                                // 支付失败
+                                showError(paymentResult.error || '支付处理失败');
+                                disablePublishButtons(false);
+                            }
+                        }).catch(error => {
+                            console.error('支付处理错误:', error);
+                            showError(error.message || '支付处理错误');
+                            disablePublishButtons(false);
                         });
-                    } catch (error) {
+                    } else {
+                        // 钱包连接失败
+                        showError('请先连接钱包以继续');
+                        disablePublishButtons(false);
+                    }
+                }).catch(error => {
+                    console.error('钱包连接错误:', error);
+                    showError(error.message || '钱包连接错误');
+                    disablePublishButtons(false);
+                });
+            });
+        }
+        
+    } catch (error) {
         console.error('显示支付确认出错:', error);
-        showError('显示支付确认时发生错误: ' + error.message);
+        showError(error.message);
     }
 }
 
-// 处理支付和发布
-async function processPaymentAndPublish() {
-    try {
-        console.log('开始处理支付和发布流程');
-        disablePublishButtons(true);
-        showLoadingState('正在处理...');
-        
-        // 获取表单数据和资产类型
-        const assetFormData = getAssetFormData();
-        if (!assetFormData) {
-            throw new Error('无法获取表单数据');
+// 检查并连接钱包
+async function checkAndConnectWallet() {
+    return new Promise(async (resolve, reject) => {
+        try {
+            // 检查是否已有全局钱包状态
+            if (window.walletState && window.walletState.connected && window.walletState.address) {
+                console.log('钱包已连接:', window.walletState.address);
+                resolve(true);
+                return;
+            }
+            
+            // 尝试连接钱包
+            console.log('尝试连接钱包...');
+            showLoadingState('正在连接钱包...');
+            
+            // 这里应该调用全局钱包连接函数 - 假设全局有一个connectWallet函数
+            if (typeof window.connectWallet === 'function') {
+                const connected = await window.connectWallet();
+                hideLoadingState();
+                
+                if (connected) {
+                    console.log('钱包连接成功');
+                    resolve(true);
+                } else {
+                    console.warn('钱包连接失败');
+                    resolve(false);
+                }
+            } else {
+                // 使用自定义逻辑模拟钱包连接
+                console.warn('未找到全局钱包连接函数，使用模拟连接');
+                
+                // 触发点击钱包按钮事件
+                const walletBtn = document.getElementById('walletBtn');
+                if (walletBtn) {
+                    walletBtn.click();
+                    
+                    // 等待5秒检查钱包状态
+                    setTimeout(() => {
+                        hideLoadingState();
+                        if (window.walletState && window.walletState.connected) {
+                            resolve(true);
+                        } else {
+                            console.warn('钱包连接超时');
+                            resolve(false);
+                        }
+                    }, 5000);
+                } else {
+                    hideLoadingState();
+                    console.error('未找到钱包按钮');
+                    resolve(false);
+                }
+            }
+        } catch (error) {
+            hideLoadingState();
+            console.error('钱包连接错误:', error);
+            reject(error);
         }
+    });
+}
+
+// 处理支付流程
+async function processPayment() {
+    return new Promise(async (resolve, reject) => {
+        try {
+            console.log('开始处理支付...');
+            showLoadingState('处理支付交易...');
+            
+            // 获取支付金额
+            const publishingFee = document.getElementById('publishingFee').textContent;
+            const feeAmount = parseFloat(publishingFee) || 1.0; // 默认1.0 USDC
+            
+            // 检查钱包余额 - 假设全局有一个获取余额的函数
+            if (typeof window.getWalletBalance === 'function') {
+                const balance = await window.getWalletBalance();
+                if (balance < feeAmount) {
+                    hideLoadingState();
+                    resolve({
+                        success: false,
+                        error: `余额不足: 需要 ${feeAmount} USDC，但钱包只有 ${balance} USDC`
+                    });
+                    return;
+                }
+            }
+            
+            // 模拟支付过程 - 在实际应用中，这里应调用区块链交易API
+            setTimeout(() => {
+                hideLoadingState();
+                
+                // 模拟一个成功的交易
+                const mockTxHash = '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
+                console.log('支付交易成功:', mockTxHash);
+                
+                resolve({
+                    success: true,
+                    txHash: mockTxHash
+                });
+            }, 2000);
+            
+        } catch (error) {
+            hideLoadingState();
+            console.error('支付处理出错:', error);
+            reject(error);
+        }
+    });
+}
+
+// 处理资产创建逻辑 - 付款成功后调用API创建资产
+async function processAssetCreation(formData, txHash) {
+    try {
+        console.log('开始创建资产...');
+        showLoadingState('创建资产中...');
+        disablePublishButtons(true);
         
         // 验证token_symbol是否已存在
-        let tokenSymbol = document.getElementById('tokensymbol').value;
+        let tokenSymbol = formData.token_symbol;
         if (!tokenSymbol) {
             // 如果没有token_symbol，则请求生成一个新的
             console.log('请求生成新的token_symbol');
-            tokenSymbol = await generateTokenSymbol(assetFormData.asset_type);
+            tokenSymbol = await generateTokenSymbol(formData.asset_type);
             
             if (!tokenSymbol) {
                 throw new Error('无法生成有效的Token符号，请重试');
             }
             
             document.getElementById('tokensymbol').value = tokenSymbol;
-            assetFormData.token_symbol = tokenSymbol;
+            formData.token_symbol = tokenSymbol;
         } else {
             // 再次验证token_symbol是否可用
             const checkResult = await checkTokenSymbolAvailability(tokenSymbol);
             if (checkResult.exists) {
                 throw new Error(`Token符号 ${tokenSymbol} 已被使用，请尝试其他符号或刷新页面重试`);
             }
-            assetFormData.token_symbol = tokenSymbol;
         }
         
         console.log('使用Token符号:', tokenSymbol);
         
         // 构建请求数据
         const requestData = {
-            ...assetFormData,
+            ...formData,
+            payment_tx_hash: txHash,
             images: uploadedImages.map(file => file.url || ''),
             documents: uploadedDocuments.map(file => {
                 return {
@@ -1236,7 +1355,7 @@ async function processPaymentAndPublish() {
         console.log('提交的资产数据:', requestData);
         
         // 更新进度
-        updateProgress(30, '创建资产...');
+        updateProgress(60, '创建资产...');
         
         // 创建资产
         const createResponse = await fetch('/api/assets/create', {
@@ -1268,7 +1387,7 @@ async function processPaymentAndPublish() {
         }, 1500);
         
     } catch (error) {
-        console.error('支付和发布过程出错:', error);
+        console.error('资产创建出错:', error);
         hideLoadingState();
         showError(error.message || '处理过程出错，请重试');
         disablePublishButtons(false);
