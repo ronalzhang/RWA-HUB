@@ -306,7 +306,7 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label>{{ _('Publishing Fee') }} <span class="text-danger">*</span></label>
-                                        <div class="form-control" id="publishingFee">0.00 USDC</div>
+                                        <div class="form-control bg-light" id="publishingFee">0.00 USDC</div>
                                         <small class="form-text text-muted">{{ _('0.01%% of total asset value, minimum 100 USDC') }}</small>
                                     </div>
                                 </div>
@@ -329,12 +329,12 @@
                                 <div class="row mb-3">
                                     <div class="col-md-4">
                                         <label class="form-label">{{ _('Token Count') }}</label>
-                                        <div class="form-control" id="token_count">0</div>
+                                        <div class="form-control bg-light" id="token_count">0</div>
                                         <small class="form-text text-muted">{{ _('1 square meter = 10,000 tokens') }}</small>
                                     </div>
                                     <div class="col-md-4">
                                         <label class="form-label">{{ _('Token Price (USDC)') }}</label>
-                                        <div class="form-control" id="token_price">0.000000</div>
+                                        <div class="form-control bg-light" id="token_price">0.000000</div>
                                         <small class="form-text text-muted">{{ _('Total Value / Token Count') }}</small>
                                     </div>
                                     <div class="col-md-4">
@@ -559,6 +559,22 @@
             </div>
             <div class="modal-footer justify-content-center">
                 <button type="button" class="btn btn-primary" data-bs-dismiss="modal">确定</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 底部按钮 -->
+<div class="fixed-bottom bg-white py-3 border-top" style="display: none;" id="previewFooter">
+    <div class="container">
+        <div class="row justify-content-end">
+            <div class="col-auto">
+                <button type="button" class="btn btn-outline-secondary me-2" id="closePreviewBtn">
+                    {{ _('Close') }}
+                </button>
+                <button type="button" class="btn btn-gradient-primary" data-page="create-asset" id="publishFromPreviewBtn">
+                    <i class="fas fa-credit-card me-2"></i>{{ _('Pay and Publish') }}
+                </button>
             </div>
         </div>
     </div>
