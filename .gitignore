@@ -38,6 +38,7 @@ wheels/
 
 # PM2配置文件
 ecosystem.config.js
+ecosystem.config.json
 
 # 备份文件
 *.bak
@@ -65,8 +66,15 @@ logs/
 static/uploads/
 app/static/uploads/
 
-# 环境变量
+# 环境变量和密钥文件
 .env
+*.env
+*.pem
+*key*
+*private*
+*secret*
+*mnemonic*
+set_env.py
 
 # 系统文件
 .DS_Store
