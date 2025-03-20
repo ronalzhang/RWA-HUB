@@ -953,7 +953,7 @@
             color: white;
         }
         
-        .real-estate {
+        .badge.real-estate, .tag.real-estate {
             background-color: rgba(13, 110, 253, 0.9);
             color: white;
             right: 10px;
@@ -1383,7 +1383,7 @@
             color: white;
         }
         
-        .real-estate {
+        .badge.real-estate, .tag.real-estate {
             background-color: rgba(13, 110, 253, 0.9);
             color: white;
             right: 10px;
@@ -1672,6 +1672,15 @@
                             // 移除任何Bootstrap dropdown相关属性
                             walletBtn.removeAttribute('data-bs-toggle');
                             walletBtn.classList.remove('dropdown-toggle');
+                            
+                            // 确保钱包按钮有点击事件
+                            walletBtn.onclick = function(event) {
+                                console.log('钱包按钮被点击');
+                                checkWalletConnection(event);
+                                return false;
+                            };
+                            
+                            console.log('钱包按钮事件已重新绑定');
                         }
                         
                         // 只对非钱包按钮初始化Bootstrap下拉菜单
