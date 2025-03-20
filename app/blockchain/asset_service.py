@@ -30,6 +30,12 @@ class AssetService:
         else:
             # 检查是否有私钥配置
             private_key = os.environ.get('SOLANA_SERVICE_WALLET_PRIVATE_KEY')
+            if not private_key:
+                # 兼容旧版本使用的私钥环境变量
+                private_key = os.environ.get('SOLANA_PRIVATE_KEY')
+                if private_key:
+                    logger.info("使用SOLANA_PRIVATE_KEY环境变量初始化Solana客户端（为向后兼容）")
+            
             if private_key:
                 logger.info("使用配置的私钥初始化Solana客户端")
                 self.solana_client = SolanaClient(private_key=private_key)
@@ -247,6 +253,12 @@ class AssetService:
             
             # 检查是否有私钥配置
             private_key = os.environ.get('SOLANA_SERVICE_WALLET_PRIVATE_KEY')
+            if not private_key:
+                # 兼容旧版本使用的私钥环境变量
+                private_key = os.environ.get('SOLANA_PRIVATE_KEY')
+                if private_key:
+                    logger.info("使用SOLANA_PRIVATE_KEY环境变量获取钱包状态（为向后兼容）")
+            
             if private_key:
                 solana_client = SolanaClient(private_key=private_key)
             else:
