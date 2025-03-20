@@ -521,23 +521,60 @@
     </div>
 </div>
 
-<!-- 加载中遮罩 -->
-<div id="loadingOverlay" class="loading-overlay d-none">
-    <div class="loading-wrapper">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">加载中...</span>
+<!-- 确认支付模态框 -->
+<div class="modal fade" id="paymentConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ _('Payment Confirmation') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center">
+                    <i class="fas fa-credit-card text-primary mb-3" style="font-size: 3rem;"></i>
+                    <h4 class="mb-3">{{ _('Ready to Publish') }}</h4>
+                    <p class="mb-2">{{ _('Asset Name') }}: <strong id="confirmAssetName"></strong></p>
+                    <p class="mb-2">{{ _('Token Symbol') }}: <strong id="confirmTokenSymbol"></strong></p>
+                    <p class="mb-4">{{ _('Publishing Fee') }}: <strong id="confirmFeeAmount"></strong></p>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        {{ _('After confirming, the system will connect to your wallet and request payment.') }}
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ _('Cancel') }}</button>
+                <button type="button" class="btn btn-gradient-primary" data-page="create-asset" id="confirmPaymentBtn">
+                    <i class="fas fa-credit-card me-2"></i>{{ _('Pay and Publish') }}
+                </button>
+            </div>
         </div>
-        <div class="loading-text mt-3">处理中...</div>
-        <div id="progressContainer" class="mt-3 w-100" style="max-width: 400px;">
-            <div class="progress">
-                <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+    </div>
+</div>
+
+<!-- 加载覆盖层 -->
+<div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" style="background-color: rgba(0,0,0,0.5); z-index: 9999;">
+    <div class="d-flex justify-content-center align-items-center h-100">
+        <div class="bg-white p-4 rounded shadow">
+            <div class="d-flex align-items-center">
+                <div class="spinner-border text-primary me-3" role="status">
+                    <span class="visually-hidden">{{ _('Loading...') }}</span>
+                </div>
+                <span class="loading-text">{{ _('Processing...') }}</span>
             </div>
-            <div id="progressSteps" class="d-flex justify-content-between mt-2">
-                <div class="step active">创建</div>
-                <div class="step">支付</div>
-                <div class="step">上链</div>
-                <div class="step">完成</div>
+        </div>
+    </div>
+</div>
+
+<!-- 进度显示 -->
+<div id="progressContainer" class="position-fixed top-0 start-0 w-100 h-100 d-none" style="background-color: rgba(0,0,0,0.5); z-index: 9999;">
+    <div class="d-flex justify-content-center align-items-center h-100">
+        <div class="bg-white p-4 rounded shadow" style="width: 300px;">
+            <h5 class="text-center mb-3" id="progressTitle">{{ _('Processing') }}</h5>
+            <div class="progress mb-3" style="height: 10px;">
+                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
             </div>
+            <p id="progressStatus" class="text-center text-muted small mb-0">{{ _('Please wait...') }}</p>
         </div>
     </div>
 </div>
@@ -765,6 +802,85 @@ function handleFileUpload(event) {
     });
 }
 </script>
+<script src="{{ url_for('static', filename='js/wallet.js') }}"></script>
 <script src="{{ url_for('static', filename='js/assets/create.js') }}"></script>
+
+<script>
+// 确保create.js中的钱包功能正常工作
+document.addEventListener('DOMContentLoaded', function() {
+    // 检查钱包按钮是否存在
+    const walletBtn = document.getElementById('walletBtn');
+    if (walletBtn) {
+        console.log('钱包按钮已找到');
+        
+        // 确保钱包按钮有点击事件
+        if (!walletBtn.onclick) {
+            console.log('添加钱包按钮点击事件');
+            walletBtn.onclick = function(event) {
+                console.log('钱包按钮被点击');
+                if (typeof checkWalletConnection === 'function') {
+                    checkWalletConnection(event);
+                } else {
+                    console.error('checkWalletConnection函数未找到');
+                }
+            };
+        }
+    } else {
+        console.error('钱包按钮未找到');
+    }
+    
+    // 添加更新进度的函数
+    window.updateProgress = function(percent, message) {
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressStatus = document.getElementById('progressStatus');
+        
+        if (progressContainer && progressBar && progressStatus) {
+            progressContainer.classList.remove('d-none');
+            progressBar.style.width = percent + '%';
+            progressBar.setAttribute('aria-valuenow', percent);
+            
+            if (message) {
+                progressStatus.textContent = message;
+            }
+            
+            // 进度完成时隐藏
+            if (percent >= 100) {
+                setTimeout(() => {
+                    progressContainer.classList.add('d-none');
+                }, 1000);
+            }
+        }
+    };
+    
+    // 添加显示加载覆盖层的函数
+    window.showLoadingOverlay = function(message) {
+        const overlay = document.createElement('div');
+        overlay.id = 'loadingOverlay';
+        overlay.className = 'position-fixed top-0 start-0 w-100 h-100';
+        overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+        overlay.style.zIndex = '9999';
+        
+        overlay.innerHTML = `
+            <div class="d-flex justify-content-center align-items-center h-100">
+                <div class="bg-white p-4 rounded shadow">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border text-primary me-3" role="status">
+                            <span class="visually-hidden">${window._('Loading...')}</span>
+                        </div>
+                        <span class="loading-text">${message || window._('Processing...')}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+    };
+});
+</script>
+{% endblock %}
+
+{% block styles %}
+<link href="{{ url_for('static', filename='css/create.css') }}" rel="stylesheet">
 {% endblock %}
 
