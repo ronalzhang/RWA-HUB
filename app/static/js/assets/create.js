@@ -917,187 +917,198 @@ function showSuccess(message) {
     }
 }
 
-// 资产预览
+// 显示资产预览
 function showAssetPreview() {
-    const form = document.getElementById('assetForm');
-    if (!form) return;
+    // 获取所有字段数据
+    const formData = getAssetFormData();
+    if (!formData) return false;
     
     try {
-        // 构建预览数据
-        const previewData = {
-            name: form.elements['name'].value,
-            assetType: form.elements['type'].value === '10' ? '不动产' : '类不动产',
-            description: form.elements['description'].value,
-            tokenSymbol: form.elements['tokensymbol'].value
-        };
+        const previewModalEl = document.getElementById('previewModal');
         
-        if (form.elements['type'].value === '10') { // 不动产
-            previewData.area = parseFloat(form.elements['area'].value) || 0;
-            previewData.totalValue = parseFloat(form.elements['total_value'].value) || 0;
-            previewData.tokenCount = parseInt(document.getElementById('token_count').textContent.replace(/,/g, '')) || 0;
-            previewData.tokenPrice = parseFloat(document.getElementById('token_price').textContent) || 0;
-        } else { // 类不动产
-            previewData.tokenSupply = parseInt(form.elements['token_supply'].value) || 0;
-            previewData.totalValue = parseFloat(form.elements['total_value_similar'].value) || 0;
-            previewData.tokenPrice = parseFloat(document.getElementById('calculatedTokenPriceSimilar').textContent) || 0;
+        if (!previewModalEl) {
+            console.error('预览模态框元素不存在');
+            return false;
         }
         
-        previewData.images = uploadedImages;
-        previewData.documents = uploadedDocuments;
-        previewData.publishingFee = document.getElementById('publishingFee').textContent;
+        // 生成预览HTML
+        const html = generatePreviewHTML(formData);
         
-        // 填充预览模态框
-        const modalBody = document.querySelector('#previewModal .modal-body');
+        // 更新模态框内容
+        const modalBody = previewModalEl.querySelector('.modal-body');
         if (modalBody) {
-            modalBody.innerHTML = generatePreviewHTML(previewData);
-            
-            // 显示预览模态框
-            const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
-            previewModal.show();
-            
-            // 绑定模态框底部的发布按钮事件
-            const previewPublishBtn = document.getElementById('previewPublishBtn');
-            if (previewPublishBtn) {
-                // 移除之前的所有事件监听器
-                const newBtn = previewPublishBtn.cloneNode(true);
-                previewPublishBtn.parentNode.replaceChild(newBtn, previewPublishBtn);
-                
-                // 添加新的事件监听器
-                newBtn.addEventListener('click', function() {
-                    previewModal.hide();
-                    showPaymentConfirmation();
-                });
-            }
+            modalBody.innerHTML = html;
         }
+        
+        // 显示底部固定按钮
+        const previewFooter = document.getElementById('previewFooter');
+        if (previewFooter) {
+            previewFooter.style.display = 'block';
+        }
+        
+        // 绑定底部按钮事件
+        const closePreviewBtn = document.getElementById('closePreviewBtn');
+        if (closePreviewBtn) {
+            closePreviewBtn.addEventListener('click', function() {
+                closePreview();
+            });
+        }
+        
+        const publishFromPreviewBtn = document.getElementById('publishFromPreviewBtn');
+        if (publishFromPreviewBtn) {
+            publishFromPreviewBtn.addEventListener('click', function() {
+                processPaymentAndPublish();
+            });
+        }
+        
+        // 显示预览模态框
+        const previewModal = new bootstrap.Modal(previewModalEl);
+        previewModal.show();
+        
+        // 模态框关闭时隐藏底部按钮
+        previewModalEl.addEventListener('hidden.bs.modal', function() {
+            closePreview();
+        });
+        
+        return true;
     } catch (error) {
-        console.error('生成预览出错:', error);
-        showError('生成预览时发生错误: ' + error.message);
+        console.error('显示预览出错:', error);
+        showError(error.message);
+        return false;
+    }
+}
+
+// 关闭预览
+function closePreview() {
+    const previewFooter = document.getElementById('previewFooter');
+    if (previewFooter) {
+        previewFooter.style.display = 'none';
     }
 }
 
 // 生成预览HTML内容
 function generatePreviewHTML(data) {
     return `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">${window._("Asset Preview")}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="${window._("Close")}"></button>
-            </div>
-            <div class="modal-body">
-                <!-- 预览内容 -->
-                <div class="row">
-                    <div class="col-md-8">
-                        <!-- 资产图片轮播 -->
-                        <div id="previewCarousel" class="carousel slide mb-4" data-bs-ride="carousel">
-                            <div class="carousel-inner">
-                                ${data.images.map((img, index) => `
-                                    <div class="carousel-item ${index === 0 ? 'active' : ''}">
-                                        <img src="${img.url}" class="d-block w-100" alt="${window._("Asset Image")}">
-                                    </div>
-                                `).join('')}
-                            </div>
-                            <button class="carousel-control-prev" type="button" data-bs-target="#previewCarousel" data-bs-slide="prev">
-                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                <span class="visually-hidden">${window._("Previous")}</span>
-                            </button>
-                            <button class="carousel-control-next" type="button" data-bs-target="#previewCarousel" data-bs-slide="next">
-                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                <span class="visually-hidden">${window._("Next")}</span>
-                            </button>
-                        </div>
-                        
-                        <!-- 缩略图导航 -->
-                        <div class="d-flex gap-2 mb-4">
-                            ${data.images.map((img, index) => `
-                                <div class="thumbnail" style="width: 80px; height: 60px; cursor: pointer;" 
-                                     onclick="$('#previewCarousel').carousel(${index})">
-                                    <img src="${img.url}" class="img-fluid rounded" alt="${window._("Thumbnail")}">
+        <!-- 预览内容 -->
+        <div class="row">
+            <div class="col-md-8">
+                <!-- 资产图片轮播 -->
+                <div id="previewCarousel" class="carousel slide mb-4" data-bs-ride="carousel">
+                    <div class="carousel-inner">
+                        ${data.images.length > 0 ? 
+                            data.images.map((img, index) => `
+                                <div class="carousel-item ${index === 0 ? 'active' : ''}">
+                                    <img src="${img.url}" class="d-block w-100" alt="${window._("Asset Image")}">
                                 </div>
-                            `).join('')}
-                        </div>
-                        
-                        <!-- 资产描述 -->
-                        <div class="card mb-4">
-                            <div class="card-body">
-                                <h5 class="card-title">${data.name}</h5>
-                                <p class="card-text">${data.description}</p>
-                                
-                                <div class="row mt-4">
-                                    <div class="col-md-6">
-                                        <h6 class="text-muted">${window._("Asset Details")}</h6>
-                                        <ul class="list-unstyled">
-                                            <li><strong>${window._("Type")}:</strong> ${data.type === '10' ? window._("Real Estate") : window._("Similar Assets")}</li>
-                                            <li><strong>${window._("Location")}:</strong> ${data.location}</li>
-                                            ${data.type === '10' ? `
-                                                <li><strong>${window._("Area")}:</strong> ${data.area} ${window._("sqm")}</li>
-                                            ` : ''}
-                                            <li><strong>${window._("Total Value")}:</strong> ${data.total_value} USDC</li>
-                                        </ul>
-                                    </div>
+                            `).join('') : 
+                            `<div class="carousel-item active">
+                                <div class="d-block w-100 bg-light text-center py-5" style="height: 300px;">
+                                    <i class="fas fa-image text-muted" style="font-size: 64px;"></i>
+                                    <p class="mt-3 text-muted">${window._("No images uploaded")}</p>
                                 </div>
-                                
-                                <!-- 相关文档 -->
-                                <div class="mt-4">
-                                    <h6 class="text-muted">${window._("Related Documents")}</h6>
-                                    ${data.documents.length > 0 ? `
-                                        <ul class="list-unstyled">
-                                            ${data.documents.map(doc => `
-                                                <li><i class="fas fa-file-alt me-2"></i>${doc.name}</li>
-                                            `).join('')}
-                                        </ul>
-                                    ` : `<p class="text-muted">${window._("No documents uploaded")}</p>`}
-                                </div>
-                            </div>
-                        </div>
+                            </div>`
+                        }
                     </div>
-                    
-                    <!-- 右侧交易信息 -->
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-body">
-                                <h5 class="card-title">${window._("Asset Trading")}</h5>
-                                <div class="mb-4">
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span class="text-muted">${window._("Total Supply")}</span>
-                                        <span>${data.token_supply} ${data.token_symbol}</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span class="text-muted">${window._("Token Price")}</span>
-                                        <span>${data.token_price} USDC</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between">
-                                        <span class="text-muted">${window._("Publishing Fee")}</span>
-                                        <span>${data.publishing_fee} USDC</span>
-                                    </div>
-                                </div>
-                                
-                                <!-- 购买表单（预览模式下禁用） -->
-                                <form class="mb-4">
-                                    <div class="mb-3">
-                                        <label class="form-label">${window._("Purchase Amount")}</label>
-                                        <div class="input-group">
-                                            <input type="number" class="form-control" placeholder="${window._("Enter amount")}" disabled>
-                                            <span class="input-group-text">${window._("tokens")}</span>
-                                        </div>
-                                    </div>
-                                    <button type="button" class="btn btn-primary w-100" disabled>
-                                        ${window._("Not available in preview mode")}
-                                    </button>
-                                </form>
-                                
-                                <!-- 近期交易 -->
-                                <div>
-                                    <h6 class="text-muted mb-3">${window._("Recent Transactions")}</h6>
-                                    <p class="text-muted">${window._("No transaction records yet")}</p>
-                                </div>
+                    ${data.images.length > 1 ? `
+                        <button class="carousel-control-prev" type="button" data-bs-target="#previewCarousel" data-bs-slide="prev">
+                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">${window._("Previous")}</span>
+                        </button>
+                        <button class="carousel-control-next" type="button" data-bs-target="#previewCarousel" data-bs-slide="next">
+                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">${window._("Next")}</span>
+                        </button>
+                    ` : ''}
+                </div>
+                
+                <!-- 缩略图导航 -->
+                ${data.images.length > 1 ? `
+                    <div class="d-flex gap-2 mb-4">
+                        ${data.images.map((img, index) => `
+                            <div class="thumbnail" style="width: 80px; height: 60px; cursor: pointer;" 
+                                onclick="$('#previewCarousel').carousel(${index})">
+                                <img src="${img.url}" class="img-fluid rounded" alt="${window._("Thumbnail")}">
                             </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                
+                <!-- 资产描述 -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">${data.name}</h5>
+                        <p class="card-text">${data.description}</p>
+                        
+                        <div class="row mt-4">
+                            <div class="col-md-6">
+                                <h6 class="text-muted">${window._("Asset Details")}</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>${window._("Type")}:</strong> ${data.asset_type === 10 ? window._("Real Estate") : window._("Similar Assets")}</li>
+                                    <li><strong>${window._("Location")}:</strong> ${data.location}</li>
+                                    ${data.asset_type === 10 ? `
+                                        <li><strong>${window._("Area")}:</strong> ${data.area} ${window._("sqm")}</li>
+                                    ` : ''}
+                                    <li><strong>${window._("Total Value")}:</strong> ${data.total_value} USDC</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 相关文档 -->
+                        <div class="mt-4">
+                            <h6 class="text-muted">${window._("Related Documents")}</h6>
+                            ${data.documents.length > 0 ? `
+                                <ul class="list-unstyled">
+                                    ${data.documents.map(doc => `
+                                        <li><i class="fas fa-file-alt me-2"></i>${doc.name}</li>
+                                    `).join('')}
+                                </ul>
+                            ` : `<p class="text-muted">${window._("No documents uploaded")}</p>`}
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">${window._("Close")}</button>
-                <button type="button" class="btn btn-primary" onclick="processPaymentAndPublish()">${window._("Publish")}</button>
+            
+            <!-- 右侧交易信息 -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">${window._("Asset Trading")}</h5>
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">${window._("Total Supply")}</span>
+                                <span>${data.token_supply} ${data.token_symbol}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">${window._("Token Price")}</span>
+                                <span>${data.token_price} USDC</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">${window._("Publishing Fee")}</span>
+                                <span>${data.publishing_fee}</span>
+                            </div>
+                        </div>
+                        
+                        <!-- 购买表单（预览模式下禁用） -->
+                        <form class="mb-4">
+                            <div class="mb-3">
+                                <label class="form-label">${window._("Purchase Amount")}</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" placeholder="${window._("Enter amount")}" disabled>
+                                    <span class="input-group-text">${window._("tokens")}</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-gradient-primary" data-page="create-asset" disabled>
+                                ${window._("Not available in preview mode")}
+                            </button>
+                        </form>
+                        
+                        <!-- 近期交易 -->
+                        <div>
+                            <h6 class="text-muted mb-3">${window._("Recent Transactions")}</h6>
+                            <p class="text-muted">${window._("No transaction records yet")}</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     `;
@@ -1135,10 +1146,8 @@ function showPaymentConfirmation() {
                             ${message}
                     </div>
                     <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="button" class="btn btn-primary" id="confirmPaymentBtn">
-                                <i class="fas fa-wallet me-2"></i>Confirm Payment
-                            </button>
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-gradient-primary" data-page="create-asset" id="confirmPaymentBtn">Pay and Publish</button>
                         </div>
                     </div>
                 </div>
@@ -1429,11 +1438,16 @@ function getAssetFormData() {
         name: form.elements['name'].value.trim(),
         description: form.elements['description'].value.trim(),
         token_symbol: form.elements['tokensymbol'].value.trim(),
+        location: form.elements['location'].value.trim(),
+        // 添加上传的文件
+        images: uploadedImages || [],
+        documents: uploadedDocuments || [],
+        // 添加发布费用
+        publishing_fee: document.getElementById('publishingFee').textContent
     };
     
     // 根据资产类型获取特定字段
     if (assetType === '10') { // 不动产
-        formData.location = form.elements['location'].value.trim();
         formData.area = parseFloat(form.elements['area'].value) || 0;
         formData.total_value = parseFloat(form.elements['total_value'].value) || 0;
         
