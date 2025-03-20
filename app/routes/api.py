@@ -1136,63 +1136,9 @@ def get_user_assets_query():
         # 记录当前请求的钱包地址，用于调试
         current_app.logger.info(f'通过查询参数获取资产 - 地址: {address}, 类型: {wallet_type}')
         
-        # 为特定的测试钱包地址返回模拟数据（仅用于测试和开发）
-        if wallet_type == 'phantom' and 'EeYfRdp' in address:
-            current_app.logger.info(f'为Phantom测试钱包 {address} 返回模拟资产数据')
-            test_assets = [
-                { 
-                    'asset_id': 4, 
-                    'name': 'Solana Beach Villa', 
-                    'quantity': 50, 
-                    'symbol': 'RH-SBV',
-                    'image_url': '/static/images/assets/beach-villa.jpg'
-                },
-                { 
-                    'asset_id': 5, 
-                    'name': 'SOL Desert Resort', 
-                    'quantity': 30, 
-                    'symbol': 'RH-SDR',
-                    'image_url': '/static/images/assets/desert-resort.jpg' 
-                },
-                {
-                    'asset_id': 6,
-                    'name': 'Phantom Mansions',
-                    'quantity': 25,
-                    'symbol': 'RH-PM',
-                    'image_url': '/static/images/assets/mansion.jpg'
-                }
-            ]
-            return jsonify(test_assets), 200
-        elif wallet_type == 'ethereum' and address.lower().endswith('8870'):
-            current_app.logger.info(f'为Ethereum测试钱包 {address} 返回模拟资产数据')
-            test_assets = [
-                { 
-                    'asset_id': 1, 
-                    'name': 'ETH Tower One', 
-                    'quantity': 100, 
-                    'symbol': 'RH-ETO',
-                    'image_url': '/static/images/assets/tower.jpg'
-                },
-                { 
-                    'asset_id': 2, 
-                    'name': 'Palm Jumeirah Villa', 
-                    'quantity': 125, 
-                    'symbol': 'RH-PJV',
-                    'image_url': '/static/images/assets/palm-villa.jpg'
-                },
-                {
-                    'asset_id': 3,
-                    'name': 'Manhattan Penthouse',
-                    'quantity': 75,
-                    'symbol': 'RH-MP',
-                    'image_url': '/static/images/assets/penthouse.jpg'
-                }
-            ]
-            return jsonify(test_assets), 200
-        else:
-            # 为其他钱包地址返回空数组
-            current_app.logger.info('返回空资产数组，未启用实际的区块链连接')
-            return jsonify([]), 200
+        # 返回空数组，让系统从区块链获取真实数据
+        current_app.logger.info('返回空数组，系统将从区块链获取真实数据')
+        return jsonify([]), 200
         
     except Exception as e:
         current_app.logger.error(f'获取用户资产失败: {str(e)}', exc_info=True)

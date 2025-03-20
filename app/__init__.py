@@ -85,18 +85,13 @@ def create_app(config_name='development'):
     # 设置Babel配置
     app.config['BABEL_DEFAULT_LOCALE'] = 'en'
     app.config['BABEL_DEFAULT_TIMEZONE'] = 'UTC'
-    app.config['LANGUAGES'] = ['en', 'zh_Hant']
+    app.config['LANGUAGES'] = ['en']  # 只使用英文
     
-    # 设置语言选择函数
+    # 设置语言选择函数，总是返回英文
     def get_locale():
-        # 从cookie获取语言设置，默认为英文
-        lang = request.cookies.get('language', 'en')
-        # 确保只支持英文和繁体中文
-        if lang not in ['en', 'zh_Hant']:
-            lang = 'en'
-        # 设置全局语言变量，供模板使用
-        g.locale = lang
-        return lang
+        # 强制使用英文
+        g.locale = 'en'
+        return 'en'
     
     babel.locale_selector_func = get_locale
     
