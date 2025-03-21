@@ -1465,7 +1465,7 @@ const walletState = {
      * 获取钱包余额
      * @returns {Promise<number>} 钱包余额（USDC）
      */
-    getWalletBalance() {
+    async getWalletBalance() {
         if (!this.connected || !this.address) {
             console.log('钱包未连接，无法获取余额');
             this.balance = 0;
@@ -1483,7 +1483,7 @@ const walletState = {
             
             // 余额已经在updateWalletBalance中设置了this.balance
             return balance;
-                } catch (error) {
+        } catch (error) {
             console.error('[getWalletBalance] 获取钱包余额失败:', error);
             this.balance = 0;
             this.nativeBalance = 0;
@@ -1496,7 +1496,7 @@ const walletState = {
      * @param {string} address 钱包地址
      * @returns {Promise<Array>} 用户资产列表
      */
-    getUserAssets(address) {
+    async getUserAssets(address) {
         if (!address) {
             this.assets = [];
             return [];
@@ -1540,8 +1540,8 @@ const walletState = {
                     // API请求失败，返回空数组
                     this.assets = [];
                     return [];
-                    }
-                } catch (error) {
+                }
+            } catch (error) {
                 console.warn('[getUserAssets] API请求失败:', error);
                 // API请求失败，返回空数组
                 this.assets = [];
@@ -1559,7 +1559,7 @@ const walletState = {
      * 连接到Solflare钱包
      * @returns {Promise<boolean>} 连接是否成功
      */
-    connectSolflare = async function() {
+    connectSolflare: async function() {
         try {
             console.log('尝试连接Solflare钱包...');
             
@@ -1633,7 +1633,7 @@ const walletState = {
      * 连接到Coinbase钱包
      * @returns {Promise<boolean>} 连接是否成功
      */
-    connectCoinbase = async function() {
+    connectCoinbase: async function() {
         try {
             console.log('尝试连接Coinbase钱包...');
             
@@ -1708,7 +1708,7 @@ const walletState = {
      * 连接到Slope钱包
      * @returns {Promise<boolean>} 连接是否成功
      */
-    connectSlope = async function() {
+    connectSlope: async function() {
         try {
             console.log('尝试连接Slope钱包...');
             
@@ -1781,7 +1781,7 @@ const walletState = {
      * 连接到Glow钱包
      * @returns {Promise<boolean>} 连接是否成功
      */
-    connectGlow = async function() {
+    connectGlow: async function() {
         try {
             console.log('尝试连接Glow钱包...');
             
