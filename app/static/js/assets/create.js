@@ -1214,50 +1214,67 @@ async function checkAndConnectWallet() {
                 return;
             }
             
-            // 尝试连接钱包
+            // 检查cookies中是否有钱包地址
+            const address = getCookieValue('eth_address') || 
+                            getCookieValue('solana_address') || 
+                            localStorage.getItem('walletAddress');
+            
+            // 如果找到地址，则视为已连接
+            if (address) {
+                console.log('从存储中找到钱包地址:', address);
+                resolve(true);
+                return;
+            }
+            
+            // 如果没有找到钱包地址，尝试连接钱包
             console.log('尝试连接钱包...');
             showLoadingState('正在连接钱包...');
             
-            // 这里应该调用全局钱包连接函数 - 假设全局有一个connectWallet函数
-            if (typeof window.connectWallet === 'function') {
-                const connected = await window.connectWallet();
+            // 尝试使用全局钱包连接函数
+            if (typeof window.walletState === 'object' && typeof window.walletState.openWalletSelector === 'function') {
+                console.log('使用全局钱包选择器连接');
+                const connected = await window.walletState.openWalletSelector();
                 hideLoadingState();
                 
                 if (connected) {
-                    console.log('钱包连接成功');
+                    console.log('成功连接钱包');
                     resolve(true);
                 } else {
-                    console.warn('钱包连接失败');
+                    console.warn('钱包连接失败或被用户取消');
                     resolve(false);
                 }
-            } else {
-                // 使用自定义逻辑模拟钱包连接
-                console.warn('未找到全局钱包连接函数，使用模拟连接');
-                
-                // 触发点击钱包按钮事件
-                const walletBtn = document.getElementById('walletBtn');
-                if (walletBtn) {
-                    walletBtn.click();
-                    
-                    // 等待5秒检查钱包状态
-                    setTimeout(() => {
-                        hideLoadingState();
-                        if (window.walletState && window.walletState.connected) {
-                            resolve(true);
-                        } else {
-                            console.warn('钱包连接超时');
-                            resolve(false);
-                        }
-                    }, 5000);
-                } else {
-                    hideLoadingState();
-                    console.error('未找到钱包按钮');
-                    resolve(false);
-                }
+                return;
             }
+            
+            // 回退到MetaMask连接
+            if (window.ethereum) {
+                try {
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    hideLoadingState();
+                    
+                    if (accounts && accounts.length > 0) {
+                        console.log('MetaMask连接成功:', accounts[0]);
+                        resolve(true);
+                    } else {
+                        console.warn('MetaMask未返回账户');
+                        resolve(false);
+                    }
+                } catch (error) {
+                    hideLoadingState();
+                    console.error('MetaMask连接失败:', error);
+                    resolve(false);
+                }
+                return;
+            }
+            
+            // 没有可用的钱包
+            hideLoadingState();
+            console.error('没有找到可用的钱包');
+            resolve(false);
+            
         } catch (error) {
             hideLoadingState();
-            console.error('钱包连接错误:', error);
+            console.error('钱包连接检查出错:', error);
             reject(error);
         }
     });
