@@ -247,7 +247,7 @@
             <div id="walletCheck" class="alert alert-warning" style="display: none;">
                 <i class="fas fa-exclamation-triangle me-2"></i>
                 {{ _('Please connect your wallet first') }}
-                <button class="btn btn-primary btn-sm ms-3" onclick="connectWallet()">
+                <button class="btn btn-primary btn-sm ms-3" id="connectWalletBtn">
                     <i class="fas fa-wallet me-2"></i>{{ _('Connect Wallet') }}
                 </button>
             </div>
@@ -694,49 +694,33 @@ function getCookieValue(name) {
     return null;
 }
 
-// 连接钱包
-async function connectWallet() {
-    try {
-        console.log('尝试连接钱包...');
-        
-        // 优先使用全局钱包对象
-        if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
-            console.log('使用全局钱包选择器连接');
-            const connected = await window.walletState.openWalletSelector();
-            
-            if (connected) {
-                console.log('钱包连接成功');
-                await checkWalletConnection();
-            } else {
-                console.warn('钱包连接失败或被用户取消');
-            }
-            return;
-        }
-        
-        // 回退到直接使用MetaMask
-        if (!window.ethereum) {
-            throw new Error('请安装MetaMask钱包');
-        }
-        
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        
-        if (accounts && accounts.length > 0) {
-            console.log('MetaMask连接成功:', accounts[0]);
-            await checkWalletConnection();
-        } else {
-            console.warn('MetaMask未返回账户');
-        }
-    } catch (error) {
-        console.error('连接钱包失败:', error);
-        alert(error.message || '连接钱包失败，请重试');
-    }
-}
-
 // 页面加载时检查钱包状态
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         // 检查钱包连接状态
         await checkWalletConnection();
+        
+        // 绑定钱包连接按钮事件
+        const connectBtn = document.getElementById('connectWalletBtn');
+        if (connectBtn) {
+            connectBtn.addEventListener('click', async function() {
+                try {
+                    // 优先使用全局钱包状态对象
+                    if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+                        await window.walletState.openWalletSelector();
+                    } else if (window.ethereum) {
+                        await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    } else {
+                        alert('请安装MetaMask或其他兼容的钱包');
+                    }
+                    // 连接后更新UI
+                    await checkWalletConnection();
+                } catch (error) {
+                    console.error('连接钱包失败:', error);
+                    alert(error.message || '连接钱包失败');
+                }
+            });
+        }
         
         // 监听钱包状态变化，但不自动刷新页面
         if (window.ethereum) {
