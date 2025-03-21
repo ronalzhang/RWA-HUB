@@ -830,8 +830,71 @@ function getCookieValue(name) {
 
 // 连接钱包
 function connectWallet() {
-    alert('钱包连接功能待实现');
-    // TODO: 实现钱包连接逻辑
+    console.log("尝试连接钱包...");
+    
+    return new Promise(async (resolve, reject) => {
+        try {
+            // 使用全局钱包状态对象
+            if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+                console.log("使用全局钱包选择器");
+                const connected = await window.walletState.openWalletSelector();
+                
+                if (connected) {
+                    console.log("钱包连接成功");
+                    // 更新UI显示
+                    const walletCheck = document.getElementById('walletCheck');
+                    const formContent = document.getElementById('formContent');
+                    if (walletCheck) walletCheck.style.display = 'none';
+                    if (formContent) formContent.style.display = 'block';
+                    
+                    // 检查是否为管理员用户
+                    if (window.walletState.address) {
+                        checkAdmin(window.walletState.address);
+                    }
+                    
+                    resolve(true);
+                } else {
+                    console.warn("钱包连接失败或被用户取消");
+                    resolve(false);
+                }
+                return;
+            }
+            
+            // 尝试使用MetaMask直接连接
+            if (window.ethereum) {
+                console.log("使用MetaMask连接");
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                
+                if (accounts.length > 0) {
+                    console.log("MetaMask连接成功:", accounts[0]);
+                    // 更新UI显示
+                    const walletCheck = document.getElementById('walletCheck');
+                    const formContent = document.getElementById('formContent');
+                    if (walletCheck) walletCheck.style.display = 'none';
+                    if (formContent) formContent.style.display = 'block';
+                    
+                    // 检查是否为管理员用户
+                    checkAdmin(accounts[0]);
+                    
+                    resolve(true);
+                } else {
+                    console.warn("MetaMask未返回账户");
+                    resolve(false);
+                }
+                return;
+            }
+            
+            // 没有找到可用的钱包
+            console.error("没有找到可用的钱包");
+            showError("请安装MetaMask或其他兼容的钱包插件");
+            resolve(false);
+            
+        } catch (error) {
+            console.error("钱包连接出错", error);
+            showError("钱包连接失败: " + (error.message || "未知错误"));
+            resolve(false);
+        }
+    });
 }
 
 // 页面加载时初始化
@@ -957,8 +1020,21 @@ function showAssetPreview() {
         const publishFromPreviewBtn = document.getElementById('publishFromPreviewBtn');
         if (publishFromPreviewBtn) {
             publishFromPreviewBtn.addEventListener('click', function() {
-                // 显示支付确认对话框
-                showPaymentConfirmation();
+                // 关闭预览
+                closePreview();
+                
+                // 先检查钱包连接状态，然后再显示支付确认对话框
+                checkAndConnectWallet().then(connected => {
+                    if (connected) {
+                        // 显示支付确认对话框
+                        showPaymentConfirmation();
+                    } else {
+                        showError('请先连接钱包以继续');
+                    }
+                }).catch(error => {
+                    console.error('钱包连接检查出错:', error);
+                    showError(error.message || '钱包连接失败，请重试');
+                });
             });
         }
         
@@ -966,8 +1042,22 @@ function showAssetPreview() {
         const previewPublishBtn = document.getElementById('previewPublishBtn');
         if (previewPublishBtn) {
             previewPublishBtn.addEventListener('click', function() {
-                // 显示支付确认对话框
-                showPaymentConfirmation();
+                // 关闭预览模态框
+                const previewModal = bootstrap.Modal.getInstance(document.getElementById('previewModal'));
+                if (previewModal) previewModal.hide();
+                
+                // 先检查钱包连接状态，然后再显示支付确认对话框
+                checkAndConnectWallet().then(connected => {
+                    if (connected) {
+                        // 显示支付确认对话框
+                        showPaymentConfirmation();
+                    } else {
+                        showError('请先连接钱包以继续');
+                    }
+                }).catch(error => {
+                    console.error('钱包连接检查出错:', error);
+                    showError(error.message || '钱包连接失败，请重试');
+                });
             });
         }
         
