@@ -722,6 +722,40 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         
+        // 添加钱包按钮下拉菜单点击处理 - 修复create页面钱包下拉菜单不显示的问题
+        const walletBtn = document.getElementById('walletBtn');
+        if (walletBtn) {
+            walletBtn.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                
+                // 获取下拉菜单元素
+                const walletMenu = document.getElementById('walletMenu');
+                if (walletMenu) {
+                    // 切换显示状态
+                    if (walletMenu.classList.contains('show')) {
+                        walletMenu.classList.remove('show');
+                    } else {
+                        walletMenu.classList.add('show');
+                        // 设置位置
+                        walletMenu.style.position = 'absolute';
+                        walletMenu.style.inset = '0px auto auto 0px';
+                        walletMenu.style.transform = 'translate(-203px, 40px)';
+                    }
+                }
+            });
+            
+            // 点击页面其他位置关闭下拉菜单
+            document.addEventListener('click', function(event) {
+                if (!walletBtn.contains(event.target)) {
+                    const walletMenu = document.getElementById('walletMenu');
+                    if (walletMenu && walletMenu.classList.contains('show')) {
+                        walletMenu.classList.remove('show');
+                    }
+                }
+            });
+        }
+        
         // 监听钱包状态变化，但不自动刷新页面
         if (window.ethereum) {
             window.ethereum.on('accountsChanged', async (accounts) => {
