@@ -371,7 +371,7 @@ function calculatePublishingFee() {
     }
     
     // 计算发布费用
-    let fee = Math.max(totalValue * 0.0001, 100);
+    let fee = Math.max(totalValue * 0.0001, 0.001);
     publishingFeeElement.textContent = `${fee.toFixed(2)} USDC`;
 }
 
@@ -828,71 +828,78 @@ function getCookieValue(name) {
     return null;
 }
 
-// 连接钱包
-function connectWallet() {
-    console.log("尝试连接钱包...");
-    
+// 检查并连接钱包
+async function checkAndConnectWallet() {
     return new Promise(async (resolve, reject) => {
         try {
-            // 使用全局钱包状态对象
-            if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
-                console.log("使用全局钱包选择器");
+            // 检查是否已有全局钱包状态
+            if (window.walletState && window.walletState.connected && window.walletState.address) {
+                console.log('钱包已连接:', window.walletState.address);
+                resolve(true);
+                return;
+            }
+            
+            // 检查cookies中是否有钱包地址
+            const address = getCookieValue('eth_address') || 
+                            getCookieValue('solana_address') || 
+                            localStorage.getItem('walletAddress');
+            
+            // 如果找到地址，则视为已连接
+            if (address) {
+                console.log('从存储中找到钱包地址:', address);
+                resolve(true);
+                return;
+            }
+            
+            // 如果没有找到钱包地址，尝试连接钱包
+            console.log('尝试连接钱包...');
+            showLoadingState('正在连接钱包...');
+            
+            // 优先直接使用MetaMask连接，避免与walletSelector冲突
+            if (window.ethereum) {
+                try {
+                    console.log('直接使用MetaMask连接');
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    hideLoadingState();
+                    
+                    if (accounts && accounts.length > 0) {
+                        console.log('MetaMask连接成功:', accounts[0]);
+                        resolve(true);
+                        return;
+                    } else {
+                        console.warn('MetaMask未返回账户');
+                    }
+                } catch (error) {
+                    console.error('MetaMask直接连接失败:', error);
+                    // 继续尝试其他方法连接
+                }
+            }
+            
+            // 回退到使用全局钱包选择器
+            if (typeof window.walletState === 'object' && typeof window.walletState.openWalletSelector === 'function') {
+                console.log('使用全局钱包选择器连接');
                 const connected = await window.walletState.openWalletSelector();
+                hideLoadingState();
                 
                 if (connected) {
-                    console.log("钱包连接成功");
-                    // 更新UI显示
-                    const walletCheck = document.getElementById('walletCheck');
-                    const formContent = document.getElementById('formContent');
-                    if (walletCheck) walletCheck.style.display = 'none';
-                    if (formContent) formContent.style.display = 'block';
-                    
-                    // 检查是否为管理员用户
-                    if (window.walletState.address) {
-                        checkAdmin(window.walletState.address);
-                    }
-                    
+                    console.log('成功连接钱包');
                     resolve(true);
+                    return;
                 } else {
-                    console.warn("钱包连接失败或被用户取消");
-                    resolve(false);
+                    console.warn('钱包连接失败或被用户取消');
                 }
-                return;
             }
             
-            // 尝试使用MetaMask直接连接
-            if (window.ethereum) {
-                console.log("使用MetaMask连接");
-                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                
-                if (accounts.length > 0) {
-                    console.log("MetaMask连接成功:", accounts[0]);
-                    // 更新UI显示
-                    const walletCheck = document.getElementById('walletCheck');
-                    const formContent = document.getElementById('formContent');
-                    if (walletCheck) walletCheck.style.display = 'none';
-                    if (formContent) formContent.style.display = 'block';
-                    
-                    // 检查是否为管理员用户
-                    checkAdmin(accounts[0]);
-                    
-                    resolve(true);
-                } else {
-                    console.warn("MetaMask未返回账户");
-                    resolve(false);
-                }
-                return;
-            }
-            
-            // 没有找到可用的钱包
-            console.error("没有找到可用的钱包");
-            showError("请安装MetaMask或其他兼容的钱包插件");
+            // 没有可用的钱包
+            hideLoadingState();
+            console.error('没有找到可用的钱包或所有连接方法都失败');
+            showError('请安装并解锁MetaMask或其他兼容的钱包');
             resolve(false);
             
         } catch (error) {
-            console.error("钱包连接出错", error);
-            showError("钱包连接失败: " + (error.message || "未知错误"));
-            resolve(false);
+            hideLoadingState();
+            console.error('钱包连接检查出错:', error);
+            reject(error);
         }
     });
 }
@@ -1291,83 +1298,6 @@ function showPaymentConfirmation() {
         console.error('显示支付确认出错:', error);
         showError(error.message);
     }
-}
-
-// 检查并连接钱包
-async function checkAndConnectWallet() {
-    return new Promise(async (resolve, reject) => {
-        try {
-            // 检查是否已有全局钱包状态
-            if (window.walletState && window.walletState.connected && window.walletState.address) {
-                console.log('钱包已连接:', window.walletState.address);
-                resolve(true);
-                return;
-            }
-            
-            // 检查cookies中是否有钱包地址
-            const address = getCookieValue('eth_address') || 
-                            getCookieValue('solana_address') || 
-                            localStorage.getItem('walletAddress');
-            
-            // 如果找到地址，则视为已连接
-            if (address) {
-                console.log('从存储中找到钱包地址:', address);
-                resolve(true);
-                return;
-            }
-            
-            // 如果没有找到钱包地址，尝试连接钱包
-            console.log('尝试连接钱包...');
-            showLoadingState('正在连接钱包...');
-            
-            // 尝试使用全局钱包连接函数
-            if (typeof window.walletState === 'object' && typeof window.walletState.openWalletSelector === 'function') {
-                console.log('使用全局钱包选择器连接');
-                const connected = await window.walletState.openWalletSelector();
-                hideLoadingState();
-                
-                if (connected) {
-                    console.log('成功连接钱包');
-                    resolve(true);
-                } else {
-                    console.warn('钱包连接失败或被用户取消');
-                    resolve(false);
-                }
-                return;
-            }
-            
-            // 回退到MetaMask连接
-            if (window.ethereum) {
-                try {
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    hideLoadingState();
-                    
-                    if (accounts && accounts.length > 0) {
-                        console.log('MetaMask连接成功:', accounts[0]);
-                        resolve(true);
-                    } else {
-                        console.warn('MetaMask未返回账户');
-                        resolve(false);
-                    }
-                } catch (error) {
-                    hideLoadingState();
-                    console.error('MetaMask连接失败:', error);
-                    resolve(false);
-                }
-                return;
-            }
-            
-            // 没有可用的钱包
-            hideLoadingState();
-            console.error('没有找到可用的钱包');
-            resolve(false);
-            
-        } catch (error) {
-            hideLoadingState();
-            console.error('钱包连接检查出错:', error);
-            reject(error);
-        }
-    });
 }
 
 // 处理支付流程
