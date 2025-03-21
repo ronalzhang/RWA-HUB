@@ -1048,7 +1048,7 @@ const walletState = {
             walletSelectorContent.style.borderRadius = '10px';
             walletSelectorContent.style.padding = '20px';
             walletSelectorContent.style.width = '90%';
-            walletSelectorContent.style.maxWidth = '400px';
+            walletSelectorContent.style.maxWidth = '450px';
             walletSelectorContent.style.maxHeight = '90vh';
             walletSelectorContent.style.overflow = 'auto';
             
@@ -1077,82 +1077,121 @@ const walletState = {
             // 添加钱包选项 - 使用wallet-grid样式
             const walletGrid = document.createElement('div');
             walletGrid.className = 'wallet-grid';
+            walletGrid.style.display = 'grid';
+            walletGrid.style.gridTemplateColumns = 'repeat(3, 1fr)';
+            walletGrid.style.gap = '15px';
             
-            // Phantom钱包选项
-            const phantomOption = document.createElement('div');
-            phantomOption.className = 'wallet-option';
+            // 定义钱包列表
+            const wallets = [
+                {
+                    name: 'Phantom',
+                    icon: '/static/images/wallets/phantom.png',
+                    class: 'phantom',
+                    onClick: () => this.connectPhantom()
+                },
+                {
+                    name: 'MetaMask',
+                    icon: '/static/images/wallets/metamask.png',
+                    class: 'ethereum',
+                    onClick: () => this.connectEthereum()
+                },
+                {
+                    name: 'Solflare',
+                    icon: '/static/images/wallets/solflare.png',
+                    class: 'solana',
+                    onClick: () => this.connectSolflare()
+                },
+                {
+                    name: 'Coinbase',
+                    icon: '/static/images/wallets/coinbase.png',
+                    class: 'ethereum',
+                    onClick: () => this.connectCoinbase()
+                },
+                {
+                    name: 'Slope',
+                    icon: '/static/images/wallets/slope.png',
+                    class: 'solana',
+                    onClick: () => this.connectSlope()
+                },
+                {
+                    name: 'Glow',
+                    icon: '/static/images/wallets/glow.png',
+                    class: 'solana',
+                    onClick: () => this.connectGlow()
+                }
+            ];
             
-            // 创建图标容器
-            const phantomIconContainer = document.createElement('div');
-            phantomIconContainer.className = 'wallet-icon-container';
-            
-            // 创建图标包装器
-            const phantomIconWrapper = document.createElement('div');
-            phantomIconWrapper.className = 'wallet-icon-wrapper phantom';
-            
-            // 添加图标
-            const phantomIcon = document.createElement('img');
-            phantomIcon.src = '/static/images/wallets/phantom.png';
-            phantomIcon.alt = 'Phantom';
-            phantomIcon.style.width = '32px';
-            phantomIcon.style.height = '32px';
-            
-            // 添加钱包名称
-            const phantomName = document.createElement('span');
-            phantomName.className = 'wallet-name';
-            phantomName.textContent = 'Phantom';
-            
-            // 组装Phantom选项
-            phantomIconWrapper.appendChild(phantomIcon);
-            phantomIconContainer.appendChild(phantomIconWrapper);
-            phantomOption.appendChild(phantomIconContainer);
-            phantomOption.appendChild(phantomName);
-            
-            // 添加点击事件
-            phantomOption.onclick = () => {
-                walletSelector.remove();
-                this.connectPhantom();
-            };
-            
-            // MetaMask钱包选项
-            const metamaskOption = document.createElement('div');
-            metamaskOption.className = 'wallet-option';
-            
-            // 创建图标容器
-            const metamaskIconContainer = document.createElement('div');
-            metamaskIconContainer.className = 'wallet-icon-container';
-            
-            // 创建图标包装器
-            const metamaskIconWrapper = document.createElement('div');
-            metamaskIconWrapper.className = 'wallet-icon-wrapper ethereum';
-            
-            // 添加图标
-            const metamaskIcon = document.createElement('img');
-            metamaskIcon.src = '/static/images/wallets/metamask.png';
-            metamaskIcon.alt = 'MetaMask';
-            metamaskIcon.style.width = '32px';
-            metamaskIcon.style.height = '32px';
-            
-            // 添加钱包名称
-            const metamaskName = document.createElement('span');
-            metamaskName.className = 'wallet-name';
-            metamaskName.textContent = 'MetaMask';
-            
-            // 组装MetaMask选项
-            metamaskIconWrapper.appendChild(metamaskIcon);
-            metamaskIconContainer.appendChild(metamaskIconWrapper);
-            metamaskOption.appendChild(metamaskIconContainer);
-            metamaskOption.appendChild(metamaskName);
-            
-            // 添加点击事件
-            metamaskOption.onclick = () => {
-                walletSelector.remove();
-                this.connectEthereum();
-            };
+            // 创建钱包选项
+            wallets.forEach(wallet => {
+                const option = document.createElement('div');
+                option.className = 'wallet-option';
+                option.style.display = 'flex';
+                option.style.flexDirection = 'column';
+                option.style.alignItems = 'center';
+                option.style.padding = '10px';
+                option.style.borderRadius = '8px';
+                option.style.cursor = 'pointer';
+                option.style.transition = 'all 0.2s ease';
+                option.style.border = '1px solid #eee';
+                
+                // 悬停效果
+                option.onmouseover = function() {
+                    this.style.backgroundColor = '#f5f8ff';
+                    this.style.transform = 'translateY(-2px)';
+                    this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.05)';
+                };
+                
+                option.onmouseout = function() {
+                    this.style.backgroundColor = '#fff';
+                    this.style.transform = 'translateY(0)';
+                    this.style.boxShadow = 'none';
+                };
+                
+                // 创建图标容器
+                const iconContainer = document.createElement('div');
+                iconContainer.className = 'wallet-icon-container';
+                iconContainer.style.marginBottom = '8px';
+                
+                // 创建图标包装器
+                const iconWrapper = document.createElement('div');
+                iconWrapper.className = `wallet-icon-wrapper ${wallet.class}`;
+                iconWrapper.style.width = '40px';
+                iconWrapper.style.height = '40px';
+                iconWrapper.style.display = 'flex';
+                iconWrapper.style.alignItems = 'center';
+                iconWrapper.style.justifyContent = 'center';
+                
+                // 添加图标
+                const icon = document.createElement('img');
+                icon.src = wallet.icon;
+                icon.alt = wallet.name;
+                icon.style.width = '32px';
+                icon.style.height = '32px';
+                
+                // 添加钱包名称
+                const name = document.createElement('span');
+                name.className = 'wallet-name';
+                name.textContent = wallet.name;
+                name.style.fontSize = '12px';
+                name.style.fontWeight = '500';
+                
+                // 组装选项
+                iconWrapper.appendChild(icon);
+                iconContainer.appendChild(iconWrapper);
+                option.appendChild(iconContainer);
+                option.appendChild(name);
+                
+                // 添加点击事件
+                option.onclick = () => {
+                    walletSelector.remove();
+                    wallet.onClick();
+                };
+                
+                // 添加到网格
+                walletGrid.appendChild(option);
+            });
             
             // 添加选项到钱包选择器
-            walletGrid.appendChild(phantomOption);
-            walletGrid.appendChild(metamaskOption);
             walletSelectorContent.appendChild(walletGrid);
             
             // 添加内容到选择器
@@ -1373,6 +1412,437 @@ const walletState = {
             console.warn('设置以太坊事件监听器失败:', listenerError);
         }
     },
+
+    /**
+     * 为Phantom钱包设置事件监听器
+     */
+    setupPhantomListeners() {
+        if (!window.solana || !window.solana.isPhantom) return;
+        
+        try {
+            // 移除现有监听器，避免重复
+            if (typeof window.solana.removeAllListeners === 'function') {
+                window.solana.removeAllListeners('disconnect');
+                window.solana.removeAllListeners('accountChanged');
+            }
+            
+            // 断开连接事件
+            window.solana.on('disconnect', async () => {
+                console.log('Phantom钱包断开连接');
+                await this.disconnect(true);
+            });
+            
+            // 账户变更事件
+            window.solana.on('accountChanged', async (publicKey) => {
+                if (publicKey) {
+                    console.log('Phantom账户已变更:', publicKey.toString());
+                    this.address = publicKey.toString();
+                    localStorage.setItem('walletAddress', this.address);
+                    
+                    // 更新余额和资产
+                    await this.getWalletBalance();
+                    await this.getUserAssets(this.address);
+                    
+                    // 检查是否为管理员
+                    await this.checkIsAdmin();
+                    
+                    // 更新UI
+                    await this.updateUI();
+                    
+                    // 触发状态变更事件
+                    this.notifyStateChange();
+                } else {
+                    console.log('Phantom账户已断开');
+                    await this.disconnect(true);
+                }
+            });
+        } catch (error) {
+            console.warn('设置Phantom事件监听器失败:', error);
+        }
+    },
+
+    /**
+     * 获取钱包余额
+     * @returns {Promise<number>} 钱包余额（USDC）
+     */
+    getWalletBalance() {
+        if (!this.connected || !this.address) {
+            console.log('钱包未连接，无法获取余额');
+            this.balance = 0;
+            this.nativeBalance = 0;
+            return 0;
+        }
+        
+        try {
+            console.log(`[getWalletBalance] 尝试获取 ${this.walletType} 钱包 ${this.address} 的余额`);
+            
+            // 直接调用新的updateWalletBalance方法获取真实数据
+            console.log('[getWalletBalance] 调用updateWalletBalance方法获取真实数据');
+            const balance = await this.updateWalletBalance();
+            console.log(`[getWalletBalance] 从updateWalletBalance获取到余额: ${balance}`);
+            
+            // 余额已经在updateWalletBalance中设置了this.balance
+            return balance;
+                } catch (error) {
+            console.error('[getWalletBalance] 获取钱包余额失败:', error);
+            this.balance = 0;
+            this.nativeBalance = 0;
+            return 0;
+        }
+    },
+
+    /**
+     * 获取用户资产
+     * @param {string} address 钱包地址
+     * @returns {Promise<Array>} 用户资产列表
+     */
+    getUserAssets(address) {
+        if (!address) {
+            this.assets = [];
+            return [];
+        }
+        
+        try {
+            // 获取当前钱包类型
+            const walletType = this.walletType || 'ethereum';
+            console.log(`[getUserAssets] 获取 ${walletType} 钱包 ${address} 的资产`);
+            
+            // 通过API获取真实数据
+            try {
+                // 构建API请求URL，添加时间戳防止缓存
+                const timestamp = new Date().getTime();
+                const url = `/api/user/assets?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
+                console.log(`[getUserAssets] 调用API: ${url}`);
+                
+                const response = await fetch(url);
+                
+                if (response.ok) {
+                    // 处理API返回数据
+                    const data = await response.json();
+                    console.log('[getUserAssets] API返回的资产数据:', data);
+                    
+                    let assets = Array.isArray(data) ? data : 
+                                (data.assets || data.data || []);
+                    
+                    // 标准化资产格式
+                    const formattedAssets = assets.map(asset => ({
+                        asset_id: asset.asset_id || asset.id || 0,
+                        name: asset.name || asset.asset_name || asset.title || 'Unknown Asset',
+                        quantity: asset.holding_amount || asset.balance || asset.tokens || asset.amount || 0,
+                        symbol: asset.symbol || asset.token_symbol || `RH-${asset.asset_id || asset.id || '???'}`
+                    }));
+                    
+                    console.log(`[getUserAssets] 处理后的资产数据 (${formattedAssets.length} 个资产):`, formattedAssets);
+                    this.assets = formattedAssets;
+                    return formattedAssets;
+                } else {
+                    console.warn('[getUserAssets] API响应不成功:', response.status, response.statusText);
+                    // API请求失败，返回空数组
+                    this.assets = [];
+                    return [];
+                    }
+                } catch (error) {
+                console.warn('[getUserAssets] API请求失败:', error);
+                // API请求失败，返回空数组
+                this.assets = [];
+                return [];
+            }
+        } catch (error) {
+            console.error('[getUserAssets] 获取用户资产失败:', error);
+            // 错误情况下返回空数组
+            this.assets = [];
+            return [];
+        }
+    },
+
+    /**
+     * 连接到Solflare钱包
+     * @returns {Promise<boolean>} 连接是否成功
+     */
+    connectSolflare = async function() {
+        try {
+            console.log('尝试连接Solflare钱包...');
+            
+            // 检查Solflare是否存在
+            if (!window.solflare) {
+                console.error('未检测到Solflare钱包');
+                showError('未检测到Solflare，请安装Solflare钱包扩展');
+                return false;
+            }
+            
+            try {
+                await window.solflare.connect();
+            } catch (error) {
+                console.error('连接到Solflare失败:', error);
+                showError('连接Solflare失败: ' + (error.message || '请检查是否已登录Solflare'));
+                return false;
+            }
+            
+            if (window.solflare.publicKey) {
+                const address = window.solflare.publicKey.toString();
+                console.log('Solflare钱包连接成功:', address);
+                
+                // 更新钱包状态
+                this.address = address;
+                this.walletType = 'solana';
+                this.connected = true;
+                this.provider = window.solflare;
+                
+                // 保存状态到本地存储
+                localStorage.setItem('walletType', 'solana');
+                localStorage.setItem('walletAddress', address);
+                localStorage.setItem('lastWalletType', 'solana');
+                localStorage.setItem('lastWalletAddress', address);
+                
+                // 获取余额和资产
+                try {
+                    await this.getWalletBalance();
+                    await this.getUserAssets(this.address);
+                    await this.checkIsAdmin();
+                    await this.updateUI();
+                    this.updateDisplay();
+                    
+                    this.notifyStateChange({
+                        type: 'connect',
+                        address: this.address,
+                        walletType: this.walletType,
+                        balance: this.balance,
+                        nativeBalance: this.nativeBalance
+                    });
+                    
+                    const truncatedAddress = this.address.slice(0, 6) + '...' + this.address.slice(-4);
+                    showSuccess(`钱包已连接: ${truncatedAddress}`);
+                } catch (e) {
+                    console.warn('处理Solflare连接后续操作失败:', e);
+                }
+                
+                return true;
+            } else {
+                console.error('未能获取Solflare钱包地址');
+                showError('未能获取Solflare钱包地址，请确保已授权访问');
+                return false;
+            }
+        } catch (error) {
+            console.error('连接Solflare钱包过程中发生错误:', error);
+            showError('连接Solflare失败: ' + (error.message || '未知错误'));
+            return false;
+        }
+    },
+
+    /**
+     * 连接到Coinbase钱包
+     * @returns {Promise<boolean>} 连接是否成功
+     */
+    connectCoinbase = async function() {
+        try {
+            console.log('尝试连接Coinbase钱包...');
+            
+            // 检查Coinbase钱包是否存在
+            if (!window.ethereum || !window.ethereum.isCoinbaseWallet) {
+                console.error('未检测到Coinbase钱包');
+                showError('未检测到Coinbase钱包，请安装Coinbase Wallet扩展');
+                return false;
+            }
+            
+            let accounts;
+            try {
+                accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            } catch (error) {
+                console.error('连接到Coinbase钱包失败:', error);
+                showError('连接Coinbase钱包失败: ' + (error.message || '请检查是否已登录'));
+                return false;
+            }
+            
+            if (accounts && accounts.length > 0) {
+                const address = accounts[0];
+                console.log('Coinbase钱包连接成功:', address);
+                
+                // 更新钱包状态
+                this.address = address;
+                this.walletType = 'ethereum';
+                this.connected = true;
+                this.provider = window.ethereum;
+                
+                // 保存状态到本地存储
+                localStorage.setItem('walletType', 'ethereum');
+                localStorage.setItem('walletAddress', address);
+                localStorage.setItem('lastWalletType', 'ethereum');
+                localStorage.setItem('lastWalletAddress', address);
+                
+                // 获取余额和资产
+                try {
+                    await this.getWalletBalance();
+                    await this.getUserAssets(this.address);
+                    await this.checkIsAdmin();
+                    await this.updateUI();
+                    this.updateDisplay();
+                    
+                    this.notifyStateChange({
+                        type: 'connect',
+                        address: this.address,
+                        walletType: this.walletType,
+                        balance: this.balance,
+                        nativeBalance: this.nativeBalance
+                    });
+                    
+                    const truncatedAddress = this.address.slice(0, 6) + '...' + this.address.slice(-4);
+                    showSuccess(`钱包已连接: ${truncatedAddress}`);
+                } catch (e) {
+                    console.warn('处理Coinbase连接后续操作失败:', e);
+                }
+                
+                return true;
+            } else {
+                console.error('未能获取Coinbase钱包地址');
+                showError('未能获取Coinbase钱包地址，请确保已授权访问');
+                return false;
+            }
+        } catch (error) {
+            console.error('连接Coinbase钱包过程中发生错误:', error);
+            showError('连接Coinbase钱包失败: ' + (error.message || '未知错误'));
+            return false;
+        }
+    },
+
+    /**
+     * 连接到Slope钱包
+     * @returns {Promise<boolean>} 连接是否成功
+     */
+    connectSlope = async function() {
+        try {
+            console.log('尝试连接Slope钱包...');
+            
+            // 检查Slope钱包是否存在
+            if (!window.Slope) {
+                console.error('未检测到Slope钱包');
+                showError('未检测到Slope钱包，请安装Slope钱包扩展');
+                return false;
+            }
+            
+            try {
+                const slope = new window.Slope();
+                const { data, error } = await slope.connect();
+                
+                if (error) {
+                    throw error;
+                }
+                
+                const address = data.publicKey;
+                console.log('Slope钱包连接成功:', address);
+                
+                // 更新钱包状态
+                this.address = address;
+                this.walletType = 'solana';
+                this.connected = true;
+                this.provider = slope;
+                
+                // 保存状态到本地存储
+                localStorage.setItem('walletType', 'solana');
+                localStorage.setItem('walletAddress', address);
+                localStorage.setItem('lastWalletType', 'solana');
+                localStorage.setItem('lastWalletAddress', address);
+                
+                // 获取余额和资产
+                try {
+                    await this.getWalletBalance();
+                    await this.getUserAssets(this.address);
+                    await this.checkIsAdmin();
+                    await this.updateUI();
+                    this.updateDisplay();
+                    
+                    this.notifyStateChange({
+                        type: 'connect',
+                        address: this.address,
+                        walletType: this.walletType,
+                        balance: this.balance,
+                        nativeBalance: this.nativeBalance
+                    });
+                    
+                    const truncatedAddress = this.address.slice(0, 6) + '...' + this.address.slice(-4);
+                    showSuccess(`钱包已连接: ${truncatedAddress}`);
+                } catch (e) {
+                    console.warn('处理Slope连接后续操作失败:', e);
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('连接到Slope钱包失败:', error);
+                showError('连接Slope钱包失败: ' + (error.message || '请检查是否已登录'));
+                return false;
+            }
+        } catch (error) {
+            console.error('连接Slope钱包过程中发生错误:', error);
+            showError('连接Slope钱包失败: ' + (error.message || '未知错误'));
+            return false;
+        }
+    },
+
+    /**
+     * 连接到Glow钱包
+     * @returns {Promise<boolean>} 连接是否成功
+     */
+    connectGlow = async function() {
+        try {
+            console.log('尝试连接Glow钱包...');
+            
+            // 检查Glow钱包是否存在
+            if (!window.glowSolana) {
+                console.error('未检测到Glow钱包');
+                showError('未检测到Glow钱包，请安装Glow钱包扩展');
+                return false;
+            }
+            
+            try {
+                const publicKey = await window.glowSolana.connect();
+                const address = publicKey.toString();
+                console.log('Glow钱包连接成功:', address);
+                
+                // 更新钱包状态
+                this.address = address;
+                this.walletType = 'solana';
+                this.connected = true;
+                this.provider = window.glowSolana;
+                
+                // 保存状态到本地存储
+                localStorage.setItem('walletType', 'solana');
+                localStorage.setItem('walletAddress', address);
+                localStorage.setItem('lastWalletType', 'solana');
+                localStorage.setItem('lastWalletAddress', address);
+                
+                // 获取余额和资产
+                try {
+                    await this.getWalletBalance();
+                    await this.getUserAssets(this.address);
+                    await this.checkIsAdmin();
+                    await this.updateUI();
+                    this.updateDisplay();
+                    
+                    this.notifyStateChange({
+                        type: 'connect',
+                        address: this.address,
+                        walletType: this.walletType,
+                        balance: this.balance,
+                        nativeBalance: this.nativeBalance
+                    });
+                    
+                    const truncatedAddress = this.address.slice(0, 6) + '...' + this.address.slice(-4);
+                    showSuccess(`钱包已连接: ${truncatedAddress}`);
+                } catch (e) {
+                    console.warn('处理Glow连接后续操作失败:', e);
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('连接到Glow钱包失败:', error);
+                showError('连接Glow钱包失败: ' + (error.message || '请检查是否已登录'));
+                return false;
+            }
+        } catch (error) {
+            console.error('连接Glow钱包过程中发生错误:', error);
+            showError('连接Glow钱包失败: ' + (error.message || '未知错误'));
+            return false;
+        }
+    },
 };
 
 /**
@@ -1589,7 +2059,7 @@ walletState.connectEthereum = async function() {
         let accounts;
         try {
             console.log('使用标准request方法连接');
-            // 使用现代方法请求账户
+            // 使用现代方法请求账户，不使用event listeners来避免兼容性问题
             accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
         } catch (error) {
             console.error('连接到MetaMask失败:', error);
@@ -1667,7 +2137,7 @@ walletState.connectEthereum = async function() {
                 // 使用更详细的状态对象
                 this.notifyStateChange({
                     type: 'connect',
-            address: this.address,
+                    address: this.address,
                     walletType: this.walletType,
                     balance: this.balance,
                     nativeBalance: this.nativeBalance
@@ -1680,11 +2150,60 @@ walletState.connectEthereum = async function() {
                 console.warn('[connectEthereum] 触发事件失败:', eventError);
             }
             
-            // 6. 设置MetaMask断开连接监听器
+            // 6. 设置MetaMask断开连接监听器 - 简化监听器设置，避免兼容性问题
             try {
-                // 使用独立的setupEthereumListeners函数
-                this.setupEthereumListeners();
-                console.log('已设置以太坊钱包事件监听器');
+                // 简化版本的监听器设置
+                if (window.ethereum) {
+                    console.log('设置简化版以太坊钱包事件监听器');
+                    
+                    // 账户变更监听
+                    const handleAccountsChanged = (newAccounts) => {
+                        if (newAccounts.length === 0) {
+                            // 用户断开连接
+                            this.disconnect();
+                        } else if (this.address !== newAccounts[0]) {
+                            // 账户切换
+                            this.address = newAccounts[0];
+                            this.updateUI();
+                            this.getWalletBalance();
+                        }
+                    };
+                    
+                    // 移除旧的监听器（如果存在）
+                    if (this._accountsChangedHandler) {
+                        try {
+                            window.ethereum.removeListener('accountsChanged', this._accountsChangedHandler);
+                        } catch (e) {
+                            console.warn('移除旧的accountsChanged监听器失败:', e);
+                        }
+                    }
+                    
+                    // 添加新的监听器
+                    this._accountsChangedHandler = handleAccountsChanged;
+                    window.ethereum.on('accountsChanged', handleAccountsChanged);
+                    
+                    // 链变更监听
+                    const handleChainChanged = (chainId) => {
+                        console.log('以太坊网络已更改，刷新页面');
+                        this.chainId = chainId;
+                        this.updateUI();
+                    };
+                    
+                    // 移除旧的监听器（如果存在）
+                    if (this._chainChangedHandler) {
+                        try {
+                            window.ethereum.removeListener('chainChanged', this._chainChangedHandler);
+                        } catch (e) {
+                            console.warn('移除旧的chainChanged监听器失败:', e);
+                        }
+                    }
+                    
+                    // 添加新的监听器
+                    this._chainChangedHandler = handleChainChanged;
+                    window.ethereum.on('chainChanged', handleChainChanged);
+                    
+                    console.log('以太坊钱包事件监听器设置完成');
+                }
             } catch (listenerError) {
                 console.warn('设置MetaMask事件监听器失败:', listenerError);
             }
@@ -1844,148 +2363,6 @@ walletState.connectPhantom = async function() {
         console.error('[connectPhantom] Phantom钱包连接失败:', error);
         showError('连接Phantom钱包失败: ' + (error.message || '未知错误'));
         return false;
-    }
-};
-
-/**
- * 为Phantom钱包设置事件监听器
- */
-walletState.setupPhantomListeners = function() {
-    if (!window.solana || !window.solana.isPhantom) return;
-    
-    try {
-        // 移除现有监听器，避免重复
-        if (typeof window.solana.removeAllListeners === 'function') {
-            window.solana.removeAllListeners('disconnect');
-            window.solana.removeAllListeners('accountChanged');
-        }
-        
-        // 断开连接事件
-        window.solana.on('disconnect', async () => {
-            console.log('Phantom钱包断开连接');
-            await this.disconnect(true);
-        });
-        
-        // 账户变更事件
-        window.solana.on('accountChanged', async (publicKey) => {
-            if (publicKey) {
-                console.log('Phantom账户已变更:', publicKey.toString());
-                this.address = publicKey.toString();
-                localStorage.setItem('walletAddress', this.address);
-                
-                // 更新余额和资产
-                await this.getWalletBalance();
-                await this.getUserAssets(this.address);
-                
-                // 检查是否为管理员
-                await this.checkIsAdmin();
-                
-                // 更新UI
-                await this.updateUI();
-                
-                // 触发状态变更事件
-                this.notifyStateChange();
-            } else {
-                console.log('Phantom账户已断开');
-                await this.disconnect(true);
-            }
-        });
-    } catch (error) {
-        console.warn('设置Phantom事件监听器失败:', error);
-    }
-};
-
-/**
- * 获取钱包余额
- * @returns {Promise<number>} 钱包余额（USDC）
- */
-walletState.getWalletBalance = async function() {
-    if (!this.connected || !this.address) {
-        console.log('钱包未连接，无法获取余额');
-        this.balance = 0;
-        this.nativeBalance = 0;
-        return 0;
-    }
-    
-    try {
-        console.log(`[getWalletBalance] 尝试获取 ${this.walletType} 钱包 ${this.address} 的余额`);
-        
-        // 直接调用新的updateWalletBalance方法获取真实数据
-        console.log('[getWalletBalance] 调用updateWalletBalance方法获取真实数据');
-        const balance = await this.updateWalletBalance();
-        console.log(`[getWalletBalance] 从updateWalletBalance获取到余额: ${balance}`);
-        
-        // 余额已经在updateWalletBalance中设置了this.balance
-        return balance;
-            } catch (error) {
-        console.error('[getWalletBalance] 获取钱包余额失败:', error);
-        this.balance = 0;
-        this.nativeBalance = 0;
-        return 0;
-    }
-};
-
-/**
- * 获取用户资产
- * @param {string} address 钱包地址
- * @returns {Promise<Array>} 用户资产列表
- */
-walletState.getUserAssets = async function(address) {
-    if (!address) {
-        this.assets = [];
-        return [];
-    }
-    
-    try {
-        // 获取当前钱包类型
-        const walletType = this.walletType || 'ethereum';
-        console.log(`[getUserAssets] 获取 ${walletType} 钱包 ${address} 的资产`);
-        
-        // 通过API获取真实数据
-        try {
-            // 构建API请求URL，添加时间戳防止缓存
-            const timestamp = new Date().getTime();
-            const url = `/api/user/assets?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
-            console.log(`[getUserAssets] 调用API: ${url}`);
-            
-            const response = await fetch(url);
-            
-            if (response.ok) {
-                // 处理API返回数据
-                const data = await response.json();
-                console.log('[getUserAssets] API返回的资产数据:', data);
-                
-                let assets = Array.isArray(data) ? data : 
-                            (data.assets || data.data || []);
-                
-                // 标准化资产格式
-                const formattedAssets = assets.map(asset => ({
-                    asset_id: asset.asset_id || asset.id || 0,
-                    name: asset.name || asset.asset_name || asset.title || 'Unknown Asset',
-                    quantity: asset.holding_amount || asset.balance || asset.tokens || asset.amount || 0,
-                    symbol: asset.symbol || asset.token_symbol || `RH-${asset.asset_id || asset.id || '???'}`
-                }));
-                
-                console.log(`[getUserAssets] 处理后的资产数据 (${formattedAssets.length} 个资产):`, formattedAssets);
-                this.assets = formattedAssets;
-                return formattedAssets;
-            } else {
-                console.warn('[getUserAssets] API响应不成功:', response.status, response.statusText);
-                // API请求失败，返回空数组
-                this.assets = [];
-                return [];
-                }
-            } catch (error) {
-            console.warn('[getUserAssets] API请求失败:', error);
-            // API请求失败，返回空数组
-            this.assets = [];
-            return [];
-        }
-    } catch (error) {
-        console.error('[getUserAssets] 获取用户资产失败:', error);
-        // 错误情况下返回空数组
-        this.assets = [];
-        return [];
     }
 };
 
