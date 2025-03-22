@@ -1,13 +1,32 @@
-import struct
-import os
-import base64
+from base64 import b64encode, b64decode
 import json
-from solana.rpc.api import Client
-from solana.rpc.types import TxOpts
-from solana.transaction import Transaction, AccountMeta
-from solana.publickey import PublicKey
-from solana.keypair import Keypair
-from solana.system_program import SYS_PROGRAM_ID, create_account
+import os
+import time
+# from solana.rpc.api import Client
+# from solana.rpc.types import TxOpts
+# from solana.transaction import Transaction, AccountMeta
+# from solana.publickey import PublicKey
+# from solana.keypair import Keypair
+# from solana.system_program import SYS_PROGRAM_ID, create_account
+# 使用我们的兼容层
+from app.utils.solana_compat.rpc.api import Client
+from app.utils.solana_compat.rpc.types import TxOpts
+from app.utils.solana_compat.transaction import Transaction, AccountMeta, TransactionInstruction
+from app.utils.solana_compat.publickey import PublicKey
+from app.utils.solana_compat.keypair import Keypair
+from app.utils.solana_compat.system_program import SystemProgram as SYS_PROGRAM
+
+import logging
+from typing import List, Optional, Dict, Any, Tuple
+import requests
+
+SYS_PROGRAM_ID = SYS_PROGRAM.PROGRAM_ID
+
+# from solana.transaction import TransactionInstruction
+# 函数导入
+import struct
+from app.utils.helpers import check_response
+
 # 修复导入问题
 try:
     from spl.token.instructions import get_associated_token_address, create_associated_token_account_instruction
@@ -22,7 +41,6 @@ except ImportError:
         pass  # 模拟实现，仅用于测试
         
 from spl.token.constants import TOKEN_PROGRAM_ID
-from solana.transaction import TransactionInstruction
 
 # 配置信息
 SOLANA_RPC_URL = os.environ.get("SOLANA_RPC_URL", "https://api.devnet.solana.com")
