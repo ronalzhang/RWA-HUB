@@ -29,7 +29,7 @@ const walletState = {
      */
     async init() {
         try {
-            console.log('初始化钱包...');
+        console.log('初始化钱包...');
             
             // 防止重复初始化
             if (this.initialized) {
@@ -180,7 +180,7 @@ const walletState = {
                         // 更新状态
                         this.walletType = storedWalletType;
                         this.address = storedWalletAddress;
-                        this.connected = true;
+                                this.connected = true;
                         
                         // 更新UI
                         this.updateUI();
@@ -202,8 +202,8 @@ const walletState = {
                                     await this.connectEthereum(true);
                                 } else if (storedWalletType === 'phantom' || storedWalletType === 'solana') {
                                     await this.connectPhantom(true);
-                                }
-                            } catch (err) {
+                            }
+                        } catch (err) {
                                 console.error('静默重连失败:', err);
                             }
                         }
@@ -362,9 +362,9 @@ const walletState = {
             if (!walletType) {
                 console.error('未指定钱包类型');
                 showError('请选择要连接的钱包类型');
-                return false;
-            }
-            
+                            return false;
+                        }
+        
             // 如果当前已经连接了同类型的钱包，先断开连接
             if (this.connected && this.walletType === walletType) {
                 await this.disconnect();
@@ -399,16 +399,16 @@ const walletState = {
                     console.error(`不支持的钱包类型: ${requestedWalletType}`);
                     showError(`不支持的钱包类型: ${requestedWalletType}`);
                     return false;
-            }
+                }
             
             // 如果连接成功
             if (success) {
                 console.log(`${requestedWalletType}钱包连接成功`);
-                
+            
                 // 关闭钱包选择器
                 this.closeWalletSelector();
-                
-                // 更新UI
+            
+            // 更新UI
                 this.updateUI();
                 
                 // 获取余额和资产
@@ -434,8 +434,8 @@ const walletState = {
                         address: this.address
                     }
                 }));
-                
-                return true;
+            
+                    return true;
             } else {
                 console.log(`${requestedWalletType}钱包连接失败`);
                 
@@ -461,7 +461,7 @@ const walletState = {
             // 更新UI
             this.updateUI();
             
-            return false;
+                            return false;
         }
     },
     
@@ -483,7 +483,7 @@ const walletState = {
                 return;
             }
             
-            if (this.connected && this.address) {
+        if (this.connected && this.address) {
                 // 钱包已连接状态
                 if (walletBtnText) {
                     // 显示格式化的地址而不是余额
@@ -541,8 +541,8 @@ const walletState = {
                 }
             } catch (e) {
                 console.warn('触发钱包状态变化事件失败:', e);
-            }
-        } catch (error) {
+                }
+            } catch (error) {
             console.error('更新UI出错:', error);
         }
     },
@@ -793,7 +793,7 @@ const walletState = {
             this.stateChangeCallbacks = [];
         }
         
-        this.stateChangeCallbacks.push(callback);
+            this.stateChangeCallbacks.push(callback);
         console.log('已注册钱包状态变更回调');
         
         // 立即调用回调一次，传递当前状态
@@ -812,7 +812,7 @@ const walletState = {
             console.error('执行初始状态回调时出错:', error);
         }
     },
-
+    
     /**
      * 取消注册钱包状态变更回调
      * 
@@ -848,11 +848,11 @@ const walletState = {
             
             // 创建状态事件数据
             const eventData = {
-                connected: this.connected,
-                address: this.address,
-                walletType: this.walletType,
-                balance: this.balance,
-                ...details
+                    connected: this.connected,
+                    address: this.address,
+                    walletType: this.walletType,
+                    balance: this.balance,
+                    ...details
             };
             
             // 通知所有注册的回调
@@ -899,9 +899,9 @@ const walletState = {
             this.nativeBalance = 0;
             this.updateBalanceDisplay();
             return;
-        }
-        
-        try {
+            }
+            
+            try {
             console.log(`获取钱包余额 - 地址: ${this.address}, 类型: ${this.walletType}`);
             
             // 构建API请求URL，添加时间戳防止缓存
@@ -909,10 +909,10 @@ const walletState = {
             const url = `/api/wallet/balance?address=${this.address}&wallet_type=${this.walletType}&_=${timestamp}`;
             
             console.log(`请求余额API: ${url}`);
-            const response = await fetch(url);
-            
-            if (response.ok) {
-                const data = await response.json();
+                const response = await fetch(url);
+                
+                if (response.ok) {
+                    const data = await response.json();
                 console.log('余额API返回数据:', JSON.stringify(data));
                 
                 // 增强USDC余额提取逻辑 - 支持更多种API返回格式
@@ -985,7 +985,7 @@ const walletState = {
                     usdcBalance = isNaN(usdcBalance) ? 0 : usdcBalance;
                     this.balance = usdcBalance;
                     console.log(`设置新的USDC余额: ${this.balance}`);
-                } else {
+                        } else {
                     console.warn('未能从API响应中提取有效余额，保留当前余额:', this.balance);
                     
                     // 如果当前余额为0或未定义，使用模拟数据
@@ -1009,11 +1009,11 @@ const walletState = {
                 
                 // 再触发事件通知其他组件（使用延时避免潜在循环）
                 setTimeout(() => {
-                    this.triggerBalanceUpdatedEvent();
+                        this.triggerBalanceUpdatedEvent();
                 }, 100);
-                
-                return this.balance;
-            } else {
+                        
+                        return this.balance;
+                    } else {
                 console.error('获取余额API失败:', response.status, response.statusText);
                 
                 // 如果API请求失败并且当前余额为0，使用模拟数据
@@ -1025,8 +1025,8 @@ const walletState = {
                 // 不要修改现有余额，但仍然触发UI更新
                 this.updateBalanceDisplay();
                 return this.balance;
-            }
-        } catch (error) {
+        }
+            } catch (error) {
             console.error('获取余额出错:', error);
             
             // 如果出错且当前余额为0，使用模拟数据
@@ -1521,8 +1521,8 @@ const walletState = {
             return null;
         }
     },
-     
-     /**
+
+    /**
       * 关闭钱包选择器
       */
      closeWalletSelector() {
@@ -1537,11 +1537,11 @@ const walletState = {
                  return true;
              }
              return false;
-         } catch (error) {
+            } catch (error) {
              console.error('关闭钱包选择器时出错:', error);
              return false;
-         }
-     },
+        }
+    },
 
     /**
      * 显示钱包选择对话框
@@ -1570,7 +1570,7 @@ const walletState = {
                     document.removeEventListener('walletConnected', walletConnectedListener);
                     reject(new Error('选择钱包超时'));
                 }, 30000);
-            } catch (error) {
+                    } catch (error) {
                 console.error('显示钱包选择对话框失败:', error);
                 reject(error);
             }
@@ -1982,7 +1982,7 @@ async connectPhantom(isReconnect = false) {
                         response = {
                             publicKey: window.solana.publicKey
                         };
-                    } else {
+                } else {
                         // 尝试静默重连
                         response = await window.solana.connect({ onlyIfTrusted: true });
                     }
@@ -2029,7 +2029,7 @@ async connectPhantom(isReconnect = false) {
             this.setupPhantomListeners();
             
             // 保存钱包信息到本地存储
-            localStorage.setItem('walletType', 'phantom');
+                localStorage.setItem('walletType', 'phantom');
             localStorage.setItem('walletAddress', this.address);
             
             // 清除重连标记
@@ -2045,19 +2045,19 @@ async connectPhantom(isReconnect = false) {
             console.error('Phantom钱包连接失败: 未获取到公钥');
             if (!isReconnect) {
                 showError('Phantom钱包连接失败: 未获取到公钥');
-            }
-            return false;
+        }
+        return false;
         }
     } catch (error) {
         console.error('连接Phantom钱包时出错:', error);
         if (!isReconnect) {
-            showError('连接Phantom钱包失败: ' + (error.message || '未知错误'));
+        showError('连接Phantom钱包失败: ' + (error.message || '未知错误'));
         }
         return false;
     }
 },
 
-    /**
+/**
      * 连接到以太坊钱包（MetaMask等）
      * @param {boolean} isReconnect - 是否是重新连接操作
      * @returns {Promise<boolean>} 连接是否成功
@@ -2097,9 +2097,9 @@ async connectPhantom(isReconnect = false) {
                     console.error('Web3库未加载');
                     showError('Web3库未加载，无法连接钱包');
                 }
-                return false;
-            }
-            
+            return false;
+        }
+        
             // 创建Web3实例
             let web3;
             try {
@@ -2114,13 +2114,13 @@ async connectPhantom(isReconnect = false) {
                 console.error('创建Web3实例失败:', web3Error);
                 if (!isReconnect) {
                     showError('创建Web3实例失败: ' + web3Error.message);
-                }
-                return false;
             }
-            
+                return false;
+        }
+        
             // 请求账户授权
-            let accounts;
-            try {
+        let accounts;
+        try {
                 // 如果是重新连接，先检查当前连接状态
                 if (isReconnect) {
                     try {
@@ -2137,7 +2137,7 @@ async connectPhantom(isReconnect = false) {
                             console.log('重连模式但没有匹配的账户，不弹出授权窗口');
                             return false;
                         }
-                    } catch (error) {
+        } catch (error) {
                         console.error('检查以太坊账户失败:', error);
                         return false;
                     }
@@ -2181,9 +2181,9 @@ async connectPhantom(isReconnect = false) {
                 if (!isReconnect) {
                     showError('未能获取钱包账户地址');
                 }
-                return false;
-            }
-            
+            return false;
+        }
+        
             // 连接成功
             console.log('成功连接到以太坊钱包');
             this.address = accounts[0];
@@ -2265,13 +2265,13 @@ async connectPhantom(isReconnect = false) {
                     
                     this.getWalletBalance().then(() => {
                         this.updateUI();
-                        this.notifyStateChange({
-                            type: 'connect',
-                            address: this.address,
-                            walletType: this.walletType,
-                            balance: this.balance,
-                            nativeBalance: this.nativeBalance
-                        });
+                this.notifyStateChange({
+                    type: 'connect',
+                    address: this.address,
+                    walletType: this.walletType,
+                    balance: this.balance,
+                    nativeBalance: this.nativeBalance
+                });
                     });
                 }
             });
@@ -2414,32 +2414,23 @@ async connectPhantom(isReconnect = false) {
             successMsg.style.opacity = '1';
             setTimeout(() => {
                 successMsg.style.opacity = '0';
-            }, 2000);
+            }, 4000); // 延长到4秒
             
             // 2. 临时改变地址显示元素样式以给予视觉反馈
             const addressDisplay = document.getElementById('walletAddressDisplay');
             if (addressDisplay) {
-                const originalBackground = addressDisplay.style.backgroundColor;
-                addressDisplay.style.backgroundColor = '#d4edda';
-                addressDisplay.style.color = '#155724';
+                // 添加背景色变化效果
+                addressDisplay.style.backgroundColor = '#e0f7e0';
+                addressDisplay.style.borderColor = '#28a745';
+                addressDisplay.style.transition = 'all 0.3s ease';
                 
+                // 4秒后恢复原样
                 setTimeout(() => {
-                    addressDisplay.style.backgroundColor = originalBackground;
-                    addressDisplay.style.color = '#333';
-                }, 1000);
+                    addressDisplay.style.backgroundColor = '#f5f8ff';
+                    addressDisplay.style.borderColor = 'transparent';
+                }, 4000);
             }
-            
-            return;
         }
-        
-        // 3. 尝试使用全局成功提示函数
-        if (typeof showSuccess === 'function') {
-            showSuccess('地址已复制到剪贴板');
-            return;
-        }
-        
-        // 4. 最后尝试使用alert
-        alert('地址已复制到剪贴板');
     }
 }
 
@@ -2557,12 +2548,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             // 触发初始化完成事件
             document.dispatchEvent(new CustomEvent('walletStateInitialized', {
-                detail: {
+                        detail: {
                     connected: window.walletState.connected,
                     address: window.walletState.address,
                     walletType: window.walletState.walletType
-                }
-            }));
+                        }
+                    }));
             
             // 确保页面可见性变化时检查钱包状态
             document.addEventListener('visibilitychange', () => {
@@ -2650,7 +2641,7 @@ function showSuccess(message) {
                 position: 'topRight',
                 timeout: 3000
             });
-        } else {
+    } else {
             console.log('%c✅ ' + message, 'color: green; font-weight: bold;');
         }
     } catch (e) {
@@ -2668,7 +2659,7 @@ function showError(message) {
                 position: 'topRight',
                 timeout: 4000
             });
-        } else {
+    } else {
             console.error('❌ ' + message);
         }
     } catch (e) {
