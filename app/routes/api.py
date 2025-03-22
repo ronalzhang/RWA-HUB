@@ -1515,18 +1515,16 @@ def generate_token_symbol_api():
             # 再次检查
             existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
             if existing_asset:
-                return jsonify({
-                    'success': False,
-                    'error': '无法生成唯一的代币符号，请稍后重试'
-                }), 500
+                # 如果依然存在，使用时间戳
+                import time
+                timestamp = int(time.time())
+                token_symbol = f"RH-{asset_type}{timestamp % 10000}"
         
-        return jsonify({
-            'success': True,
-            'token_symbol': token_symbol
-        })
+        return jsonify({'success': True, 'token_symbol': token_symbol})
     except Exception as e:
-        current_app.logger.error(f'生成代币代码失败: {str(e)}')
-        return jsonify({'success': False, 'error': str(e)}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'生成代币符号失败: {str(e)}'}), 500
 
 @api_bp.route('/assets/<int:asset_id>/distribute_dividend', methods=['POST'])
 @eth_address_required
