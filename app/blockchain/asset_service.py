@@ -13,7 +13,6 @@ import time
 from typing import Dict, Any, List, Optional, Tuple, Union
 from decimal import Decimal
 from flask import current_app, g
-from app.models.asset import AssetState, PropertyType
 from app.models.user import User
 from app.models.transaction import Transaction as DBTransaction, TransactionType, TransactionStatus
 from app.models.holding import Holding
