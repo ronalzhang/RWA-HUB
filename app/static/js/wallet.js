@@ -985,57 +985,45 @@ const walletState = {
                     usdcBalance = isNaN(usdcBalance) ? 0 : usdcBalance;
                     this.balance = usdcBalance;
                     console.log(`设置新的USDC余额: ${this.balance}`);
-                        } else {
-                    console.warn('未能从API响应中提取有效余额，保留当前余额:', this.balance);
-                    
-                    // 如果当前余额为0或未定义，使用模拟数据
-                    if (!this.balance || this.balance <= 0) {
-                        // 简单检查地址是否是特定钱包，这里提供模拟数据作为后备
-                        if (this.address.toLowerCase() === '0x123456789abcdef123456789abcdef123456789'.toLowerCase()) {
-                            this.balance = 49; // 模拟特定钱包的余额
-                            console.log('使用模拟数据设置余额:', this.balance);
-                        } else {
-                            // 对于所有地址，如果API无法获取余额，但明确知道应该有余额，使用49作为备用
-                            this.balance = 49;
-                            console.log('使用默认模拟数据设置余额:', this.balance);
-                        }
-                    }
+                } else {
+                    console.warn('未能从API响应中提取有效余额，设置余额为null');
+                    this.balance = null;
                 }
                 
-                this.nativeBalance = 0; // 不使用SOL余额
+                // 处理原生代币余额(SOL/ETH)
+                if (data.balances) {
+                    // 根据钱包类型获取正确的原生代币余额
+                    if (this.walletType === 'phantom' && data.balances.SOL !== undefined) {
+                        this.nativeBalance = parseFloat(data.balances.SOL);
+                        this.nativeCurrency = 'SOL';
+                    } else if (this.walletType === 'metamask' && data.balances.ETH !== undefined) {
+                        this.nativeBalance = parseFloat(data.balances.ETH);
+                        this.nativeCurrency = 'ETH';
+                    } else {
+                        this.nativeBalance = 0;
+                    }
+                } else {
+                    this.nativeBalance = 0;
+                }
                 
                 // 先更新UI显示
                 this.updateBalanceDisplay();
                 
                 // 再触发事件通知其他组件（使用延时避免潜在循环）
                 setTimeout(() => {
-                        this.triggerBalanceUpdatedEvent();
+                    this.triggerBalanceUpdatedEvent();
                 }, 100);
                         
-                        return this.balance;
-                    } else {
+                return this.balance;
+            } else {
                 console.error('获取余额API失败:', response.status, response.statusText);
-                
-                // 如果API请求失败并且当前余额为0，使用模拟数据
-                if (!this.balance || this.balance <= 0) {
-                    this.balance = 49; // 使用默认模拟值
-                    console.log('API请求失败，使用模拟数据设置余额:', this.balance);
-                }
-                
-                // 不要修改现有余额，但仍然触发UI更新
+                this.balance = null;  // API请求失败时设置为null而不是0
                 this.updateBalanceDisplay();
                 return this.balance;
-        }
-            } catch (error) {
-            console.error('获取余额出错:', error);
-            
-            // 如果出错且当前余额为0，使用模拟数据
-            if (!this.balance || this.balance <= 0) {
-                this.balance = 49; // 使用默认模拟值
-                console.log('余额获取出错，使用模拟数据设置余额:', this.balance);
             }
-            
-            // 不要修改现有余额，但仍然触发UI更新
+        } catch (error) {
+            console.error('获取余额出错:', error);
+            this.balance = null;  // 出错时设置为null而不是0
             this.updateBalanceDisplay();
             return this.balance;
         }
@@ -1078,9 +1066,24 @@ const walletState = {
         try {
             console.log('更新余额显示, 余额:', this.balance);
             
-            // 确保余额是有效数字
-            const validBalance = (this.balance !== null && this.balance !== undefined) ? parseFloat(this.balance) : 0;
-            const formattedBalance = isNaN(validBalance) ? '--' : validBalance.toFixed(2);
+            // 确保余额处理更准确
+            let formattedBalance = '--';
+            
+            // 处理三种情况：null/undefined、0、有效数字
+            if (this.balance === null || this.balance === undefined) {
+                // 余额未获取到，显示为 '--'
+                formattedBalance = '--';
+            } else {
+                // 转换为数字
+                const numericBalance = parseFloat(this.balance);
+                if (isNaN(numericBalance)) {
+                    // 无效数字，显示为 '--'
+                    formattedBalance = '--';
+                } else {
+                    // 有效数字(包括0)，格式化为两位小数
+                    formattedBalance = numericBalance.toFixed(2);
+                }
+            }
             
             // 更新顶部导航栏显示地址而不是余额
             const walletBtnText = document.getElementById('walletBtnText');
@@ -1361,7 +1364,7 @@ const walletState = {
             const walletGrid = document.createElement('div');
             walletGrid.className = 'wallet-grid';
             walletGrid.style.display = 'grid';
-            walletGrid.style.gridTemplateColumns = 'repeat(3, 1fr)';
+            walletGrid.style.gridTemplateColumns = 'repeat(2, 1fr)';
             walletGrid.style.gap = '15px';
             
             // 定义钱包列表
@@ -1379,34 +1382,6 @@ const walletState = {
                     class: 'ethereum',
                     type: 'ethereum',
                     onClick: () => this.connect('ethereum')
-                },
-                {
-                    name: 'Solflare',
-                    icon: '/static/images/wallets/solflare.png',
-                    class: 'solana',
-                    type: 'solflare',
-                    onClick: () => this.connect('solflare')
-                },
-                {
-                    name: 'Coinbase',
-                    icon: '/static/images/wallets/coinbase.png',
-                    class: 'ethereum',
-                    type: 'coinbase',
-                    onClick: () => this.connect('coinbase')
-                },
-                {
-                    name: 'Slope',
-                    icon: '/static/images/wallets/slope.png',
-                    class: 'solana',
-                    type: 'slope',
-                    onClick: () => this.connect('slope')
-                },
-                {
-                    name: 'Glow',
-                    icon: '/static/images/wallets/glow.png',
-                    class: 'solana',
-                    type: 'glow',
-                    onClick: () => this.connect('glow')
                 }
             ];
             
@@ -2414,7 +2389,7 @@ async connectPhantom(isReconnect = false) {
             successMsg.style.opacity = '1';
             setTimeout(() => {
                 successMsg.style.opacity = '0';
-            }, 4000); // 延长到4秒
+            }, 3000); // 延长到3秒
             
             // 2. 临时改变地址显示元素样式以给予视觉反馈
             const addressDisplay = document.getElementById('walletAddressDisplay');
