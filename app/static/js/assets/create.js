@@ -422,8 +422,8 @@ function calculatePublishingFee() {
         totalValue = parseFloat(document.getElementById('total_value_similar').value) || 0;
     }
     
-    // 计算发布费用 - 费率从0.01%降低到0.0001%
-    let fee = Math.max(totalValue * 0.000001, 0.001);
+    // 计算发布费用 - 费率为0.0001%
+    let fee = Math.max(totalValue * 0.000001, 0.01);
     publishingFeeElement.textContent = `${fee.toFixed(2)} USDC`;
 }
 
