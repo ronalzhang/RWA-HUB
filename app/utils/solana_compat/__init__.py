@@ -7,6 +7,7 @@ from .transaction import Transaction, TransactionInstruction, AccountMeta
 from .rpc.types import TxOpts
 from .connection import Connection
 from .system_program import SystemProgram
+from .token import Token, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
 
 __all__ = [
     'PublicKey',
@@ -17,4 +18,7 @@ __all__ = [
     'TxOpts',
     'Connection',
     'SystemProgram',
+    'Token',
+    'TOKEN_PROGRAM_ID',
+    'ASSOCIATED_TOKEN_PROGRAM_ID',
 ] 
