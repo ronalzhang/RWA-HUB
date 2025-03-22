@@ -558,7 +558,6 @@ def upload_files():
         return jsonify({'error': str(e)}), 500
 
 @assets_api_bp.route('/upload-images', methods=['POST'])
-@eth_address_required
 def upload_images():
     """上传图片或文档（新API）"""
     try:
@@ -568,17 +567,17 @@ def upload_images():
         content_length = request.content_length
         if content_length and content_length > 10 * 1024 * 1024:  # 限制为10MB
             current_app.logger.error(f'请求体太大: {content_length / (1024 * 1024):.2f}MB')
-            return jsonify({'error': '文件大小超过限制（最大10MB）'}), 413
+            return jsonify({'success': False, 'message': f'文件大小超过限制（最大10MB）, 当前: {content_length / (1024 * 1024):.2f}MB'}), 413
             
         # 检查是否有文件上传
         if 'file' not in request.files:
             current_app.logger.error('没有文件被上传')
-            return jsonify({'error': '没有文件被上传'}), 400
+            return jsonify({'success': False, 'message': '没有文件被上传'}), 400
             
         file = request.files['file']
         if not file:
             current_app.logger.error('文件无效')
-            return jsonify({'error': '文件无效'}), 400
+            return jsonify({'success': False, 'message': '文件无效'}), 400
             
         # 检查文件大小
         file_content = file.read()
@@ -587,45 +586,75 @@ def upload_images():
         file_size = len(file_content)
         if file_size > 5 * 1024 * 1024:  # 5MB
             current_app.logger.error(f'文件太大: {file_size / (1024 * 1024):.2f}MB')
-            return jsonify({'error': f'文件大小超过限制（最大5MB），当前大小: {file_size / (1024 * 1024):.2f}MB'}), 413
+            return jsonify({'success': False, 'message': f'文件大小超过限制（最大5MB），当前大小: {file_size / (1024 * 1024):.2f}MB'}), 413
             
         # 获取参数
         asset_type = request.form.get('asset_type')
-        file_type = request.form.get('fileType', 'image')  # 注意前端使用fileType而不是file_type
+        file_type = request.form.get('fileType', 'IMAGE')  # 注意前端使用fileType而不是file_type
         asset_id = request.form.get('asset_id', 'temp')
         token_symbol = request.form.get('token_symbol', '')
         
         current_app.logger.info(f'上传文件详情: 名称={file.filename}, 大小={file_size/1024:.2f}KB')
         current_app.logger.info(f'资产类型: {asset_type}, 文件类型: {file_type}, 资产ID: {asset_id}, 代币符号: {token_symbol}')
         
+        # 检查token_symbol有效性，避免特殊字符导致目录问题
+        if token_symbol and not re.match(r'^[A-Za-z0-9\-_]+$', token_symbol):
+            current_app.logger.error(f'无效的token_symbol格式: {token_symbol}')
+            return jsonify({'success': False, 'message': f'无效的代币符号格式: {token_symbol}，仅允许字母、数字、连字符和下划线'}), 400
+        
         if not asset_type:
             current_app.logger.error('缺少资产类型')
-            return jsonify({'error': '缺少资产类型'}), 400
+            return jsonify({'success': False, 'message': '缺少资产类型参数'}), 400
             
+        # 确保上传目录存在
+        if token_symbol:
+            is_image = file_type.upper() == 'IMAGE'
+            sub_dir = 'images' if is_image else 'documents'
+            upload_folder = os.path.join(
+                current_app.static_folder, 
+                'uploads', 
+                'projects',
+                token_symbol,
+                sub_dir
+            )
+            # 确保目录存在
+            try:
+                os.makedirs(upload_folder, exist_ok=True)
+                current_app.logger.info(f'确保上传目录存在: {upload_folder}')
+            except Exception as e:
+                current_app.logger.error(f'创建上传目录失败: {str(e)}')
+                return jsonify({'success': False, 'message': f'服务器错误: 无法创建上传目录: {str(e)}'}), 500
+                
+            # 检查目录权限
+            if not os.access(upload_folder, os.W_OK):
+                current_app.logger.error(f'上传目录没有写入权限: {upload_folder}')
+                return jsonify({'success': False, 'message': '服务器错误: 上传目录没有写入权限'}), 500
+                
         # 保存文件
         try:
             file_urls = save_files([file], asset_type, asset_id, token_symbol)
             
             if not file_urls:
                 current_app.logger.error('文件上传保存失败')
-                return jsonify({'error': '文件上传保存失败'}), 500
+                return jsonify({'success': False, 'message': '文件上传保存失败'}), 500
                 
             current_app.logger.info(f'文件上传成功: {file_urls}')
             return jsonify({
+                'success': True,
                 'urls': file_urls
             })
         except ValueError as ve:
             current_app.logger.error(f'文件保存出错 (ValueError): {str(ve)}')
-            return jsonify({'error': f'文件保存失败: {str(ve)}'}), 400
+            return jsonify({'success': False, 'message': f'文件保存失败: {str(ve)}'}), 400
         except Exception as se:
             current_app.logger.error(f'文件保存出错 (Exception): {str(se)}')
-            return jsonify({'error': f'文件保存失败: {str(se)}'}), 500
+            return jsonify({'success': False, 'message': f'文件保存失败: {str(se)}'}), 500
             
     except Exception as e:
         import traceback
         error_detail = traceback.format_exc()
         current_app.logger.error(f'上传文件处理失败:\n{error_detail}')
-        return jsonify({'error': f'上传处理失败: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': f'上传处理失败: {str(e)}'}), 500
 
 @assets_api_bp.route('/<int:asset_id>/check_owner')
 @eth_address_required
