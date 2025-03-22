@@ -1045,12 +1045,6 @@ def get_wallet_balance():
     current_app.logger.info(f'获取钱包余额请求 - 地址: {address}, 类型: {wallet_type}')
     
     try:
-        # 查询数据库或区块链获取真实余额
-        # 实际实现应该通过区块链API获取用户USDC余额
-        
-        # 数据库查询示例
-        # 查询用户的交易记录，计算余额
-        
         # 创建返回结果
         balances = {
             'USDC': 0,
@@ -1061,26 +1055,41 @@ def get_wallet_balance():
         if wallet_type == 'phantom':
             # 查询Solana钱包的SOL余额
             try:
-                # 实际应该调用Solana API，获取真实SOL余额
-                # 这里是模拟代码，实际应该连接到Solana节点
-                # from solana.rpc.api import Client
-                # client = Client(current_app.config.get('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com'))
-                # sol_balance = client.get_balance(address).get('result', {}).get('value', 0) / 1e9
+                # 导入区块链客户端
+                from app.blockchain.solana import SolanaClient
                 
-                # 模拟返回一个真实SOL余额
-                sol_balance = 1.65 if address.startswith('EeYfRd') else 0.01
+                # 创建只读Solana客户端实例，用于查询用户钱包
+                solana_client = SolanaClient(wallet_address=address)
                 
-                balances['SOL'] = sol_balance
-                current_app.logger.info(f'SOL余额: {sol_balance}')
+                # 获取SOL余额
+                sol_balance = solana_client.get_balance()
+                
+                if sol_balance is not None:
+                    balances['SOL'] = sol_balance
+                    current_app.logger.info(f'SOL余额: {sol_balance}')
+                else:
+                    current_app.logger.warning('无法获取SOL余额，返回0')
+                    balances['SOL'] = 0
+                
+                # 获取USDC余额 - USDC Token在Solana上的地址
+                # Solana主网USDC代币地址
+                usdc_token_address = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+                try:
+                    from app.blockchain.asset_service import AssetService
+                    # 调用获取SPL代币余额的方法
+                    usdc_balance = AssetService.get_token_balance(wallet_address=address, token_mint_address=usdc_token_address)
+                    balances['USDC'] = usdc_balance
+                    current_app.logger.info(f'USDC余额: {usdc_balance}')
+                except Exception as usdc_err:
+                    current_app.logger.error(f'获取USDC余额失败: {str(usdc_err)}')
+                    # 获取USDC失败不影响整体结果，保持USDC=0
             except Exception as sol_err:
                 current_app.logger.error(f'获取SOL余额失败: {str(sol_err)}')
                 balances['SOL'] = 0
                 
-            # USDC余额设为0，表示真实数据
-            balances['USDC'] = 0
-                
         else:
-            # 如果是以太坊钱包，也返回0余额，因为我们只关心SOL
+            # 如果是以太坊钱包，可以添加以太坊余额查询逻辑
+            # 目前返回0余额，后续可扩展
             balances['USDC'] = 0
             balances['SOL'] = 0
             
