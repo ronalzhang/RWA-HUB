@@ -10,6 +10,8 @@ from .trade import Trade, TradeStatus, TradeType
 from .income import PlatformIncome, IncomeType
 from .dividend import Dividend, DividendRecord
 from .shortlink import ShortLink
+from .transaction import Transaction, TransactionType, TransactionStatus
+from .holding import Holding
 
 # 从admin.py导入管理相关模型
 from .admin import (
@@ -30,5 +32,6 @@ __all__ = [
     'Trade', 'TradeType', 'TradeStatus', 'User', 'UserRole', 'UserStatus', 
     'Commission', 'AdminUser', 'SystemConfig', 'CommissionSetting',
     'DistributionLevel', 'UserReferral', 'CommissionRecord', 'AdminOperationLog',
-    'DashboardStats', 'ShortLink'
+    'DashboardStats', 'ShortLink', 'Transaction', 'TransactionType', 'TransactionStatus',
+    'Holding'
 ]
