@@ -362,9 +362,9 @@ const walletState = {
             if (!walletType) {
                 console.error('未指定钱包类型');
                 showError('请选择要连接的钱包类型');
-                return false;
-            }
-        
+                    return false;
+                }
+            
             // 如果当前已经连接了同类型的钱包，先断开连接
             if (this.connected && this.walletType === walletType) {
                 await this.disconnect();
@@ -421,13 +421,13 @@ const walletState = {
             
             // 根据钱包类型调用不同的连接方法
             switch (requestedWalletType.toLowerCase()) {
-                case 'ethereum':
+                    case 'ethereum':
                 case 'metamask':
                     success = await this.connectEthereum();
-                    break;
-                case 'phantom':
+                        break;
+                    case 'phantom':
                     success = await this.connectPhantom();
-                    break;
+                        break;
                 case 'solflare':
                     success = await this.connectSolflare();
                     break;
@@ -440,7 +440,7 @@ const walletState = {
                 case 'glow':
                     success = await this.connectGlow();
                     break;
-                default:
+                    default:
                     console.error(`不支持的钱包类型: ${requestedWalletType}`);
                     showError(`不支持的钱包类型: ${requestedWalletType}`);
                     return false;
@@ -460,7 +460,7 @@ const walletState = {
                 try {
                     await this.getWalletBalance();
                     await this.getUserAssets(this.address);
-                    await this.checkIsAdmin();
+                await this.checkIsAdmin();
                 } catch (error) {
                     console.warn('获取钱包信息时出错:', error);
                 }
@@ -586,8 +586,8 @@ const walletState = {
                 }
             } catch (e) {
                 console.warn('触发钱包状态变化事件失败:', e);
-                }
-            } catch (error) {
+            }
+        } catch (error) {
             console.error('更新UI出错:', error);
         }
     },
@@ -708,7 +708,7 @@ const walletState = {
                 setTimeout(() => {
                     window.location.reload();
                 }, 100);
-            } else {
+        } else {
                 console.log('断开连接，但不重新加载页面');
                 showSuccess('已断开钱包连接');
             }
@@ -943,9 +943,9 @@ const walletState = {
             this.balance = 0;
             this.updateBalanceDisplay();
             return;
-        }
+            }
             
-        try {
+            try {
             console.log(`获取钱包余额 - 地址: ${this.address}, 类型: ${this.walletType}`);
             
             // 构建API请求URL，添加时间戳防止缓存
@@ -953,10 +953,10 @@ const walletState = {
             const url = `/api/wallet/balance?address=${this.address}&wallet_type=${this.walletType}&_=${timestamp}`;
             
             console.log(`请求余额API: ${url}`);
-            const response = await fetch(url);
+                const response = await fetch(url);
                 
-            if (response.ok) {
-                const data = await response.json();
+                if (response.ok) {
+                    const data = await response.json();
                 console.log('余额API返回数据:', JSON.stringify(data));
                 
                 // 增强USDC余额提取逻辑 - 支持更多种API返回格式
@@ -1029,9 +1029,9 @@ const walletState = {
                     usdcBalance = isNaN(usdcBalance) ? 0 : usdcBalance;
                     this.balance = usdcBalance;
                     console.log(`设置新的USDC余额: ${this.balance}`);
-                } else {
+                    } else {
                     console.warn('未能从API响应中提取有效余额，设置余额为null');
-                    this.balance = null;
+                        this.balance = null;
                 }
                 
                 // 先更新UI显示
@@ -1039,7 +1039,7 @@ const walletState = {
                 
                 // 再触发事件通知其他组件（使用延时避免潜在循环）
                 setTimeout(() => {
-                    this.triggerBalanceUpdatedEvent();
+                this.triggerBalanceUpdatedEvent();
                 }, 100);
                         
                 return this.balance;
@@ -1091,15 +1091,15 @@ const walletState = {
     updateBalanceDisplay() {
         try {
             console.log('更新余额显示, 余额:', this.balance);
-            
+                
             // 确保余额处理更准确
             let formattedBalance = '--';
             
             // 处理三种情况：null/undefined、0、有效数字
-            if (this.balance === null || this.balance === undefined) {
+                if (this.balance === null || this.balance === undefined) {
                 // 余额未获取到，显示为 '--'
                 formattedBalance = '--';
-            } else {
+                } else {
                 // 转换为数字
                 const numericBalance = parseFloat(this.balance);
                 if (isNaN(numericBalance)) {
@@ -1183,7 +1183,7 @@ const walletState = {
                 const emptyItem = document.createElement('li');
                 emptyItem.className = 'text-muted text-center py-1';
                 emptyItem.style.fontSize = '11px';
-                emptyItem.textContent = '没有找到资产';
+                emptyItem.textContent = 'No Assets Found';
                 assetsList.appendChild(emptyItem);
                 
                 // 仍然显示资产容器，只是显示"没有资产"的信息
@@ -2437,200 +2437,18 @@ async connectPhantom(isReconnect = false) {
 
 // 页面初始化时就自动调用钱包初始化方法
 document.addEventListener('DOMContentLoaded', async function() {
-
-    // 确保钱包状态对象全局可用
-    window.walletState = walletState;
-    
-    // 添加兼容层，确保旧代码仍然能够工作
-    // 为walletState对象添加getter，使旧代码能够通过isConnected访问connected属性
-    Object.defineProperty(window.walletState, 'isConnected', {
-        get: function() {
-            console.log('通过兼容层访问isConnected');
-            return this.connected;
-        },
-        configurable: true
-    });
-    
-    // 监听Web3.js加载失败事件
-    document.addEventListener('web3LoadFailed', function() {
-        console.warn('Web3.js加载失败，某些钱包功能可能受限');
-        // 将Web3依赖标记为不可用
-        window.walletState.web3Available = false;
+    console.log('页面加载完成，初始化钱包状态');
+    try {
+        // 确保全局访问
+        window.walletState = wallet;
         
-        // 即使Web3.js不可用，仍然初始化钱包状态
-        initWalletState();
-    });
-    
-    // 监听Web3.js加载成功事件
-    document.addEventListener('web3Loaded', function() {
-        console.log('Web3.js加载成功，所有钱包功能可用');
-        window.walletState.web3Available = true;
-        
-        // Web3.js加载成功，初始化钱包状态
-        initWalletState();
-    });
-    
-    // 如果5秒后没有收到Web3.js加载事件，强制初始化钱包
-    // 这是为了防止事件监听器可能没有正确触发的情况
-    setTimeout(function() {
-        if (window.walletState.web3Available === undefined) {
-            console.warn('未检测到Web3.js加载事件，强制初始化钱包状态');
-            window.walletState.web3Available = typeof Web3 !== 'undefined';
-            initWalletState();
-        }
-    }, 5000);
-    
-    // 初始化钱包状态的函数
-    async function initWalletState() {
-        try {
-            console.log('开始初始化钱包...');
-            
-            // 如果已经初始化，避免重复初始化
-            if (window.walletState && window.walletState.initialized) {
-                console.log('钱包状态已初始化，跳过');
-                return window.walletState;
-            }
-            
-            // 先从存储中读取钱包信息，确保DOM渲染时有初始状态
-            const storedWalletType = localStorage.getItem('walletType') || sessionStorage.getItem('walletType');
-            const storedWalletAddress = localStorage.getItem('walletAddress') || sessionStorage.getItem('walletAddress');
-            
-            if (storedWalletType && storedWalletAddress) {
-                console.log('从存储中恢复钱包状态:', storedWalletType, storedWalletAddress);
-                
-                // 创建初始钱包状态对象
-                window.walletState = window.walletState || {
-                    walletType: storedWalletType,
-                    address: storedWalletAddress,
-                    connected: true,
-                    initialized: false // 将在完整初始化后设置为true
-                };
-                
-                // 触发钱包状态事件，使UI立即响应
-                try {
-                    document.dispatchEvent(new CustomEvent('walletStateChanged', {
-                        detail: {
-                            connected: true,
-                            address: storedWalletAddress,
-                            walletType: storedWalletType
-                        }
-                    }));
-                    console.log('触发初始钱包状态事件');
-                } catch (e) {
-                    console.warn('触发初始钱包状态事件失败:', e);
-                }
-            } else {
-                // 创建空的钱包状态对象
-                window.walletState = window.walletState || {};
-                console.log('未找到已保存的钱包信息，创建新的钱包状态对象');
-            }
-            
-            // 确保Web3.js加载完成
-            if (typeof Web3 !== 'undefined') {
-                console.log('Web3.js已加载，继续初始化钱包');
-            } else {
-                // 尝试动态加载Web3.js
-                console.log('尝试加载Web3.js...');
-                await loadWeb3().catch(err => {
-                    console.warn('Web3.js加载失败，但继续初始化钱包:', err);
-                });
-            }
-            
-            // 使用Object.assign合并方法和属性
-            Object.assign(window.walletState, walletState);
-            
-            // 初始化钱包状态 - 在设置initialized标记之前执行
-            await window.walletState.init();
-            
-            console.log('钱包状态初始化完成');
-            
-            // 设置全局引用，便于调试
-            window.getWalletState = () => window.walletState;
-            
-            // 触发初始化完成事件
-            document.dispatchEvent(new CustomEvent('walletStateInitialized', {
-                        detail: {
-                    connected: window.walletState.connected,
-                    address: window.walletState.address,
-                    walletType: window.walletState.walletType
-                        }
-                    }));
-            
-            // 确保页面可见性变化时检查钱包状态
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible' && window.walletState.connected) {
-                    console.log('页面变为可见，检查钱包状态...');
-                    window.walletState.checkWalletConnection();
-                }
-            });
-            
-            // 监听localStorage变化
-            window.addEventListener('storage', (event) => {
-                if (event.key === 'walletAddress' || event.key === 'walletType') {
-                    console.log('检测到其他标签页钱包状态变化:', event.key, event.newValue);
-                    window.walletState.handleStorageChange();
-                }
-            });
-            
-            return window.walletState;
-        } catch (error) {
-            console.error('初始化钱包状态失败:', error);
-            
-            // 即使出错，也要确保walletState是可用的
-            if (!window.walletState) {
-                console.log('钱包初始化失败，创建空的walletState对象');
-                window.walletState = Object.assign({}, walletState);
-                window.walletState.initialized = true;
-            }
-            
-            return window.walletState;
-        }
+        // 初始化钱包状态
+        await wallet.init();
+        console.log('钱包初始化完成');
+    } catch (error) {
+        console.error('钱包初始化失败:', error);
     }
-
-    /**
-     * 加载Web3.js
-     * 动态加载Web3.js库
-     */
-    async function loadWeb3() {
-        return new Promise((resolve, reject) => {
-            if (typeof Web3 !== 'undefined') {
-                console.log('Web3.js已经加载');
-                resolve();
-                return;
-            }
-            
-            const script = document.createElement('script');
-            script.src = 'https://unpkg.com/web3@1.5.2/dist/web3.min.js';
-            script.async = true;
-            script.onload = () => {
-                console.log('成功从 ' + script.src + ' 加载Web3.js');
-                resolve();
-            };
-            script.onerror = (error) => {
-                console.error('加载Web3.js失败:', error);
-                reject(new Error('无法加载Web3.js'));
-            };
-            
-            document.head.appendChild(script);
-        });
-    }
-
-    // 页面加载完成后自动初始化钱包状态
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('DOM加载完成，初始化钱包状态');
-        
-        // 延迟一点再初始化，确保所有DOM元素都已准备好
-        setTimeout(() => {
-            initWalletState().catch(error => {
-                console.error('初始化钱包状态时出错:', error);
-            });
-        }, 100);
-    });
-
-    // 导出函数，便于外部调用
-    window.initWalletState = initWalletState;
-    window.loadWeb3 = loadWeb3;
-}); // 闭合第一个DOMContentLoaded事件监听器
+});
 
 // 显示成功消息
 function showSuccess(message) {
