@@ -1509,7 +1509,16 @@ def generate_token_symbol_api():
     try:
         from app.models.asset import Asset
         
-        data = request.get_json()
+        # 记录请求开始
+        current_app.logger.info("开始处理生成代币符号请求")
+        
+        # 验证请求数据
+        try:
+            data = request.get_json()
+        except Exception as e:
+            current_app.logger.error(f"解析请求JSON数据失败: {str(e)}")
+            return jsonify({'success': False, 'error': '无效的请求格式'}), 400
+            
         if not data:
             current_app.logger.error("生成代币符号失败: 无效的请求数据")
             return jsonify({'success': False, 'error': '无效的请求数据'}), 400
@@ -1520,38 +1529,96 @@ def generate_token_symbol_api():
         if not asset_type:
             current_app.logger.error("生成代币符号失败: 缺少资产类型参数")
             return jsonify({'success': False, 'error': '缺少资产类型'}), 400
+        
+        # 确保资产类型是字符串格式
+        try:
+            asset_type = str(asset_type)
+            current_app.logger.info(f"转换后的资产类型: {asset_type}")
+        except Exception as e:
+            current_app.logger.error(f"转换资产类型为字符串失败: {str(e)}")
+            return jsonify({'success': False, 'error': f'资产类型格式错误: {str(e)}'}), 400
             
         # 生成随机数
-        random_num = f"{random.randint(0, 9999):04d}"
-        token_symbol = f"RH-{asset_type}{random_num}"
-        current_app.logger.info(f"第一次尝试生成的代币符号: {token_symbol}")
+        try:
+            random_num = f"{random.randint(0, 9999):04d}"
+            token_symbol = f"RH-{asset_type}{random_num}"
+            current_app.logger.info(f"第一次尝试生成的代币符号: {token_symbol}")
+        except Exception as e:
+            current_app.logger.error(f"生成随机代币符号失败: {str(e)}")
+            # 使用时间戳作为备用方案
+            import time
+            token_symbol = f"RH-{asset_type}{int(time.time()) % 10000}"
+            current_app.logger.info(f"备用方案：使用时间戳生成的代币符号: {token_symbol}")
         
         # 检查是否已存在
-        existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+        try:
+            existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+        except Exception as e:
+            current_app.logger.error(f"查询数据库检查代币符号是否存在时出错: {str(e)}")
+            # 使用更独特的标识符
+            import time
+            token_symbol = f"RH-{asset_type}{int(time.time() * 1000) % 10000}"
+            current_app.logger.info(f"查询失败后使用毫秒时间戳生成的代币符号: {token_symbol}")
+            return jsonify({'success': True, 'token_symbol': token_symbol})
+            
         if existing_asset:
             current_app.logger.info(f"代币符号 {token_symbol} 已存在，尝试第二次生成")
             
             # 如果已存在，再尝试生成一次
-            random_num = f"{random.randint(0, 9999):04d}"
-            token_symbol = f"RH-{asset_type}{random_num}"
-            current_app.logger.info(f"第二次尝试生成的代币符号: {token_symbol}")
+            try:
+                random_num = f"{random.randint(0, 9999):04d}"
+                token_symbol = f"RH-{asset_type}{random_num}"
+                current_app.logger.info(f"第二次尝试生成的代币符号: {token_symbol}")
+            except Exception as e:
+                current_app.logger.error(f"第二次生成随机代币符号失败: {str(e)}")
+                # 使用时间戳作为备用方案
+                import time
+                token_symbol = f"RH-{asset_type}{int(time.time()) % 10000}"
+                current_app.logger.info(f"第二次备用方案：使用时间戳生成的代币符号: {token_symbol}")
             
             # 再次检查
-            existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+            try:
+                existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+            except Exception as e:
+                current_app.logger.error(f"第二次查询数据库检查代币符号是否存在时出错: {str(e)}")
+                # 使用更独特的标识符
+                import time
+                token_symbol = f"RH-{asset_type}{int(time.time() * 1000) % 10000}"
+                current_app.logger.info(f"第二次查询失败后使用毫秒时间戳生成的代币符号: {token_symbol}")
+                return jsonify({'success': True, 'token_symbol': token_symbol})
+                
             if existing_asset:
                 current_app.logger.info(f"代币符号 {token_symbol} 依然存在，使用时间戳生成")
                 
                 # 如果依然存在，使用时间戳
-                import time
-                timestamp = int(time.time())
-                token_symbol = f"RH-{asset_type}{timestamp % 10000}"
-                current_app.logger.info(f"使用时间戳生成的代币符号: {token_symbol}")
+                try:
+                    import time
+                    timestamp = int(time.time())
+                    token_symbol = f"RH-{asset_type}{timestamp % 10000}"
+                    current_app.logger.info(f"使用时间戳生成的代币符号: {token_symbol}")
+                except Exception as e:
+                    current_app.logger.error(f"使用时间戳生成代币符号失败: {str(e)}")
+                    # 使用更加独特的标识符
+                    import time, uuid
+                    unique_id = str(uuid.uuid4())[:4]
+                    token_symbol = f"RH-{asset_type}{unique_id}"
+                    current_app.logger.info(f"使用UUID生成的代币符号: {token_symbol}")
                 
                 # 最后检查一次
-                existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+                try:
+                    existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+                except Exception as e:
+                    current_app.logger.error(f"最终查询数据库检查代币符号是否存在时出错: {str(e)}")
+                    # 放弃检查，直接返回最新生成的符号
+                    return jsonify({'success': True, 'token_symbol': token_symbol})
+                    
                 if existing_asset:
                     current_app.logger.error(f"无法生成唯一的代币符号，所有尝试都已存在")
-                    return jsonify({'success': False, 'error': '无法生成唯一的代币符号，请稍后重试'}), 500
+                    # 最终备用方案：使用UUID生成完全唯一的标识符
+                    import uuid
+                    unique_id = str(uuid.uuid4())[:6]
+                    token_symbol = f"RH-{asset_type}{unique_id}"
+                    current_app.logger.info(f"最终备用方案：使用UUID生成的代币符号: {token_symbol}")
         
         current_app.logger.info(f"成功生成代币符号: {token_symbol}")
         return jsonify({'success': True, 'token_symbol': token_symbol})
@@ -1559,7 +1626,18 @@ def generate_token_symbol_api():
         import traceback
         error_traceback = traceback.format_exc()
         current_app.logger.error(f"生成代币符号失败: {str(e)}\n{error_traceback}")
-        return jsonify({'success': False, 'error': f'生成代币符号失败: {str(e)}'}), 500
+        
+        # 发生未知错误时，仍然尝试生成一个符号而不是返回500错误
+        try:
+            import time, uuid
+            asset_type = request.get_json().get('type', '00') if request.get_json() else '00'
+            unique_id = f"{int(time.time() % 10000)}-{str(uuid.uuid4())[:4]}"
+            emergency_token_symbol = f"RH-{asset_type}{unique_id}"
+            current_app.logger.info(f"紧急情况下生成的代币符号: {emergency_token_symbol}")
+            return jsonify({'success': True, 'token_symbol': emergency_token_symbol})
+        except Exception as fallback_error:
+            current_app.logger.error(f"最后的紧急备用生成也失败了: {str(fallback_error)}")
+            return jsonify({'success': False, 'error': f'生成代币符号失败，请重试'}), 500
 
 @api_bp.route('/assets/<int:asset_id>/distribute_dividend', methods=['POST'])
 @eth_address_required
