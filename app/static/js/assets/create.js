@@ -423,6 +423,8 @@ function calculatePublishingFee() {
     }
     
     // 计算发布费用 - 费率为0.0001%
+    // 计算发布费用：totalValue * 0.000001 是基于资产总值的费用比例（0.0001%）
+    // 0.01 是最低收费标准（0.01 USDC），确保即使资产价值很低也至少收取这个金额
     let fee = Math.max(totalValue * 0.000001, 0.01);
     publishingFeeElement.textContent = `${fee.toFixed(2)} USDC`;
 }
@@ -502,8 +504,8 @@ async function handleFiles(files, fileType) {
     const currentFiles = isImage ? uploadedImages.length : uploadedDocuments.length;
     if (currentFiles + files.length > maxFiles) {
         alert(`最多只能上传${maxFiles}个${isImage ? '图片' : '文档'}`);
-            return;
-        }
+        return;
+    }
 
     // 使用进度条和上传状态元素
     const progressId = isImage ? 'imageUploadProgress' : 'documentUploadProgress';
@@ -524,8 +526,8 @@ async function handleFiles(files, fileType) {
     if (!progressBar) {
         console.error('找不到进度条元素');
         alert('上传失败: 找不到进度条元素');
-            return;
-        }
+        return;
+    }
 
     // 显示进度条区域
     progressContainer.style.display = 'block';
@@ -553,38 +555,36 @@ async function handleFiles(files, fileType) {
             continue;
         }
         
+        // 检查文件大小
+        if (file.size > 5 * 1024 * 1024) { // 5MB
+            statusElement.textContent = `文件过大: ${file.name} (${(file.size/1024/1024).toFixed(2)}MB > 5MB)`;
+            console.error(`文件过大: ${file.name}, 大小: ${(file.size/1024/1024).toFixed(2)}MB`);
+            failed++;
+            continue;
+        }
+        
         // 创建FormData
-                const formData = new FormData();
+        const formData = new FormData();
         formData.append('file', file);
         formData.append('fileType', fileType);
         
         // 获取当前选择的资产类型
         const assetTypeSelect = document.getElementById('type');
-        const assetType = assetTypeSelect ? assetTypeSelect.value : '10'; // 默认为不动产类型
+        const assetType = assetTypeSelect ? assetTypeSelect.value : '';
         formData.append('asset_type', assetType);
-        console.log(`当前资产类型: ${assetType}`);
         
-        // 获取代币符号 - 优先获取已填写的代币符号
-        const tokenSymbolInput = document.getElementById('tokensymbol');
-        let tokenSymbol = '';
-        if (tokenSymbolInput && tokenSymbolInput.value) {
-            tokenSymbol = tokenSymbolInput.value.trim();
-        }
-        
-        // 如果有代币符号，添加到表单数据
+        // 获取代币符号
+        const tokenSymbolInput = document.getElementById('token_symbol');
+        const tokenSymbol = tokenSymbolInput ? tokenSymbolInput.value : '';
         if (tokenSymbol) {
             formData.append('token_symbol', tokenSymbol);
             console.log(`使用代币符号: ${tokenSymbol}`);
-                        } else {
-            console.log('未找到代币符号，将使用默认目录结构');
         }
         
-        // 获取用户地址
-        const address = getCookieValue('eth_address') || 
-                        getCookieValue('solana_address') || 
-                        localStorage.getItem('walletAddress');
-        
-        if (address) {
+        // 尝试获取当前用户的钱包地址
+        let address = null;
+        if (window.walletState && window.walletState.address) {
+            address = window.walletState.address;
             formData.append('address', address);
             console.log(`使用地址: ${address}`);
         } else {
@@ -597,7 +597,7 @@ async function handleFiles(files, fileType) {
             statusElement.textContent = `正在上传: ${file.name} (${i+1}/${files.length})`;
             
             // 发送上传请求
-            console.log(`发送上传请求到 /api/upload-images`);
+            console.log(`发送上传请求到 /api/upload-images，文件大小: ${(file.size/1024).toFixed(2)}KB`);
             const response = await fetch('/api/upload-images', {
                 method: 'POST',
                 body: formData
@@ -606,7 +606,16 @@ async function handleFiles(files, fileType) {
             console.log(`收到响应，状态码: ${response.status}`);
             
             if (!response.ok) {
-                throw new Error(`上传失败: HTTP ${response.status}`);
+                let errorMessage = `上传失败: HTTP ${response.status}`;
+                try {
+                    const errorJson = await response.json();
+                    if (errorJson && errorJson.message) {
+                        errorMessage = errorJson.message;
+                    }
+                } catch (e) {
+                    // 无法解析JSON，使用默认错误消息
+                }
+                throw new Error(errorMessage);
             }
             
             const result = await response.json();
@@ -621,7 +630,7 @@ async function handleFiles(files, fileType) {
                         url: url
                     });
                     renderImages();
-        } else {
+                } else {
                     uploadedDocuments.push({
                         name: file.name,
                         url: url
@@ -633,7 +642,7 @@ async function handleFiles(files, fileType) {
             } else {
                 throw new Error(result.error || '上传失败');
             }
-    } catch (error) {
+        } catch (error) {
             console.error(`上传文件失败:`, error);
             statusElement.textContent = `上传失败: ${error.message}`;
             failed++;
@@ -656,7 +665,7 @@ async function handleFiles(files, fileType) {
     saveDraft();
     
     // 延迟隐藏进度条
-        setTimeout(() => {
+    setTimeout(() => {
         progressContainer.style.display = 'none';
     }, 3000);
 }
