@@ -422,8 +422,8 @@ function calculatePublishingFee() {
         totalValue = parseFloat(document.getElementById('total_value_similar').value) || 0;
     }
     
-    // 计算发布费用
-    let fee = Math.max(totalValue * 0.0001, 0.001);
+    // 计算发布费用 - 费率从0.01%降低到0.0001%
+    let fee = Math.max(totalValue * 0.000001, 0.001);
     publishingFeeElement.textContent = `${fee.toFixed(2)} USDC`;
 }
 
@@ -597,8 +597,8 @@ async function handleFiles(files, fileType) {
             statusElement.textContent = `正在上传: ${file.name} (${i+1}/${files.length})`;
             
             // 发送上传请求
-            console.log(`发送上传请求到 /api/assets/upload`);
-            const response = await fetch('/api/assets/upload', {
+            console.log(`发送上传请求到 /api/upload-images`);
+            const response = await fetch('/api/upload-images', {
                 method: 'POST',
                 body: formData
             });
