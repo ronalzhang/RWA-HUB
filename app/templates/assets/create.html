@@ -224,6 +224,38 @@
         cursor: not-allowed;
     }
 </style>
+
+<script>
+    // 确保使用全局钱包状态，与基础模板保持一致
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('资产创建页面加载，检查钱包状态');
+        
+        // 检查钱包状态并使用base.html中的全局钱包对象
+        if (window.walletState) {
+            console.log('找到全局钱包状态:', window.walletState.connected ? '已连接' : '未连接');
+        } else {
+            console.warn('全局钱包状态对象不可用');
+        }
+        
+        // 处理钱包状态变化事件
+        document.addEventListener('walletStateChanged', function(e) {
+            console.log('收到钱包状态变化事件:', e.detail);
+            if (e.detail && typeof e.detail.connected !== 'undefined') {
+                // 更新UI显示
+                const walletCheck = document.getElementById('walletCheck');
+                const formContent = document.getElementById('formContent');
+                
+                if (e.detail.connected) {
+                    if (walletCheck) walletCheck.style.display = 'none';
+                    if (formContent) formContent.style.display = 'block';
+                } else {
+                    if (walletCheck) walletCheck.style.display = 'block';
+                    if (formContent) formContent.style.display = 'none';
+                }
+            }
+        });
+    });
+</script>
 {% endblock %}
 
 {% block content %}
@@ -620,7 +652,7 @@
 
 {% block scripts %}
 <script>
-// 检查钱包连接状态
+// 修改钱包连接检查函数，使其只检查状态而不主动连接或断开钱包
 async function checkWalletConnection() {
     const walletCheck = document.getElementById('walletCheck');
     const formContent = document.getElementById('formContent');
@@ -632,7 +664,18 @@ async function checkWalletConnection() {
     }
     
     try {
-        // 优先检查全局钱包状态
+        // 首先检查sessionStorage和localStorage
+        const storedWalletAddress = localStorage.getItem('walletAddress') || sessionStorage.getItem('walletAddress');
+        const storedWalletType = localStorage.getItem('walletType') || sessionStorage.getItem('walletType');
+        
+        if (storedWalletAddress && storedWalletType) {
+            console.log('从存储中检测到钱包信息:', storedWalletType, storedWalletAddress);
+            walletCheck.style.display = 'none';
+            formContent.style.display = 'block';
+            return true;
+        }
+        
+        // 然后检查全局钱包状态
         if (window.walletState && window.walletState.connected && window.walletState.address) {
             console.log('钱包已连接(walletState):', window.walletState.address);
             walletCheck.style.display = 'none';
@@ -640,32 +683,7 @@ async function checkWalletConnection() {
             return true;
         }
         
-        // 回退到检查cookies或localStorage
-        const address = getCookieValue('eth_address') || 
-                        getCookieValue('solana_address') || 
-                        localStorage.getItem('walletAddress');
-        
-        if (address) {
-            console.log('从存储中找到钱包地址:', address);
-            walletCheck.style.display = 'none';
-            formContent.style.display = 'block';
-            return true;
-        }
-        
-        // 回退到检查MetaMask
-        if (window.ethereum) {
-            // 仅检查当前连接状态，不请求连接
-            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-            
-            if (accounts && accounts.length > 0) {
-                console.log('MetaMask已连接:', accounts[0]);
-                walletCheck.style.display = 'none';
-                formContent.style.display = 'block';
-                return true;
-            }
-        }
-        
-        // 未找到已连接的钱包
+        // 未连接钱包时显示连接提示
         console.log('未找到已连接的钱包');
         walletCheck.style.display = 'block';
         formContent.style.display = 'none';
@@ -678,96 +696,69 @@ async function checkWalletConnection() {
     }
 }
 
-// 获取cookie值的辅助函数
-function getCookieValue(name) {
-    const cookieStr = decodeURIComponent(document.cookie);
-    const cookies = cookieStr.split(';');
-    
-    for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i].trim();
-        // 检查cookie是否以name=开头
-        if (cookie.indexOf(name + '=') === 0) {
-            return cookie.substring(name.length + 1);
-        }
-    }
-    
-    return null;
-}
-
 // 页面加载时检查钱包状态
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        // 检查钱包连接状态
-        await checkWalletConnection();
+        console.log('资产创建页面DOM加载完成');
         
-        // 绑定钱包连接按钮事件
-        const connectBtn = document.getElementById('connectWalletBtn');
-        if (connectBtn) {
-            connectBtn.addEventListener('click', async function() {
-                try {
-                    // 优先使用全局钱包状态对象
-                    if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
-                        await window.walletState.openWalletSelector();
-                    } else if (window.ethereum) {
-                        await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    } else {
-                        alert('请安装MetaMask或其他兼容的钱包');
-                    }
-                    // 连接后更新UI
-                    await checkWalletConnection();
-                } catch (error) {
-                    console.error('连接钱包失败:', error);
-                    alert(error.message || '连接钱包失败');
-                }
-            });
-        }
-        
-        // 添加钱包按钮下拉菜单点击处理 - 修复create页面钱包下拉菜单不显示的问题
-        const walletBtn = document.getElementById('walletBtn');
-        if (walletBtn) {
-            walletBtn.addEventListener('click', function(event) {
-                event.preventDefault();
-                event.stopPropagation();
-                
-                // 获取下拉菜单元素
-                const walletMenu = document.getElementById('walletMenu');
-                if (walletMenu) {
-                    // 切换显示状态
-                    if (walletMenu.classList.contains('show')) {
-                        walletMenu.classList.remove('show');
-                    } else {
-                        walletMenu.classList.add('show');
-                        // 设置位置
-                        walletMenu.style.position = 'absolute';
-                        walletMenu.style.inset = '0px auto auto 0px';
-                        walletMenu.style.transform = 'translate(-203px, 40px)';
-                    }
-                }
-            });
+        // 延迟检查钱包连接状态，确保walletState已初始化
+        setTimeout(async () => {
+            // 检查钱包连接状态
+            await checkWalletConnection();
             
-            // 点击页面其他位置关闭下拉菜单
-            document.addEventListener('click', function(event) {
-                if (!walletBtn.contains(event.target)) {
-                    const walletMenu = document.getElementById('walletMenu');
-                    if (walletMenu && walletMenu.classList.contains('show')) {
-                        walletMenu.classList.remove('show');
+            // 绑定钱包连接按钮事件
+            const connectBtn = document.getElementById('connectWalletBtn');
+            if (connectBtn) {
+                connectBtn.addEventListener('click', async function() {
+                    try {
+                        // 使用全局钱包选择器
+                        if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+                            await window.walletState.openWalletSelector();
+                            // 连接后更新UI
+                            setTimeout(checkWalletConnection, 500);
+                        } else {
+                            console.error('钱包选择器功能不可用');
+                            if (typeof window.openWalletSelector === 'function') {
+                                // 尝试使用全局函数
+                                await window.openWalletSelector();
+                                setTimeout(checkWalletConnection, 500);
+                            } else {
+                                alert('钱包功能不可用，请尝试刷新页面');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('连接钱包失败:', error);
+                        alert(error.message || '连接钱包失败');
                     }
-                }
-            });
-        }
+                });
+                console.log('已绑定钱包连接按钮事件');
+            } else {
+                console.warn('未找到钱包连接按钮');
+            }
+        }, 1000);
         
-        // 监听钱包状态变化，但不自动刷新页面
-        if (window.ethereum) {
-            window.ethereum.on('accountsChanged', async (accounts) => {
-                console.log('账户已更改:', accounts);
-                await checkWalletConnection();
-            });
-            
-            window.ethereum.on('disconnect', async () => {
-                console.log('钱包已断开');
-                await checkWalletConnection();
-            });
-        }
+        // 监听钱包状态变化
+        document.addEventListener('walletStateChanged', async (event) => {
+            console.log('资产创建页面收到钱包状态变化事件:', event.detail);
+            await checkWalletConnection();
+        });
+        
+        // 监听钱包连接变化
+        document.addEventListener('walletConnectionChanged', async (event) => {
+            console.log('资产创建页面收到钱包连接变化事件:', event.detail);
+            await checkWalletConnection();
+        });
+        
+        // 监听钱包初始化完成
+        document.addEventListener('walletStateInitialized', async (event) => {
+            console.log('资产创建页面收到钱包初始化完成事件:', event.detail);
+            await checkWalletConnection();
+        });
+        
+        // 监听钱包余额更新
+        document.addEventListener('walletBalanceUpdated', async (event) => {
+            console.log('资产创建页面收到钱包余额更新事件:', event.detail);
+        });
     } catch (err) {
         console.error('初始化钱包检查出错:', err);
     }
@@ -880,81 +871,9 @@ function handleFileUpload(event) {
     });
 }
 </script>
-<script src="{{ url_for('static', filename='js/assets/create.js') }}"></script>
 
-<script>
-// 确保create.js中的钱包功能正常工作
-document.addEventListener('DOMContentLoaded', function() {
-    // 检查钱包按钮是否存在
-    const walletBtn = document.getElementById('walletBtn');
-    if (walletBtn) {
-        console.log('钱包按钮已找到');
-        
-        // 确保钱包按钮有点击事件
-        if (!walletBtn.onclick) {
-            console.log('添加钱包按钮点击事件');
-            walletBtn.onclick = function(event) {
-                console.log('钱包按钮被点击');
-                if (typeof checkWalletConnection === 'function') {
-                    checkWalletConnection(event);
-                } else {
-                    console.error('checkWalletConnection函数未找到');
-                }
-            };
-        }
-    } else {
-        console.error('钱包按钮未找到');
-    }
-    
-    // 添加更新进度的函数
-    window.updateProgress = function(percent, message) {
-        const progressContainer = document.getElementById('progressContainer');
-        const progressBar = document.getElementById('progressBar');
-        const progressStatus = document.getElementById('progressStatus');
-        
-        if (progressContainer && progressBar && progressStatus) {
-            progressContainer.classList.remove('d-none');
-            progressBar.style.width = percent + '%';
-            progressBar.setAttribute('aria-valuenow', percent);
-            
-            if (message) {
-                progressStatus.textContent = message;
-            }
-            
-            // 进度完成时隐藏
-            if (percent >= 100) {
-                setTimeout(() => {
-                    progressContainer.classList.add('d-none');
-                }, 1000);
-            }
-        }
-    };
-    
-    // 添加显示加载覆盖层的函数
-    window.showLoadingOverlay = function(message) {
-        const overlay = document.createElement('div');
-        overlay.id = 'loadingOverlay';
-        overlay.className = 'position-fixed top-0 start-0 w-100 h-100';
-        overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
-        overlay.style.zIndex = '9999';
-        
-        overlay.innerHTML = `
-            <div class="d-flex justify-content-center align-items-center h-100">
-                <div class="bg-white p-4 rounded shadow">
-                    <div class="d-flex align-items-center">
-                        <div class="spinner-border text-primary me-3" role="status">
-                            <span class="visually-hidden">${window._('Loading...')}</span>
-                        </div>
-                        <span class="loading-text">${message || window._('Processing...')}</span>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(overlay);
-    };
-});
-</script>
+<!-- 引入资产创建脚本 -->
+<script src="{{ url_for('static', filename='js/assets/create.js') }}"></script>
 {% endblock %}
 
 {% block styles %}

@@ -53,7 +53,7 @@ function initializeCreatePage() {
     window.assetFormInitialized = true;
     
     // 检查钱包连接
-    initializeWalletCheck();
+    setTimeout(initializeWalletCheck, 500); // 延迟执行，确保钱包状态已初始化
     
     // 初始化表单元素
     initializeFormFields();
@@ -64,30 +64,82 @@ function initializeCreatePage() {
     // 设置自动保存
     setInterval(saveDraft, CONFIG.DRAFT.AUTO_SAVE_INTERVAL);
     
+    // 监听钱包状态变化事件
+    document.addEventListener('walletStateChanged', function(event) {
+        console.log('资产创建页面收到钱包状态变化事件:', event.detail);
+        if (event.detail && typeof event.detail.connected !== 'undefined') {
+            // 更新钱包状态
+            initializeWalletCheck();
+        }
+    });
+    
+    // 监听钱包初始化完成事件
+    document.addEventListener('walletStateInitialized', function(event) {
+        console.log('资产创建页面收到钱包初始化完成事件:', event.detail);
+        // 重新检查钱包状态
+        setTimeout(initializeWalletCheck, 100);
+    });
+    
     console.log('初始化完成');
 }
 
 // 检查钱包连接状态
 function initializeWalletCheck() {
+    console.log('执行钱包连接状态检查...');
     const walletCheck = document.getElementById('walletCheck');
     const formContent = document.getElementById('formContent');
     
-    const address = getCookieValue('eth_address') || 
-                    getCookieValue('solana_address') || 
-                    localStorage.getItem('walletAddress');
+    if (!walletCheck || !formContent) {
+        console.error('找不到钱包检查或表单内容元素');
+        return;
+    }
     
-    if (address) {
-        console.log('找到钱包地址:', address);
-        if (walletCheck) walletCheck.style.display = 'none';
-        if (formContent) formContent.style.display = 'block';
+    // 先检查sessionStorage中是否有钱包信息（可能比walletState更可靠）
+    const sessionWalletAddress = sessionStorage.getItem('walletAddress');
+    const sessionWalletType = sessionStorage.getItem('walletType');
+    
+    // 然后检查localStorage中是否有钱包信息
+    const localWalletAddress = localStorage.getItem('walletAddress');
+    const localWalletType = localStorage.getItem('walletType');
+    
+    // 最后检查window.walletState
+    const walletStateConnected = window.walletState && window.walletState.connected && window.walletState.address;
+    
+    // 优先级：sessionStorage > localStorage > walletState
+    if (sessionWalletAddress && sessionWalletType) {
+        console.log('从sessionStorage找到钱包地址:', sessionWalletAddress);
+        walletCheck.style.display = 'none';
+        formContent.style.display = 'block';
         
         // 检查管理员状态
-        setTimeout(() => checkAdmin(address), 100);
-    } else {
-        console.log('未找到钱包地址');
-        if (walletCheck) walletCheck.style.display = 'block';
-        if (formContent) formContent.style.display = 'none';
+        setTimeout(() => checkAdmin(sessionWalletAddress), 100);
+        return;
     }
+    
+    if (localWalletAddress && localWalletType) {
+        console.log('从localStorage找到钱包地址:', localWalletAddress);
+        walletCheck.style.display = 'none';
+        formContent.style.display = 'block';
+        
+        // 检查管理员状态
+        setTimeout(() => checkAdmin(localWalletAddress), 100);
+        return;
+    }
+    
+    if (walletStateConnected) {
+        console.log('从walletState找到钱包地址:', window.walletState.address);
+        walletCheck.style.display = 'none';
+        formContent.style.display = 'block';
+        
+        // 检查管理员状态
+        setTimeout(() => checkAdmin(window.walletState.address), 100);
+        return;
+    }
+    
+    // 如果上述三种方式都没有找到钱包地址，则显示钱包检查
+    console.log('未找到已连接的钱包地址，显示连接提示');
+    walletCheck.style.display = 'block';
+    formContent.style.display = 'none';
 }
 
 // 检查管理员状态
@@ -839,43 +891,11 @@ async function checkAndConnectWallet() {
                 return;
             }
             
-            // 检查cookies中是否有钱包地址
-            const address = getCookieValue('eth_address') || 
-                            getCookieValue('solana_address') || 
-                            localStorage.getItem('walletAddress');
-            
-            // 如果找到地址，则视为已连接
-            if (address) {
-                console.log('从存储中找到钱包地址:', address);
-                resolve(true);
-                return;
-            }
-            
-            // 如果没有找到钱包地址，尝试连接钱包
+            // 尝试使用全局钱包选择器连接
             console.log('尝试连接钱包...');
             showLoadingState('正在连接钱包...');
             
-            // 优先直接使用MetaMask连接，避免与walletSelector冲突
-            if (window.ethereum) {
-                try {
-                    console.log('直接使用MetaMask连接');
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    hideLoadingState();
-                    
-                    if (accounts && accounts.length > 0) {
-                        console.log('MetaMask连接成功:', accounts[0]);
-                        resolve(true);
-                        return;
-                    } else {
-                        console.warn('MetaMask未返回账户');
-                    }
-                } catch (error) {
-                    console.error('MetaMask直接连接失败:', error);
-                    // 继续尝试其他方法连接
-                }
-            }
-            
-            // 回退到使用全局钱包选择器
+            // 使用全局钱包选择器
             if (typeof window.walletState === 'object' && typeof window.walletState.openWalletSelector === 'function') {
                 console.log('使用全局钱包选择器连接');
                 const connected = await window.walletState.openWalletSelector();
@@ -892,8 +912,8 @@ async function checkAndConnectWallet() {
             
             // 没有可用的钱包
             hideLoadingState();
-            console.error('没有找到可用的钱包或所有连接方法都失败');
-            showError('请安装并解锁MetaMask或其他兼容的钱包');
+            console.error('没有找到可用的钱包或连接方法失败');
+            showError('请安装并解锁兼容的钱包');
             resolve(false);
             
         } catch (error) {
