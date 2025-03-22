@@ -1,17 +1,40 @@
-from solana.rpc.api import Client as SolanaRpcClient
-from solana.transaction import Transaction
-from solana.publickey import PublicKey
-from solana.keypair import Keypair
-from solana.system_program import transfer, TransferParams
-from solana.rpc.types import TxOpts
-from spl.token.client import Token
-from spl.token.constants import TOKEN_PROGRAM_ID
-import base58
+# 注释原始导入
+# from solana.rpc.api import Client as SolanaRpcClient
+# from solana.transaction import Transaction
+# from solana.publickey import PublicKey
+# from solana.keypair import Keypair
+# from solana.system_program import transfer, TransferParams
+# from solana.rpc.types import TxOpts
+# 保留必要的标准库导入
+import base64
+import json
 import os
+import time
+import asyncio
+# from solana.blockhash import Blockhash
+import base58  # 添加base58库导入
+
+# 使用我们的兼容层
+from app.utils.solana_compat.rpc.api import Client as SolanaRpcClient
+from app.utils.solana_compat.transaction import Transaction
+from app.utils.solana_compat.publickey import PublicKey
+from app.utils.solana_compat.keypair import Keypair
+from app.utils.solana_compat.system_program import SystemProgram
+from app.utils.solana_compat.rpc.types import TxOpts
+# SPL Token 兼容
+from app.utils.solana_compat.token import Token, TOKEN_PROGRAM_ID
+
+# 注释SPL导入
+# from spl.token.client import Token
+# from spl.token.constants import TOKEN_PROGRAM_ID
+
+from app.models.asset import Asset, AssetState
+from app.models.transaction import Transaction as DBTransaction
+from app.utils.helpers import get_solana_keypair_from_env
+from app.utils.config import get_config
 import logging
-from datetime import datetime
-from flask import current_app
-from solana.blockhash import Blockhash
+from typing import Dict, Any, List, Optional
+from decimal import Decimal
 # 导入助记词相关库
 from mnemonic import Mnemonic
 from bip32utils import BIP32Key
@@ -28,110 +51,72 @@ class SolanaClient:
     处理SPL代币的创建和资产上链操作
     """
     
-    def __init__(self, network_url=None, private_key=None, mnemonic=None, wallet_address=None):
+    def __init__(self, endpoint_url=None, auth_keypair=None, private_key=None):
         """
         初始化Solana客户端
         
         Args:
-            network_url: Solana网络RPC URL，默认从环境变量获取
-            private_key: 服务钱包私钥，默认从环境变量获取
-            mnemonic: 助记词，如果提供则使用助记词生成私钥
-            wallet_address: 直接指定钱包地址（仅用于查询，不能执行交易）
+            endpoint_url (str, optional): Solana集群端点URL. 默认为None.
+            auth_keypair (str, optional): 密钥对的路径. 默认为None.
+            private_key (str, optional): 私钥. 默认为None.
         """
-        # 初始化日志
-        logger.info("正在初始化Solana客户端...")
-        
-        # 是否启用模拟模式（无需真实连接Solana网络）
-        # 强制设置为False，不使用模拟模式，始终连接真实网络
-        self.mock_mode = False  # 不再使用环境变量，强制使用真实网络
-        if wallet_address and wallet_address == "8cU6PAtRTRgfyJu48qfz2hQP5aMGwooxqrCZtyB6UcYP":
-            logger.info(f"为特定钱包地址 {wallet_address} 使用真实网络连接")
-        
-        # 获取网络URL
-        self.network_url = network_url or os.environ.get('SOLANA_NETWORK_URL', 'https://api.mainnet-beta.solana.com')
-        logger.info(f"使用Solana网络: {self.network_url}")
-        
-        # 备用节点列表，当主节点失败时尝试
-        self.backup_nodes = [
-            'https://ssc-dao.genesysgo.net',
-            'https://free.rpcpool.com',  
-            'https://api.metaplex.solana.com',
-            'https://api.devnet.solana.com',  # 如果只是测试，devnet也可以使用
-            'https://solana-api.projectserum.com',
-            'https://rpc.ankr.com/solana',
-            'https://solana-mainnet.g.alchemy.com/v2/demo'
-        ]
-        
-        # 检查是否直接指定了钱包地址（只读模式）
-        self.readonly_mode = False
-        if wallet_address or os.environ.get('SOLANA_WALLET_ADDRESS'):
-            address = wallet_address or os.environ.get('SOLANA_WALLET_ADDRESS')
-            logger.info(f"使用直接指定的钱包地址: {address}")
-            try:
-                self.public_key = PublicKey(address)
-                self.keypair = None  # 只读模式没有私钥
-                self.readonly_mode = True
-                logger.info(f"钱包地址初始化成功（只读模式）: {self.public_key}")
-                
-                # 初始化RPC客户端
-                self.client = SolanaRpcClient(self.network_url)
-                logger.info("Solana RPC客户端初始化成功")
-                return
-            except Exception as e:
-                logger.error(f"解析钱包地址失败: {str(e)}")
-                # 如果解析失败，回退到标准流程
-        
-        # 安全地获取私钥
-        private_key_bytes = None
-        auth_method = None
-        
-        # 优先检查直接参数
-        if mnemonic:
-            logger.info("使用直接提供的助记词初始化")
-            if validate_mnemonic(mnemonic):
+        self.config = get_config()
+        endpoint_url = endpoint_url or self.config.SOLANA_ENDPOINT
+
+        self.client = SolanaRpcClient(endpoint_url)
+        self.endpoint = endpoint_url
+        auth_method = "none"
+
+        # 私钥处理逻辑
+        try:
+            # 1. 直接使用参数中提供的私钥
+            if private_key:
+                logger.info("使用直接提供的私钥初始化")
                 try:
-                    private_key_bytes = self._derive_private_key_from_mnemonic(mnemonic)
-                    auth_method = "provided_mnemonic"
+                    # 尝试base58解码
+                    private_key_bytes = base58.b58decode(private_key)
+                    auth_method = "provided_private_key"
                 except Exception as e:
-                    logger.error(f"处理提供的助记词出错: {str(e)}")
-            else:
-                logger.error("提供的助记词无效")
-                
-        elif private_key:
-            logger.info("使用直接提供的私钥初始化")
-            try:
-                private_key_bytes = base58.b58decode(private_key)
-                auth_method = "provided_private_key"
-            except Exception as e:
-                logger.error(f"处理提供的私钥出错: {str(e)}")
-                
-        # 然后检查环境变量
-        else:
-            # 从环境变量加载钱包凭证
-            wallet_info = load_wallet_from_env()
-            
-            if wallet_info:
-                if wallet_info['type'] == 'mnemonic':
-                    logger.info("使用环境变量中的助记词初始化")
+                    logger.warning(f"Base58解码失败，尝试Base64解码: {e}")
                     try:
-                        mnemonic_phrase = wallet_info['value']
-                        logger.debug(f"助记词长度: {len(mnemonic_phrase.split())}")
-                        
-                        private_key_bytes = self._derive_private_key_from_mnemonic(mnemonic_phrase)
-                        auth_method = "env_mnemonic"
-                    except Exception as e:
-                        logger.error(f"处理环境变量中的助记词出错: {str(e)}")
-                        
-                elif wallet_info['type'] == 'private_key':
-                    logger.info("使用环境变量中的私钥初始化")
+                        # 备用方案：尝试base64解码
+                        private_key_bytes = base64.b64decode(private_key)
+                        auth_method = "provided_private_key_base64"
+                    except Exception as e2:
+                        logger.error(f"无法解码提供的私钥: {e2}")
+                        raise ValueError("无效的私钥格式")
+            # 2. 如果提供了keypair文件路径
+            elif auth_keypair:
+                logger.info(f"使用keypair文件初始化: {auth_keypair}")
+                with open(auth_keypair, 'r') as f:
+                    private_key_bytes = bytes([int(n) for n in json.load(f)])
+                    auth_method = "keypair_file"
+            # 3. 尝试从环境变量获取
+            else:
+                logger.info("尝试从环境变量获取私钥")
+                wallet_info = get_solana_keypair_from_env()
+                if wallet_info and 'value' in wallet_info:
                     try:
                         private_key_str = wallet_info['value']
-                        private_key_bytes = base58.b58decode(private_key_str)
-                        auth_method = "env_private_key"
+                        # 尝试base58解码
+                        try:
+                            private_key_bytes = base58.b58decode(private_key_str)
+                            auth_method = "env_private_key"
+                        except Exception as e:
+                            logger.warning(f"Base58解码失败，尝试Base64解码: {e}")
+                            try:
+                                # 备用方案：尝试base64解码
+                                private_key_bytes = base64.b64decode(private_key_str)
+                                auth_method = "env_private_key_base64"
+                            except Exception as e2:
+                                logger.error(f"无法解码环境变量中的私钥: {e2}")
+                                raise ValueError("环境变量中的私钥格式无效")
                     except Exception as e:
-                        logger.error(f"处理环境变量中的私钥出错: {str(e)}")
-            else:
-                logger.warning("未找到任何有效的钱包凭证")
+                        logger.error(f"处理环境变量私钥失败: {e}")
+                        private_key_bytes = None
+        except Exception as e:
+            logger.error(f"初始化Solana客户端失败: {str(e)}")
+            self.client = None
         
         # 创建keypair和客户端
         if private_key_bytes:
@@ -150,7 +135,7 @@ class SolanaClient:
             self.public_key = None
             
         try:
-            self.client = SolanaRpcClient(self.network_url)
+            self.client = SolanaRpcClient(self.endpoint)
             logger.info("Solana RPC客户端初始化成功")
         except Exception as e:
             logger.error(f"初始化Solana RPC客户端失败: {str(e)}")
@@ -500,7 +485,7 @@ class SolanaClient:
                 'token_address': token_result['token_address'],
                 'token_account': token_result['token_account'],
                 'mint_tx': token_result['mint_tx'],
-                'network': self.network_url,
+                'network': self.endpoint,
                 'deployed_by': str(self.public_key)
             }
             

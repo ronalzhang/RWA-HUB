@@ -10,6 +10,19 @@ import traceback
 import base58
 import hashlib
 import time
+from typing import Dict, Any, List, Optional, Tuple, Union
+from decimal import Decimal
+from flask import current_app, g
+from app.models.asset import AssetState, PropertyType
+from app.models.user import User
+from app.models.transaction import Transaction as DBTransaction, TransactionType, TransactionStatus
+from app.models.holding import Holding
+from app.utils.config import get_config
+from app.utils.constants import MIN_SOL_BALANCE
+from app.utils.transaction_helpers import record_fee_transaction
+from app.utils.solana_compat.rpc.api import Client
+from app.utils.solana_compat.publickey import PublicKey
+from app.blockchain.ethereum import get_usdc_balance, get_eth_balance, send_usdc, deploy_asset_contract, create_purchase_transaction
 
 logger = logging.getLogger(__name__)
 
@@ -355,8 +368,6 @@ class AssetService:
                 return 49.0
                 
             # 导入所需模块
-            from solana.rpc.api import Client
-            from solana.publickey import PublicKey
             import spl.token.client
             
             # 创建RPC客户端
