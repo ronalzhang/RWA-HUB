@@ -672,6 +672,27 @@ const walletState = {
                     }
                 }));
                 
+                // 针对Phantom钱包特殊处理
+                if (this.walletType === 'phantom') {
+                    console.log('[notifyStateChange] 检测到Phantom钱包连接，特殊处理UI更新');
+                    
+                    // 强制直接更新钱包按钮和地址显示
+                    const walletBtnText = document.getElementById('walletBtnText');
+                    const walletAddressDisplay = document.getElementById('walletAddressDisplay');
+                    
+                    if (this.address && walletBtnText) {
+                        const shortAddress = this.address.slice(0, 6) + '...' + this.address.slice(-4);
+                        walletBtnText.textContent = shortAddress;
+                        walletBtnText.setAttribute('data-connected', 'true');
+                    }
+                    
+                    if (this.address && walletAddressDisplay) {
+                        const shortAddress = this.address.slice(0, 6) + '...' + this.address.slice(-4);
+                        walletAddressDisplay.textContent = shortAddress;
+                        walletAddressDisplay.setAttribute('data-connected', 'true');
+                    }
+                }
+                
                 // 强制更新UI显示
                 this.updateDisplay();
                 
@@ -1227,8 +1248,11 @@ const walletState = {
             const userAssetsSection = document.getElementById('userAssetsSection');
             const adminEntry = document.getElementById('adminEntry');
             
+            // 更严格地检查连接状态和地址
+            const isValidAddress = this.address && this.address.length > 10;
+            
             // 更新显示
-            if (this.connected && this.address) {
+            if (this.connected && isValidAddress) {
                 // 已连接状态
                 // 简化显示地址
                 const shortAddress = this.address.slice(0, 6) + '...' + this.address.slice(-4);
@@ -1238,12 +1262,14 @@ const walletState = {
                 // 更新连接按钮文本
                 if (walletBtnText) {
                     walletBtnText.textContent = shortAddress;
+                    walletBtnText.setAttribute('data-connected', 'true');
                     console.log('[updateDisplay] 已更新按钮文本');
                 }
                 
                 // 更新地址显示
                 if (walletAddressDisplay) {
                     walletAddressDisplay.textContent = shortAddress;
+                    walletAddressDisplay.setAttribute('data-connected', 'true');
                     console.log('[updateDisplay] 已更新地址显示');
                 }
                 
@@ -1294,11 +1320,13 @@ const walletState = {
                 
                 if (walletBtnText) {
                     walletBtnText.textContent = window._('Connect Wallet') || '连接钱包';
+                    walletBtnText.setAttribute('data-connected', 'false');
                     console.log('[updateDisplay] 已更新按钮文本为默认状态');
                 }
                 
                 if (walletAddressDisplay) {
                     walletAddressDisplay.textContent = window._('Not Connected') || '未连接';
+                    walletAddressDisplay.setAttribute('data-connected', 'false');
                     console.log('[updateDisplay] 已更新地址显示为默认状态');
                 }
                 
@@ -1843,6 +1871,177 @@ const walletState = {
             return false;
         }
     },
+
+    /**
+     * 连接到Phantom钱包
+     * @returns {Promise<boolean>} 连接是否成功
+     */
+    connectPhantom: async function() {
+        try {
+            console.log('[connectPhantom] 开始尝试连接Phantom钱包...');
+            console.log('[connectPhantom] 检查window.solana:', window.solana ? '存在' : '不存在');
+            
+            if (!window.solana) {
+                console.error('[connectPhantom] window.solana对象不存在，请安装Phantom钱包扩展');
+                showError('未检测到Phantom钱包，请安装Phantom钱包扩展');
+                return false;
+            }
+            
+            console.log('[connectPhantom] window.solana.isPhantom:', window.solana.isPhantom ? '是' : '否');
+            
+            if (!window.solana.isPhantom) {
+                console.error('[connectPhantom] 不是Phantom钱包，请安装Phantom钱包扩展');
+                showError('请安装Phantom钱包扩展');
+                return false;
+            }
+            
+            // 检查现有连接状态
+            console.log('[connectPhantom] 检查Phantom是否已连接:', window.solana.isConnected ? '已连接' : '未连接');
+            
+            // 获取公钥
+            let publicKey = null;
+            
+            if (window.solana.isConnected) {
+                // 已经连接，直接获取公钥
+                publicKey = window.solana.publicKey;
+                console.log('[connectPhantom] Phantom已连接，publicKey:', publicKey ? publicKey.toString() : '无');
+                
+                if (!publicKey) {
+                    // 连接了但没有公钥，需要重新连接
+                    console.log('[connectPhantom] Phantom声称已连接，但没有publicKey，尝试重新连接');
+                    try {
+                        const resp = await window.solana.connect();
+                        publicKey = resp.publicKey;
+                    } catch (e) {
+                        console.error('[connectPhantom] 重新连接Phantom失败:', e);
+                        showError('连接Phantom钱包失败: ' + (e.message || '未知错误'));
+                        return false;
+                    }
+                }
+            } else {
+                // 未连接，尝试连接
+                try {
+                    console.log('[connectPhantom] 尝试新建Phantom连接...');
+                    const resp = await window.solana.connect();
+                    console.log('[connectPhantom] Phantom连接响应:', resp);
+                    
+                    if (resp && resp.publicKey) {
+                        publicKey = resp.publicKey;
+                        console.log('[connectPhantom] 成功获取publicKey:', publicKey.toString());
+                    } else {
+                        console.error('[connectPhantom] 连接响应没有publicKey');
+                        showError('未能获取Phantom钱包地址');
+                        return false;
+                    }
+                } catch (connectError) {
+                    console.error('[connectPhantom] 连接Phantom时出错:', connectError);
+                    showError('连接Phantom钱包失败: ' + (connectError.message || '未知错误'));
+                    return false;
+                }
+            }
+            
+            // 到这里，publicKey应该已经存在
+            if (!publicKey) {
+                console.error('[connectPhantom] 未能获取Phantom钱包公钥');
+                showError('未能获取Phantom钱包地址');
+                return false;
+            }
+            
+            // 设置钱包状态
+            this.walletType = 'phantom';
+            this.address = publicKey.toString();
+            this.connected = true;
+            this.provider = window.solana;
+            
+            console.log(`[connectPhantom] 更新钱包状态，地址: ${this.address}`);
+            
+            // 设置事件监听器
+            this.setupPhantomListeners();
+            
+            console.log(`[connectPhantom] Phantom钱包连接成功: ${this.address}`);
+            
+            // 1. 保存状态到本地存储
+            try {
+                localStorage.setItem('walletType', 'phantom');
+                localStorage.setItem('walletAddress', this.address);
+                console.log('[connectPhantom] 钱包信息已保存到本地存储');
+            } catch (storageError) {
+                console.warn('[connectPhantom] 保存到本地存储失败:', storageError);
+            }
+            
+            // 2. 获取余额和资产
+            console.log('[connectPhantom] 获取钱包余额和资产');
+            try {
+                await this.getWalletBalance();
+                await this.getUserAssets(this.address);
+            } catch (balanceError) {
+                console.warn('[connectPhantom] 获取余额或资产失败:', balanceError);
+            }
+            
+            // 3. 检查是否为管理员
+            console.log('[connectPhantom] 检查是否为管理员');
+            try {
+                await this.checkIsAdmin();
+            } catch (adminError) {
+                console.warn('[connectPhantom] 检查管理员状态失败:', adminError);
+            }
+            
+            // 4. 立即更新UI
+            this.updateDisplay();
+            
+            // 5. 触发状态变更事件
+            this.notifyStateChange({
+                type: 'connect',
+                address: this.address,
+                walletType: this.walletType,
+                balance: this.balance,
+                nativeBalance: this.nativeBalance
+            });
+            
+            // 6. 延迟再次更新UI以确保显示正确
+            setTimeout(() => {
+                // 直接更新钱包按钮文本
+                const walletBtnText = document.getElementById('walletBtnText');
+                const walletAddressDisplay = document.getElementById('walletAddressDisplay');
+                
+                if (walletBtnText && this.address) {
+                    const shortAddress = this.address.slice(0, 6) + '...' + this.address.slice(-4);
+                    walletBtnText.textContent = shortAddress;
+                    walletBtnText.setAttribute('data-connected', 'true');
+                }
+                
+                if (walletAddressDisplay && this.address) {
+                    const shortAddress = this.address.slice(0, 6) + '...' + this.address.slice(-4);
+                    walletAddressDisplay.textContent = shortAddress;
+                    walletAddressDisplay.setAttribute('data-connected', 'true');
+                }
+                
+                // 再次获取余额并更新显示
+                this.updateWalletBalance().then(() => {
+                    const usdcBalanceElement = document.querySelector('.wallet-usdc-balance');
+                    const solBalanceElement = document.querySelector('.native-balance .balance-value');
+                    
+                    if (usdcBalanceElement && this.balance !== null) {
+                        usdcBalanceElement.textContent = this.balance.toFixed(2);
+                    }
+                    
+                    if (solBalanceElement && this.nativeBalance !== null) {
+                        solBalanceElement.textContent = this.nativeBalance.toFixed(4);
+                    }
+                });
+                
+                // 显示成功消息
+                const shortAddr = this.address.slice(0, 6) + '...' + this.address.slice(-4);
+                showSuccess(`钱包已连接: ${shortAddr}`);
+            }, 300);
+            
+            return true;
+        } catch (error) {
+            console.error('[connectPhantom] 连接Phantom钱包过程发生错误:', error);
+            showError('连接Phantom钱包失败: ' + (error.message || '未知错误'));
+            return false;
+        }
+    },
 };
 
 /**
@@ -2217,151 +2416,6 @@ walletState.connectEthereum = async function() {
     } catch (error) {
         console.error('连接以太坊钱包过程中发生错误:', error);
         showError('连接MetaMask失败: ' + (error.message || '未知错误'));
-        return false;
-    }
-};
-
-/**
- * 连接到Phantom钱包
- * @returns {Promise<boolean>} 连接是否成功
- */
-walletState.connectPhantom = async function() {
-    try {
-        console.log('[connectPhantom] 开始尝试连接Phantom钱包...');
-        console.log('[connectPhantom] 检查window.solana:', window.solana ? '存在' : '不存在');
-        
-        if (!window.solana) {
-            console.error('[connectPhantom] window.solana对象不存在，请安装Phantom钱包扩展');
-            showError('未检测到Phantom钱包，请安装Phantom钱包扩展');
-            return false;
-        }
-        
-        console.log('[connectPhantom] window.solana.isPhantom:', window.solana.isPhantom ? '是' : '否');
-        
-        if (!window.solana.isPhantom) {
-            console.error('[connectPhantom] 不是Phantom钱包，请安装Phantom钱包扩展');
-            showError('未检测到Phantom钱包，请安装Phantom钱包扩展');
-            return false;
-        }
-        
-        let connected = false;
-        let publicKey = null;
-        
-        // 首先尝试检查是否已连接
-        console.log('[connectPhantom] 检查Phantom是否已连接:', window.solana.isConnected ? '已连接' : '未连接');
-        
-        if (window.solana.isConnected) {
-            publicKey = window.solana.publicKey;
-            console.log('[connectPhantom] Phantom已连接，publicKey:', publicKey ? publicKey.toString() : '无');
-            
-            if (publicKey) {
-                console.log('[connectPhantom] Phantom已经连接，使用现有连接');
-                connected = true;
-                } else {
-                console.log('[connectPhantom] Phantom声称已连接，但没有publicKey，尝试重新连接');
-            }
-        }
-        
-        // 如果未连接，尝试连接
-        if (!connected) {
-            console.log('[connectPhantom] 尝试新建Phantom连接...');
-            
-            try {
-                // 尝试连接Phantom
-                const resp = await window.solana.connect();
-                console.log('[connectPhantom] Phantom连接响应:', resp);
-                
-                if (resp && resp.publicKey) {
-                    publicKey = resp.publicKey;
-                    connected = true;
-                    console.log('[connectPhantom] 成功获取publicKey:', publicKey.toString());
-                } else {
-                    console.error('[connectPhantom] 连接响应没有publicKey');
-                    throw new Error('未能获取Phantom钱包地址');
-                }
-            } catch (connectError) {
-                console.error('[connectPhantom] 连接Phantom时出错:', connectError);
-                showError('连接Phantom钱包失败: ' + (connectError.message || '未知错误'));
-                throw connectError;
-            }
-        }
-        
-        if (connected && publicKey) {
-            // 更新状态
-            this.address = publicKey.toString();
-            this.walletType = 'phantom';
-            this.connected = true;
-            this.provider = window.solana;
-            
-            console.log(`[connectPhantom] 更新钱包状态，地址: ${this.address}`);
-            
-            // 设置事件监听器
-            this.setupPhantomListeners();
-            
-            console.log(`[connectPhantom] Phantom钱包连接成功: ${this.address}`);
-            
-            // 连接成功后处理
-            // 1. 保存状态到本地存储
-            try {
-                localStorage.setItem('walletType', 'phantom');
-                localStorage.setItem('walletAddress', this.address);
-                console.log('[connectPhantom] 钱包信息已保存到本地存储');
-            } catch (storageError) {
-                console.warn('[connectPhantom] 保存到本地存储失败:', storageError);
-            }
-            
-            // 2. 获取余额和资产
-            console.log('[connectPhantom] 获取钱包余额和资产');
-            try {
-                await this.getWalletBalance();
-                await this.getUserAssets(this.address);
-            } catch (balanceError) {
-                console.warn('[connectPhantom] 获取余额或资产失败:', balanceError);
-            }
-            
-            // 3. 检查是否为管理员
-            console.log('[connectPhantom] 检查是否为管理员');
-            try {
-                await this.checkIsAdmin();
-            } catch (adminError) {
-                console.warn('[connectPhantom] 检查管理员状态失败:', adminError);
-            }
-            
-            // 4. 更新UI显示
-            console.log('[connectPhantom] 更新UI显示');
-            try {
-                await this.updateUI();
-            } catch (uiError) {
-                console.warn('[connectPhantom] 更新UI失败:', uiError);
-            }
-            
-            // 5. 触发状态变更事件
-            console.log('[connectPhantom] 触发状态变更事件');
-            try {
-                // 使用更详细的状态对象
-                this.notifyStateChange({
-                    type: 'connect',
-                    address: this.address,
-                    walletType: this.walletType,
-                    balance: this.balance,
-                    nativeBalance: this.nativeBalance
-                });
-                
-                // 显示连接成功提示
-                const truncatedAddress = this.address.slice(0, 6) + '...' + this.address.slice(-4);
-                showSuccess(`钱包已连接: ${truncatedAddress}`);
-            } catch (eventError) {
-                console.warn('[connectPhantom] 触发事件失败:', eventError);
-            }
-            
-            return true;
-        } else {
-            console.error('[connectPhantom] 未能连接到Phantom钱包');
-            throw new Error('未能连接到Phantom钱包');
-        }
-                } catch (error) {
-        console.error('[connectPhantom] Phantom钱包连接失败:', error);
-        showError('连接Phantom钱包失败: ' + (error.message || '未知错误'));
         return false;
     }
 };
