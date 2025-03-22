@@ -896,12 +896,11 @@ const walletState = {
         if (!this.connected || !this.address) {
             console.log('钱包未连接，无法获取余额');
             this.balance = 0;
-            this.nativeBalance = 0;
             this.updateBalanceDisplay();
             return;
-            }
+        }
             
-            try {
+        try {
             console.log(`获取钱包余额 - 地址: ${this.address}, 类型: ${this.walletType}`);
             
             // 构建API请求URL，添加时间戳防止缓存
@@ -909,10 +908,10 @@ const walletState = {
             const url = `/api/wallet/balance?address=${this.address}&wallet_type=${this.walletType}&_=${timestamp}`;
             
             console.log(`请求余额API: ${url}`);
-                const response = await fetch(url);
+            const response = await fetch(url);
                 
-                if (response.ok) {
-                    const data = await response.json();
+            if (response.ok) {
+                const data = await response.json();
                 console.log('余额API返回数据:', JSON.stringify(data));
                 
                 // 增强USDC余额提取逻辑 - 支持更多种API返回格式
@@ -990,22 +989,6 @@ const walletState = {
                     this.balance = null;
                 }
                 
-                // 处理原生代币余额(SOL/ETH)
-                if (data.balances) {
-                    // 根据钱包类型获取正确的原生代币余额
-                    if (this.walletType === 'phantom' && data.balances.SOL !== undefined) {
-                        this.nativeBalance = parseFloat(data.balances.SOL);
-                        this.nativeCurrency = 'SOL';
-                    } else if (this.walletType === 'metamask' && data.balances.ETH !== undefined) {
-                        this.nativeBalance = parseFloat(data.balances.ETH);
-                        this.nativeCurrency = 'ETH';
-                    } else {
-                        this.nativeBalance = 0;
-                    }
-                } else {
-                    this.nativeBalance = 0;
-                }
-                
                 // 先更新UI显示
                 this.updateBalanceDisplay();
                 
@@ -1035,15 +1018,13 @@ const walletState = {
      */
     triggerBalanceUpdatedEvent() {
         try {
-            console.log(`[triggerBalanceUpdatedEvent] 触发余额更新事件: USDC=${this.balance}, SOL=${this.nativeBalance}`);
+            console.log(`[triggerBalanceUpdatedEvent] 触发余额更新事件: USDC=${this.balance}`);
             
             // 创建并分发自定义事件
             const event = new CustomEvent('walletBalanceUpdated', {
                 detail: {
                     balance: this.balance,
-                    nativeBalance: this.nativeBalance,
                     currency: 'USDC',
-                    nativeCurrency: 'SOL',  // 始终使用SOL作为原生代币
                     timestamp: new Date().getTime()
                 }
             });
@@ -1378,7 +1359,7 @@ const walletState = {
                 },
                 {
                     name: 'MetaMask',
-                    icon: '/static/images/wallets/metamask.png',
+                    icon: '/static/images/wallets/MetaMask.png', // 使用正确的文件名大小写
                     class: 'ethereum',
                     type: 'ethereum',
                     onClick: () => this.connect('ethereum')
