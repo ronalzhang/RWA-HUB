@@ -2440,10 +2440,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     console.log('页面加载完成，初始化钱包状态');
     try {
         // 确保全局访问
-        window.walletState = wallet;
+        window.walletState = walletState;
         
         // 初始化钱包状态
-        await wallet.init();
+        await walletState.init();
         console.log('钱包初始化完成');
     } catch (error) {
         console.error('钱包初始化失败:', error);
