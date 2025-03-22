@@ -28,7 +28,7 @@ from app.utils.solana_compat.token import Token, TOKEN_PROGRAM_ID
 # from spl.token.client import Token
 # from spl.token.constants import TOKEN_PROGRAM_ID
 
-from app.models.asset import Asset, AssetState
+from app.models.asset import Asset, AssetStatus
 from app.models.transaction import Transaction as DBTransaction
 from app.utils.helpers import get_solana_keypair_from_env
 from app.utils.config import get_config
