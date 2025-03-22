@@ -362,12 +362,57 @@ const walletState = {
             if (!walletType) {
                 console.error('未指定钱包类型');
                 showError('请选择要连接的钱包类型');
-                            return false;
-                        }
+                return false;
+            }
         
             // 如果当前已经连接了同类型的钱包，先断开连接
             if (this.connected && this.walletType === walletType) {
                 await this.disconnect();
+            }
+            
+            // 在移动设备上进行特殊处理
+            if (this.isMobile()) {
+                console.log('检测到移动设备，特殊处理钱包连接');
+                
+                // 检查是否在dApp浏览器中
+                let inDAppBrowser = false;
+                
+                if (walletType.toLowerCase() === 'phantom' || walletType.toLowerCase() === 'solflare') {
+                    // 检查Solana对象是否存在
+                    inDAppBrowser = window.solana !== undefined;
+                } else if (walletType.toLowerCase() === 'ethereum' || walletType.toLowerCase() === 'metamask') {
+                    // 检查ethereum对象是否存在
+                    inDAppBrowser = window.ethereum !== undefined;
+                }
+                
+                if (!inDAppBrowser) {
+                    console.log('未在dApp浏览器中，尝试直接跳转到钱包App');
+                    
+                    // 根据钱包类型构建移动端深度链接
+                    let deepLink = '';
+                    
+                    if (walletType.toLowerCase() === 'phantom') {
+                        // 构建Phantom钱包链接
+                        const currentUrl = encodeURIComponent(window.location.href);
+                        deepLink = `https://phantom.app/ul/browse/${currentUrl}`;
+                    } else if (walletType.toLowerCase() === 'metamask') {
+                        // 构建MetaMask钱包链接
+                        const currentUrl = encodeURIComponent(window.location.href);
+                        deepLink = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
+                    }
+                    
+                    if (deepLink) {
+                        console.log('跳转到钱包App:', deepLink);
+                        // 存储尝试连接的钱包类型，以便返回时检查
+                        localStorage.setItem('pendingWalletType', walletType);
+                        localStorage.setItem('pendingWalletConnection', 'true');
+                        localStorage.setItem('pendingWalletTimestamp', Date.now().toString());
+                        
+                        // 跳转到钱包App
+                        window.location.href = deepLink;
+                        return true; // 返回true表示已尝试连接
+                    }
+                }
             }
             
             // 记录要连接的钱包类型
