@@ -42,15 +42,10 @@ class SolanaClient:
         logger.info("正在初始化Solana客户端...")
         
         # 是否启用模拟模式（无需真实连接Solana网络）
-        self.mock_mode = os.environ.get('SOLANA_MOCK_MODE', 'false').lower() == 'true'
-        if self.mock_mode:
-            logger.warning("Solana客户端运行在模拟模式，不会连接真实网络")
-            self.public_key = PublicKey(wallet_address or "EeYfRdpGtdTM9pLDrXFq39C2SKYD9SQkijw7keUKJtLR")
-            self.keypair = None
-            self.network_url = "https://api.mainnet-beta.solana.com"
-            self.readonly_mode = wallet_address is not None
-            self.client = None
-            return
+        # 强制设置为False，不使用模拟模式，始终连接真实网络
+        self.mock_mode = False  # 不再使用环境变量，强制使用真实网络
+        if wallet_address and wallet_address == "8cU6PAtRTRgfyJu48qfz2hQP5aMGwooxqrCZtyB6UcYP":
+            logger.info(f"为特定钱包地址 {wallet_address} 使用真实网络连接")
         
         # 获取网络URL
         self.network_url = network_url or os.environ.get('SOLANA_NETWORK_URL', 'https://api.mainnet-beta.solana.com')
