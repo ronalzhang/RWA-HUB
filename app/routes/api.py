@@ -1089,27 +1089,32 @@ def get_wallet_balance():
                 
         else:
             # 如果是以太坊钱包，可以添加以太坊余额查询逻辑
-            # 目前返回0余额，后续可扩展
-            balances['USDC'] = 0
-            balances['SOL'] = 0
+            try:
+                # 导入以太坊客户端
+                from app.blockchain.ethereum import get_usdc_balance, get_eth_balance
+                
+                # 获取ETH余额
+                eth_balance = get_eth_balance(address)
+                if eth_balance is not None:
+                    balances['ETH'] = eth_balance
+                    current_app.logger.info(f'ETH余额: {eth_balance}')
+                
+                # 获取USDC余额
+                usdc_balance = get_usdc_balance(address)
+                if usdc_balance is not None:
+                    balances['USDC'] = usdc_balance
+                    current_app.logger.info(f'USDC余额: {usdc_balance}')
+            except Exception as eth_err:
+                current_app.logger.error(f'获取以太坊余额失败: {str(eth_err)}')
             
         current_app.logger.info(f'返回真实余额数据: USDC={balances["USDC"]}, SOL={balances["SOL"]}')
         
-        # 如果获取到的余额为0，添加测试数据以确保前端能正确显示
-        if balances['USDC'] == 0:
-            balances['USDC'] = 1000.00  # 添加模拟USDC数据
-            current_app.logger.info('使用模拟数据: USDC=1000.00')
-            
-        if balances['SOL'] == 0 and wallet_type == 'phantom':
-            balances['SOL'] = 5.75  # 添加模拟SOL数据
-            current_app.logger.info('使用模拟数据: SOL=5.75')
-            
         return jsonify({
             'success': True,
             'balance': balances['USDC'],  # 保持兼容性
             'balances': balances,
             'currency': 'USDC',
-            'is_real_data': False  # 修改为false表示这是模拟数据
+            'is_real_data': True
         }), 200
     except Exception as e:
         current_app.logger.error(f'获取钱包余额失败: {str(e)}', exc_info=True)
@@ -1505,34 +1510,55 @@ def generate_token_symbol_api():
         from app.models.asset import Asset
         
         data = request.get_json()
+        if not data:
+            current_app.logger.error("生成代币符号失败: 无效的请求数据")
+            return jsonify({'success': False, 'error': '无效的请求数据'}), 400
+            
         asset_type = data.get('type')
+        current_app.logger.info(f"正在为资产类型 {asset_type} 生成代币符号")
         
         if not asset_type:
+            current_app.logger.error("生成代币符号失败: 缺少资产类型参数")
             return jsonify({'success': False, 'error': '缺少资产类型'}), 400
             
         # 生成随机数
         random_num = f"{random.randint(0, 9999):04d}"
         token_symbol = f"RH-{asset_type}{random_num}"
+        current_app.logger.info(f"第一次尝试生成的代币符号: {token_symbol}")
         
         # 检查是否已存在
         existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
         if existing_asset:
+            current_app.logger.info(f"代币符号 {token_symbol} 已存在，尝试第二次生成")
+            
             # 如果已存在，再尝试生成一次
             random_num = f"{random.randint(0, 9999):04d}"
             token_symbol = f"RH-{asset_type}{random_num}"
+            current_app.logger.info(f"第二次尝试生成的代币符号: {token_symbol}")
             
             # 再次检查
             existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
             if existing_asset:
+                current_app.logger.info(f"代币符号 {token_symbol} 依然存在，使用时间戳生成")
+                
                 # 如果依然存在，使用时间戳
                 import time
                 timestamp = int(time.time())
                 token_symbol = f"RH-{asset_type}{timestamp % 10000}"
+                current_app.logger.info(f"使用时间戳生成的代币符号: {token_symbol}")
+                
+                # 最后检查一次
+                existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+                if existing_asset:
+                    current_app.logger.error(f"无法生成唯一的代币符号，所有尝试都已存在")
+                    return jsonify({'success': False, 'error': '无法生成唯一的代币符号，请稍后重试'}), 500
         
+        current_app.logger.info(f"成功生成代币符号: {token_symbol}")
         return jsonify({'success': True, 'token_symbol': token_symbol})
     except Exception as e:
         import traceback
-        traceback.print_exc()
+        error_traceback = traceback.format_exc()
+        current_app.logger.error(f"生成代币符号失败: {str(e)}\n{error_traceback}")
         return jsonify({'success': False, 'error': f'生成代币符号失败: {str(e)}'}), 500
 
 @api_bp.route('/assets/<int:asset_id>/distribute_dividend', methods=['POST'])
