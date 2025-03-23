@@ -1286,24 +1286,56 @@ def upload_images_api():
         import time
         
         current_app.logger.info("接收到图片上传请求")
+        current_app.logger.info(f"请求表单数据: {list(request.form.keys())}")
+        current_app.logger.info(f"请求文件数据: {list(request.files.keys())}")
         
-        if 'file0' not in request.files:
-            current_app.logger.error("没有接收到图片文件")
+        # 检查请求中是否包含文件
+        file_count = len(request.files)
+        if file_count == 0:
+            current_app.logger.error("请求中没有包含任何文件")
             return jsonify({
                 'success': False,
-                'message': '没有接收到图片文件'
+                'message': '请求中没有包含任何文件'
+            }), 400
+            
+        current_app.logger.info(f"接收到 {file_count} 个文件")
+        
+        # 允许任何文件键名，不仅仅是file0
+        files_to_process = []
+        for key in request.files:
+            file = request.files[key]
+            if file and file.filename:
+                files_to_process.append(file)
+                current_app.logger.info(f"准备处理文件: {file.filename}, 类型: {file.content_type}")
+        
+        if not files_to_process:
+            current_app.logger.error("没有有效的文件可以处理")
+            return jsonify({
+                'success': False,
+                'message': '没有有效的文件可以处理'
             }), 400
             
         # 获取token_symbol，用于创建正确的目录结构
         token_symbol = request.form.get('token_symbol', '')
         current_app.logger.info(f"上传图片的token_symbol: {token_symbol}")
         
+        # 尝试两种可能的上传路径
+        app_uploads_path = os.path.join(current_app.root_path, 'uploads')
+        static_uploads_path = os.path.join(current_app.static_folder, 'uploads')
+        
+        current_app.logger.info(f"检查可能的上传路径:")
+        current_app.logger.info(f"1. app uploads: {app_uploads_path}")
+        current_app.logger.info(f"2. static uploads: {static_uploads_path}")
+        
+        # 确定实际使用的上传基础路径
+        base_uploads_path = static_uploads_path if os.path.exists(static_uploads_path) else app_uploads_path
+        current_app.logger.info(f"选择的上传基础路径: {base_uploads_path}")
+        
         # 确定存储路径
         if token_symbol:
-            # 使用新的目录结构: /static/uploads/projects/{token_symbol}/images/
+            # 使用新的目录结构: /uploads/projects/{token_symbol}/images/
             upload_folder = os.path.join(
-                current_app.static_folder, 
-                'uploads', 
+                base_uploads_path, 
                 'projects',
                 token_symbol,
                 'images'
@@ -1311,36 +1343,59 @@ def upload_images_api():
         else:
             # 使用临时目录
             current_app.logger.warning("未提供token_symbol，使用临时目录")
-            upload_folder = os.path.join(current_app.static_folder, 'uploads', 'temp', 'images')
+            upload_folder = os.path.join(base_uploads_path, 'temp', 'images')
             
-        # 检查uploads和projects目录是否存在
-        base_dir = os.path.join(current_app.static_folder, 'uploads')
-        projects_dir = os.path.join(base_dir, 'projects')
-        
-        # 检查并创建目录
+        # 检查并创建所有父目录
         try:
-            current_app.logger.info(f"检查基本目录: {base_dir}")
-            if not os.path.exists(base_dir):
-                current_app.logger.warning(f"基本uploads目录不存在，尝试创建: {base_dir}")
-                os.makedirs(base_dir, exist_ok=True)
-            
-            current_app.logger.info(f"检查projects目录: {projects_dir}")
+            # 确保上传基础目录存在
+            if not os.path.exists(base_uploads_path):
+                current_app.logger.warning(f"上传基础目录不存在，尝试创建: {base_uploads_path}")
+                os.makedirs(base_uploads_path, exist_ok=True)
+                
+            # 确保projects目录存在
+            projects_dir = os.path.join(base_uploads_path, 'projects')
             if not os.path.exists(projects_dir):
                 current_app.logger.warning(f"projects目录不存在，尝试创建: {projects_dir}")
                 os.makedirs(projects_dir, exist_ok=True)
             
-            # 检查目录权限
-            if not os.access(projects_dir, os.W_OK):
-                current_app.logger.error(f"projects目录没有写入权限: {projects_dir}")
-                return jsonify({
-                    'success': False,
-                    'message': f'服务器目录权限错误，无法写入: {projects_dir}'
-                }), 500
+            # 如果使用临时目录，确保它存在
+            if not token_symbol:
+                temp_dir = os.path.join(base_uploads_path, 'temp')
+                if not os.path.exists(temp_dir):
+                    current_app.logger.warning(f"temp目录不存在，尝试创建: {temp_dir}")
+                    os.makedirs(temp_dir, exist_ok=True)
+                    
+                temp_images_dir = os.path.join(temp_dir, 'images')
+                if not os.path.exists(temp_images_dir):
+                    current_app.logger.warning(f"temp/images目录不存在，尝试创建: {temp_images_dir}")
+                    os.makedirs(temp_images_dir, exist_ok=True)
             
             # 确保最终的上传目录存在
             current_app.logger.info(f"尝试创建上传目录: {upload_folder}")
             os.makedirs(upload_folder, exist_ok=True)
-            current_app.logger.info(f"上传目录创建成功")
+            current_app.logger.info(f"上传目录创建或确认成功: {upload_folder}")
+            
+            # 检查目录权限
+            if not os.access(upload_folder, os.W_OK):
+                current_app.logger.error(f"上传目录没有写入权限: {upload_folder}")
+                try:
+                    # 尝试修改权限
+                    import stat
+                    os.chmod(upload_folder, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)  # 777权限
+                    current_app.logger.info(f"已尝试修改目录权限: {upload_folder}")
+                    
+                    if not os.access(upload_folder, os.W_OK):
+                        current_app.logger.error(f"修改权限后，仍然没有写入权限: {upload_folder}")
+                        return jsonify({
+                            'success': False,
+                            'message': f'服务器目录权限错误，无法写入: {upload_folder}'
+                        }), 500
+                except Exception as perm_err:
+                    current_app.logger.error(f"修改目录权限失败: {str(perm_err)}")
+                    return jsonify({
+                        'success': False,
+                        'message': f'服务器目录权限错误，无法修复: {str(perm_err)}'
+                    }), 500
         except PermissionError as pe:
             current_app.logger.error(f"创建目录权限错误: {str(pe)}")
             return jsonify({
@@ -1358,44 +1413,56 @@ def upload_images_api():
         image_paths = []
         timestamp = int(time.time())
         
-        for key in request.files:
-            file = request.files[key]
+        for file in files_to_process:
             if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                # 添加时间戳防止文件名冲突
-                filename = f"{timestamp}_{filename}"
-                file_path = os.path.join(upload_folder, filename)
-                
                 try:
-                    current_app.logger.info(f"保存文件: {file_path}")
+                    filename = secure_filename(file.filename)
+                    # 添加时间戳防止文件名冲突
+                    filename = f"{timestamp}_{filename}"
+                    file_path = os.path.join(upload_folder, filename)
+                    
+                    current_app.logger.info(f"准备保存文件: {file_path}")
                     file.save(file_path)
-                    current_app.logger.info(f"文件保存成功: {file_path}")
                     
                     # 检查文件是否实际创建
-                    if not os.path.exists(file_path):
+                    if os.path.exists(file_path):
+                        current_app.logger.info(f"文件保存成功: {file_path}, 大小: {os.path.getsize(file_path)} 字节")
+                    else:
                         current_app.logger.error(f"文件保存失败，路径不存在: {file_path}")
                         return jsonify({
                             'success': False,
                             'message': f'文件无法保存到服务器: {file_path}'
                         }), 500
+                    
+                    # 构建相对路径，用于前端显示
+                    # 确保使用与前端一致的URL格式
+                    if token_symbol:
+                        # 使用项目路径
+                        relative_path = f"/static/uploads/projects/{token_symbol}/images/{filename}"
+                    else:
+                        relative_path = f"/static/uploads/temp/images/{filename}"
+                        
+                    image_paths.append(relative_path)
+                    current_app.logger.info(f"图片URL路径: {relative_path}")
                 except Exception as save_err:
                     current_app.logger.error(f"保存文件时出错: {str(save_err)}")
+                    import traceback
+                    current_app.logger.error(traceback.format_exc())
                     return jsonify({
                         'success': False,
                         'message': f'保存文件错误: {str(save_err)}'
                     }), 500
+            else:
+                current_app.logger.warning(f"文件 {file.filename} 类型不允许，跳过")
                 
-                # 构建相对路径，用于前端显示
-                if token_symbol:
-                    # 使用代理路径
-                    relative_path = f"projects/{token_symbol}/images/{filename}"
-                else:
-                    relative_path = f"temp/images/{filename}"
-                    
-                image_paths.append(relative_path)
-                current_app.logger.info(f"图片相对路径: {relative_path}")
-        
-        current_app.logger.info(f"成功上传 {len(image_paths)} 张图片")
+        if len(image_paths) == 0:
+            current_app.logger.warning("所有文件处理完毕，但没有成功保存任何图片")
+            return jsonify({
+                'success': False,
+                'message': '没有成功保存任何图片，请检查文件类型是否被支持'
+            }), 400
+            
+        current_app.logger.info(f"成功上传 {len(image_paths)} 张图片: {image_paths}")
         return jsonify({
             'success': True,
             'message': f'成功上传 {len(image_paths)} 张图片',
