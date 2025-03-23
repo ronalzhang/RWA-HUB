@@ -348,42 +348,97 @@ class AssetService:
             float: 代币余额
         """
         try:
-            logger.info(f"获取钱包 {wallet_address} 的代币 {token_mint_address} 余额")
+            logger.info(f"开始获取钱包 {wallet_address} 的代币 {token_mint_address} 余额")
+            
+            # 验证输入参数
+            if not wallet_address or not token_mint_address:
+                logger.error("钱包地址或代币地址为空")
+                return 0.0
+            
+            # 检查USDC代币地址是否正确（Solana主网）
+            expected_usdc_address = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+            if token_mint_address != expected_usdc_address:
+                logger.warning(f"请求的代币地址 {token_mint_address} 不是标准USDC地址 {expected_usdc_address}")
             
             # 初始化Solana客户端
-            solana_client = SolanaClient(wallet_address=wallet_address)
+            try:
+                from app.blockchain.solana import SolanaClient
+                solana_client = SolanaClient(wallet_address=wallet_address)
+                network_url = solana_client.network_url
+                logger.info(f"Solana客户端初始化成功，网络URL: {network_url}")
+            except Exception as client_err:
+                logger.error(f"Solana客户端初始化失败: {str(client_err)}")
+                return 0.0
             
             # 检查是否处于模拟模式
             if getattr(solana_client, 'mock_mode', False):
                 logger.info("模拟模式：返回模拟的代币余额")
                 return 0.0
             
-            # 移除特定地址的特殊处理，使用真实网络数据
             # 导入所需模块
-            import spl.token.client
+            try:
+                from solders.pubkey import Pubkey as PublicKey
+                import spl.token.client
+                logger.info("成功导入Solana相关模块")
+            except ImportError as import_err:
+                logger.error(f"导入Solana模块失败: {str(import_err)}")
+                try:
+                    # 尝试备用导入
+                    from solana.publickey import PublicKey
+                    import spl.token.client
+                    logger.info("使用备用方式成功导入Solana模块")
+                except ImportError:
+                    logger.error("备用导入也失败，无法获取余额")
+                    return 0.0
             
             # 创建RPC客户端
-            rpc_client = Client(solana_client.network_url)
-            logger.info(f"创建RPC客户端成功，连接到: {solana_client.network_url}")
+            try:
+                try:
+                    from solana.rpc.api import Client
+                except ImportError:
+                    from app.utils.solana_compat.rpc.api import Client
+                
+                rpc_client = Client(solana_client.network_url)
+                logger.info(f"创建RPC客户端成功，连接到: {solana_client.network_url}")
+            except Exception as rpc_err:
+                logger.error(f"创建RPC客户端失败: {str(rpc_err)}")
+                return 0.0
             
             # 获取代币账户信息
             try:
+                # 验证公钥格式
+                try:
+                    wallet_pubkey = PublicKey(wallet_address)
+                    token_mint_pubkey = PublicKey(token_mint_address)
+                    logger.info(f"成功创建公钥对象: 钱包={wallet_pubkey}, 代币={token_mint_pubkey}")
+                except Exception as pubkey_err:
+                    logger.error(f"创建公钥对象失败: {str(pubkey_err)}")
+                    return 0.0
+                
                 # 使用spl.token库获取代币账户信息
-                token = spl.token.client.Token(
-                    conn=rpc_client,
-                    pubkey=PublicKey(token_mint_address),
-                    program_id=spl.token.constants.TOKEN_PROGRAM_ID,
-                    payer=None
-                )
-                logger.info(f"创建Token对象成功: {token_mint_address}")
+                try:
+                    token = spl.token.client.Token(
+                        conn=rpc_client,
+                        pubkey=token_mint_pubkey,
+                        program_id=spl.token.constants.TOKEN_PROGRAM_ID,
+                        payer=None
+                    )
+                    logger.info(f"成功创建Token对象: {token_mint_address}")
+                except Exception as token_err:
+                    logger.error(f"创建Token对象失败: {str(token_err)}")
+                    return 0.0
                 
                 # 获取钱包的代币账户
                 logger.info(f"开始获取钱包的代币账户: {wallet_address}")
-                token_accounts_response = rpc_client.get_token_accounts_by_owner(
-                    PublicKey(wallet_address),
-                    {'mint': PublicKey(token_mint_address)}
-                )
-                logger.info(f"代币账户响应: {token_accounts_response}")
+                try:
+                    token_accounts_response = rpc_client.get_token_accounts_by_owner(
+                        wallet_pubkey,
+                        {'mint': token_mint_pubkey}
+                    )
+                    logger.info(f"代币账户响应: {json.dumps(token_accounts_response, default=str)[:200]}...")
+                except Exception as accounts_err:
+                    logger.error(f"获取代币账户失败: {str(accounts_err)}")
+                    return 0.0
                 
                 token_accounts = token_accounts_response.get('result', {}).get('value', [])
                 logger.info(f"找到 {len(token_accounts)} 个代币账户")
@@ -397,8 +452,12 @@ class AssetService:
                         account_pubkey = account.get('pubkey')
                         logger.info(f"处理代币账户: {account_pubkey}")
                         
-                        balance_response = rpc_client.get_token_account_balance(account_pubkey)
-                        logger.info(f"余额响应: {balance_response}")
+                        try:
+                            balance_response = rpc_client.get_token_account_balance(account_pubkey)
+                            logger.info(f"余额响应: {json.dumps(balance_response, default=str)}")
+                        except Exception as balance_err:
+                            logger.error(f"获取账户余额失败: {str(balance_err)}")
+                            continue
                         
                         account_data = balance_response.get('result', {}).get('value', {})
                         if account_data:
