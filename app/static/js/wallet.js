@@ -2336,12 +2336,12 @@ async connectPhantom(isReconnect = false) {
                     
                     // 触发状态变更事件
                     this.notifyStateChange();
-                } else {
+        } else {
                     console.log('Phantom账户已断开');
                     await this.disconnect(true);
-                }
+        }
             });
-        } catch (error) {
+    } catch (error) {
             console.warn('设置Phantom事件监听器失败:', error);
         }
     },
