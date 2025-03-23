@@ -6,6 +6,7 @@ from ..models.asset import AssetStatus
 from sqlalchemy import or_ as db_or
 from app.models.trade import Trade, TradeStatus
 from app.models import ShortLink
+import logging
 
 # 主页路由
 # @main_bp.route('/')
@@ -65,13 +66,51 @@ def create_asset():
 
 @assets_bp.route('/<int:asset_id>')
 def asset_detail(asset_id):
+    """资产详情页面"""
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"正在访问资产详情页面: asset_id={asset_id}")
+    
+    # 获取资产对象
     asset = Asset.query.get_or_404(asset_id)
+    logger.info(f"获取资产数据成功: name='{asset.name}', token_symbol='{asset.token_symbol}', token_supply={asset.token_supply}")
     
     # 计算剩余供应量
+    # 获取所有已完成的交易
     trades = Trade.query.filter_by(asset_id=asset.id, status=TradeStatus.COMPLETED.value).all()
-    completed_amount = sum(trade.amount for trade in trades)
-    remaining_supply = asset.token_supply - completed_amount
+    logger.info(f"查询到已完成交易数量: {len(trades)}")
     
+    # 检查资产的token_supply
+    if asset.token_supply is None or asset.token_supply <= 0:
+        logger.warning(f"资产token_supply异常: {asset.token_supply}")
+        
+    # 计算已完成的交易总量
+    completed_trades = []
+    for trade in trades:
+        logger.info(f"交易ID: {trade.id}, 数量: {trade.amount}, 状态: {trade.status}, 创建时间: {trade.created_at}")
+        completed_trades.append({
+            'id': trade.id,
+            'amount': trade.amount,
+            'status': trade.status
+        })
+    
+    completed_amount = sum(trade.amount for trade in trades)
+    logger.info(f"已完成交易总量: {completed_amount}")
+    
+    # 计算剩余供应量
+    try:
+        remaining_supply = asset.token_supply - completed_amount
+        logger.info(f"计算得到剩余供应量: {remaining_supply} = {asset.token_supply} - {completed_amount}")
+        
+        # 防止负值
+        if remaining_supply < 0:
+            logger.warning(f"计算得到负的剩余供应量: {remaining_supply}，将设置为0")
+            remaining_supply = 0
+    except Exception as e:
+        logger.error(f"计算剩余供应量时出错: {str(e)}")
+        remaining_supply = 0
+    
+    logger.info(f"最终剩余供应量: {remaining_supply}")
     return render_template('assets/detail.html', asset=asset, remaining_supply=remaining_supply)
 
 # 管理页面路由
