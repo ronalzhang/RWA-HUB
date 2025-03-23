@@ -621,9 +621,10 @@ async function handleFiles(files, fileType) {
             const result = await response.json();
             console.log('上传响应:', result);
             
-            if (result.urls && result.urls.length > 0) {
+            // 同时支持新旧两种格式的响应
+            if ((result.urls && result.urls.length > 0) || (result.image_paths && result.image_paths.length > 0)) {
                 // 添加到上传文件列表
-                const url = result.urls[0];
+                const url = result.urls ? result.urls[0] : result.image_paths[0];
                 if (isImage) {
                     uploadedImages.push({
                         name: file.name,
@@ -640,7 +641,7 @@ async function handleFiles(files, fileType) {
                 completed++;
                 statusElement.textContent = `成功上传 ${completed} 个文件`;
             } else {
-                throw new Error(result.error || '上传失败');
+                throw new Error(result.error || result.message || '上传失败');
             }
         } catch (error) {
             console.error(`上传文件失败:`, error);

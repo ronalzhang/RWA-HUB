@@ -957,7 +957,7 @@ const walletState = {
                 
                 if (response.ok) {
                     const data = await response.json();
-                console.log('余额API返回数据:', JSON.stringify(data));
+                console.log('余额API返回数据:', data);
                 
                 // 增强USDC余额提取逻辑 - 支持更多种API返回格式
                 let usdcBalance = null;
@@ -970,8 +970,13 @@ const walletState = {
                 } else {
                     console.log('尝试从API响应中解析余额信息');
                     
-                    // 逐级深入检查数据结构中的余额信息
-                    if (data.balance !== undefined) {
+                    // 优先使用balances中的USDC余额（针对Phantom钱包）
+                    if (data.balances && typeof data.balances === 'object' && data.balances.USDC !== undefined) {
+                        usdcBalance = parseFloat(data.balances.USDC);
+                        console.log('  从data.balances.USDC中获取到余额:', usdcBalance);
+                    }
+                    // 其次使用通用balance字段
+                    else if (data.balance !== undefined) {
                         usdcBalance = parseFloat(data.balance);
                         console.log('  从data.balance中获取到余额:', usdcBalance);
                     } else if (data.usdc_balance !== undefined) {
