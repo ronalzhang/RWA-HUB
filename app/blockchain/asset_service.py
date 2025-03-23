@@ -356,21 +356,15 @@ class AssetService:
             # 检查是否处于模拟模式
             if getattr(solana_client, 'mock_mode', False):
                 logger.info("模拟模式：返回模拟的代币余额")
-                # 如果是USDC且是测试中指定的钱包地址
-                if token_mint_address == "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" and wallet_address == "8cU6PAtRTRgfyJu48qfz2hQP5aMGwooxqrCZtyB6UcYP":
-                    return 49.0
                 return 0.0
             
-            # 特殊处理测试钱包
-            if wallet_address == "8cU6PAtRTRgfyJu48qfz2hQP5aMGwooxqrCZtyB6UcYP" and token_mint_address == "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v":
-                logger.info(f"特殊处理测试钱包 {wallet_address} 的USDC余额")
-                return 49.0
-                
+            # 移除特定地址的特殊处理，使用真实网络数据
             # 导入所需模块
             import spl.token.client
             
             # 创建RPC客户端
             rpc_client = Client(solana_client.network_url)
+            logger.info(f"创建RPC客户端成功，连接到: {solana_client.network_url}")
             
             # 获取代币账户信息
             try:
@@ -381,12 +375,18 @@ class AssetService:
                     program_id=spl.token.constants.TOKEN_PROGRAM_ID,
                     payer=None
                 )
+                logger.info(f"创建Token对象成功: {token_mint_address}")
                 
                 # 获取钱包的代币账户
-                token_accounts = rpc_client.get_token_accounts_by_owner(
+                logger.info(f"开始获取钱包的代币账户: {wallet_address}")
+                token_accounts_response = rpc_client.get_token_accounts_by_owner(
                     PublicKey(wallet_address),
                     {'mint': PublicKey(token_mint_address)}
-                ).get('result', {}).get('value', [])
+                )
+                logger.info(f"代币账户响应: {token_accounts_response}")
+                
+                token_accounts = token_accounts_response.get('result', {}).get('value', [])
+                logger.info(f"找到 {len(token_accounts)} 个代币账户")
                 
                 balance = 0.0
                 decimals = 6  # USDC默认为6位小数
@@ -395,48 +395,29 @@ class AssetService:
                 if token_accounts:
                     for account in token_accounts:
                         account_pubkey = account.get('pubkey')
-                        account_data = rpc_client.get_token_account_balance(account_pubkey).get('result', {}).get('value', {})
+                        logger.info(f"处理代币账户: {account_pubkey}")
+                        
+                        balance_response = rpc_client.get_token_account_balance(account_pubkey)
+                        logger.info(f"余额响应: {balance_response}")
+                        
+                        account_data = balance_response.get('result', {}).get('value', {})
                         if account_data:
                             amount = float(account_data.get('amount', '0'))
                             if 'decimals' in account_data:
                                 decimals = int(account_data.get('decimals'))
-                            balance += amount / (10 ** decimals)
+                            current_balance = amount / (10 ** decimals)
+                            logger.info(f"账户 {account_pubkey} 余额: {current_balance} (原始: {amount}, 小数位: {decimals})")
+                            balance += current_balance
+                else:
+                    logger.warning(f"未找到钱包 {wallet_address} 的 {token_mint_address} 代币账户")
                 
                 logger.info(f"成功获取代币余额: {balance} (decimals={decimals})")
                 return balance
             except Exception as e:
-                # 如果出错，尝试使用Token Program的方法查询
-                logger.warning(f"获取代币账户信息失败，尝试备用方法: {str(e)}")
-                
-                try:
-                    # 查找代币账户
-                    accounts = solana_client.client.get_token_accounts_by_owner(
-                        PublicKey(wallet_address),
-                        {'mint': PublicKey(token_mint_address)}
-                    )
-                    
-                    balance = 0.0
-                    
-                    if 'result' in accounts and 'value' in accounts['result']:
-                        for account in accounts['result']['value']:
-                            account_pubkey = account['pubkey']
-                            account_data = solana_client.client.get_token_account_balance(account_pubkey)
-                            
-                            if 'result' in account_data and 'value' in account_data['result']:
-                                data = account_data['result']['value']
-                                amount = float(data.get('amount', '0'))
-                                decimals = int(data.get('decimals', 6))
-                                balance += amount / (10 ** decimals)
-                                
-                    logger.info(f"备用方法获取代币余额: {balance}")
-                    return balance
-                except Exception as backup_e:
-                    logger.error(f"备用方法获取代币余额失败: {str(backup_e)}")
-            
-            # 如果无法获取，返回0
-            logger.warning(f"无法获取代币余额，返回0")
-            return 0.0
-            
+                logger.error(f"获取代币账户和余额失败: {str(e)}")
+                logger.error(traceback.format_exc())
+                return 0.0
         except Exception as e:
-            logger.exception(f"获取代币余额异常: {str(e)}")
+            logger.error(f"获取代币余额过程中发生错误: {str(e)}")
+            logger.error(traceback.format_exc())
             return 0.0 

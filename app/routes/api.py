@@ -1313,9 +1313,46 @@ def upload_images_api():
             current_app.logger.warning("未提供token_symbol，使用临时目录")
             upload_folder = os.path.join(current_app.static_folder, 'uploads', 'temp', 'images')
             
-        # 确保目录存在
-        os.makedirs(upload_folder, exist_ok=True)
-        current_app.logger.info(f"图片上传目录: {upload_folder}")
+        # 检查uploads和projects目录是否存在
+        base_dir = os.path.join(current_app.static_folder, 'uploads')
+        projects_dir = os.path.join(base_dir, 'projects')
+        
+        # 检查并创建目录
+        try:
+            current_app.logger.info(f"检查基本目录: {base_dir}")
+            if not os.path.exists(base_dir):
+                current_app.logger.warning(f"基本uploads目录不存在，尝试创建: {base_dir}")
+                os.makedirs(base_dir, exist_ok=True)
+            
+            current_app.logger.info(f"检查projects目录: {projects_dir}")
+            if not os.path.exists(projects_dir):
+                current_app.logger.warning(f"projects目录不存在，尝试创建: {projects_dir}")
+                os.makedirs(projects_dir, exist_ok=True)
+            
+            # 检查目录权限
+            if not os.access(projects_dir, os.W_OK):
+                current_app.logger.error(f"projects目录没有写入权限: {projects_dir}")
+                return jsonify({
+                    'success': False,
+                    'message': f'服务器目录权限错误，无法写入: {projects_dir}'
+                }), 500
+            
+            # 确保最终的上传目录存在
+            current_app.logger.info(f"尝试创建上传目录: {upload_folder}")
+            os.makedirs(upload_folder, exist_ok=True)
+            current_app.logger.info(f"上传目录创建成功")
+        except PermissionError as pe:
+            current_app.logger.error(f"创建目录权限错误: {str(pe)}")
+            return jsonify({
+                'success': False,
+                'message': f'服务器权限错误: {str(pe)}'
+            }), 500
+        except Exception as e:
+            current_app.logger.error(f"创建目录失败: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': f'创建目录失败: {str(e)}'
+            }), 500
         
         # 处理所有上传的图片
         image_paths = []
@@ -1328,8 +1365,25 @@ def upload_images_api():
                 # 添加时间戳防止文件名冲突
                 filename = f"{timestamp}_{filename}"
                 file_path = os.path.join(upload_folder, filename)
-                file.save(file_path)
-                current_app.logger.info(f"保存图片: {file_path}")
+                
+                try:
+                    current_app.logger.info(f"保存文件: {file_path}")
+                    file.save(file_path)
+                    current_app.logger.info(f"文件保存成功: {file_path}")
+                    
+                    # 检查文件是否实际创建
+                    if not os.path.exists(file_path):
+                        current_app.logger.error(f"文件保存失败，路径不存在: {file_path}")
+                        return jsonify({
+                            'success': False,
+                            'message': f'文件无法保存到服务器: {file_path}'
+                        }), 500
+                except Exception as save_err:
+                    current_app.logger.error(f"保存文件时出错: {str(save_err)}")
+                    return jsonify({
+                        'success': False,
+                        'message': f'保存文件错误: {str(save_err)}'
+                    }), 500
                 
                 # 构建相对路径，用于前端显示
                 if token_symbol:
