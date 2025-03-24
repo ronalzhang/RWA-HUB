@@ -162,6 +162,13 @@
         margin-right: 2px;
         vertical-align: text-bottom;
     }
+    
+    .stats-card .usdc-icon {
+        width: 16px;
+        height: 16px;
+        margin-right: 2px;
+        vertical-align: middle;
+    }
 </style>
 {% endblock %}
 
@@ -402,11 +409,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (totalDividendElement) {
             if (assetData.total_dividend !== undefined && assetData.total_dividend > 0) {
                 totalDividendElement.innerHTML = `
-                    <img src="/static/images/usdc-logo.svg" alt="USDC" class="usdc-icon" onerror="this.src='https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=024'; this.onerror='';">
+                    <img src="/static/images/usdc-logo.svg" alt="USDC" class="usdc-icon" style="width:16px;height:16px;" onerror="this.src='https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=024'; this.onerror='';">
                     ${assetData.total_dividend.toLocaleString()}`;
             } else {
                 totalDividendElement.innerHTML = `
-                    <img src="/static/images/usdc-logo.svg" alt="USDC" class="usdc-icon" onerror="this.src='https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=024'; this.onerror='';">
+                    <img src="/static/images/usdc-logo.svg" alt="USDC" class="usdc-icon" style="width:16px;height:16px;" onerror="this.src='https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=024'; this.onerror='';">
                     0`;
             }
         }
