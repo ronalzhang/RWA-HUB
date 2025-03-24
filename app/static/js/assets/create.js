@@ -1499,7 +1499,7 @@ async function processAssetCreation(formData, txHash) {
         
         // 跳转到资产详情页
         setTimeout(() => {
-            window.location.href = `/assets/${createResult.asset_id || createResult.token_symbol}`;
+            window.location.href = `/assets/${createResult.token_symbol}`;
         }, 1500);
         
     } catch (error) {
