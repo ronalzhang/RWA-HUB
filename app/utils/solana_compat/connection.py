@@ -100,4 +100,24 @@ class Connection:
         Returns:
             Dict包含当前slot信息
         """
-        return self.rpc_client.get_slot(commitment or self.commitment) 
+        return self.rpc_client.get_slot(commitment or self.commitment)
+    
+    def send_raw_transaction(
+        self, raw_transaction: bytes, opts: Optional[TxOpts] = None
+    ) -> str:
+        """
+        发送已签名的原始交易数据
+        
+        Args:
+            raw_transaction: 已签名的交易字节数据
+            opts: 可选的交易选项
+            
+        Returns:
+            交易签名字符串
+        """
+        response = self.rpc_client.send_raw_transaction(raw_transaction, opts)
+        if "error" in response:
+            error_msg = response.get("error", {}).get("message", "Unknown error")
+            raise Exception(f"发送交易失败: {error_msg}")
+        
+        return response.get("result", "") 

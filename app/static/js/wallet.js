@@ -2518,7 +2518,7 @@ async connectPhantom(isReconnect = false) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Eth-Address': fromAddress // 添加钱包地址到请求头
+                    'X-Eth-Address': fromAddress
                 },
                 body: JSON.stringify({
                     token_symbol: tokenSymbol,
@@ -2540,21 +2540,64 @@ async connectPhantom(isReconnect = false) {
             
             console.log('成功获取交易数据:', txData.message);
             
-            // 不再对交易数据进行Base64解码和转换
-            // 使用一种简单的方式发送交易
-
-            // 在真实环境中，我们需要处理一个真实的Solana交易
-            // 但考虑到Phantom钱包API的限制，我们使用一个临时的模拟交易
-            console.log('使用模拟交易进行转账...');
+            // 将Base64编码的交易数据转换为Uint8Array
+            const serializedTransaction = Uint8Array.from(atob(txData.transaction), c => c.charCodeAt(0));
+            console.log('交易数据已解码为Uint8Array');
             
-            // 创建模拟交易签名
-            const mockSignature = 'tx_' + Date.now().toString(16);
-            console.log('模拟交易签名:', mockSignature);
+            // 使用Phantom钱包的signTransaction方法签名交易
+            console.log('使用Phantom钱包签名交易...');
+            let signedTransaction;
+            try {
+                signedTransaction = await window.solana.signTransaction(serializedTransaction);
+                console.log('交易已成功签名');
+            } catch (signError) {
+                console.error('签名交易失败:', signError);
+                throw new Error(`签名交易失败: ${signError.message || '用户拒绝或未知错误'}`);
+            }
+            
+            // 将签名后的交易序列化并转换为Base64
+            const serializedSignedTx = signedTransaction.serialize ? 
+                signedTransaction.serialize() : 
+                signedTransaction;
+            
+            console.log('已序列化签名后的交易:', serializedSignedTx);
+            
+            // 将序列化后的交易转换为Base64编码发送到服务端
+            const signedBase64 = btoa(
+                String.fromCharCode.apply(null, new Uint8Array(serializedSignedTx))
+            );
+            
+            console.log('已将签名后的交易转换为Base64格式，准备发送到服务器');
+            
+            // 将签名后的交易发送到后端API
+            console.log('发送已签名的交易到后端...');
+            const sendResponse = await fetch('/api/solana/send_transaction', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Eth-Address': fromAddress
+                },
+                body: JSON.stringify({
+                    signed_transaction: signedBase64
+                })
+            });
+            
+            if (!sendResponse.ok) {
+                const sendErrorData = await sendResponse.json();
+                throw new Error(`发送交易失败: ${sendErrorData.error || sendResponse.statusText}`);
+            }
+            
+            const sendResult = await sendResponse.json();
+            if (!sendResult.success) {
+                throw new Error(`处理交易失败: ${sendResult.error || '未知错误'}`);
+            }
+            
+            console.log('交易发送成功，签名:', sendResult.signature);
             
             // 返回成功结果
             return {
                 success: true,
-                txHash: mockSignature
+                txHash: sendResult.signature
             };
             
         } catch (error) {
