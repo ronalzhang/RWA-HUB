@@ -232,16 +232,17 @@ const walletState = {
     /**
      * 清除存储的钱包数据
      */
-    clearStoredWalletData: function() {
+    clearStoredWalletData() {
         try {
+            console.log('清除存储的钱包数据');
             localStorage.removeItem('walletType');
             localStorage.removeItem('walletAddress');
-            localStorage.removeItem('walletNeedsReconnect');
-            sessionStorage.removeItem('walletType');
-            sessionStorage.removeItem('walletAddress');
-            console.log('已清除存储的钱包数据');
-        } catch (e) {
-            console.error('清除存储的钱包数据时出错:', e);
+            localStorage.removeItem('lastWalletType');
+            localStorage.removeItem('lastWalletAddress');
+            localStorage.removeItem('pendingWalletType');
+            sessionStorage.removeItem('returningFromWalletApp');
+        } catch (error) {
+            console.error('清除钱包数据失败:', error);
         }
     },
     
@@ -2588,7 +2589,24 @@ async connectPhantom(isReconnect = false) {
         this.notifyStateChange({ type: 'connect' });
         
         return true;
-    }
+    },
+
+    /**
+     * 保存钱包数据到本地存储
+     * @param {string} address - 钱包地址
+     * @param {string} walletType - 钱包类型
+     */
+    saveWalletData(address, walletType) {
+        try {
+            console.log(`保存钱包数据: 地址=${address}, 类型=${walletType}`);
+            localStorage.setItem('walletType', walletType);
+            localStorage.setItem('walletAddress', address);
+            localStorage.setItem('lastWalletType', walletType);
+            localStorage.setItem('lastWalletAddress', address);
+        } catch (error) {
+            console.error('保存钱包数据失败:', error);
+        }
+    },
 }
 
 // 页面初始化时就自动调用钱包初始化方法
