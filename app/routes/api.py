@@ -2118,3 +2118,124 @@ def register_pending_payment():
         db.session.rollback()
         current_app.logger.error(f"注册待确认支付交易失败: {str(e)}")
         return jsonify({'success': False, 'error': f'注册支付交易失败: {str(e)}'}), 500
+
+@api_bp.route('/solana/create_transfer_transaction', methods=['POST'])
+@eth_address_required
+def create_solana_transfer_transaction():
+    """
+    创建Solana转账交易
+    用于生成转账USDC或其他代币的Solana交易，返回序列化的交易数据
+    前端使用Phantom钱包签名并发送
+    """
+    try:
+        # 检查钱包连接状态
+        if not g.eth_address:
+            return jsonify({'success': False, 'error': '请先连接钱包'}), 401
+            
+        # 获取请求数据
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '无效的请求数据'}), 400
+            
+        # 检查必要字段
+        required_fields = ['token_symbol', 'to_address', 'amount']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'error': f'缺少必要字段: {field}'}), 400
+                
+        token_symbol = data.get('token_symbol')
+        to_address = data.get('to_address')
+        amount = float(data.get('amount'))
+        
+        # 记录请求信息
+        current_app.logger.info(f"创建Solana转账交易: {token_symbol}, 金额: {amount}, 接收地址: {to_address}, 发送钱包: {g.eth_address}")
+        
+        # 根据代币符号获取正确的代币铸造地址
+        token_addresses = {
+            'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',  # USDC在Solana主网上的地址
+            'SOL': 'So11111111111111111111111111111111111111112'     # SOL的标准程序地址
+        }
+        
+        # 获取代币地址
+        token_address = token_addresses.get(token_symbol)
+        if not token_address:
+            return jsonify({'success': False, 'error': f'不支持的代币: {token_symbol}'}), 400
+            
+        # USDC在Solana上有6位小数
+        decimals = 6 if token_symbol == 'USDC' else 9
+        
+        # 转换为最小单位金额
+        amount_in_lamports = int(amount * 10**decimals)
+        
+        # 使用Solana Python客户端创建转账交易
+        # 在生产环境中，这里应该使用实际的Solana Web3.py等库构建交易
+        from app.utils.solana_compat.publickey import PublicKey  # 导入Solana兼容工具
+        from app.utils.solana_compat.transaction import Transaction
+        from app.utils.solana_compat.token import Token, TOKEN_PROGRAM_ID
+        from app.utils.solana_compat.connection import Connection
+        
+        try:
+            # 创建连接对象
+            connection = Connection("https://api.mainnet-beta.solana.com")
+            
+            # 创建交易
+            transaction = Transaction()
+            
+            # 添加转账指令
+            from_pubkey = PublicKey(g.eth_address)
+            to_pubkey = PublicKey(to_address)
+            token_pubkey = PublicKey(token_address)
+            
+            # 创建Token客户端对象
+            token_client = Token(
+                conn=connection,
+                pubkey=token_pubkey,
+                program_id=TOKEN_PROGRAM_ID,
+                payer=from_pubkey
+            )
+            
+            # 获取源和目标Token账户
+            from_token_account = token_client.get_associated_token_address(from_pubkey)
+            to_token_account = token_client.get_associated_token_address(to_pubkey)
+            
+            # 添加转账指令到交易
+            transfer_tx = token_client.transfer(
+                source=from_token_account,
+                dest=to_token_account,
+                owner=from_pubkey,
+                amount=amount_in_lamports
+            )
+            
+            # 合并到主交易
+            transaction.add(transfer_tx)
+            
+            # 获取最新的区块哈希
+            recent_blockhash = connection.get_recent_blockhash()
+            transaction.recent_blockhash = recent_blockhash
+            
+            # 序列化交易
+            serialized_transaction = transaction.serialize()
+            
+            # 转换为Base64以便JSON传输
+            import base64
+            serialized_transaction_b64 = base64.b64encode(serialized_transaction).decode('utf-8')
+            
+            # 返回序列化的交易数据
+            return jsonify({
+                'success': True,
+                'transaction': serialized_transaction_b64,
+                'message': f'已创建转账{amount} {token_symbol}到{to_address}的交易',
+                'token_address': token_address,
+                'from_address': g.eth_address,
+                'to_address': to_address,
+                'amount': amount,
+                'amount_in_lamports': amount_in_lamports
+            })
+            
+        except Exception as tx_error:
+            current_app.logger.error(f"创建Solana交易失败: {str(tx_error)}")
+            return jsonify({'success': False, 'error': f'创建交易失败: {str(tx_error)}'}), 500
+        
+    except Exception as e:
+        current_app.logger.error(f"处理转账交易请求失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
