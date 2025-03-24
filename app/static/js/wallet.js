@@ -2549,28 +2549,66 @@ async connectPhantom(isReconnect = false) {
             let signedTransaction;
             try {
                 signedTransaction = await window.solana.signTransaction(serializedTransaction);
-                console.log('交易已成功签名');
+                console.log('交易已成功签名，结果类型:', typeof signedTransaction);
+                
+                // 详细记录签名结果结构，帮助调试
+                if (signedTransaction) {
+                    const props = Object.getOwnPropertyNames(signedTransaction);
+                    console.log('签名结果属性:', props);
+                } else {
+                    console.error('签名结果为空');
+                    throw new Error('签名结果为空');
+                }
             } catch (signError) {
                 console.error('签名交易失败:', signError);
                 throw new Error(`签名交易失败: ${signError.message || '用户拒绝或未知错误'}`);
             }
             
-            // 将签名后的交易序列化并转换为Base64
-            const serializedSignedTx = signedTransaction.serialize ? 
-                signedTransaction.serialize() : 
-                signedTransaction;
+            // 准备发送到后端的交易数据
+            let signedBase64;
             
-            console.log('已序列化签名后的交易:', serializedSignedTx);
-            
-            // 将序列化后的交易转换为Base64编码发送到服务端
-            const signedBase64 = btoa(
-                String.fromCharCode.apply(null, new Uint8Array(serializedSignedTx))
-            );
-            
-            console.log('已将签名后的交易转换为Base64格式，准备发送到服务器');
+            try {
+                // 尝试直接使用完整交易对象作为参数传递
+                if (!signedTransaction) {
+                    throw new Error('签名后的交易对象为空');
+                }
+                
+                // 序列化处理：处理多种可能的返回格式
+                if (signedTransaction.serialize && typeof signedTransaction.serialize === 'function') {
+                    console.log('使用内置serialize方法处理交易');
+                    const serialized = signedTransaction.serialize();
+                    if (serialized instanceof Uint8Array) {
+                        signedBase64 = btoa(String.fromCharCode.apply(null, serialized));
+                    } else {
+                        signedBase64 = btoa(String.fromCharCode.apply(null, new Uint8Array(serialized)));
+                    }
+                }
+                else if (signedTransaction instanceof Uint8Array) {
+                    console.log('签名结果已是Uint8Array');
+                    signedBase64 = btoa(String.fromCharCode.apply(null, signedTransaction));
+                }
+                else if (signedTransaction.signatures) {
+                    console.log('签名对象有signatures属性，但没有serialize方法');
+                    // 无法序列化但有签名信息，可能是不完整对象
+                    signedBase64 = JSON.stringify({
+                        original: btoa(String.fromCharCode.apply(null, serializedTransaction)),
+                        signatures: signedTransaction.signatures
+                    });
+                }
+                else {
+                    // 回退到发送原始交易
+                    console.warn('无法处理签名结果，使用原始交易');
+                    signedBase64 = btoa(String.fromCharCode.apply(null, serializedTransaction));
+                }
+                
+                console.log('已准备签名后的交易数据，准备发送');
+            } catch (serializeError) {
+                console.error('序列化签名交易失败:', serializeError);
+                throw new Error(`处理签名结果失败: ${serializeError.message}`);
+            }
             
             // 将签名后的交易发送到后端API
-            console.log('发送已签名的交易到后端...');
+            console.log('发送签名后的交易到后端...');
             const sendResponse = await fetch('/api/solana/send_transaction', {
                 method: 'POST',
                 headers: {
