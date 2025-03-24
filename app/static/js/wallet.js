@@ -2437,6 +2437,188 @@ async connectPhantom(isReconnect = false) {
                 }, 4000);
             }
         }
+    },
+    
+    /**
+     * 转账代币到指定地址
+     * @param {string} tokenSymbol 代币符号，如'USDC'
+     * @param {string} to 接收地址
+     * @param {number} amount 转账金额
+     * @returns {Promise<{success: boolean, txHash: string, error: string}>} 交易结果
+     */
+    async transferToken(tokenSymbol, to, amount) {
+        try {
+            console.log(`准备转账 ${amount} ${tokenSymbol} 到 ${to}`);
+            
+            // 检查钱包连接状态
+            if (!this.connected || !this.address) {
+                throw new Error('钱包未连接');
+            }
+            
+            // 根据钱包类型执行不同的转账逻辑
+            if (this.walletType === 'phantom' || this.walletType === 'solana') {
+                // Phantom钱包转账
+                return await this.transferSolanaToken(tokenSymbol, to, amount);
+            } else if (this.walletType === 'ethereum') {
+                // 以太坊钱包转账
+                return await this.transferEthereumToken(tokenSymbol, to, amount);
+            } else {
+                throw new Error(`不支持的钱包类型: ${this.walletType}`);
+            }
+        } catch (error) {
+            console.error('转账失败:', error);
+            return {
+                success: false,
+                error: error.message || '转账失败'
+            };
+        }
+    },
+    
+    /**
+     * 通过Solana钱包转账代币
+     * @param {string} tokenSymbol 代币符号
+     * @param {string} to 接收地址
+     * @param {number} amount 转账金额
+     * @returns {Promise<{success: boolean, txHash: string, error: string}>} 交易结果
+     */
+    async transferSolanaToken(tokenSymbol, to, amount) {
+        try {
+            console.log('使用Phantom钱包转账');
+            
+            // 检查Phantom钱包
+            if (!window.solana || !window.solana.isPhantom) {
+                throw new Error('Phantom钱包未安装或未连接');
+            }
+            
+            // 检查接收地址是否有效
+            if (!to || typeof to !== 'string' || to.length < 32) {
+                throw new Error('无效的接收地址');
+            }
+            
+            // 检查金额
+            if (!amount || isNaN(amount) || amount <= 0) {
+                throw new Error('无效的转账金额');
+            }
+            
+            // USDC代币地址 - Solana主网
+            // 注意：这是一个示例地址，实际使用时应该根据环境配置获取正确的地址
+            const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+            
+            // 确定转账数量（考虑代币小数位）
+            // USDC 在 Solana 上是 6 个小数位
+            const decimals = 6;
+            const adjustedAmount = amount * Math.pow(10, decimals);
+            
+            // 创建转账交易
+            const transaction = await this.createSolanaTransferTransaction(
+                USDC_MINT, 
+                to, 
+                Math.floor(adjustedAmount)
+            );
+            
+            // 发送交易
+            const { signature } = await window.solana.signAndSendTransaction(transaction);
+            console.log('交易已发送，签名:', signature);
+            
+            // 返回成功结果
+            return {
+                success: true,
+                txHash: signature
+            };
+        } catch (error) {
+            console.error('Solana转账失败:', error);
+            return {
+                success: false,
+                error: error.message || 'Solana转账失败'
+            };
+        }
+    },
+    
+    /**
+     * 创建Solana转账交易
+     * @param {string} tokenMint 代币铸造地址
+     * @param {string} to 接收地址
+     * @param {number} amount 转账数量（已调整小数位）
+     * @returns {Promise<Object>} 交易对象
+     */
+    async createSolanaTransferTransaction(tokenMint, to, amount) {
+        // 实际环境中，这里应该调用后端API创建交易，
+        // 然后返回给前端签名。为简化实现，这里直接模拟一个交易对象
+        console.log(`模拟创建Solana转账交易: ${amount} tokens 到 ${to}`);
+        
+        // 模拟延迟以模拟API调用
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // 返回一个模拟的交易对象
+        // 实际应用中，这应该是一个真实的Solana交易
+        return {
+            serializeData() {
+                return new Uint8Array(32); // 模拟序列化数据
+            }
+        };
+    },
+    
+    /**
+     * 通过以太坊钱包转账代币
+     * @param {string} tokenSymbol 代币符号
+     * @param {string} to 接收地址
+     * @param {number} amount 转账金额
+     * @returns {Promise<{success: boolean, txHash: string, error: string}>} 交易结果
+     */
+    async transferEthereumToken(tokenSymbol, to, amount) {
+        try {
+            console.log('使用以太坊钱包转账');
+            
+            // 检查Web3是否可用
+            if (!this.web3) {
+                throw new Error('Web3实例不可用');
+            }
+            
+            // 这里应该实现基于Web3.js的ERC20代币转账
+            // 由于我们的应用主要使用Solana，这里暂时返回一个错误
+            throw new Error('以太坊转账功能尚未实现');
+            
+        } catch (error) {
+            console.error('以太坊转账失败:', error);
+            return {
+                success: false,
+                error: error.message || '以太坊转账失败'
+            };
+        }
+    },
+    
+    /**
+     * 清除所有钱包状态
+     */
+    clearState() {
+        // 清除内存中的状态
+        this.address = null;
+        this.walletType = null;
+        this.connected = false;
+        this.isAdmin = false;
+        this.balance = 0;
+        this.nativeBalance = 0;
+        this.assets = [];
+        this.chainId = null;
+        this.web3 = null;
+        this.provider = null;
+        
+        // 清除本地存储
+        localStorage.removeItem('walletType');
+        localStorage.removeItem('walletAddress');
+        localStorage.removeItem('lastWalletType');
+        localStorage.removeItem('lastWalletAddress');
+        localStorage.removeItem('pendingWalletType');
+        sessionStorage.removeItem('returningFromWalletApp');
+        
+        // 移除可能存在的事件监听器
+        if (window.ethereum) {
+            window.ethereum.removeAllListeners?.();
+        }
+        
+        if (window.solana) {
+            window.solana.removeAllListeners?.();
+        }
     }
 }
 
