@@ -37,7 +37,7 @@ class Asset(db.Model):
     token_symbol = db.Column(db.String(20), nullable=False, unique=True)
     token_price = db.Column(db.Float, nullable=False)
     token_supply = db.Column(db.Integer)
-    token_address = db.Column(db.String(64), unique=True)
+    token_address = db.Column(db.String(128), unique=True)
     annual_revenue = db.Column(db.Float, nullable=False)
     _images = db.Column('images', db.Text)
     _documents = db.Column('documents', db.Text)
@@ -105,9 +105,9 @@ class Asset(db.Model):
     @validates('token_address')
     def validate_token_address(self, key, value):
         if value:
-            # 修改验证规则，同时接受以太坊地址和 Solana 地址
+            # 修改验证规则，接受更长的Solana地址
             if not (re.match(r'^0x[a-fA-F0-9]{40}$', value) or    # 以太坊地址格式
-                   re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$', value)):  # Solana 地址格式
+                   re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,126}$', value)):  # Solana 地址格式(最长126个字符)
                 raise ValueError('无效的代币地址格式')
         return value
 
