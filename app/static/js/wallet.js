@@ -2483,7 +2483,7 @@ async connectPhantom(isReconnect = false) {
      */
     async transferSolanaToken(tokenSymbol, to, amount) {
         try {
-            console.log('使用Phantom钱包执行真实转账');
+            console.log('使用Phantom钱包执行Solana转账');
             
             // 检查Phantom钱包
             if (!window.solana || !window.solana.isPhantom) {
@@ -2512,131 +2512,144 @@ async connectPhantom(isReconnect = false) {
             const fromAddress = window.solana.publicKey.toString();
             console.log(`从地址: ${fromAddress}`);
             
-            // 调用后端API创建交易
-            console.log('从后端获取交易数据...');
-            const txResponse = await fetch('/api/solana/create_transfer_transaction', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Eth-Address': fromAddress
-                },
-                body: JSON.stringify({
-                    token_symbol: tokenSymbol,
-                    to_address: to,
-                    amount: amount
-                })
-            });
-            
-            if (!txResponse.ok) {
-                const errorData = await txResponse.json();
-                throw new Error(`获取交易数据失败: ${errorData.error || txResponse.statusText}`);
-            }
-            
-            const txData = await txResponse.json();
-            
-            if (!txData.success || !txData.transaction) {
-                throw new Error(`创建交易失败: ${txData.error || '未知错误'}`);
-            }
-            
-            console.log('成功获取交易数据:', txData.message);
-            
-            // 将Base64编码的交易数据转换为Uint8Array
-            const serializedTransaction = Uint8Array.from(atob(txData.transaction), c => c.charCodeAt(0));
-            console.log('交易数据已解码为Uint8Array');
-            
-            // 使用Phantom钱包的signTransaction方法签名交易
-            console.log('使用Phantom钱包签名交易...');
-            let signedTransaction;
             try {
-                signedTransaction = await window.solana.signTransaction(serializedTransaction);
-                console.log('交易已成功签名，结果类型:', typeof signedTransaction);
+                // 直接使用Phantom钱包的低级request API
+                console.log('使用直接模式构建和签名交易...');
                 
-                // 详细记录签名结果结构，帮助调试
-                if (signedTransaction) {
-                    const props = Object.getOwnPropertyNames(signedTransaction);
-                    console.log('签名结果属性:', props);
-                } else {
-                    console.error('签名结果为空');
-                    throw new Error('签名结果为空');
-                }
-            } catch (signError) {
-                console.error('签名交易失败:', signError);
-                throw new Error(`签名交易失败: ${signError.message || '用户拒绝或未知错误'}`);
-            }
-            
-            // 准备发送到后端的交易数据
-            let signedBase64;
-            
-            try {
-                // 尝试直接使用完整交易对象作为参数传递
-                if (!signedTransaction) {
-                    throw new Error('签名后的交易对象为空');
-                }
-                
-                // 序列化处理：处理多种可能的返回格式
-                if (signedTransaction.serialize && typeof signedTransaction.serialize === 'function') {
-                    console.log('使用内置serialize方法处理交易');
-                    const serialized = signedTransaction.serialize();
-                    if (serialized instanceof Uint8Array) {
-                        signedBase64 = btoa(String.fromCharCode.apply(null, serialized));
-                    } else {
-                        signedBase64 = btoa(String.fromCharCode.apply(null, new Uint8Array(serialized)));
+                // 1. 首先获取区块链最新状态
+                console.log('获取Solana区块链最新状态...');
+                const getLatestBlockhashResponse = await fetch('/api/solana/get_latest_blockhash', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Eth-Address': fromAddress
                     }
-                }
-                else if (signedTransaction instanceof Uint8Array) {
-                    console.log('签名结果已是Uint8Array');
-                    signedBase64 = btoa(String.fromCharCode.apply(null, signedTransaction));
-                }
-                else if (signedTransaction.signatures) {
-                    console.log('签名对象有signatures属性，但没有serialize方法');
-                    // 无法序列化但有签名信息，可能是不完整对象
-                    signedBase64 = JSON.stringify({
-                        original: btoa(String.fromCharCode.apply(null, serializedTransaction)),
-                        signatures: signedTransaction.signatures
-                    });
-                }
-                else {
-                    // 回退到发送原始交易
-                    console.warn('无法处理签名结果，使用原始交易');
-                    signedBase64 = btoa(String.fromCharCode.apply(null, serializedTransaction));
+                });
+                
+                if (!getLatestBlockhashResponse.ok) {
+                    throw new Error('获取最新区块哈希失败');
                 }
                 
-                console.log('已准备签名后的交易数据，准备发送');
-            } catch (serializeError) {
-                console.error('序列化签名交易失败:', serializeError);
-                throw new Error(`处理签名结果失败: ${serializeError.message}`);
+                const blockhashData = await getLatestBlockhashResponse.json();
+                if (!blockhashData.success || !blockhashData.blockhash) {
+                    throw new Error(`获取区块哈希失败: ${blockhashData.error || '未知错误'}`);
+                }
+                
+                const recentBlockhash = blockhashData.blockhash;
+                console.log('获取到最新区块哈希:', recentBlockhash);
+                
+                // 2. 获取转账所需的参数和指令
+                console.log('获取转账参数...');
+                const getTransferParamsResponse = await fetch('/api/solana/get_transfer_params', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Eth-Address': fromAddress
+                    },
+                    body: JSON.stringify({
+                        token_symbol: tokenSymbol,
+                        to_address: to,
+                        amount: amount,
+                        blockhash: recentBlockhash
+                    })
+                });
+                
+                if (!getTransferParamsResponse.ok) {
+                    throw new Error('获取转账参数失败');
+                }
+                
+                const transferParamsData = await getTransferParamsResponse.json();
+                if (!transferParamsData.success) {
+                    throw new Error(`获取转账参数失败: ${transferParamsData.error || '未知错误'}`);
+                }
+                
+                // 3. 使用钱包签名消息而不是交易
+                console.log('使用钱包签名消息...');
+                const { transaction, message } = transferParamsData;
+                
+                // 将消息转换为Uint8Array
+                const messageBytes = Uint8Array.from(atob(message), c => c.charCodeAt(0));
+                
+                // 使用Phantom钱包签名消息
+                const signedMessage = await window.solana.request({
+                    method: 'signMessage',
+                    params: {
+                        message: messageBytes,
+                        display: 'hex'
+                    }
+                });
+                
+                if (!signedMessage || !signedMessage.signature) {
+                    throw new Error('签名消息失败');
+                }
+                
+                // 将签名发送到后端
+                console.log('发送签名到后端...');
+                const sendSignedResponse = await fetch('/api/solana/send_signed_transaction', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Eth-Address': fromAddress
+                    },
+                    body: JSON.stringify({
+                        transaction: transaction,
+                        signature: btoa(String.fromCharCode.apply(null, signedMessage.signature)),
+                        public_key: fromAddress
+                    })
+                });
+                
+                if (!sendSignedResponse.ok) {
+                    throw new Error('发送签名交易失败');
+                }
+                
+                const sendResult = await sendSignedResponse.json();
+                if (!sendResult.success) {
+                    throw new Error(`发送交易失败: ${sendResult.error || '未知错误'}`);
+                }
+                
+                console.log('交易发送成功！签名:', sendResult.signature);
+                
+                // 返回成功结果
+                return {
+                    success: true,
+                    txHash: sendResult.signature
+                };
+                
+            } catch (directError) {
+                console.error('直接模式失败，尝试使用备用模式...', directError);
+                
+                // 备用模式：使用后端API创建一个完整的交易，避免调用serialize方法
+                console.log('使用备用模式执行转账...');
+                const backupResponse = await fetch('/api/solana/execute_transfer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Eth-Address': fromAddress
+                    },
+                    body: JSON.stringify({
+                        token_symbol: tokenSymbol,
+                        to_address: to,
+                        amount: amount,
+                        from_address: fromAddress
+                    })
+                });
+                
+                if (!backupResponse.ok) {
+                    const errorData = await backupResponse.json();
+                    throw new Error(`备用模式失败: ${errorData.error || backupResponse.statusText}`);
+                }
+                
+                const backupResult = await backupResponse.json();
+                if (!backupResult.success) {
+                    throw new Error(`备用模式失败: ${backupResult.error || '未知错误'}`);
+                }
+                
+                console.log('备用模式交易成功，签名:', backupResult.signature);
+                return {
+                    success: true,
+                    txHash: backupResult.signature
+                };
             }
-            
-            // 将签名后的交易发送到后端API
-            console.log('发送签名后的交易到后端...');
-            const sendResponse = await fetch('/api/solana/send_transaction', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Eth-Address': fromAddress
-                },
-                body: JSON.stringify({
-                    signed_transaction: signedBase64
-                })
-            });
-            
-            if (!sendResponse.ok) {
-                const sendErrorData = await sendResponse.json();
-                throw new Error(`发送交易失败: ${sendErrorData.error || sendResponse.statusText}`);
-            }
-            
-            const sendResult = await sendResponse.json();
-            if (!sendResult.success) {
-                throw new Error(`处理交易失败: ${sendResult.error || '未知错误'}`);
-            }
-            
-            console.log('交易发送成功，签名:', sendResult.signature);
-            
-            // 返回成功结果
-            return {
-                success: true,
-                txHash: sendResult.signature
-            };
             
         } catch (error) {
             console.error('Solana转账失败:', error);
