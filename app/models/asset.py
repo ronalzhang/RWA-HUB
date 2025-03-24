@@ -43,8 +43,8 @@ class Asset(db.Model):
     _documents = db.Column('documents', db.Text)
     status = db.Column(db.Integer, nullable=False, default=AssetStatus.PENDING.value)
     reject_reason = db.Column(db.String(200))
-    owner_address = db.Column(db.String(64), nullable=False)
-    creator_address = db.Column(db.String(64), nullable=False)
+    owner_address = db.Column(db.String(128), nullable=False)
+    creator_address = db.Column(db.String(128), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     deleted_at = db.Column(db.DateTime, nullable=True)  # 软删除标记
@@ -113,17 +113,17 @@ class Asset(db.Model):
 
     @validates('owner_address')
     def validate_owner_address(self, key, value):
-        # 修改验证规则，同时接受以太坊地址和 Solana 地址
+        # 修改验证规则，接受更长的Solana地址
         if not (re.match(r'^0x[a-fA-F0-9]{40}$', value) or    # 以太坊地址格式
-               re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$', value)):  # Solana 地址格式
+               re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,126}$', value)):  # Solana 地址格式(最长126个字符)
             raise ValueError('无效的所有者地址格式')
         return value
 
     @validates('creator_address')
     def validate_creator_address(self, key, value):
-        # 修改验证规则，同时接受以太坊地址和 Solana 地址
+        # 修改验证规则，接受更长的Solana地址
         if not (re.match(r'^0x[a-fA-F0-9]{40}$', value) or    # 以太坊地址格式
-               re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$', value)):  # Solana 地址格式
+               re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,126}$', value)):  # Solana 地址格式(最长126个字符)
             raise ValueError('无效的创建者地址格式')
         return value
 
