@@ -1,7 +1,14 @@
-from flask import jsonify, request, g, current_app, session, Blueprint, make_response, redirect, url_for, Response
-from app.models.user import User, is_same_wallet_address
-from app.models.asset import Asset, AssetStatus, AssetType
+from flask import (
+    Blueprint, jsonify, request, current_app, 
+    send_from_directory, url_for, redirect, g, session, make_response, Response
+)
+from flask_cors import cross_origin
+from app.models.asset import Asset, AssetType, AssetStatus
 from app.models.trade import Trade, TradeStatus
+from app.models.user import User, is_same_wallet_address
+from app.models.dividend_record import DividendRecord
+from app.models.short_link import ShortLink
+from sqlalchemy import desc, func
 from app.extensions import db, limiter
 from app.utils.decorators import token_required, eth_address_required, api_eth_address_required, task_background, admin_required
 from .admin import is_admin, get_admin_info
@@ -30,7 +37,6 @@ from sqlalchemy import desc, or_, and_, func, text
 # from ..models.history_trade import HistoryTrade
 # from ..models.notice import Notice
 from app.models.referral import UserReferral, CommissionRecord, DistributionSetting
-from app.models import ShortLink
 
 api_bp = Blueprint('api', __name__)
 
@@ -894,6 +900,20 @@ def get_dividend_stats_by_symbol(token_symbol):
         tokens_sold = 0
         if asset.token_supply is not None and asset.remaining_supply is not None:
             tokens_sold = asset.token_supply - asset.remaining_supply
+        elif asset.token_supply is not None:
+            # 当remaining_supply不可用时，尝试从交易记录计算
+            try:
+                from app.models.trade import Trade
+                # 统计所有已完成的购买交易总量
+                buy_trades_total = db.session.query(func.sum(Trade.amount))\
+                    .filter(Trade.asset_id == asset.id, 
+                            Trade.type == 'buy',
+                            Trade.status == 'completed')\
+                    .scalar() or 0
+                tokens_sold = buy_trades_total
+            except Exception as e:
+                current_app.logger.error(f"计算已售出代币时出错: {str(e)}")
+                tokens_sold = 0
         
         data = {
             'count': dividend_count,  # 分红次数
