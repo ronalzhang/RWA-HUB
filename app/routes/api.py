@@ -241,8 +241,43 @@ def create_asset():
         data['creator_address'] = wallet_address
         data['owner_address'] = wallet_address
         
+        # 检查是否有支付交易哈希
+        has_payment = 'payment_tx_hash' in data and data['payment_tx_hash']
+        
         # 设置初始状态
-        data['status'] = AssetStatus.APPROVED.value  # 直接设置为已审核状态，模拟已上链
+        if 'status' in data and isinstance(data['status'], int):
+            # 使用前端传入的状态
+            data['status'] = data['status']
+            current_app.logger.info(f"使用前端传入的资产状态: {data['status']}")
+        else:
+            # 根据是否有支付交易设置状态
+            if has_payment:
+                # 有支付信息但需要等待确认
+                data['status'] = AssetStatus.PENDING.value
+                current_app.logger.info("设置资产状态为待确认")
+            else:
+                # 没有支付信息，直接设置为已通过（仅用于测试环境）
+                data['status'] = AssetStatus.APPROVED.value
+                current_app.logger.info("设置资产状态为已通过（测试模式）")
+        
+        # 如果有支付信息，记录到payment_details
+        if has_payment:
+            payment_info = {
+                'tx_hash': data['payment_tx_hash'],
+                'platform_address': data.get('platform_address', ''),
+                'status': data.get('payment_status', 'pending'),
+                'created_at': datetime.utcnow().isoformat()
+            }
+            data['payment_details'] = json.dumps(payment_info)
+            data['payment_confirmed'] = False  # 默认为未确认
+            
+            # 从data中移除非模型字段
+            if 'payment_tx_hash' in data:
+                del data['payment_tx_hash']
+            if 'payment_status' in data:
+                del data['payment_status']
+            if 'platform_address' in data:
+                del data['platform_address']
         
         # 处理token_symbol
         if 'token_symbol' not in data:
@@ -2004,3 +2039,82 @@ def get_user_assets():
         current_app.logger.error(f'获取用户资产失败: {str(e)}', exc_info=True)
         # 返回空数组和200状态码，而不是500错误
         return jsonify([]), 200
+
+@api_bp.route('/payments/register_pending', methods=['POST'])
+@eth_address_required
+def register_pending_payment():
+    """
+    注册待确认的支付交易
+    该API允许前端在创建资产后注册一个待确认的支付交易，系统将异步处理确认
+    """
+    try:
+        # 检查钱包连接状态
+        if not g.eth_address:
+            return jsonify({'success': False, 'error': '请先连接钱包'}), 401
+            
+        # 获取请求数据
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '无效的请求数据'}), 400
+            
+        # 检查必要字段
+        required_fields = ['asset_id', 'tx_hash', 'platform_address']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'error': f'缺少必要字段: {field}'}), 400
+                
+        # 获取资产
+        asset_id = data.get('asset_id')
+        tx_hash = data.get('tx_hash')
+        platform_address = data.get('platform_address')
+        
+        # 查询资产
+        from app.models.asset import Asset
+        asset = Asset.query.get(asset_id)
+        if not asset:
+            return jsonify({'success': False, 'error': f'资产不存在: {asset_id}'}), 404
+            
+        # 验证资产所有者
+        if asset.creator_address != g.eth_address:
+            current_app.logger.warning(f"非资产创建者尝试注册支付交易: {g.eth_address}, 资产ID: {asset_id}")
+            return jsonify({'success': False, 'error': '只有资产创建者可以注册支付交易'}), 403
+            
+        # 记录支付信息
+        payment_info = {
+            'tx_hash': tx_hash,
+            'platform_address': platform_address,
+            'status': 'pending',
+            'registered_at': datetime.utcnow().isoformat(),
+            'registered_by': g.eth_address
+        }
+        
+        # 更新资产支付信息
+        asset.payment_details = json.dumps(payment_info)
+        asset.payment_confirmed = False  # 尚未确认
+        
+        # 保存到数据库
+        db.session.commit()
+        
+        # 触发异步任务检查交易（如果有后台任务系统）
+        try:
+            # 这里可以调用异步任务系统，如Celery或其他
+            current_app.logger.info(f"注册异步任务检查交易: {tx_hash}")
+            # 例如: tasks.check_transaction_status.delay(asset_id, tx_hash)
+            
+            # 记录日志
+            current_app.logger.info(f"已注册待确认的支付交易: 资产ID={asset_id}, 交易哈希={tx_hash}")
+        except Exception as e:
+            current_app.logger.error(f"触发异步任务失败: {str(e)}")
+            # 继续执行，不影响主流程
+        
+        return jsonify({
+            'success': True,
+            'message': '支付交易已注册，系统将异步处理确认',
+            'asset_id': asset_id,
+            'tx_hash': tx_hash
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"注册待确认支付交易失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'注册支付交易失败: {str(e)}'}), 500
