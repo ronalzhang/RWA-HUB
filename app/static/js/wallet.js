@@ -2565,7 +2565,7 @@ async connectPhantom(isReconnect = false) {
         this.updateUI();
         
         // 获取余额
-        this.getBalance();
+        this.getWalletBalance();
         
         // 检查是否为管理员并更新状态
         this.checkIsAdmin().then(isAdmin => {
