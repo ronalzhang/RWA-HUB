@@ -2517,7 +2517,8 @@ async connectPhantom(isReconnect = false) {
             const txResponse = await fetch('/api/solana/create_transfer_transaction', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-Eth-Address': fromAddress // 添加钱包地址到请求头
                 },
                 body: JSON.stringify({
                     token_symbol: tokenSymbol,
