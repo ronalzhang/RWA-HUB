@@ -1344,23 +1344,7 @@ async function processPayment() {
             const publishingFee = document.getElementById('publishingFee').textContent;
             const feeAmount = parseFloat(publishingFee) || 1.0; // 默认1.0 USDC
             
-            // 检查钱包余额
-            let walletBalance = 0;
-            if (window.walletState && typeof window.walletState.balance !== 'undefined') {
-                walletBalance = parseFloat(window.walletState.balance);
-            } else if (typeof window.getWalletBalance === 'function') {
-                walletBalance = await window.getWalletBalance();
-            }
-            
-            if (walletBalance < feeAmount) {
-                hideLoadingState();
-                resolve({
-                    success: false,
-                    error: `余额不足: 需要 ${feeAmount} USDC，但钱包只有 ${walletBalance} USDC`
-                });
-                return;
-            }
-            
+            // 不再检查钱包余额，直接执行转账
             console.log(`准备支付 ${feeAmount} USDC 到平台地址: ${platformAddress}`);
             
             // 尝试执行转账
@@ -1368,7 +1352,7 @@ async function processPayment() {
                 // 更新进度
                 updateProgress(40, '正在处理USDC转账...');
                 
-                // 如果钱包API可用，使用真实交易
+                // 使用钱包API执行真实交易
                 if (window.walletState && typeof window.walletState.transferToken === 'function') {
                     console.log('使用钱包API执行USDC转账');
                     const result = await window.walletState.transferToken('USDC', platformAddress, feeAmount);
@@ -1384,21 +1368,8 @@ async function processPayment() {
                         throw new Error('转账失败: ' + (result.error || '未知错误'));
                     }
                 } else {
-                    // 模拟支付过程 - 用于开发测试
-                    console.warn('钱包API不可用，使用模拟支付');
-                    
-                    setTimeout(() => {
-                        hideLoadingState();
-                        
-                        // 模拟一个成功的交易
-                        const mockTxHash = '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
-                        console.log('模拟支付成功，交易哈希:', mockTxHash);
-                        
-                        resolve({
-                            success: true,
-                            txHash: mockTxHash
-                        });
-                    }, 2000);
+                    // 钱包API不可用，返回错误
+                    throw new Error('钱包API不可用，无法执行转账');
                 }
             } catch (error) {
                 console.error('转账过程出错:', error);
@@ -1416,7 +1387,7 @@ async function processPayment() {
     });
 }
 
-// 处理资产创建逻辑 - 付款成功后调用API创建资产
+// 处理资产创建逻辑 - 付款后立即创建资产，不等待交易确认
 async function processAssetCreation(formData, txHash) {
     try {
         console.log('开始创建资产...');
@@ -1424,31 +1395,7 @@ async function processAssetCreation(formData, txHash) {
         disablePublishButtons(true);
         
         // 更新进度
-        updateProgress(50, '验证支付交易...');
-        
-        // 首先验证支付交易是否已确认
-        try {
-            // 这里应该调用后端API验证交易
-            console.log('验证支付交易哈希:', txHash);
-            
-            // 在实际应用中，应该调用后端API验证交易
-            // const verifyResponse = await fetch('/api/payments/verify', {
-            //     method: 'POST',
-            //     headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify({ txHash })
-            // });
-            // 
-            // const verifyResult = await verifyResponse.json();
-            // if (!verifyResponse.ok || !verifyResult.verified) {
-            //     throw new Error('支付验证失败: ' + (verifyResult.error || '未知错误'));
-            // }
-            
-            // 假设验证成功
-            console.log('支付验证成功，继续创建资产');
-        } catch (error) {
-            console.error('支付验证错误:', error);
-            // 继续流程，不中断，在实际应用中可能需要中断
-        }
+        updateProgress(50, '准备资产数据...');
         
         // 验证token_symbol是否已存在
         let tokenSymbol = formData.token_symbol;
@@ -1476,10 +1423,12 @@ async function processAssetCreation(formData, txHash) {
         // 更新进度
         updateProgress(70, '准备资产数据...');
         
-        // 构建请求数据
+        // 构建请求数据，将状态初始设置为PENDING(1)
         const requestData = {
             ...formData,
+            status: 1, // PENDING状态
             payment_tx_hash: txHash,
+            payment_status: 'pending', // 支付状态为待确认
             platform_address: 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd', // 平台收款地址，用于后端二次验证
             images: uploadedImages.map(file => file.url || ''),
             documents: uploadedDocuments.map(file => {
@@ -1511,6 +1460,31 @@ async function processAssetCreation(formData, txHash) {
         }
         
         console.log('资产创建成功:', createResult);
+        
+        // 提交交易确认任务到后端，异步处理
+        try {
+            const confirmResponse = await fetch('/api/payments/register_pending', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    asset_id: createResult.asset_id,
+                    tx_hash: txHash,
+                    platform_address: 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd'
+                })
+            });
+            
+            const confirmResult = await confirmResponse.json();
+            if (confirmResponse.ok && confirmResult.success) {
+                console.log('交易确认任务已注册:', confirmResult);
+            } else {
+                console.warn('交易确认任务注册失败:', confirmResult.error || '未知错误');
+            }
+        } catch (error) {
+            console.error('注册交易确认任务出错:', error);
+            // 继续执行，不影响用户体验
+        }
         
         // 更新进度
         updateProgress(100, '资产创建完成!');
