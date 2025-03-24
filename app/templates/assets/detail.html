@@ -354,11 +354,16 @@
                         return;
                     }
                     
+                    // 直接检查walletState中的isAdmin状态
+                    const isWalletAdmin = window.walletState.isAdmin === true;
+                    console.log('钱包状态中的管理员状态:', isWalletAdmin);
+                    
                     // 打印当前钱包状态，帮助调试
                     console.log('当前钱包状态:', {
                         isConnected: window.walletState.isConnected,
                         connected: window.walletState.connected,
-                        address: window.walletState.address ? window.walletState.address.substring(0, 10) + '...' : 'none'
+                        address: window.walletState.address ? window.walletState.address.substring(0, 10) + '...' : 'none',
+                        isAdmin: window.walletState.isAdmin
                     });
                     
                     // 前端渲染时的权限判断
@@ -370,6 +375,31 @@
                     // 如果当前地址不匹配模板渲染时的地址，需要重新检查权限
                     const currentAddress = '{{ current_user_address|default("", true) }}';
                     const connectedAddress = window.walletState.address;
+                    
+                    // 如果wallet中已经确认是管理员，直接显示分红按钮
+                    if (isWalletAdmin) {
+                        console.log('钱包状态确认用户是管理员，显示分红管理按钮');
+                        const walletAddress = window.walletState.address;
+                        const dividendUrl = `/assets/${ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${walletAddress}`;
+                        
+                        // 更新所有按钮
+                        dividendBtns.forEach(btn => {
+                            if (btn) {
+                                btn.href = dividendUrl;
+                                // 根据按钮类型设置不同的显示样式
+                                if (btn.id === 'dividendManagementBtn') {
+                                    btn.style.display = 'inline-flex';
+                                } else if (btn.id === 'dividendManagementBtnMobile') {
+                                    btn.style.display = 'block';
+                                } else if (btn.id === 'dividendManagementBtnMedium') {
+                                    btn.style.display = 'block';
+                                }
+                            }
+                        });
+                        
+                        console.log('已显示所有分红管理按钮');
+                        return;
+                    }
                     
                     if (currentAddress.toLowerCase() !== connectedAddress.toLowerCase()) {
                         console.log(`地址不匹配: 模板=${currentAddress}, 当前连接=${connectedAddress}`);
