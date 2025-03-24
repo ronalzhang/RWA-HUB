@@ -2301,3 +2301,258 @@ def send_solana_transaction():
     except Exception as e:
         current_app.logger.error(f"处理交易请求失败: {str(e)}")
         return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
+
+@api_bp.route('/solana/get_latest_blockhash', methods=['GET'])
+@eth_address_required
+def get_latest_blockhash():
+    """获取Solana最新区块哈希，用于构建交易"""
+    try:
+        # 检查钱包连接状态
+        if not g.eth_address:
+            return jsonify({'success': False, 'error': '请先连接钱包'}), 401
+            
+        # 记录请求信息
+        current_app.logger.info(f"获取最新区块哈希请求 - 用户: {g.eth_address}")
+        
+        # 使用Solana客户端获取最新区块哈希
+        from app.utils.solana_compat.connection import Connection
+        
+        try:
+            # 创建连接对象
+            connection = Connection("https://api.mainnet-beta.solana.com")
+            
+            # 获取最新区块哈希
+            blockhash_data = connection.get_recent_blockhash()
+            
+            # 检查返回结果
+            if "error" in blockhash_data:
+                raise Exception(f"获取区块哈希失败: {blockhash_data.get('error')}")
+            
+            if "result" not in blockhash_data:
+                raise Exception("返回结果缺少区块哈希数据")
+            
+            # 从结果中提取区块哈希
+            blockhash = blockhash_data.get("result", {}).get("value", {}).get("blockhash")
+            if not blockhash:
+                raise Exception("无法获取有效的区块哈希")
+            
+            # 记录成功信息
+            current_app.logger.info(f"成功获取最新区块哈希: {blockhash}")
+            
+            # 返回成功结果
+            return jsonify({
+                'success': True,
+                'blockhash': blockhash,
+                'message': '成功获取最新区块哈希'
+            })
+            
+        except Exception as connection_error:
+            current_app.logger.error(f"与Solana网络通信失败: {str(connection_error)}")
+            return jsonify({'success': False, 'error': f'与Solana网络通信失败: {str(connection_error)}'}), 500
+        
+    except Exception as e:
+        current_app.logger.error(f"处理区块哈希请求失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
+
+
+@api_bp.route('/solana/get_transfer_params', methods=['POST'])
+@eth_address_required
+def get_transfer_params():
+    """
+    获取转账交易所需的参数
+    返回交易数据和消息，用于钱包签名
+    """
+    try:
+        # 检查钱包连接状态
+        if not g.eth_address:
+            return jsonify({'success': False, 'error': '请先连接钱包'}), 401
+            
+        # 获取请求数据
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '无效的请求数据'}), 400
+            
+        # 检查必要字段
+        required_fields = ['token_symbol', 'to_address', 'amount', 'blockhash']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'error': f'缺少必要字段: {field}'}), 400
+                
+        token_symbol = data.get('token_symbol')
+        to_address = data.get('to_address')
+        amount = float(data.get('amount'))
+        blockhash = data.get('blockhash')
+        from_address = g.eth_address
+        
+        # 记录请求信息
+        current_app.logger.info(f"获取转账参数 - 用户: {from_address}, 代币: {token_symbol}, 接收方: {to_address}, 金额: {amount}")
+        
+        # 获取交易参数和消息
+        from app.blockchain.solana_service import prepare_transfer_transaction
+        
+        try:
+            transaction_data, message_data = prepare_transfer_transaction(
+                token_symbol=token_symbol,
+                from_address=from_address,
+                to_address=to_address,
+                amount=amount,
+                blockhash=blockhash
+            )
+            
+            # 检查返回结果
+            if not transaction_data or not message_data:
+                raise Exception("无法创建有效的交易数据")
+            
+            # 转换为Base64格式
+            import base64
+            transaction_base64 = base64.b64encode(transaction_data).decode('ascii')
+            message_base64 = base64.b64encode(message_data).decode('ascii')
+            
+            # 记录成功信息
+            current_app.logger.info(f"成功生成转账参数 - 用户: {from_address}")
+            
+            # 返回成功结果
+            return jsonify({
+                'success': True,
+                'transaction': transaction_base64,
+                'message': message_base64,
+                'message': '成功生成转账参数'
+            })
+            
+        except Exception as prepare_error:
+            current_app.logger.error(f"准备交易数据失败: {str(prepare_error)}")
+            return jsonify({'success': False, 'error': f'准备交易数据失败: {str(prepare_error)}'}), 500
+        
+    except Exception as e:
+        current_app.logger.error(f"处理转账参数请求失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
+
+
+@api_bp.route('/solana/send_signed_transaction', methods=['POST'])
+@eth_address_required
+def send_signed_transaction():
+    """
+    发送已签名的交易
+    接收前端传来的已签名交易和签名数据，将其组合并发送到Solana网络
+    """
+    try:
+        # 检查钱包连接状态
+        if not g.eth_address:
+            return jsonify({'success': False, 'error': '请先连接钱包'}), 401
+            
+        # 获取请求数据
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '无效的请求数据'}), 400
+            
+        # 检查必要字段
+        required_fields = ['transaction', 'signature', 'public_key']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'error': f'缺少必要字段: {field}'}), 400
+                
+        transaction_base64 = data.get('transaction')
+        signature_base64 = data.get('signature')
+        public_key = data.get('public_key')
+        
+        # 记录请求信息
+        current_app.logger.info(f"发送已签名交易 - 用户: {g.eth_address}, 公钥: {public_key}")
+        
+        # 使用Solana客户端组合并发送交易
+        from app.blockchain.solana_service import send_transaction_with_signature
+        
+        try:
+            # 解码Base64数据
+            import base64
+            transaction_data = base64.b64decode(transaction_base64)
+            signature_data = base64.b64decode(signature_base64)
+            
+            # 发送交易
+            signature = send_transaction_with_signature(
+                transaction_data=transaction_data,
+                signature_data=signature_data,
+                public_key=public_key
+            )
+            
+            # 记录成功信息
+            current_app.logger.info(f"交易发送成功，签名: {signature}")
+            
+            # 返回成功结果
+            return jsonify({
+                'success': True,
+                'signature': signature,
+                'message': '交易已发送至Solana网络'
+            })
+            
+        except Exception as send_error:
+            current_app.logger.error(f"发送交易失败: {str(send_error)}")
+            return jsonify({'success': False, 'error': f'发送交易失败: {str(send_error)}'}), 500
+        
+    except Exception as e:
+        current_app.logger.error(f"处理交易请求失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
+
+
+@api_bp.route('/solana/execute_transfer', methods=['POST'])
+@eth_address_required
+def execute_transfer():
+    """
+    执行Solana转账的备用方法
+    该方法在服务器端完成大部分工作，最小化对钱包API的依赖
+    """
+    try:
+        # 检查钱包连接状态
+        if not g.eth_address:
+            return jsonify({'success': False, 'error': '请先连接钱包'}), 401
+            
+        # 获取请求数据
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '无效的请求数据'}), 400
+            
+        # 检查必要字段
+        required_fields = ['token_symbol', 'to_address', 'amount', 'from_address']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'error': f'缺少必要字段: {field}'}), 400
+                
+        token_symbol = data.get('token_symbol')
+        to_address = data.get('to_address')
+        amount = float(data.get('amount'))
+        from_address = data.get('from_address')
+        
+        # 验证发送方地址匹配已连接的钱包地址
+        if from_address != g.eth_address:
+            return jsonify({'success': False, 'error': '发送方地址与连接的钱包不匹配'}), 403
+        
+        # 记录请求信息
+        current_app.logger.info(f"执行备用模式转账 - 用户: {from_address}, 代币: {token_symbol}, 接收方: {to_address}, 金额: {amount}")
+        
+        # 执行转账
+        from app.blockchain.solana_service import execute_backup_transfer
+        
+        try:
+            signature = execute_backup_transfer(
+                token_symbol=token_symbol,
+                from_address=from_address,
+                to_address=to_address,
+                amount=amount
+            )
+            
+            # 记录成功信息
+            current_app.logger.info(f"备用模式转账成功，签名: {signature}")
+            
+            # 返回成功结果
+            return jsonify({
+                'success': True,
+                'signature': signature,
+                'message': '转账交易已执行'
+            })
+            
+        except Exception as transfer_error:
+            current_app.logger.error(f"备用模式转账失败: {str(transfer_error)}")
+            return jsonify({'success': False, 'error': f'转账失败: {str(transfer_error)}'}), 500
+        
+    except Exception as e:
+        current_app.logger.error(f"处理备用转账请求失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
