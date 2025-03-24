@@ -1449,6 +1449,8 @@ async function processAssetCreation(formData, txHash) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-Eth-Address': window.walletState.getAddress() || '',
+                'X-Wallet-Type': window.walletState.getWalletType() || ''
             },
             body: JSON.stringify(requestData)
         });
@@ -1467,6 +1469,8 @@ async function processAssetCreation(formData, txHash) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-Eth-Address': window.walletState.getAddress() || '',
+                    'X-Wallet-Type': window.walletState.getWalletType() || ''
                 },
                 body: JSON.stringify({
                     asset_id: createResult.asset_id,
