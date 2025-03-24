@@ -168,7 +168,7 @@ def asset_detail_by_symbol(token_symbol):
         
         # 检查是否是管理员
         is_admin_user = is_admin(current_user_address) if current_user_address else False
-        current_app.logger.info(f'是否是管理员: {is_admin_user}')
+        current_app.logger.info(f'是否是管理员: {is_admin_user}, 地址: {current_user_address}')
         
         # 检查是否是资产所有者
         is_owner = False
@@ -181,7 +181,7 @@ def asset_detail_by_symbol(token_symbol):
                 # SOL地址比较（区分大小写）
                 is_owner = current_user_address == asset.owner_address
             
-            current_app.logger.info(f'是否是资产所有者: {is_owner}')
+            current_app.logger.info(f'是否是资产所有者: {is_owner}, 用户地址: {current_user_address}, 资产所有者地址: {asset.owner_address}')
         
         # 计算剩余供应量
         if asset.remaining_supply is not None:
