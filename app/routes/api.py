@@ -4,7 +4,7 @@ from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.trade import Trade, TradeStatus
 from app.extensions import db, limiter
 from app.utils.decorators import token_required, eth_address_required, api_eth_address_required, task_background, admin_required
-from .admin import is_admin
+from .admin import is_admin, get_admin_info
 import os
 import json
 from werkzeug.utils import secure_filename
@@ -1160,29 +1160,74 @@ def get_wallet_balance():
         current_app.logger.error(f'获取钱包余额失败: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': f'获取钱包余额失败: {str(e)}'}), 500
 
-@api_bp.route('/user/check_admin', methods=['GET'])
-def check_user_admin():
-    """检查用户是否是管理员"""
-    address = request.args.get('address')
-    wallet_type = request.args.get('wallet_type', 'ethereum')
-    
-    if not address:
-        return jsonify({'success': False, 'error': '缺少钱包地址'}), 400
-    
-    current_app.logger.info(f'检查用户管理员权限 - 地址: {address}, 类型: {wallet_type}')
-    
+@api_bp.route('/user/check_admin')
+def check_if_admin():
+    """
+    检查用户是否是管理员
+    支持通过URL参数或头部获取地址
+    """
     try:
-        # 检查是否是管理员
-        is_admin_user = is_admin_address(address)
+        # 从多个来源获取地址
+        eth_address = None
+        wallet_type = request.args.get('wallet_type', 'ethereum')
         
-        # 返回检查结果
+        # 尝试从请求参数获取
+        if request.args.get('address'):
+            eth_address = request.args.get('address')
+            current_app.logger.info(f'从URL参数获取地址: {eth_address}')
+            
+        # 尝试从请求头获取
+        if not eth_address and request.headers.get('X-Eth-Address'):
+            eth_address = request.headers.get('X-Eth-Address')
+            current_app.logger.info(f'从请求头获取地址: {eth_address}')
+            
+        # 尝试从Cookie获取
+        if not eth_address and request.cookies.get('eth_address'):
+            eth_address = request.cookies.get('eth_address')
+            current_app.logger.info(f'从Cookie获取地址: {eth_address}')
+            
+        # 尝试从g对象获取
+        if not eth_address and hasattr(g, 'eth_address'):
+            eth_address = g.eth_address
+            current_app.logger.info(f'从g对象获取地址: {eth_address}')
+        
+        # 如果没有找到地址
+        if not eth_address:
+            current_app.logger.warning('未找到钱包地址')
+            return jsonify({
+                'success': False,
+                'is_admin': False,
+                'admin': False,
+                'message': '未提供钱包地址'
+            })
+            
+        # 检查是否是管理员
+        admin_status = is_admin(eth_address)
+        
+        # 如果是管理员，获取更多信息
+        admin_info = None
+        if admin_status:
+            admin_info = get_admin_info(eth_address)
+            
+        # 记录结果
+        current_app.logger.info(f'地址 {eth_address} 管理员状态: {admin_status}')
+            
         return jsonify({
             'success': True,
-            'is_admin': is_admin_user
-        }), 200
+            'is_admin': admin_status,
+            'admin': admin_status,  # 保持兼容
+            'wallet_type': wallet_type,
+            'address': eth_address,
+            'admin_info': admin_info
+        })
     except Exception as e:
-        current_app.logger.error(f'检查管理员权限失败: {str(e)}', exc_info=True)
-        return jsonify({'success': False, 'error': f'检查管理员权限失败: {str(e)}'}), 500
+        current_app.logger.error(f'检查管理员状态时出错: {str(e)}')
+        return jsonify({
+            'success': False,
+            'is_admin': False,
+            'admin': False,
+            'message': f'检查管理员状态时出错: {str(e)}'
+        })
 
 # 修改现有的获取用户资产API，支持查询参数
 @api_bp.route('/user/assets', methods=['GET'])
