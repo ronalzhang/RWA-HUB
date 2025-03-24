@@ -2483,7 +2483,7 @@ async connectPhantom(isReconnect = false) {
      */
     async transferSolanaToken(tokenSymbol, to, amount) {
         try {
-            console.log('使用Phantom钱包转账');
+            console.log('使用Phantom钱包执行真实转账');
             
             // 检查Phantom钱包
             if (!window.solana || !window.solana.isPhantom) {
@@ -2506,70 +2506,56 @@ async connectPhantom(isReconnect = false) {
                 throw new Error('无效的转账金额');
             }
             
-            // USDC代币地址 - Solana主网
-            // 注意：这是一个示例地址，实际使用时应该根据环境配置获取正确的地址
-            const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+            console.log(`准备转账 ${amount} ${tokenSymbol} 到 ${to}`);
             
-            // 确定转账数量（考虑代币小数位）
-            // USDC 在 Solana 上是 6 个小数位
-            const decimals = 6;
-            const adjustedAmount = amount * Math.pow(10, decimals);
-            
-            console.log(`准备转账 ${adjustedAmount} (原始: ${amount}) USDC 到 ${to}`);
-            
-            // 获取用户公钥
+            // 获取当前用户的公钥
             const fromAddress = window.solana.publicKey.toString();
             console.log(`从地址: ${fromAddress}`);
             
-            try {
-                // 由于我们只是在前端模拟，这里直接调用Phantom钱包的转账功能
-                // 在实际环境中，应该通过后端API构建完整的交易
-                
-                // 模拟一个成功的交易
-                // 注意：在生产环境中，这里应该通过后端API获取实际交易
-                const mockSignature = `sim${Date.now()}${Math.random().toString(16).substring(2, 10)}`;
-                console.log('模拟交易签名:', mockSignature);
-                
-                return {
-                    success: true,
-                    txHash: mockSignature
-                };
-                
-                /* 实际代码应该类似于：
-                // 创建转账交易
-                const transaction = await this.createSolanaTransferTransaction(
-                    USDC_MINT, 
-                    to, 
-                    Math.floor(adjustedAmount)
-                );
-                
-                // 在发送交易前记录一些信息
-                console.log('准备发送交易:', {
-                    from: fromAddress,
-                    to: to,
-                    amount: adjustedAmount,
-                    transaction: transaction
-                });
-                
-                // 发送交易
-                const { signature } = await window.solana.signAndSendTransaction(transaction);
-                console.log('交易已发送，签名:', signature);
-                
-                // 返回成功结果
-                return {
-                    success: true,
-                    txHash: signature
-                };
-                */
-            } catch (txError) {
-                console.error('交易执行失败:', txError);
-                console.log('错误详情:', {
-                    message: txError.message,
-                    stack: txError.stack,
-                    name: txError.name
-                });
-                throw new Error(`交易执行失败: ${txError.message}`);
+            // 调用后端API创建交易
+            console.log('从后端获取交易数据...');
+            const txResponse = await fetch('/api/solana/create_transfer_transaction', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    token_symbol: tokenSymbol,
+                    to_address: to,
+                    amount: amount
+                })
+            });
+            
+            if (!txResponse.ok) {
+                const errorData = await txResponse.json();
+                throw new Error(`获取交易数据失败: ${errorData.error || txResponse.statusText}`);
             }
+            
+            const txData = await txResponse.json();
+            
+            if (!txData.success || !txData.transaction) {
+                throw new Error(`创建交易失败: ${txData.error || '未知错误'}`);
+            }
+            
+            console.log('成功获取交易数据:', txData.message);
+            
+            // 将Base64编码的交易数据转换为Uint8Array
+            const serializedTransaction = Uint8Array.from(atob(txData.transaction), c => c.charCodeAt(0));
+            
+            // 使用Phantom钱包签名并发送交易
+            console.log('使用Phantom钱包签名并发送交易...');
+            const { signature } = await window.solana.signAndSendTransaction({
+                data: serializedTransaction
+            });
+            
+            console.log('交易已发送，签名:', signature);
+            
+            // 返回成功结果
+            return {
+                success: true,
+                txHash: signature
+            };
+            
         } catch (error) {
             console.error('Solana转账失败:', error);
             return {
@@ -2577,30 +2563,6 @@ async connectPhantom(isReconnect = false) {
                 error: error.message || 'Solana转账失败'
             };
         }
-    },
-    
-    /**
-     * 创建Solana转账交易
-     * @param {string} tokenMint 代币铸造地址
-     * @param {string} to 接收地址
-     * @param {number} amount 转账数量（已调整小数位）
-     * @returns {Promise<Object>} 交易对象
-     */
-    async createSolanaTransferTransaction(tokenMint, to, amount) {
-        // 实际环境中，这里应该调用后端API创建交易，
-        // 然后返回给前端签名。为简化实现，这里直接模拟一个交易对象
-        console.log(`模拟创建Solana转账交易: ${amount} tokens 到 ${to}`);
-        
-        // 模拟延迟以模拟API调用
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // 返回一个模拟的交易对象
-        // 实际应用中，这应该是一个真实的Solana交易
-        return {
-            serialize() {
-                return new Uint8Array(32); // 模拟序列化数据
-            }
-        };
     },
     
     /**
