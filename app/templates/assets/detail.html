@@ -2029,13 +2029,7 @@
                                 </div>
                             </div>
                     
-                    {% if is_owner or is_admin_user %}
-                    <div class="text-center mt-3">
-                        <a id="dividendManagementBtn" href="/assets/{{ asset.token_symbol }}/dividend" class="btn btn-outline-primary" style="display: none;">
-                            <i class="fas fa-money-bill-wave me-2"></i>{{ _('Manage Dividends') }}
-                        </a>
-                                </div>
-                    {% endif %}
+                    <!-- 分红管理按钮 - 已移到上方按钮组，此处删除 -->
                             </div>
                                 </div>
                             </div>
@@ -2488,25 +2482,94 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 1. 修复分红管理按钮显示问题 - 直接强制显示
                 function fixDividendButton() {
                     console.log('正在修复分红管理按钮...');
-                    const dividendBtn = document.getElementById('dividendManagementBtn');
-                    const dividendBtnMobile = document.getElementById('dividendManagementBtnMobile');
-                    const dividendBtnMedium = document.getElementById('dividendManagementBtnMedium');
                     
-                    if (dividendBtn) {
+                    // 检查常规按钮
+                    let dividendBtn = document.getElementById('dividendManagementBtn');
+                    let dividendBtnMobile = document.getElementById('dividendManagementBtnMobile');
+                    let dividendBtnMedium = document.getElementById('dividendManagementBtnMedium');
+                    
+                    // 检查分红按钮是否存在，如果不存在则创建
+                    if (!dividendBtn) {
+                        console.log('分红管理按钮不存在，尝试创建...');
+                        
+                        // 获取资产符号和顶部按钮容器
+                        const tokenSymbol = ASSET_CONFIG?.tokenSymbol || "{{ asset.token_symbol }}";
+                        const buttonContainer = document.querySelector('.d-flex.align-items-center.gap-2');
+                        
+                        if (buttonContainer) {
+                            // 创建分红管理按钮
+                            dividendBtn = document.createElement('a');
+                            dividendBtn.id = 'dividendManagementBtn';
+                            dividendBtn.href = `/assets/${tokenSymbol}/dividend`;
+                            dividendBtn.className = 'btn btn-outline-primary';
+                            dividendBtn.innerHTML = '<i class="fas fa-coins me-2"></i>{{ _("Dividend Management") }}';
+                            
+                            // 添加到容器中
+                            buttonContainer.appendChild(dividendBtn);
+                            console.log('成功创建分红管理按钮');
+                        }
+                    }
+                    
                     // 确保按钮可见
-                    dividendBtn.style.display = '';
+                    if (dividendBtn) {
+                        dividendBtn.style.display = 'inline-flex';
+                        console.log('已设置分红管理按钮可见');
                     } else {
                         console.warn('未找到分红管理按钮');
                     }
                     
-                    if (dividendBtnMobile) {
-                        // 确保移动端按钮可见
-                        dividendBtnMobile.style.display = '';
+                    // 检查移动端按钮
+                    if (!dividendBtnMobile) {
+                        console.log('移动端分红管理按钮不存在，尝试创建...');
+                        
+                        const tokenSymbol = ASSET_CONFIG?.tokenSymbol || "{{ asset.token_symbol }}";
+                        const mobileButtonContainer = document.querySelector('.d-flex.gap-2');
+                        
+                        if (mobileButtonContainer) {
+                            // 创建移动端分红管理按钮
+                            dividendBtnMobile = document.createElement('a');
+                            dividendBtnMobile.id = 'dividendManagementBtnMobile';
+                            dividendBtnMobile.href = `/assets/${tokenSymbol}/dividend`;
+                            dividendBtnMobile.className = 'btn btn-sm btn-outline-primary d-md-none d-block';
+                            dividendBtnMobile.innerHTML = '<i class="fas fa-coins me-2"></i>{{ _("Dividend") }}';
+                            
+                            // 添加到容器中
+                            mobileButtonContainer.appendChild(dividendBtnMobile);
+                            console.log('成功创建移动端分红管理按钮');
+                        }
                     }
                     
+                    // 确保移动端按钮可见
+                    if (dividendBtnMobile) {
+                        dividendBtnMobile.style.display = 'block';
+                        console.log('已设置移动端分红管理按钮可见');
+                    }
+                    
+                    // 检查中屏按钮
+                    if (!dividendBtnMedium) {
+                        console.log('中屏分红管理按钮不存在，尝试创建...');
+                        
+                        const tokenSymbol = ASSET_CONFIG?.tokenSymbol || "{{ asset.token_symbol }}";
+                        const mediumButtonContainer = document.querySelector('.d-flex.gap-2');
+                        
+                        if (mediumButtonContainer) {
+                            // 创建中屏分红管理按钮
+                            dividendBtnMedium = document.createElement('a');
+                            dividendBtnMedium.id = 'dividendManagementBtnMedium';
+                            dividendBtnMedium.href = `/assets/${tokenSymbol}/dividend`;
+                            dividendBtnMedium.className = 'btn btn-outline-primary d-none d-md-block d-lg-none';
+                            dividendBtnMedium.innerHTML = '<i class="fas fa-coins me-2"></i>{{ _("Dividend Management") }}';
+                            
+                            // 添加到容器中
+                            mediumButtonContainer.appendChild(dividendBtnMedium);
+                            console.log('成功创建中屏分红管理按钮');
+                        }
+                    }
+                    
+                    // 确保中屏按钮可见
                     if (dividendBtnMedium) {
-                        // 确保中屏按钮可见
-                        dividendBtnMedium.style.display = '';
+                        dividendBtnMedium.style.display = 'block';
+                        console.log('已设置中屏分红管理按钮可见');
                     }
                 }
                 
