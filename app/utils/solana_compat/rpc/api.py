@@ -89,4 +89,32 @@ class Client:
         if commitment:
             params.append({"commitment": commitment})
         
-        return self._make_request("getTransactionCount", params) 
+        return self._make_request("getTransactionCount", params)
+    
+    def send_raw_transaction(self, raw_transaction: bytes, opts: Optional[TxOpts] = None) -> Dict[str, Any]:
+        """
+        发送已签名的原始交易数据
+        
+        Args:
+            raw_transaction: 已签名的交易字节数据
+            opts: 可选的交易选项
+            
+        Returns:
+            Dict包含交易结果
+        """
+        # 将原始交易数据编码为base64格式
+        tx_data = base64.b64encode(raw_transaction).decode('ascii')
+        params = [tx_data]
+        
+        if opts:
+            config = {}
+            if opts.skip_preflight:
+                config["skipPreflight"] = opts.skip_preflight
+            if opts.preflight_commitment:
+                config["preflightCommitment"] = opts.preflight_commitment
+            if opts.commitment:
+                config["commitment"] = opts.commitment
+            if config:
+                params.append(config)
+        
+        return self._make_request("sendTransaction", params) 

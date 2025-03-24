@@ -2239,3 +2239,65 @@ def create_solana_transfer_transaction():
     except Exception as e:
         current_app.logger.error(f"处理转账交易请求失败: {str(e)}")
         return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
+
+@api_bp.route('/solana/send_transaction', methods=['POST'])
+@eth_address_required
+def send_solana_transaction():
+    """
+    发送已签名的Solana交易
+    接收前端传来的已签名交易，发送到Solana网络
+    """
+    try:
+        # 检查钱包连接状态
+        if not g.eth_address:
+            return jsonify({'success': False, 'error': '请先连接钱包'}), 401
+            
+        # 获取请求数据
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '无效的请求数据'}), 400
+            
+        # 检查必要字段
+        if 'signed_transaction' not in data:
+            return jsonify({'success': False, 'error': '缺少已签名的交易数据'}), 400
+            
+        signed_transaction_b64 = data.get('signed_transaction')
+        
+        # 记录请求信息
+        current_app.logger.info(f"接收到已签名交易，发送方: {g.eth_address}")
+        
+        # 解码交易数据
+        import base64
+        try:
+            signed_transaction_bytes = base64.b64decode(signed_transaction_b64)
+        except Exception as e:
+            current_app.logger.error(f"解码交易数据失败: {str(e)}")
+            return jsonify({'success': False, 'error': f'解码交易数据失败: {str(e)}'}), 400
+        
+        # 使用Solana Python客户端发送已签名的交易
+        from app.utils.solana_compat.connection import Connection
+        
+        try:
+            # 创建连接对象
+            connection = Connection("https://api.mainnet-beta.solana.com")
+            
+            # 发送交易
+            signature = connection.send_raw_transaction(signed_transaction_bytes)
+            
+            # 记录成功信息
+            current_app.logger.info(f"交易发送成功，签名: {signature}")
+            
+            # 返回成功结果
+            return jsonify({
+                'success': True,
+                'signature': signature,
+                'message': '交易已发送至Solana网络'
+            })
+            
+        except Exception as tx_error:
+            current_app.logger.error(f"发送交易失败: {str(tx_error)}")
+            return jsonify({'success': False, 'error': f'发送交易失败: {str(tx_error)}'}), 500
+        
+    except Exception as e:
+        current_app.logger.error(f"处理交易请求失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
