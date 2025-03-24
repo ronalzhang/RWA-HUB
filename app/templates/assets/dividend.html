@@ -45,12 +45,23 @@
         margin-bottom: 15px;
         position: relative;
         overflow: hidden;
-        height: auto;
+        height: 100%;
+        min-height: 120px;
+        display: flex;
+        flex-direction: column;
     }
     
     .stats-card:hover {
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         transform: translateY(-2px);
+    }
+    
+    .stats-card .card-body {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        height: 100%;
+        padding: 1rem;
     }
     
     .stats-card .card-title {
@@ -123,15 +134,25 @@
         .stats-row {
             display: flex;
             flex-wrap: wrap;
+            margin: 0 -5px;
         }
         
         .stats-card-wrapper {
             width: 50%;
             padding: 0 5px;
+            margin-bottom: 10px;
+        }
+        
+        .stats-card {
+            min-height: 100px;
         }
         
         .stats-card .card-value {
             font-size: 1.3rem;
+        }
+        
+        .stats-card .icon-bg {
+            font-size: 2.5rem !important;
         }
     }
     
@@ -146,10 +167,13 @@
 
 {% block content %}
 <div class="container my-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1>Dividend Management <span class="badge bg-primary">{{ asset.token_symbol }}</span></h1>
-        <a href="/assets/{{ asset.id }}" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Back
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="d-flex align-items-center">
+            Dividend Management 
+            <span class="badge bg-primary ms-2 fs-6">{{ asset.token_symbol }}</span>
+        </h1>
+        <a href="/assets/{{ asset.id }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Back
         </a>
     </div>
     
@@ -359,7 +383,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (assetData.holder_count > 0) {
                 holderCountElement.innerHTML = assetData.holder_count.toLocaleString();
             } else {
-                holderCountElement.innerHTML = "--";
+                holderCountElement.innerHTML = "0";
             }
         }
         
@@ -369,7 +393,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (assetData.dividend_count !== undefined && assetData.dividend_count > 0) {
                 dividendCountElement.innerHTML = assetData.dividend_count.toLocaleString();
             } else {
-                // 如果没有数据，显示0而不是--，因为用户提到应该有值
                 dividendCountElement.innerHTML = "0";
             }
         }
@@ -382,7 +405,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     <img src="/static/images/usdc-logo.svg" alt="USDC" class="usdc-icon" onerror="this.src='https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=024'; this.onerror='';">
                     ${assetData.total_dividend.toLocaleString()}`;
             } else {
-                // 如果没有数据，显示0而不是--，因为用户提到应该有值
                 totalDividendElement.innerHTML = `
                     <img src="/static/images/usdc-logo.svg" alt="USDC" class="usdc-icon" onerror="this.src='https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=024'; this.onerror='';">
                     0`;
