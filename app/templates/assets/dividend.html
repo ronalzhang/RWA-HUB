@@ -356,16 +356,26 @@ document.addEventListener('DOMContentLoaded', function() {
         symbol: "{{ asset.token_symbol|default('') }}",
         token_supply: {{ asset.token_supply|default(0) }},
         remaining_supply: {{ remaining_supply|default(0) }},
-        tokens_sold: 0,
+        tokens_sold: 0,  // 将在下面正确计算
         holder_count: 0,
         dividend_count: 0,
         total_dividend: 0
     };
     
+    // 计算已售出代币数量 - 直接从模板变量计算，避免依赖API
+    // 确保remaining_supply是数值类型
+    let remainingSupply = parseFloat("{{ remaining_supply|default(0) }}");
+    let tokenSupply = parseFloat("{{ asset.token_supply|default(0) }}");
+    
     // 计算已售出代币数量
-    if (assetData.token_supply > 0 && assetData.remaining_supply >= 0) {
-        assetData.tokens_sold = assetData.token_supply - assetData.remaining_supply;
-    }
+    assetData.tokens_sold = tokenSupply > remainingSupply ? 
+                          tokenSupply - remainingSupply : 0;
+    
+    console.log("初始化资产数据:", {
+        tokenSupply: tokenSupply,
+        remainingSupply: remainingSupply,
+        calculatedTokensSold: assetData.tokens_sold
+    });
     
     // 显示加载错误
     function showError(message) {
@@ -451,35 +461,14 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
-    // 获取分红统计数据 - 修改尝试多个可能的API路径
+    // 获取分红统计数据 - 简化API调用路径
     function fetchDividendStats() {
         const symbol = assetData.symbol;
         const id = assetData.id;
         if (!symbol || id <= 0) return;
         
-        // 尝试第一个API路径
+        // 使用主要API路径
         fetch(`/api/assets/symbol/${symbol}/dividend_stats`)
-            .then(response => {
-                if (!response.ok) {
-                    // 如果第一个路径失败，尝试第二个路径
-                    return fetch(`/api/assets/${id}/dividend_stats`);
-                }
-                return response;
-            })
-            .then(response => {
-                if (!response.ok) {
-                    // 如果第二个路径也失败，尝试第三个路径
-                    return fetch(`/api/assets/${symbol}/stats`);
-                }
-                return response;
-            })
-            .then(response => {
-        if (!response.ok) {
-                    // 如果第三个路径也失败，尝试第四个路径
-                    return fetch(`/api/assets/${id}/stats`);
-                }
-                return response;
-            })
             .then(response => {
                 if (!response.ok) throw new Error('分红统计获取失败');
                 return response.json();
@@ -489,46 +478,29 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 更新分红统计数据
                     console.log("获取到的分红统计:", data);
                     
-                    // 尝试多种可能的字段名称
-                    if (data.dividend_count !== undefined) {
-                        assetData.dividend_count = parseInt(data.dividend_count) || 0;
-                    } else if (data.count !== undefined) {
+                    // 更新分红次数和总金额
+                    if (data.count !== undefined) {
                         assetData.dividend_count = parseInt(data.count) || 0;
-                    } else if (data.dividends && data.dividends.count !== undefined) {
-                        assetData.dividend_count = parseInt(data.dividends.count) || 0;
                     }
                     
-                    if (data.total_dividend !== undefined) {
-                        assetData.total_dividend = parseFloat(data.total_dividend) || 0;
-                    } else if (data.total_amount !== undefined) {
+                    if (data.total_amount !== undefined) {
                         assetData.total_dividend = parseFloat(data.total_amount) || 0;
-                    } else if (data.total !== undefined) {
-                        assetData.total_dividend = parseFloat(data.total) || 0;
-                    } else if (data.dividends && data.dividends.total !== undefined) {
-                        assetData.total_dividend = parseFloat(data.dividends.total) || 0;
                     }
                     
-                    // 如果之前获取的持有人数为0，使用这里的数据
-                    if (assetData.holder_count === 0) {
-                        if (data.holder_count !== undefined) {
-                            assetData.holder_count = parseInt(data.holder_count) || 0;
-                        } else if (data.holders !== undefined) {
-                            assetData.holder_count = parseInt(data.holders) || 0;
-                        }
+                    // 更新持有人数，但不更新tokens_sold (使用我们自己计算的值)
+                    if (data.holder_count !== undefined) {
+                        assetData.holder_count = parseInt(data.holder_count) || 0;
                     }
                     
                     // 更新UI
                     updatePageData();
                 }
                 
-                // 无论是否成功获取分红统计，都获取分红历史
+                // 获取分红历史
                 fetchDividendHistory();
             })
             .catch(error => {
                 console.error('获取分红统计失败:', error);
-                
-                // 尝试从交易数据中计算分红统计
-                calculateDividendStats();
                 
                 // 更新UI（使用可能已有的数据）
                 updatePageData();
@@ -538,174 +510,60 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
-    // 从交易数据计算分红统计
-    function calculateDividendStats() {
-        const symbol = assetData.symbol;
-        const id = assetData.id;
-        if (!symbol || id <= 0) return;
-        
-        // 尝试获取资产交易记录
-        fetch(`/api/assets/${symbol}/transactions`)
-            .then(response => {
-                if (!response.ok) {
-                    return fetch(`/api/assets/${id}/transactions`);
-                }
-                return response;
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('交易数据获取失败');
-                return response.json();
-            })
-            .then(data => {
-                if (data && Array.isArray(data)) {
-                    // 筛选出分红交易
-                    const dividendTransactions = data.filter(tx => 
-                        tx.type === 'dividend' || 
-                        tx.transaction_type === 'dividend' ||
-                        tx.action === 'dividend'
-                    );
-                    
-                    // 计算分红统计
-                    assetData.dividend_count = dividendTransactions.length;
-                    
-                    // 计算总分红金额
-                    assetData.total_dividend = dividendTransactions.reduce((total, tx) => {
-                        const amount = parseFloat(tx.amount || tx.dividend_amount || 0);
-                        return total + amount;
-                    }, 0);
-                    
-                    // 更新UI
-                    updatePageData();
-                }
-            })
-            .catch(error => {
-                console.error('从交易数据计算分红统计失败:', error);
-            });
-    }
-    
     // 获取分红历史
     function fetchDividendHistory() {
         const symbol = assetData.symbol;
         const id = assetData.id;
         if (!symbol || id <= 0) return;
         
-        // 尝试多个可能的API路径
+        // 使用主要API路径获取分红历史
         fetch(`/api/assets/symbol/${symbol}/dividend_history`)
             .then(response => {
-                if (!response.ok) {
-                    return fetch(`/api/assets/${id}/dividend_history`);
-                }
-                return response;
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return fetch(`/api/assets/${symbol}/dividends`);
-                }
-                return response;
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return fetch(`/api/assets/${id}/dividends`);
-                }
-                return response;
-            })
-            .then(response => {
-                if (!response.ok) {
-                    // 最后尝试从交易记录中筛选分红交易
-                    return fetch(`/api/assets/${symbol}/transactions`)
-                        .then(txResponse => {
-                            if (!txResponse.ok) {
-                                return fetch(`/api/assets/${id}/transactions`);
-                            }
-                            return txResponse;
-                        })
-                        .then(txResponse => {
-                            if (!txResponse.ok) throw new Error('无法获取交易记录');
-                            return txResponse.json();
-                        })
-                        .then(transactions => {
-                            // 筛选出分红交易
-                            return transactions.filter(tx => 
-                                tx.type === 'dividend' || 
-                                tx.transaction_type === 'dividend' ||
-                                tx.action === 'dividend'
-                            );
-                        });
-                }
+                if (!response.ok) throw new Error('分红历史获取失败');
                 return response.json();
             })
             .then(data => {
                 const historyContainer = document.getElementById('dividend-history-content');
                 if (!historyContainer) return;
                 
-                if (data && (Array.isArray(data) || typeof data === 'object') && 
-                    (Array.isArray(data) ? data.length > 0 : Object.keys(data).length > 0)) {
-                    
-                    // 确保数据是数组
-                    const dividendRecords = Array.isArray(data) ? data : 
-                                          (data.dividends && Array.isArray(data.dividends) ? data.dividends : 
-                                           (data.history && Array.isArray(data.history) ? data.history : []));
-                    
-                    if (dividendRecords.length > 0) {
-                        // 有历史记录，显示表格
-                        let html = `
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Amount</th>
-                                    <th>Transaction</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                        `;
-                        
-                        dividendRecords.forEach(record => {
-                            // 尝试多种可能的字段名
-                            const date = record.date || record.created_at || record.timestamp || 'N/A';
-                            const amount = parseFloat(record.amount || record.dividend_amount || 0);
-                            const txHash = record.tx_hash || record.transaction_hash || record.hash || 'N/A';
-                            const shortTxHash = txHash !== 'N/A' ? txHash.substring(0, 8) + '...' : 'N/A';
-                            
-                            html += `
+                // 处理数据
+                if (data && Array.isArray(data) && data.length > 0) {
+                    // 有历史记录，显示表格
+                    let html = `
+                    <table class="table">
+                        <thead>
                             <tr>
-                                <td>${date}</td>
-                                <td>
-                                    <img src="/static/images/usdc-logo.svg" alt="USDC" class="usdc-icon" style="width:14px;height:14px;" onerror="this.src='https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=024'; this.onerror='';">
-                                    ${amount.toLocaleString()}
-                    </td>
-                                <td>${shortTxHash}</td>
-                </tr>
-                            `;
-                        });
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Transaction</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
+                    
+                    data.forEach(record => {
+                        // 获取记录数据
+                        const date = record.date || record.created_at || record.timestamp || 'N/A';
+                        const amount = parseFloat(record.amount || record.dividend_amount || 0);
+                        const txHash = record.tx_hash || record.transaction_hash || record.hash || 'N/A';
+                        const shortTxHash = txHash !== 'N/A' ? txHash.substring(0, 8) + '...' : 'N/A';
                         
                         html += `
-                            </tbody>
-                        </table>
+                        <tr>
+                            <td>${date}</td>
+                            <td>${amount.toLocaleString()} USDC</td>
+                            <td>${shortTxHash}</td>
+                        </tr>
                         `;
-                        
-                        historyContainer.innerHTML = html;
-                        
-                        // 更新分红统计（如果之前未设置）
-                        if (assetData.dividend_count === 0) {
-                            assetData.dividend_count = dividendRecords.length;
-                            
-                            // 计算总分红金额（如果之前未设置）
-                            if (assetData.total_dividend === 0) {
-                                assetData.total_dividend = dividendRecords.reduce((total, record) => {
-                                    const amount = parseFloat(record.amount || record.dividend_amount || 0);
-                                    return total + amount;
-                                }, 0);
-                            }
-                            
-                            // 更新UI
-                            updatePageData();
-                        }
-                    } else {
-                        // 无历史记录，显示提示
-                        historyContainer.innerHTML = '<p class="text-center text-muted">No dividend records found</p>';
-                    }
-        } else {
+                    });
+                    
+                    html += `
+                        </tbody>
+                    </table>
+                    `;
+                    
+                    historyContainer.innerHTML = html;
+                } else {
                     // 无历史记录，显示提示
                     historyContainer.innerHTML = '<p class="text-center text-muted">No dividend records found</p>';
                 }
@@ -772,115 +630,46 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (!amount || isNaN(amount) || amount <= 0) {
                 alert('Please enter a valid dividend amount.');
-        return;
-    }
-    
+                return;
+            }
+            
             if (confirm(`Are you sure you want to distribute a dividend of ${amount.toFixed(2)} USDC?`)) {
                 // 显示加载状态
                 distributeButton.disabled = true;
                 const spinner = document.getElementById('distribute-spinner');
                 if (spinner) spinner.classList.remove('d-none');
                 
-                // 发送分红请求，尝试多个可能的API路径
-                const id = assetData.id;
+                // 发送分红请求
                 const symbol = assetData.symbol;
                 
-                // 尝试多个可能的API路径
-                const apiEndpoints = [
-                    `/api/assets/${id}/distribute_dividend`,
-                    `/api/assets/${symbol}/distribute_dividend`,
-                    `/api/assets/symbol/${symbol}/distribute_dividend`,
-                    `/api/dividend/distribute/${id}`,
-                    `/api/dividend/distribute/${symbol}`,
-                    `/api/dividends/distribute/${id}`,
-                    `/api/dividends/distribute/${symbol}`
-                ];
-                
-                // 检查USDC余额（如果能获取用户信息）
-                let userChecked = false;
-                
-                fetch('/api/user/balance/usdc')
-                    .then(response => {
-                        if (!response.ok) {
-                            // 如果无法获取余额，直接继续分红流程
-                            return { balance: 0, success: false };
-                        }
-                        return response.json();
+                // 使用主要API路径
+                fetch(`/api/assets/symbol/${symbol}/distribute_dividend`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        amount: amount
                     })
-                    .then(userData => {
-                        userChecked = true;
-                        
-                        if (userData.success && userData.balance < amount) {
-                            throw new Error(`Insufficient USDC balance. You have ${userData.balance} USDC but need ${amount} USDC.`);
-                        }
-                        
-                        // 尝试第一个API端点
-                        return tryNextEndpoint(0);
-                    })
-                    .catch(error => {
-                        if (userChecked) {
-                            // 这是余额检查的错误
-                            alert(error.message || 'Failed to check USDC balance.');
-                            distributeButton.disabled = false;
-                            if (spinner) spinner.classList.add('d-none');
-                        } else {
-                            // 继续尝试分红流程
-                            tryNextEndpoint(0)
-                                .catch(error => {
-                                    console.error('分红提交失败:', error);
-                                    alert('Failed to distribute dividend. The API endpoint may not be implemented yet.');
-                                    distributeButton.disabled = false;
-                                    if (spinner) spinner.classList.add('d-none');
-                                });
-                        }
-                    });
-                
-                // 递归尝试每个API端点
-                function tryNextEndpoint(index) {
-                    if (index >= apiEndpoints.length) {
-                        throw new Error('All API endpoints failed. The dividend API may not be implemented yet.');
-                    }
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to distribute dividend');
+                    return response.json();
+                })
+                .then(result => {
+                    alert(`Dividend of ${amount.toFixed(2)} USDC successfully distributed!`);
                     
-                    return fetch(apiEndpoints[index], {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            amount: amount,
-                            currency: 'usdc'  // 指定使用USDC货币
-                        })
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            // 如果当前端点失败，尝试下一个
-                            return tryNextEndpoint(index + 1);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('分红成功响应:', data);
-                        alert('Dividend distribution initiated successfully!');
-                        
-                        // 更新分红统计
-                        assetData.dividend_count += 1;
-                        assetData.total_dividend += amount;
-                        updatePageData();
-                        
-                        // 刷新分红历史
-                        setTimeout(() => {
-                            fetchDividendHistory();
-                        }, 1000);
-                        
-                        // 重置表单
-                        document.getElementById('dividend-amount').value = '';
-                        updateDividendEstimate();
-                        
-                        // 恢复按钮状态
-                        distributeButton.disabled = false;
-                        if (spinner) spinner.classList.add('d-none');
-                    });
-                }
+                    // 刷新页面以显示最新数据
+                    location.reload();
+                })
+                .catch(error => {
+                    console.error('分红发放失败:', error);
+                    alert(`Failed to distribute dividend: ${error.message}`);
+                    
+                    // 恢复按钮状态
+                    distributeButton.disabled = false;
+                    if (spinner) spinner.classList.add('d-none');
+                });
             }
         });
     }
