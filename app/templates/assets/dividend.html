@@ -408,13 +408,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const totalDividendElement = document.getElementById('total-dividend');
         if (totalDividendElement) {
             if (assetData.total_dividend !== undefined && assetData.total_dividend > 0) {
-                totalDividendElement.innerHTML = `
-                    <img src="/static/images/usdc-logo.svg" alt="USDC" class="usdc-icon" style="width:16px;height:16px;" onerror="this.src='https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=024'; this.onerror='';">
-                    ${assetData.total_dividend.toLocaleString()}`;
+                totalDividendElement.innerHTML = `${assetData.total_dividend.toLocaleString()} USDC`;
             } else {
-                totalDividendElement.innerHTML = `
-                    <img src="/static/images/usdc-logo.svg" alt="USDC" class="usdc-icon" style="width:16px;height:16px;" onerror="this.src='https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=024'; this.onerror='';">
-                    0`;
+                totalDividendElement.innerHTML = `0 USDC`;
             }
         }
     }
