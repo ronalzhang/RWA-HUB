@@ -1631,7 +1631,7 @@
                         <a class="nav-link" href="{{ url_for('assets.list_assets_page') }}">{{ _('All Assets') }}</a>
                     </li>
                     <li class="nav-item" id="adminEntry" style="display: none;">
-                        <a class="nav-link" href="/admin/dashboard" id="adminNavLink">
+                        <a class="nav-link" href="{{ url_for('admin.dashboard') }}" id="adminNavLink">
                             <i class="fas fa-user-shield me-1"></i>{{ _('Admin') }}
                         </a>
                     </li>

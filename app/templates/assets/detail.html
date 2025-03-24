@@ -240,6 +240,28 @@
                         loadTradeHistory();
                     });
                     
+                    // 添加管理员状态变化事件监听
+                    window.addEventListener('adminStatusChanged', function(event) {
+                        console.log('管理员状态已变更:', event.detail);
+                        
+                        // 重新检查分红管理权限
+                        setTimeout(function() {
+                            console.log('重新检查分红管理权限 - 管理员状态变化事件');
+                            checkDividendManagementAccess();
+                        }, 100);
+                    });
+                    
+                    // 添加walletStateChanged事件监听，确保所有状态变化都被捕获
+                    window.addEventListener('walletStateChanged', function(event) {
+                        console.log('钱包状态变化:', event.detail);
+                        
+                        // 如果是管理员状态变化，重新检查分红权限
+                        if (event.detail.isAdmin !== undefined) {
+                            console.log('检测到管理员状态变化，重新检查分红管理权限');
+                            setTimeout(checkDividendManagementAccess, 100);
+                        }
+                    });
+                    
                     window.addEventListener('walletDisconnected', function() {
                         console.log('钱包已断开连接，隐藏分红按钮');
                         const dividendBtn = document.getElementById('dividendManagementBtn');
