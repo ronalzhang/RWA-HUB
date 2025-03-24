@@ -329,10 +329,15 @@ def create_asset():
         import base58
         import time
         
-        # 生成Token地址（Solana格式）
+        # 生成Token地址（Solana格式）- 确保长度不超过128字符
         seed = f"{data.get('name', '')}_{data.get('token_symbol', '')}_{int(time.time())}".encode()
         hash_bytes = hashlib.sha256(seed).digest()[:32]
-        token_address = "So" + base58.b58encode(hash_bytes).decode()[:40]
+        token_address = "So" + base58.b58encode(hash_bytes).decode()
+        
+        # 确保地址长度不超过数据库限制(128字符)
+        if len(token_address) > 128:
+            token_address = token_address[:128]
+            
         data['token_address'] = token_address
         
         # 处理可能缺失的blockchain_details字段
