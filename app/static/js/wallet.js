@@ -2545,16 +2545,19 @@ async connectPhantom(isReconnect = false) {
             
             // 使用Phantom钱包签名并发送交易
             console.log('使用Phantom钱包签名并发送交易...');
-            const { signature } = await window.solana.signAndSendTransaction({
-                data: serializedTransaction
-            });
+            
+            // 直接将序列化的交易传递给Phantom，不包裹在对象中
+            // 参考文档：https://docs.phantom.app/solana/sending-a-transaction
+            const signature = await window.solana.signAndSendTransaction(serializedTransaction);
             
             console.log('交易已发送，签名:', signature);
             
             // 返回成功结果
             return {
                 success: true,
-                txHash: signature
+                txHash: typeof signature === 'string' ? signature : 
+                       (signature && signature.signature ? signature.signature : 
+                       JSON.stringify(signature))
             };
             
         } catch (error) {
