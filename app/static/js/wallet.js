@@ -2522,7 +2522,8 @@ async connectPhantom(isReconnect = false) {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Eth-Address': fromAddress
+                        'X-Eth-Address': fromAddress,
+                        'X-Wallet-Type': 'phantom'
                     }
                 });
                 
@@ -2544,7 +2545,8 @@ async connectPhantom(isReconnect = false) {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Eth-Address': fromAddress
+                        'X-Eth-Address': fromAddress,
+                        'X-Wallet-Type': 'phantom'
                     },
                     body: JSON.stringify({
                         token_symbol: tokenSymbol,
@@ -2589,7 +2591,8 @@ async connectPhantom(isReconnect = false) {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Eth-Address': fromAddress
+                        'X-Eth-Address': fromAddress,
+                        'X-Wallet-Type': 'phantom'
                     },
                     body: JSON.stringify({
                         transaction: transaction,
@@ -2624,7 +2627,8 @@ async connectPhantom(isReconnect = false) {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Eth-Address': fromAddress
+                        'X-Eth-Address': fromAddress,
+                        'X-Wallet-Type': 'phantom'
                     },
                     body: JSON.stringify({
                         token_symbol: tokenSymbol,
