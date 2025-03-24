@@ -151,6 +151,12 @@
                     console.log('初始化完成后刷新数据');
                     refreshAssetInfo();
                     
+                    // 初始化刷新按钮
+                    initRefreshButton();
+                    
+                    // 检查分红管理权限
+                    setTimeout(checkDividendManagementAccess, 500);
+                    
                     // 更新钱包资产列表 - 使用base.html中的函数
                     if (typeof loadUserAssets === 'function') {
                         console.log('使用全局loadUserAssets函数加载钱包资产');
@@ -359,6 +365,8 @@
                     const isOwnerFrontend = "{{ is_owner|lower }}" === "true";
                     const isAdminFrontend = "{{ is_admin_user|lower }}" === "true";
                     
+                    console.log('前端权限状态：owner=', isOwnerFrontend, 'admin=', isAdminFrontend);
+                    
                     // 如果当前地址不匹配模板渲染时的地址，需要重新检查权限
                     const currentAddress = '{{ current_user_address|default("", true) }}';
                     const connectedAddress = window.walletState.address;
@@ -384,9 +392,9 @@
                                 if (btn.id === 'dividendManagementBtn') {
                                     btn.style.display = 'inline-flex';
                                 } else if (btn.id === 'dividendManagementBtnMobile') {
-                                    btn.style.display = 'd-md-none d-block';
+                                    btn.style.display = 'block';
                                 } else if (btn.id === 'dividendManagementBtnMedium') {
-                                    btn.style.display = 'd-none d-md-block d-lg-none';
+                                    btn.style.display = 'block';
                                 }
                             }
                         });
@@ -1812,7 +1820,7 @@
                 <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
             </button>
             {% if is_admin_user or is_owner %}
-            <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary" id="dividendManagementBtn" data-token-symbol="{{ asset.token_symbol }}" style="display: none;">
+            <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary" id="dividendManagementBtn" data-token-symbol="{{ asset.token_symbol }}">
                 <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
             </a>
             {% endif %}
@@ -1842,10 +1850,10 @@
                     <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
                 </button>
                 {% if is_admin_user or is_owner %}
-                <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-sm btn-outline-primary d-md-none d-block" id="dividendManagementBtnMobile" data-token-symbol="{{ asset.token_symbol }}" style="display: none;">
+                <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-sm btn-outline-primary d-md-none d-block" id="dividendManagementBtnMobile" data-token-symbol="{{ asset.token_symbol }}">
                     <i class="fas fa-coins me-2"></i>{{ _('Dividend') }}
                 </a>
-                <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary d-none d-md-block d-lg-none" id="dividendManagementBtnMedium" data-token-symbol="{{ asset.token_symbol }}" style="display: none;">
+                <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary d-none d-md-block d-lg-none" id="dividendManagementBtnMedium" data-token-symbol="{{ asset.token_symbol }}">
                     <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
                 </a>
                 {% endif %}
@@ -2627,14 +2635,6 @@ async function updateRemainingSupply() {
         const maxPurchaseElement = document.getElementById('max-purchase-amount');
         if (maxPurchaseElement) {
             maxPurchaseElement.textContent = new Intl.NumberFormat().format(assetData.remaining_supply);
-        }
-        
-        // 确保分红按钮在未连接钱包时保持隐藏状态
-        if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
-            const dividendBtn = document.getElementById('dividendManagementBtn');
-            if (dividendBtn) {
-                dividendBtn.style.display = 'none';
-            }
         }
         
         // 更新 Total Supply / Remaining 显示
