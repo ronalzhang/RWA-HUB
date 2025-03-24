@@ -609,6 +609,7 @@ const walletState = {
                     address: this.address,
                     walletType: this.walletType,
                     balance: this.balance,
+                    isAdmin: this.isAdmin,
                     timestamp: new Date().getTime()
                 } 
             });
@@ -886,21 +887,22 @@ const walletState = {
      */
     notifyStateChange(details = {}) {
         try {
-            console.log('通知钱包状态变化:', details);
-            
-            // 确保stateChangeCallbacks是一个数组
             if (!Array.isArray(this.stateChangeCallbacks)) {
                 this.stateChangeCallbacks = [];
             }
             
-            // 创建状态事件数据
+            // 构建事件数据
             const eventData = {
                     connected: this.connected,
                     address: this.address,
                     walletType: this.walletType,
                     balance: this.balance,
+                    isAdmin: this.isAdmin,
                     ...details
             };
+            
+            // 更新管理员入口显示状态，确保任何状态变化都会触发管理员入口更新
+            this.updateAdminDisplay();
             
             // 通知所有注册的回调
             this.stateChangeCallbacks.forEach(callback => {
@@ -919,18 +921,53 @@ const walletState = {
             }));
             
             // 为特定类型的变化触发额外的事件
-            if (details.type === 'connect' || details.type === 'init' || details.type === 'reconnect') {
+            if (details.type === 'connect' || details.type === 'init' || details.type === 'reconnect' || details.type === 'admin_status_changed') {
                 // 触发余额更新事件
                 document.dispatchEvent(new CustomEvent('walletBalanceUpdated', {
                     detail: {
                         address: this.address,
                         balance: this.balance,
-                        walletType: this.walletType
+                        walletType: this.walletType,
+                        isAdmin: this.isAdmin
                     }
                 }));
+                
+                // 如果是管理员状态变化，触发特定事件
+                if (details.type === 'admin_status_changed') {
+                    document.dispatchEvent(new CustomEvent('adminStatusChanged', {
+                        detail: {
+                            isAdmin: this.isAdmin,
+                            address: this.address
+                        }
+                    }));
+                }
             }
         } catch (error) {
             console.error('通知钱包状态变化时出错:', error);
+        }
+    },
+    
+    /**
+     * 更新管理员显示状态
+     * 独立函数，确保在任何状态变化时都可以单独调用
+     */
+    updateAdminDisplay() {
+        try {
+            console.log('更新管理员入口显示状态，当前状态:', this.isAdmin);
+            const adminEntry = document.getElementById('adminEntry');
+            if (adminEntry) {
+                adminEntry.style.display = this.isAdmin ? 'block' : 'none';
+                console.log('管理员入口显示状态已更新:', this.isAdmin ? '显示' : '隐藏');
+            }
+            
+            // 检查是否在资产详情页，如果是则更新分红入口
+            const isDetailPage = document.querySelector('.asset-detail-page') !== null;
+            if (isDetailPage && typeof window.checkDividendManagementAccess === 'function') {
+                console.log('检测到资产详情页，更新分红入口状态');
+                window.checkDividendManagementAccess();
+            }
+        } catch (error) {
+            console.error('更新管理员显示状态失败:', error);
         }
     },
     
