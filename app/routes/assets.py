@@ -751,9 +751,20 @@ def dividend_page_by_symbol(token_symbol):
             flash('您没有权限管理此资产的分红', 'danger')
             return redirect(url_for('assets.asset_detail_by_symbol', token_symbol=token_symbol))
         
+        # 计算剩余供应量
+        if asset.remaining_supply is not None:
+            # 优先使用数据库存储的剩余供应量
+            remaining_supply = asset.remaining_supply
+        else:
+            # 如果没有剩余供应量数据，使用总供应量
+            remaining_supply = asset.token_supply
+        
+        current_app.logger.info(f'资产 {asset.id} 分红页面 剩余供应量: {remaining_supply}')
+        
         # 渲染分红页面
         return render_template('assets/dividend.html', 
                               asset=asset, 
+                              remaining_supply=remaining_supply,
                               can_manage=True)
                               
     except Exception as e:
