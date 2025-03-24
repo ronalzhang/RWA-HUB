@@ -312,31 +312,20 @@ const walletState = {
      * 清除所有钱包状态
      */
     clearState() {
-        // 清除内存中的状态
+        console.log('清除钱包状态');
         this.address = null;
-        this.walletType = null;
         this.connected = false;
+        this.walletType = null;
+        this.balance = null;
         this.isAdmin = false;
-        this.balance = 0;
-        this.nativeBalance = 0;
-        this.assets = [];
-        this.chainId = null;
-        this.web3 = null;
-        this.provider = null;
         
-        // 清除本地存储
-        localStorage.removeItem('walletType');
-        localStorage.removeItem('walletAddress');
-        localStorage.removeItem('lastWalletType');
-        localStorage.removeItem('lastWalletAddress');
-        localStorage.removeItem('pendingWalletType');
-        sessionStorage.removeItem('returningFromWalletApp');
+        // 清除存储的钱包数据
+        this.clearStoredWalletData();
         
-        // 移除可能存在的事件监听器
+        // 清除事件监听器
         if (window.ethereum) {
             window.ethereum.removeAllListeners?.();
         }
-        
         if (window.solana) {
             window.solana.removeAllListeners?.();
         }
@@ -522,6 +511,7 @@ const walletState = {
             const walletBtnText = document.getElementById('walletBtnText');
             const walletAddressDisplay = document.getElementById('walletAddressDisplay');
             const walletMenu = document.getElementById('walletMenu');
+            const adminEntry = document.getElementById('adminEntry');
             
             if (!walletBtn) {
                 console.warn('找不到钱包按钮元素');
@@ -563,6 +553,12 @@ const walletState = {
                     userAssetsSection.style.display = 'block';
                 }
                 
+                // 根据管理员状态更新管理员入口显示
+                if (adminEntry) {
+                    console.log('更新管理员入口显示, 当前管理员状态:', this.isAdmin);
+                    adminEntry.style.display = this.isAdmin ? 'block' : 'none';
+                }
+                
                 // 确保余额也更新
                 this.updateBalanceDisplay();
             } else {
@@ -576,6 +572,11 @@ const walletState = {
                 const userAssetsSection = document.getElementById('userAssetsSection');
                 if (userAssetsSection) {
                     userAssetsSection.style.display = 'none';
+                }
+                
+                // 隐藏管理员入口
+                if (adminEntry) {
+                    adminEntry.style.display = 'none';
                 }
             }
             
@@ -1946,118 +1947,35 @@ const walletState = {
  * @returns {Promise<boolean>} 连接是否成功
  */
 async connectPhantom(isReconnect = false) {
+    console.log('尝试连接Phantom钱包' + (isReconnect ? ' (重连)' : ''));
+    
     try {
-        if (!isReconnect) {
-            console.log('尝试连接Phantom钱包...');
-        } else {
-            console.log('尝试重新连接Phantom钱包...');
-        }
-        
         // 检查Phantom钱包是否安装
         if (!window.solana || !window.solana.isPhantom) {
             console.error('Phantom钱包未安装');
             if (!isReconnect) {
-                showError('未检测到Phantom钱包，请安装Phantom钱包扩展程序或应用');
-                
-                // 如果在移动设备上，提供下载链接
-                if (this.isMobile()) {
-                    if (confirm('您需要安装Phantom钱包应用以继续。是否前往下载？')) {
-                        window.open('https://phantom.app/download', '_blank');
-                    }
-                } else {
-                    // 桌面设备显示安装指引
-                    if (confirm('您需要安装Phantom钱包浏览器扩展以继续。是否前往安装？')) {
-                        window.open('https://phantom.app/', '_blank');
-                    }
-                }
+                showError('请安装Phantom钱包');
             }
             return false;
         }
         
-        let response;
-        try {
-            // 如果是重新连接且已有地址匹配，尝试使用onlyIfTrusted
-            if (isReconnect && this.address) {
-                try {
-                    console.log('使用静默模式重连Phantom...');
-                    // 首先检查当前连接状态
-                    if (window.solana.isConnected && 
-                        window.solana.publicKey && 
-                        window.solana.publicKey.toString() === this.address) {
-                        console.log('Phantom钱包已连接且地址匹配，无需重连');
-                        response = {
-                            publicKey: window.solana.publicKey
-                        };
-                } else {
-                        // 尝试静默重连
-                        response = await window.solana.connect({ onlyIfTrusted: true });
-                    }
-                } catch (silentError) {
-                    // 只有在非重连模式下才回退到请求用户授权
-                    console.log('静默重连失败，不再尝试弹出授权窗口');
-                    return false;
-                }
-            } else if (!isReconnect) {
-                // 常规连接，需要用户授权
-                response = await window.solana.connect();
-            } else {
-                // 如果是重连但没有之前的地址匹配，不弹出授权窗口
-                console.log('重连模式但没有匹配的地址，不弹出授权窗口');
-                return false;
-            }
-        } catch (connectionError) {
-            // 明确处理用户拒绝连接的情况
-            if (connectionError.code === 4001) { // User rejected request
-                console.log('用户拒绝了连接请求');
-                if (!isReconnect) {
-                    showError('连接已被用户取消');
-                }
-                return false;
-            }
-            
-            // 其他连接错误
-            console.error('连接Phantom钱包时出错:', connectionError);
+        // 请求连接到钱包
+        const response = await window.solana.connect();
+        
+        if (!response || !response.publicKey) {
+            console.error('无法获取Phantom钱包公钥');
             if (!isReconnect) {
-                showError('连接Phantom钱包失败: ' + connectionError.message);
+                showError('连接Phantom钱包失败: 无法获取公钥');
             }
             return false;
         }
         
-        // 连接成功
-        if (response && response.publicKey) {
-            console.log('成功连接到Phantom钱包');
-            this.address = response.publicKey.toString();
-            this.walletType = 'phantom';
-            this.connected = true;
-            this.provider = window.solana;
-            
-            // 设置事件监听器
-            this.setupPhantomListeners();
-            
-            // 保存钱包信息到本地存储
-                localStorage.setItem('walletType', 'phantom');
-            localStorage.setItem('walletAddress', this.address);
-            
-            // 清除重连标记
-            localStorage.removeItem('walletNeedsReconnect');
-            
-            if (!isReconnect) {
-                // 显示成功提示
-                showSuccess('成功连接到Phantom钱包');
-            }
-            
-            return true;
-        } else {
-            console.error('Phantom钱包连接失败: 未获取到公钥');
-            if (!isReconnect) {
-                showError('Phantom钱包连接失败: 未获取到公钥');
-        }
-        return false;
-        }
+        // 连接成功，使用afterSuccessfulConnection方法处理
+        return this.afterSuccessfulConnection(response.publicKey.toString(), 'phantom', window.solana);
     } catch (error) {
         console.error('连接Phantom钱包时出错:', error);
         if (!isReconnect) {
-        showError('连接Phantom钱包失败: ' + (error.message || '未知错误'));
+            showError('连接Phantom钱包失败: ' + (error.message || '未知错误'));
         }
         return false;
     }
@@ -2065,155 +1983,50 @@ async connectPhantom(isReconnect = false) {
 
 /**
      * 连接到以太坊钱包（MetaMask等）
-     * @param {boolean} isReconnect - 是否是重新连接操作
+     * @param {boolean} isReconnect - 是否是重新连接
      * @returns {Promise<boolean>} 连接是否成功
      */
     async connectEthereum(isReconnect = false) {
+        console.log('尝试连接以太坊钱包' + (isReconnect ? ' (重连)' : ''));
+        
         try {
-            if (!isReconnect) {
-                console.log('尝试连接以太坊钱包...');
-            } else {
-                console.log('尝试重新连接以太坊钱包...');
-            }
-            
-            // 检查以太坊提供者是否可用
+            // 检查以太坊对象是否存在
             if (!window.ethereum) {
-                console.error('以太坊提供者不可用');
+                console.error('MetaMask或其他以太坊钱包未安装');
                 if (!isReconnect) {
-                    showError('未检测到MetaMask等以太坊钱包，请安装钱包扩展程序或应用');
-                    
-                    // 如果在移动设备上，提供下载链接
-                    if (this.isMobile()) {
-                        if (confirm('您需要安装MetaMask应用以继续。是否前往下载？')) {
-                            window.open('https://metamask.io/download/', '_blank');
-                        }
-                    } else {
-                        // 桌面设备显示安装指引
-                        if (confirm('您需要安装MetaMask浏览器扩展以继续。是否前往安装？')) {
-                            window.open('https://metamask.io/download/', '_blank');
-                        }
-                    }
+                    showError('请安装MetaMask或其他以太坊钱包');
                 }
                 return false;
             }
             
-            // 确保Web3.js已加载
-            if (typeof Web3 === 'undefined' && typeof web3 === 'undefined') {
-                if (!isReconnect) {
-                    console.error('Web3库未加载');
-                    showError('Web3库未加载，无法连接钱包');
-                }
-            return false;
-        }
-        
+            const provider = window.ethereum;
+            
             // 创建Web3实例
-            let web3;
+            const web3 = new Web3(provider);
+            
+            // 连接前检查chainId，确保是主网或测试网
             try {
-                if (typeof Web3 !== 'undefined') {
-                    web3 = new Web3(window.ethereum);
-                } else if (typeof web3 !== 'undefined') {
-                    web3 = new web3(window.ethereum);
-                } else {
-                    throw new Error('Web3实例无法创建');
-                }
-            } catch (web3Error) {
-                console.error('创建Web3实例失败:', web3Error);
-                if (!isReconnect) {
-                    showError('创建Web3实例失败: ' + web3Error.message);
-            }
-                return false;
-        }
-        
-            // 请求账户授权
-        let accounts;
-        try {
-                // 如果是重新连接，先检查当前连接状态
-                if (isReconnect) {
-                    try {
-                        console.log('检查当前以太坊连接状态...');
-                        const currentAccounts = await web3.eth.getAccounts();
-                        
-                        // 如果已有账户且与存储的地址匹配，则直接使用
-                        if (currentAccounts && currentAccounts.length > 0 && 
-                            this.address && currentAccounts[0].toLowerCase() === this.address.toLowerCase()) {
-                            console.log('以太坊钱包已连接且地址匹配，无需重连');
-                            accounts = currentAccounts;
-                        } else {
-                            // 如果是重连但没有匹配的账户，不弹出授权窗口
-                            console.log('重连模式但没有匹配的账户，不弹出授权窗口');
-                            return false;
-                        }
-        } catch (error) {
-                        console.error('检查以太坊账户失败:', error);
-                        return false;
-                    }
-                } else {
-                    // 正常连接流程，请求用户授权
-                    accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                }
-            } catch (accountsError) {
-                // 明确处理用户拒绝连接的情况
-                if (accountsError.code === 4001) { // User rejected request
-                    console.log('用户拒绝了连接请求');
-                    if (!isReconnect) {
-                        showError('连接已被用户取消');
-                    }
-                    return false;
-                } else if (accountsError.code === -32002) { // Request already pending
-                    console.log('钱包请求已挂起，请在钱包中完成操作');
-                    if (!isReconnect) {
-                        showError('钱包请求已挂起，请在MetaMask中完成操作');
-                    }
-                    return false;
-                } else if (accountsError.code === -32603) { // Internal error, often indicates wallet is locked
-                    console.log('钱包可能已锁定，请解锁钱包');
-                    if (!isReconnect) {
-                        showError('钱包已锁定，请解锁您的MetaMask钱包');
-                    }
-                    return false;
-                }
-                
-                // 其他连接错误
-                console.error('请求账户授权时出错:', accountsError);
-                if (!isReconnect) {
-                    showError('连接以太坊钱包失败: ' + (accountsError.message || '未知错误'));
-                }
-                return false;
+                const chainId = await web3.eth.getChainId();
+                console.log('当前链ID:', chainId);
+                this.chainId = chainId;
+            } catch (chainError) {
+                console.warn('无法获取链ID:', chainError);
             }
             
-            // 确保返回了账户
+            // 请求用户账户授权
+            console.log('请求账户授权...');
+            const accounts = await provider.request({ method: 'eth_requestAccounts' });
+            
             if (!accounts || accounts.length === 0) {
-                console.error('未能获取以太坊账户');
+                console.error('用户拒绝连接或无法获取账户');
                 if (!isReconnect) {
-                    showError('未能获取钱包账户地址');
+                    showError('用户拒绝连接或无法获取账户');
                 }
-            return false;
-        }
-        
-            // 连接成功
-            console.log('成功连接到以太坊钱包');
-            this.address = accounts[0];
-            this.walletType = 'ethereum';
-            this.connected = true;
-            this.provider = window.ethereum;
-            this.web3 = web3;
-            
-            // 设置事件监听器
-            this.setupEthereumListeners();
-            
-            // 保存钱包信息到本地存储
-            localStorage.setItem('walletType', 'ethereum');
-            localStorage.setItem('walletAddress', this.address);
-            
-            // 清除重连标记
-            localStorage.removeItem('walletNeedsReconnect');
-            
-            if (!isReconnect) {
-                // 显示成功提示
-                showSuccess('成功连接到以太坊钱包');
+                return false;
             }
             
-            return true;
+            // 连接成功，使用afterSuccessfulConnection方法处理
+            return this.afterSuccessfulConnection(accounts[0], 'ethereum', provider);
         } catch (error) {
             console.error('连接以太坊钱包时出错:', error);
             if (!isReconnect) {
@@ -2725,6 +2538,56 @@ async connectPhantom(isReconnect = false) {
         if (window.solana) {
             window.solana.removeAllListeners?.();
         }
+    },
+
+    /**
+     * 成功连接钱包后的操作
+     * 更新UI并获取余额
+     */
+    afterSuccessfulConnection(address, walletType, provider = null) {
+        console.log('钱包连接成功，地址:', address, '类型:', walletType);
+        
+        // 更新钱包状态
+        this.address = address;
+        this.walletType = walletType;
+        this.connected = true;
+        
+        // 保存连接信息到本地存储
+        this.saveWalletData(address, walletType);
+        
+        // 存储钱包提供商对象（如果有）
+        if (provider) {
+            this.walletProvider = provider;
+        }
+        
+        // 更新UI
+        this.updateUI();
+        
+        // 获取余额
+        this.getBalance();
+        
+        // 检查是否为管理员并更新状态
+        this.checkIsAdmin().then(isAdmin => {
+            console.log('管理员状态检查结果:', isAdmin);
+            this.isAdmin = isAdmin;
+            
+            // 更新管理员入口显示
+            const adminEntry = document.getElementById('adminEntry');
+            if (adminEntry) {
+                adminEntry.style.display = isAdmin ? 'block' : 'none';
+                console.log('已更新管理员入口显示状态:', isAdmin ? '显示' : '隐藏');
+            }
+            
+            // 触发状态变化通知
+            this.notifyStateChange({ type: 'admin_status_changed', isAdmin });
+        }).catch(error => {
+            console.error('检查管理员状态时出错:', error);
+        });
+        
+        // 通知状态变化
+        this.notifyStateChange({ type: 'connect' });
+        
+        return true;
     }
 }
 
