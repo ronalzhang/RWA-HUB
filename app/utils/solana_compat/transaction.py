@@ -22,12 +22,27 @@ class TransactionInstruction:
     
     def __init__(
         self,
-        keys: List[AccountMeta],
+        keys: List[Any],  # 可以接收AccountMeta或字典
         program_id: Any,
         data: bytes = bytes(0),
     ):
         """Initialize instruction."""
-        self.keys = keys
+        # 将字典格式的账户信息转换为AccountMeta对象
+        self.keys = []
+        if isinstance(keys, list):
+            for key in keys:
+                if isinstance(key, dict):
+                    # 从字典创建AccountMeta
+                    pubkey = key.get('pubkey')
+                    is_signer = key.get('isSigner', False)
+                    is_writable = key.get('isWritable', False)
+                    self.keys.append(AccountMeta(pubkey, is_signer, is_writable))
+                else:
+                    # 如果已经是AccountMeta对象，直接添加
+                    self.keys.append(key)
+        else:
+            self.keys = keys
+            
         self.program_id = program_id
         self.data = data
 
