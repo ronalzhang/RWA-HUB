@@ -2952,9 +2952,10 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- 添加Solana Web3.js -->
+<script src="https://unpkg.com/@solana/web3.js@1.87.6/lib/index.iife.min.js"></script>
 <!-- 添加SPL Token库 -->
-<script src="https://cdn.jsdelivr.net/npm/@solana/spl-token@0.4.12/lib/index.iife.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.87.6/lib/index.iife.min.js"></script>
+<script src="https://unpkg.com/@solana/spl-token@0.4.12/dist/index.iife.js"></script>
 <script>
     // 确保SPL Token库正确加载
     window.initSplTokenLib = async function() {
@@ -2966,35 +2967,55 @@ document.addEventListener('DOMContentLoaded', function() {
             return true;
         }
 
-        // 如果全局对象不存在，创建必要的对象
-        console.log('创建必要的SPL Token对象');
-        window.splToken = {
-            TOKEN_PROGRAM_ID: new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
-            createTransferInstruction: function(fromPubkey, toPubkey, ownerPubkey, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
-                const keys = [
-                    { pubkey: fromPubkey, isSigner: false, isWritable: true },
-                    { pubkey: toPubkey, isSigner: false, isWritable: true },
-                    { pubkey: ownerPubkey, isSigner: multiSigners.length === 0, isWritable: false }
-                ];
-                multiSigners.forEach(signer => {
-                    keys.push({ pubkey: signer.publicKey, isSigner: true, isWritable: false });
-                });
-                return new solanaWeb3.TransactionInstruction({
-                    keys,
-                    programId,
-                    data: Buffer.from([3, ...new Uint8Array(8)]) // 3是transfer指令的代码
-                });
+        try {
+            // 如果全局对象不存在，尝试从window.SolanaToken获取
+            if (window.SolanaToken) {
+                window.splToken = window.SolanaToken;
+                console.log('从SolanaToken复制成功');
+                return true;
             }
-        };
-        console.log('使用紧急备用TOKEN_PROGRAM_ID (错误恢复)');
-        return true;
+
+            // 如果还是不存在，创建必要的对象
+            console.log('创建必要的SPL Token对象');
+            if (!window.solanaWeb3) {
+                console.error('Solana Web3.js未加载');
+                throw new Error('Solana Web3.js未加载');
+            }
+
+            window.splToken = {
+                TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+                createTransferInstruction: function(fromPubkey, toPubkey, ownerPubkey, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
+                    const keys = [
+                        { pubkey: fromPubkey, isSigner: false, isWritable: true },
+                        { pubkey: toPubkey, isSigner: false, isWritable: true },
+                        { pubkey: ownerPubkey, isSigner: multiSigners.length === 0, isWritable: false }
+                    ];
+                    multiSigners.forEach(signer => {
+                        keys.push({ pubkey: signer.publicKey, isSigner: true, isWritable: false });
+                    });
+                    return new window.solanaWeb3.TransactionInstruction({
+                        keys,
+                        programId,
+                        data: new Uint8Array([3, ...new Array(8).fill(0)]) // 3是transfer指令的代码
+                    });
+                }
+            };
+            console.log('使用紧急备用TOKEN_PROGRAM_ID (错误恢复)');
+            return true;
+        } catch (error) {
+            console.error('SPL Token库初始化失败:', error);
+            throw error;
+        }
     };
 
     // 在页面加载时初始化
-    document.addEventListener('DOMContentLoaded', function() {
-        window.initSplTokenLib().catch(error => {
+    document.addEventListener('DOMContentLoaded', async function() {
+        try {
+            await window.initSplTokenLib();
+            console.log('SPL Token库初始化成功');
+        } catch (error) {
             console.error('SPL Token库初始化失败:', error);
-        });
+        }
     });
 </script>
 
