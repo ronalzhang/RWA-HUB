@@ -134,11 +134,39 @@
 
             // 初始化 Solana 连接
             let solanaConnection;
+            
+            // 检查后端API是否可用
+            async function checkApiAvailability() {
+                try {
+                    console.log('正在检查后端API可用性...');
+                    const response = await fetch('/api/health_check', {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' },
+                        cache: 'no-cache'
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('后端API健康检查结果:', data);
+                        return true;
+                    } else {
+                        console.error('后端API健康检查失败:', response.status);
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('后端API连接错误:', error);
+                    return false;
+                }
+            }
 
             // 页面加载完成后初始化
             document.addEventListener('DOMContentLoaded', async function() {
                 try {
                     console.log('页面初始化开始...');
+                    
+                    // 检查后端API可用性
+                    const apiAvailable = await checkApiAvailability();
+                    console.log('后端API可用:', apiAvailable);
                     
                     // 输出初始钱包状态
                     console.log('初始钱包状态:', window.walletState);
@@ -1518,18 +1546,25 @@
                                         console.log(`尝试使用RPC节点: ${rpcEndpoints[i]}`);
                                         
                                         // 创建新的连接对象
-                                        const tempConnection = new window.solanaWeb3.Connection(rpcEndpoints[i], 'confirmed');
+                                        const tempConnection = new window.solanaWeb3.Connection(rpcEndpoints[i], {
+                                            commitment: 'confirmed',
+                                            confirmTransactionInitialTimeout: 30000, // 30秒超时
+                                            disableRetryOnRateLimit: false
+                                        });
                                         
                                         // 设置超时
                                         const timeoutPromise = new Promise((_, reject) => 
-                                            setTimeout(() => reject(new Error('连接超时')), 10000)
+                                            setTimeout(() => reject(new Error('连接超时')), 30000) // 增加到30秒
                                         );
                                         
+                                        console.log(`正在获取最新区块哈希...`);
                                         // 尝试获取区块哈希，带超时
                                         blockhash = await Promise.race([
                                             tempConnection.getRecentBlockhash(),
                                             timeoutPromise
                                         ]);
+                                        
+                                        console.log(`成功获取区块哈希: ${blockhash.blockhash}`);
                                         
                                         // 更新连接对象并设置成功标志
                                         connection = tempConnection;
@@ -1544,7 +1579,7 @@
                                 
                                 // 所有节点都失败了
                                 if (!connectionSuccess) {
-                                    throw new Error('无法连接到任何Solana RPC节点，请稍后再试');
+                                    throw new Error('无法连接到任何Solana RPC节点，请稍后再试或使用VPN');
                                 }
                                 
                                 // 设置交易参数
@@ -1555,6 +1590,13 @@
                                 
                                 try {
                                     // 使用Phantom钱包签名并发送交易
+                                    console.log('调用钱包signAndSendTransaction...');
+                                    console.log('交易数据:', {
+                                        blockhash: blockhash.blockhash,
+                                        feePayer: walletPublicKey.toString(),
+                                        instructions: transaction.instructions.length
+                                    });
+                                    
                                     const { signature } = await window.solana.signAndSendTransaction(transaction);
                                     
                                     // 获取交易签名
@@ -1564,7 +1606,21 @@
                                     showMessage("交易已提交，等待确认...", "info");
                                 } catch (signError) {
                                     console.error('交易签名失败:', signError);
-                                    showError('交易签名失败: ' + signError.message);
+                                    // 提供更详细的错误信息
+                                    const errorMsg = signError.message || '未知错误';
+                                    console.log('错误详情:', {
+                                        message: errorMsg,
+                                        code: signError.code,
+                                        stack: signError.stack
+                                    });
+                                    
+                                    if (errorMsg.includes('timeout') || errorMsg.includes('超时')) {
+                                        showError('交易签名超时，请检查您的网络连接或使用VPN');
+                                    } else if (errorMsg.includes('User rejected')) {
+                                        showError('用户拒绝了交易签名请求');
+                                    } else {
+                                        showError('交易签名失败: ' + errorMsg);
+                                    }
                                     return;
                                 }
                                 
