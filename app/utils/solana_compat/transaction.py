@@ -47,6 +47,36 @@ class Transaction:
         self.instructions.append(instruction)
         return self
     
+    def add_memo(self, memo: str, pubkey: Optional[PublicKey] = None) -> "Transaction":
+        """
+        向交易添加备注指令
+        
+        Args:
+            memo: 备注文本
+            pubkey: 可选的签名者公钥
+        
+        Returns:
+            Transaction: 当前交易实例，用于链式调用
+        """
+        # 备注程序ID
+        memo_program_id = PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr")
+        
+        # 创建账户元数据
+        keys = []
+        if pubkey:
+            keys.append(AccountMeta(pubkey, True, False))
+        
+        # 创建备注指令
+        instruction = TransactionInstruction(
+            keys=keys,
+            program_id=memo_program_id,
+            data=bytes(memo, 'utf-8')
+        )
+        
+        # 添加指令到交易
+        self.add(instruction)
+        return self
+    
     def add_signature(self, pubkey: PublicKey, signature: bytes) -> "Transaction":
         """Add an external signature to the transaction."""
         self.signatures.append({
@@ -80,3 +110,21 @@ class Transaction:
         """Serialize the transaction to the wire format."""
         # 简化实现，实际应序列化为特定格式
         return bytes([0] * 32) 
+        
+    @staticmethod
+    def from_bytes(raw_bytes: bytes) -> "Transaction":
+        """
+        从字节数据反序列化交易
+        
+        Args:
+            raw_bytes: 经过序列化的交易字节数据
+            
+        Returns:
+            Transaction: 交易实例
+        """
+        # 在实际实现中，这里应该解析原始字节数据
+        # 这里是简化的实现
+        transaction = Transaction()
+        # 假设我们能解析出区块哈希
+        transaction.set_recent_blockhash("simulated_blockhash_from_bytes")
+        return transaction 
