@@ -1484,9 +1484,14 @@
                                 try {
                                     console.log('准备处理交易数据...');
                                     
-                                    // 直接使用服务器返回的交易数据，不进行转换
-                                    transactionBase58 = txData.serialized_transaction;
-                                    console.log('使用服务器提供的原始交易数据');
+                                    // 使用直接返回的交易对象
+                                    if (!txData.transaction) {
+                                        throw new Error('服务器未返回交易对象');
+                                    }
+                                    
+                                    transactionBase58 = txData.transaction;
+                                    console.log('使用服务器提供的交易对象');
+                                    
                                 } catch (e) {
                                     console.error('处理交易数据失败:', e);
                                     showError('处理交易数据失败: ' + e.message);
@@ -1496,18 +1501,13 @@
                                 // 使用Phantom钱包签名并发送交易
                                 console.log('使用Phantom钱包签名并发送交易...');
                                 try {
-                                    // 直接使用Phantom钱包的request API来签名交易
-                                    console.log('尝试使用Phantom的request API');
+                                    // 直接使用交易对象
+                                    console.log('尝试使用Phantom的直接交易对象签名方法');
                                     
-                                    const signature = await window.solana.request({
-                                        method: "signAndSendTransaction",
-                                        params: {
-                                            message: transactionBase58
-                                        }
-                                    });
+                                    const { signature } = await window.solana.signAndSendTransaction(transactionBase58);
                                     
                                     // 获取交易签名
-                                    txHash = signature.signature || signature;
+                                    txHash = signature;
                                     console.log('交易已提交，签名:', txHash);
                                     
                                     showMessage("交易已提交，等待确认...", "info");
@@ -1516,15 +1516,14 @@
                                     // 尝试使用第二种方法
                                     console.log('尝试使用备用方法...');
                                     try {
-                                        // 使用替代API方法
-                                        const signature = await window.solana.request({
-                                            method: "signTransaction",
-                                            params: {
-                                                message: transactionBase58
-                                            }
-                                        });
-
-                                        txHash = signature;
+                                        // 使用替代方法
+                                        const signedTransaction = await window.solana.signTransaction(transactionBase58);
+                                        
+                                        // 获取签名数据
+                                        txHash = signedTransaction.signatures?.length > 0 
+                                            ? Object.keys(signedTransaction.signatures)[0]
+                                            : "unknown-signature";
+                                            
                                         console.log('交易已签名，正在发送...');
                                         showMessage("交易已签名，正在发送...", "info");
                                         
@@ -1537,7 +1536,8 @@
                                             },
                                             body: JSON.stringify({
                                                 signature: txHash,
-                                                transaction: txData.serialized_transaction
+                                                // 传递完整的已签名交易
+                                                signedTransaction: signedTransaction
                                             })
                                         });
                                         
