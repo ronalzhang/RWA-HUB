@@ -3,6 +3,94 @@
 {% block title %}{{ asset.token_symbol }} - {{ asset.name }} | RWA-HUB{% endblock %}
 
 {% block head %}
+<!-- 费用计算函数的定义 - 放在最前面 -->
+<script>
+// 全局费用计算函数定义 - 使用立即执行函数确保作用域隔离
+(function() {
+    // 定义常量
+    window.PLATFORM_FEE_RATE = 0.035; // 3.5%平台费率
+    window.ACTUAL_PAYMENT_RATE = 0.965; // 96.5%实际支付率
+
+    // 计算平台费用
+    window.calculatePlatformFee = function(amount) {
+        return amount * window.PLATFORM_FEE_RATE;
+    };
+
+    // 计算实际支付金额
+    window.calculateActualPayment = function(amount) {
+        return amount * window.ACTUAL_PAYMENT_RATE;
+    };
+
+    // 购买处理函数
+    window.handleBuy = async function() {
+        try {
+            // 获取购买数量
+            const amountInput = document.getElementById('purchase-amount');
+            if (!amountInput) {
+                throw new Error('找不到数量输入框');
+            }
+            const amount = parseFloat(amountInput.value);
+            if (isNaN(amount) || amount <= 0) {
+                throw new Error('请输入有效的购买数量');
+            }
+
+            // 获取代币价格
+            const price = parseFloat("{{ asset.token_price }}");
+            if (isNaN(price) || price <= 0) {
+                throw new Error('无效的代币价格');
+            }
+
+            // 计算总金额和费用
+            const totalAmount = amount * price;
+            const platformFee = window.calculatePlatformFee(totalAmount);
+            const actualPayment = window.calculateActualPayment(totalAmount);
+
+            // 显示确认模态框
+            const confirmAmount = document.getElementById('confirm-amount');
+            const confirmTotal = document.getElementById('confirm-total');
+            const platformFeeDisplay = document.getElementById('platform-fee');
+            const actualPaymentDisplay = document.getElementById('actual-payment');
+            
+            if (confirmAmount) confirmAmount.value = amount;
+            if (confirmTotal) confirmTotal.value = totalAmount.toFixed(2) + ' USDC';
+            if (platformFeeDisplay) platformFeeDisplay.value = platformFee.toFixed(2) + ' USDC';
+            if (actualPaymentDisplay) actualPaymentDisplay.value = actualPayment.toFixed(2) + ' USDC';
+            
+            const buyModal = new bootstrap.Modal(document.getElementById('buyModal'));
+            buyModal.show();
+        } catch (error) {
+            console.error('购买处理失败:', error);
+            if (typeof window.showError === 'function') {
+                window.showError(error.message);
+            } else {
+                alert(error.message);
+            }
+        }
+    };
+
+    // 在页面加载完成后绑定事件
+    document.addEventListener('DOMContentLoaded', function() {
+        // 绑定购买按钮事件
+        const buyButton = document.getElementById('buy-button');
+        if (buyButton) {
+            buyButton.removeEventListener('click', window.handleBuy);
+            buyButton.addEventListener('click', window.handleBuy);
+        }
+
+        // 验证函数是否正确定义
+        if (typeof window.calculatePlatformFee !== 'function') {
+            console.error('警告：平台费用计算函数未正确定义');
+        }
+        if (typeof window.calculateActualPayment !== 'function') {
+            console.error('警告：实际支付金额计算函数未正确定义');
+        }
+        if (typeof window.handleBuy !== 'function') {
+            console.error('警告：购买处理函数未正确定义');
+        }
+    });
+})();
+</script>
+
 <!-- 添加jQuery库 -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <!-- 在head部分添加bs58库 -->
@@ -2993,7 +3081,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- 添加Solana Web3.js -->
 <script src="https://unpkg.com/@solana/web3.js@1.87.6/lib/index.iife.min.js"></script>
 <!-- 添加SPL Token库 -->
-<script src="https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js"></script>
+<script src="https://unpkg.com/@solana/spl-token@0.3.8/dist/index.iife.js"></script>
 <script>
     // 确保SPL Token库正确加载
     window.initSplTokenLib = async function() {
@@ -3105,93 +3193,12 @@ document.addEventListener('DOMContentLoaded', function() {
         validateTradeRecord 
     } from '/static/js/utils/apiValidator.js';
 
-    // 计算平台费用
-    function calculatePlatformFee(amount) {
-        // 平台费率 3.5%
-        const FEE_RATE = 0.035;
-        return amount * FEE_RATE;
-    }
-
-    // 计算实际支付金额（扣除平台费用后）
-    function calculateActualPayment(amount) {
-        const platformFee = calculatePlatformFee(amount);
-        return amount - platformFee;
-    }
-
-    // 将函数设置为全局变量
-    window.calculatePlatformFee = calculatePlatformFee;
-    window.calculateActualPayment = calculateActualPayment;
-    window.validateTradeHistoryParams = validateTradeHistoryParams;
-    window.validateApiResponse = validateApiResponse;
-    window.validateTradeRecord = validateTradeRecord;
-    window.validateCreateTradeParams = validateCreateTradeParams;
-    window.validateUpdateTradeParams = validateUpdateTradeParams;
-
     // 检查Web3环境
     try {
         checkWeb3Environment();
     } catch (error) {
         console.error('Web3环境检查失败:', error);
         showError(error.message);
-    }
-
-    // 购买功能
-    async function handleBuy() {
-        try {
-            // 获取购买数量
-            const amountInput = document.getElementById('purchase-amount');
-            if (!amountInput) {
-                throw new Error('找不到数量输入框');
-            }
-            const amount = parseFloat(amountInput.value);
-            if (isNaN(amount) || amount <= 0) {
-                throw new Error('请输入有效的购买数量');
-            }
-
-            // 获取代币价格
-            const price = parseFloat("{{ asset.token_price }}");
-            if (isNaN(price) || price <= 0) {
-                throw new Error('无效的代币价格');
-            }
-
-            // 计算总金额和费用
-            const totalAmount = amount * price;
-            const platformFee = calculatePlatformFee(totalAmount);
-            const actualPayment = calculateActualPayment(totalAmount);
-
-            // 获取钱包地址
-            const walletAddress = await getWalletAddress();
-            if (!walletAddress) {
-                throw new Error('请先连接钱包');
-            }
-
-            // 检查真实USDC余额
-            const realBalance = await checkUSDCBalance(walletAddress);
-            console.log('当前钱包USDC余额:', realBalance);
-            
-            if (realBalance < totalAmount) {
-                throw new Error(`USDC余额不足。需要 ${totalAmount.toFixed(2)} USDC，当前余额 ${realBalance.toFixed(2)} USDC`);
-            }
-
-            // 显示确认模态框
-            const confirmAmount = document.getElementById('confirm-amount');
-            const confirmTotal = document.getElementById('confirm-total');
-            const platformFeeDisplay = document.getElementById('platform-fee');
-            const actualPaymentDisplay = document.getElementById('actual-payment');
-            
-            if (confirmAmount) confirmAmount.value = amount;
-            if (confirmTotal) confirmTotal.value = totalAmount.toFixed(2) + ' USDC';
-            if (platformFeeDisplay) platformFeeDisplay.value = platformFee.toFixed(2) + ' USDC';
-            if (actualPaymentDisplay) actualPaymentDisplay.value = actualPayment.toFixed(2) + ' USDC';
-            
-            const buyModal = new bootstrap.Modal(document.getElementById('buyModal'));
-            buyModal.show();
-            
-            // ... rest of the handleBuy function ...
-        } catch (error) {
-            console.error('购买失败:', error);
-            showError(error.message || '购买失败，请稍后重试');
-        }
     }
 
     // 刷新钱包资产列表
@@ -3203,340 +3210,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // 导出函数供其他模块使用
-    window.handleBuy = handleBuy;
     window.refreshWalletAssets = refreshWalletAssets;
-
-    // 执行API验证测试
-    async function runApiTests() {
-        console.log('开始执行API验证测试...');
-        
-        try {
-            const result = await runApiValidation();
-            if (result.success) {
-                console.log('✅ API验证通过!');
-                showMessage('API验证通过', 'success');
-            } else {
-                console.error('❌ API验证失败:', result.errors);
-                showMessage('API验证失败: ' + result.errors.join(', '), 'danger');
-            }
-        } catch (error) {
-            console.error('API验证执行出错:', error);
-            showMessage('API验证执行出错: ' + error.message, 'danger');
-        }
-    }
-
-    // 页面加载完成后运行测试
-    document.addEventListener('DOMContentLoaded', () => {
-        // 添加测试按钮
-        const testButton = document.createElement('button');
-        testButton.className = 'btn btn-info position-fixed bottom-0 end-0 m-3';
-        testButton.innerHTML = '<i class="fas fa-vial me-2"></i>运行API验证';
-        testButton.onclick = runApiTests;
-        document.body.appendChild(testButton);
-        
-        // 自动运行测试
-        setTimeout(runApiTests, 2000);
-    });
-</script>
-
-<script>
-// 添加验证函数的定义
-window.validateTradeHistoryParams = function(params) {
-    // 验证asset_id
-    if (!params.asset_id || typeof params.asset_id !== 'number') {
-        return {
-            isValid: false,
-            errors: ['资产ID必须是数字']
-        };
-    }
-
-    // 验证page
-    if (!params.page || typeof params.page !== 'number' || params.page < 1) {
-        return {
-            isValid: false,
-            errors: ['页码必须是大于0的数字']
-        };
-    }
-
-    // 验证per_page
-    if (!params.per_page || typeof params.per_page !== 'number' || params.per_page < 1 || params.per_page > 100) {
-        return {
-            isValid: false,
-            errors: ['每页数量必须是1-100之间的数字']
-        };
-    }
-
-    return {
-        isValid: true,
-        errors: []
-    };
-};
-
-window.validateApiResponse = function(response, endpoint) {
-    if (endpoint === 'GET_TRADE_HISTORY') {
-        // 验证trades数组
-        if (!response.trades || !Array.isArray(response.trades)) {
-            return {
-                isValid: false,
-                errors: ['响应必须包含trades数组']
-            };
-        }
-
-        // 验证pagination对象
-        if (!response.pagination || typeof response.pagination !== 'object') {
-            return {
-                isValid: false,
-                errors: ['响应必须包含pagination对象']
-            };
-        }
-
-        return {
-            isValid: true,
-            errors: []
-        };
-    }
-
-    return {
-        isValid: true,
-        errors: []
-    };
-};
-
-window.validateTradeRecord = function(trade) {
-    const errors = [];
-
-    // 验证必需字段
-    if (!trade.id || typeof trade.id !== 'number') {
-        errors.push('交易ID无效');
-    }
-
-    if (!trade.created_at) {
-        errors.push('创建时间无效');
-    }
-
-    if (!trade.type || !['buy', 'sell'].includes(trade.type)) {
-        errors.push('交易类型无效');
-    }
-
-    if (!trade.amount || isNaN(parseFloat(trade.amount))) {
-        errors.push('交易数量无效');
-    }
-
-    if (!trade.price || isNaN(parseFloat(trade.price))) {
-        errors.push('交易价格无效');
-    }
-
-    if (!trade.status) {
-        errors.push('交易状态无效');
-    }
-
-    return {
-        isValid: errors.length === 0,
-        errors: errors
-    };
-};
-
-// 计算平台费用
-function calculatePlatformFee(amount) {
-    // 平台费率 3.5%
-    const FEE_RATE = 0.035;
-    return amount * FEE_RATE;
-}
-
-// 计算实际支付金额（扣除平台费用后）
-function calculateActualPayment(amount) {
-    const platformFee = calculatePlatformFee(amount);
-    return amount - platformFee;
-}
-</script>
-
-<script>
-// 在页面最开始就定义这些函数
-(function() {
-    // 计算平台费用
-    window.calculatePlatformFee = function(amount) {
-        // 平台费率 3.5%
-        const FEE_RATE = 0.035;
-        return amount * FEE_RATE;
-    };
-
-    // 计算实际支付金额（扣除平台费用后）
-    window.calculateActualPayment = function(amount) {
-        const platformFee = window.calculatePlatformFee(amount);
-        return amount - platformFee;
-    };
-})();
-</script>
-
-<script>
-// 全局定义费用计算函数
-window.calculatePlatformFee = function(amount) {
-    const platformFeeRate = 0.035; // 3.5%平台费率
-    return amount * platformFeeRate;
-};
-
-window.calculateActualPayment = function(amount) {
-    const actualPaymentRate = 0.965; // 96.5%实际支付率
-    return amount * actualPaymentRate;
-};
-
-// 确保函数在全局范围内可用
-if (typeof window.calculatePlatformFee !== 'function') {
-    console.error('平台费用计算函数未正确定义');
-}
-</script>
-
-<script>
-// 在所有其他脚本之前定义这些全局函数
-(function() {
-    // 计算平台费用
-    window.calculatePlatformFee = function(amount) {
-        const platformFeeRate = 0.035; // 3.5%平台费率
-        return amount * platformFeeRate;
-    };
-
-    // 计算实际支付金额
-    window.calculateActualPayment = function(amount) {
-        const actualPaymentRate = 0.965; // 96.5%实际支付率
-        return amount * actualPaymentRate;
-    };
-
-    // 定义handleBuy函数
-    window.handleBuy = async function() {
-        try {
-            // 获取购买数量
-            const amountInput = document.getElementById('purchase-amount');
-            if (!amountInput) {
-                throw new Error('找不到数量输入框');
-            }
-            const amount = parseFloat(amountInput.value);
-            if (isNaN(amount) || amount <= 0) {
-                throw new Error('请输入有效的购买数量');
-            }
-
-            // 获取代币价格
-            const price = parseFloat("{{ asset.token_price }}");
-            if (isNaN(price) || price <= 0) {
-                throw new Error('无效的代币价格');
-            }
-
-            // 计算总金额和费用
-            const totalAmount = amount * price;
-            const platformFee = window.calculatePlatformFee(totalAmount);
-            const actualPayment = window.calculateActualPayment(totalAmount);
-
-            // 获取钱包地址
-            const walletAddress = await window.getWalletAddress();
-            if (!walletAddress) {
-                throw new Error('请先连接钱包');
-            }
-
-            // 检查USDC余额
-            const realBalance = await window.checkUSDCBalance(walletAddress);
-            console.log('当前钱包USDC余额:', realBalance);
-            
-            if (realBalance < totalAmount) {
-                throw new Error(`USDC余额不足。需要 ${totalAmount.toFixed(2)} USDC，当前余额 ${realBalance.toFixed(2)} USDC`);
-            }
-
-            // 显示确认模态框
-            const confirmAmount = document.getElementById('confirm-amount');
-            const confirmTotal = document.getElementById('confirm-total');
-            const platformFeeDisplay = document.getElementById('platform-fee');
-            const actualPaymentDisplay = document.getElementById('actual-payment');
-            
-            if (confirmAmount) confirmAmount.value = amount;
-            if (confirmTotal) confirmTotal.value = totalAmount.toFixed(2) + ' USDC';
-            if (platformFeeDisplay) platformFeeDisplay.value = platformFee.toFixed(2) + ' USDC';
-            if (actualPaymentDisplay) actualPaymentDisplay.value = actualPayment.toFixed(2) + ' USDC';
-            
-            const buyModal = new bootstrap.Modal(document.getElementById('buyModal'));
-            buyModal.show();
-        } catch (error) {
-            console.error('购买处理失败:', error);
-            window.showError(error.message);
-        }
-    };
-})();
-
-// 在DOMContentLoaded事件中绑定handleBuy函数
-document.addEventListener('DOMContentLoaded', function() {
-    const buyButton = document.getElementById('buy-button');
-    if (buyButton) {
-        buyButton.removeEventListener('click', window.handleBuy);
-        buyButton.addEventListener('click', window.handleBuy);
-    }
-});
-</script>
-
-<script>
-// 全局定义费用计算函数
-window.PLATFORM_FEE_RATE = 0.035; // 3.5%平台费率
-window.ACTUAL_PAYMENT_RATE = 0.965; // 96.5%实际支付率
-
-window.calculatePlatformFee = function(amount) {
-    return amount * window.PLATFORM_FEE_RATE;
-};
-
-window.calculateActualPayment = function(amount) {
-    return amount * window.ACTUAL_PAYMENT_RATE;
-};
-
-// 定义handleBuy函数
-window.handleBuy = async function() {
-    try {
-        // 获取购买数量
-        const amountInput = document.getElementById('purchase-amount');
-        if (!amountInput) {
-            throw new Error('找不到数量输入框');
-        }
-        const amount = parseFloat(amountInput.value);
-        if (isNaN(amount) || amount <= 0) {
-            throw new Error('请输入有效的购买数量');
-        }
-
-        // 获取代币价格
-        const price = parseFloat("{{ asset.token_price }}");
-        if (isNaN(price) || price <= 0) {
-            throw new Error('无效的代币价格');
-        }
-
-        // 计算总金额和费用
-        const totalAmount = amount * price;
-        const platformFee = window.calculatePlatformFee(totalAmount);
-        const actualPayment = window.calculateActualPayment(totalAmount);
-
-        // 显示确认模态框
-        const confirmAmount = document.getElementById('confirm-amount');
-        const confirmTotal = document.getElementById('confirm-total');
-        const platformFeeDisplay = document.getElementById('platform-fee');
-        const actualPaymentDisplay = document.getElementById('actual-payment');
-        
-        if (confirmAmount) confirmAmount.value = amount;
-        if (confirmTotal) confirmTotal.value = totalAmount.toFixed(2) + ' USDC';
-        if (platformFeeDisplay) platformFeeDisplay.value = platformFee.toFixed(2) + ' USDC';
-        if (actualPaymentDisplay) actualPaymentDisplay.value = actualPayment.toFixed(2) + ' USDC';
-        
-        const buyModal = new bootstrap.Modal(document.getElementById('buyModal'));
-        buyModal.show();
-    } catch (error) {
-        console.error('购买处理失败:', error);
-        if (typeof window.showError === 'function') {
-            window.showError(error.message);
-        } else {
-            alert(error.message);
-        }
-    }
-};
-
-// 在页面加载完成后绑定事件
-document.addEventListener('DOMContentLoaded', function() {
-    // 绑定购买按钮事件
-    const buyButton = document.getElementById('buy-button');
-    if (buyButton) {
-        buyButton.removeEventListener('click', window.handleBuy);
-        buyButton.addEventListener('click', window.handleBuy);
-    }
-});
 </script>
 
