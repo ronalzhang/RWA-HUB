@@ -1524,11 +1524,17 @@
                                 // 显示等待提示
                                 showMessage("正在处理交易...", "info");
                                 
-                                // 创建实际的代币转账交易
+                                // 创建简单的memo交易
                                 // 假设window.solanaWeb3已经通过CDN加载
                                 if (!window.solanaWeb3) {
                                     console.error('加载solanaWeb3库失败');
                                     throw new Error('加载solanaWeb3库失败，请刷新页面重试');
+                                }
+                                
+                                // 检查SPL Token库是否加载
+                                if (!window.splToken) {
+                                    console.error('SPL Token库未加载');
+                                    throw new Error('SPL Token库未加载，请刷新页面重试');
                                 }
                                 
                                 // 创建连接对象
@@ -1542,61 +1548,94 @@
                                 // 获取钱包公钥
                                 const walletPublicKey = new window.solanaWeb3.PublicKey(window.solana.publicKey.toString());
                                 
-                                // 定义系统接收方钱包地址 - 这应该是您的收款钱包地址
-                                const receiverPublicKey = new window.solanaWeb3.PublicKey("8cU6PAtRTRgfyJu48qfz2hQP5aMGwooxqrCZtyB6UcYP"); // 替换为您的实际收款钱包地址
+                                // 定义系统接收方钱包地址
+                                const receiverPublicKey = new window.solanaWeb3.PublicKey("8cU6PAtRTRgfyJu48qfz2hQP5aMGwooxqrCZtyB6UcYP");
                                 
-                                // USDC代币的程序ID和Mint地址
-                                const TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-                                const USDC_MINT = new window.solanaWeb3.PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"); // Solana上USDC的Mint地址
+                                // USDC代币的Mint地址
+                                const USDC_MINT = new window.solanaWeb3.PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
                                 
-                                // 获取发送方的USDC代币账户
+                                // 计算USDC转账金额（保留2位小数）
+                                const rawAmount = parseFloat(tradeInfo.price);
+                                const formattedAmount = parseFloat(rawAmount.toFixed(2)); // 总金额只保留2位小数
+                                const transferAmount = formattedAmount * 1000000; // 转换为USDC的最小单位，USDC有6位小数
+                                console.log(`准备转账${formattedAmount} USDC (${transferAmount}个最小单位)`);
+                                
+                                // 获取用户的USDC代币账户
+                                console.log("查询用户USDC代币账户...");
                                 const userTokenAccounts = await connection.getParsedTokenAccountsByOwner(
                                     walletPublicKey,
                                     { mint: USDC_MINT }
                                 );
                                 
-                                // 确保用户有USDC代币账户
+                                // 确认用户有USDC代币账户
                                 if (userTokenAccounts.value.length === 0) {
                                     throw new Error("您没有USDC代币账户，请先在钱包中添加USDC代币");
                                 }
                                 
+                                // 获取用户的代币账户地址
                                 const sourceTokenAccount = userTokenAccounts.value[0].pubkey;
+                                console.log("用户USDC账户:", sourceTokenAccount.toString());
                                 
-                                // 获取或创建接收方的代币账户
-                                const receiverTokenAccounts = await connection.getParsedTokenAccountsByOwner(
-                                    receiverPublicKey,
-                                    { mint: USDC_MINT }
-                                );
-                                
+                                // 处理接收方代币账户
+                                console.log("处理接收方USDC代币账户...");
                                 let destinationTokenAccount;
-                                if (receiverTokenAccounts.value.length > 0) {
-                                    destinationTokenAccount = receiverTokenAccounts.value[0].pubkey;
-                                } else {
-                                    // 如果接收方没有USDC账户，则需要创建一个
-                                    throw new Error("接收方没有USDC代币账户，请联系管理员");
+                                
+                                try {
+                                    // 查询接收方是否已有USDC账户
+                                    const receiverTokenAccounts = await connection.getParsedTokenAccountsByOwner(
+                                        receiverPublicKey,
+                                        { mint: USDC_MINT }
+                                    );
+                                    
+                                    if (receiverTokenAccounts.value.length > 0) {
+                                        // 已有账户，直接使用
+                                        destinationTokenAccount = receiverTokenAccounts.value[0].pubkey;
+                                        console.log("接收方已有USDC代币账户:", destinationTokenAccount.toString());
+                                    } else {
+                                        // 没有账户，计算关联代币账户地址
+                                        destinationTokenAccount = window.splToken.getAssociatedTokenAddressSync(
+                                            USDC_MINT,
+                                            receiverPublicKey,
+                                            false
+                                        );
+                                        
+                                        // 尝试查询该账户是否存在
+                                        try {
+                                            await connection.getAccountInfo(destinationTokenAccount);
+                                            console.log("接收方关联代币账户已存在:", destinationTokenAccount.toString());
+                                        } catch (accountError) {
+                                            // 账户不存在，需要创建
+                                            console.log("接收方需要创建USDC代币账户");
+                                            showMessage("需要为接收方创建USDC账户，将收取少量SOL作为网络费用", "info");
+                                            
+                                            // 创建账户指令
+                                            const createAccountInstruction = window.splToken.createAssociatedTokenAccountInstruction(
+                                                walletPublicKey, // 付款方(交易费用)
+                                                destinationTokenAccount, // 新账户地址
+                                                receiverPublicKey, // 账户所有者
+                                                USDC_MINT // 代币类型
+                                            );
+                                            
+                                            // 添加创建账户指令
+                                            transaction.add(createAccountInstruction);
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.error("查询接收方账户出错:", error);
+                                    throw new Error("无法处理接收方代币账户: " + error.message);
                                 }
                                 
-                                // 创建代币转账指令
-                                // USDC有6位小数，所以需要乘以1000000
-                                const transferAmount = parseFloat(tradeInfo.price) * 1000000; // 转换为USDC的最小单位
-                                console.log(`准备转账${tradeInfo.price} USDC (${transferAmount}个最小单位)`);
-                                
-                                // 创建转账指令
-                                // 使用正确的SPL代币库语法
-                                if (!window.splToken) {
-                                    throw new Error("SPL Token库未正确加载，请刷新页面");
-                                }
-                                
-                                // 使用@solana/spl-token库创建转账指令
+                                // 创建USDC转账指令
+                                console.log("创建USDC转账指令...");
                                 const transferInstruction = window.splToken.createTransferInstruction(
                                     sourceTokenAccount,
                                     destinationTokenAccount,
                                     walletPublicKey,
-                                    BigInt(Math.floor(transferAmount)),  // 确保是整数
-                                    []  // 多签账户，这里不需要
+                                    BigInt(Math.floor(transferAmount)), // 确保是整数
+                                    [] // 多签账户，这里不需要
                                 );
                                 
-                                // 添加转账指令到交易
+                                // 添加USDC转账指令到交易
                                 transaction.add(transferInstruction);
                                 
                                 // 创建Memo程序ID
@@ -1615,7 +1654,6 @@
                                         }
                                     ],
                                     programId: memoProgramId,
-                                    // 解决Buffer not defined问题 - 使用Uint8Array替代
                                     data: new TextEncoder().encode(memoData)
                                 });
                                 
