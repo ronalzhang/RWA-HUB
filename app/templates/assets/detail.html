@@ -1496,16 +1496,16 @@
                                 
                                 // 定义多个RPC节点地址以便在主节点失败时切换
                                 const rpcEndpoints = [
-                                    'https://api.mainnet-beta.solana.com',  // 官方主网节点 - 测试可用
-                                    'https://solana-mainnet.g.alchemy.com/v2/demo', // Alchemy免费节点
-                                    'https://mainnet.helius-rpc.com/?api-key=1d8740dc-e5f4-421c-b823-e1bad1889eff', // Helius免费节点
-                                    'https://solana.blockpi.network/v1/rpc/public',
-                                    'https://api.devnet.solana.com',  // 官方开发网节点
-                                    'https://api.testnet.solana.com',  // 官方测试网节点
-                                    'https://rpc.ankr.com/solana',  // Ankr节点，需要API密钥
-                                    'https://free.rpcpool.com',  // RPC Pool节点，需要API密钥
-                                    'https://solana-mainnet.rpc.extrnode.com', // Extrnode节点，需要API密钥
-                                    'https://solana-api.projectserum.com'
+                                    'https://api.mainnet-beta.solana.com', // 官方Solana主网节点
+                                    'https://explorer-api.mainnet-beta.solana.com', // Solana备用节点
+                                    'https://solana.publicnode.com', // Allnodes提供的免费节点
+                                    'https://solana-mainnet.public.blastapi.io', // BlastAPI免费节点
+                                    'https://solana-api.syndica.io/access-token/bEGnPnYJUBz8Z82x293XJQpoSQMTVxkE/rpc', // Syndica免费节点
+                                    'https://ssc-dao.genesysgo.net', // GenesysGo免费节点
+                                    'https://api.ligmanode.org', // Ligma Node免费节点
+                                    'https://solana-api.tt-prod.net', // 备用节点
+                                    'https://rpc.ankr.com/solana', // Ankr节点，需要API密钥
+                                    'https://solana-mainnet.rpc.extrnode.com' // Extrnode节点，需要API密钥
                                 ];
                                 
                                 // 获取最新的区块哈希 - 使用多个节点轮询
@@ -1518,20 +1518,33 @@
                                         showMessage(`正在连接Solana网络(${i+1}/${rpcEndpoints.length})...`, "info");
                                         console.log(`尝试使用RPC节点: ${rpcEndpoints[i]}`);
                                         
-                                        // 创建新的连接对象
+                                        // 创建新的连接对象，使用更完整的配置
                                         const tempConnection = new window.solanaWeb3.Connection(rpcEndpoints[i], {
                                             commitment: 'confirmed',
-                                            confirmTransactionInitialTimeout: 60000 // 增加交易确认超时时间到60秒
+                                            confirmTransactionInitialTimeout: 60000, // 增加交易确认超时时间到60秒
+                                            disableRetryOnRateLimit: false, // 开启速率限制时重试
+                                            fetch: async (url, options) => {
+                                                // 自定义fetch，添加更多重试和超时选项
+                                                return fetch(url, {
+                                                    ...options,
+                                                    headers: {
+                                                        ...options.headers,
+                                                        'Content-Type': 'application/json'
+                                                    },
+                                                    // 设置更长的超时时间
+                                                    signal: AbortSignal.timeout(40000) // 40秒超时
+                                                });
+                                            }
                                         });
                                         
-                                        // 设置超时 - 从10秒增加到30秒
+                                        // 设置超时 - 从10秒增加到40秒
                                         const timeoutPromise = new Promise((_, reject) => 
-                                            setTimeout(() => reject(new Error('连接超时')), 30000)
+                                            setTimeout(() => reject(new Error('连接超时')), 40000)
                                         );
                                         
                                         // 尝试获取区块哈希，带超时
                                         blockhash = await Promise.race([
-                                            tempConnection.getRecentBlockhash(),
+                                            tempConnection.getRecentBlockhash('confirmed'),
                                             timeoutPromise
                                         ]);
                                         
