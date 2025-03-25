@@ -1454,12 +1454,18 @@
                         throw new Error('无效的代币价格');
                     }
 
+                    // 获取钱包地址
+                    const walletAddress = window.ethereum.selectedAddress;
+                    if (!walletAddress) {
+                        throw new Error('请先连接钱包');
+                    }
+
                     // 创建交易
-                    const response = await fetch('/trades/create', {
+                    const response = await fetch('/api/trades/create', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-Eth-Address': window.ethereum.selectedAddress
+                            'X-Eth-Address': walletAddress
                         },
                         body: JSON.stringify({
                             asset_id: parseInt("{{ asset.id }}"),
@@ -1473,17 +1479,26 @@
                     const responseText = await response.text();
                     console.log('API响应:', responseText);
 
+                    // 检查响应状态
+                    if (!response.ok) {
+                        if (response.status === 404) {
+                            throw new Error('交易服务暂时不可用，请稍后再试');
+                        }
+                        try {
+                            const errorData = JSON.parse(responseText);
+                            throw new Error(errorData.error || '创建交易失败');
+                        } catch (e) {
+                            throw new Error('创建交易失败，请稍后重试');
+                        }
+                    }
+
                     // 尝试解析JSON
                     let data;
                     try {
                         data = JSON.parse(responseText);
                     } catch (e) {
                         console.error('JSON解析错误:', e);
-                        throw new Error('服务器响应格式错误');
-                    }
-
-                    if (!response.ok) {
-                        throw new Error(data.error || '创建交易失败');
+                        throw new Error('服务器响应格式错误，请稍后重试');
                     }
 
                     // 显示成功消息

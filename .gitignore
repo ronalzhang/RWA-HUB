@@ -111,3 +111,9 @@ ignition/deployments/chain-31337
 
 # 其他无关文件
 fix_instructions.md
+
+# 文档文件
+docs/
+app/docs/
+*.md
+!README.md
