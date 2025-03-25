@@ -1496,14 +1496,15 @@
                                 
                                 // 定义多个RPC节点地址以便在主节点失败时切换
                                 const rpcEndpoints = [
-                                    'https://api.mainnet-beta.solana.com',
-                                    'https://api.devnet.solana.com',
-                                    'https://api.testnet.solana.com',
-                                    window.solanaWeb3.clusterApiUrl('mainnet-beta'),
+                                    'https://api.mainnet-beta.solana.com',  // 官方主网节点 - 测试可用
+                                    'https://solana-mainnet.g.alchemy.com/v2/demo', // Alchemy免费节点
+                                    'https://mainnet.helius-rpc.com/?api-key=1d8740dc-e5f4-421c-b823-e1bad1889eff', // Helius免费节点
                                     'https://solana.blockpi.network/v1/rpc/public',
-                                    'https://rpc.ankr.com/solana',
-                                    'https://free.rpcpool.com',
-                                    'https://solana-mainnet.rpc.extrnode.com',
+                                    'https://api.devnet.solana.com',  // 官方开发网节点
+                                    'https://api.testnet.solana.com',  // 官方测试网节点
+                                    'https://rpc.ankr.com/solana',  // Ankr节点，需要API密钥
+                                    'https://free.rpcpool.com',  // RPC Pool节点，需要API密钥
+                                    'https://solana-mainnet.rpc.extrnode.com', // Extrnode节点，需要API密钥
                                     'https://solana-api.projectserum.com'
                                 ];
                                 
@@ -1518,11 +1519,14 @@
                                         console.log(`尝试使用RPC节点: ${rpcEndpoints[i]}`);
                                         
                                         // 创建新的连接对象
-                                        const tempConnection = new window.solanaWeb3.Connection(rpcEndpoints[i], 'confirmed');
+                                        const tempConnection = new window.solanaWeb3.Connection(rpcEndpoints[i], {
+                                            commitment: 'confirmed',
+                                            confirmTransactionInitialTimeout: 60000 // 增加交易确认超时时间到60秒
+                                        });
                                         
-                                        // 设置超时
+                                        // 设置超时 - 从10秒增加到30秒
                                         const timeoutPromise = new Promise((_, reject) => 
-                                            setTimeout(() => reject(new Error('连接超时')), 10000)
+                                            setTimeout(() => reject(new Error('连接超时')), 30000)
                                         );
                                         
                                         // 尝试获取区块哈希，带超时
