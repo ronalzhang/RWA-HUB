@@ -2992,7 +2992,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <script type="module">
-    import { API_ENDPOINTS, CONTRACT_CONFIG, TradeContractABI, USDC_ABI } from '/static/js/config/api.js';
+    import { API_ENDPOINTS, CONTRACT_CONFIG } from '/static/js/config/api.js';
     import { 
         checkWeb3Environment, 
         getWalletAddress, 
@@ -3001,8 +3001,12 @@ document.addEventListener('DOMContentLoaded', function() {
         executeTrade, 
         updateTradeStatus 
     } from '/static/js/utils/web3.js';
-    import { validateCreateTradeParams, validateUpdateTradeParams, validateApiResponse } from '/static/js/utils/apiValidator.js';
-    import { runApiValidation } from '/static/js/utils/apiValidator.js';
+    import { 
+        validateCreateTradeParams, 
+        validateUpdateTradeParams, 
+        validateTradeHistoryParams,
+        validateApiResponse 
+    } from '/static/js/utils/apiValidator.js';
 
     // 检查Web3环境
     try {
