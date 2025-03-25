@@ -1428,7 +1428,7 @@
                     showMessage("交易已提交，正在等待确认...", "info");
                     
                     // 获取交易信息
-                    const getTradeResponse = await fetch(`/api/trades/${tradeId}`);
+                    const getTradeResponse = await fetch(`/api/trades/${tradeId}?address=${dbAddress}`);
                     if (!getTradeResponse.ok) {
                         throw new Error('获取交易信息失败');
                     }
@@ -1564,7 +1564,7 @@
                                 let confirmed = false;
                                 let attempts = 0;
                                 
-                                while (!attempts < 10) {
+                                while (!confirmed && attempts < 10) {
                                     attempts++;
                                     try {
                                         // 请求后端检查交易状态
@@ -1599,71 +1599,47 @@
                             showError(`不支持的钱包类型: ${walletType}`);
                             return;
                         }
-                        
-                        // 交易已完成，更新后端数据
-                        if (txHash) {
-                            const updateResponse = await fetch(`/api/trades/${tradeId}/update`, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-Eth-Address': dbAddress
-                                },
-                                body: JSON.stringify({
-                                    status: 'completed',
-                                    tx_hash: txHash
-                                })
-                            });
-                            
-                            if (!updateResponse.ok) {
-                                const errorData = await updateResponse.json();
-                                console.error('交易状态更新失败:', errorData);
-                                showError('交易状态更新失败');
-                                return;
-                            }
-                            
-                            const result = await updateResponse.json();
-                            console.log('交易状态更新成功:', result);
-                            
-                            // 更新剩余可购买量
-                            if (result.remaining_supply !== undefined) {
-                                // 更新全局变量
-                                actualPurchasable = result.remaining_supply;
-                                maxPurchaseAmount = result.remaining_supply;
-                                remainingSupply = result.remaining_supply;
-                                
-                                // 更新界面显示
-                                const maxPurchaseElement = document.getElementById('max-purchase-amount');
-                                if (maxPurchaseElement) {
-                                    maxPurchaseElement.textContent = new Intl.NumberFormat().format(remainingSupply);
-                                }
-                            }
-                            
-                            // 显示交易成功消息
-                            showMessage("交易已完成！", "success");
-                            
-                            // 交易完成后重新加载交易历史和刷新钱包资产列表
-                            loadTradeHistory();
-                            
-                            // 立即刷新钱包资产列表，确保显示最新数据
-                            console.log('交易完成，立即刷新钱包资产列表');
-                            if (typeof loadUserAssets === 'function') {
-                                loadUserAssets();
-                            }
-                            
-                            // 延迟1秒后再次刷新，确保后端数据已完全更新
-                            setTimeout(() => {
-                                console.log('延迟刷新钱包资产列表');
-                                if (typeof loadUserAssets === 'function') {
-                                    loadUserAssets();
-                                }
-                            }, 1000);
-                        }
-                    } else {
-                        throw new Error('钱包未连接或不可用');
                     }
+                    
+                    // 更新交易状态
+                    const updateResponse = await fetch(`/api/trades/${tradeId}/update`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Eth-Address': dbAddress
+                        },
+                        body: JSON.stringify({
+                            status: 'completed',
+                            tx_hash: txHash || 'blockchain_confirmed'
+                        })
+                    });
+                    
+                    if (!updateResponse.ok) {
+                        const errorData = await updateResponse.json();
+                        console.error('更新交易状态失败:', errorData);
+                        showError('交易完成，但更新状态失败');
+                        return;
+                    }
+                    
+                    // 交易完成，更新UI
+                    showSuccess('购买成功！');
+                    console.log('手动更新资产信息成功，新剩余数量: ' + (Number(remainingSupply) - Number(tradeInfo.amount)));
+                    
+                    // 更新剩余供应量
+                    remainingSupply = (Number(remainingSupply) - Number(tradeInfo.amount)).toString();
+                    
+                    // 刷新交易历史和资产信息
+                    fetchTransactionHistory();
+                    refreshAssetInfo();
+                    
                 } catch (error) {
                     console.error('处理交易过程中出错:', error);
                     showError('处理交易失败: ' + error.message);
+                } finally {
+                    // 重置按钮状态
+                    const buyButton = document.getElementById('buy-button');
+                    buyButton.disabled = false;
+                    buyButton.textContent = '购买';
                 }
             }
 

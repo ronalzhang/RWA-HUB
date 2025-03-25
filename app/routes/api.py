@@ -2624,12 +2624,33 @@ def get_trade(trade_id):
         # 获取交易记录
         trade = Trade.query.get_or_404(trade_id)
         
+        # 从请求中尝试获取用户地址
+        user_address = None
+        if 'X-Eth-Address' in request.headers:
+            user_address = request.headers.get('X-Eth-Address')
+        elif request.args.get('address'):
+            user_address = request.args.get('address')
+        elif hasattr(g, 'eth_address'):
+            user_address = g.eth_address
+            
+        # 如果找不到地址，返回交易基本信息（非敏感字段）
+        if not user_address:
+            # 返回有限的交易信息，不包含敏感详情
+            trade_data = {
+                'id': trade.id,
+                'asset_id': trade.asset_id,
+                'amount': trade.amount,
+                'price': trade.price,
+                'status': trade.status,
+                'created_at': trade.created_at.isoformat() if trade.created_at else None
+            }
+            return jsonify(trade_data)
+            
         # 检查权限 - 只有交易创建者或管理员可以获取详情
-        user_address = g.eth_address
-        if not is_admin() and trade.trader_address.lower() != user_address.lower():
+        if not is_admin(user_address) and trade.trader_address.lower() != user_address.lower():
             return jsonify({'error': '无权限访问该交易'}), 403
             
-        # 转换为字典并返回
+        # 转换为字典并返回完整信息
         return jsonify(trade.to_dict())
         
     except Exception as e:
