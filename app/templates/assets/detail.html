@@ -1612,7 +1612,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
 
                     // 检查真实USDC余额
-                    const realBalance = await checkSolanaUSDCBalance(walletAddress);
+                    const realBalance = await window.checkSolanaUSDCBalance(walletAddress);
                     console.log('当前钱包USDC余额:', realBalance);
                     
                     if (realBalance < totalAmount) {
