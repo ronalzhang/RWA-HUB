@@ -1618,6 +1618,18 @@
             overflow: hidden;
         }
     </style>
+
+    <!-- 添加bs58库，确保所有页面都能使用 -->
+    <script src="https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/index.js"></script>
+    
+    <!-- 添加Solana Web3.js库 -->
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script>
+        // 确保Solana Web3库可用
+        window.solanaWeb3 = window.solanaWeb3 || solanaWeb3;
+    </script>
+
+    <!-- Bootstrap 核心CSS -->
 </head>
 <body>
     <!-- 导航栏 -->
