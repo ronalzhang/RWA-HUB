@@ -218,15 +218,33 @@ def prepare_transaction(user_address, asset_id, token_symbol, amount, price, tra
         # 将指令数据序列化
         instruction_bytes = json.dumps(instruction_data).encode('utf-8')
         
+        # 设置最近的区块哈希
+        transaction.set_recent_blockhash("simulated_blockhash_for_dev")
+        
         # 将交易序列化为Base64编码
         serialized_tx = base64.b64encode(transaction.serialize()).decode('utf-8')
         
-        # 返回交易数据
-        return {
-            "serialized_transaction": serialized_tx,
-            "instruction_data": base64.b64encode(instruction_bytes).decode('utf-8'),
-            "recent_blockhash": "simulated_blockhash_for_dev"
+        # 构建Phantom钱包需要的交易格式
+        # Phantom钱包需要一个Message对象和Uint8Array对象
+        phantom_transaction = {
+            "transaction": {
+                "recentBlockhash": "simulated_blockhash_for_dev",
+                "feePayer": user_address,
+                "instructions": [
+                    {
+                        "programId": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+                        "keys": [{"pubkey": user_address, "isSigner": True, "isWritable": False}],
+                        "data": base64.b64encode(f"trade:{trade_id}".encode('utf-8')).decode('utf-8')
+                    }
+                ],
+                "signers": []
+            },
+            "signers": [],
+            "signerPublicKeys": [user_address]
         }
+        
+        # 返回交易数据
+        return phantom_transaction
         
     except Exception as e:
         logger.error(f"准备Solana交易失败: {str(e)}")

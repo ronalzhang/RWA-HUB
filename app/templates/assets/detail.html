@@ -1478,39 +1478,53 @@
                                 showMessage("正在处理交易...", "info");
                                 
                                 // 向用户请求签名
-                                const { signature } = await window.solana.signAndSendTransaction(txData.transaction);
-                                txHash = signature;
+                                console.log('准备签名交易:', txData);
                                 
-                                console.log('交易已提交，签名:', txHash);
-                                showMessage("交易已提交，正在确认...", "info");
-                                
-                                // 等待交易确认
-                                let confirmed = false;
-                                let attempts = 0;
-                                
-                                while (!confirmed && attempts < 10) {
-                                    attempts++;
-                                    try {
-                                        // 请求后端检查交易状态
-                                        const confirmResponse = await fetch(`/api/blockchain/solana/check-transaction?signature=${txHash}`);
-                                        if (confirmResponse.ok) {
-                                            const confirmResult = await confirmResponse.json();
-                                            if (confirmResult.confirmed) {
-                                                confirmed = true;
-                                                console.log('交易已确认');
-                                                break;
+                                try {
+                                    // 使用Phantom钱包签名并发送交易
+                                    const { signature } = await window.solana.signAndSendTransaction(txData.transaction);
+                                    txHash = signature;
+                                    
+                                    console.log('交易已提交，签名:', txHash);
+                                    showMessage("交易已提交，正在确认...", "info");
+                                    
+                                    // 等待交易确认
+                                    let confirmed = false;
+                                    let attempts = 0;
+                                    
+                                    while (!confirmed && attempts < 10) {
+                                        attempts++;
+                                        try {
+                                            // 请求后端检查交易状态
+                                            const confirmResponse = await fetch(`/api/blockchain/solana/check-transaction?signature=${txHash}`);
+                                            if (confirmResponse.ok) {
+                                                const confirmResult = await confirmResponse.json();
+                                                if (confirmResult.confirmed) {
+                                                    confirmed = true;
+                                                    console.log('交易已确认');
+                                                    break;
+                                                }
                                             }
+                                        } catch (e) {
+                                            console.warn('检查交易状态失败，尝试重试', e);
                                         }
-                                    } catch (e) {
-                                        console.warn('检查交易状态失败，尝试重试', e);
+                                        
+                                        // 等待2秒再次检查
+                                        await new Promise(resolve => setTimeout(resolve, 2000));
                                     }
                                     
-                                    // 等待2秒再次检查
-                                    await new Promise(resolve => setTimeout(resolve, 2000));
-                                }
-                                
-                                if (!confirmed) {
-                                    console.warn('交易未在预期时间内确认，但仍然继续处理');
+                                    if (!confirmed) {
+                                        console.warn('交易未在预期时间内确认，但仍然继续处理');
+                                    }
+                                } catch (signError) {
+                                    console.error('Solana交易签名失败:', signError);
+                                    
+                                    // 如果是用户拒绝签名，给出友好提示
+                                    if (signError.message && signError.message.includes('User rejected')) {
+                                        throw new Error('用户拒绝签名交易');
+                                    } else {
+                                        throw new Error('签名交易失败: ' + signError.message);
+                                    }
                                 }
                             } catch (e) {
                                 console.error('Solana交易处理失败:', e);
