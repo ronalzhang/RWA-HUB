@@ -1599,8 +1599,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     // 计算总金额和费用
                     const totalAmount = amount * price;
-                    const platformFee = calculatePlatformFee(totalAmount);
-                    const actualPayment = calculateActualPayment(totalAmount);
+                    // 内联定义费用计算逻辑
+                    const platformFeeRate = 0.035; // 3.5%平台费率 
+                    const actualPaymentRate = 0.965; // 96.5%实际支付率
+                    const platformFee = totalAmount * platformFeeRate;
+                    const actualPayment = totalAmount * actualPaymentRate;
 
                     // 获取钱包地址
                     const walletAddress = await getWalletAddress();
