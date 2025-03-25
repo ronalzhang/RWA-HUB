@@ -1,78 +1,146 @@
 {% extends "base.html" %}
 
-{% block title %}{{ asset.token_symbol }} - {{ asset.name }} | RWA-HUB{% endblock %}
+{% block title %}{{ _('Asset Details') }} - {{ asset.name }}{% endblock %}
 
-{% block head %}
-<!-- 添加jQuery库 -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<!-- 在head部分添加bs58库 -->
-<script src="https://unpkg.com/bs58@5.0.0/dist/index.js"></script>
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
+{% block styles %}
+<!-- 资产详情页特定样式 -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/asset_detail.css') }}">
 <style>
-    /* 主要容器样式 */
-    /* 修复详情页卡片样式 */
-    .asset-detail-page .card {
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 3px 15px rgba(0,0,0,0.08);
-        margin-bottom: 1.5rem;
+    .asset-section {
+        margin-bottom: 30px;
     }
     
-    .asset-detail-page .card-header {
-        background-color: rgba(248, 249, 250, 0.5);
-        border-bottom: 1px solid rgba(0,0,0,0.08);
-        padding: 1rem 1.25rem;
+    .asset-image {
+        border-radius: 10px;
+        object-fit: cover;
+        width: 100%;
+        height: 300px;
     }
     
-    .asset-detail-page .card-body {
-        padding: 1.25rem;
+    .detail-icon {
+        width: 30px;
+        text-align: center;
+        color: var(--primary-color);
     }
     
-    /* 修复Asset Trading模块样式 */
-    .asset-detail-page .trade-card .card-body {
-        padding: 1.2rem;
-    }
-    
-    /* 确保表单元素样式正确 */
-    .asset-detail-page .form-label {
+    .specs-table th {
+        width: 250px;
         font-weight: 500;
-        margin-bottom: 0.5rem;
-        color: #495057;
+        color: #555;
     }
     
-    .asset-detail-page .form-control {
-        border-radius: 0.375rem;
-        border: 1px solid #ced4da;
-        padding: 0.375rem 0.75rem;
+    .revenue-chart {
+        height: 300px;
     }
     
-    .asset-detail-page .form-text {
-        color: #6c757d;
-        font-size: 0.875rem;
-        margin-top: 0.25rem;
+    .token-price, .annual-dividend {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #1e3c72;
     }
     
-    /* 修复分页控件样式 */
-    #pagination-controls {
+    .purchase-section {
+        background-color: #f7f9fc;
+        padding: 25px;
+        border-radius: 15px;
+    }
+    
+    .purchase-title {
+        font-size: 1.3rem;
+        margin-bottom: 20px;
+    }
+    
+    /* 确保输入框中的数字居中显示 */
+    #amount-input {
+        text-align: center;
+        font-size: 1.2rem;
+    }
+    
+    /* 轮播图样式 */
+    .carousel-inner {
+        border-radius: 15px;
+        overflow: hidden;
+    }
+    
+    /* 保护图片宽高比 */
+    .carousel-item img {
+        object-fit: cover;
+        height: 400px;
+    }
+    
+    /* 资产卡片的样式增强 */
+    .card {
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* 文本强调样式 */
+    .text-highlight {
+        color: #1e3c72;
+        font-weight: 600;
+    }
+    
+    /* 分享模态框样式 */
+    .share-message {
+        background-color: #f7fafc;
+        border-left: 4px solid #4a6cf7;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        font-weight: 500;
+    }
+    
+    .commission-info {
+        background-color: #fff8eb;
+        padding: 15px;
+        border-radius: 8px;
+    }
+    
+    .commission-tiers {
         display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-top: 1rem;
+        justify-content: space-between;
     }
     
-    /* 交易历史表格样式 */
-    .trade-history-section table {
-        margin-bottom: 0;
+    .tier {
+        text-align: center;
+        flex: 1;
+        padding: 10px 5px;
+        border-radius: 8px;
     }
     
-    .trade-history-section th, 
-    .trade-history-section td {
-        padding: 0.75rem;
-        vertical-align: middle;
+    .tier-label {
+        font-size: 12px;
+        color: #6c757d;
+    }
+    
+    .tier-value {
+        font-size: 18px;
+        font-weight: 600;
+        color: #ff6b6b;
+    }
+    
+    .info-icon {
+        display: inline-block;
+        cursor: help;
     }
 </style>
+{% endblock %}
+
+{% block scripts %}
+<!-- Solana Web3 SDK -->
+<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+<!-- Solana SPL Token SDK -->
+<script src="https://unpkg.com/@solana/spl-token@latest/lib/index.iife.min.js"></script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -1456,7 +1524,7 @@
                                 // 显示等待提示
                                 showMessage("正在处理交易...", "info");
                                 
-                                // 创建简单的memo交易
+                                // 创建实际的代币转账交易
                                 // 假设window.solanaWeb3已经通过CDN加载
                                 if (!window.solanaWeb3) {
                                     console.error('加载solanaWeb3库失败');
@@ -1473,6 +1541,63 @@
                                 
                                 // 获取钱包公钥
                                 const walletPublicKey = new window.solanaWeb3.PublicKey(window.solana.publicKey.toString());
+                                
+                                // 定义系统接收方钱包地址 - 这应该是您的收款钱包地址
+                                const receiverPublicKey = new window.solanaWeb3.PublicKey("8cU6PAtRTRgfyJu48qfz2hQP5aMGwooxqrCZtyB6UcYP"); // 替换为您的实际收款钱包地址
+                                
+                                // USDC代币的程序ID和Mint地址
+                                const TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+                                const USDC_MINT = new window.solanaWeb3.PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"); // Solana上USDC的Mint地址
+                                
+                                // 获取发送方的USDC代币账户
+                                const userTokenAccounts = await connection.getParsedTokenAccountsByOwner(
+                                    walletPublicKey,
+                                    { mint: USDC_MINT }
+                                );
+                                
+                                // 确保用户有USDC代币账户
+                                if (userTokenAccounts.value.length === 0) {
+                                    throw new Error("您没有USDC代币账户，请先在钱包中添加USDC代币");
+                                }
+                                
+                                const sourceTokenAccount = userTokenAccounts.value[0].pubkey;
+                                
+                                // 获取或创建接收方的代币账户
+                                const receiverTokenAccounts = await connection.getParsedTokenAccountsByOwner(
+                                    receiverPublicKey,
+                                    { mint: USDC_MINT }
+                                );
+                                
+                                let destinationTokenAccount;
+                                if (receiverTokenAccounts.value.length > 0) {
+                                    destinationTokenAccount = receiverTokenAccounts.value[0].pubkey;
+                                } else {
+                                    // 如果接收方没有USDC账户，则需要创建一个
+                                    throw new Error("接收方没有USDC代币账户，请联系管理员");
+                                }
+                                
+                                // 创建代币转账指令
+                                // USDC有6位小数，所以需要乘以1000000
+                                const transferAmount = parseFloat(tradeInfo.price) * 1000000; // 转换为USDC的最小单位
+                                console.log(`准备转账${tradeInfo.price} USDC (${transferAmount}个最小单位)`);
+                                
+                                // 创建转账指令
+                                // 使用正确的SPL代币库语法
+                                if (!window.splToken) {
+                                    throw new Error("SPL Token库未正确加载，请刷新页面");
+                                }
+                                
+                                // 使用@solana/spl-token库创建转账指令
+                                const transferInstruction = window.splToken.createTransferInstruction(
+                                    sourceTokenAccount,
+                                    destinationTokenAccount,
+                                    walletPublicKey,
+                                    BigInt(Math.floor(transferAmount)),  // 确保是整数
+                                    []  // 多签账户，这里不需要
+                                );
+                                
+                                // 添加转账指令到交易
+                                transaction.add(transferInstruction);
                                 
                                 // 创建Memo程序ID
                                 const memoProgramId = new window.solanaWeb3.PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
