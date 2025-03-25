@@ -1504,193 +1504,30 @@
 
             // 处理购买按钮点击
             async function handleBuy() {
-                // 隐藏之前的错误
-                const errorElement = document.getElementById('buy-error');
-                if (errorElement) {
-                    errorElement.style.display = 'none';
-                }
-                
-                // 显示错误函数
-                function showError(message) {
-                    if (errorElement) {
-                        errorElement.textContent = message;
-                        errorElement.style.display = 'block';
-                    } else {
-                        alert(message);
-                    }
-                }
-                
                 try {
-                    // 检查钱包是否连接
-                    if (!window.walletState || !(window.walletState.isConnected || window.walletState.connected) || !window.walletState.address) {
-                        showError('请先连接钱包');
-                        // 调用全局钱包连接函数
-                        if (typeof toggleWalletMenu === 'function') {
-                            toggleWalletMenu();
-                        }
-                        return;
-                    }
-                    
                     // 获取购买数量
-                    const amountInput = document.getElementById('purchase-amount');
-                    const buyAmount = parseFloat(amountInput.value);
-                    
-                    if (isNaN(buyAmount) || buyAmount <= 0) {
+                    const amount = parseInt(document.getElementById('amount').value);
+                    if (isNaN(amount) || amount <= 0) {
                         showError('请输入有效的购买数量');
                         return;
                     }
-                    
-                    // 检查最大可购买数量
-                    if (buyAmount > maxPurchaseAmount) {
-                        showError(`超出最大可购买数量 ${maxPurchaseAmount}`);
+
+                    // 获取单价
+                    const price = parseFloat(document.getElementById('price').value);
+                    if (isNaN(price) || price <= 0) {
+                        showError('请输入有效的单价');
                         return;
                     }
-                    
-                    // 显示加载中
-                    const buyButton = document.getElementById('buy-button');
-                    const originalText = buyButton.textContent;
-                    buyButton.disabled = true;
-                    buyButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 处理中...';
-                    
-                    // 创建交易请求 - 使用全局钱包地址
-                    const walletAddress = window.walletState.address;
-                    console.log(`正在创建购买请求，数量: ${buyAmount}, 单价: ${assetPrice}, 总价: ${buyAmount * assetPrice}`);
-                    console.log(`使用地址: ${walletAddress}`);
-                    
-                    const response = await fetch('/api/trades', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Eth-Address': walletAddress
-                        },
-                        body: JSON.stringify({
-                            asset_id: assetId,
-                            type: 'buy',
-                            amount: buyAmount,
-                            price: assetPrice,
-                            trader_address: walletAddress
-                        })
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || '购买请求失败');
-                    }
-                    
-                    const trade = await response.json();
-                    console.log('购买交易创建成功:', trade);
-                    
-                    // 在测试环境中，添加模拟交易确认功能
-                    if (trade.id) {
-                        simulateTransactionConfirmation(trade.id);
-                    }
-                    
-                    // 交易成功后更新UI
-                    buyButton.className = 'btn btn-success w-100';
-                    buyButton.innerHTML = '<i class="fas fa-check-circle"></i> 购买成功';
-                    
-                    // 修改：将购买数量设为1，而不是清空
-                    amountInput.value = '1';
-                    
-                    // 立即手动更新剩余供应量
-                    try {
-                        // 当前可用量减去购买量
-                        const newRemainingSupply = maxPurchaseAmount - buyAmount;
-                        
-                        // 更新Available文本
-                        const maxPurchaseElement = document.getElementById('max-purchase-amount');
-                        if (maxPurchaseElement) {
-                            maxPurchaseElement.textContent = newRemainingSupply;
-                            maxPurchaseElement.classList.add('highlight-change');
-                        }
-                        
-                        // 更新全局变量和lastKnownData
-                        maxPurchaseAmount = newRemainingSupply;
-                        if (typeof window.lastKnownData === 'undefined') {
-                            window.lastKnownData = {
-                                remainingSupply: newRemainingSupply,
-                                tokenSupply: parseInt("{{ asset.token_supply|default(0) }}"),
-                                tokenPrice: parseFloat("{{ asset.token_price|default(0) }}")
-                            };
-                        } else {
-                            window.lastKnownData.remainingSupply = newRemainingSupply;
-                        }
-                        
-                        // 2秒后移除高亮
-                        setTimeout(() => {
-                            const highlightElements = document.querySelectorAll('.highlight-change');
-                            highlightElements.forEach(el => el.classList.remove('highlight-change'));
-                        }, 2000);
-                        
-                        // 同时更新Total Supply / Remaining 显示
-                        const supplyElements = document.querySelectorAll('.col-12 div.bg-light');
-                        let supplyElement = null;
-                        
-                        // 找到包含Total Supply / Remaining文本的元素
-                        for (let i = 0; i < supplyElements.length; i++) {
-                            const smallEl = supplyElements[i].querySelector('small.text-muted');
-                            if (smallEl && smallEl.textContent.includes('Total Supply / Remaining')) {
-                                supplyElement = supplyElements[i];
-                                break;
-                            }
-                        }
-                        
-                        if (supplyElement) {
-                            const supplyTextElement = supplyElement.querySelector('h5');
-                            if (supplyTextElement) {
-                                const totalSupply = window.lastKnownData.tokenSupply || parseInt("{{ asset.token_supply|default(0) }}");
-                                supplyTextElement.innerText = `${totalSupply} / ${newRemainingSupply} token`;
-                                supplyTextElement.classList.add('highlight-change');
-                            }
-                        }
-                        
-                        console.log('手动更新资产信息成功，新剩余数量:', newRemainingSupply);
-                    } catch (error) {
-                        console.error('手动更新资产信息失败:', error);
-                    }
-                    
-                    // 立即重新加载交易历史
-                    loadTradeHistory();
-                    
-                    // 刷新钱包资产列表 - 使用base.html全局函数
-                    if (typeof loadUserAssets === 'function') {
-                        loadUserAssets();
-                    }
-                    
-                    // 延迟一段时间再从API刷新资产信息，确保数据已经更新
-                    setTimeout(() => {
-                        refreshAssetInfoNow();
-                    }, 2000);
-                    
-                    // 5秒后重置按钮
-                    setTimeout(() => {
-                        buyButton.className = 'btn btn-primary w-100';
-                        buyButton.textContent = originalText;
-                        buyButton.disabled = false;
-                    }, 5000);
-                    
-                } catch (error) {
-                    console.error('购买过程中发生错误:', error);
-                    showError('购买过程中发生错误: ' + error.message);
-                    
-                    // 重置按钮状态
-                    const buyButton = document.getElementById('buy-button');
-                    buyButton.disabled = false;
-                    buyButton.textContent = '购买';
-                }
-            }
 
-            // 添加模拟交易确认功能
-            async function simulateTransactionConfirmation(tradeId) {
-                console.log(`开始处理交易确认: ${tradeId}`);
-                
-                try {
+                    // 计算总价
+                    const totalPrice = amount * price;
+                    console.log('正在创建购买请求，数量:', amount, '单价:', price, '总价:', totalPrice);
+
                     // 获取钱包地址
                     let dbAddress = '';
                     if (window.walletState && window.walletState.address) {
                         dbAddress = getAddressForApi(window.walletState.address);
                     } else {
-                        // 如果钱包状态不可用，则使用本地存储
                         const storedAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
                         if (storedAddress) {
                             dbAddress = getAddressForApi(storedAddress);
@@ -1699,382 +1536,167 @@
                             return;
                         }
                     }
-                    
-                    // 通知用户交易已提交
-                    showMessage("交易已提交，正在等待确认...", "info");
-                    
-                    // 获取交易信息
-                    const getTradeResponse = await fetch(`/api/trades/${tradeId}?address=${dbAddress}`);
-                    if (!getTradeResponse.ok) {
-                        throw new Error('获取交易信息失败');
-                    }
-                    const tradeInfo = await getTradeResponse.json();
-                    
-                    // 使用真实区块链网络处理交易
-                    if (window.walletState && window.walletState.walletType) {
-                        const walletType = window.walletState.walletType;
-                        let txHash = '';
-                        
-                        // 根据钱包类型执行不同的交易流程
-                        if (walletType === 'phantom' || walletType === 'solana') {
-                            // Solana钱包交易处理
-                            try {
-                                // 确认用户已连接Phantom钱包
-                                if (!window.solana || !window.solana.isPhantom || !window.solana.isConnected) {
-                                    throw new Error('未检测到Phantom钱包连接');
-                                }
-                                
-                                // 显示等待提示
-                                showMessage("正在处理交易...", "info");
-                                
-                                // ====== 开始：紧急自动修复 SPL Token 库 ======
-                                try {
-                                    console.log("紧急检查SPL Token库状态...");
-                                    
-                                    // 使用专门的初始化函数
-                                    if (typeof window.initSplTokenLib === 'function') {
-                                        console.log("调用专用的SPL Token库初始化函数");
-                                        await window.initSplTokenLib();
-                                    } else {
-                                        console.log("使用备用初始化方法");
-                                        
-                                        // 确保全局对象存在
-                                        window.solanaWeb3 = window.solanaWeb3 || {};
-                                        window.splToken = window.splToken || {};
-                                        
-                                        // 检查是否需要复制SolanaWeb3
-                                        if (typeof SolanaWeb3 !== 'undefined' && !window.solanaWeb3.Connection) {
-                                            console.log("从全局SolanaWeb3复制属性到window.solanaWeb3");
-                                            // 复制所有属性
-                                            for (const key in SolanaWeb3) {
-                                                window.solanaWeb3[key] = SolanaWeb3[key];
-                                            }
-                                        }
-                                        
-                                        // 检查是否需要复制SolanaToken
-                                        if (typeof SolanaToken !== 'undefined' && !window.splToken.TOKEN_PROGRAM_ID) {
-                                            console.log("从全局SolanaToken复制属性到window.splToken");
-                                            // 复制所有属性
-                                            for (const key in SolanaToken) {
-                                                window.splToken[key] = SolanaToken[key];
-                                            }
-                                        }
-                                    }
-                                    
-                                    // 最后一道防线：创建必要的常量
-                                    if (!window.splToken.TOKEN_PROGRAM_ID && window.solanaWeb3 && window.solanaWeb3.PublicKey) {
-                                        console.log("创建必要的SPL Token常量");
-                                        window.splToken.TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-                                        window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
-                                    }
-                                    
-                                    // 如果PublicKey不可用，单独创建
-                                    if (!window.solanaWeb3.PublicKey) {
-                                        console.log("创建必要的PublicKey类");
-                                        window.solanaWeb3.PublicKey = function(value) {
-                                            this.value = value;
-                                            this.toString = function() { return this.value; };
-                                            this.toBuffer = function() { return new Uint8Array([...Buffer.from(value, 'hex')]); };
-                                            this.equals = function(other) { return this.toString() === other.toString(); };
-                                        };
-                                    }
-                                    
-                                    // 如果Transaction不可用，单独创建
-                                    if (!window.solanaWeb3.Transaction) {
-                                        console.log("创建必要的Transaction类");
-                                        window.solanaWeb3.Transaction = function() {
-                                            this.instructions = [];
-                                            this.recentBlockhash = null;
-                                            this.feePayer = null;
-                                            
-                                            this.add = function(instruction) {
-                                                this.instructions.push(instruction);
-                                                return this;
-                                            };
-                                        };
-                                        
-                                        window.solanaWeb3.TransactionInstruction = function(params) {
-                                            this.keys = params.keys || [];
-                                            this.programId = params.programId;
-                                            this.data = params.data;
-                                        };
-                                    }
-                                    
-                                    console.log("SPL Token库检查完成");
-                                } catch (fixError) {
-                                    console.error("修复SPL Token库失败:", fixError);
-                                }
-                                // ====== 结束：紧急自动修复 SPL Token 库 ======
-                                
-                                // 定义系统接收方钱包地址
-                                const receiverPublicKey = new window.solanaWeb3.PublicKey("8cU6PAtRTRgfyJu48qfz2hQP5aMGwooxqrCZtyB6UcYP");
-                                
-                                // USDC代币的Mint地址
-                                const USDC_MINT = new window.solanaWeb3.PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
-                                
-                                // 计算USDC转账金额（保留2位小数）
-                                const rawAmount = parseFloat(tradeInfo.price);
-                                const formattedAmount = parseFloat(rawAmount.toFixed(2)); // 总金额只保留2位小数
-                                const transferAmount = formattedAmount * 1000000; // 转换为USDC的最小单位，USDC有6位小数
-                                console.log(`准备转账${formattedAmount} USDC (${transferAmount}个最小单位)`);
-                                
-                                // 创建区块链交易（包含USDC转账）
-                                // 假设window.solanaWeb3已经通过CDN加载
-                                if (!window.solanaWeb3 || !window.solanaWeb3.Connection) {
-                                    console.error('加载solanaWeb3库失败');
-                                    throw new Error('加载solanaWeb3库失败，请刷新页面重试');
-                                }
-                                
-                                // 创建连接对象
-                                let connection = new window.solanaWeb3.Connection(
-                                    window.solanaWeb3.clusterApiUrl('mainnet-beta')
-                                );
-                                
-                                // 创建交易对象
-                                const transaction = new window.solanaWeb3.Transaction();
-                                
-                                // 获取钱包公钥
-                                const walletPublicKey = new window.solanaWeb3.PublicKey(window.solana.publicKey.toString());
-                                
-                                // 创建Memo程序ID
-                                const memoProgramId = new window.solanaWeb3.PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
-                                
-                                // 添加memo指令，记录交易信息
-                                const memoData = `RWA-HUB:trade:${tradeId}:asset:${tradeInfo.asset_id}:amount:${tradeInfo.amount}:price:${tradeInfo.price}`;
-                                
-                                // 使用MemoProgram创建指令
-                                const memoInstruction = new window.solanaWeb3.TransactionInstruction({
-                                    keys: [
-                                        {
-                                            pubkey: walletPublicKey,
-                                            isSigner: true,
-                                            isWritable: false
-                                        }
-                                    ],
-                                    programId: memoProgramId,
-                                    // 解决Buffer not defined问题 - 使用Uint8Array替代
-                                    data: new TextEncoder().encode(memoData)
-                                });
-                                
-                                // 添加memo指令到交易
-                                transaction.add(memoInstruction);
-                                
-                                // 定义多个RPC节点地址以便在主节点失败时切换
-                                const rpcEndpoints = [
-                                    'https://solana-mainnet.rpc.extrnode.com/ad2090b9-0e8a-4bc7-a0b9-cb416dfc7998', // Extrnode提供的API节点
-                                    'https://solana.publicnode.com', // Allnodes提供的免费节点 - 已测试可用
-                                    'https://api.mainnet-beta.solana.com', // 官方Solana主网节点
-                                    'https://explorer-api.mainnet-beta.solana.com', // Solana备用节点
-                                    'https://rpc.ankr.com/solana' // Ankr节点，需要API密钥
-                                ];
-                                
-                                // 获取最新的区块哈希 - 使用多个节点轮询
-                                let blockhash = null;
-                                let connectionSuccess = false;
-                                
-                                // 尝试每个节点直到成功
-                                for (let i = 0; i < rpcEndpoints.length; i++) {
-                                    try {
-                                        showMessage(`正在连接Solana网络(${i+1}/${rpcEndpoints.length})...`, "info");
-                                        console.log(`尝试使用RPC节点: ${rpcEndpoints[i]}`);
-                                        
-                                        // 创建新的连接对象，使用更完整的配置
-                                        const tempConnection = new window.solanaWeb3.Connection(rpcEndpoints[i], {
-                                            commitment: 'confirmed',
-                                            confirmTransactionInitialTimeout: 60000, // 增加交易确认超时时间到60秒
-                                            disableRetryOnRateLimit: false, // 开启速率限制时重试
-                                            fetch: async (url, options) => {
-                                                // 自定义fetch，添加更多重试和超时选项
-                                                return fetch(url, {
-                                                    ...options,
-                                                    headers: {
-                                                        ...options.headers,
-                                                        'Content-Type': 'application/json'
-                                                    },
-                                                    // 设置更长的超时时间
-                                                    signal: AbortSignal.timeout(40000) // 40秒超时
-                                                });
-                                            }
-                                        });
-                                        
-                                        // 设置超时 - 从10秒增加到40秒
-                                        const timeoutPromise = new Promise((_, reject) => 
-                                            setTimeout(() => reject(new Error('连接超时')), 40000)
-                                        );
-                                        
-                                        // 尝试获取区块哈希，带超时
-                                        blockhash = await Promise.race([
-                                            tempConnection.getRecentBlockhash('confirmed'),
-                                            timeoutPromise
-                                        ]);
-                                        
-                                        // 更新连接对象并设置成功标志
-                                        connection = tempConnection;
-                                        connectionSuccess = true;
-                                        console.log(`成功连接到RPC节点: ${rpcEndpoints[i]}`);
-                                        break;
-                                    } catch (error) {
-                                        console.error(`RPC节点 ${rpcEndpoints[i]} 连接失败:`, error);
-                                        // 继续尝试下一个节点
-                                    }
-                                }
-                                
-                                // 所有节点都失败了
-                                if (!connectionSuccess) {
-                                    throw new Error('无法连接到任何Solana RPC节点，请稍后再试');
-                                }
-                                
-                                // 设置交易参数
-                                transaction.recentBlockhash = blockhash.blockhash;
-                                transaction.feePayer = walletPublicKey;
-                                
-                                console.log('准备签名交易...');
-                                
-                                try {
-                                    // 使用Phantom钱包签名并发送交易
-                                    const { signature } = await window.solana.signAndSendTransaction(transaction);
-                                    
-                                    // 获取交易签名
-                                    txHash = signature;
-                                    console.log('交易已提交，签名:', txHash);
-                                    
-                                    showMessage("交易已提交，等待确认...", "info");
-                                } catch (signError) {
-                                    console.error('交易签名失败:', signError);
-                                    showError('交易签名失败: ' + signError.message);
-                                    return;
-                                }
-                                
-                                showMessage("交易已提交，处理中...", "info");
-                            } catch (e) {
-                                console.error('Solana交易处理失败:', e);
-                                showError('交易处理失败: ' + e.message);
-                                return;
-                            }
-                        } else if (walletType === 'metamask' || walletType === 'ethereum') {
-                            // Metamask交易处理（保持原有代码）
-                            try {
-                                // 确认用户已连接Metamask钱包
-                                if (!window.ethereum || !window.ethereum.isConnected()) {
-                                    throw new Error('未检测到MetaMask钱包连接');
-                                }
-                                
-                                // 向后端请求交易数据
-                                const txDataResponse = await fetch('/api/blockchain/ethereum/prepare-transaction', {
+                    console.log('使用地址:', dbAddress);
+
+                    // 创建购买请求
+                    const response = await fetch('/api/trades/create', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'X-Eth-Address': dbAddress
                         },
                         body: JSON.stringify({
-                                        trade_id: tradeId,
-                                        amount: tradeInfo.amount,
-                                        price: tradeInfo.price,
-                                        asset_id: tradeInfo.asset_id
+                            asset_id: assetId,
+                            amount: amount,
+                            price: price
                         })
                     });
-                    
-                                if (!txDataResponse.ok) {
-                                    const errorData = await txDataResponse.json();
-                                    throw new Error(errorData.error || '准备交易数据失败');
-                                }
-                                
-                                const txData = await txDataResponse.json();
-                                
-                                // 发送交易到以太坊网络
-                                console.log('正在发送交易到以太坊网络...');
-                                showMessage("正在处理交易...", "info");
-                                
-                                // 向用户请求签名并发送交易
-                                txHash = await window.ethereum.request({
-                                    method: 'eth_sendTransaction',
-                                    params: [txData.transaction]
-                                });
-                                
-                                console.log('交易已提交，哈希:', txHash);
-                                showMessage("交易已提交，正在确认...", "info");
-                                
-                                // 等待交易确认
-                                let confirmed = false;
-                                let attempts = 0;
-                                
-                                while (!confirmed && attempts < 10) {
-                                    attempts++;
-                                    try {
-                                        // 请求后端检查交易状态
-                                        const confirmResponse = await fetch(`/api/solana/check_transaction?signature=${txHash}`);
-                                        if (confirmResponse.ok) {
-                                            const confirmResult = await confirmResponse.json();
-                                            if (confirmResult.confirmed) {
-                                                confirmed = true;
-                                                console.log('交易已确认');
-                                                break;
-                                            }
-                                        }
-                                    } catch (e) {
-                                        console.warn('检查交易状态失败，尝试重试', e);
-                                    }
-                                    
-                                    // 等待2秒再次检查
-                                    await new Promise(resolve => setTimeout(resolve, 2000));
-                                }
-                                
-                                if (!confirmed) {
-                                    console.warn('交易未在预期时间内确认，但仍然继续处理');
-                                }
-                            } catch (e) {
-                                console.error('以太坊交易处理失败:', e);
-                                showError('交易处理失败: ' + e.message);
-                                return;
-                            }
-                            } else {
-                            // 不支持的钱包类型，显示错误
-                            console.error('不支持的钱包类型:', walletType);
-                            showError(`不支持的钱包类型: ${walletType}`);
-                            return;
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || '创建交易失败');
+                    }
+
+                    const tradeInfo = await response.json();
+                    console.log('购买交易创建成功:', tradeInfo);
+
+                    // 确保SPL Token库已加载
+                    if (!window.splToken) {
+                        console.log('SPL Token库未加载，尝试重新初始化');
+                        await window.initSplTokenLib();
+                        if (!window.splToken) {
+                            throw new Error('SPL Token库加载失败，请刷新页面重试');
                         }
                     }
+
+                    // 创建交易
+                    const transaction = new Transaction();
                     
-                    // 更新交易状态
-                    const updateResponse = await fetch(`/api/trades/${tradeId}/update`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Eth-Address': dbAddress
-                        },
-                        body: JSON.stringify({
-                            status: 'completed',
-                            tx_hash: txHash || 'blockchain_confirmed',
-                            wallet_address: dbAddress
-                        })
+                    // 获取钱包公钥
+                    const walletPublicKey = new PublicKey(window.solana.publicKey.toString());
+                    
+                    // 创建Memo程序ID
+                    const memoProgramId = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
+                    
+                    // 添加memo指令，记录交易信息
+                    const memoData = `RWA-HUB:trade:${tradeInfo.id}:asset:${tradeInfo.asset_id}:amount:${tradeInfo.amount}:price:${tradeInfo.price}`;
+                    
+                    // 使用MemoProgram创建指令
+                    const memoInstruction = new TransactionInstruction({
+                        keys: [
+                            {
+                                pubkey: walletPublicKey,
+                                isSigner: true,
+                                isWritable: false
+                            }
+                        ],
+                        programId: memoProgramId,
+                        data: new TextEncoder().encode(memoData)
                     });
                     
-                    if (!updateResponse.ok) {
-                        const errorData = await updateResponse.json();
-                        console.error('更新交易状态失败:', errorData);
-                        showError('交易完成，但更新状态失败');
-                        return;
+                    // 添加memo指令到交易
+                    transaction.add(memoInstruction);
+
+                    // 获取最新的区块哈希
+                    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+                    const { blockhash } = await connection.getRecentBlockhash('confirmed');
+                    
+                    // 设置交易参数
+                    transaction.recentBlockhash = blockhash;
+                    transaction.feePayer = walletPublicKey;
+
+                    // 签名并发送交易
+                    const { signature } = await window.solana.signAndSendTransaction(transaction);
+                    console.log('交易已提交，签名:', signature);
+
+                    // 等待交易确认
+                    const confirmed = await simulateTransactionConfirmation(signature);
+                    if (confirmed) {
+                        // 更新交易状态
+                        const updateResponse = await fetch(`/api/trades/${tradeInfo.id}/update`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Eth-Address': dbAddress
+                            },
+                            body: JSON.stringify({
+                                status: 'completed',
+                                tx_hash: signature,
+                                wallet_address: dbAddress
+                            })
+                        });
+
+                        if (!updateResponse.ok) {
+                            const errorData = await updateResponse.json();
+                            console.error('更新交易状态失败:', errorData);
+                            showError('交易完成，但更新状态失败');
+                            return;
+                        }
+
+                        // 交易完成，更新UI
+                        showSuccess('购买成功！');
+                        await refreshAssetInfo();
                     }
-                    
-                    // 交易完成，更新UI
-                    showSuccess('购买成功！');
-                    console.log('手动更新资产信息成功，新剩余数量: ' + (Number(remainingSupply) - Number(tradeInfo.amount)));
-                    
-                    // 更新剩余供应量
-                    remainingSupply = (Number(remainingSupply) - Number(tradeInfo.amount)).toString();
-                    
-                    // 刷新交易历史和资产信息
-                    fetchTransactionHistory();
-                    refreshAssetInfo();
-                    
                 } catch (error) {
-                    console.error('处理交易过程中出错:', error);
-                    showError('处理交易失败: ' + error.message);
+                    console.error('购买失败:', error);
+                    showError('购买失败: ' + error.message);
                 } finally {
                     // 重置按钮状态
                     const buyButton = document.getElementById('buy-button');
                     buyButton.disabled = false;
                     buyButton.textContent = '购买';
+                }
+            }
+
+            // 添加模拟交易确认功能
+            async function simulateTransactionConfirmation(signature) {
+                console.log('开始处理交易确认:', signature);
+                try {
+                    // 确保SPL Token库已加载
+                    if (!window.splToken) {
+                        console.log('SPL Token库未加载，尝试重新初始化');
+                        await window.initSplTokenLib();
+                        if (!window.splToken) {
+                            throw new Error('SPL Token库加载失败，请刷新页面重试');
+                        }
+                    }
+
+                    // 使用硬编码的备用方案
+                    const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+                    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+                    
+                    // 等待交易确认
+                    const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+                    console.log('交易确认状态:', confirmation);
+                    
+                    // 获取交易详情
+                    const tx = await connection.getTransaction(signature, {
+                        commitment: 'confirmed',
+                        maxSupportedTransactionVersion: 0
+                    });
+                    
+                    if (!tx) {
+                        throw new Error('无法获取交易详情');
+                    }
+                    
+                    console.log('交易详情:', tx);
+                    
+                    // 检查交易是否成功
+                    if (tx.meta && tx.meta.err) {
+                        throw new Error('交易执行失败: ' + JSON.stringify(tx.meta.err));
+                    }
+                    
+                    // 更新UI
+                    await refreshAssetInfo();
+                    
+                    // 显示成功消息
+                    showSuccess('交易已确认');
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Solana交易处理失败:', error);
+                    showError('交易处理失败: ' + error.message);
+                    return false;
                 }
             }
 
@@ -3328,5 +2950,51 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }, 1000);
 });
+</script>
+
+<!-- 添加SPL Token库 -->
+<script src="https://cdn.jsdelivr.net/npm/@solana/spl-token@0.4.12/lib/index.iife.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.87.6/lib/index.iife.min.js"></script>
+<script>
+    // 确保SPL Token库正确加载
+    window.initSplTokenLib = async function() {
+        console.log('执行SPL Token库初始化');
+        
+        // 检查全局对象
+        if (window.splToken) {
+            console.log('SPL Token库已加载');
+            return true;
+        }
+
+        // 如果全局对象不存在，创建必要的对象
+        console.log('创建必要的SPL Token对象');
+        window.splToken = {
+            TOKEN_PROGRAM_ID: new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+            createTransferInstruction: function(fromPubkey, toPubkey, ownerPubkey, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
+                const keys = [
+                    { pubkey: fromPubkey, isSigner: false, isWritable: true },
+                    { pubkey: toPubkey, isSigner: false, isWritable: true },
+                    { pubkey: ownerPubkey, isSigner: multiSigners.length === 0, isWritable: false }
+                ];
+                multiSigners.forEach(signer => {
+                    keys.push({ pubkey: signer.publicKey, isSigner: true, isWritable: false });
+                });
+                return new solanaWeb3.TransactionInstruction({
+                    keys,
+                    programId,
+                    data: Buffer.from([3, ...new Uint8Array(8)]) // 3是transfer指令的代码
+                });
+            }
+        };
+        console.log('使用紧急备用TOKEN_PROGRAM_ID (错误恢复)');
+        return true;
+    };
+
+    // 在页面加载时初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        window.initSplTokenLib().catch(error => {
+            console.error('SPL Token库初始化失败:', error);
+        });
+    });
 </script>
 
