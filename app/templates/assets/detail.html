@@ -1440,16 +1440,20 @@
             async function handleBuy() {
                 try {
                     // 获取购买数量
-                    const amount = parseInt(document.getElementById('purchase-amount').value);
+                    const amountInput = document.querySelector('input[type="number"]');
+                    if (!amountInput) {
+                        throw new Error('找不到购买数量输入框');
+                    }
+                    const amount = parseInt(amountInput.value);
                     if (isNaN(amount) || amount <= 0) {
                         showError('请输入有效的购买数量');
                         return;
                     }
 
-                    // 获取单价
-                    const price = parseFloat(document.getElementById('token-price').value);
+                    // 获取单价（从资产配置中获取）
+                    const price = parseFloat("{{ asset.token_price }}");
                     if (isNaN(price) || price <= 0) {
-                        showError('请输入有效的单价');
+                        showError('无效的代币单价');
                         return;
                     }
 
