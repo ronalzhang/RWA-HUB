@@ -1496,11 +1496,11 @@
                                 
                                 // 定义多个RPC节点地址以便在主节点失败时切换
                                 const rpcEndpoints = [
+                                    'https://solana-mainnet.rpc.extrnode.com/ad2090b9-0e8a-4bc7-a0b9-cb416dfc7998', // Extrnode提供的API节点
                                     'https://solana.publicnode.com', // Allnodes提供的免费节点 - 已测试可用
                                     'https://api.mainnet-beta.solana.com', // 官方Solana主网节点
                                     'https://explorer-api.mainnet-beta.solana.com', // Solana备用节点
-                                    'https://rpc.ankr.com/solana', // Ankr节点，需要API密钥
-                                    'https://solana-mainnet.rpc.extrnode.com' // Extrnode节点，需要API密钥
+                                    'https://rpc.ankr.com/solana' // Ankr节点，需要API密钥
                                 ];
                                 
                                 // 获取最新的区块哈希 - 使用多个节点轮询
