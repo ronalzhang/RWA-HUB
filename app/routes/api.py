@@ -4,10 +4,9 @@ from flask import (
 )
 from flask_cors import cross_origin
 from app.models.asset import Asset, AssetType, AssetStatus
-from app.models.trade import Trade, TradeStatus
+from app.models.trade import Trade, TradeStatus, TradeType
 from app.models.user import User, is_same_wallet_address
-from app.models.dividend_record import DividendRecord
-from app.models.short_link import ShortLink
+from app.models.shortlink import ShortLink
 from sqlalchemy import desc, func
 from app.extensions import db, limiter
 from app.utils.decorators import token_required, eth_address_required, api_eth_address_required, task_background, admin_required
@@ -181,8 +180,8 @@ def _get_asset_details(asset):
     # 获取持有人数 - 基于已完成的购买交易中不同的交易者地址
     unique_holders = db.session.query(Trade.trader_address)\
         .filter(Trade.asset_id == asset.id,
-                Trade.type == 'buy',
-                Trade.status == 'completed')\
+                Trade.type == TradeType.BUY.value,
+                Trade.status == TradeStatus.COMPLETED.value)\
         .distinct().count()
         
     # 构建资产数据
