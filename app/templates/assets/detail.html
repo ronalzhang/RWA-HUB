@@ -2955,7 +2955,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- 添加Solana Web3.js -->
 <script src="https://unpkg.com/@solana/web3.js@1.87.6/lib/index.iife.min.js"></script>
 <!-- 添加SPL Token库 -->
-<script src="https://unpkg.com/@solana/spl-token@0.4.12/dist/index.iife.js"></script>
+<script src="https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js"></script>
 <script>
     // 确保SPL Token库正确加载
     window.initSplTokenLib = async function() {
@@ -2975,33 +2975,63 @@ document.addEventListener('DOMContentLoaded', function() {
                 return true;
             }
 
-            // 如果还是不存在，创建必要的对象
-            console.log('创建必要的SPL Token对象');
-            if (!window.solanaWeb3) {
-                console.error('Solana Web3.js未加载');
-                throw new Error('Solana Web3.js未加载');
+            // 如果还是不存在，尝试从备用CDN加载
+            const backupUrls = [
+                'https://unpkg.com/@solana/spl-token@0.3.8/dist/index.iife.js',
+                'https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.8/dist/index.iife.js',
+                'https://cdn.skypack.dev/@solana/spl-token@0.3.8'
+            ];
+
+            for (const url of backupUrls) {
+                try {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = url;
+                        script.onload = () => {
+                            if (window.SolanaToken) {
+                                window.splToken = window.SolanaToken;
+                                resolve();
+                            } else {
+                                reject(new Error('SolanaToken未定义'));
+                            }
+                        };
+                        script.onerror = () => reject(new Error(`加载失败: ${url}`));
+                        document.head.appendChild(script);
+                    });
+                    console.log(`成功从 ${url} 加载SPL Token库`);
+                    return true;
+                } catch (error) {
+                    console.warn(`从 ${url} 加载失败:`, error);
+                    continue;
+                }
             }
 
-            window.splToken = {
-                TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
-                createTransferInstruction: function(fromPubkey, toPubkey, ownerPubkey, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
-                    const keys = [
-                        { pubkey: fromPubkey, isSigner: false, isWritable: true },
-                        { pubkey: toPubkey, isSigner: false, isWritable: true },
-                        { pubkey: ownerPubkey, isSigner: multiSigners.length === 0, isWritable: false }
-                    ];
-                    multiSigners.forEach(signer => {
-                        keys.push({ pubkey: signer.publicKey, isSigner: true, isWritable: false });
-                    });
-                    return new window.solanaWeb3.TransactionInstruction({
-                        keys,
-                        programId,
-                        data: new Uint8Array([3, ...new Array(8).fill(0)]) // 3是transfer指令的代码
-                    });
-                }
-            };
-            console.log('使用紧急备用TOKEN_PROGRAM_ID (错误恢复)');
-            return true;
+            // 如果所有CDN都失败，创建基本对象
+            if (window.solanaWeb3 && window.solanaWeb3.PublicKey) {
+                window.splToken = {
+                    TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+                    ASSOCIATED_TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
+                    createTransferInstruction: function(fromPubkey, toPubkey, ownerPubkey, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
+                        const keys = [
+                            { pubkey: fromPubkey, isSigner: false, isWritable: true },
+                            { pubkey: toPubkey, isSigner: false, isWritable: true },
+                            { pubkey: ownerPubkey, isSigner: multiSigners.length === 0, isWritable: false }
+                        ];
+                        multiSigners.forEach(signer => {
+                            keys.push({ pubkey: signer.publicKey, isSigner: true, isWritable: false });
+                        });
+                        return new window.solanaWeb3.TransactionInstruction({
+                            keys,
+                            programId,
+                            data: new Uint8Array([3, ...new Array(8).fill(0)]) // 3是transfer指令的代码
+                        });
+                    }
+                };
+                console.log('使用基本SPL Token对象');
+                return true;
+            }
+
+            throw new Error('无法初始化SPL Token库');
         } catch (error) {
             console.error('SPL Token库初始化失败:', error);
             throw error;
