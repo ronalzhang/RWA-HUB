@@ -3368,3 +3368,21 @@ function calculateActualPayment(amount) {
 })();
 </script>
 
+<script>
+// 全局定义费用计算函数
+window.calculatePlatformFee = function(amount) {
+    const platformFeeRate = 0.035; // 3.5%平台费率
+    return amount * platformFeeRate;
+};
+
+window.calculateActualPayment = function(amount) {
+    const actualPaymentRate = 0.965; // 96.5%实际支付率
+    return amount * actualPaymentRate;
+};
+
+// 确保函数在全局范围内可用
+if (typeof window.calculatePlatformFee !== 'function') {
+    console.error('平台费用计算函数未正确定义');
+}
+</script>
+
