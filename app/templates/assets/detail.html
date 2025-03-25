@@ -2921,3 +2921,27 @@ async function updateRemainingSupply() {
 </div>
 {% endblock %}
 
+<!-- 添加在文件底部，确保bs58库已加载 -->
+<script>
+// 检查bs58库是否正确加载
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        if (typeof bs58 === 'undefined') {
+            console.warn('bs58库未加载，尝试手动加载');
+            
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/index.js';
+            script.onload = function() {
+                console.log('bs58库已手动加载成功');
+            };
+            script.onerror = function() {
+                console.error('bs58库加载失败');
+            };
+            document.head.appendChild(script);
+        } else {
+            console.log('bs58库已正确加载');
+        }
+    }, 1000);
+});
+</script>
+
