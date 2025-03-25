@@ -8,114 +8,87 @@
 <!-- 在head部分添加bs58库 -->
 <script src="https://unpkg.com/bs58@5.0.0/dist/index.js"></script>
 <!-- 添加Solana Web3 SDK -->
-<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-<!-- 添加Solana SPL Token SDK -->
-<script src="https://unpkg.com/@solana/spl-token@latest/lib/index.iife.min.js"></script>
-<!-- 备用SPL Token库加载 -->
+<script src="https://unpkg.com/@solana/web3.js@1.87.6/lib/index.iife.min.js"></script>
+<!-- 添加SPL Token库 -->
+<script src="https://unpkg.com/@solana/spl-token@0.3.8/dist/index.iife.js"></script>
+<!-- 初始化Solana库 -->
 <script>
-    // 检测SPL Token库是否已加载
-    (function() {
-        // 检查是否已加载
-        if (typeof SolanaToken !== 'undefined') {
-            console.log('SPL Token库已通过CDN加载');
-            window.splToken = SolanaToken;
-            return;
-        }
-        
-        console.log('尝试使用备用地址加载SPL Token库');
-        
-        // 备用CDN地址列表
-        const backupUrls = [
-            'https://cdn.jsdelivr.net/npm/@solana/spl-token@latest/lib/index.iife.min.js',
-            'https://cdnjs.cloudflare.com/ajax/libs/solana-web3.js/1.73.3/index.min.js',
-            // 使用固定版本避免latest不稳定的问题
-            'https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js',
-            'https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.8/lib/index.iife.min.js'
-        ];
-        
-        // 顺序尝试加载
-        function tryNextUrl(index) {
-            if (index >= backupUrls.length) {
-                console.warn('无法从任何CDN加载SPL Token库，将使用备用方案');
-                return;
-            }
-            
-            const script = document.createElement('script');
-            script.src = backupUrls[index];
-            script.onload = function() {
-                console.log('SPL Token库从备用地址加载成功:', backupUrls[index]);
-                
-                // 检测是否有SolanaToken全局变量
-                if (typeof SolanaToken !== 'undefined') {
-                    window.splToken = SolanaToken;
-                    console.log('SPL Token全局变量设置完成');
-                } else {
-                    console.log('已加载备用CDN但未找到SolanaToken全局变量，尝试下一个地址');
-                    tryNextUrl(index + 1);
-                }
-            };
-            script.onerror = function() {
-                console.warn('加载备用地址失败:', backupUrls[index]);
-                tryNextUrl(index + 1);
-            };
-            document.head.appendChild(script);
-        }
-        
-        // 开始尝试加载
-        tryNextUrl(0);
-    })();
-</script>
-<!-- 直接全局注入所需依赖 -->
-<script>
-    console.log('初始化Solana全局对象...');
     // 创建全局对象
     window.splToken = {};
     window.solanaWeb3 = {};
     
-    // 注入到全局对象的函数
-    function initGlobalLibs() {
-        console.log('执行全局库初始化...');
+    // 初始化函数
+    async function initSolanaLibs() {
+        console.log('初始化Solana库...');
         
-        // 检测solanaWeb3是否已加载
-        if (typeof window.solanaWeb3.Connection === 'undefined' && typeof SolanaWeb3 !== 'undefined') {
-            console.log('SolanaWeb3已加载，注入到全局对象');
-            // 复制所有属性
+        try {
+            // 检查Solana Web3.js
+            if (typeof SolanaWeb3 === 'undefined') {
+                throw new Error('Solana Web3.js未加载');
+            }
+            
+            // 复制Solana Web3.js到全局对象
             for (const key in SolanaWeb3) {
                 window.solanaWeb3[key] = SolanaWeb3[key];
             }
-        }
-        
-        // 检测SolanaToken是否已加载
-        if (typeof window.splToken.TOKEN_PROGRAM_ID === 'undefined' && typeof SolanaToken !== 'undefined') {
-            console.log('SolanaToken已加载，注入到全局对象');
-            // 复制所有属性
+            console.log('Solana Web3.js初始化成功');
+            
+            // 检查SPL Token
+            if (typeof SolanaToken === 'undefined') {
+                throw new Error('SPL Token库未加载');
+            }
+            
+            // 复制SPL Token到全局对象
             for (const key in SolanaToken) {
                 window.splToken[key] = SolanaToken[key];
             }
+            console.log('SPL Token库初始化成功');
             
-            // 确保solanaWeb3.SPL也存在
-            if (window.solanaWeb3) {
-                window.solanaWeb3.SPL = window.splToken;
+            // 确保solanaWeb3.SPL存在
+            window.solanaWeb3.SPL = window.splToken;
+            
+            return true;
+        } catch (error) {
+            console.error('Solana库初始化失败:', error);
+            
+            // 如果初始化失败，创建基本对象
+            if (window.solanaWeb3 && window.solanaWeb3.PublicKey) {
+                window.splToken = {
+                    TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+                    ASSOCIATED_TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
+                    createTransferInstruction: function(fromPubkey, toPubkey, ownerPubkey, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
+                        const keys = [
+                            { pubkey: fromPubkey, isSigner: false, isWritable: true },
+                            { pubkey: toPubkey, isSigner: false, isWritable: true },
+                            { pubkey: ownerPubkey, isSigner: multiSigners.length === 0, isWritable: false }
+                        ];
+                        multiSigners.forEach(signer => {
+                            keys.push({ pubkey: signer.publicKey, isSigner: true, isWritable: false });
+                        });
+                        return new window.solanaWeb3.TransactionInstruction({
+                            keys,
+                            programId,
+                            data: new Uint8Array([3, ...new Array(8).fill(0)]) // 3是transfer指令的代码
+                        });
+                    }
+                };
+                console.log('使用基本SPL Token对象');
+                return true;
             }
+            
+            throw error;
         }
-        
-        console.log('全局库对象初始化完成');
-        console.log('solanaWeb3可用:', typeof window.solanaWeb3.Connection !== 'undefined');
-        console.log('splToken可用:', typeof window.splToken.TOKEN_PROGRAM_ID !== 'undefined');
     }
     
-    // 立即尝试初始化一次
-    try {
-        initGlobalLibs();
-    } catch (e) {
-        console.error('首次全局库初始化失败:', e);
-    }
-    
-    // DOM加载完成时初始化
-    document.addEventListener('DOMContentLoaded', initGlobalLibs);
-    
-    // 页面完全加载后再次初始化
-    window.addEventListener('load', initGlobalLibs);
+    // 在页面加载时初始化
+    document.addEventListener('DOMContentLoaded', async function() {
+        try {
+            await initSolanaLibs();
+            console.log('Solana库初始化完成');
+        } catch (error) {
+            console.error('Solana库初始化失败:', error);
+        }
+    });
 </script>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
