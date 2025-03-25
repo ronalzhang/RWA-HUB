@@ -2924,23 +2924,24 @@ def create_solana_transaction():
             transaction.add(memo_instruction)
             
             # 获取最新区块哈希
-            recent_blockhash = connection.get_recent_blockhash()
-            transaction.recent_blockhash = recent_blockhash
+            recent_blockhash_resp = connection.get_recent_blockhash()
+            blockhash = recent_blockhash_resp.get('result', {}).get('value', {}).get('blockhash', 'simulated_blockhash')
+            transaction.recent_blockhash = blockhash
             
             # 设置手续费支付者
             transaction.fee_payer = user_pubkey
             
-            # 序列化交易消息
-            message = transaction.serialize_message()
+            # 序列化完整交易
+            serialized = transaction.serialize()
             
             # 转换为Base64以便JSON传输
             import base64
-            serialized_message_b64 = base64.b64encode(message).decode('utf-8')
+            serialized_transaction_b64 = base64.b64encode(serialized).decode('utf-8')
             
             # 返回序列化的交易数据
             return jsonify({
                 'success': True,
-                'serialized_transaction': serialized_message_b64,
+                'serialized_transaction': serialized_transaction_b64, 
                 'message': f'已创建交易记录',
                 'trade_id': trade_id,
                 'asset_id': asset_id,
