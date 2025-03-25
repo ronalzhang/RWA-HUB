@@ -1496,8 +1496,11 @@
                                 
                                 // 定义多个RPC节点地址以便在主节点失败时切换
                                 const rpcEndpoints = [
-                                    window.solanaWeb3.clusterApiUrl('mainnet-beta'),
                                     'https://api.mainnet-beta.solana.com',
+                                    'https://solana.blockpi.network/v1/rpc/public',
+                                    window.solanaWeb3.clusterApiUrl('mainnet-beta'),
+                                    'https://rpc.ankr.com/solana',
+                                    'https://free.rpcpool.com',
                                     'https://api.devnet.solana.com',
                                     'https://solana-mainnet.rpc.extrnode.com',
                                     'https://solana-api.projectserum.com'
