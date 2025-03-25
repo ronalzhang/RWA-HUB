@@ -5,6 +5,8 @@
 {% block head %}
 <!-- 添加jQuery库 -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- 在head部分添加bs58库 -->
+<script src="https://unpkg.com/bs58@5.0.0/dist/index.js"></script>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1488,29 +1490,34 @@
                                         bytes[i] = binaryString.charCodeAt(i);
                                     }
                                     
-                                    // 使用Solana API中的bs58.encode方法，这通常已内置在Solana应用中
-                                    // 或者使用window.bs58?.encode(bytes)
-                                    transactionBase58 = window.solana.bs58?.encode 
-                                        ? window.solana.bs58.encode(bytes) 
-                                        : txData.serialized_transaction; // 回退到原始值
+                                    // 使用bs58库进行编码
+                                    if (typeof bs58 !== 'undefined') {
+                                        console.log('使用bs58库编码交易');
+                                        transactionBase58 = bs58.encode(bytes);
+                                    } else if (window.solana && window.solana.bs58 && window.solana.bs58.encode) {
+                                        console.log('使用Solana钱包内置bs58编码交易');
+                                        transactionBase58 = window.solana.bs58.encode(bytes);
+                                    } else {
+                                        console.error('找不到bs58库');
+                                        throw new Error('找不到Base58编码库');
+                                    }
+                                    console.log('交易数据已转换为base58格式');
                                 } catch (e) {
                                     console.error('转换交易格式失败:', e);
-                                    transactionBase58 = txData.serialized_transaction;
+                                    showError('交易格式转换失败: ' + e.message);
+                                    return;
                                 }
                                 
                                 // 使用Phantom钱包签名并发送交易
                                 console.log('使用Phantom钱包签名并发送交易...');
                                 try {
                                     // 使用正确的交易格式
-                                    const signature = await window.solana.request({
-                                        method: 'signAndSendTransaction',
-                                        params: {
-                                            message: transactionBase58
-                                        }
+                                    const signature = await window.solana.signAndSendTransaction({
+                                        message: transactionBase58
                                     });
                                     
                                     // 获取交易签名
-                                    txHash = signature;
+                                    txHash = signature.signature || signature;
                                     console.log('交易已提交，签名:', txHash);
                                     
                                     showMessage("交易已提交，等待确认...", "info");
@@ -1519,11 +1526,8 @@
                                     // 尝试使用旧版API格式
                                     console.log('尝试使用备用方法...');
                                     try {
-                                        const signature = await window.solana.request({
-                                            method: 'signTransaction',
-                                            params: {
-                                                message: transactionBase58
-                                            }
+                                        const signature = await window.solana.signTransaction({
+                                            message: transactionBase58
                                         });
                                         
                                         txHash = signature;
