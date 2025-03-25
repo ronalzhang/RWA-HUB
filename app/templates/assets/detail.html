@@ -1566,8 +1566,16 @@
                                 console.log('准备签名交易...');
                                 
                                 try {
-                                    // 使用Phantom钱包签名并发送交易
-                                    const { signature } = await window.solana.signAndSendTransaction(transaction);
+                                    // 使用Phantom钱包签名交易 - 使用两步式处理减少权限需求
+                                    // 第1步：仅请求签名，不直接发送
+                                    const signedTx = await window.solana.signTransaction(transaction);
+                                    
+                                    // 在控制台显示签名的交易
+                                    console.log('交易已签名:', signedTx);
+                                    
+                                    // 第2步：手动发送已签名的交易
+                                    showMessage("交易已签名，正在发送...", "info");
+                                    const signature = await connection.sendRawTransaction(signedTx.serialize());
                                     
                                     // 获取交易签名
                                     txHash = signature;
