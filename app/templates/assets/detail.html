@@ -1487,7 +1487,8 @@
                                         }
                                     ],
                                     programId: memoProgramId,
-                                    data: Buffer.from(memoData, 'utf-8')
+                                    // 解决Buffer not defined问题 - 使用Uint8Array替代
+                                    data: new TextEncoder().encode(memoData)
                                 });
                                 
                                 // 添加memo指令到交易
