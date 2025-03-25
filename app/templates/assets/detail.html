@@ -5,32 +5,33 @@
 {% block head %}
 <!-- 费用计算函数的定义 - 放在最前面 -->
 <script>
-// 全局费用计算函数定义 - 使用立即执行函数确保作用域隔离
-(function() {
-    // 定义常量
-    window.PLATFORM_FEE_RATE = 0.035; // 3.5%平台费率
-    window.ACTUAL_PAYMENT_RATE = 0.965; // 96.5%实际支付率
+// 定义常量
+const PLATFORM_FEE_RATE = 0.035; // 3.5%平台费率
+const ACTUAL_PAYMENT_RATE = 0.965; // 96.5%实际支付率
 
-    // 计算平台费用
-    window.calculatePlatformFee = function(amount) {
-        return amount * window.PLATFORM_FEE_RATE;
-    };
+// 计算平台费用
+function calculatePlatformFee(amount) {
+    return amount * PLATFORM_FEE_RATE;
+}
 
-    // 计算实际支付金额
-    window.calculateActualPayment = function(amount) {
-        return amount * window.ACTUAL_PAYMENT_RATE;
-    };
+// 计算实际支付金额
+function calculateActualPayment(amount) {
+    return amount * ACTUAL_PAYMENT_RATE;
+}
 
-    // 验证函数是否正确定义
-    document.addEventListener('DOMContentLoaded', function() {
-        if (typeof window.calculatePlatformFee !== 'function') {
-            console.error('警告：平台费用计算函数未正确定义');
-        }
-        if (typeof window.calculateActualPayment !== 'function') {
-            console.error('警告：实际支付金额计算函数未正确定义');
-        }
-    });
-})();
+// 确保函数在全局作用域可用
+window.calculatePlatformFee = calculatePlatformFee;
+window.calculateActualPayment = calculateActualPayment;
+
+// 验证函数是否正确定义
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof window.calculatePlatformFee !== 'function') {
+        console.error('警告：平台费用计算函数未正确定义');
+    }
+    if (typeof window.calculateActualPayment !== 'function') {
+        console.error('警告：实际支付金额计算函数未正确定义');
+    }
+});
 </script>
 
 <!-- 添加jQuery库 -->
