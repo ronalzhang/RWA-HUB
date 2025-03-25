@@ -679,7 +679,7 @@
             let totalTradeCount = 0;
 
             // 加载交易历史
-            async function loadTradeHistory() {
+            async function loadTradeHistory(page = 1) {
                 try {
                     // 获取交易历史容器
                     const tradeHistoryContainer = document.getElementById('trade-history');
@@ -696,14 +696,23 @@
                     }
                     
                     // 获取当前页码和每页数量
-                    const page = 1;
                     const perPage = 5;
                     
-                    // 发起API请求获取真实数据
-                    console.log('从API获取真实交易数据');
+                    // 准备API请求参数
+                    const queryParams = {
+                        asset_id: parseInt("{{ asset.id }}"),
+                        page: page,
+                        per_page: perPage
+                    };
+
+                    // 验证请求参数
+                    const validation = validateTradeHistoryParams(queryParams);
+                    if (!validation.isValid) {
+                        throw new Error('参数验证失败: ' + validation.errors.join(', '));
+                    }
                     
                     // 发起API请求
-                    const response = await fetch(`/api/trades?asset_id={{ asset.id }}&page=${page}&per_page=${perPage}`);
+                    const response = await fetch(`/api/trades?asset_id=${queryParams.asset_id}&page=${queryParams.page}&per_page=${queryParams.per_page}`);
                     if (!response.ok) {
                         const errorText = await response.text();
                         console.error('API响应错误:', errorText);
@@ -712,8 +721,10 @@
 
                     const data = await response.json();
                     
-                    if (!data || !Array.isArray(data.trades)) {
-                        throw new Error('无效的交易数据');
+                    // 验证响应格式
+                    const responseValidation = validateApiResponse(data, 'GET_TRADE_HISTORY');
+                    if (!responseValidation.isValid) {
+                        throw new Error('API响应格式错误: ' + responseValidation.errors.join(', '));
                     }
                     
                     // 获取交易历史容器（再次确认）
@@ -754,6 +765,13 @@
                     // 添加交易记录
                     const tbody = table.querySelector('tbody');
                     data.trades.forEach(trade => {
+                        // 验证每条交易记录的格式
+                        const tradeValidation = validateTradeRecord(trade);
+                        if (!tradeValidation.isValid) {
+                            console.warn('交易记录格式错误:', trade, tradeValidation.errors);
+                            return;
+                        }
+
                         // 格式化日期
                         const date = new Date(trade.created_at);
                         const formattedDate = date.toLocaleString('zh-CN', {
@@ -1439,7 +1457,7 @@
             async function handleBuy() {
                 try {
                     // 获取购买数量
-                    const amountInput = document.querySelector('input[type="number"]');
+                    const amountInput = document.getElementById('purchase-amount');
                     if (!amountInput) {
                         throw new Error('找不到数量输入框');
                     }
@@ -1454,124 +1472,175 @@
                         throw new Error('无效的代币价格');
                     }
 
+                    // 计算总金额和费用
+                    const totalAmount = amount * price;
+                    const platformFee = calculatePlatformFee(totalAmount);
+                    const actualPayment = calculateActualPayment(totalAmount);
+
                     // 获取钱包地址
-                    const walletAddress = window.ethereum.selectedAddress;
+                    const walletAddress = await getWalletAddress();
                     if (!walletAddress) {
                         throw new Error('请先连接钱包');
                     }
 
-                    // 创建交易
-                    const response = await fetch('/api/trades/create', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Eth-Address': walletAddress
-                        },
-                        body: JSON.stringify({
-                            asset_id: parseInt("{{ asset.id }}"),
-                            amount: amount.toString(),
-                            price: price.toString(),
-                            type: 'buy'
-                        })
+                    // 检查真实USDC余额
+                    const realBalance = await checkSolanaUSDCBalance(walletAddress);
+                    console.log('当前钱包USDC余额:', realBalance);
+                    
+                    if (realBalance < totalAmount) {
+                        throw new Error(`USDC余额不足。需要 ${totalAmount.toFixed(2)} USDC，当前余额 ${realBalance.toFixed(2)} USDC`);
+                    }
+
+                    // 显示确认模态框
+                    const confirmAmount = document.getElementById('confirm-amount');
+                    const confirmTotal = document.getElementById('confirm-total');
+                    const platformFeeDisplay = document.getElementById('platform-fee');
+                    const actualPaymentDisplay = document.getElementById('actual-payment');
+                    
+                    if (confirmAmount) confirmAmount.value = amount;
+                    if (confirmTotal) confirmTotal.value = totalAmount.toFixed(2) + ' USDC';
+                    if (platformFeeDisplay) platformFeeDisplay.value = platformFee.toFixed(2) + ' USDC';
+                    if (actualPaymentDisplay) actualPaymentDisplay.value = actualPayment.toFixed(2) + ' USDC';
+                    
+                    const buyModal = new bootstrap.Modal(document.getElementById('buyModal'));
+                    buyModal.show();
+                    
+                    // 等待用户确认
+                    return new Promise((resolve) => {
+                        window.confirmPurchase = async function() {
+                            try {
+                                buyModal.hide();
+                                
+                                // 准备创建交易的参数
+                                const createTradeParams = {
+                                    asset_id: parseInt("{{ asset.id }}"),
+                                    amount: amount.toString(),
+                                    price: price.toString(),
+                                    type: 'buy',
+                                    trader_address: walletAddress
+                                };
+
+                                // 验证参数
+                                const validation = validateCreateTradeParams(createTradeParams);
+                                if (!validation.isValid) {
+                                    throw new Error('参数验证失败: ' + validation.errors.join(', '));
+                                }
+
+                                // 创建交易记录
+                                const createResponse = await fetch(API_ENDPOINTS.CREATE_TRADE, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-Eth-Address': walletAddress
+                                    },
+                                    body: JSON.stringify(createTradeParams)
+                                });
+
+                                if (!createResponse.ok) {
+                                    const errorText = await createResponse.text();
+                                    throw new Error('创建交易失败: ' + errorText);
+                                }
+
+                                const tradeData = await createResponse.json();
+                                
+                                // 验证响应格式
+                                const responseValidation = validateApiResponse(tradeData, 'CREATE_TRADE');
+                                if (!responseValidation.isValid) {
+                                    throw new Error('API响应格式错误: ' + responseValidation.errors.join(', '));
+                                }
+
+                                // 执行转账
+                                const transferResult = await transferUSDC(
+                                    walletAddress,
+                                    "{{ asset.creator_address }}", 
+                                    totalAmount
+                                );
+
+                                // 准备更新交易状态的参数
+                                const updateParams = {
+                                    status: 'completed',
+                                    tx_hash: transferResult.signature,
+                                    wallet_address: walletAddress
+                                };
+
+                                // 验证更新参数
+                                const updateValidation = validateUpdateTradeParams(updateParams);
+                                if (!updateValidation.isValid) {
+                                    throw new Error('更新参数验证失败: ' + updateValidation.errors.join(', '));
+                                }
+
+                                // 更新交易状态
+                                await updateTradeStatus(
+                                    tradeData.id,
+                                    updateParams.status,
+                                    updateParams.tx_hash,
+                                    updateParams.wallet_address
+                                );
+
+                                // 显示成功消息
+                                showSuccess('交易完成');
+                                
+                                // 刷新页面数据
+                                await refreshAssetInfo();
+                                loadTradeHistory(1);
+                                
+                                resolve(true);
+                            } catch (error) {
+                                console.error('购买失败:', error);
+                                showError(error.message || '购买失败，请稍后重试');
+                                resolve(false);
+                            }
+                        };
                     });
-
-                    // 先获取响应文本
-                    const responseText = await response.text();
-                    console.log('API响应:', responseText);
-
-                    // 检查响应状态
-                    if (!response.ok) {
-                        if (response.status === 404) {
-                            throw new Error('交易服务暂时不可用，请稍后再试');
-                        }
-                        try {
-                            const errorData = JSON.parse(responseText);
-                            throw new Error(errorData.error || '创建交易失败');
-                        } catch (e) {
-                            throw new Error('创建交易失败，请稍后重试');
-                        }
-                    }
-
-                    // 尝试解析JSON
-                    let data;
-                    try {
-                        data = JSON.parse(responseText);
-                    } catch (e) {
-                        console.error('JSON解析错误:', e);
-                        throw new Error('服务器响应格式错误，请稍后重试');
-                    }
-
-                    // 显示成功消息
-                    showSuccess('交易创建成功，请等待确认');
-                    
-                    // 刷新交易历史
-                    loadTradeHistory(1);
-                    
-                    // 关闭模态框
-                    const modal = document.getElementById('buyModal');
-                    if (modal) {
-                        const modalInstance = bootstrap.Modal.getInstance(modal);
-                        if (modalInstance) {
-                            modalInstance.hide();
-                        }
-                    }
                 } catch (error) {
-                    console.error('购买失败:', error);
-                    showError(error.message || '购买失败，请稍后重试');
-                }
-            }
-
-            // 添加模拟交易确认功能
-            async function simulateTransactionConfirmation(signature) {
-                console.log('开始处理交易确认:', signature);
-                try {
-                    // 确保SPL Token库已加载
-                    if (!window.splToken) {
-                        console.log('SPL Token库未加载，尝试重新初始化');
-                        await window.initSplTokenLib();
-                        if (!window.splToken) {
-                            throw new Error('SPL Token库加载失败，请刷新页面重试');
-                        }
-                    }
-
-                    // 使用硬编码的备用方案
-                    const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
-                    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-                    
-                    // 等待交易确认
-                    const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-                    console.log('交易确认状态:', confirmation);
-                    
-                    // 获取交易详情
-                    const tx = await connection.getTransaction(signature, {
-                        commitment: 'confirmed',
-                        maxSupportedTransactionVersion: 0
-                    });
-                    
-                    if (!tx) {
-                        throw new Error('无法获取交易详情');
-                    }
-                    
-                    console.log('交易详情:', tx);
-                    
-                    // 检查交易是否成功
-                    if (tx.meta && tx.meta.err) {
-                        throw new Error('交易执行失败: ' + JSON.stringify(tx.meta.err));
-                    }
-                    
-                    // 更新UI
-                    await refreshAssetInfo();
-                    
-                    // 显示成功消息
-                    showSuccess('交易已确认');
-                    
-                    return true;
-                } catch (error) {
-                    console.error('Solana交易处理失败:', error);
-                    showError('交易处理失败: ' + error.message);
+                    console.error('购买处理失败:', error);
+                    showError(error.message || '购买处理失败');
                     return false;
                 }
             }
+
+            // 添加购买确认模态框
+            const buyModalHtml = `
+            <div class="modal fade" id="buyModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">确认购买</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">购买数量</label>
+                                <input type="text" class="form-control" id="confirm-amount" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">总金额</label>
+                                <input type="text" class="form-control" id="confirm-total" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">平台手续费 (3.5%)</label>
+                                <input type="text" class="form-control" id="platform-fee" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">实际支付给卖家</label>
+                                <input type="text" class="form-control" id="actual-payment" readonly>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                            <button type="button" class="btn btn-primary" onclick="confirmPurchase()">确认购买</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            `;
+
+            // 在页面加载时添加模态框
+            document.addEventListener('DOMContentLoaded', () => {
+                if (!document.getElementById('buyModal')) {
+                    document.body.insertAdjacentHTML('beforeend', buyModalHtml);
+                }
+            });
 
             // 添加单独刷新钱包资产列表的函数 - 使用全局loadUserAssets函数替代
             function refreshWalletAssets() {
@@ -2919,6 +2988,203 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('SPL Token库初始化失败:', error);
         }
+    });
+</script>
+
+<script type="module">
+    import { API_ENDPOINTS, CONTRACT_CONFIG, TradeContractABI, USDC_ABI } from '/static/js/config/api.js';
+    import { 
+        checkWeb3Environment, 
+        getWalletAddress, 
+        checkUSDCBalance, 
+        approveUSDC, 
+        executeTrade, 
+        updateTradeStatus 
+    } from '/static/js/utils/web3.js';
+    import { validateCreateTradeParams, validateUpdateTradeParams, validateApiResponse } from '/static/js/utils/apiValidator.js';
+    import { runApiValidation } from '/static/js/utils/apiValidator.js';
+
+    // 检查Web3环境
+    try {
+        checkWeb3Environment();
+    } catch (error) {
+        console.error('Web3环境检查失败:', error);
+        showError(error.message);
+    }
+
+    // 购买功能
+    async function handleBuy() {
+        try {
+            // 获取购买数量
+            const amountInput = document.getElementById('purchase-amount');
+            if (!amountInput) {
+                throw new Error('找不到数量输入框');
+            }
+            const amount = parseFloat(amountInput.value);
+            if (isNaN(amount) || amount <= 0) {
+                throw new Error('请输入有效的购买数量');
+            }
+
+            // 获取代币价格
+            const price = parseFloat("{{ asset.token_price }}");
+            if (isNaN(price) || price <= 0) {
+                throw new Error('无效的代币价格');
+            }
+
+            // 获取钱包地址
+            const walletAddress = await getWalletAddress();
+            if (!walletAddress) {
+                throw new Error('请先连接钱包');
+            }
+
+            // 1. 创建交易记录
+            const createResponse = await fetch(API_ENDPOINTS.CREATE_TRADE, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Eth-Address': walletAddress
+                },
+                body: JSON.stringify({
+                    asset_id: parseInt("{{ asset.id }}"),
+                    amount: amount.toString(),
+                    price: price.toString(),
+                    type: 'buy'
+                })
+            });
+
+            if (!createResponse.ok) {
+                const errorText = await createResponse.text();
+                console.error('创建交易失败:', errorText);
+                throw new Error('创建交易失败');
+            }
+
+            const tradeData = await createResponse.json();
+            
+            // 2. 调用智能合约执行交易
+            try {
+                // 获取合约实例
+                const tradeContract = new web3.eth.Contract(
+                    TradeContractABI,
+                    CONTRACT_CONFIG.TRADE_CONTRACT_ADDRESS
+                );
+
+                const usdcContract = new web3.eth.Contract(
+                    USDC_ABI,
+                    CONTRACT_CONFIG.USDC_CONTRACT_ADDRESS
+                );
+
+                // 计算总金额
+                const totalAmount = amount * price;
+                
+                // 检查USDC余额
+                const balance = await checkUSDCBalance(walletAddress, usdcContract);
+                if (parseInt(balance) < totalAmount) {
+                    throw new Error('USDC余额不足');
+                }
+
+                // 授权USDC
+                const approveResult = await approveUSDC(
+                    usdcContract,
+                    CONTRACT_CONFIG.TRADE_CONTRACT_ADDRESS,
+                    totalAmount,
+                    walletAddress
+                );
+                console.log('USDC授权结果:', approveResult);
+
+                // 执行交易
+                const tradeResult = await executeTrade(
+                    tradeContract,
+                    tradeData.id,
+                    walletAddress
+                );
+                console.log('交易执行结果:', tradeResult);
+
+                // 3. 更新交易状态
+                await updateTradeStatus(
+                    tradeData.id,
+                    'completed',
+                    tradeResult.transactionHash,
+                    walletAddress
+                );
+
+                // 显示成功消息
+                showSuccess('交易完成');
+                
+                // 刷新交易历史
+                loadTradeHistory(1);
+                
+                // 刷新资产信息
+                await refreshAssetInfo();
+                
+                // 关闭模态框
+                const modal = document.getElementById('buyModal');
+                if (modal) {
+                    const modalInstance = bootstrap.Modal.getInstance(modal);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                }
+            } catch (contractError) {
+                console.error('合约交易失败:', contractError);
+                
+                // 更新交易状态为失败
+                await updateTradeStatus(
+                    tradeData.id,
+                    'failed',
+                    null,
+                    walletAddress
+                );
+                
+                throw new Error('智能合约交易失败: ' + contractError.message);
+            }
+        } catch (error) {
+            console.error('购买失败:', error);
+            showError(error.message || '购买失败，请稍后重试');
+        }
+    }
+
+    // 刷新钱包资产列表
+    function refreshWalletAssets() {
+        if (typeof loadUserAssets === 'function') {
+            console.log('使用全局loadUserAssets函数加载钱包资产');
+            loadUserAssets();
+        }
+    }
+
+    // 导出函数供其他模块使用
+    window.handleBuy = handleBuy;
+    window.refreshWalletAssets = refreshWalletAssets;
+
+    // 执行API验证测试
+    async function runApiTests() {
+        console.log('开始执行API验证测试...');
+        
+        try {
+            const result = await runApiValidation();
+            if (result.success) {
+                console.log('✅ API验证通过!');
+                showMessage('API验证通过', 'success');
+            } else {
+                console.error('❌ API验证失败:', result.errors);
+                showMessage('API验证失败: ' + result.errors.join(', '), 'danger');
+            }
+        } catch (error) {
+            console.error('API验证执行出错:', error);
+            showMessage('API验证执行出错: ' + error.message, 'danger');
+        }
+    }
+
+    // 页面加载完成后运行测试
+    document.addEventListener('DOMContentLoaded', () => {
+        // 添加测试按钮
+        const testButton = document.createElement('button');
+        testButton.className = 'btn btn-info position-fixed bottom-0 end-0 m-3';
+        testButton.innerHTML = '<i class="fas fa-vial me-2"></i>运行API验证';
+        testButton.onclick = runApiTests;
+        document.body.appendChild(testButton);
+        
+        // 自动运行测试
+        setTimeout(runApiTests, 2000);
     });
 </script>
 
