@@ -2897,9 +2897,8 @@ def create_solana_transaction():
         
         # 使用Solana Python客户端创建交易
         from app.utils.solana_compat.publickey import PublicKey
-        from app.utils.solana_compat.transaction import Transaction
+        from app.utils.solana_compat.transaction import Transaction, TransactionInstruction
         from app.utils.solana_compat.connection import Connection
-        from app.utils.solana_compat.instruction import TransactionInstruction
         
         try:
             # 创建连接对象
