@@ -1477,17 +1477,35 @@
                                     throw new Error(txData.error || '无效的交易数据');
                                 }
                                 
-                                // 将base64编码的序列化交易转换为Uint8Array
-                                const transactionBytes = Uint8Array.from(atob(txData.serialized_transaction), c => c.charCodeAt(0));
+                                // 将base64编码的序列化交易转换为base58编码
+                                let transactionBase58;
+                                try {
+                                    // 先将base64解码为字节数组
+                                    const binaryString = atob(txData.serialized_transaction);
+                                    const len = binaryString.length;
+                                    const bytes = new Uint8Array(len);
+                                    for (let i = 0; i < len; i++) {
+                                        bytes[i] = binaryString.charCodeAt(i);
+                                    }
+                                    
+                                    // 使用Solana API中的bs58.encode方法，这通常已内置在Solana应用中
+                                    // 或者使用window.bs58?.encode(bytes)
+                                    transactionBase58 = window.solana.bs58?.encode 
+                                        ? window.solana.bs58.encode(bytes) 
+                                        : txData.serialized_transaction; // 回退到原始值
+                                } catch (e) {
+                                    console.error('转换交易格式失败:', e);
+                                    transactionBase58 = txData.serialized_transaction;
+                                }
                                 
                                 // 使用Phantom钱包签名并发送交易
                                 console.log('使用Phantom钱包签名并发送交易...');
                                 try {
-                                    // 直接使用base64编码的交易数据
+                                    // 使用正确的交易格式
                                     const signature = await window.solana.request({
                                         method: 'signAndSendTransaction',
                                         params: {
-                                            message: txData.serialized_transaction
+                                            message: transactionBase58
                                         }
                                     });
                                     
@@ -1504,7 +1522,7 @@
                                         const signature = await window.solana.request({
                                             method: 'signTransaction',
                                             params: {
-                                                message: txData.serialized_transaction
+                                                message: transactionBase58
                                             }
                                         });
                                         
