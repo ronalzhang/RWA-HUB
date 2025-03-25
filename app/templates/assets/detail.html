@@ -1482,36 +1482,21 @@
                                 // 将base64编码的序列化交易转换为base58编码
                                 let transactionBase58;
                                 try {
-                                    // 先将base64解码为字节数组
-                                    const binaryString = atob(txData.serialized_transaction);
-                                    const len = binaryString.length;
-                                    const bytes = new Uint8Array(len);
-                                    for (let i = 0; i < len; i++) {
-                                        bytes[i] = binaryString.charCodeAt(i);
-                                    }
+                                    console.log('准备处理交易数据...');
                                     
-                                    // 使用bs58库进行编码
-                                    if (typeof bs58 !== 'undefined') {
-                                        console.log('使用bs58库编码交易');
-                                        transactionBase58 = bs58.encode(bytes);
-                                    } else if (window.solana && window.solana.bs58 && window.solana.bs58.encode) {
-                                        console.log('使用Solana钱包内置bs58编码交易');
-                                        transactionBase58 = window.solana.bs58.encode(bytes);
-                                    } else {
-                                        console.error('找不到bs58库');
-                                        throw new Error('找不到Base58编码库');
-                                    }
-                                    console.log('交易数据已转换为base58格式');
+                                    // 直接使用服务器返回的交易数据，不进行转换
+                                    transactionBase58 = txData.serialized_transaction;
+                                    console.log('使用服务器提供的原始交易数据');
                                 } catch (e) {
-                                    console.error('转换交易格式失败:', e);
-                                    showError('交易格式转换失败: ' + e.message);
+                                    console.error('处理交易数据失败:', e);
+                                    showError('处理交易数据失败: ' + e.message);
                                     return;
                                 }
                                 
                                 // 使用Phantom钱包签名并发送交易
                                 console.log('使用Phantom钱包签名并发送交易...');
                                 try {
-                                    // 使用正确的交易格式
+                                    // 直接使用交易数据
                                     const signature = await window.solana.signAndSendTransaction({
                                         message: transactionBase58
                                     });
