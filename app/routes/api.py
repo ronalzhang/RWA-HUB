@@ -2841,3 +2841,146 @@ def check_ethereum_transaction():
     except Exception as e:
         current_app.logger.error(f'检查以太坊交易状态失败: {str(e)}')
         return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/solana/check_transaction', methods=['GET'])
+def check_solana_transaction():
+    """检查Solana交易状态"""
+    try:
+        # 获取交易签名
+        signature = request.args.get('signature')
+        if not signature:
+            return jsonify({'success': False, 'error': '缺少交易签名参数'}), 400
+            
+        # 记录请求信息
+        current_app.logger.info(f"检查Solana交易状态: {signature}")
+        
+        # 使用Solana Python客户端检查交易状态
+        try:
+            from app.utils.solana_compat.connection import Connection
+            
+            # 创建连接对象
+            connection = Connection("https://api.mainnet-beta.solana.com")
+            
+            # 获取交易状态
+            transaction_status = connection.get_signature_status(signature)
+            
+            # 检查交易是否已确认
+            confirmed = transaction_status is not None and transaction_status.get('confirmations') is not None
+            
+            current_app.logger.info(f"交易状态检查结果: {signature}, 确认状态: {confirmed}")
+            
+            # 返回结果
+            return jsonify({
+                'success': True,
+                'signature': signature,
+                'confirmed': confirmed,
+                'status': transaction_status
+            })
+            
+        except Exception as tx_error:
+            current_app.logger.error(f"检查交易状态失败: {str(tx_error)}")
+            # 返回失败，但HTTP状态码仍为200，让前端继续轮询
+            return jsonify({
+                'success': True,
+                'signature': signature,
+                'confirmed': False,
+                'error': str(tx_error)
+            })
+        
+    except Exception as e:
+        current_app.logger.error(f"处理交易状态请求失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
+
+@api_bp.route('/solana/create_transaction', methods=['POST'])
+@eth_address_required
+def create_solana_transaction():
+    """
+    创建Solana交易
+    用于生成各类Solana交易，返回序列化的交易数据
+    前端使用Phantom钱包签名并发送
+    """
+    try:
+        # 检查钱包连接状态
+        if not g.eth_address:
+            return jsonify({'success': False, 'error': '请先连接钱包'}), 401
+            
+        # 获取请求数据
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '无效的请求数据'}), 400
+            
+        # 检查必要字段
+        required_fields = ['trade_id', 'amount', 'price', 'asset_id']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'error': f'缺少必要字段: {field}'}), 400
+                
+        trade_id = data.get('trade_id')
+        amount = float(data.get('amount'))
+        price = float(data.get('price'))
+        asset_id = data.get('asset_id')
+        
+        # 记录请求信息
+        current_app.logger.info(f"创建Solana交易: 交易ID={trade_id}, 金额={amount}, 价格={price}, 资产ID={asset_id}, 用户={g.eth_address}")
+        
+        # 使用Solana Python客户端创建交易
+        from app.utils.solana_compat.publickey import PublicKey
+        from app.utils.solana_compat.transaction import Transaction
+        from app.utils.solana_compat.connection import Connection
+        from app.utils.solana_compat.instruction import TransactionInstruction
+        
+        try:
+            # 创建连接对象
+            connection = Connection("https://api.mainnet-beta.solana.com")
+            
+            # 创建交易对象
+            transaction = Transaction()
+            
+            # 添加备注指令，记录交易ID
+            user_pubkey = PublicKey(g.eth_address)
+            memo_program_id = PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
+            
+            # 创建交易数据
+            memo_data = f"trade:{trade_id}:asset:{asset_id}:amount:{amount}:price:{price}"
+            
+            # 添加备注指令
+            memo_instruction = TransactionInstruction(
+                keys=[{'pubkey': user_pubkey, 'isSigner': True, 'isWritable': False}],
+                program_id=memo_program_id,
+                data=memo_data.encode('utf-8')
+            )
+            
+            transaction.add(memo_instruction)
+            
+            # 获取最新区块哈希
+            recent_blockhash = connection.get_recent_blockhash()
+            transaction.recent_blockhash = recent_blockhash
+            
+            # 设置手续费支付者
+            transaction.fee_payer = user_pubkey
+            
+            # 序列化交易消息
+            message = transaction.serialize_message()
+            
+            # 转换为Base64以便JSON传输
+            import base64
+            serialized_message_b64 = base64.b64encode(message).decode('utf-8')
+            
+            # 返回序列化的交易数据
+            return jsonify({
+                'success': True,
+                'serialized_transaction': serialized_message_b64,
+                'message': f'已创建交易记录',
+                'trade_id': trade_id,
+                'asset_id': asset_id,
+                'amount': amount,
+                'price': price
+            })
+            
+        except Exception as tx_error:
+            current_app.logger.error(f"创建Solana交易失败: {str(tx_error)}")
+            return jsonify({'success': False, 'error': f'创建交易失败: {str(tx_error)}'}), 500
+        
+    except Exception as e:
+        current_app.logger.error(f"处理交易请求失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
