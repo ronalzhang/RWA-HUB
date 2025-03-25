@@ -2934,14 +2934,19 @@ def create_solana_transaction():
             # 序列化完整交易
             serialized = transaction.serialize()
             
-            # 转换为Base64以便JSON传输
-            import base64
-            serialized_transaction_b64 = base64.b64encode(serialized).decode('utf-8')
+            # 改用base58编码
+            import base58
             
-            # 返回序列化的交易数据
+            # 先序列化交易消息，这是Phantom钱包需要的格式
+            message_bytes = transaction.serialize_message()
+            
+            # 使用base58编码
+            serialized_transaction_b58 = base58.b58encode(message_bytes).decode('utf-8')
+            
+            # 返回序列化的交易数据（使用base58格式）
             return jsonify({
                 'success': True,
-                'serialized_transaction': serialized_transaction_b64, 
+                'serialized_transaction': serialized_transaction_b58, 
                 'message': f'已创建交易记录',
                 'trade_id': trade_id,
                 'asset_id': asset_id,

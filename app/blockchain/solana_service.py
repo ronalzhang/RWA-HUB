@@ -189,7 +189,7 @@ def prepare_transaction(user_address, asset_id, token_symbol, amount, price, tra
         trade_id: 交易记录ID
         
     Returns:
-        dict: 交易数据
+        dict: 交易数据，包含已经base58编码的交易信息
     """
     try:
         logger.info(f"准备Solana交易: 用户={user_address}, 资产ID={asset_id}, 数量={amount}")
@@ -221,34 +221,30 @@ def prepare_transaction(user_address, asset_id, token_symbol, amount, price, tra
         # 设置最近的区块哈希
         transaction.set_recent_blockhash("simulated_blockhash_for_dev")
         
-        # 将交易序列化为Base64编码
-        serialized_tx = base64.b64encode(transaction.serialize()).decode('utf-8')
+        # 直接返回base58编码的交易消息
+        import base58
         
-        # 构建Phantom钱包需要的交易格式
-        # Phantom钱包需要一个Message对象和Uint8Array对象
-        phantom_transaction = {
-            "transaction": {
-                "recentBlockhash": "simulated_blockhash_for_dev",
-                "feePayer": user_address,
-                "instructions": [
-                    {
-                        "programId": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
-                        "keys": [{"pubkey": user_address, "isSigner": True, "isWritable": False}],
-                        "data": base64.b64encode(f"trade:{trade_id}".encode('utf-8')).decode('utf-8')
-                    }
-                ],
-                "signers": []
-            },
-            "signers": [],
-            "signerPublicKeys": [user_address]
+        # 序列化交易消息
+        message_bytes = transaction.serialize_message()
+        
+        # 使用base58编码 
+        base58_message = base58.b58encode(message_bytes).decode('utf-8')
+        
+        logger.info(f"已生成base58格式的交易消息")
+        
+        # 返回交易数据，包含base58编码的消息
+        return {
+            "success": True,
+            "serialized_transaction": base58_message,
+            "trade_id": trade_id
         }
-        
-        # 返回交易数据
-        return phantom_transaction
         
     except Exception as e:
         logger.error(f"准备Solana交易失败: {str(e)}")
-        raise Exception(f"准备交易失败: {str(e)}")
+        return {
+            "success": False,
+            "error": f"准备交易失败: {str(e)}"
+        }
 
 def check_transaction(signature):
     """
