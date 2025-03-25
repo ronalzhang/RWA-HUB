@@ -111,6 +111,49 @@ class Transaction:
         # 简化实现，实际应序列化为特定格式
         return bytes([0] * 32) 
         
+    def serialize_message(self) -> bytes:
+        """
+        序列化交易消息，供Phantom钱包签名
+        
+        Returns:
+            bytes: 序列化后的交易消息
+        """
+        # 简化实现，实际应根据Solana交易格式序列化
+        # 这里仅仅创建一个示例消息格式
+        import json
+        import struct
+        
+        # 创建一个简化的消息结构
+        message = {
+            "header": {
+                "numRequiredSignatures": 1,
+                "numReadonlySignedAccounts": 0,
+                "numReadonlyUnsignedAccounts": 1
+            },
+            "recentBlockhash": self.recent_blockhash or "simulated_blockhash",
+            "instructions": []
+        }
+        
+        # 添加所有指令
+        for idx, instruction in enumerate(self.instructions):
+            instruction_data = {
+                "programIdIndex": idx,
+                "accounts": [idx for idx in range(len(instruction.keys))],
+                "data": instruction.data.hex() if isinstance(instruction.data, bytes) else instruction.data
+            }
+            message["instructions"].append(instruction_data)
+        
+        # 将消息转换为字节
+        message_bytes = json.dumps(message).encode('utf-8')
+        
+        # 添加长度前缀
+        length = len(message_bytes)
+        # 使用4字节的小端序整数表示长度
+        length_bytes = struct.pack("<I", length)
+        
+        # 返回最终的字节序列
+        return length_bytes + message_bytes
+    
     @staticmethod
     def from_bytes(raw_bytes: bytes) -> "Transaction":
         """

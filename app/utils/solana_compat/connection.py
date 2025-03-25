@@ -120,4 +120,30 @@ class Connection:
             error_msg = response.get("error", {}).get("message", "Unknown error")
             raise Exception(f"发送交易失败: {error_msg}")
         
-        return response.get("result", "") 
+        return response.get("result", "")
+    
+    def get_signature_status(
+        self, signature: str, commitment: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        获取交易签名状态
+        
+        Args:
+            signature: 交易签名
+            commitment: 可选的承诺级别
+            
+        Returns:
+            Dict包含交易签名状态
+        """
+        response = self.rpc_client.get_signature_statuses([signature], commitment or self.commitment)
+        if "error" in response:
+            error_msg = response.get("error", {}).get("message", "Unknown error")
+            raise Exception(f"获取交易状态失败: {error_msg}")
+        
+        result = response.get("result", {})
+        value = result.get("value", [])
+        
+        if value and len(value) > 0:
+            return value[0]
+        
+        return None 
