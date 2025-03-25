@@ -1448,24 +1448,78 @@
                                     throw new Error('未检测到Phantom钱包连接');
                                 }
                                 
-                                // 创建交易参数
-                                const transactionParams = {
-                                    trade_id: tradeId,
-                                    amount: tradeInfo.amount,
-                                    price: tradeInfo.price,
-                                    asset_id: tradeInfo.asset_id
-                                };
-                                
                                 // 显示等待提示
                                 showMessage("正在处理交易...", "info");
                                 
-                                // 模拟交易ID和签名 - 开发阶段使用模拟交易
-                                const txHash = `simulated_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
-                                console.log('使用模拟交易ID:', txHash);
+                                // 向后端请求交易数据
+                                const txDataResponse = await fetch('/api/solana/create_transaction', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-Eth-Address': dbAddress,
+                                        'X-Wallet-Type': 'phantom'
+                                    },
+                                    body: JSON.stringify({
+                                        trade_id: tradeId,
+                                        amount: tradeInfo.amount,
+                                        price: tradeInfo.price,
+                                        asset_id: tradeInfo.asset_id
+                                    })
+                                });
                                 
-                                // 模拟交易确认延迟
-                                await new Promise(resolve => setTimeout(resolve, 2000));
-                                console.log('模拟交易已确认');
+                                if (!txDataResponse.ok) {
+                                    const errorData = await txDataResponse.json();
+                                    throw new Error(errorData.error || '准备交易数据失败');
+                                }
+                                
+                                const txData = await txDataResponse.json();
+                                if (!txData.success || !txData.serialized_transaction) {
+                                    throw new Error(txData.error || '无效的交易数据');
+                                }
+                                
+                                // 将base64编码的序列化交易转换为Uint8Array
+                                const transactionBytes = Uint8Array.from(atob(txData.serialized_transaction), c => c.charCodeAt(0));
+                                
+                                // 使用Phantom钱包签名并发送交易
+                                console.log('使用Phantom钱包签名并发送交易...');
+                                const { signature } = await window.solana.signAndSendTransaction({
+                                    message: transactionBytes
+                                });
+                                
+                                // 获取交易签名
+                                txHash = signature;
+                                console.log('交易已提交，签名:', txHash);
+                                
+                                showMessage("交易已提交，等待确认...", "info");
+                                
+                                // 等待交易确认
+                                let confirmed = false;
+                                let attempts = 0;
+                                
+                                while (!confirmed && attempts < 10) {
+                                    attempts++;
+                                    try {
+                                        // 请求后端检查交易状态
+                                        const confirmResponse = await fetch(`/api/solana/check_transaction?signature=${txHash}`);
+                                        if (confirmResponse.ok) {
+                                            const confirmResult = await confirmResponse.json();
+                                            if (confirmResult.confirmed) {
+                                                confirmed = true;
+                                                console.log('交易已确认');
+                                                break;
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.warn('检查交易状态失败，尝试重试', e);
+                                    }
+                                    
+                                    // 等待2秒再次检查
+                                    await new Promise(resolve => setTimeout(resolve, 2000));
+                                }
+                                
+                                if (!confirmed) {
+                                    console.warn('交易未在预期时间内确认，但仍然继续处理');
+                                }
                                 
                                 showMessage("交易已提交，处理中...", "info");
                             } catch (e) {
