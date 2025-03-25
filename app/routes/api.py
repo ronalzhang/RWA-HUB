@@ -641,6 +641,28 @@ def update_trade_status(trade_id):
         # 获取交易记录
         trade = Trade.query.get_or_404(trade_id)
         
+        # 获取用户地址，验证权限
+        user_address = None
+        if 'X-Eth-Address' in request.headers:
+            user_address = request.headers.get('X-Eth-Address')
+        elif data.get('wallet_address'):
+            user_address = data.get('wallet_address')
+        elif hasattr(g, 'eth_address'):
+            user_address = g.eth_address
+            
+        # 如果提供了地址，验证交易创建者
+        if user_address:
+            user_address_lower = user_address.lower() if user_address.startswith('0x') else user_address
+            trader_address_lower = trade.trader_address.lower() if trade.trader_address.startswith('0x') else trade.trader_address
+            
+            # 检查是否是交易创建者或管理员
+            is_creator = user_address_lower == trader_address_lower
+            is_admin_user = is_admin(user_address)
+            
+            if not is_creator and not is_admin_user:
+                current_app.logger.warning(f'无权更新交易状态: 用户={user_address}, 交易创建者={trade.trader_address}')
+                return jsonify({'error': '无权操作此交易'}), 403
+                
         # 更新交易状态
         old_status = trade.status
         trade.status = new_status
@@ -678,10 +700,15 @@ def update_trade_status(trade_id):
         db.session.add(trade)
         db.session.commit()
         
+        # 获取资产信息
+        asset = Asset.query.get(trade.asset_id)
+        
         return jsonify({
             'id': trade.id,
             'status': trade.status,
-            'tx_hash': trade.tx_hash
+            'tx_hash': trade.tx_hash,
+            'remaining_supply': asset.remaining_supply if asset else None,
+            'success': True
         })
         
     except Exception as e:
@@ -2617,7 +2644,6 @@ def execute_transfer():
 
 # 添加新的区块链交易相关API路由
 @api_bp.route('/trades/<int:trade_id>', methods=['GET'])
-@eth_address_required
 def get_trade(trade_id):
     """获取单个交易详情"""
     try:
@@ -2645,9 +2671,17 @@ def get_trade(trade_id):
                 'created_at': trade.created_at.isoformat() if trade.created_at else None
             }
             return jsonify(trade_data)
+        
+        # 用户地址不区分大小写处理
+        user_address_lower = user_address.lower() if user_address.startswith('0x') else user_address
+        trader_address_lower = trade.trader_address.lower() if trade.trader_address.startswith('0x') else trade.trader_address
             
         # 检查权限 - 只有交易创建者或管理员可以获取详情
-        if not is_admin(user_address) and trade.trader_address.lower() != user_address.lower():
+        is_user_admin = is_admin(user_address)
+        is_creator = trader_address_lower == user_address_lower
+        
+        if not is_user_admin and not is_creator:
+            current_app.logger.warning(f'交易访问权限不足: 用户={user_address}, 交易创建者={trade.trader_address}, 管理员={is_user_admin}, 创建者匹配={is_creator}')
             return jsonify({'error': '无权限访问该交易'}), 403
             
         # 转换为字典并返回完整信息
@@ -2658,10 +2692,21 @@ def get_trade(trade_id):
         return jsonify({'error': str(e)}), 500
 
 @api_bp.route('/blockchain/solana/prepare-transaction', methods=['POST'])
-@eth_address_required
 def prepare_solana_transaction():
     """准备Solana交易"""
     try:
+        # 获取用户地址
+        user_address = None
+        if 'X-Eth-Address' in request.headers:
+            user_address = request.headers.get('X-Eth-Address')
+        elif request.json and 'wallet_address' in request.json:
+            user_address = request.json.get('wallet_address')
+        elif hasattr(g, 'eth_address'):
+            user_address = g.eth_address
+            
+        if not user_address:
+            return jsonify({'error': '未提供钱包地址'}), 401
+            
         data = request.json
         
         # 检查必要字段
@@ -2674,9 +2719,11 @@ def prepare_solana_transaction():
         trade_id = data.get('trade_id')
         trade = Trade.query.get_or_404(trade_id)
         
-        # 验证交易创建者
-        user_address = g.eth_address
-        if trade.trader_address.lower() != user_address.lower():
+        # 验证交易创建者 - 不区分大小写
+        user_address_lower = user_address.lower() if user_address.startswith('0x') else user_address
+        trader_address_lower = trade.trader_address.lower() if trade.trader_address.startswith('0x') else trade.trader_address
+        
+        if trader_address_lower != user_address_lower:
             return jsonify({'error': '无权操作此交易'}), 403
             
         # 获取资产信息
