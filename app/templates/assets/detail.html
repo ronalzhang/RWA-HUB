@@ -3469,3 +3469,74 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<script>
+// 全局定义费用计算函数
+window.PLATFORM_FEE_RATE = 0.035; // 3.5%平台费率
+window.ACTUAL_PAYMENT_RATE = 0.965; // 96.5%实际支付率
+
+window.calculatePlatformFee = function(amount) {
+    return amount * window.PLATFORM_FEE_RATE;
+};
+
+window.calculateActualPayment = function(amount) {
+    return amount * window.ACTUAL_PAYMENT_RATE;
+};
+
+// 定义handleBuy函数
+window.handleBuy = async function() {
+    try {
+        // 获取购买数量
+        const amountInput = document.getElementById('purchase-amount');
+        if (!amountInput) {
+            throw new Error('找不到数量输入框');
+        }
+        const amount = parseFloat(amountInput.value);
+        if (isNaN(amount) || amount <= 0) {
+            throw new Error('请输入有效的购买数量');
+        }
+
+        // 获取代币价格
+        const price = parseFloat("{{ asset.token_price }}");
+        if (isNaN(price) || price <= 0) {
+            throw new Error('无效的代币价格');
+        }
+
+        // 计算总金额和费用
+        const totalAmount = amount * price;
+        const platformFee = window.calculatePlatformFee(totalAmount);
+        const actualPayment = window.calculateActualPayment(totalAmount);
+
+        // 显示确认模态框
+        const confirmAmount = document.getElementById('confirm-amount');
+        const confirmTotal = document.getElementById('confirm-total');
+        const platformFeeDisplay = document.getElementById('platform-fee');
+        const actualPaymentDisplay = document.getElementById('actual-payment');
+        
+        if (confirmAmount) confirmAmount.value = amount;
+        if (confirmTotal) confirmTotal.value = totalAmount.toFixed(2) + ' USDC';
+        if (platformFeeDisplay) platformFeeDisplay.value = platformFee.toFixed(2) + ' USDC';
+        if (actualPaymentDisplay) actualPaymentDisplay.value = actualPayment.toFixed(2) + ' USDC';
+        
+        const buyModal = new bootstrap.Modal(document.getElementById('buyModal'));
+        buyModal.show();
+    } catch (error) {
+        console.error('购买处理失败:', error);
+        if (typeof window.showError === 'function') {
+            window.showError(error.message);
+        } else {
+            alert(error.message);
+        }
+    }
+};
+
+// 在页面加载完成后绑定事件
+document.addEventListener('DOMContentLoaded', function() {
+    // 绑定购买按钮事件
+    const buyButton = document.getElementById('buy-button');
+    if (buyButton) {
+        buyButton.removeEventListener('click', window.handleBuy);
+        buyButton.addEventListener('click', window.handleBuy);
+    }
+});
+</script>
+
