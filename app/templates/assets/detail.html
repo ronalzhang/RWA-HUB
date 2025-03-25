@@ -1440,14 +1440,14 @@
             async function handleBuy() {
                 try {
                     // 获取购买数量
-                    const amount = parseInt(document.getElementById('amount').value);
+                    const amount = parseInt(document.getElementById('purchase-amount').value);
                     if (isNaN(amount) || amount <= 0) {
                         showError('请输入有效的购买数量');
                         return;
                     }
 
                     // 获取单价
-                    const price = parseFloat(document.getElementById('price').value);
+                    const price = parseFloat(document.getElementById('token-price').value);
                     if (isNaN(price) || price <= 0) {
                         showError('请输入有效的单价');
                         return;
