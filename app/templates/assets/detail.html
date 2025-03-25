@@ -1,146 +1,82 @@
 {% extends "base.html" %}
 
-{% block title %}{{ _('Asset Details') }} - {{ asset.name }}{% endblock %}
+{% block title %}{{ asset.token_symbol }} - {{ asset.name }} | RWA-HUB{% endblock %}
 
-{% block styles %}
-<!-- 资产详情页特定样式 -->
-<link rel="stylesheet" href="{{ url_for('static', filename='css/asset_detail.css') }}">
+{% block head %}
+<!-- 添加jQuery库 -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- 在head部分添加bs58库 -->
+<script src="https://unpkg.com/bs58@5.0.0/dist/index.js"></script>
+<!-- 添加Solana Web3 SDK -->
+<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+<!-- 添加Solana SPL Token SDK -->
+<script src="https://unpkg.com/@solana/spl-token@latest/lib/index.iife.min.js"></script>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <style>
-    .asset-section {
-        margin-bottom: 30px;
-    }
-    
-    .asset-image {
-        border-radius: 10px;
-        object-fit: cover;
-        width: 100%;
-        height: 300px;
-    }
-    
-    .detail-icon {
-        width: 30px;
-        text-align: center;
-        color: var(--primary-color);
-    }
-    
-    .specs-table th {
-        width: 250px;
-        font-weight: 500;
-        color: #555;
-    }
-    
-    .revenue-chart {
-        height: 300px;
-    }
-    
-    .token-price, .annual-dividend {
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: #1e3c72;
-    }
-    
-    .purchase-section {
-        background-color: #f7f9fc;
-        padding: 25px;
-        border-radius: 15px;
-    }
-    
-    .purchase-title {
-        font-size: 1.3rem;
-        margin-bottom: 20px;
-    }
-    
-    /* 确保输入框中的数字居中显示 */
-    #amount-input {
-        text-align: center;
-        font-size: 1.2rem;
-    }
-    
-    /* 轮播图样式 */
-    .carousel-inner {
-        border-radius: 15px;
+    /* 主要容器样式 */
+    /* 修复详情页卡片样式 */
+    .asset-detail-page .card {
+        border-radius: 12px;
         overflow: hidden;
+        box-shadow: 0 3px 15px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
     }
     
-    /* 保护图片宽高比 */
-    .carousel-item img {
-        object-fit: cover;
-        height: 400px;
+    .asset-detail-page .card-header {
+        background-color: rgba(248, 249, 250, 0.5);
+        border-bottom: 1px solid rgba(0,0,0,0.08);
+        padding: 1rem 1.25rem;
     }
     
-    /* 资产卡片的样式增强 */
-    .card {
-        border-radius: 15px;
-        overflow: hidden;
-        box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05);
-        transition: all 0.3s ease;
+    .asset-detail-page .card-body {
+        padding: 1.25rem;
     }
     
-    .card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    /* 修复Asset Trading模块样式 */
+    .asset-detail-page .trade-card .card-body {
+        padding: 1.2rem;
     }
     
-    /* 文本强调样式 */
-    .text-highlight {
-        color: #1e3c72;
-        font-weight: 600;
-    }
-    
-    /* 分享模态框样式 */
-    .share-message {
-        background-color: #f7fafc;
-        border-left: 4px solid #4a6cf7;
-        padding: 15px;
-        margin-bottom: 20px;
-        border-radius: 8px;
+    /* 确保表单元素样式正确 */
+    .asset-detail-page .form-label {
         font-weight: 500;
+        margin-bottom: 0.5rem;
+        color: #495057;
     }
     
-    .commission-info {
-        background-color: #fff8eb;
-        padding: 15px;
-        border-radius: 8px;
+    .asset-detail-page .form-control {
+        border-radius: 0.375rem;
+        border: 1px solid #ced4da;
+        padding: 0.375rem 0.75rem;
     }
     
-    .commission-tiers {
-        display: flex;
-        justify-content: space-between;
-    }
-    
-    .tier {
-        text-align: center;
-        flex: 1;
-        padding: 10px 5px;
-        border-radius: 8px;
-    }
-    
-    .tier-label {
-        font-size: 12px;
+    .asset-detail-page .form-text {
         color: #6c757d;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
     }
     
-    .tier-value {
-        font-size: 18px;
-        font-weight: 600;
-        color: #ff6b6b;
+    /* 修复分页控件样式 */
+    #pagination-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 1rem;
     }
     
-    .info-icon {
-        display: inline-block;
-        cursor: help;
+    /* 交易历史表格样式 */
+    .trade-history-section table {
+        margin-bottom: 0;
+    }
+    
+    .trade-history-section th, 
+    .trade-history-section td {
+        padding: 0.75rem;
+        vertical-align: middle;
     }
 </style>
-{% endblock %}
-
-{% block scripts %}
-<!-- Solana Web3 SDK -->
-<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-<!-- Solana SPL Token SDK -->
-<script src="https://unpkg.com/@solana/spl-token@latest/lib/index.iife.min.js"></script>
-
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -1504,13 +1440,10 @@
                     }
                     const tradeInfo = await getTradeResponse.json();
                     
-                    // 初始化交易哈希变量，确保在整个函数作用域中可用
-                    let txHash = '';
-                    
                     // 使用真实区块链网络处理交易
                     if (window.walletState && window.walletState.walletType) {
                         const walletType = window.walletState.walletType;
-                        // 移除这里的txHash声明，使用顶部声明的变量
+                        let txHash = '';
                         
                         // 根据钱包类型执行不同的交易流程
                         if (walletType === 'phantom' || walletType === 'solana') {
@@ -1524,29 +1457,11 @@
                                 // 显示等待提示
                                 showMessage("正在处理交易...", "info");
                                 
-                                // 创建简单的memo交易
-                                // 假设window.solanaWeb3已经通过CDN加载
-                                if (!window.solanaWeb3) {
-                                    console.error('加载solanaWeb3库失败');
-                                    throw new Error('加载solanaWeb3库失败，请刷新页面重试');
-                                }
-                                
                                 // 检查SPL Token库是否加载
                                 if (!window.splToken) {
-                                    console.error('SPL Token库未加载');
-                                    throw new Error('SPL Token库未加载，请刷新页面重试');
+                                    console.error("SPL Token库未加载");
+                                    throw new Error("SPL Token库未加载，请刷新页面重试");
                                 }
-                                
-                                // 创建连接对象
-                                let connection = new window.solanaWeb3.Connection(
-                                    window.solanaWeb3.clusterApiUrl('mainnet-beta')
-                                );
-                                
-                                // 创建交易对象
-                                const transaction = new window.solanaWeb3.Transaction();
-                                
-                                // 获取钱包公钥
-                                const walletPublicKey = new window.solanaWeb3.PublicKey(window.solana.publicKey.toString());
                                 
                                 // 定义系统接收方钱包地址
                                 const receiverPublicKey = new window.solanaWeb3.PublicKey("8cU6PAtRTRgfyJu48qfz2hQP5aMGwooxqrCZtyB6UcYP");
@@ -1560,83 +1475,23 @@
                                 const transferAmount = formattedAmount * 1000000; // 转换为USDC的最小单位，USDC有6位小数
                                 console.log(`准备转账${formattedAmount} USDC (${transferAmount}个最小单位)`);
                                 
-                                // 获取用户的USDC代币账户
-                                console.log("查询用户USDC代币账户...");
-                                const userTokenAccounts = await connection.getParsedTokenAccountsByOwner(
-                                    walletPublicKey,
-                                    { mint: USDC_MINT }
-                                );
-                                
-                                // 确认用户有USDC代币账户
-                                if (userTokenAccounts.value.length === 0) {
-                                    throw new Error("您没有USDC代币账户，请先在钱包中添加USDC代币");
+                                // 创建区块链交易（包含USDC转账）
+                                // 假设window.solanaWeb3已经通过CDN加载
+                                if (!window.solanaWeb3) {
+                                    console.error('加载solanaWeb3库失败');
+                                    throw new Error('加载solanaWeb3库失败，请刷新页面重试');
                                 }
                                 
-                                // 获取用户的代币账户地址
-                                const sourceTokenAccount = userTokenAccounts.value[0].pubkey;
-                                console.log("用户USDC账户:", sourceTokenAccount.toString());
-                                
-                                // 处理接收方代币账户
-                                console.log("处理接收方USDC代币账户...");
-                                let destinationTokenAccount;
-                                
-                                try {
-                                    // 查询接收方是否已有USDC账户
-                                    const receiverTokenAccounts = await connection.getParsedTokenAccountsByOwner(
-                                        receiverPublicKey,
-                                        { mint: USDC_MINT }
-                                    );
-                                    
-                                    if (receiverTokenAccounts.value.length > 0) {
-                                        // 已有账户，直接使用
-                                        destinationTokenAccount = receiverTokenAccounts.value[0].pubkey;
-                                        console.log("接收方已有USDC代币账户:", destinationTokenAccount.toString());
-                                    } else {
-                                        // 没有账户，计算关联代币账户地址
-                                        destinationTokenAccount = window.splToken.getAssociatedTokenAddressSync(
-                                            USDC_MINT,
-                                            receiverPublicKey,
-                                            false
-                                        );
-                                        
-                                        // 尝试查询该账户是否存在
-                                        try {
-                                            await connection.getAccountInfo(destinationTokenAccount);
-                                            console.log("接收方关联代币账户已存在:", destinationTokenAccount.toString());
-                                        } catch (accountError) {
-                                            // 账户不存在，需要创建
-                                            console.log("接收方需要创建USDC代币账户");
-                                            showMessage("需要为接收方创建USDC账户，将收取少量SOL作为网络费用", "info");
-                                            
-                                            // 创建账户指令
-                                            const createAccountInstruction = window.splToken.createAssociatedTokenAccountInstruction(
-                                                walletPublicKey, // 付款方(交易费用)
-                                                destinationTokenAccount, // 新账户地址
-                                                receiverPublicKey, // 账户所有者
-                                                USDC_MINT // 代币类型
-                                            );
-                                            
-                                            // 添加创建账户指令
-                                            transaction.add(createAccountInstruction);
-                                        }
-                                    }
-                                } catch (error) {
-                                    console.error("查询接收方账户出错:", error);
-                                    throw new Error("无法处理接收方代币账户: " + error.message);
-                                }
-                                
-                                // 创建USDC转账指令
-                                console.log("创建USDC转账指令...");
-                                const transferInstruction = window.splToken.createTransferInstruction(
-                                    sourceTokenAccount,
-                                    destinationTokenAccount,
-                                    walletPublicKey,
-                                    BigInt(Math.floor(transferAmount)), // 确保是整数
-                                    [] // 多签账户，这里不需要
+                                // 创建连接对象
+                                let connection = new window.solanaWeb3.Connection(
+                                    window.solanaWeb3.clusterApiUrl('mainnet-beta')
                                 );
                                 
-                                // 添加USDC转账指令到交易
-                                transaction.add(transferInstruction);
+                                // 创建交易对象
+                                const transaction = new window.solanaWeb3.Transaction();
+                                
+                                // 获取钱包公钥
+                                const walletPublicKey = new window.solanaWeb3.PublicKey(window.solana.publicKey.toString());
                                 
                                 // 创建Memo程序ID
                                 const memoProgramId = new window.solanaWeb3.PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
@@ -1654,6 +1509,7 @@
                                         }
                                     ],
                                     programId: memoProgramId,
+                                    // 解决Buffer not defined问题 - 使用Uint8Array替代
                                     data: new TextEncoder().encode(memoData)
                                 });
                                 
@@ -1662,8 +1518,8 @@
                                 
                                 // 定义多个RPC节点地址以便在主节点失败时切换
                                 const rpcEndpoints = [
-                                    'https://solana.publicnode.com', // Allnodes提供的免费节点 - 测试稳定且快速
-                                    'https://solana-mainnet.rpc.extrnode.com/ad2090b9-0e8a-4bc7-a0b9-cb416dfc7998', // Extrnode提供的API节点（备用）
+                                    'https://solana-mainnet.rpc.extrnode.com/ad2090b9-0e8a-4bc7-a0b9-cb416dfc7998', // Extrnode提供的API节点
+                                    'https://solana.publicnode.com', // Allnodes提供的免费节点 - 已测试可用
                                     'https://api.mainnet-beta.solana.com', // 官方Solana主网节点
                                     'https://explorer-api.mainnet-beta.solana.com', // Solana备用节点
                                     'https://rpc.ankr.com/solana' // Ankr节点，需要API密钥
@@ -1732,19 +1588,11 @@
                                 console.log('准备签名交易...');
                                 
                                 try {
-                                    // 使用Phantom钱包签名交易 - 使用两步式处理减少权限需求
-                                    // 第1步：仅请求签名，不直接发送
-                                    const signedTx = await window.solana.signTransaction(transaction);
-                                    
-                                    // 在控制台显示签名的交易
-                                    console.log('交易已签名:', signedTx);
-                                    
-                                    // 第2步：手动发送已签名的交易
-                                    showMessage("交易已签名，正在发送...", "info");
-                                    const signature = await connection.sendRawTransaction(signedTx.serialize());
+                                    // 使用Phantom钱包签名并发送交易
+                                    const { signature } = await window.solana.signAndSendTransaction(transaction);
                                     
                                     // 获取交易签名
-                                    txHash = signature;  // 确保txHash在外部作用域已定义
+                                    txHash = signature;
                                     console.log('交易已提交，签名:', txHash);
                                     
                                     showMessage("交易已提交，等待确认...", "info");
