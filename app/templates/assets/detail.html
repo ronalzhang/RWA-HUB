@@ -1477,7 +1477,7 @@
                     console.log('使用地址:', dbAddress);
 
                     // 创建购买请求
-                    const response = await fetch('/api/v1/trades/create', {
+                    const response = await fetch('/trades/create', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -1498,7 +1498,7 @@
                             const errorData = JSON.parse(errorText);
                             throw new Error(errorData.error || '创建交易失败');
                         } catch (e) {
-                            throw new Error('创建交易失败: ' + (errorText || response.statusText));
+                            throw new Error('创建交易失败: ' + (response.status === 404 ? '交易API未找到，请联系管理员' : errorText || response.statusText));
                         }
                     }
 
