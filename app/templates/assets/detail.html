@@ -1494,11 +1494,57 @@
                                 // 添加memo指令到交易
                                 transaction.add(memoInstruction);
                                 
-                                // 获取最新的区块哈希
-                                let blockhash = await connection.getRecentBlockhash();
-                                transaction.recentBlockhash = blockhash.blockhash;
+                                // 定义多个RPC节点地址以便在主节点失败时切换
+                                const rpcEndpoints = [
+                                    window.solanaWeb3.clusterApiUrl('mainnet-beta'),
+                                    'https://solana-mainnet.rpc.extrnode.com',
+                                    'https://solana-api.projectserum.com',
+                                    'https://mainnet.helius-rpc.com/?api-key=15319977-2032-418b-a04d-9ae79ccd6e7e',
+                                    'https://api.mainnet-beta.solana.com'
+                                ];
                                 
-                                // 设置费用支付者
+                                // 获取最新的区块哈希 - 使用多个节点轮询
+                                let blockhash = null;
+                                let connectionSuccess = false;
+                                
+                                // 尝试每个节点直到成功
+                                for (let i = 0; i < rpcEndpoints.length; i++) {
+                                    try {
+                                        showMessage(`正在连接Solana网络(${i+1}/${rpcEndpoints.length})...`, "info");
+                                        console.log(`尝试使用RPC节点: ${rpcEndpoints[i]}`);
+                                        
+                                        // 创建新的连接对象
+                                        const tempConnection = new window.solanaWeb3.Connection(rpcEndpoints[i], 'confirmed');
+                                        
+                                        // 设置超时
+                                        const timeoutPromise = new Promise((_, reject) => 
+                                            setTimeout(() => reject(new Error('连接超时')), 10000)
+                                        );
+                                        
+                                        // 尝试获取区块哈希，带超时
+                                        blockhash = await Promise.race([
+                                            tempConnection.getRecentBlockhash(),
+                                            timeoutPromise
+                                        ]);
+                                        
+                                        // 更新连接对象并设置成功标志
+                                        connection = tempConnection;
+                                        connectionSuccess = true;
+                                        console.log(`成功连接到RPC节点: ${rpcEndpoints[i]}`);
+                                        break;
+                                    } catch (error) {
+                                        console.error(`RPC节点 ${rpcEndpoints[i]} 连接失败:`, error);
+                                        // 继续尝试下一个节点
+                                    }
+                                }
+                                
+                                // 所有节点都失败了
+                                if (!connectionSuccess) {
+                                    throw new Error('无法连接到任何Solana RPC节点，请稍后再试');
+                                }
+                                
+                                // 设置交易参数
+                                transaction.recentBlockhash = blockhash.blockhash;
                                 transaction.feePayer = walletPublicKey;
                                 
                                 console.log('准备签名交易...');
