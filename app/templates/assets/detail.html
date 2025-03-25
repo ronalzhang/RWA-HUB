@@ -3005,8 +3005,16 @@ document.addEventListener('DOMContentLoaded', function() {
         validateCreateTradeParams, 
         validateUpdateTradeParams, 
         validateTradeHistoryParams,
-        validateApiResponse 
+        validateApiResponse,
+        validateTradeRecord 
     } from '/static/js/utils/apiValidator.js';
+
+    // 将验证函数设置为全局变量，以便在其他脚本中使用
+    window.validateTradeHistoryParams = validateTradeHistoryParams;
+    window.validateApiResponse = validateApiResponse;
+    window.validateTradeRecord = validateTradeRecord;
+    window.validateCreateTradeParams = validateCreateTradeParams;
+    window.validateUpdateTradeParams = validateUpdateTradeParams;
 
     // 检查Web3环境
     try {
