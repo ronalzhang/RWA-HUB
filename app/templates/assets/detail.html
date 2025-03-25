@@ -1482,43 +1482,28 @@
                                 
                                 // 使用Phantom钱包签名并发送交易
                                 console.log('使用Phantom钱包签名并发送交易...');
-                                const { signature } = await window.solana.signAndSendTransaction({
-                                    message: transactionBytes
-                                });
-                                
-                                // 获取交易签名
-                                txHash = signature;
-                                console.log('交易已提交，签名:', txHash);
-                                
-                                showMessage("交易已提交，等待确认...", "info");
-                                
-                                // 等待交易确认
-                                let confirmed = false;
-                                let attempts = 0;
-                                
-                                while (!confirmed && attempts < 10) {
-                                    attempts++;
-                                    try {
-                                        // 请求后端检查交易状态
-                                        const confirmResponse = await fetch(`/api/solana/check_transaction?signature=${txHash}`);
-                                        if (confirmResponse.ok) {
-                                            const confirmResult = await confirmResponse.json();
-                                            if (confirmResult.confirmed) {
-                                                confirmed = true;
-                                                console.log('交易已确认');
-                                                break;
-                                            }
-                                        }
-                                    } catch (e) {
-                                        console.warn('检查交易状态失败，尝试重试', e);
-                                    }
+                                try {
+                                    // 新的Phantom钱包API调用方式
+                                    const { signature } = await window.solana.signAndSendTransaction({
+                                        transaction: transactionBytes
+                                    });
                                     
-                                    // 等待2秒再次检查
-                                    await new Promise(resolve => setTimeout(resolve, 2000));
-                                }
-                                
-                                if (!confirmed) {
-                                    console.warn('交易未在预期时间内确认，但仍然继续处理');
+                                    // 获取交易签名
+                                    txHash = signature;
+                                    console.log('交易已提交，签名:', txHash);
+                                    
+                                    showMessage("交易已提交，等待确认...", "info");
+                                } catch (signError) {
+                                    console.error('交易签名失败:', signError);
+                                    // 尝试使用旧版API格式
+                                    console.log('尝试使用旧版API格式...');
+                                    const { signature } = await window.solana.signAndSendTransaction(transactionBytes);
+                                    
+                                    // 获取交易签名
+                                    txHash = signature;
+                                    console.log('交易已提交(旧版API)，签名:', txHash);
+                                    
+                                    showMessage("交易已提交，等待确认...", "info");
                                 }
                                 
                                 showMessage("交易已提交，处理中...", "info");
@@ -1578,7 +1563,7 @@
                                     attempts++;
                                     try {
                                         // 请求后端检查交易状态
-                                        const confirmResponse = await fetch(`/api/blockchain/ethereum/check-transaction?hash=${txHash}`);
+                                        const confirmResponse = await fetch(`/api/solana/check_transaction?signature=${txHash}`);
                                         if (confirmResponse.ok) {
                                             const confirmResult = await confirmResponse.json();
                                             if (confirmResult.confirmed) {
@@ -1591,8 +1576,8 @@
                                         console.warn('检查交易状态失败，尝试重试', e);
                                     }
                                     
-                                    // 等待3秒再次检查
-                                    await new Promise(resolve => setTimeout(resolve, 3000));
+                                    // 等待2秒再次检查
+                                    await new Promise(resolve => setTimeout(resolve, 2000));
                                 }
                                 
                                 if (!confirmed) {

@@ -123,9 +123,44 @@ class Transaction:
     
     def serialize(self) -> bytes:
         """Serialize the transaction to the wire format."""
-        # 简化实现，实际应序列化为特定格式
-        return bytes([0] * 32) 
+        # 实现完整的交易序列化
+        import json
+        import struct
+        import base64
         
+        # 创建一个交易结构
+        transaction = {
+            "recentBlockhash": self.recent_blockhash or "simulated_blockhash", 
+            "feePayer": str(self.fee_payer) if self.fee_payer else None,
+            "instructions": []
+        }
+        
+        # 添加所有指令
+        for idx, instruction in enumerate(self.instructions):
+            instruction_data = {
+                "programId": str(instruction.program_id),
+                "keys": [
+                    {
+                        "pubkey": str(key.pubkey),
+                        "isSigner": key.is_signer,
+                        "isWritable": key.is_writable
+                    } for key in instruction.keys
+                ],
+                "data": base64.b64encode(instruction.data if isinstance(instruction.data, bytes) else instruction.data.encode('utf-8')).decode('utf-8')
+            }
+            transaction["instructions"].append(instruction_data)
+        
+        # 将完整交易转换为字节
+        transaction_bytes = json.dumps(transaction).encode('utf-8')
+        
+        # 添加版本标识 (1个字节) 和长度前缀 (4个字节)
+        version = 0  # 版本0表示标准交易
+        length = len(transaction_bytes)
+        version_and_length = struct.pack(">BI", version, length)
+        
+        # 返回最终的交易字节序列
+        return version_and_length + transaction_bytes
+    
     def serialize_message(self) -> bytes:
         """
         序列化交易消息，供Phantom钱包签名
