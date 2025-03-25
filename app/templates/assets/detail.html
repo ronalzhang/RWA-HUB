@@ -1441,154 +1441,68 @@
                     // 获取购买数量
                     const amountInput = document.querySelector('input[type="number"]');
                     if (!amountInput) {
-                        throw new Error('找不到购买数量输入框');
+                        throw new Error('找不到数量输入框');
                     }
-                    const amount = parseInt(amountInput.value);
+                    const amount = parseFloat(amountInput.value);
                     if (isNaN(amount) || amount <= 0) {
-                        showError('请输入有效的购买数量');
-                        return;
+                        throw new Error('请输入有效的购买数量');
                     }
 
-                    // 获取单价（从资产配置中获取）
+                    // 获取代币价格
                     const price = parseFloat("{{ asset.token_price }}");
                     if (isNaN(price) || price <= 0) {
-                        showError('无效的代币单价');
-                        return;
+                        throw new Error('无效的代币价格');
                     }
 
-                    // 计算总价
-                    const totalPrice = amount * price;
-                    console.log('正在创建购买请求，数量:', amount, '单价:', price, '总价:', totalPrice);
-
-                    // 获取钱包地址
-                    let dbAddress = '';
-                    if (window.walletState && window.walletState.address) {
-                        dbAddress = getAddressForApi(window.walletState.address);
-                    } else {
-                        const storedAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
-                        if (storedAddress) {
-                            dbAddress = getAddressForApi(storedAddress);
-                        } else {
-                            console.error('找不到钱包地址');
-                            return;
-                        }
-                    }
-                    console.log('使用地址:', dbAddress);
-
-                    // 创建购买请求
-                    const response = await fetch('/api/trades/create', {
+                    // 创建交易
+                    const response = await fetch('/trades/create', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-Eth-Address': dbAddress
+                            'X-Eth-Address': window.ethereum.selectedAddress
                         },
                         body: JSON.stringify({
                             asset_id: parseInt("{{ asset.id }}"),
-                            amount: amount,
-                            price: price,
+                            amount: amount.toString(),
+                            price: price.toString(),
                             type: 'buy'
                         })
                     });
 
+                    // 先获取响应文本
+                    const responseText = await response.text();
+                    console.log('API响应:', responseText);
+
+                    // 尝试解析JSON
+                    let data;
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (e) {
+                        console.error('JSON解析错误:', e);
+                        throw new Error('服务器响应格式错误');
+                    }
+
                     if (!response.ok) {
-                        const errorText = await response.text();
-                        console.error('API响应错误:', errorText);
-                        try {
-                            const errorData = JSON.parse(errorText);
-                            throw new Error(errorData.error || '创建交易失败');
-                        } catch (e) {
-                            throw new Error('创建交易失败: ' + (response.status === 404 ? 'API服务暂时不可用，请稍后再试' : errorText || response.statusText));
-                        }
+                        throw new Error(data.error || '创建交易失败');
                     }
 
-                    const tradeInfo = await response.json();
-                    console.log('购买交易创建成功:', tradeInfo);
-
-                    // 确保SPL Token库已加载
-                    if (!window.splToken) {
-                        console.log('SPL Token库未加载，尝试重新初始化');
-                        await window.initSplTokenLib();
-                        if (!window.splToken) {
-                            throw new Error('SPL Token库加载失败，请刷新页面重试');
+                    // 显示成功消息
+                    showSuccess('交易创建成功，请等待确认');
+                    
+                    // 刷新交易历史
+                    loadTradeHistory(1);
+                    
+                    // 关闭模态框
+                    const modal = document.getElementById('buyModal');
+                    if (modal) {
+                        const modalInstance = bootstrap.Modal.getInstance(modal);
+                        if (modalInstance) {
+                            modalInstance.hide();
                         }
-                    }
-
-                    // 创建交易
-                    const transaction = new Transaction();
-                    
-                    // 获取钱包公钥
-                    const walletPublicKey = new PublicKey(window.solana.publicKey.toString());
-                    
-                    // 创建Memo程序ID
-                    const memoProgramId = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
-                    
-                    // 添加memo指令，记录交易信息
-                    const memoData = `RWA-HUB:trade:${tradeInfo.id}:asset:${tradeInfo.asset_id}:amount:${tradeInfo.amount}:price:${tradeInfo.price}`;
-                    
-                    // 使用MemoProgram创建指令
-                    const memoInstruction = new TransactionInstruction({
-                        keys: [
-                            {
-                                pubkey: walletPublicKey,
-                                isSigner: true,
-                                isWritable: false
-                            }
-                        ],
-                        programId: memoProgramId,
-                        data: new TextEncoder().encode(memoData)
-                    });
-                    
-                    // 添加memo指令到交易
-                    transaction.add(memoInstruction);
-
-                    // 获取最新的区块哈希
-                    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-                    const { blockhash } = await connection.getRecentBlockhash('confirmed');
-                    
-                    // 设置交易参数
-                    transaction.recentBlockhash = blockhash;
-                    transaction.feePayer = walletPublicKey;
-
-                    // 签名并发送交易
-                    const { signature } = await window.solana.signAndSendTransaction(transaction);
-                    console.log('交易已提交，签名:', signature);
-
-                    // 等待交易确认
-                    const confirmed = await simulateTransactionConfirmation(signature);
-                    if (confirmed) {
-                        // 更新交易状态
-                        const updateResponse = await fetch(`/api/trades/${tradeInfo.id}/update`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-Eth-Address': dbAddress
-                            },
-                            body: JSON.stringify({
-                                status: 'completed',
-                                tx_hash: signature,
-                                wallet_address: dbAddress
-                            })
-                        });
-
-                        if (!updateResponse.ok) {
-                            const errorData = await updateResponse.json();
-                            console.error('更新交易状态失败:', errorData);
-                            showError('交易完成，但更新状态失败');
-                            return;
-                        }
-
-                        // 交易完成，更新UI
-                        showSuccess('购买成功！');
-                        await refreshAssetInfo();
                     }
                 } catch (error) {
                     console.error('购买失败:', error);
-                    showError('购买失败: ' + error.message);
-                } finally {
-                    // 重置按钮状态
-                    const buyButton = document.getElementById('buy-button');
-                    buyButton.disabled = false;
-                    buyButton.textContent = '购买';
+                    showError(error.message || '购买失败，请稍后重试');
                 }
             }
 
