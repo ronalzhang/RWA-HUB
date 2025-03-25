@@ -1436,10 +1436,13 @@
                     }
                     const tradeInfo = await getTradeResponse.json();
                     
+                    // 初始化交易哈希变量，确保在整个函数作用域中可用
+                    let txHash = '';
+                    
                     // 使用真实区块链网络处理交易
                     if (window.walletState && window.walletState.walletType) {
                         const walletType = window.walletState.walletType;
-                        let txHash = '';
+                        // 移除这里的txHash声明，使用顶部声明的变量
                         
                         // 根据钱包类型执行不同的交易流程
                         if (walletType === 'phantom' || walletType === 'solana') {
@@ -1578,7 +1581,7 @@
                                     const signature = await connection.sendRawTransaction(signedTx.serialize());
                                     
                                     // 获取交易签名
-                                    txHash = signature;
+                                    txHash = signature;  // 确保txHash在外部作用域已定义
                                     console.log('交易已提交，签名:', txHash);
                                     
                                     showMessage("交易已提交，等待确认...", "info");
