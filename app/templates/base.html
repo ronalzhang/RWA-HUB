@@ -1620,13 +1620,127 @@
     </style>
 
     <!-- 添加bs58库，确保所有页面都能使用 -->
-    <script src="https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/index.js"></script>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/index.js"></script> -->
     
     <!-- 添加Solana Web3.js库 -->
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
     <script>
         // 确保Solana Web3库可用
         window.solanaWeb3 = window.solanaWeb3 || solanaWeb3;
+    </script>
+
+    <!-- 添加内置bs58库实现 -->
+    <script>
+        // 提供内置的bs58实现，避免依赖外部CDN
+        window.bs58 = (function() {
+            // Base58字符集 (比特币/Solana使用)
+            const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+            const BASE = ALPHABET.length;
+            
+            // 编码函数
+            function encode(buffer) {
+                if (!(buffer instanceof Uint8Array)) {
+                    buffer = new Uint8Array(buffer);
+                }
+                
+                // 计算前导0的数量
+                let zeros = 0;
+                for (let i = 0; i < buffer.length && buffer[i] === 0; i++) {
+                    zeros++;
+                }
+                
+                // 转换为数值并编码
+                let result = '';
+                let value = Array.from(buffer);
+                
+                while (value.length > 0) {
+                    let remainder = 0;
+                    const temp = [];
+                    
+                    for (let i = 0; i < value.length; i++) {
+                        remainder = remainder * 256 + value[i];
+                        if (remainder < BASE) {
+                            if (temp.length > 0 || i === value.length - 1) {
+                                temp.push(0);
+                            }
+                            continue;
+                        }
+                        
+                        const div = Math.floor(remainder / BASE);
+                        remainder = remainder % BASE;
+                        temp.push(div);
+                    }
+                    
+                    result = ALPHABET[remainder] + result;
+                    value = temp;
+                }
+                
+                // 添加前导1对应前导0
+                for (let i = 0; i < zeros; i++) {
+                    result = '1' + result;
+                }
+                
+                return result;
+            }
+            
+            // 解码函数
+            function decode(string) {
+                // 验证输入
+                if (typeof string !== 'string') {
+                    throw new Error('Expected string as input');
+                }
+                
+                // 处理空字符串
+                if (string.length === 0) return new Uint8Array(0);
+                
+                // 计算前导1的数量
+                let zeros = 0;
+                for (let i = 0; i < string.length && string[i] === '1'; i++) {
+                    zeros++;
+                }
+                
+                // 转换为数值
+                let result = [0];
+                for (let i = zeros; i < string.length; i++) {
+                    const value = ALPHABET.indexOf(string[i]);
+                    if (value === -1) {
+                        throw new Error('Invalid base58 character: ' + string[i]);
+                    }
+                    
+                    let j = 0;
+                    let carry = value;
+                    for (let k = 0; k < result.length; k++) {
+                        carry += result[k] * BASE;
+                        result[k] = carry & 0xff;
+                        carry >>= 8;
+                    }
+                    
+                    while (carry > 0) {
+                        result.push(carry & 0xff);
+                        carry >>= 8;
+                    }
+                }
+                
+                // 添加前导0
+                result = result.reverse();
+                const output = new Uint8Array(zeros + result.length);
+                for (let i = 0; i < zeros; i++) {
+                    output[i] = 0;
+                }
+                for (let i = 0; i < result.length; i++) {
+                    output[zeros + i] = result[i];
+                }
+                
+                return output;
+            }
+            
+            return {
+                encode: encode,
+                decode: decode
+            };
+        })();
+        
+        console.log('内置bs58实现已加载');
     </script>
 
     <!-- Bootstrap 核心CSS -->
