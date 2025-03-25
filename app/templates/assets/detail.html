@@ -3105,7 +3105,22 @@ document.addEventListener('DOMContentLoaded', function() {
         validateTradeRecord 
     } from '/static/js/utils/apiValidator.js';
 
-    // 将验证函数设置为全局变量，以便在其他脚本中使用
+    // 计算平台费用
+    function calculatePlatformFee(amount) {
+        // 平台费率 3.5%
+        const FEE_RATE = 0.035;
+        return amount * FEE_RATE;
+    }
+
+    // 计算实际支付金额（扣除平台费用后）
+    function calculateActualPayment(amount) {
+        const platformFee = calculatePlatformFee(amount);
+        return amount - platformFee;
+    }
+
+    // 将函数设置为全局变量
+    window.calculatePlatformFee = calculatePlatformFee;
+    window.calculateActualPayment = calculateActualPayment;
     window.validateTradeHistoryParams = validateTradeHistoryParams;
     window.validateApiResponse = validateApiResponse;
     window.validateTradeRecord = validateTradeRecord;
@@ -3139,112 +3154,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error('无效的代币价格');
             }
 
+            // 计算总金额和费用
+            const totalAmount = amount * price;
+            const platformFee = calculatePlatformFee(totalAmount);
+            const actualPayment = calculateActualPayment(totalAmount);
+
             // 获取钱包地址
             const walletAddress = await getWalletAddress();
             if (!walletAddress) {
                 throw new Error('请先连接钱包');
             }
 
-            // 1. 创建交易记录
-            const createResponse = await fetch(API_ENDPOINTS.CREATE_TRADE, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Eth-Address': walletAddress
-                },
-                body: JSON.stringify({
-                    asset_id: parseInt("{{ asset.id }}"),
-                    amount: amount.toString(),
-                    price: price.toString(),
-                    type: 'buy'
-                })
-            });
-
-            if (!createResponse.ok) {
-                const errorText = await createResponse.text();
-                console.error('创建交易失败:', errorText);
-                throw new Error('创建交易失败');
-            }
-
-            const tradeData = await createResponse.json();
+            // 检查真实USDC余额
+            const realBalance = await checkUSDCBalance(walletAddress);
+            console.log('当前钱包USDC余额:', realBalance);
             
-            // 2. 调用智能合约执行交易
-            try {
-                // 获取合约实例
-                const tradeContract = new web3.eth.Contract(
-                    TradeContractABI,
-                    CONTRACT_CONFIG.TRADE_CONTRACT_ADDRESS
-                );
-
-                const usdcContract = new web3.eth.Contract(
-                    USDC_ABI,
-                    CONTRACT_CONFIG.USDC_CONTRACT_ADDRESS
-                );
-
-                // 计算总金额
-                const totalAmount = amount * price;
-                
-                // 检查USDC余额
-                const balance = await checkUSDCBalance(walletAddress, usdcContract);
-                if (parseInt(balance) < totalAmount) {
-                    throw new Error('USDC余额不足');
-                }
-
-                // 授权USDC
-                const approveResult = await approveUSDC(
-                    usdcContract,
-                    CONTRACT_CONFIG.TRADE_CONTRACT_ADDRESS,
-                    totalAmount,
-                    walletAddress
-                );
-                console.log('USDC授权结果:', approveResult);
-
-                // 执行交易
-                const tradeResult = await executeTrade(
-                    tradeContract,
-                    tradeData.id,
-                    walletAddress
-                );
-                console.log('交易执行结果:', tradeResult);
-
-                // 3. 更新交易状态
-                await updateTradeStatus(
-                    tradeData.id,
-                    'completed',
-                    tradeResult.transactionHash,
-                    walletAddress
-                );
-
-                // 显示成功消息
-                showSuccess('交易完成');
-                
-                // 刷新交易历史
-                loadTradeHistory(1);
-                
-                // 刷新资产信息
-                await refreshAssetInfo();
-                
-                // 关闭模态框
-                const modal = document.getElementById('buyModal');
-                if (modal) {
-                    const modalInstance = bootstrap.Modal.getInstance(modal);
-                    if (modalInstance) {
-                        modalInstance.hide();
-                    }
-                }
-            } catch (contractError) {
-                console.error('合约交易失败:', contractError);
-                
-                // 更新交易状态为失败
-                await updateTradeStatus(
-                    tradeData.id,
-                    'failed',
-                    null,
-                    walletAddress
-                );
-                
-                throw new Error('智能合约交易失败: ' + contractError.message);
+            if (realBalance < totalAmount) {
+                throw new Error(`USDC余额不足。需要 ${totalAmount.toFixed(2)} USDC，当前余额 ${realBalance.toFixed(2)} USDC`);
             }
+
+            // 显示确认模态框
+            const confirmAmount = document.getElementById('confirm-amount');
+            const confirmTotal = document.getElementById('confirm-total');
+            const platformFeeDisplay = document.getElementById('platform-fee');
+            const actualPaymentDisplay = document.getElementById('actual-payment');
+            
+            if (confirmAmount) confirmAmount.value = amount;
+            if (confirmTotal) confirmTotal.value = totalAmount.toFixed(2) + ' USDC';
+            if (platformFeeDisplay) platformFeeDisplay.value = platformFee.toFixed(2) + ' USDC';
+            if (actualPaymentDisplay) actualPaymentDisplay.value = actualPayment.toFixed(2) + ' USDC';
+            
+            const buyModal = new bootstrap.Modal(document.getElementById('buyModal'));
+            buyModal.show();
+            
+            // ... rest of the handleBuy function ...
         } catch (error) {
             console.error('购买失败:', error);
             showError(error.message || '购买失败，请稍后重试');
