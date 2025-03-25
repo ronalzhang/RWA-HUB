@@ -61,6 +61,14 @@ class Config:
         PRICE_DECIMALS = 6  # 代币价格小数位数
         VALUE_DECIMALS = 2  # 价值小数位数
 
+    # 区块链网络配置
+    SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL', 'https://api.devnet.solana.com')
+    SOLANA_PROGRAM_ID = os.environ.get('SOLANA_PROGRAM_ID')
+    SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT')
+    
+    ETH_RPC_URL = os.environ.get('ETH_RPC_URL', 'https://rpc.ankr.com/eth')
+    ETH_USDC_CONTRACT = os.environ.get('ETH_USDC_CONTRACT', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
+
     @staticmethod
     def init_app(app):
         # 基础配置初始化

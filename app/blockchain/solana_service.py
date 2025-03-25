@@ -8,6 +8,7 @@ Solana区块链服务，提供交易构建和处理功能
 import base64
 import logging
 import time
+import json
 from typing import Tuple, Dict, Any, Optional
 
 from flask import current_app
@@ -15,12 +16,23 @@ from flask import current_app
 # 导入Solana兼容工具
 from app.utils.solana_compat.connection import Connection
 from app.utils.solana_compat.publickey import PublicKey
+from app.utils.solana_compat.transaction import Transaction
+from app.utils.solana_compat.tx_opts import TxOpts
+from app.config import Config
+from app.extensions import db
+from app.models import Trade
+from datetime import datetime
 
 # 获取日志记录器
 logger = logging.getLogger(__name__)
 
-# Solana网络RPC端点
-SOLANA_ENDPOINT = "https://api.mainnet-beta.solana.com"
+# 通用常量
+SOLANA_ENDPOINT = Config.SOLANA_RPC_URL or 'https://api.devnet.solana.com'
+PROGRAM_ID = Config.SOLANA_PROGRAM_ID or 'RWAxxx111111111111111111111111111111111111'
+USDC_MINT = Config.SOLANA_USDC_MINT or 'USCG9aStBYmRbJdY7cBiiqmyNEGqwT6vAxkxfHECdKN'
+
+# 创建Solana连接
+solana_connection = Connection(SOLANA_ENDPOINT)
 
 def prepare_transfer_transaction(
     token_symbol: str,
@@ -100,14 +112,17 @@ def send_transaction_with_signature(
         # 在实际环境中，这里应该将交易数据和签名组合成一个完整的交易，然后发送到Solana网络
         # 现在我们只是模拟这个过程
         
-        # 生成一个交易签名（在实际环境中，这应该是Solana网络返回的）
-        import hashlib
-        import binascii
+        # 构建完整的交易对象
+        transaction = Transaction.from_bytes(transaction_data)
         
-        # 使用交易数据和签名计算哈希，模拟交易签名
-        combined = transaction_data + signature_data
-        tx_hash = hashlib.sha256(combined).digest()
-        signature = binascii.hexlify(tx_hash).decode('ascii')
+        # 添加签名
+        transaction.add_signature(PublicKey(public_key), signature_data)
+        
+        # 发送交易到Solana网络
+        result = solana_connection.send_raw_transaction(transaction.serialize())
+        
+        # 获取交易签名
+        signature = result
         
         logger.info(f"交易发送成功 - 签名: {signature}")
         
@@ -159,4 +174,109 @@ def execute_backup_transfer(
         
     except Exception as e:
         logger.error(f"备用转账失败: {str(e)}")
-        raise Exception(f"备用转账失败: {str(e)}") 
+        raise Exception(f"备用转账失败: {str(e)}")
+
+def prepare_transaction(user_address, asset_id, token_symbol, amount, price, trade_id):
+    """
+    准备Solana交易数据
+    
+    Args:
+        user_address: 用户钱包地址
+        asset_id: 资产ID
+        token_symbol: 代币符号
+        amount: 交易数量
+        price: 代币价格
+        trade_id: 交易记录ID
+        
+    Returns:
+        dict: 交易数据
+    """
+    try:
+        logger.info(f"准备Solana交易: 用户={user_address}, 资产ID={asset_id}, 数量={amount}")
+        
+        # 创建交易
+        transaction = Transaction()
+        
+        # 将交易ID编码到交易备注中
+        transaction.add_memo(f"trade:{trade_id}", PublicKey(user_address))
+        
+        # 创建资产购买指令
+        # 根据具体的Solana合约设计来构建指令
+        # 这里是简化的示例，实际应用中需要根据合约ABI来构建
+        instruction_data = {
+            "method": "buy_asset",
+            "params": {
+                "asset_id": asset_id,
+                "token_symbol": token_symbol,
+                "amount": amount,
+                "price": price,
+                "trade_id": trade_id,
+                "buyer": user_address
+            }
+        }
+        
+        # 将指令数据序列化
+        instruction_bytes = json.dumps(instruction_data).encode('utf-8')
+        
+        # 将交易序列化为Base64编码
+        serialized_tx = base64.b64encode(transaction.serialize()).decode('utf-8')
+        
+        # 返回交易数据
+        return {
+            "serialized_transaction": serialized_tx,
+            "instruction_data": base64.b64encode(instruction_bytes).decode('utf-8'),
+            "recent_blockhash": "simulated_blockhash_for_dev"
+        }
+        
+    except Exception as e:
+        logger.error(f"准备Solana交易失败: {str(e)}")
+        raise Exception(f"准备交易失败: {str(e)}")
+
+def check_transaction(signature):
+    """
+    检查Solana交易状态
+    
+    Args:
+        signature: 交易签名
+        
+    Returns:
+        dict: 交易状态
+    """
+    try:
+        logger.info(f"检查Solana交易状态: 签名={signature}")
+        
+        # 查询交易状态
+        try:
+            # 尝试获取交易确认状态
+            tx_result = solana_connection.confirm_transaction(signature)
+            
+            if tx_result and 'result' in tx_result:
+                confirmed = tx_result['result'].get('value', 0) > 0
+                confirmations = tx_result['result'].get('value', 0)
+                
+                return {
+                    "confirmed": confirmed,
+                    "confirmations": confirmations
+                }
+            else:
+                # 交易未找到或未确认
+                return {
+                    "confirmed": False,
+                    "confirmations": 0,
+                    "error": "交易未确认"
+                }
+                
+        except Exception as e:
+            logger.error(f"获取交易确认状态失败: {str(e)}")
+            return {
+                "confirmed": False,
+                "confirmations": 0,
+                "error": f"获取确认状态失败: {str(e)}"
+            }
+        
+    except Exception as e:
+        logger.error(f"检查Solana交易状态失败: {str(e)}")
+        return {
+            "confirmed": False,
+            "error": f"检查交易失败: {str(e)}"
+        } 
