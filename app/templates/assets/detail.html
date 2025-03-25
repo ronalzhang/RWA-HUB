@@ -3386,3 +3386,86 @@ if (typeof window.calculatePlatformFee !== 'function') {
 }
 </script>
 
+<script>
+// 在所有其他脚本之前定义这些全局函数
+(function() {
+    // 计算平台费用
+    window.calculatePlatformFee = function(amount) {
+        const platformFeeRate = 0.035; // 3.5%平台费率
+        return amount * platformFeeRate;
+    };
+
+    // 计算实际支付金额
+    window.calculateActualPayment = function(amount) {
+        const actualPaymentRate = 0.965; // 96.5%实际支付率
+        return amount * actualPaymentRate;
+    };
+
+    // 定义handleBuy函数
+    window.handleBuy = async function() {
+        try {
+            // 获取购买数量
+            const amountInput = document.getElementById('purchase-amount');
+            if (!amountInput) {
+                throw new Error('找不到数量输入框');
+            }
+            const amount = parseFloat(amountInput.value);
+            if (isNaN(amount) || amount <= 0) {
+                throw new Error('请输入有效的购买数量');
+            }
+
+            // 获取代币价格
+            const price = parseFloat("{{ asset.token_price }}");
+            if (isNaN(price) || price <= 0) {
+                throw new Error('无效的代币价格');
+            }
+
+            // 计算总金额和费用
+            const totalAmount = amount * price;
+            const platformFee = window.calculatePlatformFee(totalAmount);
+            const actualPayment = window.calculateActualPayment(totalAmount);
+
+            // 获取钱包地址
+            const walletAddress = await window.getWalletAddress();
+            if (!walletAddress) {
+                throw new Error('请先连接钱包');
+            }
+
+            // 检查USDC余额
+            const realBalance = await window.checkUSDCBalance(walletAddress);
+            console.log('当前钱包USDC余额:', realBalance);
+            
+            if (realBalance < totalAmount) {
+                throw new Error(`USDC余额不足。需要 ${totalAmount.toFixed(2)} USDC，当前余额 ${realBalance.toFixed(2)} USDC`);
+            }
+
+            // 显示确认模态框
+            const confirmAmount = document.getElementById('confirm-amount');
+            const confirmTotal = document.getElementById('confirm-total');
+            const platformFeeDisplay = document.getElementById('platform-fee');
+            const actualPaymentDisplay = document.getElementById('actual-payment');
+            
+            if (confirmAmount) confirmAmount.value = amount;
+            if (confirmTotal) confirmTotal.value = totalAmount.toFixed(2) + ' USDC';
+            if (platformFeeDisplay) platformFeeDisplay.value = platformFee.toFixed(2) + ' USDC';
+            if (actualPaymentDisplay) actualPaymentDisplay.value = actualPayment.toFixed(2) + ' USDC';
+            
+            const buyModal = new bootstrap.Modal(document.getElementById('buyModal'));
+            buyModal.show();
+        } catch (error) {
+            console.error('购买处理失败:', error);
+            window.showError(error.message);
+        }
+    };
+})();
+
+// 在DOMContentLoaded事件中绑定handleBuy函数
+document.addEventListener('DOMContentLoaded', function() {
+    const buyButton = document.getElementById('buy-button');
+    if (buyButton) {
+        buyButton.removeEventListener('click', window.handleBuy);
+        buyButton.addEventListener('click', window.handleBuy);
+    }
+});
+</script>
+
