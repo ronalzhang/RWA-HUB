@@ -3392,5 +3392,18 @@ window.validateTradeRecord = function(trade) {
         errors: errors
     };
 };
+
+// 计算平台费用
+function calculatePlatformFee(amount) {
+    // 平台费率 3.5%
+    const FEE_RATE = 0.035;
+    return amount * FEE_RATE;
+}
+
+// 计算实际支付金额（扣除平台费用后）
+function calculateActualPayment(amount) {
+    const platformFee = calculatePlatformFee(amount);
+    return amount - platformFee;
+}
 </script>
 
