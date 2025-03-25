@@ -892,8 +892,8 @@ def get_dividend_stats_by_symbol(token_symbol):
         # 2. 获取持有人数 - 基于已完成的购买交易中不同的交易者地址
         unique_holders = db.session.query(Trade.trader_address)\
             .filter(Trade.asset_id == asset.id,
-                    Trade.type == 'buy',  # 使用字符串 'buy' 替代 TradeType.BUY.value
-                    Trade.status == 'completed')\
+                    Trade.type == TradeType.BUY.value,
+                    Trade.status == TradeStatus.COMPLETED.value)\
             .distinct().count()
         
         # 3. 计算已售出代币数量
@@ -903,16 +903,16 @@ def get_dividend_stats_by_symbol(token_symbol):
         elif asset.token_supply is not None:
             # 当remaining_supply不可用时，尝试从交易记录计算
             try:
-                from app.models.trade import Trade
                 # 统计所有已完成的购买交易总量
                 buy_trades_total = db.session.query(func.sum(Trade.amount))\
                     .filter(Trade.asset_id == asset.id, 
-                            Trade.type == 'buy',
-                            Trade.status == 'completed')\
+                            Trade.type == TradeType.BUY.value,
+                            Trade.status == TradeStatus.COMPLETED.value)\
                     .scalar() or 0
                 tokens_sold = buy_trades_total
             except Exception as e:
                 current_app.logger.error(f"计算已售出代币时出错: {str(e)}")
+                # 发生错误时返回0，而不是抛出异常
                 tokens_sold = 0
         
         data = {
@@ -925,7 +925,14 @@ def get_dividend_stats_by_symbol(token_symbol):
         return jsonify(data)
     except Exception as e:
         current_app.logger.error(f'获取分红统计失败: {str(e)}')
-        return jsonify({'error': '获取分红统计失败'}), 500
+        # 返回一个有效的响应，而不是500错误
+        return jsonify({
+            'count': 0,
+            'total_amount': 0,
+            'holder_count': 0,
+            'tokens_sold': 0,
+            'error': '获取分红统计失败'
+        })
 
 @api_bp.route("/assets/symbol/<string:token_symbol>/dividend_history", methods=['GET'])
 def get_dividend_history_by_symbol(token_symbol):
