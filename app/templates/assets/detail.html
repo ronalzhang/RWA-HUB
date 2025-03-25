@@ -681,6 +681,102 @@
             // 加载交易历史
             async function loadTradeHistory(page = 1) {
                 try {
+                    // 内部验证函数
+                    function validateTradeHistoryParams(params) {
+                        // 验证asset_id
+                        if (!params.asset_id || typeof params.asset_id !== 'number') {
+                            return {
+                                isValid: false,
+                                errors: ['资产ID必须是数字']
+                            };
+                        }
+
+                        // 验证page
+                        if (!params.page || typeof params.page !== 'number' || params.page < 1) {
+                            return {
+                                isValid: false,
+                                errors: ['页码必须是大于0的数字']
+                            };
+                        }
+
+                        // 验证per_page
+                        if (!params.per_page || typeof params.per_page !== 'number' || params.per_page < 1 || params.per_page > 100) {
+                            return {
+                                isValid: false,
+                                errors: ['每页数量必须是1-100之间的数字']
+                            };
+                        }
+
+                        return {
+                            isValid: true,
+                            errors: []
+                        };
+                    }
+
+                    function validateApiResponse(response, endpoint) {
+                        if (endpoint === 'GET_TRADE_HISTORY') {
+                            // 验证trades数组
+                            if (!response.trades || !Array.isArray(response.trades)) {
+                                return {
+                                    isValid: false,
+                                    errors: ['响应必须包含trades数组']
+                                };
+                            }
+
+                            // 验证pagination对象
+                            if (!response.pagination || typeof response.pagination !== 'object') {
+                                return {
+                                    isValid: false,
+                                    errors: ['响应必须包含pagination对象']
+                                };
+                            }
+
+                            return {
+                                isValid: true,
+                                errors: []
+                            };
+                        }
+
+                        return {
+                            isValid: true,
+                            errors: []
+                        };
+                    }
+
+                    function validateTradeRecord(trade) {
+                        const errors = [];
+
+                        // 验证必需字段
+                        if (!trade.id || typeof trade.id !== 'number') {
+                            errors.push('交易ID无效');
+                        }
+
+                        if (!trade.created_at) {
+                            errors.push('创建时间无效');
+                        }
+
+                        if (!trade.type || !['buy', 'sell'].includes(trade.type)) {
+                            errors.push('交易类型无效');
+                        }
+
+                        if (!trade.amount || isNaN(parseFloat(trade.amount))) {
+                            errors.push('交易数量无效');
+                        }
+
+                        if (!trade.price || isNaN(parseFloat(trade.price))) {
+                            errors.push('交易价格无效');
+                        }
+
+                        if (!trade.status) {
+                            errors.push('交易状态无效');
+                        }
+
+                        return {
+                            isValid: errors.length === 0,
+                            errors: errors
+                        };
+                    }
+
                     // 获取交易历史容器
                     const tradeHistoryContainer = document.getElementById('trade-history');
                     if (!tradeHistoryContainer) {
