@@ -1453,58 +1453,58 @@
                                 // 显示等待提示
                                 showMessage("正在处理交易...", "info");
                                 
-                                // 向后端请求交易数据
-                                const txDataResponse = await fetch('/api/solana/create_transaction', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                                        'X-Eth-Address': dbAddress,
-                                        'X-Wallet-Type': 'phantom'
-                        },
-                        body: JSON.stringify({
-                                        trade_id: tradeId,
-                                        amount: tradeInfo.amount,
-                                        price: tradeInfo.price,
-                                        asset_id: tradeInfo.asset_id
-                        })
-                    });
-                    
-                                if (!txDataResponse.ok) {
-                                    const errorData = await txDataResponse.json();
-                                    throw new Error(errorData.error || '准备交易数据失败');
+                                // 创建简单的memo交易
+                                // 假设window.solanaWeb3已经通过CDN加载
+                                if (!window.solanaWeb3) {
+                                    console.error('加载solanaWeb3库失败');
+                                    throw new Error('加载solanaWeb3库失败，请刷新页面重试');
                                 }
                                 
-                                const txData = await txDataResponse.json();
-                                if (!txData.success || !txData.serialized_transaction) {
-                                    throw new Error(txData.error || '无效的交易数据');
-                                }
+                                // 创建连接对象
+                                const connection = new window.solanaWeb3.Connection(
+                                    window.solanaWeb3.clusterApiUrl('mainnet-beta')
+                                );
                                 
-                                // 将base64编码的序列化交易转换为base58编码
-                                let transactionBase58;
+                                // 创建交易对象
+                                const transaction = new window.solanaWeb3.Transaction();
+                                
+                                // 获取钱包公钥
+                                const walletPublicKey = new window.solanaWeb3.PublicKey(window.solana.publicKey.toString());
+                                
+                                // 创建Memo程序ID
+                                const memoProgramId = new window.solanaWeb3.PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
+                                
+                                // 添加memo指令，记录交易信息
+                                const memoData = `RWA-HUB:trade:${tradeId}:asset:${tradeInfo.asset_id}:amount:${tradeInfo.amount}:price:${tradeInfo.price}`;
+                                
+                                // 使用MemoProgram创建指令
+                                const memoInstruction = new window.solanaWeb3.TransactionInstruction({
+                                    keys: [
+                                        {
+                                            pubkey: walletPublicKey,
+                                            isSigner: true,
+                                            isWritable: false
+                                        }
+                                    ],
+                                    programId: memoProgramId,
+                                    data: Buffer.from(memoData, 'utf-8')
+                                });
+                                
+                                // 添加memo指令到交易
+                                transaction.add(memoInstruction);
+                                
+                                // 获取最新的区块哈希
+                                let blockhash = await connection.getRecentBlockhash();
+                                transaction.recentBlockhash = blockhash.blockhash;
+                                
+                                // 设置费用支付者
+                                transaction.feePayer = walletPublicKey;
+                                
+                                console.log('准备签名交易...');
+                                
                                 try {
-                                    console.log('准备处理交易数据...');
-                                    
-                                    // 使用直接返回的交易对象
-                                    if (!txData.transaction) {
-                                        throw new Error('服务器未返回交易对象');
-                                    }
-                                    
-                                    transactionBase58 = txData.transaction;
-                                    console.log('使用服务器提供的交易对象');
-                                    
-                                } catch (e) {
-                                    console.error('处理交易数据失败:', e);
-                                    showError('处理交易数据失败: ' + e.message);
-                                    return;
-                                }
-                                
-                                // 使用Phantom钱包签名并发送交易
-                                console.log('使用Phantom钱包签名并发送交易...');
-                                try {
-                                    // 直接使用交易对象
-                                    console.log('尝试使用Phantom的直接交易对象签名方法');
-                                    
-                                    const { signature } = await window.solana.signAndSendTransaction(transactionBase58);
+                                    // 使用Phantom钱包签名并发送交易
+                                    const { signature } = await window.solana.signAndSendTransaction(transaction);
                                     
                                     // 获取交易签名
                                     txHash = signature;
@@ -1513,45 +1513,8 @@
                                     showMessage("交易已提交，等待确认...", "info");
                                 } catch (signError) {
                                     console.error('交易签名失败:', signError);
-                                    // 尝试使用第二种方法
-                                    console.log('尝试使用备用方法...');
-                                    try {
-                                        // 使用替代方法
-                                        const signedTransaction = await window.solana.signTransaction(transactionBase58);
-                                        
-                                        // 获取签名数据
-                                        txHash = signedTransaction.signatures?.length > 0 
-                                            ? Object.keys(signedTransaction.signatures)[0]
-                                            : "unknown-signature";
-                                            
-                                        console.log('交易已签名，正在发送...');
-                                        showMessage("交易已签名，正在发送...", "info");
-                                        
-                                        // 发送已签名的交易
-                                        const sendResponse = await fetch('/api/solana/send_signed_transaction', {
-                                            method: 'POST',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                                'X-Eth-Address': dbAddress
-                                            },
-                                            body: JSON.stringify({
-                                                signature: txHash,
-                                                // 传递完整的已签名交易
-                                                signedTransaction: signedTransaction
-                                            })
-                                        });
-                                        
-                                        if (!sendResponse.ok) {
-                                            throw new Error('发送已签名交易失败');
-                                        }
-                                        
-                                        const sendResult = await sendResponse.json();
-                                        txHash = sendResult.signature;
-                                        
-                                    } catch (e) {
-                                        console.error('备用方法也失败:', e);
-                                        throw new Error('所有交易方法都失败: ' + e.message);
-                                    }
+                                    showError('交易签名失败: ' + signError.message);
+                                    return;
                                 }
                                 
                                 showMessage("交易已提交，处理中...", "info");
@@ -1561,7 +1524,7 @@
                                 return;
                             }
                         } else if (walletType === 'metamask' || walletType === 'ethereum') {
-                            // Metamask/以太坊钱包交易处理
+                            // Metamask交易处理（保持原有代码）
                             try {
                                 // 确认用户已连接Metamask钱包
                                 if (!window.ethereum || !window.ethereum.isConnected()) {
