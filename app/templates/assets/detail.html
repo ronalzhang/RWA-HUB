@@ -3350,3 +3350,21 @@ function calculateActualPayment(amount) {
 }
 </script>
 
+<script>
+// 在页面最开始就定义这些函数
+(function() {
+    // 计算平台费用
+    window.calculatePlatformFee = function(amount) {
+        // 平台费率 3.5%
+        const FEE_RATE = 0.035;
+        return amount * FEE_RATE;
+    };
+
+    // 计算实际支付金额（扣除平台费用后）
+    window.calculateActualPayment = function(amount) {
+        const platformFee = window.calculatePlatformFee(amount);
+        return amount - platformFee;
+    };
+})();
+</script>
+
