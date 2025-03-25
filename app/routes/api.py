@@ -36,10 +36,8 @@ from sqlalchemy import desc, or_, and_, func, text
 # from ..models.history_trade import HistoryTrade
 # from ..models.notice import Notice
 from app.models.referral import UserReferral, CommissionRecord, DistributionSetting
-from app.blockchain.ethereum import EthereumBlockchain
-from app.blockchain.solana_service import SolanaService
 
-api_bp = Blueprint('api', __name__, url_prefix='/api')
+api_bp = Blueprint('api', __name__)
 
 # 允许的文件扩展名
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'webp'}
@@ -2965,87 +2963,3 @@ def create_solana_transaction():
     except Exception as e:
         current_app.logger.error(f"处理交易请求失败: {str(e)}")
         return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
-
-# 添加健康检查API
-@api_bp.route('/health_check', methods=['GET'])
-def health_check():
-    """
-    健康检查API，用于前端检测后端可用性
-    """
-    try:
-        # 简单的数据库连接测试
-        db_status = False
-        try:
-            db.session.execute("SELECT 1")
-            db_status = True
-        except Exception as e:
-            current_app.logger.error(f"数据库连接错误: {str(e)}")
-        
-        return jsonify({
-            'status': 'ok',
-            'timestamp': datetime.datetime.now().isoformat(),
-            'service': 'RWA-HUB API',
-            'database': db_status
-        }), 200
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'error': str(e)
-        }), 500
-
-@api_bp.route('/assets', methods=['GET'])
-def list_assets():
-    """获取资产列表"""
-    try:
-        # 检查是否是管理员
-        eth_address = request.headers.get('X-Eth-Address') or \
-                     request.args.get('eth_address') or \
-                     request.cookies.get('eth_address')
-        is_admin = is_admin_address(eth_address)
-        
-        current_app.logger.info(f'获取资产列表请求 - 地址: {eth_address}, 是否管理员: {is_admin}')
-        
-        # 如果是管理员，获取所有资产，否则只获取已审核通过的资产
-        if is_admin:
-            current_app.logger.info('管理员用户：获取所有状态的资产')
-            query = Asset.query.filter(
-                Asset.status.in_([
-                    AssetStatus.PENDING.value,
-                    AssetStatus.APPROVED.value,
-                    AssetStatus.REJECTED.value
-                ])
-            )
-        else:
-            current_app.logger.info('普通用户：只获取已审核通过的资产')
-            query = Asset.query.filter_by(status=AssetStatus.APPROVED.value)
-        
-        # 如果指定了owner参数，则只返回该owner的资产
-        owner = request.args.get('owner')
-        if owner:
-            query = query.filter_by(owner_address=owner)
-        
-        # 按创建时间倒序排序
-        query = query.order_by(Asset.created_at.desc())
-        
-        # 执行查询
-        assets = query.all()
-        current_app.logger.info(f'Found {len(assets)} assets')
-        
-        # 转换为字典格式
-        asset_list = []
-        for asset in assets:
-            try:
-                asset_dict = asset.to_dict()
-                asset_list.append(asset_dict)
-            except Exception as e:
-                current_app.logger.error(f'Error converting asset {asset.id} to dict: {str(e)}')
-                continue
-        
-        current_app.logger.info(f'Returning {len(asset_list)} assets')
-        return jsonify({
-            'assets': asset_list
-        })
-        
-    except Exception as e:
-        current_app.logger.error(f'Error listing assets: {str(e)}', exc_info=True)
-        return jsonify({'error': '获取资产列表失败'}), 500
