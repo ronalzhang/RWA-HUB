@@ -1453,20 +1453,20 @@
                                 
                                 // 向后端请求交易数据
                                 const txDataResponse = await fetch('/api/solana/create_transaction', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
                                         'X-Eth-Address': dbAddress,
                                         'X-Wallet-Type': 'phantom'
-                                    },
-                                    body: JSON.stringify({
+                        },
+                        body: JSON.stringify({
                                         trade_id: tradeId,
                                         amount: tradeInfo.amount,
                                         price: tradeInfo.price,
                                         asset_id: tradeInfo.asset_id
-                                    })
-                                });
-                                
+                        })
+                    });
+                    
                                 if (!txDataResponse.ok) {
                                     const errorData = await txDataResponse.json();
                                     throw new Error(errorData.error || '准备交易数据失败');
@@ -1483,11 +1483,11 @@
                                 // 使用Phantom钱包签名并发送交易
                                 console.log('使用Phantom钱包签名并发送交易...');
                                 try {
-                                    // 直接作为交易数据发送，由Phantom解析
+                                    // 直接使用base64编码的交易数据
                                     const signature = await window.solana.request({
                                         method: 'signAndSendTransaction',
                                         params: {
-                                            message: transactionBytes.buffer
+                                            message: txData.serialized_transaction
                                         }
                                     });
                                     
@@ -1504,7 +1504,7 @@
                                         const signature = await window.solana.request({
                                             method: 'signTransaction',
                                             params: {
-                                                message: transactionBytes.buffer
+                                                message: txData.serialized_transaction
                                             }
                                         });
                                         
