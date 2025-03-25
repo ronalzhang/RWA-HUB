@@ -1494,20 +1494,15 @@
                                 // 添加memo指令到交易
                                 transaction.add(memoInstruction);
                                 
-                                // 添加最大重试次数和超时设置
-                                const MAX_RETRIES = 5;           // 最大重试次数
-                                const CONNECTION_TIMEOUT = 15000; // 连接超时时间（毫秒）
-                                const RETRY_DELAY = 1000;        // 重试延迟（毫秒）
-                                let currentRetry = 0;            // 当前重试次数
-                                
                                 // 定义多个RPC节点地址以便在主节点失败时切换
                                 const rpcEndpoints = [
                                     'https://api.mainnet-beta.solana.com',
-                                    'https://solana.blockpi.network/v1/rpc/public',
+                                    'https://api.devnet.solana.com',
+                                    'https://api.testnet.solana.com',
                                     window.solanaWeb3.clusterApiUrl('mainnet-beta'),
+                                    'https://solana.blockpi.network/v1/rpc/public',
                                     'https://rpc.ankr.com/solana',
                                     'https://free.rpcpool.com',
-                                    'https://api.devnet.solana.com',
                                     'https://solana-mainnet.rpc.extrnode.com',
                                     'https://solana-api.projectserum.com'
                                 ];
@@ -1527,7 +1522,7 @@
                                         
                                         // 设置超时
                                         const timeoutPromise = new Promise((_, reject) => 
-                                            setTimeout(() => reject(new Error('连接超时')), 30000) // 增加到30秒超时
+                                            setTimeout(() => reject(new Error('连接超时')), 10000)
                                         );
                                         
                                         // 尝试获取区块哈希，带超时
@@ -1549,46 +1544,7 @@
                                 
                                 // 所有节点都失败了
                                 if (!connectionSuccess) {
-                                    // 延迟3秒后重试一次
-                                    console.log("所有节点连接失败，3秒后重试...");
-                                    showMessage("网络连接不稳定，正在重试...", "warning");
-                                    await new Promise(resolve => setTimeout(resolve, 3000));
-                                    
-                                    // 再次尝试所有节点
-                                    for (let i = 0; i < rpcEndpoints.length; i++) {
-                                        try {
-                                            showMessage(`重试连接Solana网络(${i+1}/${rpcEndpoints.length})...`, "info");
-                                            console.log(`重试RPC节点: ${rpcEndpoints[i]}`);
-                                            
-                                            // 创建新的连接对象
-                                            const tempConnection = new window.solanaWeb3.Connection(rpcEndpoints[i], 'confirmed');
-                                            
-                                            // 设置超时
-                                            const timeoutPromise = new Promise((_, reject) => 
-                                                setTimeout(() => reject(new Error('连接超时')), 30000) // 增加到30秒超时
-                                            );
-                                            
-                                            // 尝试获取区块哈希，带超时
-                                            blockhash = await Promise.race([
-                                                tempConnection.getRecentBlockhash(),
-                                                timeoutPromise
-                                            ]);
-                                            
-                                            // 更新连接对象并设置成功标志
-                                            connection = tempConnection;
-                                            connectionSuccess = true;
-                                            console.log(`成功连接到RPC节点: ${rpcEndpoints[i]}`);
-                                            break;
-                                        } catch (error) {
-                                            console.error(`重试RPC节点 ${rpcEndpoints[i]} 也失败:`, error);
-                                            // 继续尝试下一个节点
-                                        }
-                                    }
-                                }
-                                
-                                // 两轮尝试后仍然失败
-                                if (!connectionSuccess) {
-                                    throw new Error('无法连接到任何Solana RPC节点，请检查网络连接或使用VPN后重试');
+                                    throw new Error('无法连接到任何Solana RPC节点，请稍后再试');
                                 }
                                 
                                 // 设置交易参数
