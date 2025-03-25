@@ -1697,7 +1697,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // }
 
                                 // 创建交易记录
-                                const createResponse = await fetch(API_ENDPOINTS.CREATE_TRADE, {
+                                const createResponse = await fetch('/api/trades', {
                                     method: 'POST',
                                     headers: {
                                         'Content-Type': 'application/json',
