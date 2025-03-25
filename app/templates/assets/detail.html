@@ -1477,22 +1477,29 @@
                     console.log('使用地址:', dbAddress);
 
                     // 创建购买请求
-                    const response = await fetch('/api/trades/create', {
+                    const response = await fetch('/api/v1/trades/create', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'X-Eth-Address': dbAddress
                         },
                         body: JSON.stringify({
-                            asset_id: assetId,
+                            asset_id: parseInt("{{ asset.id }}"),
                             amount: amount,
-                            price: price
+                            price: price,
+                            type: 'buy'
                         })
                     });
 
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || '创建交易失败');
+                        const errorText = await response.text();
+                        console.error('API响应错误:', errorText);
+                        try {
+                            const errorData = JSON.parse(errorText);
+                            throw new Error(errorData.error || '创建交易失败');
+                        } catch (e) {
+                            throw new Error('创建交易失败: ' + (errorText || response.statusText));
+                        }
                     }
 
                     const tradeInfo = await response.json();
