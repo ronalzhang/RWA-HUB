@@ -1461,7 +1461,7 @@
                                 }
                                 
                                 // 创建连接对象
-                                const connection = new window.solanaWeb3.Connection(
+                                let connection = new window.solanaWeb3.Connection(
                                     window.solanaWeb3.clusterApiUrl('mainnet-beta')
                                 );
                                 
