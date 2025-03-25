@@ -1496,9 +1496,14 @@
                                 // 使用Phantom钱包签名并发送交易
                                 console.log('使用Phantom钱包签名并发送交易...');
                                 try {
-                                    // 直接使用交易数据
-                                    const signature = await window.solana.signAndSendTransaction({
-                                        message: transactionBase58
+                                    // 直接使用Phantom钱包的request API来签名交易
+                                    console.log('尝试使用Phantom的request API');
+                                    
+                                    const signature = await window.solana.request({
+                                        method: "signAndSendTransaction",
+                                        params: {
+                                            message: transactionBase58
+                                        }
                                     });
                                     
                                     // 获取交易签名
@@ -1508,13 +1513,17 @@
                                     showMessage("交易已提交，等待确认...", "info");
                                 } catch (signError) {
                                     console.error('交易签名失败:', signError);
-                                    // 尝试使用旧版API格式
+                                    // 尝试使用第二种方法
                                     console.log('尝试使用备用方法...');
                                     try {
-                                        const signature = await window.solana.signTransaction({
-                                            message: transactionBase58
+                                        // 使用替代API方法
+                                        const signature = await window.solana.request({
+                                            method: "signTransaction",
+                                            params: {
+                                                message: transactionBase58
+                                            }
                                         });
-                                        
+
                                         txHash = signature;
                                         console.log('交易已签名，正在发送...');
                                         showMessage("交易已签名，正在发送...", "info");
