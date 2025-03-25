@@ -2614,3 +2614,162 @@ def execute_transfer():
     except Exception as e:
         current_app.logger.error(f"处理备用转账请求失败: {str(e)}")
         return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
+
+# 添加新的区块链交易相关API路由
+@api_bp.route('/trades/<int:trade_id>', methods=['GET'])
+@eth_address_required
+def get_trade(trade_id):
+    """获取单个交易详情"""
+    try:
+        # 获取交易记录
+        trade = Trade.query.get_or_404(trade_id)
+        
+        # 检查权限 - 只有交易创建者或管理员可以获取详情
+        user_address = g.eth_address
+        if not is_admin() and trade.trader_address.lower() != user_address.lower():
+            return jsonify({'error': '无权限访问该交易'}), 403
+            
+        # 转换为字典并返回
+        return jsonify(trade.to_dict())
+        
+    except Exception as e:
+        current_app.logger.error(f'获取交易详情失败: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/blockchain/solana/prepare-transaction', methods=['POST'])
+@eth_address_required
+def prepare_solana_transaction():
+    """准备Solana交易"""
+    try:
+        data = request.json
+        
+        # 检查必要字段
+        required_fields = ['trade_id', 'amount', 'asset_id']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'缺少必要字段: {field}'}), 400
+                
+        # 获取交易记录
+        trade_id = data.get('trade_id')
+        trade = Trade.query.get_or_404(trade_id)
+        
+        # 验证交易创建者
+        user_address = g.eth_address
+        if trade.trader_address.lower() != user_address.lower():
+            return jsonify({'error': '无权操作此交易'}), 403
+            
+        # 获取资产信息
+        asset = Asset.query.get_or_404(trade.asset_id)
+        
+        # 调用Solana服务准备交易
+        from app.blockchain.solana_service import prepare_transaction
+        transaction_data = prepare_transaction(
+            user_address=user_address,
+            asset_id=asset.id,
+            token_symbol=asset.token_symbol,
+            amount=trade.amount,
+            price=trade.price,
+            trade_id=trade.id
+        )
+        
+        return jsonify({
+            'success': True,
+            'transaction': transaction_data,
+            'trade_id': trade.id
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'准备Solana交易失败: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/blockchain/solana/check-transaction', methods=['GET'])
+def check_solana_transaction():
+    """检查Solana交易状态"""
+    try:
+        signature = request.args.get('signature')
+        if not signature:
+            return jsonify({'error': '缺少交易签名'}), 400
+            
+        # 调用Solana服务检查交易
+        from app.blockchain.solana_service import check_transaction
+        result = check_transaction(signature)
+        
+        return jsonify({
+            'success': True,
+            'confirmed': result.get('confirmed', False),
+            'confirmations': result.get('confirmations', 0),
+            'error': result.get('error')
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'检查Solana交易状态失败: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/blockchain/ethereum/prepare-transaction', methods=['POST'])
+@eth_address_required
+def prepare_ethereum_transaction():
+    """准备以太坊交易"""
+    try:
+        data = request.json
+        
+        # 检查必要字段
+        required_fields = ['trade_id', 'amount', 'asset_id']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'缺少必要字段: {field}'}), 400
+                
+        # 获取交易记录
+        trade_id = data.get('trade_id')
+        trade = Trade.query.get_or_404(trade_id)
+        
+        # 验证交易创建者
+        user_address = g.eth_address
+        if trade.trader_address.lower() != user_address.lower():
+            return jsonify({'error': '无权操作此交易'}), 403
+            
+        # 获取资产信息
+        asset = Asset.query.get_or_404(trade.asset_id)
+        
+        # 调用以太坊服务准备交易
+        from app.blockchain.ethereum import prepare_transaction
+        transaction_data = prepare_transaction(
+            user_address=user_address,
+            asset_id=asset.id,
+            token_symbol=asset.token_symbol,
+            amount=trade.amount,
+            price=trade.price,
+            trade_id=trade.id
+        )
+        
+        return jsonify({
+            'success': True,
+            'transaction': transaction_data,
+            'trade_id': trade.id
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'准备以太坊交易失败: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/blockchain/ethereum/check-transaction', methods=['GET'])
+def check_ethereum_transaction():
+    """检查以太坊交易状态"""
+    try:
+        tx_hash = request.args.get('hash')
+        if not tx_hash:
+            return jsonify({'error': '缺少交易哈希'}), 400
+            
+        # 调用以太坊服务检查交易
+        from app.blockchain.ethereum import check_transaction
+        result = check_transaction(tx_hash)
+        
+        return jsonify({
+            'success': True,
+            'confirmed': result.get('confirmed', False),
+            'confirmations': result.get('confirmations', 0),
+            'error': result.get('error')
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'检查以太坊交易状态失败: {str(e)}')
+        return jsonify({'error': str(e)}), 500

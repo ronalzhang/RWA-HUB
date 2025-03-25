@@ -493,51 +493,12 @@
                     const page = 1;
                     const perPage = 5;
                     
-                    // 使用模拟数据代替API调用
-                    console.log('使用模拟数据代替API调用');
+                    // 发起API请求获取真实数据
+                    console.log('从API获取真实交易数据');
                     
-                    // 创建模拟交易数据
-                    const mockTradeData = {
-                        trades: [
-                            {
-                                id: 1,
-                                created_at: new Date().toISOString(),
-                                type: 'Buy',
-                                quantity: 20,
-                                amount: 1000,
-                                status: 'Completed',
-                                hash: '0x' + Math.random().toString(16).substr(2, 40)
-                            },
-                            {
-                                id: 2,
-                                created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-                                type: 'Sell',
-                                quantity: 10,
-                                amount: 550,
-                                status: 'Completed',
-                                hash: '0x' + Math.random().toString(16).substr(2, 40)
-                            },
-                            {
-                                id: 3,
-                                created_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-                                type: 'Buy',
-                                quantity: 30,
-                                amount: 1450,
-                                status: 'Completed',
-                                hash: '0x' + Math.random().toString(16).substr(2, 40)
-                            }
-                        ],
-                        total: 3
-                    };
-                    
-                    // 使用模拟数据
-                    const data = mockTradeData;
-                    
-                    /* 注释掉API调用
                     // 发起API请求
                     const response = await fetch(`/api/trades?asset_id={{ asset.id }}&page=${page}&per_page=${perPage}`);
                     const data = await response.json();
-                    */
                     
                     if (!data || !Array.isArray(data.trades)) {
                         throw new Error('无效的交易数据');
@@ -1445,121 +1406,264 @@
 
             // 添加模拟交易确认功能
             async function simulateTransactionConfirmation(tradeId) {
-                console.log(`开始模拟交易确认: ${tradeId}`);
+                console.log(`开始处理交易确认: ${tradeId}`);
                 
-                // 等待3秒模拟区块链确认
-                await new Promise(resolve => setTimeout(resolve, 3000));
-                
-                // 模拟链上交易结果 - 随机生成一个成功率为90%的结果
-                // 注意：在真实环境中，这里应该是对接Solana API查询交易结果
-                const chainSuccess = Math.random() < 0.9; // 90%的成功率
-                
-                // 更新交易状态
                 try {
-                    const originalAddress = walletPublicKey.toString();
-                    const dbAddress = getAddressForApi(originalAddress);
-                    
-                    const response = await fetch(`/api/trades/${tradeId}/update`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Eth-Address': dbAddress
-                        },
-                        body: JSON.stringify({
-                            status: 'completed',
-                            tx_hash: 'mock_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15),
-                            chain_success: chainSuccess // 添加链上交易结果
-                        })
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        console.error('交易状态更新失败:', errorData);
-                        return;
+                    // 获取钱包地址
+                    let dbAddress = '';
+                    if (window.walletState && window.walletState.address) {
+                        dbAddress = getAddressForApi(window.walletState.address);
+                    } else {
+                        // 如果钱包状态不可用，则使用本地存储
+                        const storedAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
+                        if (storedAddress) {
+                            dbAddress = getAddressForApi(storedAddress);
+                        } else {
+                            console.error('找不到钱包地址');
+                            return;
+                        }
                     }
                     
-                    const result = await response.json();
-                    console.log('交易状态更新成功:', result);
+                    // 通知用户交易已提交
+                    showMessage("交易已提交，正在等待确认...", "info");
                     
-                    // 更新剩余可购买量
-                    if (result.remaining_supply !== undefined) {
-                        // 更新全局变量
-                        actualPurchasable = result.remaining_supply;
-                        maxPurchaseAmount = result.remaining_supply;
-                        remainingSupply = result.remaining_supply;
+                    // 获取交易信息
+                    const getTradeResponse = await fetch(`/api/trades/${tradeId}`);
+                    if (!getTradeResponse.ok) {
+                        throw new Error('获取交易信息失败');
+                    }
+                    const tradeInfo = await getTradeResponse.json();
+                    
+                    // 使用真实区块链网络处理交易
+                    if (window.walletState && window.walletState.walletType) {
+                        const walletType = window.walletState.walletType;
+                        let txHash = '';
                         
-                        // 更新界面显示
-                        const maxPurchaseElement = document.getElementById('max-purchase-amount');
-                        if (maxPurchaseElement) {
-                            maxPurchaseElement.textContent = new Intl.NumberFormat().format(remainingSupply);
-                        }
-                    }
-                    
-                    // 交易完成后重新加载交易历史和刷新钱包资产列表
-                    loadTradeHistory();
-                    
-                    // 立即刷新钱包资产列表，确保显示最新数据 - 使用base.html全局函数
-                    console.log('交易完成，立即刷新钱包资产列表');
-                    if (typeof loadUserAssets === 'function') {
-                        loadUserAssets();
-                    }
-                    
-                    // 如果交易成功，显示一个分销佣金通知
-                    if (chainSuccess && result.commissions && result.commissions.length > 0) {
-                        // 查找用户收到的分销佣金
-                        const userCommissions = result.commissions.filter(comm => {
-                            // 检查地址匹配，考虑ETH地址大小写不敏感
-                            let addressMatch = false;
-                            const recipientAddress = comm.recipient_address;
-                            if (recipientAddress.startsWith('0x') && dbAddress.startsWith('0x')) {
-                                addressMatch = recipientAddress.toLowerCase() === dbAddress.toLowerCase();
-                            } else {
-                                addressMatch = recipientAddress === dbAddress;
+                        // 根据钱包类型执行不同的交易流程
+                        if (walletType === 'phantom' || walletType === 'solana') {
+                            // Solana钱包交易处理
+                            try {
+                                // 确认用户已连接Phantom钱包
+                                if (!window.solana || !window.solana.isPhantom || !window.solana.isConnected) {
+                                    throw new Error('未检测到Phantom钱包连接');
+                                }
+                                
+                                // 创建交易参数
+                                const transactionParams = {
+                                    trade_id: tradeId,
+                                    amount: tradeInfo.amount,
+                                    price: tradeInfo.price,
+                                    asset_id: tradeInfo.asset_id
+                                };
+                                
+                                // 向后端请求交易数据
+                                const txDataResponse = await fetch('/api/blockchain/solana/prepare-transaction', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-Eth-Address': dbAddress
+                                    },
+                                    body: JSON.stringify(transactionParams)
+                                });
+                                
+                                if (!txDataResponse.ok) {
+                                    const errorData = await txDataResponse.json();
+                                    throw new Error(errorData.error || '准备交易数据失败');
+                                }
+                                
+                                const txData = await txDataResponse.json();
+                                
+                                // 发送交易到Solana网络
+                                console.log('正在发送交易到Solana网络...');
+                                showMessage("正在处理交易...", "info");
+                                
+                                // 向用户请求签名
+                                const { signature } = await window.solana.signAndSendTransaction(txData.transaction);
+                                txHash = signature;
+                                
+                                console.log('交易已提交，签名:', txHash);
+                                showMessage("交易已提交，正在确认...", "info");
+                                
+                                // 等待交易确认
+                                let confirmed = false;
+                                let attempts = 0;
+                                
+                                while (!confirmed && attempts < 10) {
+                                    attempts++;
+                                    try {
+                                        // 请求后端检查交易状态
+                                        const confirmResponse = await fetch(`/api/blockchain/solana/check-transaction?signature=${txHash}`);
+                                        if (confirmResponse.ok) {
+                                            const confirmResult = await confirmResponse.json();
+                                            if (confirmResult.confirmed) {
+                                                confirmed = true;
+                                                console.log('交易已确认');
+                                                break;
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.warn('检查交易状态失败，尝试重试', e);
+                                    }
+                                    
+                                    // 等待2秒再次检查
+                                    await new Promise(resolve => setTimeout(resolve, 2000));
+                                }
+                                
+                                if (!confirmed) {
+                                    console.warn('交易未在预期时间内确认，但仍然继续处理');
+                                }
+                            } catch (e) {
+                                console.error('Solana交易处理失败:', e);
+                                showError('交易处理失败: ' + e.message);
+                                return;
                             }
-                            return addressMatch && comm.commission_type.startsWith('referral_');
-                        });
+                        } else if (walletType === 'metamask' || walletType === 'ethereum') {
+                            // Metamask/以太坊钱包交易处理
+                            try {
+                                // 确认用户已连接Metamask钱包
+                                if (!window.ethereum || !window.ethereum.isConnected()) {
+                                    throw new Error('未检测到MetaMask钱包连接');
+                                }
+                                
+                                // 向后端请求交易数据
+                                const txDataResponse = await fetch('/api/blockchain/ethereum/prepare-transaction', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-Eth-Address': dbAddress
+                                    },
+                                    body: JSON.stringify({
+                                        trade_id: tradeId,
+                                        amount: tradeInfo.amount,
+                                        price: tradeInfo.price,
+                                        asset_id: tradeInfo.asset_id
+                                    })
+                                });
+                                
+                                if (!txDataResponse.ok) {
+                                    const errorData = await txDataResponse.json();
+                                    throw new Error(errorData.error || '准备交易数据失败');
+                                }
+                                
+                                const txData = await txDataResponse.json();
+                                
+                                // 发送交易到以太坊网络
+                                console.log('正在发送交易到以太坊网络...');
+                                showMessage("正在处理交易...", "info");
+                                
+                                // 向用户请求签名并发送交易
+                                txHash = await window.ethereum.request({
+                                    method: 'eth_sendTransaction',
+                                    params: [txData.transaction]
+                                });
+                                
+                                console.log('交易已提交，哈希:', txHash);
+                                showMessage("交易已提交，正在确认...", "info");
+                                
+                                // 等待交易确认
+                                let confirmed = false;
+                                let attempts = 0;
+                                
+                                while (!attempts < 10) {
+                                    attempts++;
+                                    try {
+                                        // 请求后端检查交易状态
+                                        const confirmResponse = await fetch(`/api/blockchain/ethereum/check-transaction?hash=${txHash}`);
+                                        if (confirmResponse.ok) {
+                                            const confirmResult = await confirmResponse.json();
+                                            if (confirmResult.confirmed) {
+                                                confirmed = true;
+                                                console.log('交易已确认');
+                                                break;
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.warn('检查交易状态失败，尝试重试', e);
+                                    }
+                                    
+                                    // 等待3秒再次检查
+                                    await new Promise(resolve => setTimeout(resolve, 3000));
+                                }
+                                
+                                if (!confirmed) {
+                                    console.warn('交易未在预期时间内确认，但仍然继续处理');
+                                }
+                            } catch (e) {
+                                console.error('以太坊交易处理失败:', e);
+                                showError('交易处理失败: ' + e.message);
+                                return;
+                            }
+                        } else {
+                            // 不支持的钱包类型，显示错误
+                            console.error('不支持的钱包类型:', walletType);
+                            showError(`不支持的钱包类型: ${walletType}`);
+                            return;
+                        }
                         
-                        if (userCommissions.length > 0) {
-                            // 计算总分销佣金
-                            const totalCommission = userCommissions.reduce((sum, comm) => sum + parseFloat(comm.amount), 0);
+                        // 交易已完成，更新后端数据
+                        if (txHash) {
+                            const updateResponse = await fetch(`/api/trades/${tradeId}/update`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-Eth-Address': dbAddress
+                                },
+                                body: JSON.stringify({
+                                    status: 'completed',
+                                    tx_hash: txHash
+                                })
+                            });
                             
-                            // 根据佣金类型获取级别说明
-                            const levelDescriptions = {
-                                'referral_1': '一级分销',
-                                'referral_2': '二级分销',
-                                'referral_3': '三级分销'
-                            };
-                            
-                            // 构建详细信息
-                            let detailsMessage = userCommissions.map(comm => {
-                                const levelDesc = levelDescriptions[comm.commission_type] || comm.commission_type;
-                                return `${levelDesc}: ${parseFloat(comm.amount).toFixed(2)} USDC`;
-                            }).join('，');
-                            
-                            // 显示通知
-                            showMessage(`您收到了 ${totalCommission.toFixed(2)} USDC 的分销佣金！(${detailsMessage})`, 'success');
-                            
-                            // 添加余额更新高亮提示
-                            const walletBalanceElement = document.querySelector('.wallet-balance');
-                            if (walletBalanceElement) {
-                                walletBalanceElement.classList.add('highlight-change');
-                                setTimeout(() => {
-                                    walletBalanceElement.classList.remove('highlight-change');
-                                }, 5000);
+                            if (!updateResponse.ok) {
+                                const errorData = await updateResponse.json();
+                                console.error('交易状态更新失败:', errorData);
+                                showError('交易状态更新失败');
+                                return;
                             }
+                            
+                            const result = await updateResponse.json();
+                            console.log('交易状态更新成功:', result);
+                            
+                            // 更新剩余可购买量
+                            if (result.remaining_supply !== undefined) {
+                                // 更新全局变量
+                                actualPurchasable = result.remaining_supply;
+                                maxPurchaseAmount = result.remaining_supply;
+                                remainingSupply = result.remaining_supply;
+                                
+                                // 更新界面显示
+                                const maxPurchaseElement = document.getElementById('max-purchase-amount');
+                                if (maxPurchaseElement) {
+                                    maxPurchaseElement.textContent = new Intl.NumberFormat().format(remainingSupply);
+                                }
+                            }
+                            
+                            // 显示交易成功消息
+                            showMessage("交易已完成！", "success");
+                            
+                            // 交易完成后重新加载交易历史和刷新钱包资产列表
+                            loadTradeHistory();
+                            
+                            // 立即刷新钱包资产列表，确保显示最新数据
+                            console.log('交易完成，立即刷新钱包资产列表');
+                            if (typeof loadUserAssets === 'function') {
+                                loadUserAssets();
+                            }
+                            
+                            // 延迟1秒后再次刷新，确保后端数据已完全更新
+                            setTimeout(() => {
+                                console.log('延迟刷新钱包资产列表');
+                                if (typeof loadUserAssets === 'function') {
+                                    loadUserAssets();
+                                }
+                            }, 1000);
                         }
+                    } else {
+                        throw new Error('钱包未连接或不可用');
                     }
-                    
-                    // 延迟1秒后再次刷新，确保后端数据已完全更新
-                    setTimeout(() => {
-                        console.log('延迟刷新钱包资产列表');
-                        if (typeof loadUserAssets === 'function') {
-                            loadUserAssets();
-                        }
-                    }, 1000);
-                    
                 } catch (error) {
-                    console.error('更新交易状态时出错:', error);
+                    console.error('处理交易过程中出错:', error);
+                    showError('处理交易失败: ' + error.message);
                 }
             }
 
