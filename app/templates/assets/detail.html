@@ -223,75 +223,36 @@
                     return;
                 }
                 
-                // 备用CDN地址列表
-                const backupUrls = [
-                    'https://cdn.jsdelivr.net/npm/@solana/spl-token@latest/lib/index.iife.js',
-                    'https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.8/lib/index.iife.min.js',
-                    'https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js',
-                    'https://cdn.skypack.dev/@solana/spl-token'
-                ];
-                
-                // 尝试所有备用URL
-                for (let i = 0; i < backupUrls.length; i++) {
-                    try {
-                        console.log(`尝试加载备用SPL Token库 (${i+1}/${backupUrls.length}): ${backupUrls[i]}`);
-                        
-                        // 尝试加载SPL Token库
-                        await new Promise((resolve, reject) => {
-                            // 设置超时
-                            const timeout = setTimeout(() => {
-                                reject(new Error(`SPL Token库加载超时: ${backupUrls[i]}`));
-                            }, 5000);
-                            
-                            // 创建脚本元素
-                            const script = document.createElement('script');
-                            script.src = backupUrls[i];
-                            script.onload = () => {
-                                clearTimeout(timeout);
-                                
-                                if (typeof SolanaToken !== 'undefined') {
-                                    window.splToken = SolanaToken;
-                                    window.spl_token_initialized = true;
-                                    console.log('SPL Token库动态加载成功');
-                                    resolve();
-                                } else {
-                                    console.warn('SPL Token库加载完成，但SolanaToken未定义，尝试下一个地址');
-                                    reject(new Error('SolanaToken未定义'));
-                                }
-                            };
-                            
-                            script.onerror = () => {
-                                clearTimeout(timeout);
-                                reject(new Error(`SPL Token库加载失败: ${backupUrls[i]}`));
-                            };
-                            
-                            document.head.appendChild(script);
-                        });
-                        
-                        // 如果能到这里，说明加载成功了
-                        console.log('SPL Token库初始化完成');
-                        return;
-                    } catch (error) {
-                        console.warn(`备用地址 ${backupUrls[i]} 加载失败:`, error);
-                        // 继续尝试下一个
-                    }
+                // 如果全局对象不存在，创建基本对象
+                if (window.solanaWeb3 && window.solanaWeb3.PublicKey) {
+                    window.splToken = {
+                        TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+                        ASSOCIATED_TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
+                        createTransferInstruction: function(fromPubkey, toPubkey, ownerPubkey, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
+                            const keys = [
+                                { pubkey: fromPubkey, isSigner: false, isWritable: true },
+                                { pubkey: toPubkey, isSigner: false, isWritable: true },
+                                { pubkey: ownerPubkey, isSigner: multiSigners.length === 0, isWritable: false }
+                            ];
+                            multiSigners.forEach(signer => {
+                                keys.push({ pubkey: signer.publicKey, isSigner: true, isWritable: false });
+                            });
+                            return new window.solanaWeb3.TransactionInstruction({
+                                keys,
+                                programId,
+                                data: new Uint8Array([3, ...new Array(8).fill(0)]) // 3是transfer指令的代码
+                            });
+                        }
+                    };
+                    window.spl_token_initialized = true;
+                    console.log('使用基本SPL Token对象');
+                    return;
                 }
                 
-                // 所有备用地址都失败了，尝试创建紧急备用对象
-                throw new Error('所有备用地址加载失败');
+                throw new Error('无法初始化SPL Token库');
             } catch (error) {
                 console.error('SPL Token库初始化失败:', error);
-                
-                // 尝试创建紧急备用对象
-                if (window.solanaWeb3 && window.solanaWeb3.PublicKey) {
-                    window.splToken = window.splToken || {};
-                    window.splToken.TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-                    window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
-                    window.spl_token_initialized = true;
-                    console.log('使用紧急备用TOKEN_PROGRAM_ID (错误恢复)');
-                } else {
-                    throw new Error('无法初始化SPL Token库');
-                }
+                throw error;
             }
         };
         
