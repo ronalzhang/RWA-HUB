@@ -681,22 +681,18 @@
             // 加载交易历史
             async function loadTradeHistory() {
                 try {
-                    // 获取加载更多按钮
-                    const loadMoreBtn = document.getElementById('load-more-trades');
                     // 获取交易历史容器
                     const tradeHistoryContainer = document.getElementById('trade-history');
-                    
-                    // 如果按钮存在，禁用它
-                    if (loadMoreBtn) {
-                        loadMoreBtn.disabled = true;
-                    }
-                    
-                    // 如果容器不存在，创建它
                     if (!tradeHistoryContainer) {
                         console.warn('交易历史容器不存在，创建新容器');
                         const container = document.createElement('div');
                         container.id = 'trade-history';
-                        document.querySelector('.trade-history-section').appendChild(container);
+                        const section = document.querySelector('.trade-history-section');
+                        if (!section) {
+                            console.error('找不到交易历史区域');
+                            return;
+                        }
+                        section.appendChild(container);
                     }
                     
                     // 获取当前页码和每页数量
@@ -707,39 +703,49 @@
                     console.log('从API获取真实交易数据');
                     
                     // 发起API请求
-                    const response = await fetch(`/api/trades/history?asset_id={{ asset.id }}&page=${page}&per_page=${perPage}`);
+                    const response = await fetch(`/api/trades?asset_id={{ asset.id }}&page=${page}&per_page=${perPage}`);
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('API响应错误:', errorText);
+                        throw new Error('加载交易历史失败: ' + (response.status === 404 ? 'API服务暂时不可用' : response.statusText));
+                    }
+
                     const data = await response.json();
                     
                     if (!data || !Array.isArray(data.trades)) {
                         throw new Error('无效的交易数据');
                     }
                     
-                    // 清空现有内容
-                    if (tradeHistoryContainer) {
-                        tradeHistoryContainer.innerHTML = '';
+                    // 获取交易历史容器（再次确认）
+                    const container = document.getElementById('trade-history');
+                    if (!container) {
+                        throw new Error('找不到交易历史容器');
                     }
+                    
+                    // 清空现有内容
+                    container.innerHTML = '';
                     
                     // 如果没有交易记录
                     if (data.trades.length === 0) {
                         const noTradesMessage = document.createElement('div');
                         noTradesMessage.className = 'text-center text-muted my-4';
-                        noTradesMessage.textContent = 'No transaction records';
-                        tradeHistoryContainer.appendChild(noTradesMessage);
-                    return;
-                }
-                
+                        noTradesMessage.textContent = '暂无交易记录';
+                        container.appendChild(noTradesMessage);
+                        return;
+                    }
+                    
                     // 创建交易记录表格
                     const table = document.createElement('table');
                     table.className = 'table table-striped';
                     table.innerHTML = `
                         <thead>
                             <tr>
-                                <th>Time</th>
-                                <th>Type</th>
-                                <th>Qua</th>
-                                <th>Amount</th>
-                                <th>Status</th>
-                                <th style="width: 25%;">Hash</th>
+                                <th>时间</th>
+                                <th>类型</th>
+                                <th>数量</th>
+                                <th>金额</th>
+                                <th>状态</th>
+                                <th style="width: 25%;">交易哈希</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -750,9 +756,9 @@
                     data.trades.forEach(trade => {
                         // 格式化日期
                         const date = new Date(trade.created_at);
-                        const formattedDate = date.toLocaleString('en-US', {
-                            month: 'short',
-                            day: '2-digit',
+                        const formattedDate = date.toLocaleString('zh-CN', {
+                            month: 'numeric',
+                            day: 'numeric',
                             hour: '2-digit',
                             minute: '2-digit'
                         });
@@ -764,20 +770,20 @@
                         
                         // 处理交易类型
                         const typeClass = trade.type === 'buy' ? 'text-success' : 'text-danger';
-                        const typeText = trade.type === 'buy' ? 'Buy' : 'Sell';
+                        const typeText = trade.type === 'buy' ? '买入' : '卖出';
                         
                         // 处理交易状态
-                        let statusText = 'Pending';
+                        let statusText = '处理中';
                         let statusClass = 'text-warning';
                         if (trade.status === 'completed' || trade.status === 2 || trade.status === '2') {
-                            statusText = 'Completed';
+                            statusText = '已完成';
                             statusClass = 'text-success';
                         } else if (trade.status === 'failed' || trade.status === 3 || trade.status === '3') {
-                            statusText = 'Failed';
+                            statusText = '失败';
                             statusClass = 'text-danger';
                         }
                         
-                        // 处理交易哈希 - 确保不会太长导致换行
+                        // 处理交易哈希
                         let txHashDisplay = 'N/A';
                         if (trade.tx_hash) {
                             const shortHash = trade.tx_hash.substring(0, 8) + '...' + trade.tx_hash.substring(trade.tx_hash.length - 8);
@@ -797,31 +803,24 @@
                     });
                     
                     // 添加表格到容器
-                    if (tradeHistoryContainer) {
-                        tradeHistoryContainer.appendChild(table);
-                    }
+                    container.appendChild(table);
                     
-                    // 更新分页信息并使用上下翻页按钮
+                    // 更新分页信息
                     if (data.pagination) {
                         totalPages = data.pagination.pages;
                         totalTradeCount = data.pagination.total;
-                    setupPagination();
+                        setupPagination();
                     }
                 } catch (error) {
                     console.error('加载交易历史失败:', error);
                     // 显示错误信息
-                    const errorMessage = document.createElement('div');
-                    errorMessage.className = 'alert alert-danger';
-                    errorMessage.textContent = '加载交易历史失败，请稍后重试';
-                    if (tradeHistoryContainer) {
-                        tradeHistoryContainer.innerHTML = '';
-                        tradeHistoryContainer.appendChild(errorMessage);
-                    }
-                } finally {
-                    // 如果按钮存在，重新启用它
-                    const loadMoreBtn = document.getElementById('load-more-trades');
-                    if (loadMoreBtn) {
-                        loadMoreBtn.disabled = false;
+                    const container = document.getElementById('trade-history');
+                    if (container) {
+                        const errorMessage = document.createElement('div');
+                        errorMessage.className = 'alert alert-danger';
+                        errorMessage.textContent = error.message || '加载交易历史失败，请稍后重试';
+                        container.innerHTML = '';
+                        container.appendChild(errorMessage);
                     }
                 }
             }
