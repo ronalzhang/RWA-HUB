@@ -1611,8 +1611,28 @@ document.addEventListener('DOMContentLoaded', function() {
                         throw new Error('请先连接钱包');
                     }
 
-                    // 检查真实USDC余额
-                    const realBalance = await window.checkSolanaUSDCBalance(walletAddress);
+                    // 检查真实USDC余额 - 内联实现
+                    console.log('检查钱包USDC余额:', walletAddress);
+                    let realBalance = 0;
+                    try {
+                        // 调用API获取余额
+                        const response = await fetch(`/api/wallet/token_balance?address=${walletAddress}&token=USDC&_=${Date.now()}`);
+                        if (!response.ok) {
+                            throw new Error('获取余额接口请求失败');
+                        }
+                        
+                        const data = await response.json();
+                        console.log('获取到的余额数据:', data);
+                        
+                        if (data && data.success) {
+                            realBalance = parseFloat(data.balance);
+                        } else {
+                            console.error('获取余额失败:', data.error || '未知错误');
+                        }
+                    } catch (error) {
+                        console.error('检查USDC余额时出错:', error);
+                    }
+                    
                     console.log('当前钱包USDC余额:', realBalance);
                     
                     if (realBalance < totalAmount) {
