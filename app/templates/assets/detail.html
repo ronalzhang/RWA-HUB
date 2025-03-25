@@ -1483,9 +1483,12 @@
                                 // 使用Phantom钱包签名并发送交易
                                 console.log('使用Phantom钱包签名并发送交易...');
                                 try {
-                                    // 新的Phantom钱包API调用方式
-                                    const { signature } = await window.solana.signAndSendTransaction({
-                                        transaction: transactionBytes
+                                    // 直接作为交易数据发送，由Phantom解析
+                                    const signature = await window.solana.request({
+                                        method: 'signAndSendTransaction',
+                                        params: {
+                                            message: transactionBytes.buffer
+                                        }
                                     });
                                     
                                     // 获取交易签名
@@ -1496,14 +1499,43 @@
                                 } catch (signError) {
                                     console.error('交易签名失败:', signError);
                                     // 尝试使用旧版API格式
-                                    console.log('尝试使用旧版API格式...');
-                                    const { signature } = await window.solana.signAndSendTransaction(transactionBytes);
-                                    
-                                    // 获取交易签名
-                                    txHash = signature;
-                                    console.log('交易已提交(旧版API)，签名:', txHash);
-                                    
-                                    showMessage("交易已提交，等待确认...", "info");
+                                    console.log('尝试使用备用方法...');
+                                    try {
+                                        const signature = await window.solana.request({
+                                            method: 'signTransaction',
+                                            params: {
+                                                message: transactionBytes.buffer
+                                            }
+                                        });
+                                        
+                                        txHash = signature;
+                                        console.log('交易已签名，正在发送...');
+                                        showMessage("交易已签名，正在发送...", "info");
+                                        
+                                        // 发送已签名的交易
+                                        const sendResponse = await fetch('/api/solana/send_signed_transaction', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'X-Eth-Address': dbAddress
+                                            },
+                                            body: JSON.stringify({
+                                                signature: txHash,
+                                                transaction: txData.serialized_transaction
+                                            })
+                                        });
+                                        
+                                        if (!sendResponse.ok) {
+                                            throw new Error('发送已签名交易失败');
+                                        }
+                                        
+                                        const sendResult = await sendResponse.json();
+                                        txHash = sendResult.signature;
+                                        
+                                    } catch (e) {
+                                        console.error('备用方法也失败:', e);
+                                        throw new Error('所有交易方法都失败: ' + e.message);
+                                    }
                                 }
                                 
                                 showMessage("交易已提交，处理中...", "info");
