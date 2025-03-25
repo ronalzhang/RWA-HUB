@@ -1497,10 +1497,10 @@
                                 // 定义多个RPC节点地址以便在主节点失败时切换
                                 const rpcEndpoints = [
                                     window.solanaWeb3.clusterApiUrl('mainnet-beta'),
+                                    'https://api.mainnet-beta.solana.com',
+                                    'https://api.devnet.solana.com',
                                     'https://solana-mainnet.rpc.extrnode.com',
-                                    'https://solana-api.projectserum.com',
-                                    'https://mainnet.helius-rpc.com/?api-key=15319977-2032-418b-a04d-9ae79ccd6e7e',
-                                    'https://api.mainnet-beta.solana.com'
+                                    'https://solana-api.projectserum.com'
                                 ];
                                 
                                 // 获取最新的区块哈希 - 使用多个节点轮询
