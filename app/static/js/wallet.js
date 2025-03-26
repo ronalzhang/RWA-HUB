@@ -148,6 +148,22 @@ const walletState = {
                 }
             });
             
+            // 监听Web3加载成功事件
+            document.addEventListener('web3Loaded', () => {
+                console.log('检测到Web3已加载成功');
+                this.web3Available = true;
+            });
+            
+            // 监听Web3加载失败事件
+            document.addEventListener('web3LoadFailed', () => {
+                console.warn('检测到Web3加载失败');
+                this.web3Available = false;
+                // 如果当前连接的是以太坊钱包，显示警告
+                if (this.connected && this.walletType === 'ethereum') {
+                    console.warn('以太坊钱包功能可能受到限制');
+                }
+            });
+            
             // 完成初始化
             this.initialized = true;
             console.log('钱包初始化完成');
@@ -1740,7 +1756,7 @@ const walletState = {
         
         try {
             // 获取当前钱包类型
-            const walletType = this.walletType || 'ethereum';
+            const walletType = this.walletType || (address.startsWith('0x') ? 'ethereum' : 'solana');
             console.log(`[getUserAssets] 获取 ${walletType} 钱包 ${address} 的资产`);
             
             // 通过API获取真实数据
@@ -2142,10 +2158,35 @@ async connectPhantom(isReconnect = false) {
                 return false;
             }
             
+            // 检查Web3是否已加载
+            if (typeof Web3 === 'undefined' && typeof web3 === 'undefined') {
+                console.error('Web3库未加载，尝试使用备用方法');
+                // 尝试加载本地Web3
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = '/static/vendor/web3.min.js';
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                }).catch(err => {
+                    console.error('加载本地Web3失败:', err);
+                });
+                
+                // 再次检查Web3是否可用
+                if (typeof Web3 === 'undefined' && typeof web3 === 'undefined') {
+                    console.error('Web3仍然不可用，无法连接以太坊钱包');
+                    if (!isReconnect) {
+                        showError('无法加载Web3库，请刷新页面重试');
+                    }
+                    return false;
+                }
+            }
+            
             const provider = window.ethereum;
             
             // 创建Web3实例
             const web3 = new Web3(provider);
+            this.web3 = web3;
             
             // 连接前检查chainId，确保是主网或测试网
             try {
