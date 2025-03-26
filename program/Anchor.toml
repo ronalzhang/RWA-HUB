@@ -1,0 +1,6 @@
+[provider]
+cluster = "devnet"
+wallet = "program-keypair.json"
+
+[programs.devnet]
+rwa_hub = "2TsURTNQXyqHLB2bfbzFME7HkSMLWueYPjqXBBy2u1wP" 
