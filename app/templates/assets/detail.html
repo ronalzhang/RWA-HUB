@@ -1720,16 +1720,64 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // }
 
                                 // 执行转账
-                                const transferResult = await transferUSDC(
-                                    walletAddress,
-                                    "{{ asset.creator_address }}", 
-                                    totalAmount
-                                );
+                                console.log('开始执行USDC转账...');
+                                
+                                // 内联实现USDC转账逻辑
+                                // 计算平台费和实际支付金额
+                                const platformFeeRate = 0.035; // 3.5%平台费率
+                                const platformFee = totalAmount * platformFeeRate;
+                                const actualPayment = totalAmount * (1 - platformFeeRate);
+                                
+                                console.log(`转账明细: 总金额=${totalAmount}, 平台费=${platformFee}, 实际支付=${actualPayment}`);
+                                
+                                // 平台手续费地址 - 应该由后端提供或配置
+                                const platformAddress = "{{ platform_fee_address|default('8mYGpVRUoKgZyqRUNQzGN1iQwKRXtA1bMDTnj8YX1bYM') }}";
+                                
+                                let transferSignature = null;
+                                
+                                // 检查钱包状态
+                                if (!window.walletState || !window.walletState.transferToken) {
+                                    throw new Error('钱包状态不可用或缺少transferToken方法');
+                                }
+                                
+                                try {
+                                    // 1. 转账平台费用
+                                    console.log(`转账平台费用: ${platformFee} USDC 到 ${platformAddress}`);
+                                    const platformFeeResult = await window.walletState.transferToken(
+                                        'USDC',
+                                        platformAddress,
+                                        platformFee
+                                    );
+                                    
+                                    if (!platformFeeResult || !platformFeeResult.success) {
+                                        throw new Error('平台费用转账失败: ' + (platformFeeResult?.error || '未知错误'));
+                                    }
+                                    
+                                    console.log('平台费用转账成功:', platformFeeResult);
+                                    transferSignature = platformFeeResult.txHash || platformFeeResult.signature || 'tx_' + Date.now();
+                                    
+                                    // 2. 转账到资产创建者
+                                    console.log(`转账到资产创建者: ${actualPayment} USDC 到 ${"{{ asset.creator_address }}"}`);
+                                    const creatorPaymentResult = await window.walletState.transferToken(
+                                        'USDC',
+                                        "{{ asset.creator_address }}",
+                                        actualPayment
+                                    );
+                                    
+                                    if (!creatorPaymentResult || !creatorPaymentResult.success) {
+                                        throw new Error('支付给资产创建者失败: ' + (creatorPaymentResult?.error || '未知错误'));
+                                    }
+                                    
+                                    console.log('支付给资产创建者成功:', creatorPaymentResult);
+                                } catch (error) {
+                                    console.error('USDC转账失败:', error);
+                                    throw new Error('USDC转账失败: ' + error.message);
+                                }
 
                                 // 准备更新交易状态的参数
                                 const updateParams = {
                                     status: 'completed',
-                                    tx_hash: transferResult.signature,
+                                    tx_hash: transferSignature || 'tx_' + Date.now(),
                                     wallet_address: walletAddress
                                 };
 
