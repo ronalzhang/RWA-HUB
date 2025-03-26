@@ -9,7 +9,40 @@ class DividendRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False)
     amount = db.Column(db.Float, nullable=False)  # 分红金额
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    distributor_address = db.Column(db.String(44), nullable=False)
+    transaction_hash = db.Column(db.String(88))
+    interval = db.Column(db.Integer, nullable=False)  # 分红间隔（秒）
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @classmethod
+    def create(cls, asset_id, amount, distributor_address, interval):
+        record = cls(
+            asset_id=asset_id,
+            amount=amount,
+            distributor_address=distributor_address,
+            interval=interval
+        )
+        db.session.add(record)
+        db.session.commit()
+        return record
+        
+    def update_transaction_hash(self, tx_hash):
+        self.transaction_hash = tx_hash
+        db.session.commit()
+        
+    @classmethod
+    def get_by_asset(cls, asset_id):
+        return cls.query.filter_by(asset_id=asset_id).order_by(cls.created_at.desc()).all()
+        
+    @classmethod
+    def get_count_by_asset(cls, asset_id):
+        return cls.query.filter_by(asset_id=asset_id).count()
+        
+    @classmethod
+    def get_total_amount_by_asset(cls, asset_id):
+        result = db.session.query(db.func.sum(cls.amount)).filter_by(asset_id=asset_id).scalar()
+        return float(result) if result else 0.0
 
     def to_dict(self):
         """转换为字典格式"""
@@ -17,7 +50,11 @@ class DividendRecord(db.Model):
             'id': self.id,
             'asset_id': self.asset_id,
             'amount': self.amount,
-            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None
+            'distributor_address': self.distributor_address,
+            'transaction_hash': self.transaction_hash,
+            'interval': self.interval,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None,
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else None
         }
 
 class Dividend(db.Model):
