@@ -16,12 +16,13 @@ from flask import current_app
 # 导入Solana兼容工具
 from app.utils.solana_compat.connection import Connection
 from app.utils.solana_compat.publickey import PublicKey
-from app.utils.solana_compat.transaction import Transaction
+from app.utils.solana_compat.transaction import Transaction, TransactionInstruction
 from app.utils.solana_compat.tx_opts import TxOpts
 from app.config import Config
 from app.extensions import db
-from app.models import Trade
+from app.models import Trade, Asset
 from datetime import datetime
+from spl.token.constants import TOKEN_PROGRAM_ID
 
 # 获取日志记录器
 logger = logging.getLogger(__name__)
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 # 通用常量
 SOLANA_ENDPOINT = Config.SOLANA_RPC_URL or 'https://api.devnet.solana.com'
 PROGRAM_ID = Config.SOLANA_PROGRAM_ID or 'RWAxxx111111111111111111111111111111111111'
-USDC_MINT = Config.SOLANA_USDC_MINT or 'USCG9aStBYmRbJdY7cBiiqmyNEGqwT6vAxkxfHECdKN'
+USDC_MINT = Config.SOLANA_USDC_MINT or 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'  # Solana Devnet USDC
 
 # 创建Solana连接
 solana_connection = Connection(SOLANA_ENDPOINT)
@@ -57,33 +58,62 @@ def prepare_transfer_transaction(
     try:
         logger.info(f"准备交易数据 - 代币: {token_symbol}, 发送方: {from_address}, 接收方: {to_address}, 金额: {amount}")
         
-        # 创建一个模拟交易，仅用于前端测试
-        # 在实际环境中，这里应该使用Solana SDK构建真实交易
+        # 创建真实的Solana转账交易
+        from app.utils.solana_compat.publickey import PublicKey
+        from app.utils.solana_compat.transaction import Transaction, TransactionInstruction
+        from spl.token.constants import TOKEN_PROGRAM_ID
         
-        # 生成一个随机交易ID
-        import random
-        import struct
-        transaction_id = random.randint(1, 1000000)
+        # 创建交易
+        transaction = Transaction()
+        transaction.recent_blockhash = blockhash
         
-        # 创建一个简单的交易数据结构
-        transaction_data = struct.pack("<IQQQI", 
-            transaction_id,                         # 交易ID
-            int(time.time()),                       # 时间戳
-            int(from_address[:16], 16),             # 发送方地址的一部分（截取16个字符当作数字，这是一个简化操作）
-            int(to_address[:16], 16),               # 接收方地址的一部分
-            int(amount * 1000000)                   # 金额（转换为整数，乘以10^6表示小数点后6位）
+        # 获取代币铸造地址
+        token_mint = PublicKey(USDC_MINT)
+        
+        # 将from_address和to_address转换为PublicKey
+        sender = PublicKey(from_address)
+        recipient = PublicKey(to_address)
+        
+        # 创建转账指令所需的账户
+        from app.utils.solana import SolanaClient
+        solana_client = SolanaClient()
+        
+        # 获取代币账户地址
+        sender_token_account = solana_client.get_token_account(sender, token_mint)
+        recipient_token_account = solana_client.get_token_account(recipient, token_mint)
+        
+        # 将金额转换为正确的小数位数
+        amount_lamports = int(amount * 1000000)  # USDC有6位小数
+        
+        # 创建转账指令
+        # 这里使用SPL Token程序的transfer指令
+        # 在真实环境中需要根据SPL Token程序的ABI来构建
+        transfer_instruction_data = bytes([3]) + amount_lamports.to_bytes(8, byteorder='little')  # 3 = Transfer指令ID
+        
+        keys = [
+            {"pubkey": sender_token_account, "isSigner": False, "isWritable": True},
+            {"pubkey": recipient_token_account, "isSigner": False, "isWritable": True},
+            {"pubkey": sender, "isSigner": True, "isWritable": False}
+        ]
+        
+        transfer_instruction = TransactionInstruction(
+            program_id=TOKEN_PROGRAM_ID,
+            data=transfer_instruction_data,
+            keys=keys
         )
         
-        # 创建一个简单的消息数据（在实际环境中，这应该是交易数据的一部分）
-        message_data = struct.pack("<IQI",
-            transaction_id,                         # 交易ID
-            int(time.time()),                       # 时间戳
-            int(amount * 1000000)                   # 金额
-        )
+        # 添加指令到交易
+        transaction.add(transfer_instruction)
         
-        logger.info(f"已成功生成交易数据 - ID: {transaction_id}")
+        # 序列化交易
+        transaction_bytes = transaction.serialize()
         
-        return transaction_data, message_data
+        # 获取交易消息（用于签名）
+        message_bytes = transaction.serialize_message()
+        
+        logger.info(f"已成功生成真实交易数据")
+        
+        return transaction_bytes, message_bytes
         
     except Exception as e:
         logger.error(f"准备交易数据失败: {str(e)}")
@@ -141,7 +171,7 @@ def execute_backup_transfer(
 ) -> str:
     """
     执行备用模式的转账交易
-    这是一个无需客户端签名的备用方案
+    这是一个后端验证方案，但仅用于确认转账请求，不实际执行转账
     
     Args:
         token_symbol (str): 代币符号
@@ -153,28 +183,55 @@ def execute_backup_transfer(
         str: 交易签名
     """
     try:
-        logger.info(f"执行备用模式转账 - 代币: {token_symbol}, 发送方: {from_address}, 接收方: {to_address}, 金额: {amount}")
+        logger.info(f"执行备用模式转账确认 - 代币: {token_symbol}, 发送方: {from_address}, 接收方: {to_address}, 金额: {amount}")
         
-        # 在真实环境中，这里应该利用后端私钥签名并执行交易
-        # 现在我们模拟这个过程
-        
-        # 生成一个随机的交易签名
-        import random
+        # 生成一个唯一的交易ID，用于前端跟踪
         import hashlib
         
         # 创建一个唯一的种子
         seed = f"{token_symbol}:{from_address}:{to_address}:{amount}:{int(time.time())}"
         
-        # 生成签名
+        # 生成交易ID（非链上签名，仅用于前端UI跟踪）
         signature = hashlib.sha256(seed.encode()).hexdigest()
         
-        logger.info(f"备用模式转账成功 - 签名: {signature}")
+        # 创建交易记录
+        from app.models import Trade, Asset
+        from app.extensions import db
+        
+        # 查找相关资产
+        asset = None
+        if token_symbol == 'USDC':
+            # 尝试从to_address判断是转账给平台还是资产创建者
+            if to_address == "8mYGpVRUoKgZyqRUNQzGN1iQwKRXtA1bMDTnj8YX1bYM":
+                # 如果是平台费，查找资产信息可能在另一个转账中
+                logger.info("此转账为平台费，不关联具体资产")
+            else:
+                # 查找资产创建者地址匹配的资产
+                assets = Asset.query.filter_by(creator_address=to_address).all()
+                if assets:
+                    asset = assets[0]  # 取第一个匹配的资产
+                    logger.info(f"找到匹配的资产: {asset.token_symbol}")
+        
+        # 记录交易到数据库
+        trade = Trade(
+            wallet_address=from_address,
+            asset_id=asset.id if asset else None,
+            amount=amount,
+            price=asset.token_price if asset else 0,
+            tx_hash=signature,
+            status='pending',  # 初始状态为pending
+            token_amount=amount / (asset.token_price if asset and asset.token_price > 0 else 1)
+        )
+        db.session.add(trade)
+        db.session.commit()
+        
+        logger.info(f"备用模式交易记录已创建 - 交易ID: {trade.id}, 签名: {signature}")
         
         return signature
         
     except Exception as e:
-        logger.error(f"备用转账失败: {str(e)}")
-        raise Exception(f"备用转账失败: {str(e)}")
+        logger.error(f"备用转账确认失败: {str(e)}")
+        raise Exception(f"备用转账确认失败: {str(e)}")
 
 def prepare_transaction(user_address, asset_id, token_symbol, amount, price, trade_id):
     """
