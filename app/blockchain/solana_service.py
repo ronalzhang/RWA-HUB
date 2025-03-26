@@ -202,7 +202,7 @@ def execute_backup_transfer(
         asset = None
         if token_symbol == 'USDC':
             # 尝试从to_address判断是转账给平台还是资产创建者
-            if to_address == "8mYGpVRUoKgZyqRUNQzGN1iQwKRXtA1bMDTnj8YX1bYM":
+            if to_address == "HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd":
                 # 如果是平台费，查找资产信息可能在另一个转账中
                 logger.info("此转账为平台费，不关联具体资产")
             else:

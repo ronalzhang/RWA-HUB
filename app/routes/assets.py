@@ -19,6 +19,7 @@ import random
 import requests
 import re
 import mimetypes
+from app.config import Config
 
 # 页面路由
 @assets_bp.route("/")
@@ -217,7 +218,8 @@ def asset_detail_by_symbol(token_symbol):
                               is_owner=is_owner,
                               is_admin_user=is_admin_user,
                               current_user_address=current_user_address,
-                              total_dividends=total_dividends)
+                              total_dividends=total_dividends,
+                              platform_fee_address=Config.PLATFORM_FEE_ADDRESS)
                               
     except Exception as e:
         current_app.logger.error(f"访问资产详情页面失败: {str(e)}", exc_info=True)
