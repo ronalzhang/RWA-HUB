@@ -1,5 +1,6 @@
 use solana_program::program_error::ProgramError;
 use thiserror::Error;
+use anchor_lang::prelude::*;
 
 #[derive(Error, Debug, Copy, Clone)]
 pub enum RwaHubError {
@@ -25,6 +26,7 @@ pub enum RwaHubError {
     InvalidDividendAmount,
 }
 
+#[error_code]
 impl From<RwaHubError> for ProgramError {
     fn from(e: RwaHubError) -> Self {
         ProgramError::Custom(e as u32)
