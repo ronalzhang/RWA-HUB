@@ -867,9 +867,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         noTradesMessage.className = 'text-center text-muted my-4';
                         noTradesMessage.textContent = '暂无交易记录';
                         container.appendChild(noTradesMessage);
-                        return;
-                    }
-                    
+                    return;
+                }
+                
                     // 创建交易记录表格
                     const table = document.createElement('table');
                     table.className = 'table table-striped';
@@ -952,15 +952,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.pagination) {
                         totalPages = data.pagination.pages;
                         totalTradeCount = data.pagination.total;
-                        setupPagination();
+                    setupPagination();
                     }
                 } catch (error) {
                     console.error('加载交易历史失败:', error);
                     // 显示错误信息
                     const container = document.getElementById('trade-history');
                     if (container) {
-                        const errorMessage = document.createElement('div');
-                        errorMessage.className = 'alert alert-danger';
+                    const errorMessage = document.createElement('div');
+                    errorMessage.className = 'alert alert-danger';
                         errorMessage.textContent = error.message || '加载交易历史失败，请稍后重试';
                         container.innerHTML = '';
                         container.appendChild(errorMessage);
@@ -1698,9 +1698,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
                                 // 创建交易记录
                                 const createResponse = await fetch('/api/trades', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
                                         'X-Eth-Address': walletAddress
                                     },
                                     body: JSON.stringify(createTradeParams)
@@ -1731,7 +1731,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 console.log(`转账明细: 总金额=${totalAmount}, 平台费=${platformFee}, 实际支付=${actualPayment}`);
                                 
                                 // 平台手续费地址 - 应该由后端提供或配置
-                                const platformAddress = "{{ platform_fee_address|default('8mYGpVRUoKgZyqRUNQzGN1iQwKRXtA1bMDTnj8YX1bYM') }}";
+                                const platformAddress = "{{ platform_fee_address|default('HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd') }}";
                                 
                                 let transferSignature = null;
                                 
@@ -3298,7 +3298,7 @@ async function transferUSDC(fromAddress, toAddress, amount) {
         console.log(`转账明细: 总金额=${amount}, 平台费=${platformFee}, 实际支付=${actualPayment}`);
         
         // 平台手续费地址 - 应该由后端提供或配置
-        const platformAddress = "{{ platform_fee_address|default('8mYGpVRUoKgZyqRUNQzGN1iQwKRXtA1bMDTnj8YX1bYM') }}";
+        const platformAddress = "{{ platform_fee_address|default('HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd') }}";
         
         // 1. 转账平台费用
         console.log(`转账平台费用: ${platformFee} USDC 到 ${platformAddress}`);
