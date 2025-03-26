@@ -45,8 +45,8 @@ from spl.token.constants import TOKEN_PROGRAM_ID
 # 配置信息
 SOLANA_RPC_URL = os.environ.get("SOLANA_RPC_URL", "https://api.devnet.solana.com")
 # 使用一个有效的测试程序 ID
-PROGRAM_ID = os.environ.get("SOLANA_PROGRAM_ID", "HmbTLCmaGvZhKnn1Zfa1JVnp7vkMV4DYVxPLWBVoN65")
 USDC_MINT = os.environ.get("SOLANA_USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
+PROGRAM_ID = os.environ.get("SOLANA_PROGRAM_ID", "HmbTLCmaGvZhKnn1Zfa1JVnp7vkMV4DYVxPLWBVoN65")
 
 # 指令类型枚举
 INSTRUCTION_INITIALIZE_ASSET = 0

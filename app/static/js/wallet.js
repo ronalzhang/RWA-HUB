@@ -2484,7 +2484,8 @@ async connectPhantom(isReconnect = false) {
                 });
                 
                 if (!getLatestBlockhashResponse.ok) {
-                    throw new Error('获取最新区块哈希失败');
+                    console.error('区块哈希API响应状态码:', getLatestBlockhashResponse.status);
+                    throw new Error(`获取最新区块哈希失败: ${getLatestBlockhashResponse.statusText}`);
                 }
                 
                 const blockhashData = await getLatestBlockhashResponse.json();
@@ -2512,8 +2513,16 @@ async connectPhantom(isReconnect = false) {
                     })
                 });
                 
+                // 检查API响应状态
                 if (!getTransferParamsResponse.ok) {
-                    throw new Error('获取转账参数失败');
+                    console.error('转账参数API返回错误状态码:', getTransferParamsResponse.status);
+                    // 尝试读取错误信息
+                    try {
+                        const errorData = await getTransferParamsResponse.json();
+                        throw new Error(`获取转账参数失败: ${errorData.error || getTransferParamsResponse.statusText}`);
+                    } catch (parseError) {
+                        throw new Error(`获取转账参数失败: ${getTransferParamsResponse.statusText}`);
+                    }
                 }
                 
                 const transferParamsData = await getTransferParamsResponse.json();
@@ -2524,6 +2533,11 @@ async connectPhantom(isReconnect = false) {
                 // 3. 使用钱包签名消息而不是交易
                 console.log('使用钱包签名消息...');
                 const { transaction, message } = transferParamsData;
+                
+                if (!transaction || !message) {
+                    console.error('服务器响应缺少必要的交易数据:', transferParamsData);
+                    throw new Error('服务器返回的交易数据无效');
+                }
                 
                 // 将消息转换为Uint8Array
                 const messageBytes = Uint8Array.from(atob(message), c => c.charCodeAt(0));
@@ -2558,6 +2572,7 @@ async connectPhantom(isReconnect = false) {
                 });
                 
                 if (!sendSignedResponse.ok) {
+                    console.error('发送签名API响应状态码:', sendSignedResponse.status);
                     throw new Error('发送签名交易失败');
                 }
                 
@@ -2595,8 +2610,14 @@ async connectPhantom(isReconnect = false) {
                 });
                 
                 if (!backupResponse.ok) {
-                    const errorData = await backupResponse.json();
-                    throw new Error(`备用模式失败: ${errorData.error || backupResponse.statusText}`);
+                    console.error('备用模式API返回状态码:', backupResponse.status);
+                    // 尝试解析错误消息
+                    try {
+                        const errorData = await backupResponse.json();
+                        throw new Error(`备用模式失败: ${errorData.error || backupResponse.statusText}`);
+                    } catch (parseError) {
+                        throw new Error(`备用模式失败: ${backupResponse.statusText}`);
+                    }
                 }
                 
                 const backupResult = await backupResponse.json();
@@ -2605,6 +2626,20 @@ async connectPhantom(isReconnect = false) {
                 }
                 
                 console.log('备用模式交易成功，签名:', backupResult.signature);
+                
+                // 在备用模式成功后，应该检查交易状态并更新前端显示
+                console.log('检查交易状态更新UI...');
+                setTimeout(() => {
+                    // 如果页面上有交易记录列表，可以尝试更新
+                    if (typeof loadTradeHistory === 'function') {
+                        loadTradeHistory();
+                    }
+                    // 更新余额显示
+                    if (typeof this.getBalance === 'function') {
+                        this.getBalance();
+                    }
+                }, 2000);
+                
                 return {
                     success: true,
                     txHash: backupResult.signature
