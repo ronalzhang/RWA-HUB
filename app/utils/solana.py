@@ -15,6 +15,8 @@ from app.utils.solana_compat.transaction import Transaction, AccountMeta, Transa
 from app.utils.solana_compat.publickey import PublicKey
 from app.utils.solana_compat.keypair import Keypair
 from app.utils.solana_compat.system_program import SystemProgram as SYS_PROGRAM
+from app.utils.solana_compat.token.instructions import get_associated_token_address, create_associated_token_account_instruction
+from app.utils.solana_compat.token.constants import TOKEN_PROGRAM_ID
 
 import logging
 from typing import List, Optional, Dict, Any, Tuple
@@ -46,7 +48,8 @@ from spl.token.constants import TOKEN_PROGRAM_ID
 SOLANA_RPC_URL = os.environ.get("SOLANA_RPC_URL", "https://api.devnet.solana.com")
 # 使用一个有效的测试程序 ID
 USDC_MINT = os.environ.get("SOLANA_USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
-PROGRAM_ID = os.environ.get("SOLANA_PROGRAM_ID", "HmbTLCmaGvZhKnn1Zfa1JVnp7vkMV4DYVxPLWBVoN65")
+PROGRAM_ID = os.environ.get("SOLANA_PROGRAM_ID", "9AcvoQmz22KRcMhkLkeSkKs8W7ru6oae8GHcxrS83fKz")
+PLATFORM_FEE_ADDRESS = os.environ.get("PLATFORM_FEE_ADDRESS", "HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd")
 
 # 指令类型枚举
 INSTRUCTION_INITIALIZE_ASSET = 0
@@ -60,6 +63,7 @@ class SolanaClient:
         self.client = Client(SOLANA_RPC_URL)
         self.program_id = PublicKey(PROGRAM_ID)
         self.usdc_mint = PublicKey(USDC_MINT)
+        self.platform_fee_address = PublicKey(PLATFORM_FEE_ADDRESS)
     
     def get_account_info(self, pubkey):
         """获取账户信息"""
@@ -75,14 +79,13 @@ class SolanaClient:
         )
         return asset_pubkey
     
-    def get_dividend_pool(self, asset_id):
-        """获取分红池账户"""
-        # 使用资产ID作为种子派生PDA
-        dividend_seed = f"dividend-{asset_id}".encode()
-        dividend_pubkey, _ = PublicKey.find_program_address(
-            [dividend_seed], self.program_id
+    def get_dividend_pool(self):
+        """获取分红池PDA地址"""
+        pool_seed = b"pool"
+        pool_pubkey, _ = PublicKey.find_program_address(
+            [pool_seed], self.program_id
         )
-        return dividend_pubkey
+        return pool_pubkey
     
     def get_asset_mint(self, asset_id):
         """获取资产代币铸造账户"""
@@ -97,114 +100,123 @@ class SolanaClient:
         """获取代币账户地址"""
         return get_associated_token_address(owner, mint)
     
-    def create_asset(self, owner_keypair, asset_id, name, symbol, total_supply, decimals=0):
-        """创建资产"""
-        owner = PublicKey(owner_keypair.public_key)
-        asset_pubkey = self.get_asset_account(asset_id)
-        mint_pubkey = self.get_asset_mint(asset_id)
-        
-        # 创建交易指令
-        transaction = Transaction()
-        
-        # 添加创建资产指令
-        # 封装指令数据
-        instruction_data = struct.pack(
-            "<B" +   # 指令类型 (1 byte)
-            "I" +    # 资产ID (4 bytes)
-            f"{len(name)}s" +   # 名称
-            f"{len(symbol)}s" +   # 符号
-            "Q" +    # 总供应量 (8 bytes)
-            "B",     # 小数位数 (1 byte)
-            INSTRUCTION_INITIALIZE_ASSET,
-            asset_id,
-            name.encode(),
-            symbol.encode(),
-            total_supply,
-            decimals
-        )
-        
-        # 创建指令
-        initialize_asset_instruction = TransactionInstruction(
-            keys=[
-                AccountMeta(owner, True, True),               # 创建者
-                AccountMeta(asset_pubkey, False, True),       # 资产账户
-                AccountMeta(mint_pubkey, False, True),        # 代币铸造账户
-                AccountMeta(SYS_PROGRAM_ID, False, False),    # 系统程序
-                AccountMeta(TOKEN_PROGRAM_ID, False, False),  # 代币程序
-            ],
-            program_id=self.program_id,
-            data=instruction_data
-        )
-        
-        # 添加到交易
-        transaction.add(initialize_asset_instruction)
-        
-        # 签名并发送交易
-        txid = self.client.send_transaction(
-            transaction, owner_keypair, opts=TxOpts(skip_preflight=False)
-        )
-        return {"transaction_id": txid["result"], "asset_account": str(asset_pubkey), "mint_account": str(mint_pubkey)}
+    def get_token_account_balance(self, token_account):
+        """获取代币账户余额"""
+        try:
+            response = self.client.get_token_account_balance(token_account)
+            return float(response["result"]["value"]["amount"]) / (10 ** response["result"]["value"]["decimals"])
+        except Exception as e:
+            logging.error(f"获取代币余额失败: {str(e)}")
+            return 0
     
-    def buy_asset(self, buyer_keypair, asset_id, amount):
-        """购买资产代币"""
-        buyer = PublicKey(buyer_keypair.public_key)
-        asset_pubkey = self.get_asset_account(asset_id)
-        mint_pubkey = self.get_asset_mint(asset_id)
-        
-        # 获取代币账户
-        buyer_token_account = self.get_token_account(buyer, mint_pubkey)
-        buyer_usdc_account = self.get_token_account(buyer, self.usdc_mint)
-        
-        # 获取资产信息以获取所有者信息
-        asset_info = self.get_account_info(asset_pubkey)
-        if not asset_info:
-            raise ValueError(f"资产 {asset_id} 不存在")
-        
-        # 这里需要解析资产数据以获取所有者地址
-        # 为简化，假设我们有解析函数
-        seller = PublicKey("11111111111111111111111111111111")  # 替换为实际所有者地址
-        seller_token_account = self.get_token_account(seller, mint_pubkey)
-        seller_usdc_account = self.get_token_account(seller, self.usdc_mint)
-        
-        # 创建交易指令
-        transaction = Transaction()
-        
-        # 封装购买指令数据
-        instruction_data = struct.pack(
-            "<BQ",   # 指令类型 (1 byte) + 数量 (8 bytes)
-            INSTRUCTION_BUY,
-            amount
-        )
-        
-        # 创建购买指令
-        buy_instruction = TransactionInstruction(
-            keys=[
-                AccountMeta(buyer, True, True),                 # 买家
-                AccountMeta(buyer_token_account, False, True),  # 买家代币账户
-                AccountMeta(seller_token_account, False, True), # 卖家代币账户
-                AccountMeta(buyer_usdc_account, False, True),   # 买家USDC账户
-                AccountMeta(seller_usdc_account, False, True),  # 卖家USDC账户
-                AccountMeta(TOKEN_PROGRAM_ID, False, False),    # 代币程序
-                AccountMeta(asset_pubkey, False, True),         # 资产账户
-            ],
-            program_id=self.program_id,
-            data=instruction_data
-        )
-        
-        # 添加到交易
-        transaction.add(buy_instruction)
-        
-        # 签名并发送交易
-        txid = self.client.send_transaction(
-            transaction, buyer_keypair, opts=TxOpts(skip_preflight=False)
-        )
-        return {"transaction_id": txid["result"]}
+    def get_platform_token_account(self):
+        """获取平台USDC代币账户"""
+        return get_associated_token_address(self.platform_fee_address, self.usdc_mint)
+    
+    def create_asset(self, owner_keypair, name: str, symbol: str, total_supply: int, price: float, decimals: int = 0) -> Dict[str, str]:
+        """创建资产"""
+        try:
+            # 转换价格为lamports (USDC有6位小数)
+            price_lamports = int(price * 1e6)
+            
+            # 获取相关账户
+            owner = PublicKey(owner_keypair.public_key)
+            asset_pubkey = self.get_asset_account(symbol)
+            mint_pubkey = self.get_asset_mint(symbol)
+            
+            # 创建交易
+            transaction = Transaction()
+            
+            # 创建资产指令
+            create_asset_instruction = TransactionInstruction(
+                keys=[
+                    AccountMeta(asset_pubkey, False, True),           # 资产账户
+                    AccountMeta(owner, True, True),                   # 所有者
+                    AccountMeta(mint_pubkey, False, True),           # 代币铸造账户
+                    AccountMeta(SYS_PROGRAM_ID, False, False),       # 系统程序
+                    AccountMeta(TOKEN_PROGRAM_ID, False, False),     # 代币程序
+                    AccountMeta(RentSysvarPubkey, False, False),     # 租金系统变量
+                ],
+                program_id=self.program_id,
+                data=struct.pack(
+                    "<B32s32sQQB",
+                    0,  # 0表示create_asset指令
+                    name.encode('utf-8').ljust(32, b'\0'),
+                    symbol.encode('utf-8').ljust(32, b'\0'),
+                    total_supply,
+                    price_lamports,
+                    decimals
+                )
+            )
+            
+            transaction.add(create_asset_instruction)
+            
+            # 发送交易
+            result = self.client.send_transaction(
+                transaction,
+                [owner_keypair],
+                opts=TxOpts(skip_preflight=False)
+            )
+            
+            return {
+                "transaction_id": result["result"],
+                "asset_pubkey": str(asset_pubkey),
+                "mint_pubkey": str(mint_pubkey)
+            }
+            
+        except Exception as e:
+            logging.error(f"创建资产失败: {str(e)}")
+            raise
+
+    def buy_asset(self, buyer_keypair, symbol: str, amount: int) -> str:
+        """购买资产"""
+        try:
+            # 获取相关账户
+            buyer = PublicKey(buyer_keypair.public_key)
+            asset_pubkey = self.get_asset_account(symbol)
+            mint_pubkey = self.get_asset_mint(symbol)
+            buyer_token_account = self.get_token_account(buyer, mint_pubkey)
+            buyer_usdc_account = self.get_token_account(buyer, self.usdc_mint)
+            platform_usdc_account = self.get_platform_token_account()
+            
+            # 创建交易
+            transaction = Transaction()
+            
+            # 创建购买指令
+            buy_instruction = TransactionInstruction(
+                keys=[
+                    AccountMeta(asset_pubkey, False, True),           # 资产账户
+                    AccountMeta(buyer, True, True),                   # 买家
+                    AccountMeta(mint_pubkey, False, True),           # 代币铸造账户
+                    AccountMeta(buyer_token_account, False, True),    # 买家代币账户
+                    AccountMeta(buyer_usdc_account, False, True),     # 买家USDC账户
+                    AccountMeta(platform_usdc_account, False, True),  # 平台USDC账户
+                    AccountMeta(TOKEN_PROGRAM_ID, False, False),      # 代币程序
+                ],
+                program_id=self.program_id,
+                data=struct.pack("<BQ", 3, amount)  # 3表示buy_asset指令
+            )
+            
+            transaction.add(buy_instruction)
+            
+            # 发送交易
+            result = self.client.send_transaction(
+                transaction,
+                [buyer_keypair],
+                opts=TxOpts(skip_preflight=False)
+            )
+            
+            return result["result"]
+            
+        except Exception as e:
+            logging.error(f"购买资产失败: {str(e)}")
+            raise
     
     def create_dividend(self, owner_keypair, asset_id, amount):
         """创建分红"""
         owner = PublicKey(owner_keypair.public_key)
         asset_pubkey = self.get_asset_account(asset_id)
-        dividend_pool = self.get_dividend_pool(asset_id)
+        dividend_pool = self.get_dividend_pool()
         owner_usdc_account = self.get_token_account(owner, self.usdc_mint)
         
         # 创建交易指令
@@ -239,6 +251,93 @@ class SolanaClient:
         )
         return {"transaction_id": txid["result"], "dividend_pool": str(dividend_pool)}
     
+    def transfer_dividend_to_platform(self, amount: float, distributor: str, platform_address: str) -> str:
+        """将分红金额转入平台PDA账户"""
+        try:
+            # 转换金额为lamports (USDC有6位小数)
+            amount_lamports = int(amount * 1e6)
+            
+            # 获取相关账户
+            distributor_pubkey = PublicKey(distributor)
+            distributor_token_account = get_associated_token_address(distributor_pubkey, self.usdc_mint)
+            platform_pubkey = PublicKey(platform_address)
+            platform_token_account = get_associated_token_address(platform_pubkey, self.usdc_mint)
+            pool_pubkey = self.get_dividend_pool()
+            
+            # 创建交易
+            transaction = Transaction()
+            
+            # 创建转账指令
+            transfer_instruction = TransactionInstruction(
+                keys=[
+                    AccountMeta(pool_pubkey, False, True),           # 分红池PDA
+                    AccountMeta(distributor_pubkey, True, True),     # 发起人
+                    AccountMeta(distributor_token_account, False, True),  # 发起人USDC账户
+                    AccountMeta(platform_token_account, False, True), # 平台USDC账户
+                    AccountMeta(TOKEN_PROGRAM_ID, False, False),     # 代币程序
+                ],
+                program_id=self.program_id,
+                data=struct.pack("<BQ", 1, amount_lamports)  # 1表示transfer_dividend_to_platform指令
+            )
+            
+            transaction.add(transfer_instruction)
+            
+            # 发送交易
+            result = self.client.send_transaction(
+                transaction,
+                opts=TxOpts(skip_preflight=False)
+            )
+            
+            return result["result"]
+            
+        except Exception as e:
+            logging.error(f"转账分红到平台失败: {str(e)}")
+            raise
+    
+    def process_withdrawal(self, amount: float, user: str, platform_address: str) -> str:
+        """处理提现请求"""
+        try:
+            # 转换金额为lamports
+            amount_lamports = int(amount * 1e6)
+            
+            # 获取相关账户
+            user_pubkey = PublicKey(user)
+            user_token_account = get_associated_token_address(user_pubkey, self.usdc_mint)
+            platform_pubkey = PublicKey(platform_address)
+            platform_token_account = get_associated_token_address(platform_pubkey, self.usdc_mint)
+            pool_pubkey = self.get_dividend_pool()
+            
+            # 创建交易
+            transaction = Transaction()
+            
+            # 创建提现指令
+            withdrawal_instruction = TransactionInstruction(
+                keys=[
+                    AccountMeta(pool_pubkey, False, True),           # 分红池PDA
+                    AccountMeta(user_pubkey, True, True),           # 用户
+                    AccountMeta(platform_token_account, False, True), # 平台USDC账户
+                    AccountMeta(user_token_account, False, True),    # 用户USDC账户
+                    AccountMeta(self.usdc_mint, False, False),       # USDC代币铸造账户
+                    AccountMeta(TOKEN_PROGRAM_ID, False, False),     # 代币程序
+                ],
+                program_id=self.program_id,
+                data=struct.pack("<BQ", 2, amount_lamports)  # 2表示process_withdrawal指令
+            )
+            
+            transaction.add(withdrawal_instruction)
+            
+            # 发送交易
+            result = self.client.send_transaction(
+                transaction,
+                opts=TxOpts(skip_preflight=False)
+            )
+            
+            return result["result"]
+            
+        except Exception as e:
+            logging.error(f"处理提现请求失败: {str(e)}")
+            raise
+    
     @staticmethod
     def load_keypair(keypair_path):
         """从文件加载密钥对"""
@@ -253,3 +352,7 @@ class SolanaClient:
 
 # 单例实例
 solana_client = SolanaClient() 
+
+def get_solana_client():
+    """获取Solana客户端实例"""
+    return solana_client 
