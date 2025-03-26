@@ -174,67 +174,68 @@
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
-    <div class="bg-white rounded-lg shadow-lg p-6">
-        <h1 class="text-2xl font-bold mb-6">分红管理</h1>
-        
-        <!-- 资产统计 -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <div class="bg-gray-50 p-4 rounded-lg">
-                <h3 class="text-gray-500 text-sm">总分红次数</h3>
-                <p class="text-2xl font-bold" id="dividend-count">-</p>
-            </div>
-            <div class="bg-gray-50 p-4 rounded-lg">
-                <h3 class="text-gray-500 text-sm">总分红金额</h3>
-                <p class="text-2xl font-bold" id="total-amount">-</p>
-            </div>
-            <div class="bg-gray-50 p-4 rounded-lg">
-                <h3 class="text-gray-500 text-sm">持有人数量</h3>
-                <p class="text-2xl font-bold" id="holder-count">-</p>
-            </div>
+    <h1 class="text-3xl font-bold mb-8">分红管理</h1>
+    
+    <!-- 资产统计 -->
+    <div class="grid grid-cols-3 gap-4 mb-8">
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-2">总分红次数</h3>
+            <p class="text-2xl font-bold" id="totalDividends">0</p>
         </div>
-        
-        <!-- 发起分红表单 -->
-        <div class="mb-8">
-            <h2 class="text-xl font-semibold mb-4">发起分红</h2>
-            <form id="dividend-form" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">分红金额 (USDC)</label>
-                    <input type="number" step="0.01" min="0" id="amount" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">分红间隔 (小时)</label>
-                    <input type="number" min="1" id="interval" value="24" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                </div>
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    <h3 class="text-gray-500 text-sm">预估信息</h3>
-                    <p class="text-sm">平台手续费: <span id="platform-fee">-</span> USDC</p>
-                    <p class="text-sm">实际分红金额: <span id="actual-amount">-</span> USDC</p>
-                </div>
-                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                    确认发起分红
-                </button>
-            </form>
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-2">总分红金额</h3>
+            <p class="text-2xl font-bold" id="totalAmount">0 USDC</p>
         </div>
-        
-        <!-- 分红历史 -->
-        <div>
-            <h2 class="text-xl font-semibold mb-4">分红历史</h2>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">金额</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">间隔</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">发起人</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易哈希</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200" id="dividend-history">
-                        <!-- 历史记录将通过JavaScript动态加载 -->
-                    </tbody>
-                </table>
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-2">持有人数量</h3>
+            <p class="text-2xl font-bold" id="holderCount">0</p>
+        </div>
+    </div>
+
+    <!-- 发起分红表单 -->
+    <div class="bg-white rounded-lg shadow p-6 mb-8">
+        <h2 class="text-xl font-bold mb-4">发起分红</h2>
+        <form id="dividendForm" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">分红金额 (USDC)</label>
+                <input type="number" id="amount" name="amount" step="0.01" min="0" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
             </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">分红间隔 (小时)</label>
+                <input type="number" id="interval" name="interval" min="1" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            </div>
+            <div class="bg-gray-50 p-4 rounded-md">
+                <h3 class="text-sm font-medium text-gray-700 mb-2">预估信息</h3>
+                <p class="text-sm text-gray-600">平台手续费: <span id="platformFee">0 USDC</span></p>
+                <p class="text-sm text-gray-600">实际分红金额: <span id="actualAmount">0 USDC</span></p>
+            </div>
+            <button type="submit" id="submitBtn"
+                class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                发起分红
+            </button>
+        </form>
+    </div>
+
+    <!-- 分红历史 -->
+    <div class="bg-white rounded-lg shadow">
+        <h2 class="text-xl font-bold p-6 border-b">分红历史</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">金额</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">间隔</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">发起人</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易哈希</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTable" class="bg-white divide-y divide-gray-200">
+                    <!-- 历史记录将通过JavaScript动态加载 -->
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -245,131 +246,122 @@ const PLATFORM_FEE_RATE = 0.035; // 3.5%平台手续费
 // 加载资产统计信息
 async function loadAssetStats() {
     try {
-        const response = await fetch(`/api/assets/symbol/${symbol}/dividend_stats`);
+        const response = await fetch(`/api/dividend/stats/{{ symbol }}`);
         const data = await response.json();
         
-        document.getElementById('dividend-count').textContent = data.count;
-        document.getElementById('total-amount').textContent = data.total_amount.toFixed(2);
-        document.getElementById('holder-count').textContent = data.holder_count;
+        document.getElementById('totalDividends').textContent = data.count;
+        document.getElementById('totalAmount').textContent = `${data.total_amount} USDC`;
+        document.getElementById('holderCount').textContent = data.holder_count;
     } catch (error) {
         console.error('加载资产统计失败:', error);
-        showError('加载资产统计失败');
     }
 }
 
 // 加载分红历史
 async function loadDividendHistory() {
     try {
-        const response = await fetch(`/api/assets/symbol/${symbol}/dividend_history`);
-        const history = await response.json();
+        const response = await fetch(`/api/dividend/history/{{ symbol }}`);
+        const data = await response.json();
         
-        const tbody = document.getElementById('dividend-history');
+        const tbody = document.getElementById('historyTable');
         tbody.innerHTML = '';
         
-        history.forEach(record => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.created_at}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.amount.toFixed(2)} USDC</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.interval / 3600}小时</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.distributor_address}</td>
+        data.forEach(record => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <a href="https://solscan.io/tx/${record.transaction_hash}" target="_blank" class="text-blue-600 hover:text-blue-800">
+                    ${new Date(record.created_at).toLocaleString()}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ${record.amount} USDC
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${record.interval / 3600}小时
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${record.distributor_address.slice(0, 8)}...${record.distributor_address.slice(-8)}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <a href="https://solscan.io/tx/${record.transaction_hash}" target="_blank" class="text-indigo-600 hover:text-indigo-900">
                         ${record.transaction_hash.slice(0, 8)}...${record.transaction_hash.slice(-8)}
                     </a>
                 </td>
             `;
-            tbody.appendChild(tr);
+            tbody.appendChild(row);
         });
     } catch (error) {
         console.error('加载分红历史失败:', error);
-        showError('加载分红历史失败');
     }
 }
 
-// 计算预估信息
-function updateEstimate() {
+// 计算预估费用
+function calculateFees() {
     const amount = parseFloat(document.getElementById('amount').value) || 0;
     const platformFee = amount * PLATFORM_FEE_RATE;
     const actualAmount = amount - platformFee;
     
-    document.getElementById('platform-fee').textContent = platformFee.toFixed(2);
-    document.getElementById('actual-amount').textContent = actualAmount.toFixed(2);
+    document.getElementById('platformFee').textContent = `${platformFee.toFixed(2)} USDC`;
+    document.getElementById('actualAmount').textContent = `${actualAmount.toFixed(2)} USDC`;
 }
 
 // 检查权限
 async function checkPermission() {
     try {
-        const response = await fetch(`/api/assets/symbol/${symbol}/check_permission`);
+        const response = await fetch(`/api/dividend/check_permission/{{ symbol }}`);
         const data = await response.json();
         
-        if (!data.can_manage_dividend) {
-            document.getElementById('dividend-form').style.display = 'none';
-            showError('您没有权限管理分红');
+        if (!data.has_permission) {
+            document.getElementById('dividendForm').style.display = 'none';
+            alert('您没有权限管理该资产的分红');
         }
     } catch (error) {
         console.error('检查权限失败:', error);
-        showError('检查权限失败');
     }
 }
 
-// 显示错误信息
-function showError(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4';
-    errorDiv.innerHTML = `
-        <strong class="font-bold">错误!</strong>
-        <span class="block sm:inline">${message}</span>
-    `;
-    document.querySelector('.container').insertBefore(errorDiv, document.querySelector('.bg-white'));
-}
+// 表单提交处理
+document.getElementById('dividendForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const amount = document.getElementById('amount').value;
+    const interval = document.getElementById('interval').value;
+    
+    try {
+        const response = await fetch(`/api/dividend/distribute/{{ symbol }}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                amount: parseFloat(amount),
+                interval: parseInt(interval) * 3600,
+            }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert('分红发起成功！');
+            loadAssetStats();
+            loadDividendHistory();
+            e.target.reset();
+        } else {
+            alert(data.error || '分红发起失败');
+        }
+    } catch (error) {
+        console.error('发起分红失败:', error);
+        alert('发起分红失败，请稍后重试');
+    }
+});
 
-// 初始化
+// 监听输入变化
+document.getElementById('amount').addEventListener('input', calculateFees);
+
+// 页面加载时初始化
 document.addEventListener('DOMContentLoaded', () => {
     loadAssetStats();
     loadDividendHistory();
     checkPermission();
-    
-    // 监听表单输入
-    document.getElementById('amount').addEventListener('input', updateEstimate);
-    document.getElementById('interval').addEventListener('input', updateEstimate);
-    
-    // 处理表单提交
-    document.getElementById('dividend-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const amount = parseFloat(document.getElementById('amount').value);
-        const interval = parseInt(document.getElementById('interval').value) * 3600; // 转换为秒
-        
-        if (!amount || amount <= 0) {
-            showError('请输入有效的分红金额');
-            return;
-        }
-        
-        try {
-            const response = await fetch(`/api/assets/symbol/${symbol}/distribute_dividend`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ amount, interval })
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                alert('分红发起成功！');
-                loadAssetStats();
-                loadDividendHistory();
-                document.getElementById('amount').value = '';
-            } else {
-                showError(data.error || '发起分红失败');
-            }
-        } catch (error) {
-            console.error('发起分红失败:', error);
-            showError('发起分红失败');
-        }
-    });
 });
 </script>
 {% endblock %} 
