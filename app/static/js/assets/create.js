@@ -433,7 +433,7 @@ function calculatePublishingFee() {
 async function generateTokenSymbol(type) {
     try {
         // 请求服务器生成代币符号
-        const response = await fetch('/api/generate-token-symbol', {
+        const response = await fetch('/api/assets/generate-token-symbol', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
