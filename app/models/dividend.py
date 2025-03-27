@@ -15,7 +15,7 @@ class DividendRecord(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # 关联
-    asset = db.relationship('Asset', backref=db.backref('dividend_records', lazy=True))
+    asset = db.relationship("Asset")
     distributions = db.relationship('DividendDistribution', backref='dividend_record', lazy=True)
     
     @classmethod

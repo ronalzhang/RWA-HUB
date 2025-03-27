@@ -64,7 +64,7 @@ class Asset(db.Model):
     approved_by = db.Column(db.String(64))  # 审核人地址
 
     # 添加关联
-    dividend_records = db.relationship('DividendRecord', backref='asset', lazy=True, cascade='all, delete-orphan')
+    dividend_records = db.relationship("DividendRecord", lazy=True, cascade="all, delete-orphan")
     trades = db.relationship('Trade', backref='asset', lazy=True, cascade='all, delete-orphan')
 
     # 添加索引

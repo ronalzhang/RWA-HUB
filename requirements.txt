@@ -19,7 +19,7 @@ beautifulsoup4==4.12.2
 bitarray==3.0.0
 blinker==1.9.0
 cached-property==2.0.1
-cachetools==5.5.1
+cachetools==4.2.4
 candlelite==1.0.17
 ccxt==4.2.14
 certifi==2025.1.31
@@ -197,7 +197,5 @@ wrapt==1.17.2
 WTForms==3.0.1
 yarl==1.18.3
 zipp==3.21.0
-spl-token==0.3.1
-pyserum==0.5.0
 mnemonic==0.20
 bip32utils==0.3.post4
