@@ -134,7 +134,8 @@ def prepare_transfer_transaction(
         # 获取交易消息（用于签名）
         message_bytes = transaction.serialize_message()
         
-        logger.info(f"已成功生成真实交易数据")
+        # 确保日志记录了序列化结果的长度
+        logger.info(f"已成功生成真实交易数据，transaction_bytes长度: {len(transaction_bytes)}, message_bytes长度: {len(message_bytes)}")
         
         return transaction_bytes, message_bytes
         
