@@ -2439,14 +2439,13 @@ async connectPhantom(isReconnect = false) {
      */
     async transferSolanaToken(tokenSymbol, to, amount) {
         try {
-            console.log('使用Phantom钱包执行Solana转账');
+            console.log('使用Solana钱包转账');
             
-            // 检查Phantom钱包
+            // 确保Phantom钱包已连接
             if (!window.solana || !window.solana.isPhantom) {
-                throw new Error('Phantom钱包未安装或未连接');
+                throw new Error('Phantom钱包未安装或不可用');
             }
             
-            // 确认钱包已连接
             if (!window.solana.isConnected) {
                 console.log('尝试连接Phantom钱包...');
                 await window.solana.connect();
@@ -2469,13 +2468,8 @@ async connectPhantom(isReconnect = false) {
             console.log(`从地址: ${fromAddress}`);
             
             try {
-                console.log('正在获取Solana区块链最新状态...');
-                // 1. 获取最新区块哈希
-                const { blockhash: recentBlockhash } = await window.solana.getLatestBlockhash();
-                console.log('获取到最新区块哈希:', recentBlockhash);
-                
-                // 2. 获取转账参数
-                console.log('获取转账参数...');
+                console.log('开始获取转账参数...');
+                // 直接从后端获取转账参数，不在前端获取区块哈希
                 const getTransferParamsResponse = await fetch('/api/solana/get_transfer_params', {
                     method: 'POST',
                     headers: {
@@ -2486,8 +2480,7 @@ async connectPhantom(isReconnect = false) {
                     body: JSON.stringify({
                         token_symbol: tokenSymbol,
                         to_address: to,
-                        amount: amount,
-                        blockhash: recentBlockhash
+                        amount: amount
                     })
                 });
                 
