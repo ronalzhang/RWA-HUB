@@ -2500,24 +2500,45 @@ async connectPhantom(isReconnect = false) {
                 // 使用更安全的方式解码Base64
                 let messageBytes;
                 try {
-                    // 先使用安全的Base64解码函数将消息字符串解码
-                    const decodedMessage = this.safeAtob(message);
-                    // 然后转换为Uint8Array
-                    messageBytes = new Uint8Array(decodedMessage.length);
-                    for (let i = 0; i < decodedMessage.length; i++) {
-                        messageBytes[i] = decodedMessage.charCodeAt(i);
+                    console.log('准备处理Base64消息数据...');
+                    
+                    // 将Base64转为二进制数据
+                    const decoder = new TextDecoder('utf-8');
+                    const binaryString = this.safeAtob(message);
+                    
+                    // 创建Uint8Array而不直接使用charCodeAt
+                    messageBytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        messageBytes[i] = binaryString.charCodeAt(i) & 0xff;
                     }
+                    
+                    console.log('消息数据处理成功，长度:', messageBytes.length);
                 } catch (decodeError) {
-                    console.error('Base64解码失败，将尝试备用方法:', decodeError);
-                    throw new Error('Base64解码失败: ' + decodeError.message);
+                    console.error('Base64解码失败，错误详情:', decodeError);
+                    
+                    // 尝试备用方法
+                    try {
+                        console.log('尝试备用Base64解码方法...');
+                        
+                        // 使用ArrayBuffer直接解码
+                        const base64 = message.replace(/-/g, '+').replace(/_/g, '/');
+                        const binaryStr = window.atob(base64);
+                        messageBytes = Uint8Array.from(binaryStr, c => c.charCodeAt(0));
+                        
+                        console.log('备用方法成功，数据长度:', messageBytes.length);
+                    } catch (fallbackError) {
+                        console.error('所有Base64解码方法都失败:', fallbackError);
+                        throw new Error('无法解码消息数据: ' + fallbackError.message);
+                    }
                 }
                 
                 // 使用Phantom钱包签名消息
+                console.log('请求Phantom钱包签名消息...');
                 const signedMessage = await window.solana.request({
                     method: 'signMessage',
                     params: {
                         message: messageBytes,
-                        display: 'hex'
+                        display: 'utf8' // 改为utf8而不是hex
                     }
                 });
                 
@@ -2704,27 +2725,69 @@ async connectPhantom(isReconnect = false) {
     // 安全的Base64解码函数，处理非Latin1字符
     safeAtob(str) {
         try {
-            // 标准atob尝试
-            return atob(str);
-        } catch (e) {
-            console.warn('标准atob解码失败，使用备用方法', e);
-            try {
-                // 处理Base64字符串可能包含的URL安全字符
-                const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+            // 创建一个Base64解码器
+            const base64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+            const base64Map = {};
+            for (let i = 0; i < base64Chars.length; i++) {
+                base64Map[base64Chars.charAt(i)] = i;
+            }
+            
+            // 替换URL安全字符
+            const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+            
+            // 手动解码Base64
+            let result = '';
+            let i = 0;
+            
+            // 处理填充
+            let encodedStr = base64;
+            if (encodedStr.length % 4 === 1) {
+                throw new Error('Invalid base64 string');
+            }
+            
+            // 添加缺失的填充
+            while (encodedStr.length % 4 !== 0) {
+                encodedStr += '=';
+            }
+            
+            // 手动解码
+            while (i < encodedStr.length) {
+                const enc1 = base64Map[encodedStr.charAt(i++)];
+                const enc2 = base64Map[encodedStr.charAt(i++)];
+                const enc3 = base64Map[encodedStr.charAt(i++)];
+                const enc4 = base64Map[encodedStr.charAt(i++)];
                 
-                // 使用更安全的解码方式
-                const binaryString = atob(base64);
+                const chr1 = (enc1 << 2) | (enc2 >> 4);
+                const chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
+                const chr3 = ((enc3 & 3) << 6) | enc4;
+                
+                result += String.fromCharCode(chr1);
+                
+                if (enc3 !== 64) {
+                    result += String.fromCharCode(chr2);
+                }
+                if (enc4 !== 64) {
+                    result += String.fromCharCode(chr3);
+                }
+            }
+            
+            return result;
+        } catch (e) {
+            console.error('自定义Base64解码失败', e);
+            
+            // 尝试使用浏览器API但进行错误处理
+            try {
+                // 使用TextDecoder和Uint8Array间接处理
+                const binaryString = window.atob(str);
                 const bytes = new Uint8Array(binaryString.length);
                 for (let i = 0; i < binaryString.length; i++) {
                     bytes[i] = binaryString.charCodeAt(i);
                 }
-                
-                // 将字节数组转换回字符串
-                return new TextDecoder('utf-8').decode(bytes);
+                return String.fromCharCode.apply(null, bytes);
             } catch (fallbackError) {
-                console.error('备用Base64解码也失败', fallbackError);
-                // 如果所有方法都失败，则使用第三种方法
-                return atob(str.replace(/[^A-Za-z0-9\+\/\=]/g, ''));
+                console.error('所有Base64解码方法都失败', fallbackError);
+                // 最后的尝试：返回一个安全的空二进制字符串
+                return '';
             }
         }
     },

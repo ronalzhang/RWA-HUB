@@ -2500,8 +2500,7 @@ def get_transfer_params():
             return jsonify({
                 'success': True,
                 'transaction': transaction_base64,
-                'message': message_base64,
-                'message': '成功生成转账参数'
+                'message': message_base64
             })
             
         except Exception as prepare_error:
