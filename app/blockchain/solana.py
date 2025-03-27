@@ -51,7 +51,7 @@ class SolanaClient:
     处理SPL代币的创建和资产上链操作
     """
     
-    def __init__(self, endpoint_url=None, auth_keypair=None, private_key=None):
+    def __init__(self, endpoint_url=None, auth_keypair=None, private_key=None, wallet_address=None):
         """
         初始化Solana客户端
         
@@ -59,6 +59,7 @@ class SolanaClient:
             endpoint_url (str, optional): Solana集群端点URL. 默认为None.
             auth_keypair (str, optional): 密钥对的路径. 默认为None.
             private_key (str, optional): 私钥. 默认为None.
+            wallet_address (str, optional): 钱包地址，仅用于只读操作. 默认为None.
         """
         self.config = get_config()
         endpoint_url = endpoint_url or self.config.SOLANA_ENDPOINT
@@ -70,6 +71,18 @@ class SolanaClient:
         self.client = SolanaRpcClient(endpoint_url)
         self.endpoint = endpoint_url
         auth_method = "none"
+
+        # 如果只提供了wallet_address但没有私钥，则设置公钥但没有私钥（只读模式）
+        if wallet_address and not private_key and not auth_keypair:
+            try:
+                from app.utils.solana_compat.publickey import PublicKey
+                self.public_key = PublicKey(wallet_address)
+                self.keypair = None
+                logger.info(f"使用只读模式初始化Solana客户端，钱包地址: {wallet_address}")
+                return
+            except Exception as e:
+                logger.error(f"无法解析钱包地址: {str(e)}")
+                # 继续执行其他初始化步骤
 
         # 私钥处理逻辑
         try:
