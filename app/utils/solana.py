@@ -29,21 +29,6 @@ SYS_PROGRAM_ID = SYS_PROGRAM.PROGRAM_ID
 import struct
 from app.utils.helpers import check_response
 
-# 修复导入问题
-try:
-    from spl.token.instructions import get_associated_token_address, create_associated_token_account_instruction
-except ImportError:
-    # 如果无法导入，提供替代实现
-    def get_associated_token_address(owner, mint):
-        """获取关联代币账户地址"""
-        return PublicKey(str(owner)[:32])  # 模拟实现，仅用于测试
-    
-    def create_associated_token_account_instruction():
-        """创建关联代币账户指令"""
-        pass  # 模拟实现，仅用于测试
-        
-from spl.token.constants import TOKEN_PROGRAM_ID
-
 # 配置信息
 SOLANA_RPC_URL = os.environ.get("SOLANA_RPC_URL", "https://api.devnet.solana.com")
 # 使用一个有效的测试程序 ID
@@ -350,7 +335,7 @@ class SolanaClient:
         """创建新的密钥对"""
         return Keypair.generate()
 
-# 单例实例
+# 创建全局客户端实例
 solana_client = SolanaClient() 
 
 def get_solana_client():
