@@ -62,6 +62,10 @@ class SolanaClient:
         """
         self.config = get_config()
         endpoint_url = endpoint_url or self.config.SOLANA_ENDPOINT
+        
+        # 设置mock_mode标志，确保从环境变量读取
+        self.mock_mode = os.environ.get('SOLANA_MOCK_MODE', 'false').lower() == 'true'
+        logger.info(f"Solana客户端模拟模式: {'开启' if self.mock_mode else '关闭'}")
 
         self.client = SolanaRpcClient(endpoint_url)
         self.endpoint = endpoint_url
