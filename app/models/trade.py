@@ -22,11 +22,12 @@ class Trade(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
-    asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False)
+    asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=True)  # 改为可空，支持无资产交易如平台费
     type = db.Column(db.String(10), nullable=False)  # buy 或 sell
     amount = db.Column(db.Integer, nullable=False)  # 交易数量
     price = db.Column(db.Float, nullable=False)  # 交易价格
     total = db.Column(db.Float, nullable=True)  # 交易总额
+    token_amount = db.Column(db.Float, nullable=True)  # 购买的代币数量
     fee = db.Column(db.Float, nullable=True)  # 交易手续费
     fee_rate = db.Column(db.Float, nullable=True)  # 手续费率
     trader_address = db.Column(db.String(64), nullable=False)  # 交易者钱包地址，支持Solana长度
@@ -73,6 +74,7 @@ class Trade(db.Model):
             'type': self.type,
             'amount': self.amount,
             'price': self.price,
+            'token_amount': self.token_amount,
             'total': self.total if self.total is not None else self.amount * self.price,
             'fee': self.fee,
             'fee_rate': self.fee_rate,

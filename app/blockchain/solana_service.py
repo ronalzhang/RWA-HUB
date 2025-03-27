@@ -21,6 +21,7 @@ from app.utils.solana_compat.tx_opts import TxOpts
 from app.config import Config
 from app.extensions import db
 from app.models import Trade, Asset
+from app.models.trade import TradeType
 from datetime import datetime
 from spl.token.constants import TOKEN_PROGRAM_ID
 
@@ -213,21 +214,48 @@ def execute_backup_transfer(
                     logger.info(f"找到匹配的资产: {asset.token_symbol}")
         
         # 记录交易到数据库
-        trade = Trade(
-            wallet_address=from_address,
-            asset_id=asset.id if asset else None,
-            amount=amount,
-            price=asset.token_price if asset else 0,
-            tx_hash=signature,
-            status='pending',  # 初始状态为pending
-            token_amount=amount / (asset.token_price if asset and asset.token_price > 0 else 1)
-        )
-        db.session.add(trade)
-        db.session.commit()
-        
-        logger.info(f"备用模式交易记录已创建 - 交易ID: {trade.id}, 签名: {signature}")
-        
-        return signature
+        try:
+            # 如果没有找到资产，但仍需要记录交易
+            if not asset:
+                logger.warning(f"未找到匹配的资产，将创建没有资产关联的交易记录")
+                # 为平台费或其他没有资产的转账创建记录
+                trade = Trade(
+                    trader_address=from_address,
+                    asset_id=None,  # 无关联资产
+                    amount=amount,
+                    price=0,  # 无价格
+                    token_amount=0,  # 无代币数量
+                    tx_hash=signature,
+                    status='pending',  # 初始状态为pending
+                    type=TradeType.BUY.value  # 添加交易类型
+                )
+            else:
+                # 计算代币数量
+                token_price = asset.token_price if asset and asset.token_price > 0 else 1
+                token_amount = amount / token_price
+                
+                # 正常创建带资产关联的交易记录
+                trade = Trade(
+                    trader_address=from_address,
+                    asset_id=asset.id,
+                    amount=amount,
+                    price=token_price,
+                    token_amount=token_amount,  # 设置代币数量
+                    tx_hash=signature,
+                    status='pending',  # 初始状态为pending
+                    type=TradeType.BUY.value  # 添加交易类型
+                )
+            
+            db.session.add(trade)
+            db.session.commit()
+            
+            logger.info(f"备用模式交易记录已创建 - 交易ID: {trade.id}, 签名: {signature}")
+            
+            return signature
+        except Exception as db_error:
+            logger.error(f"创建交易记录失败: {str(db_error)}")
+            db.session.rollback()
+            raise Exception(f"创建交易记录失败: {str(db_error)}")
         
     except Exception as e:
         logger.error(f"备用转账确认失败: {str(e)}")
