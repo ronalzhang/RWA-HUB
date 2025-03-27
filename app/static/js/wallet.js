@@ -2502,82 +2502,68 @@ async connectPhantom(isReconnect = false) {
                 try {
                     console.log('准备处理Base64消息数据...');
                     
-                    // 将Base64转为二进制数据
-                    const decoder = new TextDecoder('utf-8');
-                    const binaryString = this.safeAtob(message);
-                    
-                    // 创建Uint8Array而不直接使用charCodeAt
-                    messageBytes = new Uint8Array(binaryString.length);
-                    for (let i = 0; i < binaryString.length; i++) {
-                        messageBytes[i] = binaryString.charCodeAt(i) & 0xff;
+                    // 从字符串转为Uint8Array，等待Phantom钱包签名
+                    const decodedTransaction = this.safeAtob(transaction);
+                    const transactionBytes = new Uint8Array(decodedTransaction.length);
+                    for (let i = 0; i < decodedTransaction.length; i++) {
+                        transactionBytes[i] = decodedTransaction.charCodeAt(i) & 0xff;
                     }
                     
-                    console.log('消息数据处理成功，长度:', messageBytes.length);
-                } catch (decodeError) {
-                    console.error('Base64解码失败，错误详情:', decodeError);
+                    console.log('交易数据处理成功，长度:', transactionBytes.length);
                     
-                    // 尝试备用方法
-                    try {
-                        console.log('尝试备用Base64解码方法...');
-                        
-                        // 使用ArrayBuffer直接解码
-                        const base64 = message.replace(/-/g, '+').replace(/_/g, '/');
-                        const binaryStr = window.atob(base64);
-                        messageBytes = Uint8Array.from(binaryStr, c => c.charCodeAt(0));
-                        
-                        console.log('备用方法成功，数据长度:', messageBytes.length);
-                    } catch (fallbackError) {
-                        console.error('所有Base64解码方法都失败:', fallbackError);
-                        throw new Error('无法解码消息数据: ' + fallbackError.message);
+                    // 使用Phantom钱包的signTransaction方法
+                    console.log('请求Phantom钱包签名交易...');
+                    const signedTransaction = await window.solana.signTransaction(transactionBytes);
+                    
+                    // 确保成功获取签名
+                    if (!signedTransaction) {
+                        throw new Error('钱包返回的已签名交易为空');
                     }
-                }
-                
-                // 使用Phantom钱包签名消息
-                console.log('请求Phantom钱包签名消息...');
-                const signedMessage = await window.solana.request({
-                    method: 'signMessage',
-                    params: {
-                        message: messageBytes,
-                        display: 'utf8' // 改为utf8而不是hex
+                    
+                    // 将签名交易序列化为Base64以发送给后端
+                    const signedTransactionBase64 = btoa(
+                        String.fromCharCode.apply(null, new Uint8Array(signedTransaction.serialize()))
+                    );
+                    
+                    console.log('交易签名成功，准备发送到后端...');
+                    
+                    // 将签名发送到后端
+                    const sendSignedResponse = await fetch('/api/solana/execute_transfer', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Eth-Address': fromAddress,
+                            'X-Wallet-Type': 'phantom'
+                        },
+                        body: JSON.stringify({
+                            token_symbol: tokenSymbol,
+                            to_address: to,
+                            amount: amount,
+                            from_address: fromAddress
+                        })
+                    });
+                    
+                    if (!sendSignedResponse.ok) {
+                        throw new Error('发送签名交易失败: HTTP ' + sendSignedResponse.status);
                     }
-                });
-                
-                if (!signedMessage || !signedMessage.signature) {
-                    throw new Error('签名消息失败');
+                    
+                    const sendResult = await sendSignedResponse.json();
+                    if (!sendResult.success) {
+                        throw new Error(`发送交易失败: ${sendResult.error || '未知错误'}`);
+                    }
+                    
+                    console.log('交易发送成功！签名:', sendResult.signature);
+                    
+                    // 返回成功结果
+                    return {
+                        success: true,
+                        txHash: sendResult.signature
+                    };
+                } catch (error) {
+                    console.error('Base64解码或签名失败:', error);
+                    throw error; // 把错误抛出到外层catch处理
                 }
                 
-                // 将签名发送到后端
-                console.log('发送签名到后端...');
-                const sendSignedResponse = await fetch('/api/solana/send_signed_transaction', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Eth-Address': fromAddress,
-                        'X-Wallet-Type': 'phantom'
-                    },
-                    body: JSON.stringify({
-                        transaction: transaction,
-                        signature: this.arrayBufferToBase64(signedMessage.signature),
-                        public_key: fromAddress
-                    })
-                });
-                
-                if (!sendSignedResponse.ok) {
-                    throw new Error('发送签名交易失败');
-                }
-                
-                const sendResult = await sendSignedResponse.json();
-                if (!sendResult.success) {
-                    throw new Error(`发送交易失败: ${sendResult.error || '未知错误'}`);
-                }
-                
-                console.log('交易发送成功！签名:', sendResult.signature);
-                
-                // 返回成功结果
-                return {
-                    success: true,
-                    txHash: sendResult.signature
-                };
             } catch (decodingError) {
                 console.error('Base64解码或签名失败:', decodingError);
                 throw decodingError; // 把错误抛出到外层catch处理
