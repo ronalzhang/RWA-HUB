@@ -2456,7 +2456,7 @@ def get_transfer_params():
             return jsonify({'success': False, 'error': '无效的请求数据'}), 400
             
         # 检查必要字段
-        required_fields = ['token_symbol', 'to_address', 'amount', 'blockhash']
+        required_fields = ['token_symbol', 'to_address', 'amount']
         for field in required_fields:
             if field not in data:
                 return jsonify({'success': False, 'error': f'缺少必要字段: {field}'}), 400
@@ -2464,6 +2464,7 @@ def get_transfer_params():
         token_symbol = data.get('token_symbol')
         to_address = data.get('to_address')
         amount = float(data.get('amount'))
+        # blockhash可选，如果没有提供会在后端自动获取
         blockhash = data.get('blockhash')
         from_address = g.eth_address
         
@@ -2474,6 +2475,7 @@ def get_transfer_params():
         from app.blockchain.solana_service import prepare_transfer_transaction
         
         try:
+            # 如果没有提供blockhash，后端会自动获取
             transaction_data, message_data = prepare_transfer_transaction(
                 token_symbol=token_symbol,
                 from_address=from_address,
