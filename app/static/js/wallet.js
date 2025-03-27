@@ -2469,33 +2469,12 @@ async connectPhantom(isReconnect = false) {
             console.log(`从地址: ${fromAddress}`);
             
             try {
-                // 直接使用Phantom钱包的低级request API
-                console.log('使用直接模式构建和签名交易...');
-                
-                // 1. 首先获取区块链最新状态
-                console.log('获取Solana区块链最新状态...');
-                const getLatestBlockhashResponse = await fetch('/api/solana/get_latest_blockhash', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Eth-Address': fromAddress,
-                        'X-Wallet-Type': 'phantom'
-                    }
-                });
-                
-                if (!getLatestBlockhashResponse.ok) {
-                    throw new Error('获取最新区块哈希失败');
-                }
-                
-                const blockhashData = await getLatestBlockhashResponse.json();
-                if (!blockhashData.success || !blockhashData.blockhash) {
-                    throw new Error(`获取区块哈希失败: ${blockhashData.error || '未知错误'}`);
-                }
-                
-                const recentBlockhash = blockhashData.blockhash;
+                console.log('正在获取Solana区块链最新状态...');
+                // 1. 获取最新区块哈希
+                const { blockhash: recentBlockhash } = await window.solana.getLatestBlockhash();
                 console.log('获取到最新区块哈希:', recentBlockhash);
                 
-                // 2. 获取转账所需的参数和指令
+                // 2. 获取转账参数
                 console.log('获取转账参数...');
                 const getTransferParamsResponse = await fetch('/api/solana/get_transfer_params', {
                     method: 'POST',
@@ -2525,8 +2504,20 @@ async connectPhantom(isReconnect = false) {
                 console.log('使用钱包签名消息...');
                 const { transaction, message } = transferParamsData;
                 
-                // 将消息转换为Uint8Array
-                const messageBytes = Uint8Array.from(this.safeAtob(message), c => c.charCodeAt(0));
+                // 使用更安全的方式解码Base64
+                let messageBytes;
+                try {
+                    // 先使用安全的Base64解码函数将消息字符串解码
+                    const decodedMessage = this.safeAtob(message);
+                    // 然后转换为Uint8Array
+                    messageBytes = new Uint8Array(decodedMessage.length);
+                    for (let i = 0; i < decodedMessage.length; i++) {
+                        messageBytes[i] = decodedMessage.charCodeAt(i);
+                    }
+                } catch (decodeError) {
+                    console.error('Base64解码失败，将尝试备用方法:', decodeError);
+                    throw new Error('Base64解码失败: ' + decodeError.message);
+                }
                 
                 // 使用Phantom钱包签名消息
                 const signedMessage = await window.solana.request({
@@ -2573,42 +2564,9 @@ async connectPhantom(isReconnect = false) {
                     success: true,
                     txHash: sendResult.signature
                 };
-                
-            } catch (directError) {
-                console.error('直接模式失败，尝试使用备用模式...', directError);
-                
-                // 备用模式：使用后端API创建一个完整的交易，避免调用serialize方法
-                console.log('使用备用模式执行转账...');
-                const backupResponse = await fetch('/api/solana/execute_transfer', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Eth-Address': fromAddress,
-                        'X-Wallet-Type': 'phantom'
-                    },
-                    body: JSON.stringify({
-                        token_symbol: tokenSymbol,
-                        to_address: to,
-                        amount: amount,
-                        from_address: fromAddress
-                    })
-                });
-                
-                if (!backupResponse.ok) {
-                    const errorData = await backupResponse.json();
-                    throw new Error(`备用模式失败: ${errorData.error || backupResponse.statusText}`);
-                }
-                
-                const backupResult = await backupResponse.json();
-                if (!backupResult.success) {
-                    throw new Error(`备用模式失败: ${backupResult.error || '未知错误'}`);
-                }
-                
-                console.log('备用模式交易成功，签名:', backupResult.signature);
-                return {
-                    success: true,
-                    txHash: backupResult.signature
-                };
+            } catch (decodingError) {
+                console.error('Base64解码或签名失败:', decodingError);
+                throw decodingError; // 把错误抛出到外层catch处理
             }
             
         } catch (error) {
@@ -2753,16 +2711,28 @@ async connectPhantom(isReconnect = false) {
     // 安全的Base64解码函数，处理非Latin1字符
     safeAtob(str) {
         try {
-            // 标准atob尝试，可能失败
+            // 标准atob尝试
             return atob(str);
         } catch (e) {
-            // 备用方法，处理Unicode字符
-            return decodeURIComponent(
-                Array.prototype.map.call(
-                    atob(str.replace(/-/g, '+').replace(/_/g, '/')),
-                    c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-                ).join('')
-            );
+            console.warn('标准atob解码失败，使用备用方法', e);
+            try {
+                // 处理Base64字符串可能包含的URL安全字符
+                const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+                
+                // 使用更安全的解码方式
+                const binaryString = atob(base64);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                // 将字节数组转换回字符串
+                return new TextDecoder('utf-8').decode(bytes);
+            } catch (fallbackError) {
+                console.error('备用Base64解码也失败', fallbackError);
+                // 如果所有方法都失败，则使用第三种方法
+                return atob(str.replace(/[^A-Za-z0-9\+\/\=]/g, ''));
+            }
         }
     },
 
