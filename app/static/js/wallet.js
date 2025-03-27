@@ -2526,7 +2526,7 @@ async connectPhantom(isReconnect = false) {
                 const { transaction, message } = transferParamsData;
                 
                 // 将消息转换为Uint8Array
-                const messageBytes = Uint8Array.from(atob(message), c => c.charCodeAt(0));
+                const messageBytes = Uint8Array.from(this.safeAtob(message), c => c.charCodeAt(0));
                 
                 // 使用Phantom钱包签名消息
                 const signedMessage = await window.solana.request({
@@ -2552,7 +2552,7 @@ async connectPhantom(isReconnect = false) {
                     },
                     body: JSON.stringify({
                         transaction: transaction,
-                        signature: btoa(String.fromCharCode.apply(null, signedMessage.signature)),
+                        signature: this.arrayBufferToBase64(signedMessage.signature),
                         public_key: fromAddress
                     })
                 });
@@ -2748,6 +2748,32 @@ async connectPhantom(isReconnect = false) {
         } catch (error) {
             console.error('保存钱包数据失败:', error);
         }
+    },
+
+    // 安全的Base64解码函数，处理非Latin1字符
+    safeAtob(str) {
+        try {
+            // 标准atob尝试，可能失败
+            return atob(str);
+        } catch (e) {
+            // 备用方法，处理Unicode字符
+            return decodeURIComponent(
+                Array.prototype.map.call(
+                    atob(str.replace(/-/g, '+').replace(/_/g, '/')),
+                    c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+                ).join('')
+            );
+        }
+    },
+
+    // 将ArrayBuffer转换为Base64字符串
+    arrayBufferToBase64(buffer) {
+        // 首先转成Uint8Array确保我们有 .reduce 方法
+        const uint8Array = new Uint8Array(buffer);
+        // 然后将每个字节转换为字符
+        const binary = uint8Array.reduce((str, byte) => str + String.fromCharCode(byte), '');
+        // 最后使用btoa转为base64
+        return btoa(binary);
     },
 }
 
