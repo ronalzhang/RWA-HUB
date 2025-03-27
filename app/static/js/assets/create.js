@@ -1344,10 +1344,17 @@ async function processPayment() {
             const publishingFee = document.getElementById('publishingFee').textContent;
             const feeAmount = parseFloat(publishingFee) || 1.0; // 默认1.0 USDC
             
-            // 不再检查钱包余额，直接执行转账
+            // 强制使用真实交易模式，确保支付流程完整执行
+            const isSimulated = false; // 明确标记不使用模拟模式
+            
+            // 如果是模拟模式，跳过实际支付（但我们已禁用此功能）
+            if (isSimulated) {
+                console.warn('警告：模拟支付模式已禁用，必须执行真实支付');
+            }
+            
             console.log(`准备支付 ${feeAmount} USDC 到平台地址: ${platformAddress}`);
             
-            // 尝试执行转账
+            // 执行转账
             try {
                 // 更新进度
                 updateProgress(40, '正在处理USDC转账...');
