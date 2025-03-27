@@ -196,7 +196,7 @@ def execute_backup_transfer(
         signature = hashlib.sha256(seed.encode()).hexdigest()
         
         # 创建交易记录
-        from app.models import Trade, Asset
+        from app.models import Trade, Asset, TradeType
         from app.extensions import db
         
         # 查找相关资产
