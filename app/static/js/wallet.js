@@ -148,22 +148,6 @@ const walletState = {
                 }
             });
             
-            // 监听Web3加载成功事件
-            document.addEventListener('web3Loaded', () => {
-                console.log('检测到Web3已加载成功');
-                this.web3Available = true;
-            });
-            
-            // 监听Web3加载失败事件
-            document.addEventListener('web3LoadFailed', () => {
-                console.warn('检测到Web3加载失败');
-                this.web3Available = false;
-                // 如果当前连接的是以太坊钱包，显示警告
-                if (this.connected && this.walletType === 'ethereum') {
-                    console.warn('以太坊钱包功能可能受到限制');
-                }
-            });
-            
             // 完成初始化
             this.initialized = true;
             console.log('钱包初始化完成');
@@ -809,7 +793,7 @@ const walletState = {
                     console.log('管理员检查API返回数据:', data);
                     
                     if (data.success !== undefined) {
-                        this.isAdmin = Boolean(data.is_admin || data.admin || data.success);
+                        this.isAdmin = Boolean(data.is_admin || data.admin);
                         console.log(`从API获取到管理员状态: ${this.isAdmin ? '是管理员' : '不是管理员'}`);
                         return this.isAdmin;
                     } else {
@@ -1756,7 +1740,7 @@ const walletState = {
         
         try {
             // 获取当前钱包类型
-            const walletType = this.walletType || (address.startsWith('0x') ? 'ethereum' : 'solana');
+            const walletType = this.walletType || 'ethereum';
             console.log(`[getUserAssets] 获取 ${walletType} 钱包 ${address} 的资产`);
             
             // 通过API获取真实数据
@@ -2158,35 +2142,10 @@ async connectPhantom(isReconnect = false) {
                 return false;
             }
             
-            // 检查Web3是否已加载
-            if (typeof Web3 === 'undefined' && typeof web3 === 'undefined') {
-                console.error('Web3库未加载，尝试使用备用方法');
-                // 尝试加载本地Web3
-                await new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = '/static/vendor/web3.min.js';
-                    script.onload = resolve;
-                    script.onerror = reject;
-                    document.head.appendChild(script);
-                }).catch(err => {
-                    console.error('加载本地Web3失败:', err);
-                });
-                
-                // 再次检查Web3是否可用
-                if (typeof Web3 === 'undefined' && typeof web3 === 'undefined') {
-                    console.error('Web3仍然不可用，无法连接以太坊钱包');
-                    if (!isReconnect) {
-                        showError('无法加载Web3库，请刷新页面重试');
-                    }
-                    return false;
-                }
-            }
-            
             const provider = window.ethereum;
             
             // 创建Web3实例
             const web3 = new Web3(provider);
-            this.web3 = web3;
             
             // 连接前检查chainId，确保是主网或测试网
             try {
@@ -2525,8 +2484,7 @@ async connectPhantom(isReconnect = false) {
                 });
                 
                 if (!getLatestBlockhashResponse.ok) {
-                    console.error('区块哈希API响应状态码:', getLatestBlockhashResponse.status);
-                    throw new Error(`获取最新区块哈希失败: ${getLatestBlockhashResponse.statusText}`);
+                    throw new Error('获取最新区块哈希失败');
                 }
                 
                 const blockhashData = await getLatestBlockhashResponse.json();
@@ -2554,16 +2512,8 @@ async connectPhantom(isReconnect = false) {
                     })
                 });
                 
-                // 检查API响应状态
                 if (!getTransferParamsResponse.ok) {
-                    console.error('转账参数API返回错误状态码:', getTransferParamsResponse.status);
-                    // 尝试读取错误信息
-                    try {
-                        const errorData = await getTransferParamsResponse.json();
-                        throw new Error(`获取转账参数失败: ${errorData.error || getTransferParamsResponse.statusText}`);
-                    } catch (parseError) {
-                        throw new Error(`获取转账参数失败: ${getTransferParamsResponse.statusText}`);
-                    }
+                    throw new Error('获取转账参数失败');
                 }
                 
                 const transferParamsData = await getTransferParamsResponse.json();
@@ -2574,11 +2524,6 @@ async connectPhantom(isReconnect = false) {
                 // 3. 使用钱包签名消息而不是交易
                 console.log('使用钱包签名消息...');
                 const { transaction, message } = transferParamsData;
-                
-                if (!transaction || !message) {
-                    console.error('服务器响应缺少必要的交易数据:', transferParamsData);
-                    throw new Error('服务器返回的交易数据无效');
-                }
                 
                 // 将消息转换为Uint8Array
                 const messageBytes = Uint8Array.from(atob(message), c => c.charCodeAt(0));
@@ -2613,7 +2558,6 @@ async connectPhantom(isReconnect = false) {
                 });
                 
                 if (!sendSignedResponse.ok) {
-                    console.error('发送签名API响应状态码:', sendSignedResponse.status);
                     throw new Error('发送签名交易失败');
                 }
                 
@@ -2651,14 +2595,8 @@ async connectPhantom(isReconnect = false) {
                 });
                 
                 if (!backupResponse.ok) {
-                    console.error('备用模式API返回状态码:', backupResponse.status);
-                    // 尝试解析错误消息
-                    try {
-                        const errorData = await backupResponse.json();
-                        throw new Error(`备用模式失败: ${errorData.error || backupResponse.statusText}`);
-                    } catch (parseError) {
-                        throw new Error(`备用模式失败: ${backupResponse.statusText}`);
-                    }
+                    const errorData = await backupResponse.json();
+                    throw new Error(`备用模式失败: ${errorData.error || backupResponse.statusText}`);
                 }
                 
                 const backupResult = await backupResponse.json();
@@ -2667,20 +2605,6 @@ async connectPhantom(isReconnect = false) {
                 }
                 
                 console.log('备用模式交易成功，签名:', backupResult.signature);
-                
-                // 在备用模式成功后，应该检查交易状态并更新前端显示
-                console.log('检查交易状态更新UI...');
-                setTimeout(() => {
-                    // 如果页面上有交易记录列表，可以尝试更新
-                    if (typeof loadTradeHistory === 'function') {
-                        loadTradeHistory();
-                    }
-                    // 更新余额显示
-                    if (typeof this.getBalance === 'function') {
-                        this.getBalance();
-                    }
-                }, 2000);
-                
                 return {
                     success: true,
                     txHash: backupResult.signature
