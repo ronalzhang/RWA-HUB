@@ -249,21 +249,19 @@ def create_asset():
         # 检查是否有支付交易哈希
         has_payment = 'payment_tx_hash' in data and data['payment_tx_hash']
         
-        # 设置初始状态
-        if 'status' in data and isinstance(data['status'], int):
-            # 使用前端传入的状态
-            data['status'] = data['status']
-            current_app.logger.info(f"使用前端传入的资产状态: {data['status']}")
+        # 根据是否有支付交易设置状态
+        if has_payment:
+            # 有支付信息但需要等待确认
+            data['status'] = AssetStatus.PENDING.value
+            current_app.logger.info("设置资产状态为待确认")
         else:
-            # 根据是否有支付交易设置状态
-            if has_payment:
-                # 有支付信息但需要等待确认
-                data['status'] = AssetStatus.PENDING.value
-                current_app.logger.info("设置资产状态为待确认")
-            else:
-                # 没有支付信息，直接设置为已通过（仅用于测试环境）
-                data['status'] = AssetStatus.APPROVED.value
-                current_app.logger.info("设置资产状态为已通过（测试模式）")
+            # 没有支付信息，设置为待确认状态
+            data['status'] = AssetStatus.PENDING.value
+            current_app.logger.info("设置资产状态为待确认，需要完成支付。")
+            
+        # 检查环境模式，仅在开发环境下记录警告
+        if os.environ.get('FLASK_ENV') == 'development':
+            current_app.logger.warning("当前为开发环境，但创建资产仍需要支付确认。请完成支付流程以使资产生效。")
         
         # 如果有支付信息，记录到payment_details
         if has_payment:
