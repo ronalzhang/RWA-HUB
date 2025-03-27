@@ -51,6 +51,10 @@ class Trade(db.Model):
 
     @validates('price')
     def validate_price(self, key, value):
+        # 对于平台费交易(asset_id为None的情况)，允许price为0
+        if hasattr(self, 'asset_id') and self.asset_id is None:
+            return value
+            
         if value <= 0:
             raise ValueError('Trade price must be greater than 0')
         return value
