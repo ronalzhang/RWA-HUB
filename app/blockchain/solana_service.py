@@ -231,7 +231,11 @@ def execute_backup_transfer(
                 )
             else:
                 # 计算代币数量
-                token_price = asset.token_price if asset and asset.token_price > 0 else 1
+                token_price = 1  # 默认价格为1
+                if asset and hasattr(asset, 'token_price'):
+                    if asset.token_price is not None and asset.token_price > 0:
+                        token_price = asset.token_price
+                
                 token_amount = amount / token_price
                 
                 # 正常创建带资产关联的交易记录
