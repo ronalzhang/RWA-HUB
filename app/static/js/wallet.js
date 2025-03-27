@@ -2502,32 +2502,8 @@ async connectPhantom(isReconnect = false) {
                 try {
                     console.log('准备处理Base64消息数据...');
                     
-                    // 从字符串转为Uint8Array，等待Phantom钱包签名
-                    const decodedTransaction = this.safeAtob(transaction);
-                    const transactionBytes = new Uint8Array(decodedTransaction.length);
-                    for (let i = 0; i < decodedTransaction.length; i++) {
-                        transactionBytes[i] = decodedTransaction.charCodeAt(i) & 0xff;
-                    }
-                    
-                    console.log('交易数据处理成功，长度:', transactionBytes.length);
-                    
-                    // 使用Phantom钱包的signTransaction方法
-                    console.log('请求Phantom钱包签名交易...');
-                    const signedTransaction = await window.solana.signTransaction(transactionBytes);
-                    
-                    // 确保成功获取签名
-                    if (!signedTransaction) {
-                        throw new Error('钱包返回的已签名交易为空');
-                    }
-                    
-                    // 将签名交易序列化为Base64以发送给后端
-                    const signedTransactionBase64 = btoa(
-                        String.fromCharCode.apply(null, new Uint8Array(signedTransaction.serialize()))
-                    );
-                    
-                    console.log('交易签名成功，准备发送到后端...');
-                    
-                    // 将签名发送到后端
+                    // 直接调用execute_transfer端点，不再尝试进行交易签名
+                    console.log('直接使用备用转账方式...');
                     const sendSignedResponse = await fetch('/api/solana/execute_transfer', {
                         method: 'POST',
                         headers: {
@@ -2544,15 +2520,15 @@ async connectPhantom(isReconnect = false) {
                     });
                     
                     if (!sendSignedResponse.ok) {
-                        throw new Error('发送签名交易失败: HTTP ' + sendSignedResponse.status);
+                        throw new Error('发送转账请求失败: HTTP ' + sendSignedResponse.status);
                     }
                     
                     const sendResult = await sendSignedResponse.json();
                     if (!sendResult.success) {
-                        throw new Error(`发送交易失败: ${sendResult.error || '未知错误'}`);
+                        throw new Error(`转账失败: ${sendResult.error || '未知错误'}`);
                     }
                     
-                    console.log('交易发送成功！签名:', sendResult.signature);
+                    console.log('转账请求发送成功！签名:', sendResult.signature);
                     
                     // 返回成功结果
                     return {
@@ -2560,7 +2536,7 @@ async connectPhantom(isReconnect = false) {
                         txHash: sendResult.signature
                     };
                 } catch (error) {
-                    console.error('Base64解码或签名失败:', error);
+                    console.error('转账处理过程出错:', error);
                     throw error; // 把错误抛出到外层catch处理
                 }
                 
