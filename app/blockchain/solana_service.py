@@ -24,6 +24,7 @@ from app.models import Trade, Asset
 from app.models.trade import TradeType
 from datetime import datetime
 from spl.token.constants import TOKEN_PROGRAM_ID
+import base58
 
 # 获取日志记录器
 logger = logging.getLogger(__name__)
@@ -294,9 +295,9 @@ def execute_transfer_transaction(
         
         # 使用Solana客户端发送交易
         try:
-            # 序列化交易
-            transaction_base64 = base64.b64encode(transaction_bytes).decode('utf-8')
-            logger.info(f"交易序列化完成，Base64编码大小: {len(transaction_base64)}字符")
+            # 序列化交易并使用Base58编码(而不是Base64)
+            transaction_base58 = base58.b58encode(transaction_bytes).decode('utf-8')
+            logger.info(f"交易序列化完成，Base58编码大小: {len(transaction_base58)}字符")
             
             # 检查连接状态
             try:
@@ -308,10 +309,10 @@ def execute_transfer_transaction(
             
             # 发送交易到Solana网络
             logger.info("开始发送交易到Solana网络...")
-            # 直接使用RPC客户端发送原始交易数据，而不是使用send_transaction方法
+            # 直接使用RPC客户端发送原始交易数据，使用Base58编码
             result = solana_connection.rpc_client._make_request(
                 "sendTransaction",
-                [transaction_base64, {
+                [transaction_base58, {
                     "skipPreflight": False,
                     "preflightCommitment": "confirmed"
                 }]
