@@ -196,6 +196,7 @@ def execute_backup_transfer(
     """
     执行备用模式的转账交易
     这是一个后端验证方案，但仅用于确认转账请求，不实际执行转账
+    需要后台管理员确认后才能最终确认交易
     
     Args:
         token_symbol (str): 代币符号
@@ -219,74 +220,37 @@ def execute_backup_transfer(
         signature = hashlib.sha256(seed.encode()).hexdigest()
         
         # 创建交易记录
-        from app.models import Trade, Asset, TradeType
-        from app.extensions import db
-        
-        # 查找相关资产
-        asset = None
-        if token_symbol == 'USDC':
-            # 尝试从to_address判断是转账给平台还是资产创建者
-            if to_address == "HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd":
-                # 如果是平台费，查找资产信息可能在另一个转账中
-                logger.info("此转账为平台费，不关联具体资产")
-            else:
-                # 查找资产创建者地址匹配的资产
-                assets = Asset.query.filter_by(creator_address=to_address).all()
-                if assets:
-                    asset = assets[0]  # 取第一个匹配的资产
-                    logger.info(f"找到匹配的资产: {asset.token_symbol}")
-        
-        # 记录交易到数据库
         try:
-            # 如果没有找到资产，但仍需要记录交易
-            if not asset:
-                logger.warning(f"未找到匹配的资产，将创建没有资产关联的交易记录")
-                # 为平台费或其他没有资产的转账创建记录
-                trade = Trade(
-                    trader_address=from_address,
-                    asset_id=None,  # 无关联资产
-                    amount=amount,
-                    price=0,  # 无价格
-                    token_amount=0,  # 无代币数量
-                    tx_hash=signature,
-                    status='pending',  # 初始状态为pending
-                    type=TradeType.BUY.value  # 添加交易类型
-                )
-            else:
-                # 计算代币数量
-                token_price = 1  # 默认价格为1
-                if asset and hasattr(asset, 'token_price'):
-                    if asset.token_price is not None and asset.token_price > 0:
-                        token_price = asset.token_price
-                
-                token_amount = amount / token_price
-                
-                # 正常创建带资产关联的交易记录
-                trade = Trade(
-                    trader_address=from_address,
-                    asset_id=asset.id,
-                    amount=amount,
-                    price=token_price,
-                    token_amount=token_amount,  # 设置代币数量
-                    tx_hash=signature,
-                    status='pending',  # 初始状态为pending
-                    type=TradeType.BUY.value  # 添加交易类型
-                )
+            # 寻找相关资产
+            asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+            
+            # 创建交易记录
+            trade = Trade(
+                trade_type=TradeType.PLATFORM_FEE,
+                trader_address=from_address,
+                amount=amount,
+                price=1.0,  # 平台费以1:1比例计算
+                asset_id=asset.id if asset else None,
+                token_amount=amount,  # 使用实际金额作为代币数量
+                status='pending',  # 设置状态为pending，表示需要后台确认
+                tx_hash=signature
+            )
             
             db.session.add(trade)
             db.session.commit()
             
-            logger.info(f"备用模式交易记录已创建 - 交易ID: {trade.id}, 签名: {signature}")
-            
-            return signature
+            logger.info(f"已创建交易记录 ID: {trade.id}, 签名: {signature}, 状态: pending")
         except Exception as db_error:
             logger.error(f"创建交易记录失败: {str(db_error)}")
-            db.session.rollback()
-            raise Exception(f"创建交易记录失败: {str(db_error)}")
+            # 交易记录创建失败不影响流程，继续返回签名
+        
+        logger.warning(f"注意：这是备用转账方案，实际上并未执行链上转账操作。交易ID: {signature} 需要后台管理员手动确认。")
+        
+        return signature
         
     except Exception as e:
-        logger.error(f"备用转账确认失败: {str(e)}")
-        raise Exception(f"备用转账确认失败: {str(e)}")
+        logger.error(f"执行备用模式转账失败: {str(e)}")
+        raise Exception(f"执行备用模式转账失败: {str(e)}")
 
 def prepare_transaction(user_address, asset_id, token_symbol, amount, price, trade_id):
     """
