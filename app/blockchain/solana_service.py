@@ -30,9 +30,9 @@ import base58
 logger = logging.getLogger(__name__)
 
 # 通用常量
-SOLANA_ENDPOINT = Config.SOLANA_RPC_URL or 'https://api.devnet.solana.com'
+SOLANA_ENDPOINT = Config.SOLANA_RPC_URL or 'https://api.mainnet-beta.solana.com'
 PROGRAM_ID = Config.SOLANA_PROGRAM_ID or 'RWAxxx111111111111111111111111111111111111'
-USDC_MINT = Config.SOLANA_USDC_MINT or 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'  # Solana Devnet USDC
+USDC_MINT = Config.SOLANA_USDC_MINT or 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'  # Solana Mainnet USDC
 
 # 创建Solana连接
 solana_connection = Connection(SOLANA_ENDPOINT)
