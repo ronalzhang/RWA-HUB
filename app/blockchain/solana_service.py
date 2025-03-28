@@ -308,9 +308,13 @@ def execute_transfer_transaction(
             
             # 发送交易到Solana网络
             logger.info("开始发送交易到Solana网络...")
-            result = solana_connection.send_transaction(
-                transaction_base64,
-                opts=TxOpts(skip_preflight=False, preflight_commitment="confirmed")
+            # 直接使用RPC客户端发送原始交易数据，而不是使用send_transaction方法
+            result = solana_connection.rpc_client._make_request(
+                "sendTransaction",
+                [transaction_base64, {
+                    "skipPreflight": False,
+                    "preflightCommitment": "confirmed"
+                }]
             )
             
             # 详细记录结果
