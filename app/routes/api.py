@@ -2189,8 +2189,7 @@ def register_pending_payment():
             'platform_address': platform_address,
             'status': 'pending',
             'registered_at': datetime.utcnow().isoformat(),
-            'registered_by': g.eth_address,
-            'note': '使用备用转账方案，需要管理员审核确认'
+            'registered_by': g.eth_address
         }
         
         # 更新资产支付信息
@@ -2200,8 +2199,8 @@ def register_pending_payment():
         # 保存到数据库
         db.session.commit()
         
-        # 记录明确的日志，说明这是备用转账方案
-        current_app.logger.warning(f"已注册备用转账方案支付 - 资产ID: {asset_id}, 交易哈希: {tx_hash}, 当前需要管理员后台确认")
+        # 记录日志
+        current_app.logger.info(f"已注册支付交易 - 资产ID: {asset_id}, 交易哈希: {tx_hash}")
         
         # 触发异步任务检查交易（如果有后台任务系统）
         try:
@@ -2217,10 +2216,9 @@ def register_pending_payment():
         
         return jsonify({
             'success': True,
-            'message': '支付交易已注册，系统将异步处理确认(备用转账方案)',
+            'message': '支付交易已注册，系统将异步处理确认',
             'asset_id': asset_id,
-            'tx_hash': tx_hash,
-            'note': '当前使用备用转账方案，需要管理员后台确认'
+            'tx_hash': tx_hash
         })
         
     except Exception as e:
