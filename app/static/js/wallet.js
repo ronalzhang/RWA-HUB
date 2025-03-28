@@ -2467,83 +2467,43 @@ async connectPhantom(isReconnect = false) {
             const fromAddress = window.solana.publicKey.toString();
             console.log(`从地址: ${fromAddress}`);
             
-            try {
-                console.log('开始获取转账参数...');
-                // 直接从后端获取转账参数，不在前端获取区块哈希
-                const getTransferParamsResponse = await fetch('/api/solana/get_transfer_params', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Eth-Address': fromAddress,
-                        'X-Wallet-Type': 'phantom'
-                    },
-                    body: JSON.stringify({
-                        token_symbol: tokenSymbol,
-                        to_address: to,
-                        amount: amount
-                    })
-                });
-                
-                if (!getTransferParamsResponse.ok) {
-                    throw new Error('获取转账参数失败');
-                }
-                
-                const transferParamsData = await getTransferParamsResponse.json();
-                if (!transferParamsData.success) {
-                    throw new Error(`获取转账参数失败: ${transferParamsData.error || '未知错误'}`);
-                }
-                
-                // 3. 使用钱包签名消息而不是交易
-                console.log('使用钱包签名消息...');
-                const { transaction, message } = transferParamsData;
-                
-                // 使用更安全的方式解码Base64
-                let messageBytes;
-                try {
-                    console.log('准备处理Base64消息数据...');
-                    
-                    // 直接调用execute_transfer端点，不再尝试进行交易签名
-                    console.log('直接使用备用转账方式...');
-                    const sendSignedResponse = await fetch('/api/solana/execute_transfer', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Eth-Address': fromAddress,
-                            'X-Wallet-Type': 'phantom'
-                        },
-                        body: JSON.stringify({
-                            token_symbol: tokenSymbol,
-                            to_address: to,
-                            amount: amount,
-                            from_address: fromAddress
-                        })
-                    });
-                    
-                    if (!sendSignedResponse.ok) {
-                        throw new Error('发送转账请求失败: HTTP ' + sendSignedResponse.status);
-                    }
-                    
-                    const sendResult = await sendSignedResponse.json();
-                    if (!sendResult.success) {
-                        throw new Error(`转账失败: ${sendResult.error || '未知错误'}`);
-                    }
-                    
-                    console.log('转账请求发送成功！签名:', sendResult.signature);
-                    
-                    // 返回成功结果
-                    return {
-                        success: true,
-                        txHash: sendResult.signature
-                    };
-                } catch (error) {
-                    console.error('转账处理过程出错:', error);
-                    throw error; // 把错误抛出到外层catch处理
-                }
-                
-            } catch (decodingError) {
-                console.error('Base64解码或签名失败:', decodingError);
-                throw decodingError; // 把错误抛出到外层catch处理
+            // 调用后端API执行真实的链上转账
+            console.log('调用后端API执行转账...');
+            const transferResponse = await fetch('/api/solana/execute_transfer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Eth-Address': fromAddress,
+                    'X-Wallet-Type': 'phantom'
+                },
+                body: JSON.stringify({
+                    token_symbol: tokenSymbol,
+                    to_address: to,
+                    amount: amount,
+                    from_address: fromAddress
+                })
+            });
+            
+            if (!transferResponse.ok) {
+                throw new Error('发送转账请求失败: HTTP ' + transferResponse.status);
             }
+            
+            const transferResult = await transferResponse.json();
+            if (!transferResult.success) {
+                throw new Error(`转账失败: ${transferResult.error || '未知错误'}`);
+            }
+            
+            console.log('转账请求已发送！签名:', transferResult.signature);
+            
+            // 显示交易状态和签名
+            this._showTransactionStatus(transferResult.signature, tokenSymbol, amount, to);
+            
+            // 返回成功结果
+            return {
+                success: true,
+                txHash: transferResult.signature,
+                status: transferResult.tx_status || 'processing'
+            };
             
         } catch (error) {
             console.error('Solana转账失败:', error);
@@ -2552,6 +2512,173 @@ async connectPhantom(isReconnect = false) {
                 error: error.message || 'Solana转账失败'
             };
         }
+    },
+    
+    /**
+     * 显示交易状态
+     * @param {string} signature 交易签名
+     * @param {string} tokenSymbol 代币符号
+     * @param {number} amount 转账金额
+     * @param {string} to 接收地址
+     * @private
+     */
+    _showTransactionStatus(signature, tokenSymbol, amount, to) {
+        // 使用SweetAlert2显示交易状态
+        if (window.Swal) {
+            Swal.fire({
+                title: '交易处理中',
+                html: `
+                    <div class="text-center">
+                        <div class="mb-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                        <p>您的 ${amount} ${tokenSymbol} 转账正在处理中...</p>
+                        <p class="small text-muted">
+                            交易签名: <a href="https://solscan.io/tx/${signature}" target="_blank">${signature.substring(0, 8)}...${signature.substring(signature.length - 8)}</a>
+                        </p>
+                        <p class="small">请勿关闭此窗口，交易确认通常需要几秒钟到几分钟不等</p>
+                    </div>
+                `,
+                showConfirmButton: false,
+                allowOutsideClick: false,
+                didOpen: () => {
+                    // 启动轮询检查交易状态
+                    this._pollTransactionStatus(signature, tokenSymbol, amount, to);
+                }
+            });
+        } else {
+            // 如果没有SweetAlert2，使用简单的alert
+            alert(`交易已提交，签名: ${signature}`);
+        }
+    },
+    
+    /**
+     * 轮询检查交易状态
+     * @param {string} signature 交易签名
+     * @param {string} tokenSymbol 代币符号
+     * @param {number} amount 转账金额
+     * @param {string} to 接收地址
+     * @private
+     */
+    async _pollTransactionStatus(signature, tokenSymbol, amount, to) {
+        let retryCount = 0;
+        const maxRetries = 30;
+        const pollInterval = 3000; // 3秒
+        
+        const checkStatus = async () => {
+            try {
+                const response = await fetch(`/api/blockchain/solana/check-transaction?signature=${signature}`);
+                if (!response.ok) {
+                    throw new Error('检查交易状态失败');
+                }
+                
+                const result = await response.json();
+                
+                if (result.confirmed) {
+                    // 交易确认成功
+                    if (window.Swal) {
+                        Swal.fire({
+                            title: '交易成功',
+                            html: `
+                                <div class="text-center">
+                                    <div class="mb-3">
+                                        <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <p>您已成功转账 ${amount} ${tokenSymbol}</p>
+                                    <p class="small text-muted">
+                                        交易签名: <a href="https://solscan.io/tx/${signature}" target="_blank">${signature.substring(0, 8)}...${signature.substring(signature.length - 8)}</a>
+                                    </p>
+                                </div>
+                            `,
+                            icon: 'success',
+                            confirmButtonText: '确定'
+                        });
+                    }
+                    return;
+                }
+                
+                // 交易失败
+                if (result.error) {
+                    if (window.Swal) {
+                        Swal.fire({
+                            title: '交易失败',
+                            html: `
+                                <div class="text-center">
+                                    <div class="mb-3">
+                                        <i class="fas fa-times-circle text-danger" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <p>转账失败: ${result.error}</p>
+                                    <p class="small text-muted">
+                                        交易签名: <a href="https://solscan.io/tx/${signature}" target="_blank">${signature.substring(0, 8)}...${signature.substring(signature.length - 8)}</a>
+                                    </p>
+                                </div>
+                            `,
+                            icon: 'error',
+                            confirmButtonText: '确定'
+                        });
+                    }
+                    return;
+                }
+                
+                // 交易仍在处理中
+                retryCount++;
+                if (retryCount < maxRetries) {
+                    setTimeout(checkStatus, pollInterval);
+                } else {
+                    // 达到最大重试次数
+                    if (window.Swal) {
+                        Swal.fire({
+                            title: '交易状态未知',
+                            html: `
+                                <div class="text-center">
+                                    <div class="mb-3">
+                                        <i class="fas fa-question-circle text-warning" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <p>交易已提交，但尚未收到确认。您可以稍后查看交易状态。</p>
+                                    <p class="small text-muted">
+                                        交易签名: <a href="https://solscan.io/tx/${signature}" target="_blank">${signature.substring(0, 8)}...${signature.substring(signature.length - 8)}</a>
+                                    </p>
+                                </div>
+                            `,
+                            icon: 'warning',
+                            confirmButtonText: '确定'
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('检查交易状态出错:', error);
+                // 发生错误，继续重试
+                retryCount++;
+                if (retryCount < maxRetries) {
+                    setTimeout(checkStatus, pollInterval);
+                } else {
+                    // 达到最大重试次数
+                    if (window.Swal) {
+                        Swal.fire({
+                            title: '检查交易状态失败',
+                            html: `
+                                <div class="text-center">
+                                    <div class="mb-3">
+                                        <i class="fas fa-exclamation-circle text-warning" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <p>无法检查交易状态，但交易可能已经成功。您可以稍后查看。</p>
+                                    <p class="small text-muted">
+                                        交易签名: <a href="https://solscan.io/tx/${signature}" target="_blank">${signature.substring(0, 8)}...${signature.substring(signature.length - 8)}</a>
+                                    </p>
+                                </div>
+                            `,
+                            icon: 'warning',
+                            confirmButtonText: '确定'
+                        });
+                    }
+                }
+            }
+        };
+        
+        // 启动状态检查
+        setTimeout(checkStatus, 2000); // 等待2秒后开始检查
     },
     
     /**

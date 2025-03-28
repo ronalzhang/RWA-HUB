@@ -136,6 +136,9 @@ def create_app(config_name='development'):
     # 注册初始化分销佣金设置命令
     app.cli.add_command(init_distribution_command)
     
+    # 导入任务处理模块，确保异步任务处理器启动
+    import app.tasks
+    
     return app
 
 # 在初始化时添加分销佣金设置
