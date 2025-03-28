@@ -2147,6 +2147,9 @@ def register_pending_payment():
     """
     注册待确认的支付交易
     该API允许前端在创建资产后注册一个待确认的支付交易，系统将异步处理确认
+    
+    注意：当前系统使用的是备用转账方案，不执行实际的链上转账，而是通过管理员后台确认
+    未来计划实现与Solana区块链的实时交互以实现自动化支付验证
     """
     try:
         # 检查钱包连接状态
@@ -2186,7 +2189,8 @@ def register_pending_payment():
             'platform_address': platform_address,
             'status': 'pending',
             'registered_at': datetime.utcnow().isoformat(),
-            'registered_by': g.eth_address
+            'registered_by': g.eth_address,
+            'note': '使用备用转账方案，需要管理员审核确认'
         }
         
         # 更新资产支付信息
@@ -2195,6 +2199,9 @@ def register_pending_payment():
         
         # 保存到数据库
         db.session.commit()
+        
+        # 记录明确的日志，说明这是备用转账方案
+        current_app.logger.warning(f"已注册备用转账方案支付 - 资产ID: {asset_id}, 交易哈希: {tx_hash}, 当前需要管理员后台确认")
         
         # 触发异步任务检查交易（如果有后台任务系统）
         try:
@@ -2210,9 +2217,10 @@ def register_pending_payment():
         
         return jsonify({
             'success': True,
-            'message': '支付交易已注册，系统将异步处理确认',
+            'message': '支付交易已注册，系统将异步处理确认(备用转账方案)',
             'asset_id': asset_id,
-            'tx_hash': tx_hash
+            'tx_hash': tx_hash,
+            'note': '当前使用备用转账方案，需要管理员后台确认'
         })
         
     except Exception as e:

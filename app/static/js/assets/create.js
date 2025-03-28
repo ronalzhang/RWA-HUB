@@ -1767,3 +1767,60 @@ function getAssetFormData() {
     console.log('获取的表单数据:', formData);
     return formData;
 }
+
+// 处理支付成功的情况
+async function handlePaymentSuccess(txHash, formData) {
+    try {
+        updateProgress(85, '支付已确认，正在创建资产...');
+        
+        // 创建资产
+        const result = await processAssetCreation(formData, txHash);
+        
+        if (result.success) {
+            // 创建成功
+            let successMessage = `
+                <div class="text-center">
+                    <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
+                    <h4>资产创建请求已提交</h4>
+                    <p>您的资产创建交易已提交，由于使用备用转账方案，<strong>此交易需要后台管理员审核确认</strong>支付后才能最终完成。</p>
+                    <p>资产ID: ${result.asset_id}</p>
+                    <p>交易哈希: ${txHash}</p>
+                    <p class="text-muted"><i class="fas fa-info-circle"></i> 系统目前使用的是备用转账方案，您需要联系管理员进行确认，或者系统将在审核后自动处理。</p>
+                    <p class="text-muted">审核通常需要1-24小时内完成，请耐心等待。</p>
+                </div>
+            `;
+            
+            // 显示成功消息
+            Swal.fire({
+                title: '提交成功',
+                html: successMessage,
+                icon: 'success',
+                confirmButtonText: '查看资产',
+                showCancelButton: true,
+                cancelButtonText: '返回首页',
+                allowOutsideClick: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // 跳转到资产详情页
+                    window.location.href = `/assets/${result.asset_id}`;
+                } else {
+                    // 返回首页
+                    window.location.href = '/';
+                }
+            });
+            
+            // 重置表单
+            resetForm();
+        } else {
+            // 创建失败
+            showError(`资产创建失败: ${result.error || '未知错误'}`);
+            updateProgress(0, '创建失败，请重试');
+            enablePublishButtons(false);
+        }
+    } catch (error) {
+        console.error('处理支付成功后发生错误:', error);
+        showError(`资产创建过程出错: ${error.message || '未知错误'}`);
+        updateProgress(0, '创建失败，请重试');
+        enablePublishButtons(false);
+    }
+}
