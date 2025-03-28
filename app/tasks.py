@@ -35,16 +35,20 @@ class DelayedTask:
         self.func = func
         self.args = args
         self.kwargs = kwargs
-        self._add_to_queue()
+        
+        # 不要在初始化时立即添加到队列
+        # self._add_to_queue()
     
-    def _add_to_queue(self):
-        task_queue.put((self.func, self.args, self.kwargs))
+    def _add_to_queue(self, *extra_args, **extra_kwargs):
+        args = self.args + extra_args
+        kwargs = {**self.kwargs, **extra_kwargs}
+        task_queue.put((self.func, args, kwargs))
         _ensure_task_processor_running()
     
-    @classmethod
-    def delay(cls, *args, **kwargs):
+    def delay(self, *args, **kwargs):
         """模拟Celery的delay方法"""
-        return cls(*args, **kwargs)
+        self._add_to_queue(*args, **kwargs)
+        return self
 
 def _ensure_task_processor_running():
     """确保任务处理器正在运行"""
