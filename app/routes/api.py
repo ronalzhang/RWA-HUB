@@ -2610,46 +2610,27 @@ def execute_transfer():
         current_app.logger.info(f"执行转账 - 用户: {from_address}, 代币: {token_symbol}, 接收方: {to_address}, 金额: {amount}")
         
         # 执行真实的链上转账
-        from app.blockchain.solana_service import execute_transfer_transaction, execute_backup_transfer
+        from app.blockchain.solana_service import execute_transfer_transaction
         
-        signature = None
-        is_backup = False
+        # 执行转账交易
+        signature = execute_transfer_transaction(
+            token_symbol=token_symbol,
+            from_address=from_address,
+            to_address=to_address,
+            amount=amount
+        )
         
-        try:
-            # 尝试执行真实交易
-            signature = execute_transfer_transaction(
-                token_symbol=token_symbol,
-                from_address=from_address,
-                to_address=to_address,
-                amount=amount
-            )
-            current_app.logger.info(f"实际转账交易已发送，签名: {signature}")
-        except Exception as transfer_error:
-            # 实际交易失败，使用备用方法
-            current_app.logger.warning(f"实际交易失败，使用备用方法: {str(transfer_error)}")
-            signature = execute_backup_transfer(
-                token_symbol=token_symbol,
-                from_address=from_address,
-                to_address=to_address,
-                amount=amount
-            )
-            current_app.logger.info(f"备用转账已创建，签名: {signature}")
-            is_backup = True
-            
+        # 记录成功信息
+        current_app.logger.info(f"转账交易已发送，签名: {signature}")
+        
         # 返回成功结果
-        response_data = {
+        return jsonify({
             'success': True,
             'signature': signature,
-            'message': '转账交易已处理，请稍候查看结果',
-            'tx_status': 'pending' if is_backup else 'processing'
-        }
-        
-        if is_backup:
-            response_data['is_backup'] = True
-            response_data['message'] = '交易已创建并等待后台处理，请稍候查看结果'
+            'message': '转账交易已发送到链上，请稍候查看结果',
+            'tx_status': 'processing'
+        })
             
-        return jsonify(response_data)
-        
     except Exception as e:
         current_app.logger.error(f"处理转账请求失败: {str(e)}")
         return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
