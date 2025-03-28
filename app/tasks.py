@@ -218,5 +218,23 @@ def _update_transaction_status(trade_id, tx_signature, status, error=None):
     except Exception as e:
         logger.error(f"更新交易状态失败: {str(e)}")
 
+def run_task(func_name, *args, **kwargs):
+    """
+    运行一个任务
+    
+    Args:
+        func_name (str): 任务函数名称
+        *args: 位置参数
+        **kwargs: 关键字参数
+    """
+    try:
+        # 获取任务函数
+        if func_name == 'monitor_transaction_confirmation':
+            return monitor_transaction_confirmation(*args, **kwargs)
+        else:
+            logger.error(f"未知的任务函数: {func_name}")
+    except Exception as e:
+        logger.error(f"运行任务 {func_name} 出错: {str(e)}")
+
 # 导出延迟任务对象，使其可以被其他模块使用
-monitor_transaction_confirmation = DelayedTask(monitor_transaction_confirmation) 
+monitor_transaction_confirmation = DelayedTask(run_task, 'monitor_transaction_confirmation') 
