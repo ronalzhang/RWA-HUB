@@ -67,6 +67,10 @@ class Config:
     SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT')
     PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd')
     
+    # 智能合约ID
+    RWA_TRADE_PROGRAM_ID = os.environ.get('RWA_TRADE_PROGRAM_ID', 'rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
+    RWA_DIVIDEND_PROGRAM_ID = os.environ.get('RWA_DIVIDEND_PROGRAM_ID', 'rwaHubDividendXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
+    
     ETH_RPC_URL = os.environ.get('ETH_RPC_URL', 'https://rpc.ankr.com/eth')
     ETH_USDC_CONTRACT = os.environ.get('ETH_USDC_CONTRACT', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
 
