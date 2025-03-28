@@ -62,7 +62,7 @@ class Config:
         VALUE_DECIMALS = 2  # 价值小数位数
 
     # 区块链网络配置
-    SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL', 'https://api.devnet.solana.com')
+    SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')
     SOLANA_PROGRAM_ID = os.environ.get('SOLANA_PROGRAM_ID')
     SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT')
     PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd')
