@@ -263,7 +263,7 @@ def execute_transfer_transaction(
                 
                 # 启动异步任务监控交易确认状态
                 from app.tasks import monitor_transaction_confirmation
-                monitor_transaction_confirmation.delay(signature, trade.id)
+                monitor_transaction_confirmation.delay('monitor_transaction_confirmation', signature, trade.id)
                 
             except Exception as db_error:
                 logger.error(f"创建交易记录失败: {str(db_error)}")
