@@ -137,7 +137,9 @@ def create_app(config_name='development'):
     app.cli.add_command(init_distribution_command)
     
     # 导入任务处理模块，确保异步任务处理器启动
-    import app.tasks
+    # 暂时禁用任务处理系统，解决启动问题
+    # with app.app_context():
+    #     import app.tasks
     
     return app
 
