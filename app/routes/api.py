@@ -2578,8 +2578,8 @@ def send_signed_transaction():
 @eth_address_required
 def execute_transfer():
     """
-    执行Solana转账的备用方法
-    该方法在服务器端完成大部分工作，最小化对钱包API的依赖
+    执行Solana转账
+    该方法执行真实的链上转账，并自动监控交易确认状态
     """
     try:
         # 检查钱包连接状态
@@ -2607,13 +2607,13 @@ def execute_transfer():
             return jsonify({'success': False, 'error': '发送方地址与连接的钱包不匹配'}), 403
         
         # 记录请求信息
-        current_app.logger.info(f"执行备用模式转账 - 用户: {from_address}, 代币: {token_symbol}, 接收方: {to_address}, 金额: {amount}")
+        current_app.logger.info(f"执行转账 - 用户: {from_address}, 代币: {token_symbol}, 接收方: {to_address}, 金额: {amount}")
         
-        # 执行转账
-        from app.blockchain.solana_service import execute_backup_transfer
+        # 执行真实的链上转账
+        from app.blockchain.solana_service import execute_transfer_transaction
         
         try:
-            signature = execute_backup_transfer(
+            signature = execute_transfer_transaction(
                 token_symbol=token_symbol,
                 from_address=from_address,
                 to_address=to_address,
@@ -2621,21 +2621,22 @@ def execute_transfer():
             )
             
             # 记录成功信息
-            current_app.logger.info(f"备用模式转账成功，签名: {signature}")
+            current_app.logger.info(f"转账交易已发送，签名: {signature}")
             
             # 返回成功结果
             return jsonify({
                 'success': True,
                 'signature': signature,
-                'message': '转账交易已执行'
+                'message': '转账交易已发送到链上，请稍候查看结果',
+                'tx_status': 'processing'
             })
             
         except Exception as transfer_error:
-            current_app.logger.error(f"备用模式转账失败: {str(transfer_error)}")
+            current_app.logger.error(f"转账失败: {str(transfer_error)}")
             return jsonify({'success': False, 'error': f'转账失败: {str(transfer_error)}'}), 500
         
     except Exception as e:
-        current_app.logger.error(f"处理备用转账请求失败: {str(e)}")
+        current_app.logger.error(f"处理转账请求失败: {str(e)}")
         return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
 
 # 添加新的区块链交易相关API路由
