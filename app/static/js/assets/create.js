@@ -1782,11 +1782,28 @@ async function handlePaymentSuccess(txHash, formData) {
                 <div class="text-center">
                     <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
                     <h4>资产创建请求已提交</h4>
-                    <p>您的资产创建交易已提交，由于使用备用转账方案，<strong>此交易需要后台管理员审核确认</strong>支付后才能最终完成。</p>
-                    <p>资产ID: ${result.asset_id}</p>
-                    <p>交易哈希: ${txHash}</p>
-                    <p class="text-muted"><i class="fas fa-info-circle"></i> 系统目前使用的是备用转账方案，您需要联系管理员进行确认，或者系统将在审核后自动处理。</p>
-                    <p class="text-muted">审核通常需要1-24小时内完成，请耐心等待。</p>
+                    <p>您的资产创建请求已成功提交，系统正在处理中。</p>
+                    <div class="card my-3 text-start">
+                        <div class="card-body">
+                            <h5 class="card-title">交易详情</h5>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>资产ID:</span>
+                                    <strong>${result.asset_id}</strong>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>交易哈希:</span>
+                                    <a href="https://solscan.io/tx/${txHash}" target="_blank">${txHash.substring(0, 8)}...${txHash.substring(txHash.length - 8)}</a>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>状态:</span>
+                                    <span class="badge bg-info">处理中</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p class="text-muted">系统将自动确认交易状态，通常需要1-2分钟完成。</p>
+                    <p class="text-muted">您可以在"我的资产"页面查看资产状态。</p>
                 </div>
             `;
             
@@ -1809,6 +1826,9 @@ async function handlePaymentSuccess(txHash, formData) {
                 }
             });
             
+            // 设置定时任务轮询交易状态
+            _pollTransactionStatus(txHash, result.asset_id);
+            
             // 重置表单
             resetForm();
         } else {
@@ -1823,4 +1843,89 @@ async function handlePaymentSuccess(txHash, formData) {
         updateProgress(0, '创建失败，请重试');
         enablePublishButtons(false);
     }
+}
+
+// 轮询检查交易状态
+async function _pollTransactionStatus(txHash, assetId, maxRetries = 12, retryInterval = 5000) {
+    let retryCount = 0;
+    
+    const checkStatus = async () => {
+        try {
+            // 检查交易状态
+            const response = await fetch(`/api/blockchain/solana/check-transaction?signature=${txHash}`);
+            if (!response.ok) {
+                throw new Error('检查交易状态失败');
+            }
+            
+            const result = await response.json();
+            console.log('交易状态:', result);
+            
+            if (result.confirmed) {
+                console.log('交易已确认!');
+                // 交易已确认，更新资产状态
+                try {
+                    // 更新Swal对话框内容
+                    const swalContent = document.querySelector('.swal2-html-container');
+                    if (swalContent) {
+                        // 更新状态标签
+                        const statusBadge = swalContent.querySelector('.badge');
+                        if (statusBadge) {
+                            statusBadge.className = 'badge bg-success';
+                            statusBadge.textContent = '已确认';
+                        }
+                        
+                        // 更新提示文本
+                        const infoText = swalContent.querySelector('p.text-muted');
+                        if (infoText) {
+                            infoText.textContent = '交易已确认，资产已创建成功！';
+                        }
+                    }
+                } catch (e) {
+                    console.error('更新对话框状态失败:', e);
+                }
+                return;
+            }
+            
+            // 交易失败
+            if (result.error) {
+                console.error('交易失败:', result.error);
+                // 更新Swal对话框内容
+                try {
+                    const swalContent = document.querySelector('.swal2-html-container');
+                    if (swalContent) {
+                        // 更新状态标签
+                        const statusBadge = swalContent.querySelector('.badge');
+                        if (statusBadge) {
+                            statusBadge.className = 'badge bg-danger';
+                            statusBadge.textContent = '失败';
+                        }
+                        
+                        // 更新提示文本
+                        const infoText = swalContent.querySelector('p.text-muted');
+                        if (infoText) {
+                            infoText.textContent = `交易失败: ${result.error}。请联系客服处理。`;
+                        }
+                    }
+                } catch (e) {
+                    console.error('更新对话框状态失败:', e);
+                }
+                return;
+            }
+            
+            // 交易仍在处理中
+            retryCount++;
+            if (retryCount < maxRetries) {
+                setTimeout(checkStatus, retryInterval);
+            }
+        } catch (error) {
+            console.error('检查交易状态出错:', error);
+            retryCount++;
+            if (retryCount < maxRetries) {
+                setTimeout(checkStatus, retryInterval);
+            }
+        }
+    };
+    
+    // 延迟几秒后开始轮询
+    setTimeout(checkStatus, 2000);
 }

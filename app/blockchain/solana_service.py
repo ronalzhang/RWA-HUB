@@ -187,6 +187,101 @@ def send_transaction_with_signature(
         raise Exception(f"发送交易失败: {str(e)}")
 
 
+def execute_transfer_transaction(
+    token_symbol: str,
+    from_address: str,
+    to_address: str,
+    amount: float
+) -> str:
+    """
+    执行真实的Solana链上转账交易
+    
+    Args:
+        token_symbol (str): 代币符号，如'USDC'
+        from_address (str): 发送方地址
+        to_address (str): 接收方地址
+        amount (float): 转账金额
+        
+    Returns:
+        str: 交易签名
+    """
+    try:
+        logger.info(f"执行真实Solana转账 - 代币: {token_symbol}, 发送方: {from_address}, 接收方: {to_address}, 金额: {amount}")
+        
+        # 创建交易所需参数
+        transaction_bytes, message_bytes = prepare_transfer_transaction(
+            token_symbol=token_symbol,
+            from_address=from_address,
+            to_address=to_address,
+            amount=amount
+        )
+        
+        # 获取系统服务钱包（如果是管理员操作时使用）
+        from app.utils.solana import SolanaClient
+        solana_client = SolanaClient()
+        
+        # 使用Solana客户端发送交易
+        try:
+            # 序列化交易
+            transaction_base64 = base64.b64encode(transaction_bytes).decode('utf-8')
+            
+            # 发送交易到Solana网络
+            result = solana_connection.send_transaction(
+                transaction_base64,
+                opts=TxOpts(skip_preflight=False, preflight_commitment="confirmed")
+            )
+            
+            # 获取交易签名
+            signature = result.get('result', None)
+            
+            if not signature:
+                raise Exception("未获取到交易签名")
+                
+            logger.info(f"交易已发送到Solana网络，签名: {signature}")
+            
+            # 创建交易记录
+            try:
+                # 寻找相关资产
+                asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+                
+                # 创建交易记录
+                trade = Trade(
+                    trade_type=TradeType.PLATFORM_FEE,
+                    trader_address=from_address,
+                    amount=amount,
+                    price=1.0,  # 平台费以1:1比例计算
+                    asset_id=asset.id if asset else None,
+                    token_amount=amount,  # 使用实际金额作为代币数量
+                    status='processing',  # 设置状态为处理中，表示已发送但未确认
+                    tx_hash=signature
+                )
+                
+                db.session.add(trade)
+                db.session.commit()
+                
+                logger.info(f"已创建交易记录 ID: {trade.id}, 签名: {signature}, 状态: processing")
+                
+                # 启动异步任务监控交易确认状态
+                from app.tasks import monitor_transaction_confirmation
+                monitor_transaction_confirmation.delay(signature, trade.id)
+                
+            except Exception as db_error:
+                logger.error(f"创建交易记录失败: {str(db_error)}")
+                # 交易记录创建失败不影响流程，继续返回签名
+            
+            logger.info(f"Solana交易已成功发送，签名: {signature}")
+            
+            return signature
+            
+        except Exception as tx_error:
+            logger.error(f"发送Solana交易失败: {str(tx_error)}")
+            raise Exception(f"发送Solana交易失败: {str(tx_error)}")
+        
+    except Exception as e:
+        logger.error(f"执行Solana转账失败: {str(e)}")
+        raise Exception(f"执行Solana转账失败: {str(e)}")
+
+# 保留原有的备用转账方法，但标记为已弃用
 def execute_backup_transfer(
     token_symbol: str,
     from_address: str,
@@ -194,9 +289,7 @@ def execute_backup_transfer(
     amount: float
 ) -> str:
     """
-    执行备用模式的转账交易
-    这是一个后端验证方案，但仅用于确认转账请求，不实际执行转账
-    需要后台管理员确认后才能最终确认交易
+    已弃用：此方法已被真实交易方法replace，保留仅用于兼容旧代码
     
     Args:
         token_symbol (str): 代币符号
@@ -207,50 +300,14 @@ def execute_backup_transfer(
     Returns:
         str: 交易签名
     """
+    logger.warning(f"调用已弃用的备用转账方法，将使用真实转账替代 - 代币: {token_symbol}, 发送方: {from_address}, 接收方: {to_address}, 金额: {amount}")
+    
+    # 重定向到真实转账方法
     try:
-        logger.info(f"执行备用模式转账确认 - 代币: {token_symbol}, 发送方: {from_address}, 接收方: {to_address}, 金额: {amount}")
-        
-        # 生成一个唯一的交易ID，用于前端跟踪
-        import hashlib
-        
-        # 创建一个唯一的种子
-        seed = f"{token_symbol}:{from_address}:{to_address}:{amount}:{int(time.time())}"
-        
-        # 生成交易ID（非链上签名，仅用于前端UI跟踪）
-        signature = hashlib.sha256(seed.encode()).hexdigest()
-        
-        # 创建交易记录
-        try:
-            # 寻找相关资产
-            asset = Asset.query.filter_by(token_symbol=token_symbol).first()
-            
-            # 创建交易记录
-            trade = Trade(
-                trade_type=TradeType.PLATFORM_FEE,
-                trader_address=from_address,
-                amount=amount,
-                price=1.0,  # 平台费以1:1比例计算
-                asset_id=asset.id if asset else None,
-                token_amount=amount,  # 使用实际金额作为代币数量
-                status='pending',  # 设置状态为pending，表示需要后台确认
-                tx_hash=signature
-            )
-            
-            db.session.add(trade)
-            db.session.commit()
-            
-            logger.info(f"已创建交易记录 ID: {trade.id}, 签名: {signature}, 状态: pending")
-        except Exception as db_error:
-            logger.error(f"创建交易记录失败: {str(db_error)}")
-            # 交易记录创建失败不影响流程，继续返回签名
-        
-        logger.warning(f"注意：这是备用转账方案，实际上并未执行链上转账操作。交易ID: {signature} 需要后台管理员手动确认。")
-        
-        return signature
-        
+        return execute_transfer_transaction(token_symbol, from_address, to_address, amount)
     except Exception as e:
-        logger.error(f"执行备用模式转账失败: {str(e)}")
-        raise Exception(f"执行备用模式转账失败: {str(e)}")
+        logger.error(f"重定向到真实转账失败: {str(e)}")
+        raise Exception(f"转账失败: {str(e)}")
 
 def prepare_transaction(user_address, asset_id, token_symbol, amount, price, trade_id):
     """
