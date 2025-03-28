@@ -281,63 +281,6 @@ def execute_transfer_transaction(
         logger.error(f"执行Solana转账失败: {str(e)}")
         raise Exception(f"执行Solana转账失败: {str(e)}")
 
-# 保留原有的备用转账方法，但标记为已弃用
-def execute_backup_transfer(
-    token_symbol: str,
-    from_address: str,
-    to_address: str,
-    amount: float
-) -> str:
-    """
-    备用转账方法，用于在真实交易失败时仍能创建资产
-    
-    Args:
-        token_symbol (str): 代币符号
-        from_address (str): 发送方地址
-        to_address (str): 接收方地址
-        amount (float): 转账金额
-        
-    Returns:
-        str: 交易签名
-    """
-    logger.info(f"执行备用转账 - 代币: {token_symbol}, 发送方: {from_address}, 接收方: {to_address}, 金额: {amount}")
-    
-    try:
-        # 寻找相关资产
-        asset = Asset.query.filter_by(token_symbol=token_symbol).first()
-        
-        # 创建一个唯一的交易ID作为伪签名
-        import hashlib
-        import time
-        fake_signature = hashlib.sha256(f"{from_address}:{to_address}:{amount}:{time.time()}".encode()).hexdigest()
-        
-        # 创建交易记录
-        token_price = 1.0  # 默认值
-        if asset and asset.token_price:
-            token_price = float(asset.token_price) if asset.token_price > 0 else 1.0
-        
-        trade = Trade(
-            trade_type=TradeType.PLATFORM_FEE,
-            trader_address=from_address,
-            amount=amount,
-            price=token_price,
-            asset_id=asset.id if asset else None,
-            token_amount=amount,
-            status='pending',  # 设置状态为待处理，需要后台审核
-            tx_hash=fake_signature
-        )
-        
-        db.session.add(trade)
-        db.session.commit()
-        
-        logger.info(f"已创建备用交易记录 ID: {trade.id}, 签名: {fake_signature}, 状态: pending")
-        
-        return fake_signature
-        
-    except Exception as e:
-        logger.error(f"创建备用交易记录失败: {str(e)}")
-        raise Exception(f"转账失败: {str(e)}")
-
 def prepare_transaction(user_address, asset_id, token_symbol, amount, price, trade_id):
     """
     准备Solana交易数据

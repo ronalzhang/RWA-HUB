@@ -2443,21 +2443,25 @@ async connectPhantom(isReconnect = false) {
             
             // 确保Phantom钱包已连接
             if (!window.solana || !window.solana.isPhantom) {
+                console.error('Phantom钱包未安装或不可用');
                 throw new Error('Phantom钱包未安装或不可用');
             }
             
             if (!window.solana.isConnected) {
                 console.log('尝试连接Phantom钱包...');
                 await window.solana.connect();
+                console.log('Phantom钱包连接成功');
             }
             
             // 检查接收地址是否有效
             if (!to || typeof to !== 'string' || to.length < 32) {
+                console.error('无效的接收地址:', to);
                 throw new Error('无效的接收地址');
             }
             
             // 检查金额
             if (!amount || isNaN(amount) || amount <= 0) {
+                console.error('无效的转账金额:', amount);
                 throw new Error('无效的转账金额');
             }
             
@@ -2466,6 +2470,14 @@ async connectPhantom(isReconnect = false) {
             // 获取当前用户的公钥
             const fromAddress = window.solana.publicKey.toString();
             console.log(`从地址: ${fromAddress}`);
+            
+            // 记录Phantom钱包版本和环境信息
+            console.log('Phantom信息:', {
+                isPhantom: window.solana.isPhantom,
+                version: window.solana.version || '未知',
+                isMobile: /Mobi|Android/i.test(navigator.userAgent),
+                userAgent: navigator.userAgent
+            });
             
             // 调用后端API执行真实的链上转账
             console.log('调用后端API执行转账...');
@@ -2484,12 +2496,19 @@ async connectPhantom(isReconnect = false) {
                 })
             });
             
+            console.log('转账请求状态码:', transferResponse.status);
+            
             if (!transferResponse.ok) {
+                const errorText = await transferResponse.text();
+                console.error('转账请求失败:', transferResponse.status, errorText);
                 throw new Error('发送转账请求失败: HTTP ' + transferResponse.status);
             }
             
             const transferResult = await transferResponse.json();
+            console.log('转账响应:', transferResult);
+            
             if (!transferResult.success) {
+                console.error('转账处理失败:', transferResult.error || '未知错误');
                 throw new Error(`转账失败: ${transferResult.error || '未知错误'}`);
             }
             
@@ -2507,6 +2526,13 @@ async connectPhantom(isReconnect = false) {
             
         } catch (error) {
             console.error('Solana转账失败:', error);
+            // 记录错误详情
+            console.error('错误详情:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+                code: error.code
+            });
             return {
                 success: false,
                 error: error.message || 'Solana转账失败'
