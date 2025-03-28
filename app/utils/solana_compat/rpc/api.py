@@ -3,6 +3,7 @@ import requests
 import json
 from .types import TxOpts
 import base64
+import logging
 
 class Client:
     """Client to interact with the Solana JSON RPC API."""
@@ -14,6 +15,8 @@ class Client:
     
     def _make_request(self, method: str, params: List[Any] = None) -> Dict[str, Any]:
         """Make a request to the RPC endpoint."""
+        logger = logging.getLogger(__name__)
+        
         data = {
             "jsonrpc": "2.0",
             "id": 1,
@@ -22,29 +25,37 @@ class Client:
         if params:
             data["params"] = params
         
-        # 在开发环境中，避免真实的网络请求
-        # 返回模拟数据
-        if method == "getAccountInfo":
-            return {"result": {"value": {"data": "", "lamports": 1000000, "owner": ""}}}
-        elif method == "getBalance":
-            return {"result": {"value": 1000000}}
-        elif method == "getRecentBlockhash":
-            return {"result": {"value": {"blockhash": "simulated_blockhash", "feeCalculator": {"lamportsPerSignature": 5000}}}}
-        elif method == "sendTransaction":
-            return {"result": "simulated_signature_" + str(hash(json.dumps(data)))}
-        elif method == "getTransaction":
-            return {"result": {"meta": {"err": None, "status": {"Ok": None}}}}
-        elif method == "getSlot":
-            return {"result": 12345}
-        elif method == "getSignatureStatuses":
-            return {"result": {"value": [{"slot": 12345, "confirmations": 5, "err": None, "status": {"Ok": None}}]}}
-        
-        # 如果是其他方法，尝试真实请求
+        # 始终尝试发送真实的RPC请求
         try:
-            response = self.session.post(self.endpoint, json=data)
-            return response.json()
+            logger.info(f"发送Solana RPC请求: {method} 到 {self.endpoint}")
+            logger.debug(f"请求参数: {json.dumps(params) if params else 'None'}")
+            
+            response = self.session.post(self.endpoint, json=data, timeout=30)
+            
+            # 检查HTTP响应状态
+            if response.status_code != 200:
+                logger.error(f"Solana RPC请求失败，HTTP状态码: {response.status_code}")
+                return {"error": {"message": f"HTTP错误: {response.status_code}", "status_code": response.status_code}}
+            
+            # 解析JSON响应
+            result = response.json()
+            logger.debug(f"RPC响应: {json.dumps(result)}")
+            
+            # 检查是否有RPC错误
+            if "error" in result:
+                logger.error(f"Solana RPC返回错误: {result['error']}")
+            
+            return result
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"发送Solana RPC请求时发生网络错误: {str(e)}")
+            return {"error": {"message": f"网络错误: {str(e)}"}}
+        except json.JSONDecodeError as e:
+            logger.error(f"解析Solana RPC响应时发生JSON解析错误: {str(e)}")
+            return {"error": {"message": f"JSON解析错误: {str(e)}"}}
         except Exception as e:
-            return {"error": {"message": str(e)}}
+            logger.error(f"处理Solana RPC请求时发生未知错误: {str(e)}")
+            return {"error": {"message": f"未知错误: {str(e)}"}}
     
     def get_account_info(self, pubkey: str, commitment: Optional[str] = None) -> Dict[str, Any]:
         """Get account info."""
