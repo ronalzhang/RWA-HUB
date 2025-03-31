@@ -33,13 +33,13 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <!-- 添加jQuery库 -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<!-- 在head部分添加bs58库 -->
-<script src="https://unpkg.com/bs58@5.0.0/dist/index.js"></script>
+<script src="{{ url_for('static', filename='vendor/jquery.min.js') }}"></script>
+<!-- 使用内置bs58实现 -->
+<!-- <script src="https://unpkg.com/bs58@5.0.0/dist/index.js"></script> -->
 <!-- 添加Solana Web3 SDK -->
-<script src="https://unpkg.com/@solana/web3.js@1.87.6/lib/index.iife.min.js"></script>
+<script src="{{ url_for('proxy.cached_vendor', filename='solana-web3-stable.js') }}"></script>
 <!-- 添加SPL Token库 -->
-<script src="https://unpkg.com/@solana/spl-token@0.3.8/dist/index.iife.js"></script>
+<script src="{{ url_for('proxy.cached_vendor', filename='solana-spl-token.js') }}"></script>
 <!-- 初始化Solana库 -->
 <script>
     // 创建全局对象
@@ -3113,9 +3113,9 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <!-- 添加Solana Web3.js -->
-<script src="https://unpkg.com/@solana/web3.js@1.87.6/lib/index.iife.min.js"></script>
+<script src="{{ url_for('proxy.cached_vendor', filename='solana-web3-stable.js') }}"></script>
 <!-- 添加SPL Token库 -->
-<script src="https://unpkg.com/@solana/spl-token@0.3.8/dist/index.iife.js"></script>
+<script src="{{ url_for('proxy.cached_vendor', filename='solana-spl-token.js') }}"></script>
 <script>
     // 确保SPL Token库正确加载
     window.initSplTokenLib = async function() {
