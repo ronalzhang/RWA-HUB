@@ -36,10 +36,27 @@ limiter = Limiter(key_func=get_remote_address)
 # 初始化调度器
 scheduler = BackgroundScheduler()
 
+# 添加绑定模型到应用上下文的函数
+def bind_db_to_app(app):
+    """在应用上下文外也能使用Model.query"""
+    with app.app_context():
+        from app.models.asset import Asset
+        from app.models.user import User
+        from app.models.trade import Trade
+        from app.models.holding import Holding
+        from app.models.dividend import DividendRecord
+        from app.models.shortlink import ShortLink
+        # 对所有模型进行绑定，确保可以在应用上下文外使用查询
+        db.Model.query = db.session.query_property()
+    return True
+
 def init_extensions(app):
     """初始化所有扩展"""
     # 初始化数据库
     db.init_app(app)
+    
+    # 绑定数据库模型到应用
+    bind_db_to_app(app)
     
     # 初始化数据库迁移
     migrate.init_app(app, db)
