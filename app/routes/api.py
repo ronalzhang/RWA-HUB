@@ -1302,6 +1302,12 @@ def get_user_assets_query():
         from app.models.user import User
         from sqlalchemy import or_
         
+        # 查询所有用户，调试用
+        all_users = User.query.all()
+        current_app.logger.info(f'系统中共有 {len(all_users)} 个用户')
+        for u in all_users[:5]:  # 只打印前5个用户，避免日志过多
+            current_app.logger.info(f'用户: ID={u.id}, ETH地址={u.eth_address}')
+        
         # 查询用户
         user = None
         try:
@@ -1316,7 +1322,9 @@ def get_user_assets_query():
                 ).first()
             else:  # Solana地址
                 # 系统使用eth_address字段存储所有类型的地址，包括Solana地址
+                current_app.logger.info(f'正在查询Solana地址: {address}')
                 user = User.query.filter_by(eth_address=address).first()
+                current_app.logger.info(f'查询结果: {user}')
         except Exception as e:
             current_app.logger.error(f'查询用户失败: {str(e)}')
             
