@@ -129,13 +129,11 @@ def create_app(config_name='development'):
         raise RuntimeError("存储初始化失败")
     
     # 注册蓝图
-    from .routes import assets_bp, assets_api_bp, admin_bp, admin_api_bp
-    from .routes.proxy import proxy_bp
+    from .routes import register_blueprints
+    register_blueprints(app)
     
-    app.register_blueprint(assets_bp)
-    app.register_blueprint(assets_api_bp, url_prefix='/api')
-    app.register_blueprint(admin_bp, url_prefix='/admin')
-    app.register_blueprint(admin_api_bp, url_prefix='/api/admin')
+    # 单独注册代理路由
+    from .routes.proxy import proxy_bp
     app.register_blueprint(proxy_bp, url_prefix='/proxy')
     
     # 注册管理员API v2蓝图
