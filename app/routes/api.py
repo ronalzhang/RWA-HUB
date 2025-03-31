@@ -1296,29 +1296,30 @@ def get_user_assets_query():
         # 记录当前请求的钱包地址，用于调试
         current_app.logger.info(f'通过查询参数获取资产 - 地址: {address}, 类型: {wallet_type}')
         
-        # 直接获取所有可用的资产
+        # 直接获取所有已审核通过的资产
         from app.models.asset import Asset, AssetStatus
         
-        assets = Asset.query.filter_by(status=AssetStatus.APPROVED.value).all()
+        # 返回所有状态为APPROVED的资产
+        query = Asset.query.filter_by(status=AssetStatus.APPROVED.value)
+        assets = query.order_by(Asset.created_at.desc()).all()
         
         current_app.logger.info(f'找到 {len(assets)} 个可用资产')
         
-        # 准备返回的资产数据
-        result = []
-        
+        # 转换为字典格式
+        asset_list = []
         for asset in assets:
-            # 构建资产数据
-            asset_data = {
-                'asset_id': asset.id,
-                'name': asset.name,
-                'token_symbol': asset.token_symbol,
-                'quantity': 0,  # 默认持有量为0
-                'token_price': asset.token_price
-            }
-            result.append(asset_data)
-            
-        current_app.logger.info(f'返回 {len(result)} 个资产')
-        return jsonify(result), 200
+            try:
+                # 使用Asset模型的to_dict方法获取标准格式
+                asset_dict = asset.to_dict()
+                # 添加持有量字段，这里默认为0
+                asset_dict['holding_amount'] = 0
+                asset_list.append(asset_dict)
+            except Exception as e:
+                current_app.logger.error(f'转换资产 {asset.id} 为字典时出错: {str(e)}')
+                continue
+        
+        current_app.logger.info(f'返回 {len(asset_list)} 个资产')
+        return jsonify(asset_list), 200
         
     except Exception as e:
         current_app.logger.error(f'获取资产失败: {str(e)}', exc_info=True)
