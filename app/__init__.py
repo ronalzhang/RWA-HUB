@@ -5,9 +5,9 @@ import logging
 import threading
 from decimal import Decimal
 from flask import Flask, g, request, session, jsonify, render_template, current_app
-from flask_babel import gettext as _
+from flask_babel import gettext as _, Babel
 from flask.cli import with_appcontext
-from app.extensions import db, babel, limiter, scheduler, migrate, cors, configure_logging
+from app.extensions import db, limiter, scheduler, migrate, cors, configure_logging
 from pathlib import Path
 from app.config import config
 from logging.handlers import RotatingFileHandler
