@@ -55,6 +55,7 @@ def list_assets_page():
         # 记录原始查询结果数量
         total_count = query.count()
         current_app.logger.info(f'未过滤的资产总数: {total_count}')
+        current_app.logger.info(f'未过滤的资产列表: {[(a.id, a.name, a.status) for a in query.all()]}')
 
         # 根据用户身份过滤资产
         if current_user_address:
@@ -79,6 +80,7 @@ def list_assets_page():
         # 记录过滤后的查询结果数量
         filtered_count = query.count()
         current_app.logger.info(f'过滤后的资产数量: {filtered_count}')
+        current_app.logger.info(f'过滤后的资产列表: {[(a.id, a.name, a.status) for a in query.all()]}')
 
         # 按创建时间倒序排序
         query = query.order_by(Asset.created_at.desc())
