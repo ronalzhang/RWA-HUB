@@ -7,7 +7,7 @@ from . import proxy_bp
 from urllib.parse import urlparse
 
 # 缓存目录
-CACHE_DIR = os.path.join(os.getcwd(), 'app/static/vendor')
+CACHE_DIR = os.path.join(os.getcwd(), "app/static/vendor")
 
 # 确保缓存目录存在
 if not os.path.exists(CACHE_DIR):
@@ -16,49 +16,49 @@ if not os.path.exists(CACHE_DIR):
 # 缓存URL映射，将外部URL映射到本地文件
 VENDOR_MAPPING = {
     # Solana相关库
-    'solana-web3.js': 'https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js',
-    'solana-web3-stable.js': 'https://unpkg.com/@solana/web3.js@1.98.0/lib/index.iife.min.js',
-    'solana-spl-token.js': 'https://unpkg.com/@solana/spl-token@0.3.8/dist/index.iife.js',
+    "solana-web3.js": "https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js",
+    "solana-web3-stable.js": "https://unpkg.com/@solana/web3.js@1.98.0/lib/index.iife.min.js",
+    "solana-spl-token.js": "https://unpkg.com/@solana/spl-token@0.3.8/dist/index.iife.js",
     
     # Web3和区块链相关
-    'web3.min.js': 'https://unpkg.com/web3@1.5.2/dist/web3.min.js',
-    'ethereumjs-tx-1.3.7.min.js': 'https://cdn.jsdelivr.net/npm/ethereumjs-tx@1.3.7/dist/index.min.js',
-    'ethers.umd.min.js': 'https://cdn.ethers.io/lib/ethers-5.2.umd.min.js',
+    "web3.min.js": "https://unpkg.com/web3@1.5.2/dist/web3.min.js",
+    "ethereumjs-tx-1.3.7.min.js": "https://cdn.jsdelivr.net/npm/ethereumjs-tx@1.3.7/dist/index.min.js",
+    "ethers.umd.min.js": "https://cdn.ethers.io/lib/ethers-5.2.umd.min.js",
     
     # 基础库
-    'jquery.min.js': 'https://code.jquery.com/jquery-3.6.0.min.js',
-    'jquery-ui.min.js': 'https://code.jquery.com/ui/1.13.2/jquery-ui.min.js',
-    'jquery-ui.min.css': 'https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.min.css',
+    "jquery.min.js": "https://code.jquery.com/jquery-3.6.0.min.js",
+    "jquery-ui.min.js": "https://code.jquery.com/ui/1.13.2/jquery-ui.min.js",
+    "jquery-ui.min.css": "https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.min.css",
     
     # Bootstrap
-    'bootstrap.min.css': 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css',
-    'bootstrap.bundle.min.js': 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js',
+    "bootstrap.min.css": "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css",
+    "bootstrap.bundle.min.js": "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js",
     
     # Font Awesome
-    'all.min.css': 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
+    "all.min.css": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css",
     
     # Animations
-    'aos.css': 'https://unpkg.com/aos@2.3.1/dist/aos.css',
-    'aos.js': 'https://unpkg.com/aos@2.3.1/dist/aos.js',
-    'animate.min.css': 'https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css',
+    "aos.css": "https://unpkg.com/aos@2.3.1/dist/aos.css",
+    "aos.js": "https://unpkg.com/aos@2.3.1/dist/aos.js",
+    "animate.min.css": "https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css",
     
     # 图表库
-    'chart.min.js': 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
+    "chart.min.js": "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js",
     
     # 工具库
-    'moment.min.js': 'https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js',
-    'lodash.min.js': 'https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js',
-    'axios.min.js': 'https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js',
+    "moment.min.js": "https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js",
+    "lodash.min.js": "https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js",
+    "axios.min.js": "https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js",
     
     # 数据表格
-    'datatables.min.js': 'https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js',
-    'datatables.min.css': 'https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css',
+    "datatables.min.js": "https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js",
+    "datatables.min.css": "https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css",
     
     # 表单验证
-    'validate.min.js': 'https://cdn.jsdelivr.net/npm/jquery-validation@1.19.5/dist/jquery.validate.min.js',
+    "validate.min.js": "https://cdn.jsdelivr.net/npm/jquery-validation@1.19.5/dist/jquery.validate.min.js",
 }
 
-@proxy_bp.route('/external/<path:url>', methods=['GET'])
+@proxy_bp.route("/external/<path:url>", methods=["GET"])
 def proxy_external(url):
     """代理外部URL的内容"""
     try:
@@ -77,12 +77,12 @@ def proxy_external(url):
             abort(response.status_code)
         
         # 处理内容类型
-        content_type = response.headers.get('Content-Type', 'application/octet-stream')
+        content_type = response.headers.get("Content-Type", "application/octet-stream")
         
         # 创建响应
         resp = make_response(response.content)
-        resp.headers['Content-Type'] = content_type
-        resp.headers['Cache-Control'] = 'public, max-age=86400'  # 缓存1天
+        resp.headers["Content-Type"] = content_type
+        resp.headers["Cache-Control"] = "public, max-age=86400"  # 缓存1天
         
         current_app.logger.info(f"成功代理外部资源: {url}")
         return resp
@@ -91,7 +91,7 @@ def proxy_external(url):
         current_app.logger.error(f"代理外部资源出错: {str(e)}")
         abort(500)
 
-@proxy_bp.route('/cached_vendor/<filename>', methods=['GET'])
+@proxy_bp.route("/cached_vendor/<filename>", methods=["GET"])
 def cached_vendor(filename):
     """提供缓存的第三方库文件"""
     try:
@@ -126,7 +126,7 @@ def cached_vendor(filename):
                     os.makedirs(os.path.dirname(filepath), exist_ok=True)
                     
                     # 保存文件内容
-                    with open(filepath, 'wb') as f:
+                    with open(filepath, "wb") as f:
                         f.write(response.content)
                     
                     current_app.logger.info(f"成功下载并缓存: {filename}")
@@ -144,11 +144,12 @@ def cached_vendor(filename):
                     abort(500)
         
         # 提供文件
-        content_type = mimetypes.guess_type(filepath)[0] or 'application/octet-stream'
+        content_type = mimetypes.guess_type(filepath)[0] or "application/octet-stream"
         
         # 如果是字体文件，需要特殊处理
-        if filename.startswith('webfonts/'):
-            font_extensions = {'.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.eot': 'application/vnd.ms-fontobject', '.svg': 'image/svg+xml'}
+        if filename.startswith("webfonts/"):
+            font_extensions = {".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf", 
+                              ".eot": "application/vnd.ms-fontobject", ".svg": "image/svg+xml"}
             for ext, mime in font_extensions.items():
                 if filename.endswith(ext):
                     content_type = mime
@@ -161,26 +162,26 @@ def cached_vendor(filename):
         current_app.logger.error(f"提供缓存的供应商文件出错: {str(e)}")
         abort(500)
 
-@proxy_bp.route('/webfonts/<filename>', methods=['GET'])
+@proxy_bp.route("/webfonts/<filename>", methods=["GET"])
 def serve_webfonts(filename):
     """提供字体文件"""
     try:
-        filepath = os.path.join(CACHE_DIR, 'webfonts', filename)
+        filepath = os.path.join(CACHE_DIR, "webfonts", filename)
         
         # 确保webfonts目录存在
-        webfonts_dir = os.path.join(CACHE_DIR, 'webfonts')
+        webfonts_dir = os.path.join(CACHE_DIR, "webfonts")
         if not os.path.exists(webfonts_dir):
             os.makedirs(webfonts_dir)
         
         # 如果文件不存在，尝试从Font Awesome CDN获取
         if not os.path.exists(filepath):
-            fa_url = f'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/webfonts/{filename}'
+            fa_url = f"https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/webfonts/{filename}"
             current_app.logger.info(f"下载字体文件: {filename} 从 {fa_url}")
             
             try:
                 response = requests.get(fa_url, timeout=10)
                 if response.status_code == 200:
-                    with open(filepath, 'wb') as f:
+                    with open(filepath, "wb") as f:
                         f.write(response.content)
                     current_app.logger.info(f"成功下载并缓存字体文件: {filename}")
                 else:
@@ -191,8 +192,9 @@ def serve_webfonts(filename):
                 abort(500)
         
         # 确定内容类型
-        font_extensions = {'.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.eot': 'application/vnd.ms-fontobject', '.svg': 'image/svg+xml'}
-        content_type = 'application/octet-stream'
+        font_extensions = {".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf", 
+                          ".eot": "application/vnd.ms-fontobject", ".svg": "image/svg+xml"}
+        content_type = "application/octet-stream"
         
         for ext, mime in font_extensions.items():
             if filename.endswith(ext):
@@ -203,4 +205,4 @@ def serve_webfonts(filename):
         return send_file(filepath, mimetype=content_type)
     except Exception as e:
         current_app.logger.error(f"提供字体文件出错: {str(e)}")
-        abort(500) 
+        abort(500)
