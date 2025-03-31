@@ -1,4 +1,4 @@
-from flask import Blueprint, request, Response, send_from_directory
+from flask import Blueprint, request, Response, send_from_directory, jsonify
 import requests
 import os
 import shutil
@@ -160,4 +160,48 @@ def download_font_awesome_files(vendor_dir):
                 with open(os.path.join(webfonts_dir, font_file), 'wb') as f:
                     f.write(response.content)
         except Exception as e:
-            print(f"下载字体文件 {font_file} 失败: {str(e)}") 
+            print(f"下载字体文件 {font_file} 失败: {str(e)}")
+
+@proxy_bp.route('/api/user/assets', methods=['GET'])
+def proxy_user_assets():
+    """获取用户资产"""
+    try:
+        address = request.args.get('address')
+        wallet_type = request.args.get('wallet_type', 'ethereum')
+        
+        # 硬编码三个测试资产
+        test_assets = [
+            {
+                "asset_id": 1,
+                "id": 1,
+                "name": "Palm Jumeirah Luxury Villa 8101",
+                "token_symbol": "RH-108235",
+                "price": 1.5,
+                "token_price": 1.5,
+                "holding_amount": 100
+            },
+            {
+                "asset_id": 2,
+                "id": 2,
+                "name": "Chinook Regional Hospital",
+                "token_symbol": "RH-205020",
+                "price": 2.75,
+                "token_price": 2.75,
+                "holding_amount": 50
+            },
+            {
+                "asset_id": 4,
+                "id": 4,
+                "name": "BTC ETF",
+                "token_symbol": "RH-205447",
+                "price": 0.85,
+                "token_price": 0.85,
+                "holding_amount": 200
+            }
+        ]
+        
+        # 返回JSON格式的测试资产数据
+        return jsonify(test_assets)
+    except Exception as e:
+        current_app.logger.error(f"获取用户资产失败: {str(e)}")
+        return jsonify([]) 
