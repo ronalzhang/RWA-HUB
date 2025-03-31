@@ -25,10 +25,9 @@ if [ -f app/static/vendor/solana-web3.min.js ]; then
 fi
 
 # 创建webfonts符号链接，解决Font Awesome路径问题
-echo "创建webfonts符号链接..."
-cd app/static
-ln -sf vendor/webfonts/* webfonts/
-cd ../../
+echo "复制webfonts文件..."
+mkdir -p app/static/webfonts
+cp -f app/static/vendor/webfonts/* app/static/webfonts/
 
 # 根据需要下载静态资源...
 
