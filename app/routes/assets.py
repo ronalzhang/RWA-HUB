@@ -49,10 +49,15 @@ def list_assets_page():
         page = request.args.get('page', 1, type=int)
         per_page = 9  # 每页显示9个资产
 
-        # 构建基础查询 - 所有人都可以看到已审核通过的资产
-        base_query = Asset.query.filter(Asset.status == AssetStatus.APPROVED.value)
+        # 构建基础查询 - 所有人都可以看到已审核通过的资产和待审核的资产
+        base_query = Asset.query.filter(
+            Asset.status.in_([
+                AssetStatus.APPROVED.value,  # 已审核通过的资产
+                AssetStatus.PENDING.value    # 待审核的资产
+            ])
+        )
         
-        # 管理员可以额外看到待审核和被拒绝的资产
+        # 管理员可以额外看到被拒绝的资产
         if current_user_address and is_admin_user:
             current_app.logger.info('管理员用户：显示所有未删除资产')
             # 管理员可以看到所有未删除的资产

@@ -1296,11 +1296,49 @@ def get_user_assets_query():
             
         current_app.logger.info(f"查询用户资产 - 地址: {wallet_address}, 钱包类型: {wallet_type}")
         
-        # 查询该用户持有的资产
-        # 1. 先查询交易记录
+        # 1. 首先从Holding表查询持仓记录
         holdings = Holding.query.filter_by(holder_address=wallet_address).all()
-        current_app.logger.info(f"找到 {len(holdings)} 条持仓记录")
+        current_app.logger.info(f"从Holding表找到 {len(holdings)} 条持仓记录")
         
+        # 如果从Holding表中找不到记录，尝试从Trade表查询购买记录
+        if not holdings:
+            current_app.logger.info(f"尝试从Trade表查询购买记录")
+            trades = Trade.query.filter_by(
+                trader_address=wallet_address, 
+                type=TradeType.BUY.value,
+                status=TradeStatus.COMPLETED.value
+            ).all()
+            
+            current_app.logger.info(f"从Trade表找到 {len(trades)} 条购买记录")
+            
+            # 如果找到交易记录，将其转换为用户资产格式
+            user_assets = []
+            for trade in trades:
+                try:
+                    # 获取资产信息
+                    asset = Asset.query.get(trade.asset_id)
+                    if not asset:
+                        current_app.logger.warning(f"找不到资产ID: {trade.asset_id}")
+                        continue
+                        
+                    # 构建资产数据
+                    asset_data = {
+                        "id": trade.id,
+                        "asset_id": asset.id,
+                        "name": asset.name,
+                        "token_symbol": asset.token_symbol,
+                        "token_price": asset.token_price,
+                        "price": asset.token_price,
+                        "holding_amount": trade.token_amount or 0
+                    }
+                    user_assets.append(asset_data)
+                except Exception as e:
+                    current_app.logger.error(f"处理交易记录 {trade.id} 时出错: {str(e)}")
+            
+            current_app.logger.info(f"从交易记录生成 {len(user_assets)} 个用户资产")
+            return jsonify(user_assets), 200
+        
+        # 2. 如果Holding表有记录，按原来的处理方式
         user_assets = []
         for holding in holdings:
             try:

@@ -13,8 +13,13 @@ def index():
         eth_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address')
         current_app.logger.info(f'当前用户钱包地址: {eth_address}')
         
-        # 默认显示已审核通过的资产
-        query = Asset.query.filter_by(status=AssetStatus.APPROVED.value)
+        # 默认显示已审核通过的资产和待审核的资产
+        query = Asset.query.filter(
+            Asset.status.in_([
+                AssetStatus.APPROVED.value,  # 已审核通过的资产
+                AssetStatus.PENDING.value    # 待审核的资产
+            ])
+        )
         
         # 如果是管理员，显示所有未删除的资产
         if eth_address and is_admin(eth_address):
