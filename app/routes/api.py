@@ -1315,7 +1315,8 @@ def get_user_assets_query():
                     )
                 ).first()
             else:  # Solana地址
-                user = User.query.filter_by(sol_address=address).first()
+                # 系统使用eth_address字段存储所有类型的地址，包括Solana地址
+                user = User.query.filter_by(eth_address=address).first()
         except Exception as e:
             current_app.logger.error(f'查询用户失败: {str(e)}')
             
