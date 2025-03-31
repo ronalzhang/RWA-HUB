@@ -48,7 +48,7 @@ class User(db.Model):
     @validates('eth_address')
     def validate_eth_address(self, key, value):
         if value:
-            if not re.match(r'^0x[a-fA-F0-9]{40}$', value):
+            if not (re.match(r'^0x[a-fA-F0-9]{40}$', value) or re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$', value)):
                 raise ValueError('Invalid Ethereum address format')
         return value
 
