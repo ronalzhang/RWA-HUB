@@ -35,6 +35,9 @@ from .service import *
 
 # 注册蓝图函数
 def register_blueprints(app):
+    # 导入代理路由蓝图
+    from .proxy import proxy_bp
+    
     # 注册所有蓝图
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(main_bp)
@@ -43,6 +46,7 @@ def register_blueprints(app):
     app.register_blueprint(admin_bp)
     app.register_blueprint(admin_api_bp)
     app.register_blueprint(service_bp)
+    app.register_blueprint(proxy_bp, url_prefix='/proxy')
     
     # 注册全局URL前缀修正处理器
     register_global_handlers(app)

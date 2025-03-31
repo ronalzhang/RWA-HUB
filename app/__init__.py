@@ -132,10 +132,6 @@ def create_app(config_name='development'):
     from .routes import register_blueprints
     register_blueprints(app)
     
-    # 单独注册代理路由
-    from .routes.proxy import proxy_bp
-    app.register_blueprint(proxy_bp, url_prefix='/proxy')
-    
     # 注册管理员API v2蓝图
     with app.app_context():
         from app.routes.admin_api import register_admin_v2_blueprint
