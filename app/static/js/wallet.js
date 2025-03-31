@@ -1765,7 +1765,7 @@ const walletState = {
                         asset_id: asset.asset_id || asset.id || 0,
                         name: asset.name || asset.asset_name || asset.title || 'Unknown Asset',
                         quantity: asset.holding_amount || asset.balance || asset.tokens || asset.amount || 0,
-                        symbol: asset.symbol || asset.token_symbol || `RH-${asset.asset_id || asset.id || '???'}`
+                        symbol: asset.token_symbol || asset.symbol || `RH-${asset.asset_id || asset.id || '???'}`
                     }));
                     
                     console.log(`[getUserAssets] 处理后的资产数据 (${formattedAssets.length} 个资产):`, formattedAssets);
@@ -2479,50 +2479,89 @@ async connectPhantom(isReconnect = false) {
                 userAgent: navigator.userAgent
             });
             
-            // 调用后端API执行真实的链上转账
-            console.log('调用后端API执行转账...');
-            const transferResponse = await fetch('/api/solana/execute_transfer', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Eth-Address': fromAddress,
-                    'X-Wallet-Type': 'phantom'
-                },
-                body: JSON.stringify({
-                    token_symbol: tokenSymbol,
-                    to_address: to,
-                    amount: amount,
+            // 调用后端API获取交易数据
+            console.log('获取交易数据...');
+            const transferResponse = await fetch('/api/solana/get_transfer_params', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Eth-Address': fromAddress,
+                        'X-Wallet-Type': 'phantom'
+                    },
+                    body: JSON.stringify({
+                        token_symbol: tokenSymbol,
+                        to_address: to,
+                        amount: amount,
                     from_address: fromAddress
-                })
-            });
-            
-            console.log('转账请求状态码:', transferResponse.status);
-            
+                    })
+                });
+                
             if (!transferResponse.ok) {
                 const errorText = await transferResponse.text();
-                console.error('转账请求失败:', transferResponse.status, errorText);
-                throw new Error('发送转账请求失败: HTTP ' + transferResponse.status);
+                console.error('获取交易参数失败:', transferResponse.status, errorText);
+                throw new Error('获取交易参数失败: HTTP ' + transferResponse.status);
             }
             
-            const transferResult = await transferResponse.json();
-            console.log('转账响应:', transferResult);
+            const transferData = await transferResponse.json();
+            console.log('获取到交易数据:', transferData);
             
-            if (!transferResult.success) {
-                console.error('转账处理失败:', transferResult.error || '未知错误');
-                throw new Error(`转账失败: ${transferResult.error || '未知错误'}`);
+            if (!transferData.success) {
+                throw new Error(`获取交易参数失败: ${transferData.error || '未知错误'}`);
             }
             
-            console.log('转账请求已发送！签名:', transferResult.signature);
-            
-            // 显示交易状态和签名
-            this._showTransactionStatus(transferResult.signature, tokenSymbol, amount, to);
-            
-            // 返回成功结果
-            return {
-                success: true,
-                txHash: transferResult.signature,
-                status: transferResult.tx_status || 'processing'
-            };
+            // 使用Phantom钱包签名交易
+            console.log('请求Phantom钱包签名交易...');
+            try {
+                // 将Base64编码的交易数据转换为Uint8Array
+                const transactionData = new Uint8Array(atob(transferData.transaction_data).split('').map(c => c.charCodeAt(0)));
+                
+                // 请求Phantom钱包签名交易
+                const signedTransaction = await window.solana.signTransaction(transactionData);
+                console.log('交易签名成功');
+                
+                // 调用后端API执行转账
+                console.log('执行转账...');
+                const executeResponse = await fetch('/api/solana/execute_transfer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Eth-Address': fromAddress,
+                        'X-Wallet-Type': 'phantom'
+                    },
+                    body: JSON.stringify({
+                        transaction_data: btoa(String.fromCharCode(...signedTransaction.signature)),
+                        signature: btoa(String.fromCharCode(...signedTransaction.signature)),
+                        public_key: fromAddress
+                    })
+                });
+                
+                if (!executeResponse.ok) {
+                    const errorText = await executeResponse.text();
+                    console.error('执行转账失败:', executeResponse.status, errorText);
+                    throw new Error('执行转账失败: HTTP ' + executeResponse.status);
+                }
+                
+                const executeResult = await executeResponse.json();
+                console.log('转账执行结果:', executeResult);
+                
+                if (!executeResult.success) {
+                    throw new Error(`转账失败: ${executeResult.error || '未知错误'}`);
+                }
+                
+                // 显示交易状态和签名
+                this._showTransactionStatus(executeResult.signature, tokenSymbol, amount, to);
+                
+                // 返回成功结果
+                return {
+                    success: true,
+                    txHash: executeResult.signature,
+                    status: executeResult.tx_status || 'processing'
+                };
+                
+            } catch (error) {
+                console.error('交易签名或执行失败:', error);
+                throw error;
+            }
             
         } catch (error) {
             console.error('Solana转账失败:', error);
@@ -2673,7 +2712,7 @@ async connectPhantom(isReconnect = false) {
                         });
                     }
                 }
-            } catch (error) {
+        } catch (error) {
                 console.error('检查交易状态出错:', error);
                 // 发生错误，继续重试
                 retryCount++;
