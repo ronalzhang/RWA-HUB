@@ -1,6 +1,7 @@
 from flask import Blueprint, request, Response, send_from_directory
 import requests
 import os
+import shutil
 
 proxy_bp = Blueprint('proxy', __name__)
 
@@ -70,8 +71,17 @@ def cached_vendor(filename):
             try:
                 response = requests.get(cdn_urls[filename])
                 if response.status_code == 200:
+                    content = response.content
+                    
+                    # 修正 Font Awesome CSS 中的字体路径
+                    if filename == 'all.min.css':
+                        content = fix_font_awesome_paths(content)
+                        # 下载字体文件
+                        download_font_awesome_files(vendor_dir)
+                        
+                    # 保存修正后的内容
                     with open(file_path, 'wb') as f:
-                        f.write(response.content)
+                        f.write(content)
             except Exception as e:
                 return str(e), 500
     
@@ -79,4 +89,73 @@ def cached_vendor(filename):
     if os.path.exists(file_path):
         return send_from_directory(vendor_dir, filename)
     else:
-        return f"资源 {filename} 不可用", 404 
+        return f"资源 {filename} 不可用", 404
+
+def fix_font_awesome_paths(content):
+    """修正 Font Awesome CSS 中的字体文件路径"""
+    content_str = content.decode('utf-8')
+    
+    # 替换 url(../webfonts/ 为 url(/static/vendor/webfonts/
+    content_str = content_str.replace('url(../webfonts/', 'url(/static/vendor/webfonts/')
+    
+    return content_str.encode('utf-8')
+
+# 字体文件路由
+@proxy_bp.route('/static/vendor/webfonts/<path:filename>')
+def webfonts(filename):
+    webfonts_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'vendor', 'webfonts')
+    if not os.path.exists(webfonts_dir):
+        os.makedirs(webfonts_dir)
+        
+    file_path = os.path.join(webfonts_dir, filename)
+    
+    # 如果文件不存在，从CDN下载
+    if not os.path.exists(file_path):
+        font_urls = {
+            'fa-solid-900.woff2': 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-solid-900.woff2',
+            'fa-solid-900.ttf': 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-solid-900.ttf',
+            'fa-regular-400.woff2': 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-regular-400.woff2',
+            'fa-regular-400.ttf': 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-regular-400.ttf',
+            'fa-brands-400.woff2': 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-brands-400.woff2',
+            'fa-brands-400.ttf': 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-brands-400.ttf'
+        }
+        
+        if filename in font_urls:
+            try:
+                response = requests.get(font_urls[filename])
+                if response.status_code == 200:
+                    with open(file_path, 'wb') as f:
+                        f.write(response.content)
+            except Exception as e:
+                return str(e), 500
+    
+    # 如果文件存在（或已下载），直接返回
+    if os.path.exists(file_path):
+        return send_from_directory(webfonts_dir, filename)
+    else:
+        return f"字体文件 {filename} 不可用", 404
+
+def download_font_awesome_files(vendor_dir):
+    """下载 Font Awesome 字体文件"""
+    webfonts_dir = os.path.join(vendor_dir, 'webfonts')
+    if not os.path.exists(webfonts_dir):
+        os.makedirs(webfonts_dir)
+    
+    font_files = [
+        'fa-solid-900.woff2',
+        'fa-solid-900.ttf',
+        'fa-regular-400.woff2',
+        'fa-regular-400.ttf',
+        'fa-brands-400.woff2',
+        'fa-brands-400.ttf'
+    ]
+    
+    for font_file in font_files:
+        url = f'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/{font_file}'
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                with open(os.path.join(webfonts_dir, font_file), 'wb') as f:
+                    f.write(response.content)
+        except Exception as e:
+            print(f"下载字体文件 {font_file} 失败: {str(e)}") 
