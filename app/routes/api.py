@@ -1286,40 +1286,48 @@ def check_if_admin():
 def get_user_assets_query():
     """获取用户持有的资产数据（通过查询参数）"""
     try:
-        # 返回一个硬编码的测试资产，确认前端渲染是否正常
-        test_assets = [
-            {
-                "id": 1,
-                "asset_id": 1,
-                "name": "Palm Jumeirah Luxury Villa 8101",
-                "token_symbol": "RH-108235",
-                "token_price": 1.5,
-                "price": 1.5,
-                "holding_amount": 100
-            },
-            {
-                "id": 2,
-                "asset_id": 2,
-                "name": "Chinook Regional Hospital",
-                "token_symbol": "RH-205020",
-                "token_price": 2.75,
-                "price": 2.75,
-                "holding_amount": 50
-            },
-            {
-                "id": 4,
-                "asset_id": 4,
-                "name": "BTC ETF",
-                "token_symbol": "RH-205447",
-                "token_price": 0.85,
-                "price": 0.85,
-                "holding_amount": 200
-            }
-        ]
+        # 获取用户地址和钱包类型
+        wallet_address = request.args.get('address')
+        wallet_type = request.args.get('wallet_type', 'ethereum')
         
-        return jsonify(test_assets), 200
+        if not wallet_address:
+            current_app.logger.error("缺少钱包地址参数")
+            return jsonify([]), 400
+            
+        current_app.logger.info(f"查询用户资产 - 地址: {wallet_address}, 钱包类型: {wallet_type}")
+        
+        # 查询该用户持有的资产
+        # 1. 先查询交易记录
+        holdings = Holding.query.filter_by(holder_address=wallet_address).all()
+        current_app.logger.info(f"找到 {len(holdings)} 条持仓记录")
+        
+        user_assets = []
+        for holding in holdings:
+            try:
+                # 获取资产信息
+                asset = Asset.query.get(holding.asset_id)
+                if not asset:
+                    current_app.logger.warning(f"找不到资产ID: {holding.asset_id}")
+                    continue
+                    
+                # 构建资产数据
+                asset_data = {
+                    "id": holding.id,
+                    "asset_id": asset.id,
+                    "name": asset.name,
+                    "token_symbol": asset.token_symbol,
+                    "token_price": asset.token_price,
+                    "price": asset.token_price,
+                    "holding_amount": holding.amount
+                }
+                user_assets.append(asset_data)
+            except Exception as e:
+                current_app.logger.error(f"处理资产ID {holding.asset_id}时出错: {str(e)}")
+                
+        current_app.logger.info(f"返回 {len(user_assets)} 个用户资产")
+        return jsonify(user_assets), 200
     except Exception as e:
-        print(f'获取资产失败: {str(e)}')
+        current_app.logger.error(f'获取用户资产失败: {str(e)}', exc_info=True)
         return jsonify([]), 200
 
 # 添加短链接相关API

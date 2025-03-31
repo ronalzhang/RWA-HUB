@@ -49,45 +49,33 @@ def list_assets_page():
         page = request.args.get('page', 1, type=int)
         per_page = 9  # 每页显示9个资产
 
-        # 构建基础查询
-        query = Asset.query.filter(Asset.status != 0)  # 0 表示已删除
+        # 构建基础查询 - 所有人都可以看到已审核通过的资产
+        base_query = Asset.query.filter(Asset.status == AssetStatus.APPROVED.value)
         
-        # 记录原始查询结果数量
-        total_count = query.count()
-        current_app.logger.info(f'未过滤的资产总数: {total_count}')
-        current_app.logger.info(f'未过滤的资产列表: {[(a.id, a.name, a.status) for a in query.all()]}')
-
-        # 临时禁用过滤，显示所有资产
-        '''
-        # 根据用户身份过滤资产
-        if current_user_address:
-            if is_admin_user:
-                current_app.logger.info('管理员用户：显示所有未删除资产')
-                # 管理员可以看到所有未删除的资产
-                pass
-            else:
-                current_app.logger.info('普通用户：显示已审核通过的资产和自己的资产')
-                # 普通用户：显示已审核通过的资产和自己的资产
-                query = query.filter(
-                    db.or_(
-                        Asset.status == 2,  # 2 表示已审核通过
-                        Asset.owner_address == current_user_address
+        # 管理员可以额外看到待审核和被拒绝的资产
+        if current_user_address and is_admin_user:
+            current_app.logger.info('管理员用户：显示所有未删除资产')
+            # 管理员可以看到所有未删除的资产
+            base_query = Asset.query.filter(Asset.status != AssetStatus.DELETED.value)
+        # 登录用户可以额外看到自己创建的资产，即使未审核
+        elif current_user_address:
+            current_app.logger.info('普通已登录用户：显示已审核通过的资产和自己的资产')
+            base_query = Asset.query.filter(
+                db.or_(
+                    Asset.status == AssetStatus.APPROVED.value,  # 已审核通过的资产
+                    db.and_(
+                        Asset.owner_address == current_user_address,  # 自己创建的资产
+                        Asset.status != AssetStatus.DELETED.value  # 未删除的资产
                     )
                 )
-        else:
-            current_app.logger.info('未登录用户：只显示已审核通过的资产')
-            # 未登录用户：只显示已审核通过的资产
-            query = query.filter(Asset.status == 2)  # 2 表示已审核通过
-        '''
-        current_app.logger.info('临时禁用过滤，显示所有资产')
-
+            )
+        
         # 记录过滤后的查询结果数量
-        filtered_count = query.count()
+        filtered_count = base_query.count()
         current_app.logger.info(f'过滤后的资产数量: {filtered_count}')
-        current_app.logger.info(f'过滤后的资产列表: {[(a.id, a.name, a.status) for a in query.all()]}')
 
         # 按创建时间倒序排序
-        query = query.order_by(Asset.created_at.desc())
+        query = base_query.order_by(Asset.created_at.desc())
 
         # 执行分页查询
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)

@@ -92,11 +92,7 @@
             <div class="text-center py-5">
                 <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
                 <h4 class="text-muted">{{ _('No Assets') }}</h4>
-                {% if current_user_address %}
-                <p class="text-muted mb-4">{{ _('Click the "Publish Asset" button in the top right to create') }}</p>
-                {% else %}
-                <p class="text-muted mb-4">{{ _('Please connect wallet first') }}</p>
-                {% endif %}
+                <p class="text-muted mb-4">{{ _('No assets are currently available in the system') }}</p>
             </div>
         </div>
         {% endif %}
