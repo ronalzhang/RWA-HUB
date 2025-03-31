@@ -95,13 +95,15 @@ def fix_font_awesome_paths(content):
     """修正 Font Awesome CSS 中的字体文件路径"""
     content_str = content.decode('utf-8')
     
-    # 替换 url(../webfonts/ 为 url(/static/vendor/webfonts/
-    content_str = content_str.replace('url(../webfonts/', 'url(/static/vendor/webfonts/')
+    # 替换字体路径为我们的代理路径
+    content_str = content_str.replace('url(../webfonts/', 'url(/proxy/static/webfonts/')
+    content_str = content_str.replace('url("../webfonts/', 'url("/proxy/static/webfonts/')
+    content_str = content_str.replace("url('../webfonts/", "url('/proxy/static/webfonts/")
     
     return content_str.encode('utf-8')
 
 # 字体文件路由
-@proxy_bp.route('/static/vendor/webfonts/<path:filename>')
+@proxy_bp.route('/proxy/static/webfonts/<path:filename>')
 def webfonts(filename):
     webfonts_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'vendor', 'webfonts')
     if not os.path.exists(webfonts_dir):
