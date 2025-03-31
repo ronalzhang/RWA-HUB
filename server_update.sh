@@ -15,6 +15,7 @@ git pull
 # 确保vendor目录存在
 echo "创建vendor目录..."
 mkdir -p app/static/vendor/webfonts
+mkdir -p app/static/webfonts
 
 # 创建必要的符号链接
 echo "创建符号链接..."
@@ -22,6 +23,12 @@ if [ -f app/static/vendor/solana-web3.min.js ]; then
   ln -sf solana-web3.min.js app/static/vendor/solana-web3.js
   ln -sf solana-web3.min.js app/static/vendor/solana-web3-stable.js
 fi
+
+# 创建webfonts符号链接，解决Font Awesome路径问题
+echo "创建webfonts符号链接..."
+cd app/static
+ln -sf vendor/webfonts/* webfonts/
+cd ../../
 
 # 根据需要下载静态资源...
 
