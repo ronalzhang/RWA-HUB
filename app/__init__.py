@@ -11,6 +11,14 @@ from app.extensions import db, babel, limiter, scheduler, migrate, cors, configu
 from pathlib import Path
 from app.config import config
 from logging.handlers import RotatingFileHandler
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_cors import CORS
+from .config import Config
+
+db = SQLAlchemy()
+migrate = Migrate()
+babel = Babel()
 
 def create_app(config_name='development'):
     """创建Flask应用实例"""
@@ -79,8 +87,10 @@ def create_app(config_name='development'):
             return []
     
     # 初始化扩展
-    from .extensions import init_extensions
-    init_extensions(app)
+    db.init_app(app)
+    migrate.init_app(app, db)
+    CORS(app)
+    babel.init_app(app)
     
     # 设置Babel配置
     app.config['BABEL_DEFAULT_LOCALE'] = 'en'
@@ -119,8 +129,14 @@ def create_app(config_name='development'):
         raise RuntimeError("存储初始化失败")
     
     # 注册蓝图
-    from .routes import register_blueprints
-    register_blueprints(app)
+    from .routes import assets_bp, assets_api_bp, admin_bp, admin_api_bp
+    from .routes.proxy import proxy_bp
+    
+    app.register_blueprint(assets_bp)
+    app.register_blueprint(assets_api_bp, url_prefix='/api')
+    app.register_blueprint(admin_bp, url_prefix='/admin')
+    app.register_blueprint(admin_api_bp, url_prefix='/api/admin')
+    app.register_blueprint(proxy_bp, url_prefix='/proxy')
     
     # 注册管理员API v2蓝图
     with app.app_context():
