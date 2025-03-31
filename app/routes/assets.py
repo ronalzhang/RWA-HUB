@@ -57,6 +57,8 @@ def list_assets_page():
         current_app.logger.info(f'未过滤的资产总数: {total_count}')
         current_app.logger.info(f'未过滤的资产列表: {[(a.id, a.name, a.status) for a in query.all()]}')
 
+        # 临时禁用过滤，显示所有资产
+        '''
         # 根据用户身份过滤资产
         if current_user_address:
             if is_admin_user:
@@ -76,6 +78,8 @@ def list_assets_page():
             current_app.logger.info('未登录用户：只显示已审核通过的资产')
             # 未登录用户：只显示已审核通过的资产
             query = query.filter(Asset.status == 2)  # 2 表示已审核通过
+        '''
+        current_app.logger.info('临时禁用过滤，显示所有资产')
 
         # 记录过滤后的查询结果数量
         filtered_count = query.count()
