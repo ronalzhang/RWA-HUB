@@ -79,8 +79,11 @@ def create_app(config_name='development'):
             return []
     
     # 初始化扩展
-    from .extensions import init_extensions
+    from .extensions import init_extensions, bind_db_to_app
     init_extensions(app)
+    
+    # 确保SQLAlchemy模型绑定到应用上下文
+    bind_db_to_app(app)
     
     # 设置Babel配置
     app.config['BABEL_DEFAULT_LOCALE'] = 'en'
