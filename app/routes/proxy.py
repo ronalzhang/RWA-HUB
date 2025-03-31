@@ -1,4 +1,4 @@
-from flask import Blueprint, request, Response, send_from_directory, jsonify
+from flask import Blueprint, request, Response, send_from_directory, jsonify, current_app
 import requests
 import os
 import shutil
