@@ -22,6 +22,15 @@
     <!-- AOS Animation -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.1/aos.css" rel="stylesheet">
     
+    <!-- Solana Web3.js -->
+    <script src="https://unpkg.com/@solana/web3.js@1.98.0/lib/index.iife.min.js"></script>
+    <script>
+        // 如果 CDN 加载失败，使用本地文件
+        if (typeof solanaWeb3 === 'undefined') {
+            document.write('<script src="{{ url_for("static", filename="js/solana-web3.min.js") }}"><\/script>');
+        }
+    </script>
+    
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     
     <!-- 在此处引入额外的CSS文件 -->
@@ -1622,13 +1631,6 @@
     <!-- 添加bs58库，确保所有页面都能使用 -->
     <!-- <script src="https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/index.js"></script> -->
     
-    <!-- 添加Solana Web3.js库 -->
-    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-    <script>
-        // 确保Solana Web3库可用
-        window.solanaWeb3 = window.solanaWeb3 || solanaWeb3;
-    </script>
-
     <!-- 添加内置bs58库实现 -->
     <script>
         // 提供内置的bs58实现，避免依赖外部CDN
