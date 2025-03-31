@@ -25,6 +25,51 @@
     <!-- Solana Web3.js -->
     <script src="{{ url_for('proxy.cached_vendor', filename='solana-web3.min.js') }}"></script>
     
+    <!-- 静态 webfonts -->
+    <style>
+    @font-face {
+        font-family: 'Font Awesome 6 Free';
+        font-style: normal;
+        font-weight: 900;
+        font-display: block;
+        src: url("/static/vendor/webfonts/fa-solid-900.woff2") format("woff2"),
+             url("/static/vendor/webfonts/fa-solid-900.ttf") format("truetype");
+    }
+
+    @font-face {
+        font-family: 'Font Awesome 6 Free';
+        font-style: normal;
+        font-weight: 400;
+        font-display: block;
+        src: url("/static/vendor/webfonts/fa-regular-400.woff2") format("woff2"),
+             url("/static/vendor/webfonts/fa-regular-400.ttf") format("truetype");
+    }
+
+    @font-face {
+        font-family: 'Font Awesome 6 Brands';
+        font-style: normal;
+        font-weight: 400;
+        font-display: block;
+        src: url("/static/vendor/webfonts/fa-brands-400.woff2") format("woff2"),
+             url("/static/vendor/webfonts/fa-brands-400.ttf") format("truetype");
+    }
+
+    .fas {
+        font-family: 'Font Awesome 6 Free';
+        font-weight: 900;
+    }
+
+    .far {
+        font-family: 'Font Awesome 6 Free';
+        font-weight: 400;
+    }
+
+    .fab {
+        font-family: 'Font Awesome 6 Brands';
+        font-weight: 400;
+    }
+    </style>
+    
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     
     <!-- 在此处引入额外的CSS文件 -->
