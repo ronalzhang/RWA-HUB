@@ -1286,43 +1286,40 @@ def check_if_admin():
 def get_user_assets_query():
     """获取用户持有的资产数据（通过查询参数）"""
     try:
-        # 从查询参数获取地址和钱包类型
-        address = request.args.get('address')
-        wallet_type = request.args.get('wallet_type', 'ethereum')
+        # 返回一个硬编码的测试资产，确认前端渲染是否正常
+        test_assets = [
+            {
+                "id": 1,
+                "asset_id": 1,
+                "name": "Palm Jumeirah Luxury Villa 8101",
+                "token_symbol": "RH-108235",
+                "token_price": 1.5,
+                "price": 1.5,
+                "holding_amount": 100
+            },
+            {
+                "id": 2,
+                "asset_id": 2,
+                "name": "Chinook Regional Hospital",
+                "token_symbol": "RH-205020",
+                "token_price": 2.75,
+                "price": 2.75,
+                "holding_amount": 50
+            },
+            {
+                "id": 4,
+                "asset_id": 4,
+                "name": "BTC ETF",
+                "token_symbol": "RH-205447",
+                "token_price": 0.85,
+                "price": 0.85,
+                "holding_amount": 200
+            }
+        ]
         
-        if not address:
-            return jsonify({'success': False, 'error': '缺少钱包地址'}), 400
-            
-        # 记录当前请求的钱包地址，用于调试
-        current_app.logger.info(f'通过查询参数获取资产 - 地址: {address}, 类型: {wallet_type}')
-        
-        # 直接获取所有已审核通过的资产
-        from app.models.asset import Asset, AssetStatus
-        
-        # 返回所有状态为APPROVED的资产
-        query = Asset.query.filter_by(status=AssetStatus.APPROVED.value)
-        assets = query.order_by(Asset.created_at.desc()).all()
-        
-        current_app.logger.info(f'找到 {len(assets)} 个可用资产')
-        
-        # 转换为字典格式
-        asset_list = []
-        for asset in assets:
-            try:
-                # 使用Asset模型的to_dict方法获取标准格式
-                asset_dict = asset.to_dict()
-                # 添加持有量字段，这里默认为0
-                asset_dict['holding_amount'] = 0
-                asset_list.append(asset_dict)
-            except Exception as e:
-                current_app.logger.error(f'转换资产 {asset.id} 为字典时出错: {str(e)}')
-                continue
-        
-        current_app.logger.info(f'返回 {len(asset_list)} 个资产')
-        return jsonify(asset_list), 200
-        
+        return jsonify(test_assets), 200
     except Exception as e:
-        current_app.logger.error(f'获取资产失败: {str(e)}', exc_info=True)
+        print(f'获取资产失败: {str(e)}')
         return jsonify([]), 200
 
 # 添加短链接相关API
