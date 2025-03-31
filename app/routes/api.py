@@ -36,6 +36,7 @@ from sqlalchemy import desc, or_, and_, func, text
 # from ..models.history_trade import HistoryTrade
 # from ..models.notice import Notice
 from app.models.referral import UserReferral, CommissionRecord, DistributionSetting
+from app.models.holding import Holding
 
 api_bp = Blueprint('api', __name__)
 
@@ -1295,9 +1296,65 @@ def get_user_assets_query():
         # 记录当前请求的钱包地址，用于调试
         current_app.logger.info(f'通过查询参数获取资产 - 地址: {address}, 类型: {wallet_type}')
         
-        # 返回空数组，让系统从区块链获取真实数据
-        current_app.logger.info('返回空数组，系统将从区块链获取真实数据')
-        return jsonify([]), 200
+        # 添加查询资产的逻辑
+        from app.models.asset import Asset
+        from app.models.holding import Holding
+        from app.models.user import User
+        from sqlalchemy import or_
+        
+        # 查询用户
+        user = None
+        try:
+            # 尝试查找用户 - 兼容不同地址大小写
+            if address.startswith('0x'):  # 以太坊地址
+                # 查询用户 - 同时匹配原始大小写和小写地址
+                user = User.query.filter(
+                    or_(
+                        User.eth_address == address,
+                        User.eth_address == address.lower()
+                    )
+                ).first()
+            else:  # Solana地址
+                user = User.query.filter_by(sol_address=address).first()
+        except Exception as e:
+            current_app.logger.error(f'查询用户失败: {str(e)}')
+            
+        # 如果找不到用户，返回空数组
+        if not user:
+            current_app.logger.info(f'未找到用户: {address}，返回空数组')
+            return jsonify([]), 200
+            
+        current_app.logger.info(f'找到用户 ID: {user.id}，查询其资产')
+        
+        # 查询用户持有的资产
+        holdings = Holding.query.filter_by(user_id=user.id).all()
+        
+        # 如果没有持有资产，返回空数组
+        if not holdings:
+            current_app.logger.info(f'用户 {user.id} 没有持有资产，返回空数组')
+            return jsonify([]), 200
+            
+        # 准备返回的资产数据
+        result = []
+        
+        for holding in holdings:
+            # 查询资产详情
+            asset = Asset.query.get(holding.asset_id)
+            if not asset:
+                continue
+                
+            # 构建资产数据
+            asset_data = {
+                'asset_id': asset.id,
+                'name': asset.name,
+                'token_symbol': asset.token_symbol,
+                'quantity': holding.quantity,
+                'token_price': asset.token_price
+            }
+            result.append(asset_data)
+            
+        current_app.logger.info(f'返回用户 {user.id} 的 {len(result)} 个资产')
+        return jsonify(result), 200
         
     except Exception as e:
         current_app.logger.error(f'获取用户资产失败: {str(e)}', exc_info=True)
@@ -2189,7 +2246,8 @@ def register_pending_payment():
             'platform_address': platform_address,
             'status': 'pending',
             'registered_at': datetime.utcnow().isoformat(),
-            'registered_by': g.eth_address
+            'registered_by': g.eth_address,
+            'note': '使用备用转账方案，需要管理员审核确认'
         }
         
         # 更新资产支付信息
@@ -2199,8 +2257,8 @@ def register_pending_payment():
         # 保存到数据库
         db.session.commit()
         
-        # 记录日志
-        current_app.logger.info(f"已注册支付交易 - 资产ID: {asset_id}, 交易哈希: {tx_hash}")
+        # 记录明确的日志，说明这是备用转账方案
+        current_app.logger.warning(f"已注册备用转账方案支付 - 资产ID: {asset_id}, 交易哈希: {tx_hash}, 当前需要管理员后台确认")
         
         # 触发异步任务检查交易（如果有后台任务系统）
         try:
@@ -2216,9 +2274,10 @@ def register_pending_payment():
         
         return jsonify({
             'success': True,
-            'message': '支付交易已注册，系统将异步处理确认',
+            'message': '支付交易已注册，系统将异步处理确认(备用转账方案)',
             'asset_id': asset_id,
-            'tx_hash': tx_hash
+            'tx_hash': tx_hash,
+            'note': '当前使用备用转账方案，需要管理员后台确认'
         })
         
     except Exception as e:
@@ -2448,8 +2507,7 @@ def get_latest_blockhash():
 @eth_address_required
 def get_transfer_params():
     """
-    获取转账交易所需的参数
-    返回交易数据和消息，用于钱包签名
+    获取Solana转账交易参数
     """
     try:
         # 检查钱包连接状态
@@ -2462,60 +2520,46 @@ def get_transfer_params():
             return jsonify({'success': False, 'error': '无效的请求数据'}), 400
             
         # 检查必要字段
-        required_fields = ['token_symbol', 'to_address', 'amount']
+        required_fields = ['token_symbol', 'to_address', 'amount', 'from_address']
         for field in required_fields:
             if field not in data:
                 return jsonify({'success': False, 'error': f'缺少必要字段: {field}'}), 400
                 
+        # 获取参数
         token_symbol = data.get('token_symbol')
         to_address = data.get('to_address')
         amount = float(data.get('amount'))
-        # blockhash可选，如果没有提供会在后端自动获取
-        blockhash = data.get('blockhash')
-        from_address = g.eth_address
+        from_address = data.get('from_address')
         
-        # 记录请求信息
-        current_app.logger.info(f"获取转账参数 - 用户: {from_address}, 代币: {token_symbol}, 接收方: {to_address}, 金额: {amount}")
-        
-        # 获取交易参数和消息
-        from app.blockchain.solana_service import prepare_transfer_transaction
-        
+        # 验证发送方地址
+        if from_address != g.eth_address:
+            return jsonify({'success': False, 'error': '发送方地址与当前连接的钱包地址不匹配'}), 403
+            
+        # 准备交易数据
         try:
-            # 如果没有提供blockhash，后端会自动获取
-            transaction_data, message_data = prepare_transfer_transaction(
+            transaction_bytes, message_bytes = prepare_transfer_transaction(
                 token_symbol=token_symbol,
                 from_address=from_address,
                 to_address=to_address,
-                amount=amount,
-                blockhash=blockhash
+                amount=amount
             )
             
-            # 检查返回结果
-            if not transaction_data or not message_data:
-                raise Exception("无法创建有效的交易数据")
+            # 将交易数据转换为Base64编码
+            transaction_data = base64.b64encode(transaction_bytes).decode('utf-8')
             
-            # 转换为Base64格式
-            import base64
-            transaction_base64 = base64.b64encode(transaction_data).decode('ascii')
-            message_base64 = base64.b64encode(message_data).decode('ascii')
-            
-            # 记录成功信息
-            current_app.logger.info(f"成功生成转账参数 - 用户: {from_address}")
-            
-            # 返回成功结果
             return jsonify({
                 'success': True,
-                'transaction': transaction_base64,
-                'message': message_base64
+                'transaction_data': transaction_data,
+                'message_data': base64.b64encode(message_bytes).decode('utf-8')
             })
             
-        except Exception as prepare_error:
-            current_app.logger.error(f"准备交易数据失败: {str(prepare_error)}")
-            return jsonify({'success': False, 'error': f'准备交易数据失败: {str(prepare_error)}'}), 500
-        
+        except Exception as e:
+            current_app.logger.error(f"准备交易数据失败: {str(e)}")
+            return jsonify({'success': False, 'error': f'准备交易数据失败: {str(e)}'}), 500
+            
     except Exception as e:
-        current_app.logger.error(f"处理转账参数请求失败: {str(e)}")
-        return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
+        current_app.logger.error(f"获取转账参数失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'获取转账参数失败: {str(e)}'}), 500
 
 
 @api_bp.route('/solana/send_signed_transaction', methods=['POST'])
