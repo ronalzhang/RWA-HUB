@@ -109,21 +109,21 @@
                                         <i class="fas fa-map-marker-alt me-1"></i>{{ asset.location }}
                                     </p>
                                     {% if asset.asset_type == 10 %}
-                                    <p class="mb-2">
+                                    <p class="mb-2 d-flex justify-content-between">
                                         <span class="text-muted">{{ _('Area') }}：</span>
                                         <span class="fw-bold">{{ asset.area|number_format }} ㎡</span>
                                     </p>
                                     {% else %}
-                                    <p class="mb-2">
+                                    <p class="mb-2 d-flex justify-content-between">
                                         <span class="text-muted">{{ _('Total Value') }}：</span>
                                         <span class="fw-bold">{{ asset.total_value|number_format }} USDC</span>
                                     </p>
                                     {% endif %}
-                                    <p class="mb-2">
+                                    <p class="mb-2 d-flex justify-content-between">
                                         <span class="text-muted">{{ _('Token Price') }}：</span>
                                         <span class="fw-bold">{{ asset.token_price|number_format }} USDC</span>
                                     </p>
-                                    <p class="mb-0">
+                                    <p class="mb-0 d-flex justify-content-between">
                                         <span class="text-muted">{{ _('Expected Annual Revenue') }}：</span>
                                         <span class="text-success fw-bold">{{ asset.annual_revenue|number_format }} USDC</span>
                                     </p>
