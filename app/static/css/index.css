@@ -172,13 +172,13 @@
     padding: 1.5rem;
 }
 
-.asset-title {
+.card-title {
     font-size: 1.1rem;
     color: var(--primary-color);
     font-weight: 600;
 }
 
-.asset-details {
+.card-text {
     font-size: 0.9rem;
 }
 
