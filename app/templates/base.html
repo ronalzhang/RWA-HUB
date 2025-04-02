@@ -1469,7 +1469,7 @@
     <!-- 修复资产卡片样式 -->
     <style id="asset-card-fix">
         /* 资产卡片基础样式 - 限制作用域到首页和资产列表页 */
-        .index-page .asset-card, .asset-list-page .asset-card, 
+        /*
         .index-page .card, .asset-list-page .card {
             border-radius: 12px;
             overflow: hidden;
@@ -1484,12 +1484,12 @@
             cursor: pointer;
         }
         
-        .index-page .asset-card:hover, .asset-list-page .asset-card:hover,
         .index-page .card:hover, .asset-list-page .card:hover {
             transform: translateY(-5px);
             box-shadow: 0 10px 20px rgba(0,0,0,0.1);
         }
-        
+        */
+
         /* 平台优势卡片无特效 */
         .bg-transparent.card:hover,
         .feature-card:hover,
@@ -1499,13 +1499,14 @@
         }
         
         /* 卡片内容区域 - 限制作用域到首页和资产列表页 */
-        .index-page .asset-info, .asset-list-page .asset-info,
+        /*
         .index-page .card-body, .asset-list-page .card-body {
             padding: 1rem;
             flex: 1;
             display: flex;
             flex-direction: column;
         }
+        */
         
         /* 图片样式 */
         .index-page .img-cover, .asset-list-page .img-cover,
@@ -1516,6 +1517,7 @@
         }
         
         /* 资产标题 */
+        /*
         .index-page .asset-title, .asset-list-page .asset-title {
             font-size: 1.1rem;
             color: var(--primary-color);
@@ -1548,6 +1550,7 @@
             margin-right: 0.25rem;
             opacity: 0.7;
         }
+        */
         
         /* 资产标签样式 */
         .index-page .asset-tag, .asset-list-page .asset-tag {
@@ -1608,9 +1611,11 @@
         }
         
         /* 卡片中行间距优化 */
+        /* 
         .index-page .card .row, .asset-list-page .card .row {
             margin-bottom: 0.5rem;
         }
+        */
         
         /* 首页特别样式 */
         .index-page .asset-image {
