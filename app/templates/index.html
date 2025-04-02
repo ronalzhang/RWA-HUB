@@ -372,26 +372,35 @@
     align-items: center;
 }
 
+/* 确保首页资产卡片样式与列表页一致 */
+.card {
+    transition: all 0.3s ease;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }
 
-.img-placeholder {
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.card-img-top {
     width: 100%;
-    height: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+
+/* 卡片占位图样式 */
+.card-img-top.d-flex {
     background: #f8f9fa;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #adb5bd;
-    font-size: 2rem;
 }
 
-.asset-status {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-}
-
-.asset-info {
+.card-body {
     padding: 1.5rem;
 }
 
