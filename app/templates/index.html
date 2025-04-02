@@ -102,10 +102,10 @@
                             <!-- Asset Info -->
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <h5 class="asset-title text-truncate mb-0">{{ asset.name }}</h5>
+                                    <h5 class="card-title text-truncate mb-0">{{ asset.name }}</h5>
                                     <span class="badge bg-primary">{{ asset.token_symbol }}</span>
                                 </div>
-                                <div class="asset-details">
+                                <div class="card-text">
                                     <p class="location mb-2">
                                         <i class="fas fa-map-marker-alt me-1"></i>{{ asset.location }}
                                     </p>
@@ -404,13 +404,13 @@
     padding: 1.5rem;
 }
 
-.asset-title {
+.card-title {
     font-size: 1.1rem;
     color: var(--primary-color);
     font-weight: 600;
 }
 
-.asset-details {
+.card-text {
     font-size: 0.9rem;
 }
 
@@ -461,7 +461,7 @@
 }
 
 /* 确保首页资产卡片样式与列表页一致 */
-.asset-title.text-truncate {
+.card-title.text-truncate {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
