@@ -127,7 +127,16 @@ def cached_vendor(filename):
                     
                     # 保存文件内容
                     with open(filepath, "wb") as f:
-                        f.write(response.content)
+                        # 如果是CSS文件，修正webfonts路径
+                        if filename == "all.min.css":
+                            content = response.content.decode('utf-8')
+                            # 替换字体文件路径，将 ../webfonts/ 或 ./webfonts/ 改为 /proxy/webfonts/
+                            content = content.replace("../webfonts/", "/proxy/webfonts/")
+                            content = content.replace("./webfonts/", "/proxy/webfonts/")
+                            content = content.replace("url(webfonts/", "url(/proxy/webfonts/")
+                            f.write(content.encode('utf-8'))
+                        else:
+                            f.write(response.content)
                     
                     current_app.logger.info(f"成功下载并缓存: {filename}")
                 else:
