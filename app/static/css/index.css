@@ -6,259 +6,269 @@
 }
 
 .py-6 {
-    padding-top: 5rem;
-    padding-bottom: 5rem;
+    padding-top: 5rem !important;
+    padding-bottom: 5rem !important;
 }
 
 /* Hero Section */
-.hero-section {
-    background: var(--gradient);
-    padding: 2rem 0 1rem;
-    position: relative;
-    overflow: hidden;
+.index-page .hero-section {
+    background: var(--gradient) !important;
+    padding: 2rem 0 1rem !important;
+    position: relative !important;
+    overflow: hidden !important;
 }
 
-.hero-bg-pattern {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+.index-page .hero-bg-pattern {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
     background-image: 
         radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1) 0%, transparent 50%),
-        radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 50%);
-    opacity: 0.6;
+        radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 50%) !important;
+    opacity: 0.6 !important;
 }
 
-.gradient-text {
-    background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+.index-page .gradient-text {
+    background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
 }
 
-.hero-stats {
-    border: 1px solid rgba(255,255,255,0.1);
+.index-page .hero-stats {
+    border: 1px solid rgba(255,255,255,0.1) !important;
 }
 
-.backdrop-blur {
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+.index-page .backdrop-blur {
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
 }
 
-.stat-item {
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 1rem;
-    transition: all 0.3s ease;
+.index-page .stat-item {
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 1rem !important;
+    transition: all 0.3s ease !important;
 }
 
-.stat-item:hover {
-    background: rgba(255,255,255,0.1);
-    transform: translateY(-5px);
+.index-page .stat-item:hover {
+    background: rgba(255,255,255,0.1) !important;
+    transform: translateY(-5px) !important;
 }
 
-.text-gradient {
-    background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-size: 2rem;
+.index-page .text-gradient {
+    background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    font-size: 2rem !important;
 }
 
 /* 按钮样式 */
-.btn {
-    border-radius: 0.75rem;
-    transition: all 0.3s ease;
+.index-page .btn {
+    border-radius: 0.75rem !important;
+    transition: all 0.3s ease !important;
 }
 
-.btn-gradient {
-    background: var(--gradient);
-    border: none;
-    color: white;
+.index-page .btn-gradient {
+    background: var(--gradient) !important;
+    border: none !important;
+    color: white !important;
 }
 
-.btn-gradient:hover {
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(30, 60, 114, 0.3);
+.index-page .btn-gradient:hover {
+    color: white !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(30, 60, 114, 0.3) !important;
 }
 
 /* 特色卡片 */
-.feature-card {
-    padding: 2rem;
-    border-radius: 1rem;
-    background: white;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
-    transition: all 0.3s ease;
+.index-page .feature-card {
+    padding: 2rem !important;
+    border-radius: 1rem !important;
+    background: white !important;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06) !important;
+    transition: all 0.3s ease !important;
 }
 
-.feature-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+.index-page .feature-card:hover {
+    transform: translateY(-5px) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1) !important;
 }
 
-.feature-icon {
-    width: 64px;
-    height: 64px;
-    border-radius: 1rem;
-    background: var(--gradient);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 1.5rem;
+.index-page .feature-icon {
+    width: 64px !important;
+    height: 64px !important;
+    border-radius: 1rem !important;
+    background: var(--gradient) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: white !important;
+    font-size: 1.5rem !important;
 }
 
 /* 资产类型卡片 */
-.asset-type-card {
-    padding: 2rem;
-    border-radius: 1rem;
-    background: white;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
-    transition: all 0.3s ease;
+.index-page .asset-type-card {
+    padding: 2rem !important;
+    border-radius: 1rem !important;
+    background: white !important;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06) !important;
+    transition: all 0.3s ease !important;
 }
 
-.asset-type-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+.index-page .asset-type-card:hover {
+    transform: translateY(-5px) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1) !important;
 }
 
-.asset-type-icon {
-    width: 80px;
-    height: 80px;
-    border-radius: 1.5rem;
-    background: var(--gradient);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 2rem;
+.index-page .asset-type-icon {
+    width: 80px !important;
+    height: 80px !important;
+    border-radius: 1.5rem !important;
+    background: var(--gradient) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: white !important;
+    font-size: 2rem !important;
 }
 
-.asset-type-card ul li {
-    margin-bottom: 0.5rem;
-    display: flex;
-    align-items: center;
+.index-page .asset-type-card ul li {
+    margin-bottom: 0.5rem !important;
+    display: flex !important;
+    align-items: center !important;
 }
 
 /* 资产卡片 */
-.card {
-    border-radius: 1rem;
-    overflow: hidden;
-    transition: all 0.3s ease;
-    border: 1px solid #eee;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    height: 100%;
-    margin-bottom: 20px;
-    display: flex;
-    flex-direction: column;
-    background-color: #fff;
+.index-page .card {
+    border-radius: 1rem !important;
+    overflow: hidden !important;
+    transition: all 0.3s ease !important;
+    border: 1px solid #eee !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
+    height: 100% !important;
+    margin-bottom: 20px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    background-color: #fff !important;
 }
 
-.card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+.index-page .card:hover {
+    transform: translateY(-5px) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1) !important;
 }
 
-.card-img-top {
-    width: 100%;
-    height: 200px;
-    object-fit: cover;
+.index-page .card-img-top {
+    width: 100% !important;
+    height: 200px !important;
+    object-fit: cover !important;
 }
 
 /* 卡片占位图样式 */
-.card-img-top.d-flex {
-    background: #f8f9fa;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #adb5bd;
+.index-page .card-img-top.d-flex {
+    background: #f8f9fa !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #adb5bd !important;
 }
 
-.card-body {
-    padding: 1rem;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+.index-page .card-body {
+    padding: 1rem !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
-.card-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-    color: #1e3c72;
+.index-page .card-title {
+    font-size: 1.1rem !important;
+    font-weight: 600 !important;
+    margin-bottom: 0.5rem !important;
+    color: #1e3c72 !important;
 }
 
-.card-text {
-    font-size: 0.9rem;
-    margin-bottom: 0.5rem;
+.index-page .card-text {
+    font-size: 0.9rem !important;
+    margin-bottom: 0.5rem !important;
 }
 
-.text-muted {
+.index-page .text-muted {
     color: #6c757d !important;
 }
 
-.badge {
-    padding: 0.5em 1em;
-    border-radius: 6px;
+.index-page .badge {
+    padding: 0.5em 1em !important;
+    border-radius: 6px !important;
 }
 
 /* 确保badge颜色正确 */
-.badge.bg-primary {
+.index-page .badge.bg-primary {
     background-color: #0d6efd !important;
     color: #fff !important;
 }
 
-.badge.bg-warning {
+.index-page .badge.bg-warning {
     background-color: #ffc107 !important;
     color: #212529 !important;
 }
 
-.badge.bg-success {
+.index-page .badge.bg-success {
     background-color: #28a745 !important;
     color: #fff !important;
 }
 
-.badge.bg-info {
+.index-page .badge.bg-info {
     background-color: #17a2b8 !important;
     color: #fff !important;
 }
 
 /* 空状态 */
-.empty-state {
-    padding: 3rem;
-    text-align: center;
+.index-page .empty-state {
+    padding: 3rem !important;
+    text-align: center !important;
 }
 
-.empty-state i {
-    font-size: 3rem;
-    color: #adb5bd;
-    display: block;
+.index-page .empty-state i {
+    font-size: 3rem !important;
+    color: #adb5bd !important;
+    display: block !important;
 }
 
 /* 动画 */
-[data-aos] {
-    transition: opacity 0.8s, transform 0.8s;
+.index-page [data-aos] {
+    transition: opacity 0.8s, transform 0.8s !important;
 }
 
-[data-aos="fade-up"] {
-    transform: translateY(50px);
-    opacity: 0;
+.index-page [data-aos="fade-up"] {
+    transform: translateY(50px) !important;
+    opacity: 0 !important;
 }
 
-[data-aos].aos-animate {
-    transform: translateY(0);
-    opacity: 1;
+.index-page [data-aos].aos-animate {
+    transform: translateY(0) !important;
+    opacity: 1 !important;
 }
 
-.platform-illustration {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
+/* 确保首页资产卡片样式与列表页一致 */
+.index-page .card-title.text-truncate {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    max-width: 180px !important;
+    display: block !important;
 }
 
-.platform-illustration img {
-    max-width: 100%;
-    height: auto;
-    object-fit: contain;
-    opacity: 0.8;
+/* 平台插图样式 */
+.index-page .platform-illustration {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    height: 100% !important;
+}
+
+.index-page .platform-illustration img {
+    max-width: 100% !important;
+    height: auto !important;
+    object-fit: contain !important;
+    opacity: 0.8 !important;  /* 设置透明度，0.8 = 80%不透明 */
 } 
