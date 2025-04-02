@@ -100,30 +100,30 @@
                             </div>
 
                             <!-- Asset Info -->
-                            <div class="card-body" style="padding: 1rem; flex: 1; display: flex; flex-direction: column">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <h5 class="card-title text-truncate mb-0 text-dark" style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; color: #1e3c72; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; display: block">{{ asset.name }}</h5>
-                                    <span class="badge bg-secondary">{{ asset.token_symbol }}</span>
+                            <div class="card-body" style="padding: 1rem; flex: 1; display: flex; flex-direction: column; text-align: left">
+                                <div class="d-flex justify-content-between align-items-start mb-2" style="width: 100%">
+                                    <h5 class="card-title text-truncate mb-0 text-dark" style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; color: #1e3c72; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%; text-align: left; float: left">{{ asset.name }}</h5>
+                                    <span class="badge bg-secondary" style="float: right; text-align: right">{{ asset.token_symbol }}</span>
                                 </div>
-                                <p class="card-text text-muted small mb-2">
+                                <p class="card-text text-muted small mb-2" style="text-align: left">
                                     <i class="fas fa-map-marker-alt me-1"></i>{{ asset.location }}
                                 </p>
                                 {% if asset.asset_type == 10 %}
-                                <p class="card-text mb-2">
+                                <p class="card-text mb-2" style="text-align: left">
                                     <span class="text-muted">{{ _('Area') }}：</span>
                                     <span class="fw-bold text-dark">{{ asset.area|number_format }} ㎡</span>
                                 </p>
                                 {% else %}
-                                <p class="card-text mb-2">
+                                <p class="card-text mb-2" style="text-align: left">
                                     <span class="text-muted">{{ _('Total Value') }}：</span>
                                     <span class="fw-bold text-dark">{{ asset.total_value|number_format }} USDC</span>
                                 </p>
                                 {% endif %}
-                                <p class="card-text mb-2">
+                                <p class="card-text mb-2" style="text-align: left">
                                     <span class="text-muted">{{ _('Token Price') }}：</span>
                                     <span class="fw-bold text-dark">{{ asset.token_price|number_format }} USDC</span>
                                 </p>
-                                <p class="card-text">
+                                <p class="card-text" style="text-align: left">
                                     <span class="text-muted">{{ _('Expected Annual Revenue') }}：</span>
                                     <span class="fw-bold text-success">{{ asset.annual_revenue|number_format }} USDC</span>
                                 </p>
@@ -239,7 +239,7 @@
     
     // 发布资产按钮点击事件
     document.getElementById('publishAssetBtn').addEventListener('click', function() {
-        window.location.href = '{{ url_for('assets.create_asset_page') }}';
+        window.location.href = "{{ url_for('assets.create_asset_page') }}";
     });
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -293,6 +293,7 @@
         flex: 1 !important;
         display: flex !important;
         flex-direction: column !important;
+        text-align: left !important;
     }
 
     .index-page #assets .card-title {
@@ -300,16 +301,30 @@
         font-weight: 600 !important;
         margin-bottom: 0.5rem !important;
         color: #1e3c72 !important;
+        text-align: left !important;
+        float: left !important;
+        max-width: 70% !important;
     }
 
     .index-page #assets .card-text {
         font-size: 0.9rem !important;
         margin-bottom: 0.5rem !important;
+        text-align: left !important;
     }
 
     .index-page #assets .badge {
         padding: 0.5em 1em !important;
         border-radius: 6px !important;
+    }
+    
+    .index-page #assets .card-body .d-flex {
+        width: 100% !important;
+        justify-content: space-between !important;
+    }
+    
+    .index-page #assets .badge.bg-secondary {
+        float: right !important;
+        text-align: right !important;
     }
 </style>
 </div>
