@@ -63,17 +63,18 @@
                 {% for asset in assets %}
                 <div class="col-md-4" data-aos="fade-up" data-aos-delay="{{ loop.index * 100 }}">
                     <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" class="text-decoration-none">
-                        <div class="asset-card h-100">
+                        <div class="card h-100">
                             <!-- Asset Image -->
                             <div class="position-relative">
                                 {% if asset.images and asset.images|length > 0 %}
                                 <img src="{{ asset.images[0] }}" 
-                                     class="img-cover" 
+                                     class="card-img-top" 
+                                     style="height: 200px; object-fit: cover;"
                                      alt="{{ asset.name }}"
                                      onerror="this.onerror=null; this.src='/static/images/placeholder.jpg';">
                                 {% else %}
-                                <div class="img-placeholder">
-                                    <i class="fas fa-image"></i>
+                                <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 200px;">
+                                    <i class="fas fa-image fa-3x text-secondary"></i>
                                 </div>
                                 {% endif %}
                                 
@@ -99,7 +100,7 @@
                             </div>
 
                             <!-- Asset Info -->
-                            <div class="asset-info">
+                            <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start mb-3">
                                     <h5 class="asset-title text-truncate mb-0">{{ asset.name }}</h5>
                                     <span class="badge bg-primary">{{ asset.token_symbol }}</span>
