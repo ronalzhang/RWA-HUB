@@ -34,9 +34,6 @@ VENDOR_MAPPING = {
     "bootstrap.min.css": "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css",
     "bootstrap.bundle.min.js": "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js",
     
-    # Font Awesome
-    "all.min.css": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css",
-    
     # Animations
     "aos.css": "https://unpkg.com/aos@2.3.1/dist/aos.css",
     "aos.js": "https://unpkg.com/aos@2.3.1/dist/aos.js",
@@ -127,16 +124,8 @@ def cached_vendor(filename):
                     
                     # 保存文件内容
                     with open(filepath, "wb") as f:
-                        # 如果是CSS文件，修正webfonts路径
-                        if filename == "all.min.css":
-                            content = response.content.decode('utf-8')
-                            # 替换字体文件路径，将 ../webfonts/ 或 ./webfonts/ 改为 /proxy/webfonts/
-                            content = content.replace("../webfonts/", "/proxy/webfonts/")
-                            content = content.replace("./webfonts/", "/proxy/webfonts/")
-                            content = content.replace("url(webfonts/", "url(/proxy/webfonts/")
-                            f.write(content.encode('utf-8'))
-                        else:
-                            f.write(response.content)
+                        # Font Awesome CSS已经本地存储，无需在这里处理
+                        f.write(response.content)
                     
                     current_app.logger.info(f"成功下载并缓存: {filename}")
                 else:
@@ -155,63 +144,9 @@ def cached_vendor(filename):
         # 提供文件
         content_type = mimetypes.guess_type(filepath)[0] or "application/octet-stream"
         
-        # 如果是字体文件，需要特殊处理
-        if filename.startswith("webfonts/"):
-            font_extensions = {".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf", 
-                              ".eot": "application/vnd.ms-fontobject", ".svg": "image/svg+xml"}
-            for ext, mime in font_extensions.items():
-                if filename.endswith(ext):
-                    content_type = mime
-                    break
-        
         current_app.logger.info(f"提供缓存的供应商文件: {filename}, 类型: {content_type}")
         return send_file(filepath, mimetype=content_type, max_age=86400)
         
     except Exception as e:
         current_app.logger.error(f"提供缓存的供应商文件出错: {str(e)}")
-        abort(500)
-
-@proxy_bp.route("/webfonts/<filename>", methods=["GET"])
-def serve_webfonts(filename):
-    """提供字体文件"""
-    try:
-        filepath = os.path.join(CACHE_DIR, "webfonts", filename)
-        
-        # 确保webfonts目录存在
-        webfonts_dir = os.path.join(CACHE_DIR, "webfonts")
-        if not os.path.exists(webfonts_dir):
-            os.makedirs(webfonts_dir)
-        
-        # 如果文件不存在，尝试从Font Awesome CDN获取
-        if not os.path.exists(filepath):
-            fa_url = f"https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/webfonts/{filename}"
-            current_app.logger.info(f"下载字体文件: {filename} 从 {fa_url}")
-            
-            try:
-                response = requests.get(fa_url, timeout=10)
-                if response.status_code == 200:
-                    with open(filepath, "wb") as f:
-                        f.write(response.content)
-                    current_app.logger.info(f"成功下载并缓存字体文件: {filename}")
-                else:
-                    current_app.logger.error(f"下载字体文件失败 {filename}: {response.status_code}")
-                    abort(response.status_code)
-            except Exception as e:
-                current_app.logger.error(f"下载字体文件 {filename} 时出错: {str(e)}")
-                abort(500)
-        
-        # 确定内容类型
-        font_extensions = {".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf", 
-                          ".eot": "application/vnd.ms-fontobject", ".svg": "image/svg+xml"}
-        content_type = "application/octet-stream"
-        
-        for ext, mime in font_extensions.items():
-            if filename.endswith(ext):
-                content_type = mime
-                break
-        
-        current_app.logger.info(f"提供字体文件: {filename}, 类型: {content_type}")
-        return send_file(filepath, mimetype=content_type)
-    except Exception as e:
-        current_app.logger.error(f"提供字体文件出错: {str(e)}")
         abort(500)
