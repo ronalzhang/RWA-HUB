@@ -2482,20 +2482,20 @@ async connectPhantom(isReconnect = false) {
             // 调用后端API执行真实的链上转账
             console.log('调用后端API执行转账...');
             const transferResponse = await fetch('/api/solana/execute_transfer', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Eth-Address': fromAddress,
-                    'X-Wallet-Type': 'phantom'
-                },
-                body: JSON.stringify({
-                    token_symbol: tokenSymbol,
-                    to_address: to,
-                    amount: amount,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Eth-Address': fromAddress,
+                        'X-Wallet-Type': 'phantom'
+                    },
+                    body: JSON.stringify({
+                        token_symbol: tokenSymbol,
+                        to_address: to,
+                        amount: amount,
                     from_address: fromAddress
-                })
-            });
-            
+                    })
+                });
+                
             console.log('转账请求状态码:', transferResponse.status);
             
             if (!transferResponse.ok) {
@@ -2516,10 +2516,10 @@ async connectPhantom(isReconnect = false) {
             
             // 显示交易状态和签名
             this._showTransactionStatus(transferResult.signature, tokenSymbol, amount, to);
-            
-            // 返回成功结果
-            return {
-                success: true,
+                
+                // 返回成功结果
+                return {
+                    success: true,
                 txHash: transferResult.signature,
                 status: transferResult.tx_status || 'processing'
             };
@@ -2673,7 +2673,7 @@ async connectPhantom(isReconnect = false) {
                         });
                     }
                 }
-            } catch (error) {
+        } catch (error) {
                 console.error('检查交易状态出错:', error);
                 // 发生错误，继续重试
                 retryCount++;
