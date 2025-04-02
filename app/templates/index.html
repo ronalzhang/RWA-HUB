@@ -63,13 +63,13 @@
                 {% for asset in assets %}
                 <div class="col-md-4" data-aos="fade-up" data-aos-delay="{{ loop.index * 100 }}">
                     <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" class="text-decoration-none">
-                        <div class="asset-card card h-100">
+                        <div class="asset-card card h-100" style="border-radius: 1rem; overflow: hidden; transition: all 0.3s ease; border: 1px solid #eee; box-shadow: 0 2px 10px rgba(0,0,0,0.05); height: 100%; margin-bottom: 20px; display: flex; flex-direction: column; background-color: #fff;">
                             <!-- Asset Image -->
                             <div class="position-relative">
                                 {% if asset.images and asset.images|length > 0 %}
                                 <img src="{{ asset.images[0] }}" 
                                      class="card-img-top" 
-                                     style="height: 200px; object-fit: cover;"
+                                     style="height: 200px; object-fit: cover; width: 100%;"
                                      alt="{{ asset.name }}"
                                      onerror="this.onerror=null; this.src='/static/images/placeholder.jpg';">
                                 {% else %}
@@ -100,9 +100,9 @@
                             </div>
 
                             <!-- Asset Info -->
-                            <div class="card-body">
+                            <div class="card-body" style="padding: 1rem; flex: 1; display: flex; flex-direction: column;">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <h5 class="card-title text-truncate mb-0 text-dark">{{ asset.name }}</h5>
+                                    <h5 class="card-title text-truncate mb-0 text-dark" style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; color: #1e3c72; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; display: block;">{{ asset.name }}</h5>
                                     <span class="badge bg-secondary">{{ asset.token_symbol }}</span>
                                 </div>
                                 <p class="card-text text-muted small mb-2">
@@ -240,6 +240,21 @@
     // 发布资产按钮点击事件
     document.getElementById('publishAssetBtn').addEventListener('click', function() {
         window.location.href = '{{ url_for('assets.create_asset_page') }}';
+    });
+
+    // 添加卡片悬停效果
+    document.addEventListener('DOMContentLoaded', function() {
+        const cards = document.querySelectorAll('.asset-card');
+        cards.forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-5px)';
+                this.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
+            });
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+                this.style.boxShadow = '0 2px 10px rgba(0,0,0,0.05)';
+            });
+        });
     });
 </script>
 
