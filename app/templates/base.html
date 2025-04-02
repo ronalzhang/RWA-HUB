@@ -28,54 +28,6 @@
     {% block styles %}{% endblock %}
     
     <style>
-        /* 全局公共样式 */
-        :root {
-            --primary-color: #1e3c72;
-            --secondary-color: #2a5298;
-            --gradient: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-        }
-        
-        /* 自定义颜色 */
-        .text-purple {
-            color: #8a2be2;
-        }
-        
-        /* 钱包按钮清除默认下拉箭头 */
-        .wallet-btn.dropdown-toggle::after,
-        #walletBtn::after,
-        .btn.dropdown-toggle::after {
-            display: none;
-        }
-        
-        /* 确保钱包下拉菜单显示 */
-        .dropdown-menu.show,
-        .wallet-dropdown-menu.show {
-            display: block;
-            opacity: 1;
-            visibility: visible;
-        }
-        
-        /* 确保钱包按钮没有边框 */
-        .wallet-action-btn,
-        .switch-btn,
-        .disconnect-btn {
-            display: none;
-        }
-        
-        /* 钱包复制地址按钮 */
-        .copy-address-btn {
-            border: none;
-            background: none;
-            color: #6c757d;
-            padding: 0;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .copy-address-btn:hover {
-            color: #0d6efd;
-        }
-        
         /* 导航栏样式 */
         .navbar {
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
