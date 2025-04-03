@@ -331,4 +331,19 @@ section[id="assets"] .card .card-text {
     height: auto !important;
     object-fit: contain !important;
     opacity: 0.8 !important;  /* 设置透明度，0.8 = 80%不透明 */
+}
+
+.index-page .card-body {
+    padding: 1rem !important;
+}
+
+.index-page .card-title {
+    font-size: 1.1rem !important;
+    font-weight: 600 !important;
+    color: #1e3c72 !important;
+}
+
+.index-page .card-text {
+    font-size: 0.9rem !important;
+    margin-bottom: 0.5rem !important;
 } 
