@@ -194,14 +194,19 @@
     color: #adb5bd !important;
 }
 
-.index-page .card-body {
+/* 核心修复：使用非常精确的选择器并调高优先级 */
+#assets .card .card-body,
+.latest-assets .card .card-body,
+section[id="assets"] .card .card-body {
     padding: 1rem !important;
     display: block !important;
     text-align: left !important;
 }
 
-/* 修改标题和代码的布局 */
-.index-page #assets .card-body .d-flex {
+/* 修改标题和代码的布局 - 使用更精确的选择器 */
+#assets .card .card-body .d-flex,
+.latest-assets .card .card-body .d-flex,
+section[id="assets"] .card .card-body .d-flex {
     display: block !important;
     position: relative !important;
     height: 35px !important;
@@ -209,7 +214,10 @@
     width: 100% !important;
 }
 
-.index-page .card-title {
+/* 标题靠左 */
+#assets .card .card-title,
+.latest-assets .card .card-title,
+section[id="assets"] .card .card-title {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
@@ -221,15 +229,22 @@
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
     margin: 0 !important;
+    text-align: left !important;
 }
 
-.index-page #assets .badge.bg-secondary {
+/* 代码靠右 */
+#assets .card .badge.bg-secondary,
+.latest-assets .card .badge.bg-secondary,
+section[id="assets"] .card .badge.bg-secondary {
     position: absolute !important;
     right: 0 !important;
     top: 0 !important;
 }
 
-.index-page .card-text {
+/* 文本内容左对齐 */
+#assets .card .card-text,
+.latest-assets .card .card-text,
+section[id="assets"] .card .card-text {
     font-size: 0.9rem !important;
     margin-bottom: 0.5rem !important;
     display: block !important;
