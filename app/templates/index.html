@@ -101,29 +101,29 @@
 
                             <!-- Asset Info -->
                             <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <h5 class="card-title text-truncate mb-0 text-dark">{{ asset.name }}</h5>
-                                    <span class="badge bg-secondary">{{ asset.token_symbol }}</span>
+                                <div class="d-flex justify-content-between align-items-start mb-2" style="position: relative; height: 35px; width: 100%; display: block !important;">
+                                    <h5 class="card-title text-truncate mb-0 text-dark" style="position: absolute; left: 0; top: 0; width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0;">{{ asset.name }}</h5>
+                                    <span class="badge bg-secondary" style="position: absolute; right: 0; top: 0;">{{ asset.token_symbol }}</span>
                                 </div>
-                                <p class="card-text text-muted small mb-2">
+                                <p class="card-text text-muted small mb-2" style="clear: both; display: block; text-align: left; margin-top: 20px;">
                                     <i class="fas fa-map-marker-alt me-1"></i>{{ asset.location }}
                                 </p>
                                 {% if asset.asset_type == 10 %}
-                                <p class="card-text mb-2">
+                                <p class="card-text mb-2" style="text-align: left;">
                                     <span class="text-muted">{{ _('Area') }}：</span>
                                     <span class="fw-bold text-dark">{{ asset.area|number_format }} ㎡</span>
                                 </p>
                                 {% else %}
-                                <p class="card-text mb-2">
+                                <p class="card-text mb-2" style="text-align: left;">
                                     <span class="text-muted">{{ _('Total Value') }}：</span>
                                     <span class="fw-bold text-dark">{{ asset.total_value|number_format }} USDC</span>
                                 </p>
                                 {% endif %}
-                                <p class="card-text mb-2">
+                                <p class="card-text mb-2" style="text-align: left;">
                                     <span class="text-muted">{{ _('Token Price') }}：</span>
                                     <span class="fw-bold text-dark">{{ asset.token_price|number_format }} USDC</span>
                                 </p>
-                                <p class="card-text">
+                                <p class="card-text" style="text-align: left;">
                                     <span class="text-muted">{{ _('Expected Annual Revenue') }}：</span>
                                     <span class="fw-bold text-success">{{ asset.annual_revenue|number_format }} USDC</span>
                                 </p>
@@ -254,6 +254,50 @@
             card.addEventListener('mouseleave', function() {
                 this.style.transform = 'translateY(0)';
                 this.style.boxShadow = '0 2px 10px rgba(0,0,0,0.05)';
+            });
+        });
+
+        // 强制控制资产卡片布局
+        document.querySelectorAll('#assets .card .card-body').forEach(function(cardBody) {
+            // 设置卡片体为块级布局
+            cardBody.style.display = 'block';
+            cardBody.style.textAlign = 'left';
+            
+            // 获取标题容器
+            const titleContainer = cardBody.querySelector('.d-flex');
+            if (titleContainer) {
+                titleContainer.style.position = 'relative';
+                titleContainer.style.height = '35px';
+                titleContainer.style.width = '100%';
+                titleContainer.style.display = 'block';
+                
+                // 设置标题靠左
+                const title = titleContainer.querySelector('.card-title');
+                if (title) {
+                    title.style.position = 'absolute';
+                    title.style.left = '0';
+                    title.style.top = '0';
+                    title.style.width = '70%';
+                    title.style.overflow = 'hidden';
+                    title.style.textOverflow = 'ellipsis';
+                    title.style.whiteSpace = 'nowrap';
+                    title.style.margin = '0';
+                }
+                
+                // 设置代码靠右
+                const badge = titleContainer.querySelector('.badge');
+                if (badge) {
+                    badge.style.position = 'absolute';
+                    badge.style.right = '0';
+                    badge.style.top = '0';
+                }
+            }
+            
+            // 确保所有文本靠左对齐
+            cardBody.querySelectorAll('.card-text').forEach(function(text) {
+                text.style.textAlign = 'left';
+                text.style.display = 'block';
+                text.style.clear = 'both';
             });
         });
     });
