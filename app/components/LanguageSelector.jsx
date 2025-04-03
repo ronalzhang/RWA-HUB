@@ -2,6 +2,18 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dropdown } from 'react-bootstrap';
 
+// 自定义样式
+const customStyles = {
+  dropdownMenu: {
+    minWidth: '120px',  // 减小最小宽度
+    width: 'auto',      // 使宽度自适应内容
+    padding: '6px 0'    // 减小内边距
+  },
+  dropdownItem: {
+    padding: '6px 12px' // 减小选项内边距
+  }
+};
+
 const LanguageSelector = () => {
   const { i18n } = useTranslation();
 
@@ -22,12 +34,13 @@ const LanguageSelector = () => {
         {languages.find(lang => lang.code === i18n.language)?.name || 'English'}
       </Dropdown.Toggle>
 
-      <Dropdown.Menu>
+      <Dropdown.Menu style={customStyles.dropdownMenu}>
         {languages.map((lang) => (
           <Dropdown.Item
             key={lang.code}
             onClick={() => changeLanguage(lang.code)}
             active={i18n.language === lang.code}
+            style={customStyles.dropdownItem}
           >
             {lang.name}
           </Dropdown.Item>
