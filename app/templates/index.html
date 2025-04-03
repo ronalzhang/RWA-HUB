@@ -101,31 +101,31 @@
 
                             <!-- Asset Info -->
                             <div class="card-body">
-                                <div class="title-container" style="position: relative; height: 35px; margin-bottom: 15px;">
-                                    <h5 class="asset-title" style="position: absolute; left: 0; top: 0; font-size: 1.1rem; font-weight: 600; color: #1e3c72; width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0;">{{ asset.name }}</h5>
-                                    <span class="asset-code" style="position: absolute; right: 0; top: 0; background-color: #6c757d; color: white; padding: 0.3em 0.8em; border-radius: 6px; font-size: 0.8rem;">{{ asset.token_symbol }}</span>
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h5 class="card-title text-truncate mb-0 text-dark">{{ asset.name }}</h5>
+                                    <span class="badge bg-secondary">{{ asset.token_symbol }}</span>
                                 </div>
-                                <p class="location" style="text-align: left; margin-bottom: 8px; font-size: 0.9rem; color: #6c757d;">
+                                <p class="card-text text-muted small mb-2">
                                     <i class="fas fa-map-marker-alt me-1"></i>{{ asset.location }}
                                 </p>
                                 {% if asset.asset_type == 10 %}
-                                <p class="detail-item" style="text-align: left; margin-bottom: 8px; font-size: 0.9rem;">
-                                    <span style="color: #6c757d;">{{ _('Area') }}：</span>
-                                    <span style="font-weight: 600; color: #343a40;">{{ asset.area|number_format }} ㎡</span>
+                                <p class="card-text mb-2">
+                                    <span class="text-muted">{{ _('Area') }}：</span>
+                                    <span class="fw-bold text-dark">{{ asset.area|number_format }} ㎡</span>
                                 </p>
                                 {% else %}
-                                <p class="detail-item" style="text-align: left; margin-bottom: 8px; font-size: 0.9rem;">
-                                    <span style="color: #6c757d;">{{ _('Total Value') }}：</span>
-                                    <span style="font-weight: 600; color: #343a40;">{{ asset.total_value|number_format }} USDC</span>
+                                <p class="card-text mb-2">
+                                    <span class="text-muted">{{ _('Total Value') }}：</span>
+                                    <span class="fw-bold text-dark">{{ asset.total_value|number_format }} USDC</span>
                                 </p>
                                 {% endif %}
-                                <p class="detail-item" style="text-align: left; margin-bottom: 8px; font-size: 0.9rem;">
-                                    <span style="color: #6c757d;">{{ _('Token Price') }}：</span>
-                                    <span style="font-weight: 600; color: #343a40;">{{ asset.token_price|number_format }} USDC</span>
+                                <p class="card-text mb-2">
+                                    <span class="text-muted">{{ _('Token Price') }}：</span>
+                                    <span class="fw-bold text-dark">{{ asset.token_price|number_format }} USDC</span>
                                 </p>
-                                <p class="detail-item" style="text-align: left; margin-bottom: 0; font-size: 0.9rem;">
-                                    <span style="color: #6c757d;">{{ _('Expected Annual Revenue') }}：</span>
-                                    <span style="font-weight: 600; color: #28a745;">{{ asset.annual_revenue|number_format }} USDC</span>
+                                <p class="card-text">
+                                    <span class="text-muted">{{ _('Expected Annual Revenue') }}：</span>
+                                    <span class="fw-bold text-success">{{ asset.annual_revenue|number_format }} USDC</span>
                                 </p>
                             </div>
                         </div>
@@ -258,82 +258,5 @@
         });
     });
 </script>
-
-<!-- 强制覆盖资产卡片样式 -->
-<style>
-    /* 强制覆盖首页资产卡片样式 */
-    .index-page #assets .card,
-    .index-page #assets .asset-card {
-        border-radius: 1rem !important;
-        overflow: hidden !important;
-        transition: all 0.3s ease !important;
-        border: 1px solid #eee !important;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
-        height: 100% !important;
-        margin-bottom: 20px !important;
-        display: block !important; /* 改为块级布局 */
-        background-color: #fff !important;
-    }
-
-    .index-page #assets .card:hover,
-    .index-page #assets .asset-card:hover {
-        transform: translateY(-5px) !important;
-        box-shadow: 0 8px 20px rgba(0,0,0,0.1) !important;
-    }
-
-    .index-page #assets .card-img-top {
-        width: 100% !important;
-        height: 200px !important;
-        object-fit: cover !important;
-    }
-
-    .index-page #assets .card-body {
-        padding: 1rem !important;
-        display: block !important; /* 改为块级布局 */
-        text-align: left !important;
-    }
-
-    /* 完全重写标题和代码布局 */
-    .index-page #assets .card-body .d-flex {
-        display: block !important; /* 禁用flexbox */
-        position: relative !important;
-        width: 100% !important;
-        height: 35px !important; /* 固定高度 */
-        margin-bottom: 10px !important;
-    }
-    
-    .index-page #assets .card-title {
-        position: absolute !important;
-        left: 0 !important;
-        top: 0 !important;
-        font-size: 1.1rem !important;
-        font-weight: 600 !important;
-        color: #1e3c72 !important;
-        text-align: left !important;
-        width: 70% !important; 
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-    }
-
-    .index-page #assets .badge.bg-secondary {
-        position: absolute !important;
-        right: 0 !important;
-        top: 0 !important;
-    }
-
-    .index-page #assets .card-text {
-        font-size: 0.9rem !important;
-        margin-bottom: 0.5rem !important;
-        text-align: left !important;
-        display: block !important;
-        clear: both !important;
-    }
-
-    .index-page #assets .badge {
-        padding: 0.5em 1em !important;
-        border-radius: 6px !important;
-    }
-</style>
 </div>
 {% endblock %}
