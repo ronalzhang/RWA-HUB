@@ -15,6 +15,45 @@
     <link rel="stylesheet" href="{{ url_for("static", filename="fonts/fontawesome/css/all.min.css") }}">
     <!-- 添加一个简单的favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💼</text></svg>">
+    <!-- 添加URL重写脚本 -->
+    <script>
+        // 拦截并重写fetch API
+        const originalFetch = window.fetch;
+        window.fetch = function(url, options) {
+            console.log('拦截fetch请求:', url);
+            
+            // 检查并重写URL
+            if (typeof url === 'string') {
+                // 修复完整域名URL
+                if (url.includes('https://rwa-hub.com/api/admin/v2/')) {
+                    const fixedUrl = url.replace('https://rwa-hub.com/api/admin/v2/', '/admin/v2/api/');
+                    console.log(`完整URL重写: ${url} -> ${fixedUrl}`);
+                    url = fixedUrl;
+                }
+                
+                // 修复相对路径API URL
+                if (url.startsWith('/api/admin/v2/')) {
+                    const fixedUrl = url.replace('/api/admin/v2/', '/admin/v2/api/');
+                    console.log(`URL重写: ${url} -> ${fixedUrl}`);
+                    url = fixedUrl;
+                }
+            }
+            
+            return originalFetch.call(this, url, options);
+        };
+        
+        // 检查Chart.js是否正确加载
+        if (typeof Chart !== 'undefined') {
+            console.log('Chart.js库已正确加载', Chart.version);
+        } else {
+            console.error('Chart.js库未加载!');
+        }
+        
+        // 页面加载时清除可能的缓存数据
+        window.addEventListener('load', function() {
+            console.log('页面刷新，清除缓存数据');
+        });
+    </script>
 <style>
         body {
             font-family: "Helvetica Neue", Arial, sans-serif;
@@ -413,7 +452,7 @@
             loadUserGrowthData(cacheBuster);
             
             // 加载资产列表
-            fetch(`/api/admin/v2/assets?page=1&limit=5${cacheBuster ? '&' + cacheBuster.substring(1) : ''}`)
+            fetch(`/admin/v2/api/assets?page=1&limit=5${cacheBuster ? '&' + cacheBuster.substring(1) : ''}`)
                 .then(handleApiError)
                 .then(data => {
                     if (data.assets && data.assets.length > 0) {
