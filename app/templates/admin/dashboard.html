@@ -453,10 +453,31 @@
             
             // 加载资产列表
             fetch(`/admin/v2/api/assets?page=1&limit=5${cacheBuster ? '&' + cacheBuster.substring(1) : ''}`)
-                .then(handleApiError)
+                .then(response => {
+                    // 先检查响应状态码
+                    if (!response.ok) {
+                        throw new Error(`${response.status}: ${response.statusText}`);
+                    }
+                    
+                    // 检查Content-Type头
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        // 如果不是JSON，尝试获取响应文本并作为错误抛出
+                        return response.text().then(text => {
+                            console.error('API返回了非JSON响应:', text.substring(0, 200) + '...');
+                            throw new Error('服务器返回了非JSON格式数据，可能是权限问题或API路径错误');
+                        });
+                    }
+                    
+                    return response.json();
+                })
                 .then(data => {
-                    if (data.assets && data.assets.length > 0) {
-                        renderAssetList(data.assets);
+                    console.log('资产列表数据:', data);
+                    // 检查数据结构 - 判断属性是items还是assets
+                    const assets = data.items || data.assets || [];
+                    
+                    if (assets.length > 0) {
+                        renderAssetList(assets);
                         hideAlert(); // 数据加载成功后隐藏提示
                     } else {
                         document.getElementById('assetListContainer').innerHTML = 

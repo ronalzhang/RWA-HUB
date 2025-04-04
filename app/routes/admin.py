@@ -2035,6 +2035,11 @@ def admin_users_v2():
     """管理后台V2版本管理员用户页面"""
     return render_template('admin_v2/admin_users.html')
 
+@admin_bp.route('/v2/login')
+def login_v2():
+    """管理后台V2版本登录页面"""
+    return render_template('admin_v2/login.html')
+
 @admin_bp.route('/v2')
 @admin_required
 def admin_v2_index():
@@ -2084,124 +2089,136 @@ def logout_v2():
 @admin_required
 def api_assets_v2():
     """管理后台V2版本资产列表API"""
-    # 模拟分页和筛选
-    page = request.args.get('page', 1, type=int)
-    limit = request.args.get('limit', 10, type=int)
-    
-    # 模拟资产数据
-    mock_assets = [
-        {
-            'id': 1,
-            'name': '上海市中心豪华公寓',
-            'description': '位于上海市中心的高档豪华公寓，视野开阔，配套设施完善。',
-            'type': 'real_estate',
-            'type_name': '房地产',
-            'price': 3800000.00,
-            'location': '上海市黄浦区',
-            'image_url': 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2',
-            'status': 'approved',
-            'created_at': '2023-01-10T08:30:00',
-            'updated_at': '2023-01-15T14:20:00',
-            'owner_address': '0x1234567890abcdef1234567890abcdef12345678',
-            'attributes': [
-                {'key': '面积', 'value': '120平方米'},
-                {'key': '房间数', 'value': '3室2厅'},
-                {'key': '楼层', 'value': '18层/36层'}
-            ]
-        },
-        {
-            'id': 2,
-            'name': '梵高限量版画',
-            'description': '梵高向日葵系列限量版画，编号23/100，附权威机构认证。',
-            'type': 'artwork',
-            'type_name': '艺术品',
-            'price': 258000.00,
-            'location': '北京市朝阳区',
-            'image_url': 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119',
-            'status': 'pending',
-            'created_at': '2023-02-05T10:15:00',
-            'updated_at': '2023-02-05T10:15:00',
-            'owner_address': '0xabcdef1234567890abcdef1234567890abcdef12',
-            'attributes': [
-                {'key': '尺寸', 'value': '60cm x 80cm'},
-                {'key': '材质', 'value': '进口艺术纸'},
-                {'key': '版本', 'value': '23/100'}
-            ]
-        },
-        {
-            'id': 3,
-            'name': '罗伊斯古董手表',
-            'description': '1956年制造的罗伊斯古董手表，黄金表壳，运行状况良好。',
-            'type': 'collectible',
-            'type_name': '收藏品',
-            'price': 120000.00,
-            'location': '广州市天河区',
-            'image_url': 'https://images.unsplash.com/photo-1587836374828-4dbafa94cf0e',
-            'status': 'listed',
-            'created_at': '2023-01-20T15:45:00',
-            'updated_at': '2023-01-25T09:30:00',
-            'owner_address': '0x7890abcdef1234567890abcdef1234567890abcd',
-            'attributes': [
-                {'key': '年代', 'value': '1956年'},
-                {'key': '材质', 'value': '18K黄金'},
-                {'key': '直径', 'value': '38mm'}
-            ]
-        },
-        {
-            'id': 4,
-            'name': '1.5克拉天然蓝钻石',
-            'description': '极为稀有的1.5克拉天然蓝钻石，净度VS1，切工完美，附国际宝石学院证书。',
-            'type': 'jewelry',
-            'type_name': '珠宝',
-            'price': 1500000.00,
-            'location': '深圳市罗湖区',
-            'image_url': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f',
-            'status': 'approved',
-            'created_at': '2023-03-01T13:20:00',
-            'updated_at': '2023-03-05T16:10:00',
-            'owner_address': '0xef1234567890abcdef1234567890abcdef123456',
-            'attributes': [
-                {'key': '重量', 'value': '1.5克拉'},
-                {'key': '颜色', 'value': '鲜艳蓝色'},
-                {'key': '净度', 'value': 'VS1'},
-                {'key': '切工', 'value': '完美'}
-            ]
-        },
-        {
-            'id': 5,
-            'name': '1967年法拉利275 GTB/4',
-            'description': '1967年产法拉利275 GTB/4，红色车身，完全原厂状态，行驶里程仅12,000公里。',
-            'type': 'vehicle',
-            'type_name': '车辆',
-            'price': 25000000.00,
-            'location': '上海市浦东新区',
-            'image_url': 'https://images.unsplash.com/photo-1592198084033-aade902d1aae',
-            'status': 'pending',
-            'created_at': '2023-02-15T09:00:00',
-            'updated_at': '2023-02-15T09:00:00',
-            'owner_address': '0x567890abcdef1234567890abcdef1234567890ab',
-            'attributes': [
-                {'key': '年份', 'value': '1967年'},
-                {'key': '里程', 'value': '12,000公里'},
-                {'key': '颜色', 'value': '红色'},
-                {'key': '发动机', 'value': 'V12, 3.3升'}
-            ]
-        }
-    ]
-    
-    # 计算总数和分页
-    total = len(mock_assets)
-    start_idx = (page - 1) * limit
-    end_idx = min(start_idx + limit, total)
-    
-    items = mock_assets[start_idx:end_idx]
-    
-    return jsonify({
-        'items': items,
-        'total': total,
-        'page': page,
-        'limit': limit
-    })
+    try:
+        # 记录请求信息
+        current_app.logger.info("接收到资产列表API请求")
+        current_app.logger.info(f"请求头: {dict(request.headers)}")
+        current_app.logger.info(f"请求参数: {dict(request.args)}")
+        
+        # 模拟分页和筛选
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        
+        # 模拟资产数据
+        mock_assets = [
+            {
+                'id': 1,
+                'name': '上海市中心豪华公寓',
+                'description': '位于上海市中心的高档豪华公寓，视野开阔，配套设施完善。',
+                'type': 'real_estate',
+                'type_name': '房地产',
+                'price': 3800000.00,
+                'location': '上海市黄浦区',
+                'image_url': 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2',
+                'status': 'approved',
+                'created_at': '2023-01-10T08:30:00',
+                'updated_at': '2023-01-15T14:20:00',
+                'owner_address': '0x1234567890abcdef1234567890abcdef12345678',
+                'attributes': [
+                    {'key': '面积', 'value': '120平方米'},
+                    {'key': '房间数', 'value': '3室2厅'},
+                    {'key': '楼层', 'value': '18层/36层'}
+                ]
+            },
+            {
+                'id': 2,
+                'name': '梵高限量版画',
+                'description': '梵高向日葵系列限量版画，编号23/100，附权威机构认证。',
+                'type': 'artwork',
+                'type_name': '艺术品',
+                'price': 258000.00,
+                'location': '北京市朝阳区',
+                'image_url': 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119',
+                'status': 'pending',
+                'created_at': '2023-02-05T10:15:00',
+                'updated_at': '2023-02-05T10:15:00',
+                'owner_address': '0xabcdef1234567890abcdef1234567890abcdef12',
+                'attributes': [
+                    {'key': '尺寸', 'value': '60cm x 80cm'},
+                    {'key': '材质', 'value': '进口艺术纸'},
+                    {'key': '版本', 'value': '23/100'}
+                ]
+            },
+            {
+                'id': 3,
+                'name': '罗伊斯古董手表',
+                'description': '1956年制造的罗伊斯古董手表，黄金表壳，运行状况良好。',
+                'type': 'collectible',
+                'type_name': '收藏品',
+                'price': 120000.00,
+                'location': '广州市天河区',
+                'image_url': 'https://images.unsplash.com/photo-1587836374828-4dbafa94cf0e',
+                'status': 'listed',
+                'created_at': '2023-01-20T15:45:00',
+                'updated_at': '2023-01-25T09:30:00',
+                'owner_address': '0x7890abcdef1234567890abcdef1234567890abcd',
+                'attributes': [
+                    {'key': '年代', 'value': '1956年'},
+                    {'key': '材质', 'value': '18K黄金'},
+                    {'key': '直径', 'value': '38mm'}
+                ]
+            },
+            {
+                'id': 4,
+                'name': '1.5克拉天然蓝钻石',
+                'description': '极为稀有的1.5克拉天然蓝钻石，净度VS1，切工完美，附国际宝石学院证书。',
+                'type': 'jewelry',
+                'type_name': '珠宝',
+                'price': 1500000.00,
+                'location': '深圳市罗湖区',
+                'image_url': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f',
+                'status': 'approved',
+                'created_at': '2023-03-01T13:20:00',
+                'updated_at': '2023-03-05T16:10:00',
+                'owner_address': '0xef1234567890abcdef1234567890abcdef123456',
+                'attributes': [
+                    {'key': '重量', 'value': '1.5克拉'},
+                    {'key': '颜色', 'value': '鲜艳蓝色'},
+                    {'key': '净度', 'value': 'VS1'},
+                    {'key': '切工', 'value': '完美'}
+                ]
+            },
+            {
+                'id': 5,
+                'name': '1967年法拉利275 GTB/4',
+                'description': '1967年产法拉利275 GTB/4，红色车身，完全原厂状态，行驶里程仅12,000公里。',
+                'type': 'vehicle',
+                'type_name': '车辆',
+                'price': 25000000.00,
+                'location': '上海市浦东新区',
+                'image_url': 'https://images.unsplash.com/photo-1592198084033-aade902d1aae',
+                'status': 'pending',
+                'created_at': '2023-02-15T09:00:00',
+                'updated_at': '2023-02-15T09:00:00',
+                'owner_address': '0x567890abcdef1234567890abcdef1234567890ab',
+                'attributes': [
+                    {'key': '年份', 'value': '1967年'},
+                    {'key': '里程', 'value': '12,000公里'},
+                    {'key': '颜色', 'value': '红色'},
+                    {'key': '发动机', 'value': 'V12, 3.3升'}
+                ]
+            }
+        ]
+        
+        # 计算总数和分页
+        total = len(mock_assets)
+        start_idx = (page - 1) * limit
+        end_idx = min(start_idx + limit, total)
+        
+        items = mock_assets[start_idx:end_idx]
+        
+        return jsonify({
+            'items': items,
+            'total': total,
+            'page': page,
+            'limit': limit
+        })
+    except Exception as e:
+        current_app.logger.error(f'获取资产列表失败: {str(e)}')
+        return jsonify({
+            'error': '获取资产列表失败',
+            'message': str(e)
+        }), 500
 
 @admin_bp.route('/v2/api/assets/stats', methods=['GET'])
 @admin_required
