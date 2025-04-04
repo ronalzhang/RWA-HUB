@@ -62,14 +62,9 @@ def list_assets_page():
                 # 管理员可以看到所有未删除的资产
                 pass
             else:
-                current_app.logger.info('普通用户：显示已审核通过的资产和自己的资产')
-                # 普通用户：显示已审核通过的资产和自己的资产
-                query = query.filter(
-                    db.or_(
-                        Asset.status == 2,  # 2 表示已审核通过
-                        Asset.owner_address == current_user_address
-                    )
-                )
+                current_app.logger.info('普通用户：只显示已审核通过的资产')
+                # 普通用户：只显示已审核通过的资产
+                query = query.filter(Asset.status == 2)  # 2 表示已审核通过
         else:
             current_app.logger.info('未登录用户：只显示已审核通过的资产')
             # 未登录用户：只显示已审核通过的资产
