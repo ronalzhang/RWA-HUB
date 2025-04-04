@@ -32,8 +32,6 @@ from app.models.admin import DashboardStats
 from .common import get_pagination_info
 import datetime
 import calendar
-import pandas as pd
-import plotly.express as px
 import io
 import csv
 
