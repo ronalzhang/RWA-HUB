@@ -768,13 +768,12 @@ const walletState = {
     },
     
     /**
-     * 检查当前连接的钱包是否为管理员
-     * @returns {Promise<boolean>} 是否为管理员
+     * 检查钱包是否为管理员
      */
     async checkIsAdmin() {
         if (!this.connected || !this.address) {
             this.isAdmin = false;
-                return false;
+            return false;
         }
         
         try {
@@ -795,6 +794,12 @@ const walletState = {
                     if (data.success !== undefined) {
                         this.isAdmin = Boolean(data.is_admin || data.admin);
                         console.log(`从API获取到管理员状态: ${this.isAdmin ? '是管理员' : '不是管理员'}`);
+                        
+                        // 更新管理员链接
+                        if (typeof window.updateAdminNavLink === 'function') {
+                            window.updateAdminNavLink();
+                        }
+                        
                         return this.isAdmin;
                     } else {
                         console.warn('管理员检查API返回未知格式');
@@ -904,6 +909,11 @@ const walletState = {
             // 更新管理员入口显示状态，确保任何状态变化都会触发管理员入口更新
             this.updateAdminDisplay();
             
+            // 更新管理员链接，确保包含钱包地址参数
+            if (typeof window.updateAdminNavLink === 'function') {
+                window.updateAdminNavLink();
+            }
+            
             // 通知所有注册的回调
             this.stateChangeCallbacks.forEach(callback => {
                 try {
@@ -958,6 +968,11 @@ const walletState = {
             if (adminEntry) {
                 adminEntry.style.display = this.isAdmin ? 'block' : 'none';
                 console.log('管理员入口显示状态已更新:', this.isAdmin ? '显示' : '隐藏');
+                
+                // 更新管理员链接
+                if (this.isAdmin && typeof window.updateAdminNavLink === 'function') {
+                    window.updateAdminNavLink();
+                }
             }
             
             // 检查是否在资产详情页，如果是则更新分红入口

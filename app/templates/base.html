@@ -938,6 +938,24 @@
     }
     </script>
 
+    <!-- 管理员入口链接更新脚本 -->
+    <script>
+    // 更新管理员入口链接，添加钱包地址参数
+    function updateAdminNavLink() {
+        const adminNavLink = document.getElementById('adminNavLink');
+        if (adminNavLink && window.walletState && window.walletState.address) {
+            const baseUrl = adminNavLink.getAttribute('href').split('?')[0];
+            adminNavLink.href = `${baseUrl}?eth_address=${window.walletState.address}`;
+            console.log('已更新管理员入口链接:', adminNavLink.href);
+        }
+    }
+
+    // 监听钱包状态变化
+    document.addEventListener('walletStateChanged', function(event) {
+        updateAdminNavLink();
+    });
+    </script>
+
     <!-- Bootstrap, jQuery和其他脚本 -->
     <script src="{{ url_for('static', filename='vendor/jquery.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
@@ -1239,7 +1257,5 @@
     </script>
     
     {% block scripts %}{% endblock %}
-    
-    <!-- 最优化样式覆盖 - 检查点2 -->
 </body>
 </html>
