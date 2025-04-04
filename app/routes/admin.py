@@ -37,9 +37,8 @@ import plotly.express as px
 import io
 import csv
 
-# 直接定义Blueprint对象
-admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
-admin_api_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
+# 从routes/__init__.py中获取蓝图
+from . import admin_bp, admin_api_bp
 
 def get_admin_info(eth_address):
     """获取管理员权限"""
