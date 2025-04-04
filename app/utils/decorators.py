@@ -109,6 +109,39 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def api_admin_required(f):
+    """API版本的管理员权限装饰器，失败时返回JSON错误而不是重定向"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 记录请求头和参数，帮助调试
+        current_app.logger.info(f"API管理员验证 - 请求头: {dict(request.headers)}")
+        current_app.logger.info(f"API管理员验证 - 请求参数: {dict(request.args)}")
+        
+        # 尝试从多个来源获取钱包地址
+        eth_address = request.headers.get('X-Eth-Address') or \
+                     request.cookies.get('eth_address') or \
+                     request.args.get('eth_address') or \
+                     session.get('eth_address') or \
+                     session.get('admin_eth_address')
+        
+        # 记录找到的钱包地址
+        current_app.logger.info(f"API管理员验证 - 找到的钱包地址: {eth_address}")
+                     
+        if not eth_address:
+            current_app.logger.warning("API管理员验证失败 - 未提供钱包地址")
+            return jsonify({'error': '请先连接钱包', 'code': 'AUTH_REQUIRED'}), 401
+            
+        admin_info = get_admin_permissions(eth_address.lower())
+        if not admin_info:
+            current_app.logger.warning(f"API管理员验证失败 - 非管理员地址: {eth_address}")
+            return jsonify({'error': '您没有管理员权限', 'code': 'ADMIN_REQUIRED'}), 403
+            
+        g.eth_address = eth_address.lower()
+        g.admin_info = admin_info
+        current_app.logger.info(f"API管理员验证成功 - 地址: {eth_address}")
+        return f(*args, **kwargs)
+    return decorated_function
+
 def permission_required(permission):
     """要求特定权限的装饰器"""
     def decorator(f):

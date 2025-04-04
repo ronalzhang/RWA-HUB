@@ -14,36 +14,62 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <!-- 配置axios拦截器 -->
     <script>
-        // 配置axios请求拦截器，自动添加钱包地址
-        axios.interceptors.request.use(function (config) {
-            // 获取钱包地址
-            let walletAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
+        // 配置Axios拦截器添加钱包地址到请求头
+        document.addEventListener('DOMContentLoaded', function() {
+            // 从cookie、localStorage或sessionStorage获取钱包地址
+            function getWalletAddress() {
+                // 尝试从Cookie获取
+                const cookieMatch = document.cookie.match(/wallet_address=([^;]+)/);
+                if (cookieMatch) return cookieMatch[1];
+                
+                // 尝试从localStorage获取
+                if (localStorage.getItem('wallet_address')) 
+                    return localStorage.getItem('wallet_address');
+                
+                // 尝试从sessionStorage获取
+                if (sessionStorage.getItem('wallet_address')) 
+                    return sessionStorage.getItem('wallet_address');
+                
+                return null;
+            }
             
-            // 如果有钱包地址，添加到请求头中
-            if (walletAddress) {
-                config.headers['X-Eth-Address'] = walletAddress;
-                console.log('已自动为请求添加钱包地址:', walletAddress);
+            // 配置Axios请求拦截器，添加钱包地址到请求头
+            if (typeof axios !== 'undefined') {
+                console.log("配置Axios拦截器...");
+                axios.interceptors.request.use(function(config) {
+                    const walletAddress = getWalletAddress();
+                    if (walletAddress) {
+                        console.log("添加钱包地址到请求头:", walletAddress);
+                        config.headers['Wallet-Address'] = walletAddress;
+                    } else {
+                        console.warn("未找到钱包地址，无法添加到请求头");
+                    }
+                    return config;
+                }, function(error) {
+                    console.error("Axios请求拦截器错误:", error);
+                    return Promise.reject(error);
+                });
+                
+                // 添加响应拦截器记录错误和身份认证问题
+                axios.interceptors.response.use(function(response) {
+                    return response;
+                }, function(error) {
+                    console.error("API请求失败:", error.config?.url, error.response?.status, error.response?.data);
+                    // 如果返回401或403错误，可能是认证问题
+                    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+                        console.warn("认证失败，即将重定向到登录页面");
+                        // 延迟执行以确保错误信息显示
+                        setTimeout(() => {
+                            window.location.href = '/admin/v2/login';
+                        }, 2000);
+                    }
+                    return Promise.reject(error);
+                });
+                
+                console.log("Axios拦截器配置完成");
             } else {
-                console.warn('未找到钱包地址，请连接钱包');
+                console.warn("未检测到Axios库，无法配置拦截器");
             }
-            
-            // 修复URL格式，将/api/admin/v2/开头的URL修改为/admin/v2/api/
-            if (config.url && config.url.startsWith('/api/admin/v2/')) {
-                const fixedUrl = config.url.replace('/api/admin/v2/', '/admin/v2/api/');
-                console.log(`URL重写: ${config.url} -> ${fixedUrl}`);
-                config.url = fixedUrl;
-            }
-            
-            // 修复带域名的完整URL
-            if (config.url && config.url.includes('https://rwa-hub.com/api/admin/v2/')) {
-                const fixedUrl = config.url.replace('https://rwa-hub.com/api/admin/v2/', '/admin/v2/api/');
-                console.log(`完整URL重写: ${config.url} -> ${fixedUrl}`);
-                config.url = fixedUrl;
-            }
-            
-            return config;
-        }, function (error) {
-            return Promise.reject(error);
         });
     </script>
     <!-- Chart.js CDN -->
