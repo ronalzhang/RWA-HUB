@@ -1,25 +1,31 @@
-from flask import render_template, jsonify, request, g, current_app, redirect, url_for, flash, session, after_this_request
+from flask import (
+    Blueprint, render_template, request, redirect, url_for, 
+    flash, session, jsonify, current_app, g, after_this_request
+)
 from app.models.asset import Asset, AssetStatus, AssetType
-from app.models.trade import Trade, TradeStatus
-from app.models.income import PlatformIncome as DBPlatformIncome, IncomeType
+from app.models.trade import Trade, TradeStatus, TradeType
+from app.models.user import User
+from app.models.admin import AdminUser
+from app.models.dividend import DividendDistribution, DividendRecord
+from sqlalchemy import func, desc
 from app.extensions import db
-from . import admin_bp, admin_api_bp
-from app.utils.decorators import eth_address_required
-from sqlalchemy import func, text, literal
+from app.utils.decorators import eth_address_required, admin_required, permission_required, api_admin_required
+from app.utils.admin import get_admin_permissions
+from app.models.income import PlatformIncome as DBPlatformIncome, IncomeType
+from app.models.commission import Commission
+from app.models.admin import DashboardStats
+from dateutil.relativedelta import relativedelta
 from datetime import datetime, timedelta, time, date
 from functools import wraps
 import json
 import os
 from app.utils.storage import storage
-from ..models import DividendRecord
 import re
 import logging
 from urllib.parse import urlparse, parse_qs
 import random
-from app.models.user import User
 from app.models.platform_income import PlatformIncome
 from app.models.dividend import Dividend
-from dateutil.relativedelta import relativedelta
 from app.models.admin import AdminUser
 from app.models.commission import Commission
 from app.models.admin import DashboardStats
@@ -2062,20 +2068,53 @@ def admin_v2_index():
 
 @admin_bp.route('/v2/api/check-auth')
 def check_auth_v2():
-    """检查管理员身份验证状态"""
-    eth_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address') or session.get('eth_address')
-    
-    if not eth_address:
-        return jsonify({'authenticated': False}), 401
-    
-    # 尝试从新管理员表中获取信息
-    admin = AdminUser.query.filter_by(wallet_address=eth_address).first()
-    
-    # 如果在新表中没有找到，则使用旧配置
-    if not admin and eth_address not in current_app.config['ADMIN_CONFIG']:
-        return jsonify({'authenticated': False}), 401
-    
-    return jsonify({'authenticated': True})
+    """检查管理员认证状态V2"""
+    try:
+        current_app.logger.info("收到管理员认证检查请求，请求头信息：%s", request.headers)
+        wallet_address = None
+        
+        # 尝试从多个来源获取钱包地址
+        if 'Wallet-Address' in request.headers:
+            wallet_address = request.headers.get('Wallet-Address')
+            current_app.logger.info("从请求头中获取到钱包地址: %s", wallet_address)
+        elif request.cookies.get('wallet_address'):
+            wallet_address = request.cookies.get('wallet_address')
+            current_app.logger.info("从cookies中获取到钱包地址: %s", wallet_address)
+        elif session.get('wallet_address'):
+            wallet_address = session.get('wallet_address')
+            current_app.logger.info("从session中获取到钱包地址: %s", wallet_address)
+        
+        if not wallet_address:
+            current_app.logger.warning("未找到钱包地址，认证失败")
+            return jsonify({
+                'authenticated': False,
+                'message': '未找到钱包地址，请重新登录'
+            }), 401
+        
+        # 查询管理员用户
+        admin_user = AdminUser.query.filter_by(wallet_address=wallet_address).first()
+        
+        if admin_user:
+            current_app.logger.info("管理员认证成功: %s", wallet_address)
+            return jsonify({
+                'authenticated': True,
+                'wallet_address': wallet_address,
+                'admin_level': admin_user.admin_level,
+                'message': '认证成功'
+            })
+        else:
+            current_app.logger.warning("管理员认证失败，钱包地址不在管理员列表中: %s", wallet_address)
+            return jsonify({
+                'authenticated': False,
+                'message': '您不是管理员，无法访问'
+            }), 403
+    except Exception as e:
+        current_app.logger.error("管理员认证检查过程中发生错误: %s", str(e), exc_info=True)
+        return jsonify({
+            'authenticated': False,
+            'message': '认证过程中发生错误',
+            'error': str(e)
+        }), 500
 
 @admin_bp.route('/v2/api/logout', methods=['POST'])
 def logout_v2():
@@ -2086,7 +2125,7 @@ def logout_v2():
     return response
 
 @admin_bp.route('/v2/api/assets', methods=['GET'])
-@admin_required
+@api_admin_required
 def api_assets_v2():
     """管理后台V2版本资产列表API"""
     try:
@@ -2094,10 +2133,14 @@ def api_assets_v2():
         current_app.logger.info("接收到资产列表API请求")
         current_app.logger.info(f"请求头: {dict(request.headers)}")
         current_app.logger.info(f"请求参数: {dict(request.args)}")
+        current_app.logger.info(f"当前用户: {g.eth_address if hasattr(g, 'eth_address') else '未知'}")
         
         # 模拟分页和筛选
         page = request.args.get('page', 1, type=int)
         limit = request.args.get('limit', 10, type=int)
+        
+        # 记录处理信息
+        current_app.logger.info(f"处理分页请求: 页码={page}, 条数={limit}")
         
         # 模拟资产数据
         mock_assets = [
@@ -2221,7 +2264,7 @@ def api_assets_v2():
         }), 500
 
 @admin_bp.route('/v2/api/assets/stats', methods=['GET'])
-@admin_required
+@api_admin_required
 def api_assets_stats_v2():
     """管理后台V2版本资产统计API"""
     # 模拟统计数据
@@ -2251,63 +2294,63 @@ def api_assets_stats_v2():
     return jsonify(mock_stats)
 
 @admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['PUT'])
-@admin_required
+@api_admin_required
 def api_edit_asset_v2(asset_id):
     """管理后台V2版本编辑资产API"""
     # 模拟成功响应
     return jsonify({'success': True, 'message': '资产更新成功'})
 
 @admin_bp.route('/v2/api/assets', methods=['POST'])
-@admin_required
+@api_admin_required
 def api_create_asset_v2():
     """管理后台V2版本创建资产API"""
     # 模拟成功响应
     return jsonify({'success': True, 'message': '资产创建成功', 'id': 100})
 
 @admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['DELETE'])
-@admin_required
+@api_admin_required
 def api_delete_asset_v2(asset_id):
     """管理后台V2版本删除资产API"""
     # 模拟成功响应
     return jsonify({'success': True, 'message': '资产删除成功'})
 
 @admin_bp.route('/v2/api/assets/<int:asset_id>/approve', methods=['POST'])
-@admin_required
+@api_admin_required
 def api_approve_asset_v2(asset_id):
     """管理后台V2版本批准资产API"""
     # 模拟成功响应
     return jsonify({'success': True, 'message': '资产批准成功'})
 
 @admin_bp.route('/v2/api/assets/<int:asset_id>/reject', methods=['POST'])
-@admin_required
+@api_admin_required
 def api_reject_asset_v2(asset_id):
     """管理后台V2版本拒绝资产API"""
     # 模拟成功响应
     return jsonify({'success': True, 'message': '资产拒绝成功'})
 
 @admin_bp.route('/v2/api/assets/batch-approve', methods=['POST'])
-@admin_required
+@api_admin_required
 def api_batch_approve_assets_v2():
     """管理后台V2版本批量批准资产API"""
     # 模拟成功响应
     return jsonify({'success': True, 'message': '批量批准资产成功'})
 
 @admin_bp.route('/v2/api/assets/batch-reject', methods=['POST'])
-@admin_required
+@api_admin_required
 def api_batch_reject_assets_v2():
     """管理后台V2版本批量拒绝资产API"""
     # 模拟成功响应
     return jsonify({'success': True, 'message': '批量拒绝资产成功'})
 
 @admin_bp.route('/v2/api/assets/batch-delete', methods=['POST'])
-@admin_required
+@api_admin_required
 def api_batch_delete_assets_v2():
     """管理后台V2版本批量删除资产API"""
     # 模拟成功响应
     return jsonify({'success': True, 'message': '批量删除资产成功'})
 
 @admin_bp.route('/v2/api/assets/export', methods=['GET'])
-@admin_required
+@api_admin_required
 def api_export_assets_v2():
     """管理后台V2版本导出资产API"""
     # 在实际实现中，这里应该返回一个CSV或Excel文件
@@ -2315,7 +2358,7 @@ def api_export_assets_v2():
     return "资产导出功能正在开发中", 200, {'Content-Type': 'text/plain'}
 
 @admin_bp.route('/v2/api/dashboard/stats', methods=['GET'])
-@admin_required
+@api_admin_required
 def api_dashboard_stats_v2():
     """获取仪表盘统计数据"""
     try:
@@ -2358,7 +2401,7 @@ def api_dashboard_stats_v2():
         return jsonify({'error': str(e)}), 500
 
 @admin_bp.route('/v2/api/dashboard/trends', methods=['GET'])
-@admin_required
+@api_admin_required
 def api_dashboard_trends_v2():
     """获取仪表盘趋势数据"""
     try:
@@ -2382,7 +2425,7 @@ def api_dashboard_trends_v2():
         return jsonify({'error': str(e)}), 500
 
 @admin_bp.route('/v2/api/dashboard/recent-trades', methods=['GET'])
-@admin_required
+@api_admin_required
 def api_dashboard_recent_trades_v2():
     """获取最近交易数据"""
     try:
@@ -2571,3 +2614,43 @@ def update_share_messages():
             'success': False,
             'error': str(e)
         }), 500
+
+@admin_bp.route('/v2/api/users', methods=['GET'])
+@api_admin_required
+def api_users_v2():
+    """管理后台V2版本用户列表API"""
+
+@admin_bp.route('/v2/api/users/<int:user_id>', methods=['GET'])
+@api_admin_required
+def api_user_detail_v2(user_id):
+    """管理后台V2版本用户详情API"""
+
+@admin_bp.route('/v2/api/users/<int:user_id>', methods=['PUT'])
+@api_admin_required
+def api_edit_user_v2(user_id):
+    """管理后台V2版本编辑用户API"""
+
+@admin_bp.route('/v2/api/users/<int:user_id>/verify', methods=['POST'])
+@api_admin_required
+def api_verify_user_v2(user_id):
+    """管理后台V2版本验证用户API"""
+
+@admin_bp.route('/v2/api/users/<int:user_id>/reject', methods=['POST'])
+@api_admin_required
+def api_reject_user_v2(user_id):
+    """管理后台V2版本拒绝用户API"""
+
+@admin_bp.route('/v2/api/users/batch-verify', methods=['POST'])
+@api_admin_required
+def api_batch_verify_users_v2():
+    """管理后台V2版本批量验证用户API"""
+
+@admin_bp.route('/v2/api/users/batch-reject', methods=['POST'])
+@api_admin_required
+def api_batch_reject_users_v2():
+    """管理后台V2版本批量拒绝用户API"""
+
+@admin_bp.route('/v2/api/users/export', methods=['GET'])
+@api_admin_required
+def api_export_users_v2():
+    """管理后台V2版本导出用户API"""

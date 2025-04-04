@@ -82,20 +82,33 @@
                     return;
                 }
                 
-                // 设置cookie或会话
-                document.cookie = `eth_address=${walletAddress}; path=/`;
-                sessionStorage.setItem('eth_address', walletAddress);
+                // 设置cookie和本地存储
+                document.cookie = `wallet_address=${walletAddress}; path=/`;
+                sessionStorage.setItem('wallet_address', walletAddress);
+                localStorage.setItem('wallet_address', walletAddress);
                 
                 // 检查是否为管理员
-                fetch('/api/admin/check-auth')
-                    .then(response => response.json())
+                fetch('/admin/v2/api/check-auth', {
+                    headers: {
+                        'Wallet-Address': walletAddress
+                    }
+                })
+                    .then(response => {
+                        console.log('认证检查响应状态:', response.status);
+                        if (!response.ok) {
+                            console.error('认证检查失败:', response.status, response.statusText);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
+                        console.log('认证检查结果:', data);
                         if (data.authenticated) {
                             // 登录成功，重定向到管理后台
+                            console.log('认证成功，即将重定向到管理后台');
                             window.location.href = '/admin/v2';
                         } else {
                             // 登录失败，显示错误信息
-                            showAlert('无效的管理员钱包地址，请确认您有权限访问管理后台');
+                            showAlert(data.message || '无效的管理员钱包地址，请确认您有权限访问管理后台');
                         }
                     })
                     .catch(error => {
@@ -118,10 +131,10 @@
                 alertMessage.textContent = message;
                 alertBox.style.display = 'block';
                 
-                // 5秒后自动隐藏
+                // 3秒后自动隐藏
                 setTimeout(() => {
                     alertBox.style.display = 'none';
-                }, 5000);
+                }, 3000);
             }
         });
     </script>
