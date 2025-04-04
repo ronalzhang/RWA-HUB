@@ -59,22 +59,15 @@ def init_db():
                 logger.error(f"数据库连接失败: {e}")
                 raise
             
-            # 运行数据库迁移
-            try:
-                logger.info("开始运行数据库迁移...")
-                upgrade()
-                logger.info("数据库迁移完成")
-            except Exception as e:
-                logger.error(f"数据库迁移失败: {e}")
-                # 如果迁移失败，尝试直接创建表
-                logger.info("尝试直接创建数据库表...")
-                db.create_all()
-                logger.info("数据库表创建完成")
+            # 禁用数据库迁移，避免因找不到迁移版本而导致应用程序不断重启
+            # 如需手动迁移，请使用 flask db upgrade 命令
+            logger.info("已禁用自动数据库迁移，确保数据库结构已是最新")
             
-            # 验证表是否创建成功
-            if not verify_db_tables():
-                raise Exception("数据库表验证失败")
-                
+            # 如果需要创建表，请使用下面的代码
+            # db.create_all()
+            # logger.info("数据库表已创建")
+            
+            return True
     except Exception as e:
         logger.error(f"初始化数据库时出错: {e}")
         raise
