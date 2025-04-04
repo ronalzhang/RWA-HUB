@@ -12,6 +12,40 @@
     <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"></script>
     <!-- Axios CDN -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- 配置axios拦截器 -->
+    <script>
+        // 配置axios请求拦截器，自动添加钱包地址
+        axios.interceptors.request.use(function (config) {
+            // 获取钱包地址
+            let walletAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
+            
+            // 如果有钱包地址，添加到请求头中
+            if (walletAddress) {
+                config.headers['X-Eth-Address'] = walletAddress;
+                console.log('已自动为请求添加钱包地址:', walletAddress);
+            } else {
+                console.warn('未找到钱包地址，请连接钱包');
+            }
+            
+            // 修复URL格式，将/api/admin/v2/开头的URL修改为/admin/v2/api/
+            if (config.url && config.url.startsWith('/api/admin/v2/')) {
+                const fixedUrl = config.url.replace('/api/admin/v2/', '/admin/v2/api/');
+                console.log(`URL重写: ${config.url} -> ${fixedUrl}`);
+                config.url = fixedUrl;
+            }
+            
+            // 修复带域名的完整URL
+            if (config.url && config.url.includes('https://rwa-hub.com/api/admin/v2/')) {
+                const fixedUrl = config.url.replace('https://rwa-hub.com/api/admin/v2/', '/admin/v2/api/');
+                console.log(`完整URL重写: ${config.url} -> ${fixedUrl}`);
+                config.url = fixedUrl;
+            }
+            
+            return config;
+        }, function (error) {
+            return Promise.reject(error);
+        });
+    </script>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
     <!-- Alpine.js CDN -->
@@ -221,12 +255,23 @@
                     this.showUserMenu = false;
                 },
                 async logout() {
-                    try {
-                        await axios.post('/api/admin/v2/logout');
-                        window.location.href = '/admin/v2/login';
-                    } catch (error) {
-                        console.error('退出登录失败:', error);
-                        alert('退出登录失败，请重试');
+                    if (confirm('确定要退出登录吗？')) {
+                        try {
+                            await axios.post('/admin/v2/api/logout');
+                            // 清除所有相关的存储
+                            localStorage.removeItem('eth_address');
+                            localStorage.removeItem('walletAddress');
+                            sessionStorage.removeItem('eth_address');
+                            
+                            // 删除cookie
+                            document.cookie = 'eth_address=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                            
+                            // 跳转到首页
+                            window.location.href = '/';
+                        } catch (error) {
+                            console.error('退出登录失败', error);
+                            alert('退出登录失败，请重试');
+                        }
                     }
                 }
             },
