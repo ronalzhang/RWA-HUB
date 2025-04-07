@@ -2027,7 +2027,7 @@ def users_v2():
 @admin_bp.route('/v2/assets')
 def assets_v2():
     """V2资产管理页面"""
-    return render_template('admin/v2/assets.html')
+    return render_template('admin_v2/assets.html')
 
 @admin_bp.route('/v2/commission')
 @admin_required
