@@ -1050,7 +1050,7 @@ def register_admin_v2_blueprint(app):
 
 # 添加兼容旧版API的路由
 @admin_compat_bp.route('/stats')
-@compat_admin_required
+@eth_address_required
 def get_stats_compat():
     """兼容旧版API的统计数据接口"""
     try:
@@ -1131,7 +1131,7 @@ def get_stats_compat():
         return jsonify({'error': '获取统计数据失败', 'message': str(e)}), 500
 
 @admin_compat_bp.route('/asset-type-stats')
-@compat_admin_required
+@eth_address_required
 def get_asset_type_stats_compat():
     """兼容旧版API的资产类型分布接口"""
     try:
@@ -1175,7 +1175,7 @@ def get_asset_type_stats_compat():
         return jsonify({'error': '获取资产类型统计失败', 'message': str(e)}), 500
 
 @admin_compat_bp.route('/user-stats')
-@compat_admin_required
+@eth_address_required
 def get_user_stats_compat():
     """兼容旧版API的用户统计接口"""
     try:

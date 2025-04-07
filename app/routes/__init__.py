@@ -17,6 +17,9 @@ service_bp = Blueprint('service', __name__, url_prefix='/api/service')
 # 添加新的代理蓝图，用于处理外部资源代理
 proxy_bp = Blueprint('proxy', __name__, url_prefix='/proxy')
 
+# 添加管理员测试蓝图
+from .admin_test import admin_test_bp
+
 # 导入视图函数
 from . import main
 from . import views
@@ -49,6 +52,7 @@ def register_blueprints(app):
     app.register_blueprint(admin_api_bp)
     app.register_blueprint(service_bp)
     app.register_blueprint(proxy_bp)  # 注册代理蓝图
+    app.register_blueprint(admin_test_bp)  # 注册管理员测试蓝图
     
     # 注册全局URL前缀修正处理器
     register_global_handlers(app)
