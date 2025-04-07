@@ -202,13 +202,24 @@
             card.addEventListener('mouseenter', function() {
                 this.style.transform = 'translateY(-5px)';
                 this.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
+                this.style.transition = 'all 0.3s ease';
             });
             
             card.addEventListener('mouseleave', function() {
                 this.style.transform = 'translateY(0)';
                 this.style.boxShadow = '0 2px 10px rgba(0,0,0,0.05)';
+                this.style.transition = 'all 0.3s ease';
             });
         });
+        
+        // 刷新卡片样式，确保初始渲染正确
+        setTimeout(function() {
+            cards.forEach(card => {
+                card.style.transition = 'all 0.3s ease';
+                card.style.transform = 'translateY(0)';
+                card.style.boxShadow = '0 2px 10px rgba(0,0,0,0.05)';
+            });
+        }, 100);
     });
 </script>
 {% endblock %}
