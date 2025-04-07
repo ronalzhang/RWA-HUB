@@ -48,7 +48,7 @@ def index():
             })
         
         return render_template('index.html', 
-                             assets=assets,
+                             assets=asset_data,
                              current_user_address=eth_address,
                              AssetStatus=AssetStatus,
                              _=_)
