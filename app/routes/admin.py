@@ -2140,36 +2140,15 @@ def logout_v2():
 def api_assets_v2():
     """管理后台V2版本资产列表API"""
     try:
-        # 检查是否提供了钱包地址
-        eth_address = None
-        if 'X-Eth-Address' in request.headers:
-            eth_address = request.headers.get('X-Eth-Address')
-        if not eth_address and 'eth_address' in request.cookies:
-            eth_address = request.cookies.get('eth_address')
-        if not eth_address and 'eth_address' in session:
-            eth_address = session.get('eth_address')
-        if not eth_address and 'admin_eth_address' in session:
-            eth_address = session.get('admin_eth_address')
-            
-        # 记录请求
-        current_app.logger.info(f"访问V2资产列表API，地址: {eth_address}, 参数: {request.args}")
+        # 记录请求信息，方便调试
+        current_app.logger.info(f"访问V2资产列表API，参数: {request.args}")
         
         # 分页参数
         page = request.args.get('page', 1, type=int)
         limit = request.args.get('limit', 10, type=int)
         
-        # 是否为管理员
-        is_admin_user = is_admin(eth_address)
-        
-        # 查询资产列表
-        query = Asset.query
-        
-        # 非管理员用户只能看到已审核通过的资产
-        if not is_admin_user:
-            query = query.filter(Asset.status == 2)  # 2 表示已审核通过
-        else:
-            # 管理员可以看到所有未删除的资产
-            query = query.filter(Asset.status != 0)  # 0 表示已删除
+        # 查询资产列表 - 管理后台始终显示所有未删除的资产
+        query = Asset.query.filter(Asset.status != 0)  # 0 表示已删除
         
         # 查询筛选条件
         status = request.args.get('status')
@@ -2204,33 +2183,49 @@ def api_assets_v2():
         pagination = query.paginate(page=page, per_page=limit, error_out=False)
         assets = pagination.items
         
+        current_app.logger.info(f"查询到 {len(assets)} 个资产，总计 {pagination.total} 个")
+        
         # 格式化返回数据
         asset_list = []
         for asset in assets:
-            asset_list.append({
-                'id': asset.id,
-                'name': asset.name,
-                'token_symbol': asset.token_symbol,
-                'asset_type': asset.asset_type,
-                'asset_type_name': AssetType(asset.asset_type).name if hasattr(AssetType, asset.asset_type) else '未知类型',
-                'location': asset.location,
-                'area': float(asset.area) if asset.area else 0,
-                'token_price': float(asset.token_price) if asset.token_price else 0,
-                'annual_revenue': float(asset.annual_revenue) if asset.annual_revenue else 0,
-                'total_value': float(asset.total_value) if asset.total_value else 0,
-                'token_supply': asset.token_supply,
-                'creator_address': asset.creator_address,
-                'status': asset.status,
-                'status_text': {
-                    1: '待审核',
-                    2: '已通过',
-                    3: '已拒绝',
-                    4: '已删除'
-                }.get(asset.status, '未知状态'),
-                'image': asset.get_cover_image(),
-                'created_at': asset.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                'updated_at': asset.updated_at.strftime('%Y-%m-%d %H:%M:%S') if asset.updated_at else None
-            })
+            try:
+                # 获取资产类型名称
+                asset_type_name = '未知类型'
+                asset_type_value = asset.asset_type
+                
+                # 尝试查找枚举值
+                for item in AssetType:
+                    if item.value == asset_type_value:
+                        asset_type_name = item.name
+                        break
+                        
+                asset_list.append({
+                    'id': asset.id,
+                    'name': asset.name,
+                    'token_symbol': asset.token_symbol,
+                    'asset_type': asset.asset_type,
+                    'asset_type_name': asset_type_name,
+                    'location': asset.location,
+                    'area': float(asset.area) if asset.area else 0,
+                    'token_price': float(asset.token_price) if asset.token_price else 0,
+                    'annual_revenue': float(asset.annual_revenue) if asset.annual_revenue else 0,
+                    'total_value': float(asset.total_value) if asset.total_value else 0,
+                    'token_supply': asset.token_supply,
+                    'creator_address': asset.creator_address,
+                    'status': asset.status,
+                    'status_text': {
+                        1: '待审核',
+                        2: '已通过',
+                        3: '已拒绝',
+                        4: '已删除'
+                    }.get(asset.status, '未知状态'),
+                    'image': asset.get_cover_image(),
+                    'created_at': asset.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                    'updated_at': asset.updated_at.strftime('%Y-%m-%d %H:%M:%S') if asset.updated_at else None
+                })
+            except Exception as item_error:
+                current_app.logger.error(f"处理资产 {asset.id} 数据失败: {str(item_error)}")
+                # 继续处理下一个资产
         
         return jsonify({
             'items': asset_list,
@@ -2253,17 +2248,6 @@ def api_assets_v2():
 def api_assets_stats_v2():
     """管理后台V2版本资产统计API"""
     try:
-        # 检查是否提供了钱包地址
-        eth_address = None
-        if 'X-Eth-Address' in request.headers:
-            eth_address = request.headers.get('X-Eth-Address')
-        if not eth_address and 'eth_address' in request.cookies:
-            eth_address = request.cookies.get('eth_address')
-        if not eth_address and 'eth_address' in session:
-            eth_address = session.get('eth_address')
-        if not eth_address and 'admin_eth_address' in session:
-            eth_address = session.get('admin_eth_address')
-            
         # 统计数据
         total_assets = Asset.query.filter(Asset.status != 0).count()
         pending_assets = Asset.query.filter(Asset.status == 1).count()
