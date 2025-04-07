@@ -165,96 +165,70 @@ def permission_required(permission):
     return decorator
 
 def admin_page_required(f):
-    """管理页面需要验证管理员身份的装饰器"""
+    """管理页面权限装饰器，用于网页访问"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         # 记录详细的请求信息，帮助排查问题
-        current_app.logger.info("管理后台访问 - 请求信息:")
-        current_app.logger.info(f"- 请求URL: {request.url}")
-        current_app.logger.info(f"- 请求方法: {request.method}")
-        current_app.logger.info(f"- 请求参数: {request.args.to_dict()}")
-        current_app.logger.info(f"- 请求头: {dict(request.headers)}")
-        current_app.logger.info(f"- 请求Cookies: {request.cookies}")
+        current_app.logger.info(f"访问管理页面: {request.path}")
+        current_app.logger.info(f"请求头: {dict(request.headers)}")
+        current_app.logger.info(f"Cookies: {request.cookies}")
+        current_app.logger.info(f"Session: {session}")
         
-        # 按照优先级依次从不同来源获取钱包地址
+        # 尝试从各种来源获取钱包地址
         eth_address = None
         
-        # 1. 从请求头获取
-        header_address = request.headers.get('X-Eth-Address')
+        # 检查请求头
+        if 'X-Eth-Address' in request.headers:
+            eth_address = request.headers.get('X-Eth-Address')
+            current_app.logger.info(f"从请求头获取钱包地址: {eth_address}")
         
-        # 2. 从Cookie获取
-        cookie_address = request.cookies.get('eth_address')
+        # 检查Cookie
+        if not eth_address and 'eth_address' in request.cookies:
+            eth_address = request.cookies.get('eth_address')
+            current_app.logger.info(f"从Cookie获取钱包地址: {eth_address}")
         
-        # 3. 从会话获取
-        session_address = session.get('eth_address')
+        # 检查会话
+        if not eth_address and 'eth_address' in session:
+            eth_address = session.get('eth_address')
+            current_app.logger.info(f"从Session获取钱包地址: {eth_address}")
         
-        # 4. 从URL参数获取
-        param_address = request.args.get('eth_address')
+        if not eth_address and 'admin_eth_address' in session:
+            eth_address = session.get('admin_eth_address')
+            current_app.logger.info(f"从Session获取管理员钱包地址: {eth_address}")
         
-        # 记录获取钱包地址的所有来源
-        current_app.logger.info("管理后台访问 - 钱包地址来源:")
-        current_app.logger.info(f"- Header: {header_address}")
-        current_app.logger.info(f"- Cookie: {cookie_address}")
-        current_app.logger.info(f"- Session: {session_address}")
-        current_app.logger.info(f"- URL参数: {param_address}")
+        # 尝试从URL参数获取
+        if not eth_address and 'eth_address' in request.args:
+            eth_address = request.args.get('eth_address')
+            current_app.logger.info(f"从URL参数获取钱包地址: {eth_address}")
         
-        # 按优先级选择: URL参数 > 会话 > Cookie > 请求头
-        eth_address = param_address or session_address or cookie_address or header_address
+        current_app.logger.info(f"最终使用的钱包地址: {eth_address}")
         
-        if not eth_address:
-            current_app.logger.warning("管理后台访问失败 - 未提供钱包地址")
-            flash('请先连接钱包', 'warning')
-            return redirect('/')
+        # 验证是否为管理员，如果不是管理员，但路径中有v2，返回当前V2管理页面
+        if not eth_address or not is_admin(eth_address):
+            if '/v2/' in request.path or request.path.endswith('/v2'):
+                # 如果请求是V2路径，返回登录页面
+                current_app.logger.info("重定向到管理员登录页面(V2)")
+                return redirect(url_for('admin.login_v2'))
+            else:
+                # 添加简单的调试日志
+                current_app.logger.info("非V2路径，普通重定向")
+                flash('请先连接钱包并验证管理员身份', 'warning')
+                return redirect(url_for('main.index'))
         
-        # 确认钱包地址大小写
-        if eth_address.startswith('0x'):
-            eth_address = eth_address.lower()
-            current_app.logger.info(f"转换ETH地址为小写: {eth_address}")
-        else:
-            current_app.logger.info(f"保留SOL地址大小写: {eth_address}")
-        
-        # 设置全局钱包地址变量，供后续使用
+        # 如果是管理员，设置当前会话和临时变量
         g.eth_address = eth_address
+        g.admin_info = get_admin_info(eth_address)
         
-        # 首先检查会话是否已有管理员状态 - 优先使用会话记录的身份，避免重复验证
-        if session.get('is_admin') and session.get('eth_address') == eth_address:
-            current_app.logger.info(f"会话中已有管理员身份: {eth_address}")
-            return f(*args, **kwargs)
-        
-        # 检查cookie是否已有管理员状态
-        if request.cookies.get('is_admin') == 'true' and cookie_address == eth_address:
-            current_app.logger.info(f"Cookie中已有管理员身份: {eth_address}")
-            # 更新会话
-            session['eth_address'] = eth_address
-            session['is_admin'] = True
-            return f(*args, **kwargs)
-        
-        # 从配置中验证管理员身份
-        admin_info = get_admin_info(eth_address)
-        
-        if not admin_info or not admin_info.get('is_admin', False):
-            current_app.logger.warning(f"管理后台访问被拒绝 - 地址不是管理员: {eth_address}")
-            flash('您没有管理员权限', 'error')
-            return redirect('/')
-        
-        current_app.logger.info(f"管理员信息: {admin_info}")
-        
-        # 设置会话变量
+        # 更新session，确保后续请求正常
         session['eth_address'] = eth_address
-        session['is_admin'] = True
-        session['admin_role'] = admin_info.get('role')
-        session['admin_level'] = admin_info.get('level')
-        session['admin_permissions'] = admin_info.get('permissions', [])
-        
-        # 设置Cookie以便后续请求使用
-        current_app.logger.info(f"管理后台访问成功 - 管理员: {eth_address}")
+        session['admin_eth_address'] = eth_address
         
         @after_this_request
         def set_cookie(response):
-            response.set_cookie('eth_address', eth_address, max_age=86400)  # 24小时
-            response.set_cookie('is_admin', 'true', max_age=86400)          # 24小时
+            response.set_cookie('eth_address', eth_address, max_age=3600*24*30)
             return response
-            
+        
+        current_app.logger.info(f"通过管理员验证，用户: {eth_address}")
         return f(*args, **kwargs)
     return decorated_function
 
