@@ -345,116 +345,80 @@ def logout():
 def get_admin_stats():
     """获取管理仪表盘统计数据"""
     try:
-        # 获取总用户数（所有连接过钱包的用户）
-        # 从连接过钱包的所有地址中统计
-        wallet_addresses = set()
+        # 当前日期
+        today = datetime.utcnow().date()
         
-        # 从交易记录中获取钱包地址
-        trade_addresses = db.session.query(func.distinct(Trade.trader_address)).all()
-        for (address,) in trade_addresses:
-            if address:
-                wallet_addresses.add(address.lower() if address.startswith('0x') else address)
+        # 查询DashboardStats表中的统计数据
+        stats = {}
         
-        # 从用户表中获取钱包地址
-        user_addresses = db.session.query(func.distinct(User.eth_address)).filter(
-            User.eth_address.isnot(None)
+        # 用户统计
+        user_stats = DashboardStats.query.filter(
+            DashboardStats.stat_date == today,
+            DashboardStats.stat_type.in_(['user_count', 'new_users']),
+            DashboardStats.stat_period == 'daily'
         ).all()
-        for (address,) in user_addresses:
-            if address:
-                wallet_addresses.add(address.lower() if address.startswith('0x') else address)
         
-        # 总连接钱包数量
-        total_users = len(wallet_addresses)
-        
-        # 获取总交易数
-        total_trades = db.session.query(func.count(Trade.id)).scalar() or 0
-        
-        # 获取总交易金额（仅完成的交易）
-        total_trade_amount = db.session.query(func.sum(Trade.total)).filter(
-            Trade.status == TradeStatus.COMPLETED.value
+        for stat in user_stats:
+            stats[stat.stat_type] = stat.stat_value
+            
+        # 添加本周新增用户
+        week_start = today - timedelta(days=today.weekday())
+        new_users_week = db.session.query(func.sum(DashboardStats.stat_value)).filter(
+            DashboardStats.stat_type == 'new_users',
+            DashboardStats.stat_period == 'daily',
+            DashboardStats.stat_date >= week_start,
+            DashboardStats.stat_date <= today
         ).scalar() or 0
+        stats['new_users_week'] = new_users_week
         
-        # 获取总资产数
-        total_assets = db.session.query(func.count(Asset.id)).scalar() or 0
-        
-        # 获取总资产价值
-        total_asset_value = db.session.query(func.sum(Asset.total_value)).scalar() or 0
-        
-        # 获取本周新增用户数
-        today = date.today()
-        start_of_week = today - timedelta(days=today.weekday())
-        start_of_week_dt = datetime.combine(start_of_week, datetime.min.time())
-        
-        # 从本周交易记录中获取钱包地址
-        week_wallet_addresses = set()
-        
-        # 本周交易中的地址
-        week_trade_addresses = db.session.query(func.distinct(Trade.trader_address)).filter(
-            Trade.created_at >= start_of_week_dt
+        # 资产统计
+        asset_stats = DashboardStats.query.filter(
+            DashboardStats.stat_date == today,
+            DashboardStats.stat_type.in_(['asset_count', 'asset_value']),
+            DashboardStats.stat_period == 'daily'
         ).all()
-        for (address,) in week_trade_addresses:
-            if address:
-                week_wallet_addresses.add(address.lower() if address.startswith('0x') else address)
         
-        # 本周注册的用户
-        week_user_addresses = db.session.query(func.distinct(User.eth_address)).filter(
-            User.eth_address.isnot(None),
-            User.created_at >= start_of_week_dt
+        for stat in asset_stats:
+            stats[stat.stat_type] = stat.stat_value
+            
+        # 交易统计
+        trade_stats = DashboardStats.query.filter(
+            DashboardStats.stat_date == today,
+            DashboardStats.stat_type.in_(['trade_count', 'trade_volume']),
+            DashboardStats.stat_period == 'daily'
         ).all()
-        for (address,) in week_user_addresses:
-            if address:
-                week_wallet_addresses.add(address.lower() if address.startswith('0x') else address)
         
-        # 本周新增连接钱包数量
-        new_users_week = len(week_wallet_addresses)
+        for stat in trade_stats:
+            stats[stat.stat_type] = stat.stat_value
         
-        # 获取资产类型分布
-        asset_type_distribution = db.session.query(
-            Asset.asset_type,
-            func.count(Asset.id).label('count'),
-            func.sum(Asset.total_value).label('value')
-        ).group_by(Asset.asset_type).all()
+        # 如果统计数据不完整，则更新统计数据
+        if len(stats) < 6:  # 至少应有6种统计数据
+            if not DashboardStats.update_stats_from_db():
+                DashboardStats.update_daily_stats()
+            
+            # 再次查询更新后的统计数据
+            stats = {}
+            all_stats = DashboardStats.query.filter(
+                DashboardStats.stat_date == today,
+                DashboardStats.stat_period == 'daily'
+            ).all()
+            
+            for stat in all_stats:
+                stats[stat.stat_type] = stat.stat_value
         
-        distribution = []
-        color_map = {
-            10: '#4e73df',  # 蓝色 - 不动产
-            20: '#1cc88a',  # 绿色 - 类不动产
-        }
-        
-        asset_type_names = {
-            10: '不动产',
-            20: '类不动产'
-        }
-        
-        for type_id, count, value in asset_type_distribution:
-            distribution.append({
-                'type': type_id,
-                'name': asset_type_names.get(type_id, f'类型{type_id}'),
-                'count': count,
-                'value': float(value) if value else 0,
-                'color': color_map.get(type_id, '#36b9cc')  # 默认颜色
-            })
-        
-        # 返回数据
+        # 返回格式化的数据
         return jsonify({
-            'success': True,
-            'total_users': total_users,
-            'total_trades': total_trades,
-            'total_trade_amount': float(total_trade_amount),
-            'total_assets': total_assets,
-            'total_asset_value': float(total_asset_value),
-            'new_users_week': new_users_week,
-            'asset_type_distribution': distribution,
-            'total_commission': 0,
-            'commission_by_type': {}
+            'total_users': stats.get('user_count', 0),
+            'new_users_today': stats.get('new_users', 0),
+            'new_users_week': stats.get('new_users_week', 0),
+            'total_assets': stats.get('asset_count', 0),
+            'total_asset_value': stats.get('asset_value', 0),
+            'total_trades': stats.get('trade_count', 0),
+            'total_trade_volume': stats.get('trade_volume', 0)
         })
     except Exception as e:
-        current_app.logger.error(f"获取管理表格统计数据失败: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': '获取管理表格统计数据失败',
-            'message': str(e)
-        }), 500
+        current_app.logger.error(f"获取管理仪表盘统计数据失败: {str(e)}", exc_info=True)
+        return jsonify({'error': '获取统计数据失败', 'message': str(e)}), 500
 
 @admin_api_bp.route('/pending-assets')
 @admin_required
@@ -1711,30 +1675,31 @@ def get_user_stats():
                 # 合并去重
                 active_user_count = active_trade_users + active_asset_users
                 
-                # 使用前端期望的格式
+                # 添加当天数据
                 result.append({
-                    "date": day_label,
-                    "count": new_user_count,
-                    "visits": active_user_count  # 添加访问量数据
+                    'date': day_label,
+                    'new_users': new_user_count,
+                    'active_users': active_user_count
                 })
-                
         elif period == 'monthly':
-            # 获取最近30天的数据，按周聚合
-            for i in range(4, 0, -1):
-                week_start = today - timedelta(days=7*i)
-                week_end = week_start + timedelta(days=6)
+            # 获取最近30天的数据，按周汇总
+            for week in range(4, 0, -1):
+                week_end = today - timedelta(days=(week-1)*7)
+                week_start = week_end - timedelta(days=6)
+                
+                # 日期标签
+                week_label = f"{week_start.strftime('%m-%d')} ~ {week_end.strftime('%m-%d')}"
+                
+                # 周开始和结束时间
                 week_start_dt = datetime.combine(week_start, datetime.min.time())
                 week_end_dt = datetime.combine(week_end, datetime.max.time())
-                
-                # 周标签
-                week_label = f"{week_start.strftime('%m-%d')}~{week_end.strftime('%m-%d')}"
                 
                 # 新注册用户数
                 new_user_count = db.session.query(db.func.count(User.id))\
                     .filter(User.created_at.between(week_start_dt, week_end_dt))\
                     .scalar() or 0
                 
-                # 活跃用户数（修复：使用trader_address替代不存在的user_id）
+                # 活跃用户数
                 active_trade_users = db.session.query(db.func.count(db.distinct(Trade.trader_address)))\
                     .filter(Trade.created_at.between(week_start_dt, week_end_dt))\
                     .scalar() or 0
@@ -1745,36 +1710,32 @@ def get_user_stats():
                 
                 active_user_count = active_trade_users + active_asset_users
                 
-                # 使用前端期望的格式
+                # 添加当周数据
                 result.append({
-                    "date": week_label,
-                    "count": new_user_count,
-                    "visits": active_user_count  # 添加访问量数据
+                    'date': week_label,
+                    'new_users': new_user_count,
+                    'active_users': active_user_count
                 })
                 
         elif period == 'yearly':
             # 获取最近12个月的数据
-            for i in range(11, -1, -1):
-                month_start = date(today.year if today.month - i > 0 else today.year - 1, 
-                               ((today.month - i - 1) % 12) + 1, 1)
+            for month in range(11, -1, -1):
+                month_date = today.replace(day=1) - timedelta(days=month*30)
+                month_end = month_date.replace(day=calendar.monthrange(month_date.year, month_date.month)[1])
                 
-                if month_start.month == 12:
-                    month_end = date(month_start.year, month_start.month, 31)
-                else:
-                    month_end = date(month_start.year, month_start.month + 1, 1) - timedelta(days=1)
+                # 月份标签
+                month_label = month_date.strftime('%Y-%m')
                 
-                month_start_dt = datetime.combine(month_start, datetime.min.time())
+                # 月开始和结束时间
+                month_start_dt = datetime.combine(month_date.replace(day=1), datetime.min.time())
                 month_end_dt = datetime.combine(month_end, datetime.max.time())
-                
-                # 月标签
-                month_label = month_start.strftime('%Y-%m')
                 
                 # 新注册用户数
                 new_user_count = db.session.query(db.func.count(User.id))\
                     .filter(User.created_at.between(month_start_dt, month_end_dt))\
                     .scalar() or 0
                 
-                # 活跃用户数（修复：使用trader_address替代不存在的user_id）
+                # 活跃用户数
                 active_trade_users = db.session.query(db.func.count(db.distinct(Trade.trader_address)))\
                     .filter(Trade.created_at.between(month_start_dt, month_end_dt))\
                     .scalar() or 0
@@ -1785,14 +1746,25 @@ def get_user_stats():
                 
                 active_user_count = active_trade_users + active_asset_users
                 
-                # 使用前端期望的格式
+                # 添加当月数据
                 result.append({
-                    "date": month_label,
-                    "count": new_user_count,
-                    "visits": active_user_count  # 添加访问量数据
+                    'date': month_label,
+                    'new_users': new_user_count,
+                    'active_users': active_user_count
                 })
         
-        return jsonify(result)
+        # 获取用户地理分布（假数据，实际应从用户IP或注册信息中获取）
+        regions = [
+            {'name': '中国', 'value': 60},
+            {'name': '美国', 'value': 20},
+            {'name': '欧洲', 'value': 15},
+            {'name': '其他', 'value': 5}
+        ]
+        
+        return jsonify({
+            'trend': result,
+            'regions': regions
+        })
         
     except Exception as e:
         current_app.logger.error(f"获取用户统计失败: {str(e)}", exc_info=True)
