@@ -2198,6 +2198,11 @@ def api_assets_v2():
                     if item.value == asset_type_value:
                         asset_type_name = item.name
                         break
+                
+                # 获取封面图片  
+                cover_image = '/static/images/placeholder.jpg'
+                if asset.images and len(asset.images) > 0:
+                    cover_image = asset.images[0]
                         
                 asset_list.append({
                     'id': asset.id,
@@ -2219,7 +2224,7 @@ def api_assets_v2():
                         3: '已拒绝',
                         4: '已删除'
                     }.get(asset.status, '未知状态'),
-                    'image': asset.get_cover_image(),
+                    'image': cover_image,
                     'created_at': asset.created_at.strftime('%Y-%m-%d %H:%M:%S'),
                     'updated_at': asset.updated_at.strftime('%Y-%m-%d %H:%M:%S') if asset.updated_at else None
                 })
