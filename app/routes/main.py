@@ -18,24 +18,25 @@ def index():
         
         # 如果是管理员，显示所有未删除的资产
         if eth_address and is_admin(eth_address):
+            current_app.logger.info(f'管理员用户: {eth_address}，显示所有未删除资产')
             query = query.filter(Asset.status != AssetStatus.DELETED.value)
         else:
             # 非管理员只能看到已审核通过的资产
+            current_app.logger.info('普通用户或未登录用户：只显示已审核通过的资产')
             query = query.filter(Asset.status == AssetStatus.APPROVED.value)
             
         # 获取最新6个资产
         assets = query.order_by(Asset.created_at.desc()).limit(6).all()
         current_app.logger.info(f'获取资产列表成功: 找到 {len(assets)} 个资产')
         
-        # 获取资产所有者信息
+        # 获取资产信息
         asset_data = []
         for asset in assets:
-            owner = User.query.filter_by(eth_address=asset.owner_address).first()
             asset_data.append({
                 'id': asset.id,
                 'name': asset.name,
                 'images': asset.images if asset.images else ['/static/images/placeholder.jpg'],
-                'owner_name': owner.name if owner else '未知用户',
+                'owner_address': asset.owner_address,
                 'status': asset.status,
                 'token_symbol': asset.token_symbol,
                 'location': asset.location,
@@ -47,7 +48,7 @@ def index():
             })
         
         return render_template('index.html', 
-                             assets=asset_data,
+                             assets=assets,
                              current_user_address=eth_address,
                              AssetStatus=AssetStatus,
                              _=_)

@@ -42,34 +42,25 @@ def list_assets_page():
         
         # 检查是否是管理员
         is_admin_user = is_admin(current_user_address)
-        current_app.logger.info(f'是否是管理员: {is_admin_user}')
+        current_app.logger.info(f'是否是管理员: {is_admin_user}, 地址: {current_user_address}')
 
         # 获取分页参数
         page = request.args.get('page', 1, type=int)
         per_page = 9  # 每页显示9个资产
 
         # 构建基础查询
-        query = Asset.query.filter(Asset.status != 0)  # 0 表示已删除
+        query = Asset.query
         
-        # 记录原始查询结果数量
-        total_count = query.count()
-        current_app.logger.info(f'未过滤的资产总数: {total_count}')
-
         # 根据用户身份过滤资产
-        if current_user_address:
-            if is_admin_user:
-                current_app.logger.info('管理员用户：显示所有未删除资产')
-                # 管理员可以看到所有未删除的资产
-                pass
-            else:
-                current_app.logger.info('普通用户：只显示已审核通过的资产')
-                # 普通用户：只显示已审核通过的资产
-                query = query.filter(Asset.status == 2)  # 2 表示已审核通过
+        if current_user_address and is_admin_user:
+            current_app.logger.info('管理员用户：显示所有未删除资产')
+            # 管理员可以看到所有未删除的资产
+            query = query.filter(Asset.status != 0)  # 0 表示已删除
         else:
-            current_app.logger.info('未登录用户：只显示已审核通过的资产')
-            # 未登录用户：只显示已审核通过的资产
+            current_app.logger.info('普通用户或未登录用户：只显示已审核通过的资产')
+            # 普通用户或未登录用户：只显示已审核通过的资产
             query = query.filter(Asset.status == 2)  # 2 表示已审核通过
-
+        
         # 记录过滤后的查询结果数量
         filtered_count = query.count()
         current_app.logger.info(f'过滤后的资产数量: {filtered_count}')
