@@ -189,4 +189,37 @@
 
 .tier:nth-child(3) .tier-value {
     color: #9C27B0;
+}
+
+/* 资产列表页样式 */
+.asset-list-page #assets .card {
+    transition: all 0.3s ease !important;
+    border-radius: 1rem !important;
+    overflow: hidden !important;
+    border: 1px solid #eee !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
+}
+
+.asset-list-page #assets .card:hover {
+    transform: translateY(-5px) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1) !important;
+}
+
+.asset-list-page #assets .card .card-body {
+    padding: 1rem !important;
+}
+
+/* 确保页面标题和卡片正确显示 */
+.asset-list-page h2 {
+    font-weight: 600 !important;
+    margin-bottom: 1rem !important;
+}
+
+/* 确保悬停JS效果被重置 */
+@media (hover: hover) {
+    .asset-list-page #assets .card a {
+        display: block !important;
+        height: 100% !important;
+        text-decoration: none !important;
+    }
 } 
