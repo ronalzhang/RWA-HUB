@@ -2159,8 +2159,18 @@ def api_assets_v2():
         page = request.args.get('page', 1, type=int)
         limit = request.args.get('limit', 10, type=int)
         
+        # 是否为管理员
+        is_admin_user = is_admin(eth_address)
+        
         # 查询资产列表
         query = Asset.query
+        
+        # 非管理员用户只能看到已审核通过的资产
+        if not is_admin_user:
+            query = query.filter(Asset.status == 2)  # 2 表示已审核通过
+        else:
+            # 管理员可以看到所有未删除的资产
+            query = query.filter(Asset.status != 0)  # 0 表示已删除
         
         # 查询筛选条件
         status = request.args.get('status')
@@ -2241,34 +2251,62 @@ def api_assets_v2():
         })
 
 @admin_bp.route('/v2/api/assets/stats', methods=['GET'])
-@api_admin_required
 def api_assets_stats_v2():
     """管理后台V2版本资产统计API"""
-    # 模拟统计数据
-    mock_stats = {
-        'totalAssets': 58,
-        'totalValue': 89562000.00,
-        'pendingAssets': 12,
-        'assetTypes': 7,
-        'type_distribution': {
-            'real_estate': 18,
-            'artwork': 12,
-            'collectible': 9,
-            'jewelry': 6,
-            'vehicle': 5,
-            'luxury_goods': 4,
-            'other': 4
-        },
-        'status_distribution': {
-            'pending': 12,
-            'approved': 10,
-            'rejected': 3,
-            'listed': 28,
-            'sold': 5
+    try:
+        # 检查是否提供了钱包地址
+        eth_address = None
+        if 'X-Eth-Address' in request.headers:
+            eth_address = request.headers.get('X-Eth-Address')
+        if not eth_address and 'eth_address' in request.cookies:
+            eth_address = request.cookies.get('eth_address')
+        if not eth_address and 'eth_address' in session:
+            eth_address = session.get('eth_address')
+        if not eth_address and 'admin_eth_address' in session:
+            eth_address = session.get('admin_eth_address')
+            
+        # 统计数据
+        total_assets = Asset.query.filter(Asset.status != 0).count()
+        pending_assets = Asset.query.filter(Asset.status == 1).count()
+        approved_assets = Asset.query.filter(Asset.status == 2).count()
+        rejected_assets = Asset.query.filter(Asset.status == 3).count()
+        
+        # 总价值 (只统计已审核通过的资产)
+        total_value = db.session.query(func.sum(Asset.total_value)).filter(Asset.status == 2).scalar() or 0
+        
+        # 资产类型分布
+        asset_types = {}
+        for asset_type in AssetType:
+            count = Asset.query.filter(Asset.asset_type == asset_type.value).count()
+            if count > 0:
+                asset_types[asset_type.name] = count
+        
+        # 状态分布
+        status_distribution = {
+            'pending': pending_assets,
+            'approved': approved_assets,
+            'rejected': rejected_assets
         }
-    }
-    
-    return jsonify(mock_stats)
+        
+        # 返回统计数据
+        return jsonify({
+            'totalAssets': total_assets,
+            'totalValue': float(total_value),
+            'pendingAssets': pending_assets,
+            'assetTypes': len(asset_types),
+            'type_distribution': asset_types,
+            'status_distribution': status_distribution
+        })
+    except Exception as e:
+        current_app.logger.error(f"获取资产统计失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'totalAssets': 0,
+            'totalValue': 0,
+            'pendingAssets': 0,
+            'assetTypes': 0,
+            'type_distribution': {},
+            'status_distribution': {}
+        })
 
 @admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['PUT'])
 @api_admin_required
