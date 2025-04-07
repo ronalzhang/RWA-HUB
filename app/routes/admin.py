@@ -2025,10 +2025,9 @@ def users_v2():
     return render_template('admin_v2/users.html')
 
 @admin_bp.route('/v2/assets')
-@admin_required
 def assets_v2():
-    """管理后台V2版本资产管理页面"""
-    return render_template('admin_v2/assets.html')
+    """V2资产管理页面"""
+    return render_template('admin/v2/assets.html')
 
 @admin_bp.route('/v2/commission')
 @admin_required
