@@ -3,7 +3,7 @@ from app.extensions import db
 from datetime import datetime, timedelta
 from sqlalchemy import func, text
 import json
-from app.utils.decorators import eth_address_required, async_task, log_activity
+from app.utils.decorators import eth_address_required, async_task, log_activity, admin_required
 from app.models.admin import (
     AdminUser, SystemConfig, CommissionSetting, DistributionLevel,
     UserReferral, CommissionRecord, AdminOperationLog, DashboardStats
