@@ -17,6 +17,7 @@
         {% if assets %}
             {% for asset in assets %}
             <div class="col-md-4">
+                {% if asset.status == 2 %}
                 <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" class="text-decoration-none">
                     <div class="card h-100">
                         <!-- 资产图片 -->
@@ -35,13 +36,7 @@
                             
                             <!-- 状态标签 -->
                             <div class="position-absolute top-0 start-0 m-2">
-                                {% if asset.status == 1 %}
-                                <span class="badge bg-warning">{{ _('Pending Review') }}</span>
-                                {% elif asset.status == 2 %}
                                 <span class="badge bg-success">{{ _('On Chain') }}</span>
-                                {% elif asset.status == 3 %}
-                                <span class="badge bg-danger">{{ _('Rejected') }}</span>
-                                {% endif %}
                             </div>
                             
                             <!-- 资产类型标签 -->
@@ -85,6 +80,7 @@
                         </div>
                     </div>
                 </a>
+                {% endif %}
             </div>
             {% endfor %}
         {% else %}

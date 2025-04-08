@@ -9,9 +9,19 @@ from . import main_bp
 def index():
     """首页"""
     try:
-        # 获取当前用户的钱包地址
-        eth_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address')
-        current_app.logger.info(f'当前用户钱包地址: {eth_address}')
+        # 获取当前用户的钱包地址（从多个来源）
+        eth_address_header = request.headers.get('X-Eth-Address')
+        eth_address_cookie = request.cookies.get('eth_address')
+        eth_address_args = request.args.get('eth_address')
+        
+        # 优先使用 Args > Header > Cookie
+        eth_address = eth_address_args or eth_address_header or eth_address_cookie
+        
+        current_app.logger.info(f'钱包地址来源:')
+        current_app.logger.info(f'- Header: {eth_address_header}')
+        current_app.logger.info(f'- Cookie: {eth_address_cookie}')
+        current_app.logger.info(f'- Args: {eth_address_args}')
+        current_app.logger.info(f'最终使用地址: {eth_address}')
         
         # 构建查询条件
         query = Asset.query
