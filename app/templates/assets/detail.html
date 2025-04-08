@@ -777,27 +777,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
                         // 验证必需字段
                         if (!trade.id || typeof trade.id !== 'number') {
-                            errors.push('交易ID无效');
+                            errors.push('{{ _("Invalid transaction ID") }}');
                         }
 
                         if (!trade.created_at) {
-                            errors.push('创建时间无效');
+                            errors.push('{{ _("Invalid creation time") }}');
                         }
 
                         if (!trade.type || !['buy', 'sell'].includes(trade.type)) {
-                            errors.push('交易类型无效');
+                            errors.push('{{ _("Invalid transaction type") }}');
                         }
 
                         if (!trade.amount || isNaN(parseFloat(trade.amount))) {
-                            errors.push('交易数量无效');
+                            errors.push('{{ _("Invalid transaction amount") }}');
                         }
 
                         if (!trade.price || isNaN(parseFloat(trade.price))) {
-                            errors.push('交易价格无效');
+                            errors.push('{{ _("Invalid transaction price") }}');
                         }
 
                         if (!trade.status) {
-                            errors.push('交易状态无效');
+                            errors.push('{{ _("Invalid transaction status") }}');
                         }
 
                         return {
@@ -809,12 +809,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 获取交易历史容器
                     const tradeHistoryContainer = document.getElementById('trade-history');
                     if (!tradeHistoryContainer) {
-                        console.warn('交易历史容器不存在，创建新容器');
+                        console.warn('{{ _("Transaction history container does not exist, creating new container") }}');
                         const container = document.createElement('div');
                         container.id = 'trade-history';
                         const section = document.querySelector('.trade-history-section');
                         if (!section) {
-                            console.error('找不到交易历史区域');
+                            console.error('{{ _("Cannot find transaction history section") }}');
                             return;
                         }
                         section.appendChild(container);
@@ -839,23 +839,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 发起API请求
                     const response = await fetch(`/api/trades?asset_id=${queryParams.asset_id}&page=${queryParams.page}&per_page=${queryParams.per_page}`);
                     if (!response.ok) {
-                        const errorText = await response.text();
-                        console.error('API响应错误:', errorText);
-                        throw new Error('加载交易历史失败: ' + (response.status === 404 ? 'API服务暂时不可用' : response.statusText));
+                        throw new Error('{{ _("Failed to load transaction history") }}: ' + (response.status === 404 ? '{{ _("API service temporarily unavailable") }}' : response.statusText));
                     }
 
+                    // 解析JSON响应
                     const data = await response.json();
+                    if (!data || !data.trades) {
+                        throw new Error('{{ _("Invalid API response format") }}');
+                    }
                     
-                    // 验证响应格式
                     const responseValidation = validateApiResponse(data, 'GET_TRADE_HISTORY');
                     if (!responseValidation.isValid) {
-                        throw new Error('API响应格式错误: ' + responseValidation.errors.join(', '));
+                        throw new Error('{{ _("API response format error") }}: ' + responseValidation.errors.join(', '));
                     }
                     
                     // 获取交易历史容器（再次确认）
                     const container = document.getElementById('trade-history');
                     if (!container) {
-                        throw new Error('找不到交易历史容器');
+                        throw new Error('{{ _("Cannot find transaction history container") }}');
                     }
                     
                     // 清空现有内容
@@ -865,7 +866,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.trades.length === 0) {
                         const noTradesMessage = document.createElement('div');
                         noTradesMessage.className = 'text-center text-muted my-4';
-                        noTradesMessage.textContent = '暂无交易记录';
+                        noTradesMessage.textContent = '{{ _("No transaction records") }}';
                         container.appendChild(noTradesMessage);
                     return;
                 }
@@ -876,12 +877,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     table.innerHTML = `
                         <thead>
                             <tr>
-                                <th>时间</th>
-                                <th>类型</th>
-                                <th>数量</th>
-                                <th>金额</th>
-                                <th>状态</th>
-                                <th style="width: 25%;">交易哈希</th>
+                                <th>{{ _("Time") }}</th>
+                                <th>{{ _("Type") }}</th>
+                                <th>{{ _("Quantity") }}</th>
+                                <th>{{ _("Amount") }}</th>
+                                <th>{{ _("Status") }}</th>
+                                <th style="width: 25%;">{{ _("Transaction Hash") }}</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -913,16 +914,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // 处理交易类型
                         const typeClass = trade.type === 'buy' ? 'text-success' : 'text-danger';
-                        const typeText = trade.type === 'buy' ? '买入' : '卖出';
+                        const typeText = trade.type === 'buy' ? '{{ _("Buy") }}' : '{{ _("Sell") }}';
                         
                         // 处理交易状态
-                        let statusText = '处理中';
+                        let statusText = '{{ _("Processing") }}';
                         let statusClass = 'text-warning';
                         if (trade.status === 'completed' || trade.status === 2 || trade.status === '2') {
-                            statusText = '已完成';
+                            statusText = '{{ _("Completed") }}';
                             statusClass = 'text-success';
                         } else if (trade.status === 'failed' || trade.status === 3 || trade.status === '3') {
-                            statusText = '失败';
+                            statusText = '{{ _("Failed") }}';
                             statusClass = 'text-danger';
                         }
                         
@@ -955,13 +956,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     setupPagination();
                     }
                 } catch (error) {
-                    console.error('加载交易历史失败:', error);
+                    console.error('{{ _("Failed to load transaction history") }}:', error);
                     // 显示错误信息
                     const container = document.getElementById('trade-history');
                     if (container) {
                     const errorMessage = document.createElement('div');
                     errorMessage.className = 'alert alert-danger';
-                        errorMessage.textContent = error.message || '加载交易历史失败，请稍后重试';
+                        errorMessage.textContent = error.message || '{{ _("Failed to load transaction history, please try again later") }}';
                         container.innerHTML = '';
                         container.appendChild(errorMessage);
                     }
@@ -971,10 +972,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // 格式化交易状态
             function getTradeStatus(status) {
                 const statusMap = {
-                    'pending': '处理中',
-                    'completed': '已完成',
-                    'failed': '失败',
-                    'cancelled': '已取消'
+                    'pending': '{{ _("Processing") }}',
+                    'completed': '{{ _("Completed") }}',
+                    'failed': '{{ _("Failed") }}',
+                    'cancelled': '{{ _("Cancelled") }}'
                 };
                 return statusMap[status] || status;
             }
@@ -990,12 +991,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     const data = await response.json();
                     
                     if (!data || !Array.isArray(data.trades)) {
-                        throw new Error('Invalid trade data');
+                        throw new Error('{{ _("Invalid trade data") }}');
                     }
                     
                     // 没有更多数据
                     if (data.trades.length === 0) {
-                        showMessage('No more transactions', 'info');
+                        showMessage('{{ _("No more transactions") }}', 'info');
                         return;
                     }
                     
@@ -1018,12 +1019,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     table.innerHTML = `
                         <thead>
                             <tr>
-                                <th>Time</th>
-                                <th>Type</th>
-                                <th>Qua</th>
-                                <th>Amount</th>
-                                <th>Status</th>
-                                <th style="width: 25%;">Hash</th>
+                                <th>{{ _("Time") }}</th>
+                                <th>{{ _("Type") }}</th>
+                                <th>{{ _("Quantity") }}</th>
+                                <th>{{ _("Amount") }}</th>
+                                <th>{{ _("Status") }}</th>
+                                <th style="width: 25%;">{{ _("Transaction Hash") }}</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -1048,21 +1049,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // 处理交易类型
                         const typeClass = trade.type === 'buy' ? 'text-success' : 'text-danger';
-                        const typeText = trade.type === 'buy' ? 'Buy' : 'Sell';
+                        const typeText = trade.type === 'buy' ? '{{ _("Buy") }}' : '{{ _("Sell") }}';
                         
                         // 处理交易状态
-                        let statusText = 'Pending';
+                        let statusText = '{{ _("Processing") }}';
                     let statusClass = 'text-warning';
                     if (trade.status === 'completed' || trade.status === 2 || trade.status === '2') {
-                            statusText = 'Completed';
+                            statusText = '{{ _("Completed") }}';
                         statusClass = 'text-success';
                     } else if (trade.status === 'failed' || trade.status === 3 || trade.status === '3') {
-                            statusText = 'Failed';
+                            statusText = '{{ _("Failed") }}';
                         statusClass = 'text-danger';
                         }
                         
                         // 处理交易哈希 - 确保不会太长导致换行
-                        let txHashDisplay = 'N/A';
+                        let txHashDisplay = '{{ _("N/A") }}';
                         if (trade.tx_hash) {
                             const shortHash = trade.tx_hash.substring(0, 8) + '...' + trade.tx_hash.substring(trade.tx_hash.length - 8);
                             txHashDisplay = `<a href="https://solscan.io/tx/${trade.tx_hash}" target="_blank" title="${trade.tx_hash}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:100%;">${shortHash}</a>`;
@@ -1087,8 +1088,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     setupPagination();
                     
                 } catch (error) {
-                    console.error('Failed to load more trades:', error);
-                    showMessage('Failed to load more transaction records', 'error');
+                    console.error('{{ _("Failed to load more trades") }}:', error);
+                    showMessage('{{ _("Failed to load more transaction records") }}', 'error');
                 }
             }
 
@@ -1158,14 +1159,14 @@ document.addEventListener('DOMContentLoaded', function() {
             function updateTradeStatus(tradeId, status) {
                 const statusElement = document.querySelector(`#trade-${tradeId} .trade-status`);
                 if (!statusElement) {
-                    console.warn(`找不到交易 ${tradeId} 的状态元素`);
+                    console.warn(`{{ _("Cannot find status element for transaction") }} ${tradeId}`);
                     return;
                 }
                 
-                console.log(`更新交易 ${tradeId} 状态为:`, status);
+                console.log(`{{ _("Update transaction") }} ${tradeId} {{ _("status to") }}:`, status);
                 
                 // 更新状态文本和颜色
-                let statusText = '未知';
+                let statusText = '{{ _("Unknown") }}';
                 let statusClass = 'text-secondary';
                 
                 // 状态可能是字符串或数字
@@ -1174,25 +1175,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 switch (statusValue) {
                     case 'pending':
                     case 0:
-                        statusText = '处理中';
+                        statusText = '{{ _("Processing") }}';
                         statusClass = 'text-warning';
                         break;
                     case 'completed':
                     case 1:
                     case 2:
-                        statusText = '已完成';
+                        statusText = '{{ _("Completed") }}';
                         statusClass = 'text-success';
                         break;
                     case 'failed':
                     case 3:
-                        statusText = '失败';
+                        statusText = '{{ _("Failed") }}';
                         statusClass = 'text-danger';
                         break;
                     default:
-                        console.warn(`未知的交易状态: ${status}`);
+                        console.warn(`{{ _("Unknown transaction status") }}: ${status}`);
                 }
                 
                 statusElement.textContent = statusText;
+                
                 
                 // 移除所有可能的状态类
                 statusElement.classList.remove('text-warning', 'text-success', 'text-danger', 'text-secondary');
@@ -1217,7 +1219,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 设置自动刷新
             function setupAssetInfoRefresh() {
-                console.log('设置资产信息刷新 - 使用统一刷新函数');
+                console.log('{{ _("Setting up asset information refresh - using unified refresh function") }}');
                 
                 // 不再设置新的刷新定时器，只初始化一次数据
                 
@@ -1244,17 +1246,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 // 初始调用一次刷新函数，但不设置重复刷新
-                console.log('初始化时调用一次统一刷新函数');
+                console.log('{{ _("Calling unified refresh function once during initialization") }}');
                 try {
                 if (typeof refreshAssetInfo === 'function') {
                     refreshAssetInfo();
                     } else {
-                        console.warn('refreshAssetInfo函数未定义，尝试使用安全刷新方法');
+                        console.warn('{{ _("refreshAssetInfo function not defined, attempting to use safe refresh method") }}');
                         // 如果refreshAssetInfo不存在，尝试执行最基本的刷新
                         safeRefreshAssetInfo();
                     }
                 } catch (error) {
-                    console.error('资产信息刷新失败:', error);
+                    console.error('{{ _("Asset information refresh failed") }}:', error);
                     // 尝试使用安全的资产刷新方法
                     safeRefreshAssetInfo();
                 }
@@ -1263,7 +1265,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 安全的资产信息刷新函数（作为后备）
             function safeRefreshAssetInfo() {
                 try {
-                    console.log('执行安全的资产信息刷新');
+                    console.log('{{ _("Performing safe asset information refresh") }}');
                     
                     // 更新剩余可购买量
                     if (typeof updateRemainingSupply === 'function') {
@@ -1276,7 +1278,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                 } catch (error) {
-                    console.error('安全刷新资产信息失败:', error);
+                    console.error('{{ _("Safe asset information refresh failed") }}:', error);
                 }
             }
 
@@ -1287,23 +1289,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 const buyButton = document.getElementById('buy-button');
                 
                 if (!amountInput || !totalPriceDisplay || !buyButton) {
-                    console.error('找不到交易表单元素');
+                    console.error('{{ _("Cannot find trade form elements") }}');
                     return;
                 }
                 
                 // 更新购买按钮状态
                 function updateBuyButtonState() {
-                    console.log('更新购买按钮状态，当前钱包状态:', window.walletState);
+                    console.log('{{ _("Updating buy button status, current wallet status") }}:', window.walletState);
                     
                     // 如果钱包已连接
                     if (window.walletState && (window.walletState.isConnected || window.walletState.connected)) {
                         buyButton.disabled = false;
                         buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>{{ _("Buy") }}';
-                        console.log('钱包已连接，启用购买按钮');
+                        console.log('{{ _("Wallet connected, enabling buy button") }}');
                     } else {
                         buyButton.disabled = true;
                         buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>{{ _("Connect Wallet First") }}';
-                        console.log('钱包未连接，禁用购买按钮');
+                        console.log('{{ _("Wallet not connected, disabling buy button") }}');
                     }
                 }
                 
@@ -1312,24 +1314,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 延迟检查一次，确保钱包状态已经加载
                 setTimeout(function() {
-                    console.log('延迟检查钱包状态：', window.walletState);
+                    console.log('{{ _("Delayed check of wallet status") }}:', window.walletState);
                     updateBuyButtonState();
                 }, 1000);
                 
                 // 添加事件监听器
                 window.addEventListener('walletConnected', function(event) {
-                    console.log('收到钱包连接事件，更新购买按钮');
+                    console.log('{{ _("Received wallet connection event, updating buy button") }}');
                     updateBuyButtonState();
                 });
                 
                 window.addEventListener('walletDisconnected', function() {
-                    console.log('收到钱包断开事件，更新购买按钮');
+                    console.log('{{ _("Received wallet disconnection event, updating buy button") }}');
                     updateBuyButtonState();
                 });
                 
                 // 添加状态变化事件监听
                 window.addEventListener('walletStateChanged', function(event) {
-                    console.log('钱包状态变化，更新购买按钮', event.detail);
+                    console.log('{{ _("Wallet status changed, updating buy button") }}', event.detail);
                     updateBuyButtonState();
                 });
                 
@@ -1380,16 +1382,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
+            // 显示成功消息
+            function showSuccess(message) {
+                showMessage(message, 'success');
+            }
+
             // 加载累计分红信息
             async function loadTotalDividends() {
                 const totalDividendsElement = document.getElementById('totalDividendsDistributed');
                 if (!totalDividendsElement) {
-                    console.error('未找到累计分红显示元素');
+                    console.error('{{ _("Could not find total dividends display element") }}');
                     return;
                 }
                 
                 try {
-                    console.log('加载累计分红信息...');
+                    console.log('{{ _("Loading total dividend information...") }}');
                     
                     // 显示加载中状态
                     totalDividendsElement.innerHTML = `
@@ -1403,18 +1410,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // 获取资产符号
                     const tokenSymbol = ASSET_CONFIG.tokenSymbol || "{{ asset.token_symbol }}";
-                    console.log('正在获取资产分红统计信息, 资产符号:', tokenSymbol);
+                    console.log('{{ _("Retrieving asset dividend statistics, asset symbol") }}:', tokenSymbol);
                     
                     // 获取资产分红统计信息
                     const response = await fetch(`/api/assets/symbol/${tokenSymbol}/dividend_stats`);
                     
                     if (!response.ok) {
-                        console.error('分红数据API请求失败:', response.status, response.statusText);
-                        throw new Error(`Failed to load dividend stats: ${response.status}`);
+                        console.error('{{ _("Dividend data API request failed") }}:', response.status, response.statusText);
+                        throw new Error(`{{ _("Failed to load dividend stats") }}: ${response.status}`);
                     }
                     
                     const stats = await response.json();
-                    console.log('分红统计数据:', stats);
+                    console.log('{{ _("Dividend statistics data") }}:', stats);
                     
                     if (stats.total_amount !== undefined) {
                         // 显示格式化的累计分红金额
@@ -1424,26 +1431,26 @@ document.addEventListener('DOMContentLoaded', function() {
                         totalDividendsElement.innerHTML = '0 USDC';
                     }
                 } catch (error) {
-                    console.error('加载累计分红信息失败:', error);
+                    console.error('{{ _("Failed to load total dividend information") }}:', error);
                     totalDividendsElement.innerHTML = '{{ _("Failed to load") }}';
                 }
             }
 
             // 模拟区块链交易流程
             async function simulateTransaction() {
-                console.log('模拟区块链交易过程...');
+                console.log('{{ _("Simulating blockchain transaction process...") }}');
                 
                 // 模拟交易提交
                 await new Promise(resolve => setTimeout(resolve, 1000));
-                console.log('交易已提交到网络');
+                console.log('{{ _("Transaction submitted to network") }}');
                 
                 // 模拟交易确认过程
                 for (let i = 1; i <= 3; i++) {
                     await new Promise(resolve => setTimeout(resolve, 500));
-                    console.log(`获得第 ${i} 个确认`);
+                    console.log(`{{ _("Received confirmation") }} ${i}`);
                 }
                 
-                console.log('交易已完成');
+                console.log('{{ _("Transaction completed") }}');
                 return {
                     txHash: 'mock_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15),
                     confirmations: 3,
@@ -1471,7 +1478,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 通过API检查权限
             async function checkOwnershipViaApi(address) {
-                console.log(`通过API检查地址 ${address} 的权限...`);
+                console.log(`{{ _("Checking permissions for address") }} ${address} {{ _("via API") }}...`);
                 try {
                     // 获取所有分红按钮
                     const dividendBtns = [
@@ -1492,15 +1499,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     
                     if (!response.ok) {
-                        console.warn('API检查资产所有权失败:', response.status);
+                        console.warn('{{ _("API check of asset ownership failed") }}:', response.status);
                         return; // 已隐藏所有按钮
                     }
                     
                     const data = await response.json();
-                    console.log('API资产所有权检查结果:', data);
+                    console.log('{{ _("API asset ownership check result") }}:', data);
                     
                     if (data.is_owner || data.is_admin) {
-                        console.log('API确认用户有权限访问分红管理功能');
+                        console.log('{{ _("API confirms user has permission to access dividend management functionality") }}');
                         const dividendUrl = `/assets/${ASSET_CONFIG.token_symbol}/dividend?eth_address=${address}`;
                         
                         // 更新所有按钮
@@ -1520,27 +1527,27 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                         });
                         
-                        console.log('已更新并显示所有分红管理按钮');
+                        console.log('{{ _("Updated and displayed all dividend management buttons") }}');
                     } else {
-                        console.log('API确认用户无分红管理权限');
+                        console.log('{{ _("API confirms user has no dividend management permissions") }}');
                         // 已经在函数开始时隐藏了所有按钮
                     }
                 } catch (error) {
-                    console.error('API检查权限失败:', error);
+                    console.error('{{ _("API permission check failed") }}:', error);
                 }
             }
 
             // 添加立即刷新功能供交易成功后调用
             window.refreshAssetInfoNow = async function() {
                 try {
-                    console.log('执行立即刷新...');
+                    console.log('{{ _("Performing immediate refresh...") }}');
                     await refreshAssetInfo();
                     // 同时刷新钱包资产列表 - 使用base.html全局函数
                     if (typeof loadUserAssets === 'function') {
                         loadUserAssets();
                     }
                 } catch (error) {
-                    console.error('立即刷新失败:', error);
+                    console.error('{{ _("Immediate refresh failed") }}:', error);
                     
                     // 紧急备用刷新逻辑
                     try {
@@ -1573,7 +1580,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                         }
                     } catch (error) {
-                        console.error('备用刷新失败:', error);
+                        console.error('{{ _("Backup refresh failed") }}:', error);
                     }
                 }
             };
@@ -1584,17 +1591,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 获取购买数量
                     const amountInput = document.getElementById('purchase-amount');
                     if (!amountInput) {
-                        throw new Error('找不到数量输入框');
+                        throw new Error('{{ _("Cannot find quantity input field") }}');
                     }
                     const amount = parseFloat(amountInput.value);
                     if (isNaN(amount) || amount <= 0) {
-                        throw new Error('请输入有效的购买数量');
+                        throw new Error('{{ _("Please enter a valid purchase quantity") }}');
                     }
 
                     // 获取代币价格
                     const price = parseFloat("{{ asset.token_price }}");
                     if (isNaN(price) || price <= 0) {
-                        throw new Error('无效的代币价格');
+                        throw new Error('{{ _("Invalid token price") }}');
                     }
 
                     // 计算总金额和费用
@@ -1608,57 +1615,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 获取钱包地址
                     const walletAddress = await getWalletAddress();
                     if (!walletAddress) {
-                        throw new Error('请先连接钱包');
+                        throw new Error('{{ _("Please connect wallet first") }}');
                     }
 
                     // 跳过USDC余额检查 - 测试环境直接设置足够的余额
-                    console.log('测试环境: 跳过USDC余额检查');
+                    console.log('{{ _("Test environment: Skipping USDC balance check") }}');
                     const realBalance = totalAmount * 5; // 设置一个足够大的余额值
-                    console.log(`直接设置模拟余额: ${realBalance.toFixed(2)} USDC (需要: ${totalAmount.toFixed(2)} USDC)`);
+                    console.log(`{{ _("Directly setting simulated balance") }}: ${realBalance.toFixed(2)} USDC ({{ _("Required") }}: ${totalAmount.toFixed(2)} USDC)`);
                     
-                    // 注释掉原来的余额检查代码
-                    /*
-                    // 检查真实USDC余额 - 内联实现
-                    console.log('检查钱包USDC余额:', walletAddress);
-                    let realBalance = 0;
-                    try {
-                        // 调用API获取余额 - 使用正确的API路径
-                        const response = await fetch(`/api/wallet/balance?address=${walletAddress}&wallet_type=phantom&_=${Date.now()}`);
-                        if (!response.ok) {
-                            throw new Error('获取余额接口请求失败');
-                        }
-                        
-                        const data = await response.json();
-                        console.log('获取到的余额数据:', data);
-                        
-                        // 从API响应中提取USDC余额
-                        if (data && data.balances && data.balances.USDC !== undefined) {
-                            realBalance = parseFloat(data.balances.USDC);
-                            console.log('从balances.USDC获取到余额:', realBalance);
-                        } else if (data && data.balance !== undefined) {
-                            realBalance = parseFloat(data.balance);
-                            console.log('从balance获取到余额:', realBalance);
-                        } else if (data && data.usdc_balance !== undefined) {
-                            realBalance = parseFloat(data.usdc_balance);
-                            console.log('从usdc_balance获取到余额:', realBalance);
-                        } else {
-                            console.error('无法从API响应中提取USDC余额:', data);
-                            // 测试环境中，假设用户有足够余额
-                            realBalance = totalAmount * 2; // 确保有足够的余额进行测试
-                            console.log('测试环境: 设置余额为:', realBalance);
-                        }
-                    } catch (error) {
-                        console.error('检查USDC余额时出错:', error);
-                        // 测试环境中，假设用户有足够余额
-                        realBalance = totalAmount * 2; // 确保有足够的余额进行测试
-                        console.log('测试环境: 因错误设置余额为:', realBalance);
-                    }
-                    */
-                    
-                    console.log('当前钱包USDC余额:', realBalance);
+                    console.log('{{ _("Current wallet USDC balance") }}:', realBalance);
                     
                     if (realBalance < totalAmount) {
-                        throw new Error(`USDC余额不足。需要 ${totalAmount.toFixed(2)} USDC，当前余额 ${realBalance.toFixed(2)} USDC`);
+                        throw new Error(`{{ _("Insufficient USDC balance. Required") }} ${totalAmount.toFixed(2)} USDC, {{ _("current balance") }} ${realBalance.toFixed(2)} USDC`);
                     }
 
                     // 显示确认模态框
@@ -1690,12 +1658,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                     trader_address: walletAddress
                                 };
 
-                                // 验证参数
-                                // const validation = validateCreateTradeParams(createTradeParams);
-                                // if (!validation.isValid) {
-                                //     throw new Error('参数验证失败: ' + validation.errors.join(', '));
-                                // }
-
                                 // 创建交易记录
                                 const createResponse = await fetch('/api/trades', {
                         method: 'POST',
@@ -1708,19 +1670,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
                                 if (!createResponse.ok) {
                                     const errorText = await createResponse.text();
-                                    throw new Error('创建交易失败: ' + errorText);
+                                    throw new Error('{{ _("Failed to create transaction") }}: ' + errorText);
                                 }
 
                                 const tradeData = await createResponse.json();
                                 
-                                // 验证响应格式
-                                // const responseValidation = validateApiResponse(tradeData, 'CREATE_TRADE');
-                                // if (!responseValidation.isValid) {
-                                //     throw new Error('API响应格式错误: ' + responseValidation.errors.join(', '));
-                                // }
-
                                 // 执行转账
-                                console.log('开始执行USDC转账...');
+                                console.log('{{ _("Starting USDC transfer...") }}');
                                 
                                 // 内联实现USDC转账逻辑
                                 // 计算平台费和实际支付金额
@@ -1728,7 +1684,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 const platformFee = totalAmount * platformFeeRate;
                                 const actualPayment = totalAmount * (1 - platformFeeRate);
                                 
-                                console.log(`转账明细: 总金额=${totalAmount}, 平台费=${platformFee}, 实际支付=${actualPayment}`);
+                                console.log(`{{ _("Transfer details") }}: {{ _("Total amount") }}=${totalAmount}, {{ _("Platform fee") }}=${platformFee}, {{ _("Actual payment") }}=${actualPayment}`);
                                 
                                 // 平台手续费地址 - 应该由后端提供或配置
                                 const platformAddress = "{{ platform_fee_address|default('HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd') }}";
@@ -1737,12 +1693,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 
                                 // 检查钱包状态
                                 if (!window.walletState || !window.walletState.transferToken) {
-                                    throw new Error('钱包状态不可用或缺少transferToken方法');
+                                    throw new Error('{{ _("Wallet status not available or missing transferToken method") }}');
                                 }
                                 
                                 try {
                                     // 1. 转账平台费用
-                                    console.log(`转账平台费用: ${platformFee} USDC 到 ${platformAddress}`);
+                                    console.log(`{{ _("Transferring platform fee") }}: ${platformFee} USDC {{ _("to") }} ${platformAddress}`);
                                     const platformFeeResult = await window.walletState.transferToken(
                                         'USDC',
                                         platformAddress,
@@ -1750,14 +1706,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                     );
                                     
                                     if (!platformFeeResult || !platformFeeResult.success) {
-                                        throw new Error('平台费用转账失败: ' + (platformFeeResult?.error || '未知错误'));
+                                        throw new Error('{{ _("Platform fee transfer failed") }}: ' + (platformFeeResult?.error || '{{ _("Unknown error") }}'));
                                     }
                                     
-                                    console.log('平台费用转账成功:', platformFeeResult);
+                                    console.log('{{ _("Platform fee transfer successful") }}:', platformFeeResult);
                                     transferSignature = platformFeeResult.txHash || platformFeeResult.signature || 'tx_' + Date.now();
                                     
                                     // 2. 转账到资产创建者
-                                    console.log(`转账到资产创建者: ${actualPayment} USDC 到 ${"{{ asset.creator_address }}"}`);
+                                    console.log(`{{ _("Transferring to asset creator") }}: ${actualPayment} USDC {{ _("to") }} ${"{{ asset.creator_address }}"}`);
                                     const creatorPaymentResult = await window.walletState.transferToken(
                                         'USDC',
                                         "{{ asset.creator_address }}",
@@ -1765,13 +1721,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                     );
                                     
                                     if (!creatorPaymentResult || !creatorPaymentResult.success) {
-                                        throw new Error('支付给资产创建者失败: ' + (creatorPaymentResult?.error || '未知错误'));
+                                        throw new Error('{{ _("Payment to asset creator failed") }}: ' + (creatorPaymentResult?.error || '{{ _("Unknown error") }}'));
                                     }
                                     
-                                    console.log('支付给资产创建者成功:', creatorPaymentResult);
+                                    console.log('{{ _("Payment to asset creator successful") }}:', creatorPaymentResult);
                                 } catch (error) {
-                                    console.error('USDC转账失败:', error);
-                                    throw new Error('USDC转账失败: ' + error.message);
+                                    console.error('{{ _("USDC transfer failed") }}:', error);
+                                    throw new Error('{{ _("USDC transfer failed") }}: ' + error.message);
                                 }
 
                                 // 准备更新交易状态的参数
@@ -1780,12 +1736,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                     tx_hash: transferSignature || 'tx_' + Date.now(),
                                     wallet_address: walletAddress
                                 };
-
-                                // 验证更新参数
-                                // const updateValidation = validateUpdateTradeParams(updateParams);
-                                // if (!updateValidation.isValid) {
-                                //     throw new Error('更新参数验证失败: ' + updateValidation.errors.join(', '));
-                                // }
 
                                 // 更新交易状态
                                 await updateTradeStatus(
@@ -1796,7 +1746,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 );
 
                                 // 显示成功消息
-                                showSuccess('交易完成');
+                                showSuccess('{{ _("Transaction completed") }}');
                                 
                                 // 刷新页面数据
                                 await refreshAssetInfo();
@@ -1804,8 +1754,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 
                                 resolve(true);
                             } catch (error) {
-                                console.error('购买失败:', error);
-                                showError(error.message || '购买失败，请稍后重试');
+                                console.error('{{ _("Purchase failed") }}:', error);
+                                showError(error.message || '{{ _("Purchase failed, please try again later") }}');
                                 resolve(false);
                             }
                         };
@@ -1823,30 +1773,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">确认购买</h5>
+                            <h5 class="modal-title">{{ _("Confirm Purchase") }}</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
                             <div class="mb-3">
-                                <label class="form-label">购买数量</label>
+                                <label class="form-label">{{ _("Purchase Quantity") }}</label>
                                 <input type="text" class="form-control" id="confirm-amount" readonly>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">总金额</label>
+                                <label class="form-label">{{ _("Total Amount") }}</label>
                                 <input type="text" class="form-control" id="confirm-total" readonly>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">平台手续费 (3.5%)</label>
+                                <label class="form-label">{{ _("Platform Fee") }} (3.5%)</label>
                                 <input type="text" class="form-control" id="platform-fee" readonly>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">实际支付给卖家</label>
+                                <label class="form-label">{{ _("Actual Payment to Seller") }}</label>
                                 <input type="text" class="form-control" id="actual-payment" readonly>
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                            <button type="button" class="btn btn-primary" onclick="confirmPurchase()">确认购买</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _("Cancel") }}</button>
+                            <button type="button" class="btn btn-primary" onclick="confirmPurchase()">{{ _("Confirm Purchase") }}</button>
                         </div>
                     </div>
                 </div>
@@ -1929,7 +1879,7 @@ document.addEventListener('DOMContentLoaded', function() {
         function shareAsset() {
             // 检查用户是否已连接钱包
             if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
-                alert('请先连接钱包，才能生成您的专属分享链接');
+                alert('{{ _("Please connect your wallet first to generate your exclusive sharing link") }}');
                 // 调用全局钱包连接函数
                 if (typeof toggleWalletMenu === 'function') {
                     toggleWalletMenu();
@@ -1944,15 +1894,15 @@ document.addEventListener('DOMContentLoaded', function() {
             fetch('/api/share-messages/random')
                 .then(response => response.json())
                 .catch(error => {
-                    console.error('获取分享文案失败:', error);
+                    console.error('{{ _("Failed to get sharing message") }}:', error);
                     // 使用默认文案
                     return {
                         success: true,
-                        message: "📈 分享赚佣金！邀请好友投资，您可获得高达30%的推广佣金！链接由您独享，佣金终身受益，朋友越多，收益越丰厚！"
+                        message: "{{ _('📈 Share to earn commission! Invite friends to invest, and you can get up to 30% promotion commission! The link is exclusively yours, lifetime commission benefits, the more friends, the more rewards!') }}"
                     };
                 })
                 .then(data => {
-                    const shareMessage = data.message || "🔥 发现好机会就要分享！邀请好友一起投资这个优质资产，共同见证财富增长！";
+                    const shareMessage = data.message || "{{ _('🔥 Share great opportunities! Invite friends to invest in this quality asset and witness wealth growth together!') }}";
                     
                     // 生成分享链接模态框
                     showShareModal(address, shareMessage);
