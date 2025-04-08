@@ -31,7 +31,8 @@ def list_assets_page():
         eth_address_cookie = request.cookies.get('eth_address')
         eth_address_args = request.args.get('eth_address')
         
-        current_user_address = eth_address_header or eth_address_cookie or eth_address_args
+        # 优先使用 Args > Header > Cookie
+        current_user_address = eth_address_args or eth_address_header or eth_address_cookie
         
         # 详细日志记录
         current_app.logger.info(f'钱包地址来源:')
