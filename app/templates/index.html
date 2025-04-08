@@ -62,6 +62,7 @@
             {% if assets %}
                 {% for asset in assets %}
                 <div class="col-md-4" data-aos="fade-up" data-aos-delay="{{ loop.index * 100 }}">
+                    {% if asset.status == AssetStatus.APPROVED.value %}
                     <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" class="text-decoration-none">
                         <div class="card h-100">
                             <!-- Asset Image -->
@@ -80,13 +81,7 @@
                                 
                                 <!-- Status Label -->
                                 <div class="position-absolute top-0 start-0 m-2">
-                                    {% if asset.status == AssetStatus.PENDING.value %}
-                                    <span class="badge bg-warning">{{ _('Pending Review') }}</span>
-                                    {% elif asset.status == AssetStatus.APPROVED.value %}
                                     <span class="badge bg-success">{{ _('On Chain') }}</span>
-                                    {% elif asset.status == AssetStatus.REJECTED.value %}
-                                    <span class="badge bg-danger">{{ _('Rejected') }}</span>
-                                    {% endif %}
                                 </div>
 
                                 <!-- Asset Type Label -->
@@ -130,6 +125,7 @@
                             </div>
                         </div>
                     </a>
+                    {% endif %}
                 </div>
                 {% endfor %}
             {% else %}
