@@ -39,26 +39,9 @@ def index():
         assets = query.order_by(Asset.created_at.desc()).limit(6).all()
         current_app.logger.info(f'获取资产列表成功: 找到 {len(assets)} 个资产')
         
-        # 获取资产信息
-        asset_data = []
-        for asset in assets:
-            asset_data.append({
-                'id': asset.id,
-                'name': asset.name,
-                'images': asset.images if asset.images else ['/static/images/placeholder.jpg'],
-                'owner_address': asset.owner_address,
-                'status': asset.status,
-                'token_symbol': asset.token_symbol,
-                'location': asset.location,
-                'asset_type': asset.asset_type,
-                'area': asset.area,
-                'total_value': asset.total_value,
-                'token_price': asset.token_price,
-                'annual_revenue': asset.annual_revenue
-            })
-        
+        # 直接使用ORM对象列表，不转换为字典
         return render_template('index.html', 
-                             assets=asset_data,
+                             assets=assets,
                              current_user_address=eth_address,
                              AssetStatus=AssetStatus,
                              _=_)
