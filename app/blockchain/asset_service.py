@@ -68,7 +68,7 @@ class AssetService:
         
     def deploy_asset_to_blockchain(self, asset_id):
         """
-        将资产部署到区块链上
+        将资产部署到区块链上，并在成功或失败时更新数据库状态
         
         Args:
             asset_id: 资产ID
@@ -76,28 +76,45 @@ class AssetService:
         Returns:
             dict: 包含部署结果的字典
         """
+        asset = None # 初始化 asset 变量
         try:
             # 获取资产
             asset = Asset.query.get(asset_id)
             if not asset:
                 raise ValueError(f"未找到ID为{asset_id}的资产")
                 
-            # 检查资产状态
-            if asset.status != AssetStatus.APPROVED.value:
-                raise ValueError(f"资产必须是已审核状态才能部署到区块链")
+            # 检查资产状态 - 应该是在 CONFIRMED 状态才能上链
+            if asset.status != AssetStatus.CONFIRMED.value:
+                logger.warning(f"尝试部署状态不正确的资产: AssetID={asset_id}, Status={asset.status}. 预期状态: CONFIRMED")
+                # 可以选择直接返回失败，或尝试继续（取决于业务逻辑）
+                # 这里选择返回失败，因为支付确认是前置条件
+                return {
+                    "success": False,
+                    "error": f"资产状态不正确 ({asset.status})，无法部署。预期状态: CONFIRMED"
+                }
                 
-            # 如果已经有token_address，说明已经部署过
+            # 如果已经有token_address，说明已经部署过 (再次检查，以防万一)
             if asset.token_address:
                 logger.info(f"资产{asset_id}已经部署过，token_address: {asset.token_address}")
+                # 确保状态是 ON_CHAIN
+                if asset.status != AssetStatus.ON_CHAIN.value:
+                     asset.status = AssetStatus.ON_CHAIN.value
+                     db.session.commit()
                 return {
                     "success": True,
                     "message": "资产已经部署到区块链",
                     "token_address": asset.token_address,
-                    "tx_hash": asset.deployment_tx_hash,
                     "already_deployed": True
                 }
                 
-            # 模拟模式下，直接返回模拟数据
+            # --- 开始实际部署 --- 
+            logger.info(f"开始将资产部署到区块链: AssetID={asset_id}, Name={asset.name}")
+            
+            # 可以在这里临时更新状态为 DEPLOYING (如果需要更细粒度的状态)
+            # asset.status = AssetStatus.DEPLOYING.value
+            # db.session.commit()
+            
+            # 模拟模式处理 (保持不变)
             if getattr(self.solana_client, 'mock_mode', False):
                 logger.info(f"模拟模式：部署资产 {asset.name} 到区块链")
                 
@@ -110,6 +127,8 @@ class AssetService:
                 # 更新资产信息
                 asset.token_address = token_address
                 asset.deployment_tx_hash = tx_hash
+                asset.status = AssetStatus.ON_CHAIN.value
+                asset.deployment_time = datetime.utcnow()
                 
                 # 构建blockchain_details
                 blockchain_details = {
@@ -137,52 +156,76 @@ class AssetService:
                     "tx_hash": tx_hash,
                     "mock": True
                 }
-                
-            # 检查钱包余额是否足够
+            
+            # 检查服务钱包余额 (保持不变)
             if not self.solana_client.check_balance_sufficient():
                 raise ValueError("服务钱包SOL余额不足，无法创建代币")
                 
-            # 创建SPL代币
+            # --- 调用 Solana 客户端创建 SPL 代币 --- 
             token_result = self.solana_client.create_spl_token(
                 asset_name=asset.name,
                 token_symbol=asset.token_symbol,
                 token_supply=asset.token_supply,
-                decimals=9  # 默认使用9位小数
+                decimals=9  # 或从资产配置读取
             )
             
+            # --- 处理部署结果 --- 
             if token_result.get('success', False):
-                # 更新资产状态
+                # 部署成功
                 token_address = token_result.get('token_address')
+                tx_hash = token_result.get('tx_hash') # 获取交易哈希
+                details = token_result.get('details', {})
                 
                 asset.token_address = token_address
-                asset.status = AssetStatus.APPROVED.value
-                asset.approved_at = datetime.utcnow()
-                asset.approved_by = asset.creator_address  # 自动审核
+                asset.deployment_tx_hash = tx_hash
+                asset.status = AssetStatus.ON_CHAIN.value # 更新状态为 ON_CHAIN
+                asset.deployment_time = datetime.utcnow()
+                asset.blockchain_details = json.dumps(details)
                 
-                # 存储上链详情
-                asset.blockchain_details = json.dumps(token_result.get('details', {}))
-                
-                # 保存更新
                 db.session.commit()
-                
-                logger.info(f"资产成功上链: {asset_id}, 代币地址: {token_address}")
+                logger.info(f"资产成功上链: AssetID={asset_id}, TokenAddress={token_address}, Status=ON_CHAIN")
                 
                 return {
                     'success': True,
                     'asset_id': asset_id,
                     'token_address': token_address,
-                    'details': token_result.get('details', {})
+                    'tx_hash': tx_hash,
+                    'details': details
                 }
             else:
-                logger.error(f"资产上链失败: {asset_id}, 错误: {token_result.get('error')}")
-                return token_result
+                # 部署失败
+                error_message = token_result.get('error', '部署到区块链失败')
+                logger.error(f"资产上链失败: AssetID={asset_id}, Error: {error_message}")
+                
+                # 更新资产状态为部署失败
+                asset.status = AssetStatus.DEPLOYMENT_FAILED.value
+                asset.error_message = error_message
+                db.session.commit()
+                
+                return {
+                    'success': False,
+                    'error': error_message
+                }
                 
         except Exception as e:
-            logger.exception(f"部署资产过程中发生异常: {str(e)}")
-            db.session.rollback()
+            error_str = f"部署资产异常: {str(e)}"
+            logger.exception(error_str) # 使用 exception 记录完整堆栈
+            if asset: # 只有在成功获取 asset 对象后才尝试更新状态
+                 try:
+                     # 发生未知异常时，也标记为部署失败
+                     asset.status = AssetStatus.DEPLOYMENT_FAILED.value
+                     asset.error_message = error_str
+                     db.session.commit()
+                     logger.info(f"资产状态因异常更新为 DEPLOYMENT_FAILED: AssetID={asset_id}")
+                 except Exception as db_err:
+                     logger.error(f"在异常处理中更新资产状态失败: AssetID={asset_id}, DB Error: {str(db_err)}")
+                     db.session.rollback()
+            else:
+                 logger.error(f"无法更新资产状态，因为未能获取资产对象: AssetID={asset_id}")
+                 
             return {
                 'success': False,
-                'error': f"部署资产异常: {str(e)}"
+                'error': error_str
             }
             
     def process_asset_payment(self, asset_id, payment_info):

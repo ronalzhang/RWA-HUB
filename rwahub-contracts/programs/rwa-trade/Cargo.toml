@@ -1,0 +1,21 @@
+[package]
+name = "rwa-trade"
+version = "0.1.0"
+description = "RWA Trade Program"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "rwa_trade"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.31.0" # 请根据您的Anchor版本调整
+anchor-spl = "0.31.0"  # 请根据您的Anchor版本调整
+solana-program = "1.17" # 请使用兼容版本

@@ -2931,6 +2931,255 @@ async connectPhantom(isReconnect = false) {
         // 最后使用btoa转为base64
         return btoa(binary);
     },
+
+    /**
+     * 调用购买合约 (已重构以适配Anchor合约)
+     * 与Solana智能合约交互，执行资产购买操作
+     * @param {Object} params - 合约交互参数
+     * @param {string} params.contractAddress - 购买合约程序ID (rwa-trade program ID)
+     * @param {string} params.assetId - 资产的唯一标识符 (用于查找资产账户地址和价格)
+     * @param {string} params.buyerAddress - 买家钱包地址
+     * @param {string} params.sellerAddress - 卖家钱包地址 (实际合约未使用，但保留用于查找ATA)
+     * @param {number} params.totalAmount - 用户支付的总金额 (USDC)
+     * @returns {Promise<Object>} 包含交易结果的对象，成功时包含txHash
+     */
+    async callPurchaseContract(params) {
+        console.log('开始调用购买合约 (Anchor版)，参数:', params);
+
+        try {
+            // --- 1. 参数与环境校验 ---
+            if (!params.contractAddress) throw new Error('缺少购买合约程序ID');
+            if (!params.assetId) throw new Error('缺少资产ID');
+            if (!params.buyerAddress) throw new Error('缺少买家地址');
+            if (!params.sellerAddress) throw new Error('缺少卖家地址'); // 用于计算卖家ATA
+            if (typeof params.totalAmount !== 'number' || params.totalAmount <= 0) throw new Error('无效的总支付金额');
+
+            if (!this.connected || (this.walletType !== 'phantom' && this.walletType !== 'solana')) {
+                throw new Error('请先连接Phantom或兼容的Solana钱包');
+            }
+            if (!window.solanaWeb3 || !window.solanaWeb3.Connection || !window.solanaWeb3.PublicKey || !window.solanaWeb3.Transaction || !window.solanaWeb3.SystemProgram) {
+                throw new Error('Solana Web3.js基础库未完全加载');
+            }
+            // 检查SPL Token库和Anchor库
+            if (!window.splToken || !window.splToken.getAssociatedTokenAddress || !window.splToken.TOKEN_PROGRAM_ID) {
+                 console.error("SPL Token库或关键函数未加载");
+                 // 尝试动态加载或初始化
+                 if (typeof window.initSplTokenLib === 'function') {
+                     console.log("尝试动态初始化SPL Token库...");
+                     await window.initSplTokenLib();
+                     if (!window.splToken || !window.splToken.getAssociatedTokenAddress) {
+                         throw new Error('SPL Token库初始化失败或不完整');
+                     }
+                 } else {
+                     throw new Error('SPL Token库未加载且无法动态初始化');
+                 }
+            }
+            // 检查Anchor库
+            if (!window.anchor || !window.anchor.Program || !window.anchor.workspace) {
+                 // Anchor库可能不是全局变量，需要通过Provider访问
+                 console.warn('全局Anchor对象不可用，将尝试通过Provider构建Program实例');
+            }
+
+            // --- 2. 获取必要信息 ---
+            console.log('获取资产信息...');
+            // !!关键假设!!: 后端API `/api/asset_details/{assetId}` 返回资产账户地址和价格
+            // 或者这些信息存储在全局变量 `window.currentAssetInfo` 中
+            let assetAccountAddress, assetPrice;
+            try {
+                if (window.currentAsset && window.currentAsset.asset_account_address && window.currentAsset.price) {
+                    assetAccountAddress = window.currentAsset.asset_account_address;
+                    assetPrice = parseFloat(window.currentAsset.price);
+                    console.log('从全局变量 window.currentAsset 获取资产信息:', { assetAccountAddress, assetPrice });
+                } else {
+                    console.log(`尝试通过API获取资产 ${params.assetId} 的信息...`);
+                    const response = await fetch(`/api/asset_details/${params.assetId}`);
+                    if (!response.ok) throw new Error(`无法获取资产信息: ${response.statusText}`);
+                    const assetInfo = await response.json();
+                    if (!assetInfo.asset_account_address || !assetInfo.price) {
+                        throw new Error('API返回的资产信息不完整');
+                    }
+                    assetAccountAddress = assetInfo.asset_account_address;
+                    assetPrice = parseFloat(assetInfo.price);
+                    console.log('从API获取资产信息:', { assetAccountAddress, assetPrice });
+                }
+                 if (!assetAccountAddress || isNaN(assetPrice) || assetPrice <= 0) {
+                     throw new Error('无效的资产账户地址或价格');
+                 }
+            } catch (err) {
+                 console.error("获取资产信息失败:", err);
+                 throw new Error(`获取资产信息失败: ${err.message}`);
+            }
+
+            // 计算购买的代币数量 (amount)
+            // 合约期望的是代币数量，前端传递的是总金额
+            const amount = params.totalAmount / assetPrice;
+            // !!重要!!: Solana代币通常有小数位，这里需要处理精度
+            // 假设资产代币和USDC都有6位小数
+            const amountInSmallestUnit = BigInt(Math.round(amount * Math.pow(10, 6)));
+            console.log('计算的代币数量:', { amount, amountInSmallestUnit: amountInSmallestUnit.toString() });
+             if (amountInSmallestUnit <= 0) {
+                 throw new Error('计算出的购买数量无效');
+             }
+
+            // 获取其他地址
+            const platformFeeAddress = window.PLATFORM_FEE_WALLET_ADDRESS || 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd'; // 从全局或默认
+            const usdcMintAddress = window.USDC_MINT_ADDRESS || 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // 从全局或默认
+            const tokenProgramId = window.splToken.TOKEN_PROGRAM_ID;
+            const systemProgramId = window.solanaWeb3.SystemProgram.programId;
+
+            // 创建公钥对象
+            const buyerPublicKey = new window.solanaWeb3.PublicKey(params.buyerAddress);
+            const sellerPublicKey = new window.solanaWeb3.PublicKey(params.sellerAddress);
+            const assetPublicKey = new window.solanaWeb3.PublicKey(assetAccountAddress);
+            const platformFeePublicKey = new window.solanaWeb3.PublicKey(platformFeeAddress);
+            const usdcMintPublicKey = new window.solanaWeb3.PublicKey(usdcMintAddress);
+            const contractPublicKey = new window.solanaWeb3.PublicKey(params.contractAddress);
+
+            console.log('准备公钥:', {
+                buyer: buyerPublicKey.toString(),
+                seller: sellerPublicKey.toString(),
+                asset: assetPublicKey.toString(),
+                platformFeeWallet: platformFeePublicKey.toString(),
+                usdcMint: usdcMintPublicKey.toString(),
+                contract: contractPublicKey.toString(),
+                tokenProgram: tokenProgramId.toString(),
+                systemProgram: systemProgramId.toString()
+            });
+
+            // 计算ATA地址
+            console.log('计算ATA地址...');
+            const buyerTokenAccount = await window.splToken.getAssociatedTokenAddress(usdcMintPublicKey, buyerPublicKey);
+            const sellerTokenAccount = await window.splToken.getAssociatedTokenAddress(usdcMintPublicKey, sellerPublicKey);
+            const platformFeeTokenAccount = await window.splToken.getAssociatedTokenAddress(usdcMintPublicKey, platformFeePublicKey);
+
+            console.log('计算得到的ATA地址:', {
+                buyerATA: buyerTokenAccount.toString(),
+                sellerATA: sellerTokenAccount.toString(),
+                platformFeeATA: platformFeeTokenAccount.toString()
+            });
+
+            // --- 3. 构建和发送交易 ---
+            const connection = new window.solanaWeb3.Connection(
+                window.SOLANA_NETWORK_URL || 'https://api.mainnet-beta.solana.com', // 从全局或默认
+                'confirmed'
+            );
+
+            // 使用Anchor Provider和Program (如果全局Anchor可用)
+            let program;
+             let txSignature;
+
+            try {
+                 // 优先尝试使用 Anchor Provider 和 workspace 构建 program
+                 const provider = new window.anchor.AnchorProvider(connection, window.solana, window.anchor.AnchorProvider.defaultOptions());
+                 // 假设合约IDL已加载到 workspace
+                 if (window.anchor.workspace && window.anchor.workspace.RwaTrade) {
+                      program = window.anchor.workspace.RwaTrade;
+                      console.log("使用全局 Anchor workspace 构建 Program 实例");
+                 } else {
+                      console.warn("全局 Anchor workspace 或 RwaTrade 不可用，尝试手动构建 Program");
+                      // 需要合约的 IDL JSON 对象
+                      // !!关键假设!!: 合约IDL存储在 window.RWA_TRADE_IDL
+                      if (!window.RWA_TRADE_IDL) throw new Error("缺少 RWA Trade 合约的 IDL");
+                      program = new window.anchor.Program(window.RWA_TRADE_IDL, contractPublicKey, provider);
+                 }
+
+                 console.log('构建 Anchor 交易...');
+                 const tx = await program.methods
+                     .buyAsset(new window.anchor.BN(amountInSmallestUnit.toString())) // 传递 u64 金额 (BN类型)
+                     .accounts({
+                         buyer: buyerPublicKey,
+                         asset: assetPublicKey,
+                         buyerTokenAccount: buyerTokenAccount,
+                         sellerAccount: sellerTokenAccount, // 合约中是seller_account
+                         platformFeeAccount: platformFeeTokenAccount, // 合约中是platform_fee_account
+                         tokenProgram: tokenProgramId,
+                         systemProgram: systemProgramId,
+                     })
+                      // .signers([provider.wallet.payer]) // Anchor Provider 会自动添加签名者
+                     .transaction(); // 获取未签名的交易对象
+
+                 console.log('交易已构建，请求用户签名...');
+                 const signedTx = await provider.wallet.signTransaction(tx); // 请求钱包签名
+
+                 console.log('交易已签名，发送到网络...');
+                 txSignature = await connection.sendRawTransaction(signedTx.serialize());
+                 console.log('交易已发送，签名:', txSignature);
+
+             } catch (anchorError) {
+                  console.error("使用 Anchor Provider 构建/发送交易失败:", anchorError);
+                  console.log("尝试回退到手动构建 TransactionInstruction...");
+
+                  // --- 回退方案：手动构建 TransactionInstruction ---
+                  // (如果Anchor Provider方式失败或不可用)
+                  const transaction = new window.solanaWeb3.Transaction();
+                  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+                  transaction.recentBlockhash = blockhash;
+                  transaction.lastValidBlockHeight = lastValidBlockHeight;
+                  transaction.feePayer = buyerPublicKey;
+
+                  // 构建 Anchor 指令数据 (序列化方法名 + 参数)
+                  const instructionName = "buy_asset"; // 小驼峰或蛇形，取决于Anchor版本和IDL
+                  const instructionData = window.anchor.coder.instruction.encode(instructionName, {
+                      amount: new window.anchor.BN(amountInSmallestUnit.toString())
+                  });
+
+                  // 手动构建指令
+                  transaction.add(
+                      new window.solanaWeb3.TransactionInstruction({
+                          keys: [
+                              { pubkey: buyerPublicKey, isSigner: true, isWritable: true },
+                              { pubkey: assetPublicKey, isSigner: false, isWritable: true }, // 假设asset账户会被修改
+                              { pubkey: buyerTokenAccount, isSigner: false, isWritable: true },
+                              { pubkey: sellerTokenAccount, isSigner: false, isWritable: true },
+                              { pubkey: platformFeeTokenAccount, isSigner: false, isWritable: true },
+                              { pubkey: tokenProgramId, isSigner: false, isWritable: false },
+                              { pubkey: systemProgramId, isSigner: false, isWritable: false },
+                          ],
+                          programId: contractPublicKey,
+                          data: instructionData,
+                      })
+                  );
+
+                  console.log('手动构建交易完成，请求用户签名...');
+                  const signedTransaction = await window.solana.signTransaction(transaction);
+
+                  console.log('交易已签名，发送到网络...');
+                  txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
+                  console.log('交易已发送，签名:', txSignature);
+             }
+
+
+            // --- 4. 确认交易 ---
+            console.log('等待交易确认...');
+            const confirmationStatus = await connection.confirmTransaction({
+                signature: txSignature,
+                blockhash: (await connection.getLatestBlockhash()).blockhash, // 获取最新的 blockhash
+                lastValidBlockHeight: (await connection.getLatestBlockhash()).lastValidBlockHeight // 获取最新的 LBH
+            }, 'confirmed'); // 使用 'confirmed' 或 'finalized'
+
+            if (confirmationStatus.value.err) {
+                console.error('交易确认失败:', confirmationStatus.value.err);
+                throw new Error('交易确认失败: ' + JSON.stringify(confirmationStatus.value.err));
+            }
+
+            console.log('交易已确认，签名:', txSignature);
+
+            // --- 5. 返回成功结果 ---
+            return {
+                success: true,
+                txHash: txSignature,
+                // 可以选择性返回计算的费用等信息
+                // platformFee: ...,
+                // sellerAmount: ...
+            };
+        } catch (error) {
+            console.error('调用购买合约失败:', error);
+            return {
+                success: false,
+                error: error.message || '未知错误'
+            };
+        }
+    },
 }
 
 // 页面初始化时就自动调用钱包初始化方法
