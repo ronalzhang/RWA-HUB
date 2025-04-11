@@ -1,5 +1,4 @@
 import os
-from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 from datetime import timedelta
 from dotenv import load_dotenv
 
@@ -92,36 +91,14 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or Config.SQLALCHEMY_DATABASE_URI
+    # !! 关键改动：直接指定生产环境使用本地数据库 !!
+    SQLALCHEMY_DATABASE_URI = 'postgresql://rwa_hub_user:password@localhost/rwa_hub'
+    print(f"生产环境强制使用本地数据库: {SQLALCHEMY_DATABASE_URI}")
     
-    # 确保使用 postgresql:// 前缀
-    if SQLALCHEMY_DATABASE_URI.startswith('postgres://'):
-        SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace('postgres://', 'postgresql://', 1)
-        
-    # 为 Render DB 强制添加 sslmode=require
-    parsed_url = urlparse(SQLALCHEMY_DATABASE_URI)
-    if 'render.com' in parsed_url.netloc: # 仅对 Render URL 操作
-        query_params = parse_qs(parsed_url.query)
-        if 'sslmode' not in query_params:
-            query_params['sslmode'] = ['require']
-            new_query = urlencode(query_params, doseq=True)
-            # 重建 URL
-            SQLALCHEMY_DATABASE_URI = urlunparse((
-                parsed_url.scheme,
-                parsed_url.netloc,
-                parsed_url.path,
-                parsed_url.params,
-                new_query, # 使用更新后的查询字符串
-                parsed_url.fragment
-            ))
-            print(f"已为 Render DB 添加 sslmode=require: {SQLALCHEMY_DATABASE_URI}")
-        elif query_params['sslmode'] != ['require']:
-            print(f"警告: Render DB URL ({SQLALCHEMY_DATABASE_URI}) 的 sslmode 不是 'require'")
-
     @staticmethod
     def init_app(app):
         Config.init_app(app)
-        # 生产环境特定的配置 (数据库URI已在类级别设置)
+        # 生产环境特定的配置 (数据库URI已在类级别硬编码为本地)
         pass
 
 config = {
