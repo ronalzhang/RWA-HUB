@@ -91,13 +91,15 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     
+    # 从环境变量获取生产数据库URL，如果未设置则保持默认（理论上生产环境必须设置）
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or Config.SQLALCHEMY_DATABASE_URI
+    if SQLALCHEMY_DATABASE_URI.startswith('postgres://'):
+        SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace('postgres://', 'postgresql://', 1)
+
     @staticmethod
     def init_app(app):
         Config.init_app(app)
-        # 生产环境特定的配置
-        if os.environ.get('DATABASE_URL'):
-            if os.environ.get('DATABASE_URL').startswith('postgres://'):
-                os.environ['DATABASE_URL'] = os.environ.get('DATABASE_URL').replace('postgres://', 'postgresql://', 1)
+        # 生产环境特定的配置 (数据库URI已在类级别设置)
         pass
 
 config = {
