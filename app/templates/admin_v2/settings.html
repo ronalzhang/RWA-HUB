@@ -1,0 +1,100 @@
+{% extends 'admin_v2/base.html' %}
+
+{% block page_title %}{{ _('System Settings') }}{% endblock %}
+{% block page_subtitle %}{{ _('Manage platform configuration, including payment settings.') }}{% endblock %}
+
+{% block breadcrumb %}
+<li>
+    <span class="mx-1 text-gray-500">/</span>
+</li>
+<li>
+    <span class="text-gray-500">{{ _('Settings') }}</span>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow rounded-lg p-6">
+    <h2 class="text-xl font-semibold text-gray-800 mb-6">{{ _('Payment Configuration') }}</h2>
+
+    {# Display flashed messages #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-4">
+            {% for category, message in messages %}
+                <div class="p-4 rounded-md {{ 'bg-red-100 text-red-700' if category == 'error' else 'bg-green-100 text-green-700' }}" role="alert">
+                    <p class="font-medium">{{ message }}</p>
+                </div>
+            {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('admin.settings_v2') }}">
+        {{ csrf_token() }} {# Assuming you have CSRF protection set up #}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {# --- Asset Purchase Settings --- #}
+            <div>
+                <h3 class="text-lg font-medium text-gray-700 mb-4 border-b pb-2">{{ _('Asset Purchase Settings') }}</h3>
+                
+                <div class="mb-4">
+                    <label for="platform_fee_basis_points" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Platform Fee Rate (Basis Points)') }}</label>
+                    <input type="number" id="platform_fee_basis_points" name="platform_fee_basis_points" min="0" max="10000" step="1"
+                           value="{{ configs.PLATFORM_FEE_BASIS_POINTS }}" required 
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                           placeholder="e.g., 350 for 3.5%">
+                    <p class="mt-1 text-xs text-gray-500">{{ _('Percentage points (out of 10000) charged on asset purchases. 350 = 3.5%') }}</p>
+                </div>
+
+                <div class="mb-4">
+                    <label for="platform_fee_address" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Platform Fee Address (Solana)') }}</label>
+                    <input type="text" id="platform_fee_address" name="platform_fee_address" 
+                           value="{{ configs.PLATFORM_FEE_ADDRESS }}" required 
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                           placeholder="Solana address for receiving purchase fees">
+                </div>
+
+                <div class="mb-4">
+                    <label for="purchase_contract_address" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Purchase Smart Contract Address (Solana)') }}</label>
+                    <input type="text" id="purchase_contract_address" name="purchase_contract_address" 
+                           value="{{ configs.PURCHASE_CONTRACT_ADDRESS }}" required
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                           placeholder="Solana address of the purchase/escrow contract">
+                </div>
+            </div>
+
+            {# --- Asset Creation Settings --- #}
+            <div>
+                <h3 class="text-lg font-medium text-gray-700 mb-4 border-b pb-2">{{ _('Asset Creation Settings') }}</h3>
+
+                <div class="mb-4">
+                    <label for="asset_creation_fee_amount" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Asset Creation Fee Amount (USDC)') }}</label>
+                    <input type="number" id="asset_creation_fee_amount" name="asset_creation_fee_amount" min="0" step="0.000001" 
+                           value="{{ configs.ASSET_CREATION_FEE_AMOUNT }}" required
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                           placeholder="e.g., 1.0">
+                     <p class="mt-1 text-xs text-gray-500">{{ _('Fee charged in USDC for creating a new asset.') }}</p>
+               </div>
+
+                <div class="mb-4">
+                    <label for="asset_creation_fee_address" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Asset Creation Fee Address (Solana)') }}</label>
+                    <input type="text" id="asset_creation_fee_address" name="asset_creation_fee_address" 
+                           value="{{ configs.ASSET_CREATION_FEE_ADDRESS }}" required
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                           placeholder="Solana address for receiving asset creation fees">
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 pt-5 border-t border-gray-200">
+            <div class="flex justify-end">
+                <button type="submit" 
+                        class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    {{ _('Save Settings') }}
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %} 

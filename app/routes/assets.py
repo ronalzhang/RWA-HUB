@@ -3,7 +3,6 @@ from flask import (
     flash, abort, session, jsonify, current_app, g, 
     make_response, send_file, stream_with_context, Response, send_from_directory
 )
-from flask_babel import _  # 导入翻译函数
 from . import assets_bp, assets_api_bp
 from app.extensions import db  # 从扩展模块导入 db
 from app.models import Asset

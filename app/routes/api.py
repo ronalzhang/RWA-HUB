@@ -36,6 +36,8 @@ from sqlalchemy import desc, or_, and_, func, text
 # from ..models.history_trade import HistoryTrade
 # from ..models.notice import Notice
 from app.models.referral import UserReferral, CommissionRecord, DistributionSetting
+from decimal import Decimal, ROUND_HALF_UP
+from app.tasks import monitor_creation_payment # 假设后台任务在这里定义
 
 api_bp = Blueprint('api', __name__)
 
@@ -221,10 +223,7 @@ def _get_asset_details(asset):
 @api_bp.route('/assets/create', methods=['POST'])
 @eth_address_required
 def create_asset():
-    """
-    创建新资产
-    需要通过此API接收前端提交的资产信息，创建新资产
-    """
+    """创建新资产，保存到数据库并触发支付确认后台任务"""
     try:
         # 确保Asset模型在函数作用域内可用
         from app.models.asset import Asset, AssetStatus, AssetType
@@ -238,50 +237,32 @@ def create_asset():
         if not data:
             return jsonify({'success': False, 'error': '无效的请求数据'}), 400
             
-        # 使用全局钱包地址
         wallet_address = g.eth_address
-        current_app.logger.info(f"使用钱包地址: {wallet_address}")
-        
-        # 设置创建者和所有者地址
         data['creator_address'] = wallet_address
         data['owner_address'] = wallet_address
         
-        # 检查是否有支付交易哈希
-        has_payment = 'payment_tx_hash' in data and data['payment_tx_hash']
+        # 支付交易哈希必须提供
+        payment_tx_hash = data.get('payment_tx_hash')
+        if not payment_tx_hash:
+             return jsonify({'success': False, 'error': '缺少支付交易哈希 (payment_tx_hash)'}), 400
+
+        # 设置初始状态为 PENDING
+        data['status'] = AssetStatus.PENDING.value
+        current_app.logger.info("设置资产状态为 PENDING，等待支付确认")
         
-        # 根据是否有支付交易设置状态
-        if has_payment:
-            # 有支付信息但需要等待确认
-            data['status'] = AssetStatus.PENDING.value
-            current_app.logger.info("设置资产状态为待确认")
-        else:
-            # 没有支付信息，设置为待确认状态
-            data['status'] = AssetStatus.PENDING.value
-            current_app.logger.info("设置资产状态为待确认，需要完成支付。")
-            
-        # 检查环境模式，仅在开发环境下记录警告
-        if os.environ.get('FLASK_ENV') == 'development':
-            current_app.logger.warning("当前为开发环境，但创建资产仍需要支付确认。请完成支付流程以使资产生效。")
+        # 记录支付信息到 payment_details (简化版，只存 tx_hash)
+        payment_info = {
+            'tx_hash': payment_tx_hash,
+            'initiated_at': datetime.utcnow().isoformat()
+        }
+        data['payment_details'] = json.dumps(payment_info)
+        data['payment_confirmed'] = False  # 明确设为未确认
         
-        # 如果有支付信息，记录到payment_details
-        if has_payment:
-            payment_info = {
-                'tx_hash': data['payment_tx_hash'],
-                'platform_address': data.get('platform_address', ''),
-                'status': data.get('payment_status', 'pending'),
-                'created_at': datetime.utcnow().isoformat()
-            }
-            data['payment_details'] = json.dumps(payment_info)
-            data['payment_confirmed'] = False  # 默认为未确认
-            
-            # 从data中移除非模型字段
-            if 'payment_tx_hash' in data:
-                del data['payment_tx_hash']
-            if 'payment_status' in data:
-                del data['payment_status']
-            if 'platform_address' in data:
-                del data['platform_address']
-        
+        # 从data中移除非模型字段 (包括 payment_tx_hash)
+        if 'payment_tx_hash' in data:
+            del data['payment_tx_hash']
+        # ... 移除其他不再直接存入模型的字段 ...
+
         # 处理token_symbol
         if 'token_symbol' not in data:
             # 生成token_symbol
@@ -369,12 +350,27 @@ def create_asset():
                 del data['blockchain_details']
         
         # 创建资产对象
-        asset = Asset.from_dict(data)
+        # 过滤掉不在 Asset 模型中的键
+        allowed_keys = {column.name for column in Asset.__table__.columns}
+        filtered_data = {k: v for k, v in data.items() if k in allowed_keys}
+        
+        asset = Asset(**filtered_data)
         
         # 保存到数据库
         db.session.add(asset)
-        db.session.commit()
-        
+        db.session.commit() # 先提交获取 asset.id
+        current_app.logger.info(f"资产记录已创建 (ID: {asset.id}, Symbol: {asset.token_symbol})，状态: PENDING")
+
+        # -- 触发支付确认后台任务 --
+        try:
+            monitor_creation_payment.delay(asset.id, payment_tx_hash)
+            current_app.logger.info(f"已触发支付确认任务 for Asset ID: {asset.id}, TxHash: {payment_tx_hash}")
+        except Exception as task_err:
+            current_app.logger.error(f"触发支付确认任务失败 for Asset ID: {asset.id}: {str(task_err)}")
+            # 重要：即使任务触发失败，资产已创建，需要有机制处理这种情况 (例如定时扫描 PENDING 状态的资产)
+            # 这里可以考虑是否需要回滚数据库操作，或仅记录错误
+            # 暂时只记录错误，不回滚
+
         # 图片和文档文件从临时目录移动到项目目录
         from app.utils import move_temp_files_to_project
         current_app.logger.info(f"开始将临时文件移动到项目目录: asset_id={asset.id}, token_symbol={asset.token_symbol}")
@@ -409,21 +405,49 @@ def create_asset():
             current_app.logger.error(f"移动临时文件到项目目录失败: {str(e)}")
             # 继续执行，不要因为文件移动失败而影响资产创建
         
-        # 返回成功消息
+        # 返回成功消息给前端 (前端会立即跳转)
         return jsonify({
             'success': True,
-            'message': '资产创建成功并已上链',
+            'message': '资产创建请求已提交，正在后台确认支付状态',
             'asset_id': asset.id,
-            'token_symbol': asset.token_symbol,
-            'token_address': asset.token_address
-        })
+            'token_symbol': asset.token_symbol
+            # 不再返回 token_address，因为它此时还未上链
+        }), 201 # 使用 201 Created 状态码
+
     except ValueError as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"创建资产失败: {str(e)}")
+        current_app.logger.exception(f"创建资产失败: {str(e)}") # 使用 exception 记录完整堆栈
         return jsonify({'success': False, 'error': '创建资产失败: ' + str(e)}), 500
+
+# 新增：获取资产状态接口
+@api_bp.route('/assets/<int:asset_id>/status', methods=['GET'])
+def get_asset_status(asset_id):
+    """获取指定资产的当前状态"""
+    try:
+        asset = Asset.query.with_entities(Asset.status, Asset.token_symbol).get(asset_id)
+        if not asset:
+            return jsonify({'success': False, 'error': '资产不存在'}), 404
+
+        # 将数字状态转换为字符串表示（如果需要）
+        # status_str = AssetStatus(asset.status).name if asset.status is not None else 'UNKNOWN'
+        # 或者直接返回数字状态，由前端处理映射
+        status_value = asset.status
+        
+        current_app.logger.debug(f"查询资产状态 - ID: {asset_id}, Status: {status_value}")
+
+        return jsonify({
+            'success': True,
+            'asset_id': asset_id,
+            'token_symbol': asset.token_symbol,
+            'status': status_value # 直接返回数据库中的状态值
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"获取资产状态失败 (ID: {asset_id}): {str(e)}")
+        return jsonify({'success': False, 'error': '获取资产状态失败'}), 500
 
 @api_bp.route('/assets/<int:asset_id>', methods=['PUT'])
 def update_asset(asset_id):
@@ -2965,3 +2989,233 @@ def create_solana_transaction():
     except Exception as e:
         current_app.logger.error(f"处理交易请求失败: {str(e)}")
         return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
+
+# Helper function to get config values with defaults
+def get_config_value(key, default=None, required=False):
+    value = current_app.config.get(key)
+    if value is None:
+        if required:
+            raise ValueError(f"Missing required configuration: {key}")
+        return default
+    return value
+
+@api_bp.route('/trades', methods=['POST'])
+@eth_address_required
+def create_trade():
+    """创建交易记录"""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'success': False, 'error': '无效的请求数据'}), 400
+
+        asset_id = data.get('asset_id')
+        amount_str = data.get('amount')
+        price_str = data.get('price')
+        trade_type = data.get('type', 'buy')  # 默认为购买
+        trader_address = g.eth_address # 使用装饰器提供的地址
+
+        if not all([asset_id, amount_str, price_str, trader_address]):
+            return jsonify({'success': False, 'error': '缺少必要参数'}), 400
+
+        # 参数校验
+        try:
+            asset_id = int(asset_id)
+            amount = Decimal(amount_str)
+            price = Decimal(price_str)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': '无效的数字格式'}), 400
+            
+        if amount <= 0 or price <= 0:
+            return jsonify({'success': False, 'error': '金额和价格必须为正数'}), 400
+
+        asset = Asset.query.get(asset_id)
+        if not asset:
+            return jsonify({'success': False, 'error': '资产不存在'}), 404
+            
+        # 检查资产状态是否允许交易 (例如，必须是 ON_CHAIN)
+        if asset.status != AssetStatus.ON_CHAIN.value:
+             return jsonify({'success': False, 'error': '资产当前状态不允许交易'}), 400
+
+        # 检查购买数量是否超过剩余供应量
+        # 注意：这里需要更可靠的方式获取链上实时剩余供应量
+        # 暂时使用数据库中的 token_count 作为参考，但这可能不准确
+        # if trade_type == 'buy' and amount > asset.get_remaining_supply(): # 假设有 get_remaining_supply 方法
+        #     return jsonify({'success': False, 'error': '购买数量超过剩余供应量'}), 400
+
+
+        # 注意：原有的直接完成交易的逻辑已废弃，由新的 prepare/confirm 流程替代
+        # 这里只创建记录，状态可能是 PENDING 或类似状态，但不直接完成
+
+        # 创建交易对象，状态待定 (根据具体逻辑调整)
+        new_trade = Trade(
+            asset_id=asset_id,
+            trader_address=trader_address,
+            amount=amount,
+            price=price,
+            total_price=amount * price,
+            type=trade_type,
+            status=TradeStatus.PENDING_PAYMENT.value, # 初始状态
+            tx_hash=None # 初始无哈希
+        )
+
+        db.session.add(new_trade)
+        db.session.commit()
+        
+        current_app.logger.info(f"创建了交易记录 (ID: {new_trade.id})，等待支付准备。")
+
+        # 返回交易ID，前端可能需要，也可能直接调用 prepare_purchase
+        return jsonify({'success': True, 'trade_id': new_trade.id}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"创建交易失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'创建交易失败: {str(e)}'}), 500
+
+# 新增：准备购买交易接口
+@api_bp.route('/trades/prepare_purchase', methods=['POST'])
+@eth_address_required
+def prepare_purchase():
+    """准备购买交易，创建待支付记录并返回给前端调用智能合约所需信息"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '无效的请求数据'}), 400
+
+        asset_id = data.get('asset_id')
+        amount_str = data.get('amount') # 前端传递购买的数量
+
+        if not all([asset_id, amount_str]):
+            return jsonify({'success': False, 'error': '缺少必要参数 (asset_id, amount)'}), 400
+
+        # 参数校验
+        try:
+            asset_id = int(asset_id)
+            amount = Decimal(amount_str)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': '无效的数字格式'}), 400
+            
+        if amount <= 0:
+            return jsonify({'success': False, 'error': '购买数量必须为正数'}), 400
+
+        # 获取资产信息
+        asset = Asset.query.get(asset_id)
+        if not asset:
+            return jsonify({'success': False, 'error': '资产不存在'}), 404
+            
+        # 确保资产价格有效
+        if asset.token_price is None or asset.token_price <= 0:
+             return jsonify({'success': False, 'error': '资产价格无效'}), 400
+             
+        price = Decimal(asset.token_price)
+
+        # 检查资产状态是否允许交易
+        if asset.status != AssetStatus.ON_CHAIN.value:
+             return jsonify({'success': False, 'error': '资产当前状态不允许交易'}), 400
+
+        # TODO: 再次检查购买数量是否超过剩余供应量 (需要可靠的链上数据源)
+
+        # 从配置读取平台费率 (基点, e.g., 350 for 3.5%) 和平台收款地址
+        platform_fee_basis_points = get_config_value('PLATFORM_FEE_BASIS_POINTS', default=350, required=True) # 示例：默认3.5%
+        platform_address = get_config_value('PLATFORM_FEE_ADDRESS', required=True)
+        purchase_contract_address = get_config_value('PURCHASE_CONTRACT_ADDRESS', required=True) # 智能合约地址
+
+        # 计算总价
+        total_price = (amount * price).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP) # 保留6位小数
+
+        # 获取购买者和卖家地址
+        buyer_address = g.eth_address
+        seller_address = asset.creator_address # 假设资产创建者即卖家
+
+        # 创建交易记录
+        new_trade = Trade(
+            asset_id=asset_id,
+            trader_address=buyer_address,
+            amount=amount,
+            price=price,
+            total_price=total_price,
+            type='buy',
+            status=TradeStatus.PENDING_PAYMENT.value, # 等待前端支付
+            payment_details=json.dumps({ # 存储用于支付的信息
+                 'platform_fee_basis_points': platform_fee_basis_points,
+                 'platform_address': platform_address,
+                 'seller_address': seller_address,
+                 'purchase_contract_address': purchase_contract_address
+            })
+        )
+        db.session.add(new_trade)
+        db.session.commit()
+
+        current_app.logger.info(f"准备购买交易 (ID: {new_trade.id}) for asset {asset_id}, amount {amount}, total {total_price}.")
+
+        # 返回给前端调用智能合约所需的信息
+        return jsonify({
+            'success': True,
+            'trade_id': new_trade.id,
+            'total_amount': str(total_price), # 总支付金额 (USDC)
+            'seller_address': seller_address,
+            'platform_fee_basis_points': platform_fee_basis_points,
+            'purchase_contract_address': purchase_contract_address # 智能合约地址
+        }), 201
+
+    except ValueError as ve: # 处理配置缺失错误
+        current_app.logger.error(f"配置错误: {str(ve)}")
+        return jsonify({'success': False, 'error': f'服务器配置错误: {str(ve)}'}), 500
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"准备购买交易失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'准备购买交易失败: {str(e)}'}), 500
+
+# 新增：确认支付接口
+@api_bp.route('/trades/confirm_payment/<int:trade_id>', methods=['POST'])
+@eth_address_required
+def confirm_payment(trade_id):
+    """前端调用智能合约后，传递交易哈希以确认支付并发起后台监控"""
+    try:
+        data = request.get_json()
+        if not data or 'tx_hash' not in data:
+            return jsonify({'success': False, 'error': '缺少交易哈希 (tx_hash)'}), 400
+
+        tx_hash = data['tx_hash']
+        if not tx_hash:
+             return jsonify({'success': False, 'error': '交易哈希不能为空'}), 400
+
+        trade = Trade.query.get(trade_id)
+        if not trade:
+            return jsonify({'success': False, 'error': '交易不存在'}), 404
+
+        # 验证调用者是否是该交易的购买者
+        if not is_same_wallet_address(g.eth_address, trade.trader_address):
+             return jsonify({'success': False, 'error': '无权确认此交易'}), 403
+
+        # 检查交易状态是否适合确认
+        if trade.status != TradeStatus.PENDING_PAYMENT.value:
+             current_app.logger.warning(f"尝试确认非待支付状态的交易 (ID: {trade_id}, Status: {trade.status})")
+             # 可以选择返回错误，或者允许重复确认？暂时返回错误
+             return jsonify({'success': False, 'error': f'交易状态不正确 ({trade.status})，无法确认支付'}), 400
+
+        # 更新交易记录
+        trade.tx_hash = tx_hash # 存储智能合约交易哈希
+        trade.status = TradeStatus.PENDING_CONFIRMATION.value # 更新状态为等待链上确认
+        
+        # 可选：更新 payment_details
+        details = json.loads(trade.payment_details) if trade.payment_details else {}
+        details['payment_initiated_at'] = datetime.utcnow().isoformat()
+        details['initial_tx_hash'] = tx_hash
+        trade.payment_details = json.dumps(details)
+
+        db.session.commit()
+
+        current_app.logger.info(f"交易 (ID: {trade_id}) 支付已发起，哈希: {tx_hash}，状态更新为等待确认。")
+
+        # TODO: 在这里触发后台任务来监控 tx_hash 的链上状态
+        # from app.tasks import monitor_purchase_transaction # 示例
+        # monitor_purchase_transaction.delay(trade_id, tx_hash)
+        current_app.logger.info(f"TODO: 触发后台任务监控交易 {trade_id} (哈希: {tx_hash})")
+
+
+        return jsonify({'success': True, 'message': '支付确认请求已收到，正在处理'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"确认支付失败 (Trade ID: {trade_id}): {str(e)}")
+        return jsonify({'success': False, 'error': f'确认支付失败: {str(e)}'}), 500
