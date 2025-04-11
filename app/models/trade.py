@@ -37,6 +37,9 @@ class Trade(db.Model):
     gas_used = db.Column(db.Numeric, nullable=True)  # 交易使用的gas量
     is_self_trade = db.Column(db.Boolean, nullable=False, default=False)  # 是否是自交易(和自己交易)
 
+    # 添加与 Asset 的关系
+    asset = db.relationship("Asset", back_populates="trades")
+
     @validates('type')
     def validate_type(self, key, value):
         if value not in [t.value for t in TradeType]:
