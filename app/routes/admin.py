@@ -2041,11 +2041,108 @@ def trades_v2():
     """管理后台V2版本交易管理页面"""
     return render_template('admin_v2/trades.html')
 
-@admin_bp.route('/v2/settings')
-@admin_required
+@admin_bp.route('/v2/settings', methods=['GET', 'POST'])
+@admin_required # 使用页面权限装饰器
+@permission_required('管理设置') # 假设需要 '管理设置' 权限
 def settings_v2():
-    """管理后台V2版本系统设置页面"""
-    return render_template('admin_v2/settings.html')
+    """管理后台V2版本系统设置页面，包含支付相关配置"""
+    required_configs = [
+        'PLATFORM_FEE_BASIS_POINTS', 
+        'PLATFORM_FEE_ADDRESS', 
+        'PURCHASE_CONTRACT_ADDRESS', 
+        'ASSET_CREATION_FEE_AMOUNT', 
+        'ASSET_CREATION_FEE_ADDRESS'
+    ]
+    
+    if request.method == 'POST':
+        try:
+            # 获取并验证表单数据
+            config_updates = {}
+            errors = {}
+
+            # 平台购买费率 (Basis Points)
+            fee_basis_points = request.form.get('platform_fee_basis_points')
+            try:
+                val = int(fee_basis_points)
+                if 0 <= val <= 10000: # 0% to 100%
+                    config_updates['PLATFORM_FEE_BASIS_POINTS'] = str(val)
+                else:
+                    errors['platform_fee_basis_points'] = '费率基点必须在 0 到 10000 之间'
+            except (ValueError, TypeError):
+                errors['platform_fee_basis_points'] = '费率基点必须是有效的整数'
+            
+            # 平台购买收款地址 (Solana)
+            fee_address = request.form.get('platform_fee_address')
+            if fee_address and is_valid_solana_address(fee_address):
+                config_updates['PLATFORM_FEE_ADDRESS'] = fee_address
+            elif fee_address:
+                errors['platform_fee_address'] = '平台购买收款地址格式无效 (Solana)'
+            else:
+                errors['platform_fee_address'] = '平台购买收款地址不能为空' # 必须配置
+
+            # 购买智能合约地址 (Solana)
+            contract_address = request.form.get('purchase_contract_address')
+            if contract_address and is_valid_solana_address(contract_address):
+                config_updates['PURCHASE_CONTRACT_ADDRESS'] = contract_address
+            elif contract_address:
+                errors['purchase_contract_address'] = '购买智能合约地址格式无效 (Solana)'
+            else:
+                 errors['purchase_contract_address'] = '购买智能合约地址不能为空' # 必须配置
+
+            # 资产创建费用金额 (USDC)
+            creation_fee = request.form.get('asset_creation_fee_amount')
+            try:
+                val = Decimal(creation_fee)
+                if val >= 0:
+                    config_updates['ASSET_CREATION_FEE_AMOUNT'] = str(val.quantize(Decimal('0.000001')))
+                else:
+                    errors['asset_creation_fee_amount'] = '创建费用金额不能为负数'
+            except (ValueError, TypeError):
+                errors['asset_creation_fee_amount'] = '创建费用金额必须是有效的数字'
+            
+            # 资产创建收款地址 (Solana)
+            creation_address = request.form.get('asset_creation_fee_address')
+            if creation_address and is_valid_solana_address(creation_address):
+                config_updates['ASSET_CREATION_FEE_ADDRESS'] = creation_address
+            elif creation_address:
+                errors['asset_creation_fee_address'] = '创建费用收款地址格式无效 (Solana)'
+            else:
+                 errors['asset_creation_fee_address'] = '创建费用收款地址不能为空' # 必须配置
+
+            if errors:
+                for field, msg in errors.items():
+                    flash(f'{field}: {msg}', 'error')
+            else:
+                # 保存配置到数据库
+                for key, value in config_updates.items():
+                    SystemConfig.set_value(key, value, description=f'System setting for {key}')
+                flash('系统设置已成功更新', 'success')
+                current_app.logger.info(f"管理员 {g.eth_address} 更新了系统设置: {config_updates.keys()}")
+                # 更新配置后最好重新加载或清除缓存（如果应用有缓存配置）
+                # current_app.config.update(SystemConfig.load_all_to_dict()) # 示例：如果配置缓存在 app.config
+
+            # 无论成功或失败，都重定向回 GET 请求，以显示更新后的值或错误
+            return redirect(url_for('admin.settings_v2'))
+            
+        except Exception as e:
+            current_app.logger.error(f"更新系统设置失败: {str(e)}", exc_info=True)
+            flash('更新设置时发生内部错误', 'error')
+            return redirect(url_for('admin.settings_v2'))
+
+    # 处理 GET 请求
+    configs = {}
+    # 提供默认值，避免后端 API 因配置缺失而出错
+    default_values = {
+        'PLATFORM_FEE_BASIS_POINTS': '350', # 3.5%
+        'PLATFORM_FEE_ADDRESS': '', # 必须配置
+        'PURCHASE_CONTRACT_ADDRESS': '', # 必须配置
+        'ASSET_CREATION_FEE_AMOUNT': '1.0', # 1 USDC
+        'ASSET_CREATION_FEE_ADDRESS': '' # 必须配置
+    }
+    for key in required_configs:
+        configs[key] = SystemConfig.get_value(key, default=default_values.get(key, ''))
+        
+    return render_template('admin_v2/settings.html', configs=configs)
 
 @admin_bp.route('/v2/admin-users')
 @admin_required
@@ -3119,3 +3216,15 @@ def api_admin_v2_dashboard_stats():
             'total_trades': 0,
             'total_trade_volume': 0
         })
+
+# Helper function to validate Solana address (basic check)
+def is_valid_solana_address(address):
+    # Basic check for typical Solana address length and base58 characters
+    import base58
+    if not address or not (32 <= len(address) <= 44):
+        return False
+    try:
+        base58.b58decode(address)
+        return True
+    except ValueError:
+        return False

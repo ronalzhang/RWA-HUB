@@ -2,9 +2,9 @@
 seeds = false
 skip-lint = false
 
-[programs.devnet]
-rwa_trade = "rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-rwa_dividend = "rwaHubDividendXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+# [programs.devnet]
+# rwa_trade = "rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+# rwa_dividend = "rwaHubDividendXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
 [registry]
 url = "https://api.apr.dev"
