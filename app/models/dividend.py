@@ -169,30 +169,34 @@ class Dividend(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False)
-    amount = db.Column(db.Float, nullable=False)  # 分红总金额
-    distribution_date = db.Column(db.DateTime, nullable=False)  # 分红日期
-    record_date = db.Column(db.DateTime, nullable=False)  # 登记日期
-    status = db.Column(db.String(20), nullable=False, default='pending')  # pending, completed, cancelled
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
-    transaction_hash = db.Column(db.String(100))  # 区块链交易哈希
+    amount = db.Column(db.Numeric(20, 6), nullable=False)  # 使用NUMERIC类型存储金额，保留6位小数
+    payment_token = db.Column(db.String(10), default='USDC') # 支付代币,默认为USDC
+    dividend_date = db.Column(db.DateTime, default=datetime.utcnow)
+    description = db.Column(db.Text)
+    status = db.Column(db.String(50), default='pending') # pending, processing, confirmed, failed
+    transaction_hash = db.Column(db.String(255))
+    error_message = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # 关系
-    asset = db.relationship('Asset', backref=db.backref('dividends', lazy=True))
-    
+    # 定义与Asset模型的关系
+    asset = db.relationship('Asset', back_populates="dividend_records") # 使用 back_populates
+
     def __repr__(self):
-        return f'<Dividend {self.id}: {self.amount} for Asset {self.asset_id}>'
+        return f'<Dividend {self.id} for Asset {self.asset_id}>'
     
     def to_dict(self):
         """转换为字典格式"""
         return {
             'id': self.id,
             'asset_id': self.asset_id,
-            'amount': self.amount,
-            'distribution_date': self.distribution_date.strftime('%Y-%m-%d %H:%M:%S') if self.distribution_date else None,
-            'record_date': self.record_date.strftime('%Y-%m-%d %H:%M:%S') if self.record_date else None,
+            'amount': float(self.amount),
+            'payment_token': self.payment_token,
+            'dividend_date': self.dividend_date.strftime('%Y-%m-%d %H:%M:%S') if self.dividend_date else None,
+            'description': self.description,
             'status': self.status,
+            'transaction_hash': self.transaction_hash,
+            'error_message': self.error_message,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None,
-            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else None,
-            'transaction_hash': self.transaction_hash
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else None
         } 
