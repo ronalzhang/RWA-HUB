@@ -15,7 +15,7 @@ class DividendRecord(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # 关联
-    asset = db.relationship("Asset")
+    asset = db.relationship("Asset", back_populates="dividend_records")
     distributions = db.relationship('DividendDistribution', backref='dividend_record', lazy=True)
     
     @classmethod
@@ -180,7 +180,7 @@ class Dividend(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # 定义与Asset模型的关系
-    asset = db.relationship('Asset', back_populates="dividend_records") # 使用 back_populates
+    asset = db.relationship('Asset', back_populates="dividends") # 修正 back_populates 指向 Asset.dividends
 
     def __repr__(self):
         return f'<Dividend {self.id} for Asset {self.asset_id}>'
