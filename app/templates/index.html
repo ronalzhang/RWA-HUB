@@ -63,7 +63,10 @@
                 {% for asset in assets %}
                 <div class="col-md-4" data-aos="fade-up" data-aos-delay="{{ loop.index * 100 }}">
                     {% if asset.status == 2 %}
-                    <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" class="text-decoration-none">
+                    <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" 
+                       class="text-decoration-none home-asset-card-link"
+                       data-token-symbol="{{ asset.token_symbol }}"
+                       onclick="console.log('首页点击资产卡片:', '{{ asset.token_symbol }}', '{{ asset.name }}'); debugHomeAssetClick(event, this);">
                         <div class="card h-100">
                             <!-- Asset Image -->
                             <div class="position-relative">
@@ -276,7 +279,42 @@
         }
         
         console.log("资产卡片处理完成");
+        
+        // 添加资产卡片点击事件监听
+        const assetLinks = document.querySelectorAll('.home-asset-card-link');
+        assetLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                const tokenSymbol = this.getAttribute('data-token-symbol');
+                console.log(`首页资产卡片点击事件触发 - 符号: ${tokenSymbol}`);
+                console.log(`链接href: ${this.href}`);
+                // 不阻止默认行为，让跳转正常进行
+            });
+        });
     });
+    
+    // 调试资产点击行为
+    function debugHomeAssetClick(event, element) {
+        console.group('首页资产点击调试');
+        console.log('点击事件:', event);
+        console.log('元素:', element);
+        console.log('链接地址:', element.href);
+        console.log('资产代码:', element.getAttribute('data-token-symbol'));
+        
+        // 检查是否有其他事件监听器阻止了默认行为
+        const eventCopy = { ...event };
+        console.log('事件默认行为是否已阻止:', eventCopy.defaultPrevented);
+        console.log('点击时间戳:', new Date().toISOString());
+        
+        // 手动跳转一次试试，2秒后
+        setTimeout(() => {
+            console.log('尝试手动跳转到:', element.href);
+            window.location.href = element.href;
+        }, 2000);
+        
+        console.groupEnd();
+        
+        // 在控制台中记录，但不阻止默认跳转
+    }
 </script>
 </div>
 {% endblock %}
