@@ -122,7 +122,7 @@ def asset_detail_page(asset_id):
 def asset_detail_by_symbol(token_symbol):
     """资产详情页面 - 使用token_symbol"""
     try:
-        current_app.logger.info(f'访问资产详情页面，Token Symbol: {token_symbol}')
+        current_app.logger.info(f'[DETAIL_PAGE_START] 访问资产详情页面，Token Symbol: {token_symbol}')
         
         # 获取资产信息
         asset = Asset.query.filter_by(token_symbol=token_symbol).first_or_404()
@@ -134,14 +134,10 @@ def asset_detail_by_symbol(token_symbol):
         referrer = request.args.get('ref') or request.args.get('referrer')
         if referrer and current_user_address and referrer != current_user_address:
             try:
-                # 记录推荐关系
-                # 检查是否已存在推荐关系，避免重复记录
                 existing_referral = NewUserReferral.query.filter_by(
                     user_address=current_user_address
                 ).first()
-                
                 if not existing_referral:
-                    # 创建新的推荐关系
                     new_referral = NewUserReferral(
                         user_address=current_user_address,
                         referrer_address=referrer,
@@ -151,67 +147,63 @@ def asset_detail_by_symbol(token_symbol):
                     )
                     db.session.add(new_referral)
                     db.session.commit()
-                    current_app.logger.info(f'已创建推荐关系: {referrer} -> {current_user_address}')
-            except Exception as e:
-                current_app.logger.error(f'记录推荐关系失败: {str(e)}')
+                    current_app.logger.info(f'[DETAIL_PAGE_REFERRAL] 已创建推荐关系: {referrer} -> {current_user_address}')
+            except Exception as ref_e:
+                current_app.logger.error(f'[DETAIL_PAGE_REFERRAL_ERROR] 记录推荐关系失败: {str(ref_e)}')
         
         # 检查是否是管理员
         is_admin_user = is_admin(current_user_address) if current_user_address else False
-        current_app.logger.info(f'是否是管理员: {is_admin_user}, 地址: {current_user_address}')
         
         # 检查是否是资产所有者
         is_owner = False
         if current_user_address and asset.owner_address:
-            # 区分ETH和SOL地址处理
             if current_user_address.startswith('0x') and asset.owner_address.startswith('0x'):
-                # ETH地址比较（不区分大小写）
                 is_owner = current_user_address.lower() == asset.owner_address.lower()
             else:
-                # SOL地址比较（区分大小写）
                 is_owner = current_user_address == asset.owner_address
             
-            current_app.logger.info(f'是否是资产所有者: {is_owner}, 用户地址: {current_user_address}, 资产所有者地址: {asset.owner_address}')
-        
         # 计算剩余供应量
         if asset.remaining_supply is not None:
-            # 优先使用数据库存储的剩余供应量
             remaining_supply = asset.remaining_supply
         else:
-            # 如果没有剩余供应量数据，使用总供应量
             remaining_supply = asset.token_supply
         
-        current_app.logger.info(f'资产 {asset.id} 剩余供应量: {remaining_supply}')
-        
         # 获取资产累计分红数据
+        total_dividends = 0
         try:
             from app.models import Dividend
-            
-            # 查询所有已确认的分红记录
-            dividends = Dividend.query.filter_by(
-                asset_id=asset.id, 
-                status='confirmed'
-            ).all()
-            
-            # 计算累计分红金额
+            dividends = Dividend.query.filter_by(asset_id=asset.id, status='confirmed').all()
             total_dividends = sum(dividend.amount for dividend in dividends)
-            current_app.logger.info(f'资产 {asset.id} 累计分红: {total_dividends} USDC')
-        except Exception as e:
-            current_app.logger.error(f'获取累计分红数据失败: {str(e)}')
-            total_dividends = 0
+        except Exception as div_e:
+            current_app.logger.error(f'[DETAIL_PAGE_DIVIDEND_ERROR] 获取累计分红数据失败: {str(div_e)}')
         
-        # 渲染详情页面
-        return render_template('assets/detail.html', 
-                              asset=asset, 
-                              remaining_supply=remaining_supply,
-                              is_owner=is_owner,
-                              is_admin_user=is_admin_user,
-                              current_user_address=current_user_address,
-                              total_dividends=total_dividends,
-                              platform_fee_address=Config.PLATFORM_FEE_ADDRESS)
+        # Log right before rendering
+        current_app.logger.info(f'[DETAIL_PAGE_RENDER_START] 准备渲染模板 detail.html for {token_symbol}.')
+        context = {
+            'asset': asset,
+            'remaining_supply': remaining_supply,
+            'is_owner': is_owner,
+            'is_admin_user': is_admin_user,
+            'current_user_address': current_user_address,
+            'total_dividends': total_dividends,
+            'platform_fee_address': Config.PLATFORM_FEE_ADDRESS
+        }
+        current_app.logger.info(f'[DETAIL_PAGE_CONTEXT] Context keys: {list(context.keys())}')
+
+        # Render detail page
+        rendered_html = render_template('assets/detail.html', **context)
+
+        # Log after successful rendering (if we get here)
+        current_app.logger.info(f'[DETAIL_PAGE_RENDER_SUCCESS] 成功渲染 detail.html for {token_symbol}.')
+        return rendered_html # Return the rendered HTML
                               
     except Exception as e:
-        current_app.logger.error(f"访问资产详情页面失败: {str(e)}", exc_info=True)
+        # Log the exception *before* redirecting, ensuring it gets written
+        current_app.logger.error(f'[DETAIL_PAGE_EXCEPTION] 访问资产详情页面 {token_symbol} 时捕获到异常!')
+        # 使用 logger.exception() 保证打印堆栈跟踪信息
+        current_app.logger.exception(f'[DETAIL_PAGE_TRACEBACK] Exception details for {token_symbol}:') 
         flash(_('Failed to access asset detail page'), 'danger')
+        current_app.logger.warning(f'[DETAIL_PAGE_REDIRECT] 即将重定向到 list_assets_page due to exception for {token_symbol}.')
         return redirect(url_for('assets.list_assets_page'))
 
 @assets_bp.route('/create')
