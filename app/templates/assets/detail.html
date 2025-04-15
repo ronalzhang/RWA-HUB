@@ -2233,7 +2233,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <h6 class="fw-bold">{{ _('Property Details') }}</h6>
                         <ul class="list-unstyled">
                             <li class="mb-2"><i class="fas fa-map-marker-alt text-muted me-2"></i> <strong>{{ _('Location') }}:</strong> {{ asset.location }}</li>
-                            <li class="mb-2"><i class="fas fa-ruler-combined text-muted me-2"></i> <strong>{{ _('Area') }}:</strong> {% set _tmp = (g.__setattr__('formatting_field_name', 'area'), False) %}{{ asset.area|number_format }}{% set _tmp = (g.__setattr__('formatting_field_name', ''), False) %} ㎡</li>
+                            <li class="mb-2"><i class="fas fa-ruler-combined text-muted me-2"></i> <strong>{{ _('Area') }}:</strong> {{ asset.area|number_format(field_name='area') }} ㎡</li>
                         </ul>
                             </div>
                             {% else %}
@@ -2241,7 +2241,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <h6 class="fw-bold">{{ _('Asset Details') }}</h6>
                         <ul class="list-unstyled">
                             <li class="mb-2"><i class="fas fa-map-marker-alt text-muted me-2"></i> <strong>{{ _('Location') }}:</strong> {{ asset.location }}</li>
-                            <li class="mb-2"><i class="fas fa-money-bill-wave text-muted me-2"></i> <strong>{{ _('Total Value') }}:</strong> {% set _tmp = (g.__setattr__('formatting_field_name', 'total_value'), False) %}{{ asset.total_value|number_format }}{% set _tmp = (g.__setattr__('formatting_field_name', ''), False) %} USDC</li>
+                            <li class="mb-2"><i class="fas fa-money-bill-wave text-muted me-2"></i> <strong>{{ _('Total Value') }}:</strong> {{ asset.total_value|number_format(field_name='total_value') }} USDC</li>
                             <li class="mb-2"><i class="fas fa-certificate text-muted me-2"></i> <strong>{{ _('Certification') }}:</strong> {{ asset.certification_type|default('N/A', true) }}</li>
                         </ul>
                             </div>
@@ -2271,7 +2271,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <p><strong>{{ _('Annual Revenue') }}:</strong> {% set _tmp = (g.__setattr__('formatting_field_name', 'annual_revenue'), False) %}{{ asset.annual_revenue|number_format }}{% set _tmp = (g.__setattr__('formatting_field_name', ''), False) %} USDC</p>
+                            <p><strong>{{ _('Annual Revenue') }}:</strong> {{ asset.annual_revenue|number_format(field_name='annual_revenue') }} USDC</p>
                             <p><strong>{{ _('Dividend Frequency') }}:</strong> {{ asset.dividend_frequency|default(_('Quarterly'), true) }}</p>
                             </div>
                         <div class="col-md-6">
@@ -2301,15 +2301,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                             </div>
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="text-muted">{{ _('Token Price') }}:</span>
-                            <span class="fw-bold fs-5">{% set _tmp = (g.__setattr__('formatting_field_name', 'token_price'), False) %}{{ asset.token_price|number_format }}{% set _tmp = (g.__setattr__('formatting_field_name', ''), False) %} USDC</span>
+                            <span class="fw-bold fs-5">{{ asset.token_price|number_format(field_name='token_price') }} USDC</span>
                                 </div>
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="text-muted">{{ _('Token Supply') }}:</span>
-                            <span>{% set _tmp = (g.__setattr__('formatting_field_name', 'token_supply'), False) %}{{ asset.token_supply|number_format }}{% set _tmp = (g.__setattr__('formatting_field_name', ''), False) %}</span>
+                            <span>{{ asset.token_supply|number_format(field_name='token_supply') }}</span>
                             </div>
                         <div class="d-flex justify-content-between align-items-center mb-4">
                             <span class="text-muted">{{ _('Available Tokens') }}:</span>
-                            <span id="availableTokens">{% set _tmp = (g.__setattr__('formatting_field_name', 'remaining_supply'), False) %}{{ remaining_supply|number_format }}{% set _tmp = (g.__setattr__('formatting_field_name', ''), False) %}</span>
+                            <span id="availableTokens">{{ remaining_supply|number_format(field_name='remaining_supply') }}</span>
                         </div>
 
                     </div>
