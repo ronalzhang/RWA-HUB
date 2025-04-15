@@ -209,7 +209,8 @@ document.addEventListener('DOMContentLoaded', function() {
     <script src="https://cdn.jsdelivr.net/npm/bn.js@5.2.0/lib/bn.min.js"></script>
     -->
 
-    <!-- 确保Solana库正确初始化 -->
+    <!-- 确保Solana库正确初始化 (这段代码是多余且冲突的，将被删除) -->
+    <!-- 
     <script>
         // 初始化全局对象
         function initSolanaLibs() {
@@ -237,6 +238,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 同时在window加载完成后再次检查
         window.addEventListener('load', initSolanaLibs);
     </script>
+    -->
     
     <!-- 紧急全局修复 - 确保在交易前可获取必要对象 -->
     <script>
@@ -261,51 +263,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (typeof SolanaToken !== 'undefined') {
                     window.splToken = SolanaToken;
                     window.spl_token_initialized = true;
-                    console.log('从全局SolanaToken初始化SPL Token成功');
-                    return;
+                    console.log('通过全局SolanaToken对象初始化SPL成功');
+                } else {
+                    console.warn('全局SolanaToken对象未定义，SPL Token库可能未加载或加载失败');
                 }
-                
-                // 如果全局对象不存在，创建基本对象
-                if (window.solanaWeb3 && window.solanaWeb3.PublicKey) {
-                    window.splToken = {
-                        TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
-                        ASSOCIATED_TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
-                        createTransferInstruction: function(fromPubkey, toPubkey, ownerPubkey, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
-                            const keys = [
-                                { pubkey: fromPubkey, isSigner: false, isWritable: true },
-                                { pubkey: toPubkey, isSigner: false, isWritable: true },
-                                { pubkey: ownerPubkey, isSigner: multiSigners.length === 0, isWritable: false }
-                            ];
-                            multiSigners.forEach(signer => {
-                                keys.push({ pubkey: signer.publicKey, isSigner: true, isWritable: false });
-                            });
-                            return new window.solanaWeb3.TransactionInstruction({
-                                keys,
-                                programId,
-                                data: new Uint8Array([3, ...new Array(8).fill(0)]) // 3是transfer指令的代码
-                            });
-                        }
-                    };
-                    window.spl_token_initialized = true;
-                    console.log('使用基本SPL Token对象');
-                    return;
+
+                // 再次检查并确保关键对象存在，如果需要，从 solanaWeb3 中获取
+                if (!window.splToken || Object.keys(window.splToken).length === 0) {
+                    if (window.solanaWeb3 && window.solanaWeb3.SPL) {
+                         window.splToken = window.solanaWeb3.SPL;
+                         console.log('从 solanaWeb3.SPL 恢复 splToken 对象');
+                    } else {
+                         console.error('无法初始化 SPL Token 库，缺少必要的对象');
+                         throw new Error('SPL Token library initialization failed.');
+                    }
                 }
-                
-                throw new Error('无法初始化SPL Token库');
+
+                // 确保关键方法存在
+                if (typeof window.splToken.getAssociatedTokenAddress !== 'function') {
+                     console.error('splToken.getAssociatedTokenAddress 不是一个函数');
+                     throw new Error('splToken.getAssociatedTokenAddress is not a function');
+                }
+                 if (typeof window.splToken.createAssociatedTokenAccountInstruction !== 'function') {
+                     console.error('splToken.createAssociatedTokenAccountInstruction 不是一个函数');
+                     throw new Error('splToken.createAssociatedTokenAccountInstruction is not a function');
+                }
+
+                console.log('SPL Token库初始化成功');
+                window.spl_token_initialized = true;
+
             } catch (error) {
                 console.error('SPL Token库初始化失败:', error);
                 throw error;
             }
         };
-        
-        // 执行一次初始化，但不阻塞页面加载
-        setTimeout(async () => {
-            try {
-                await window.initSplTokenLib();
-            } catch (e) {
-                console.error('初始化SPL Token库失败:', e);
-            }
-        }, 1000);
     </script>
 
     <div class="container mt-4">
