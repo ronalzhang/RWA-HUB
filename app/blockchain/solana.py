@@ -61,7 +61,7 @@ class SolanaClient:
             private_key (str, optional): 私钥. 默认为None.
             wallet_address (str, optional): 钱包地址，仅用于只读操作. 默认为None.
         """
-        self.config = get_config()
+        self.config = load_config()
         endpoint_url = endpoint_url or self.config.SOLANA_ENDPOINT
         
         # 设置mock_mode标志，确保从环境变量读取

@@ -1,0 +1,1 @@
+Error: Function _ZN112_$LT$solana_program..instruction..InstructionError$u20$as$u20$solana_frozen_abi..abi_example..AbiEnumVisitor$GT$13visit_for_abi17h6c5de73bb51d4fbcE Stack offset of 4608 exceeded max offset of 4096 by 512 bytes, please minimize large stack variables
