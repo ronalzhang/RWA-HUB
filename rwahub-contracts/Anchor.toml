@@ -2,16 +2,19 @@
 seeds = false
 skip-lint = false
 
-# [programs.devnet]
-# rwa_trade = "rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-# rwa_dividend = "rwaHubDividendXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+[programs.localnet]
+rwa_trade = "9AcvoQmz22KRcMhkLkeSkKs8W7ru6oae8GHcxrS83fKz"
+rwa_dividend = "DvdnKLNYxRLCGJrLnYLmCTRxPXcmVvGM8x7cT8MZHnZU"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
-wallet = "/Users/godfather/.config/solana/id.json"
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts" 
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[workspace]
+members = ["src/programs/*"]

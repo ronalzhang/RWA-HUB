@@ -3,7 +3,10 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use solana_program::program::invoke;
 use solana_program::system_instruction;
 
-declare_id!("rwaHubDividendXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+// 这是一个示例合约，用于RWA-Hub分红功能
+// 请根据实际需求修改
+
+declare_id!("DvdnKLNYxRLCGJrLnYLmCTRxPXcmVvGM8x7cT8MZHnZU");
 
 #[program]
 pub mod rwa_dividend {
@@ -200,6 +203,10 @@ pub mod rwa_dividend {
 
         Ok(())
     }
+
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// 分红账户数据结构
@@ -348,4 +355,7 @@ pub enum ErrorCode {
     DividendNotActive,
     #[msg("已超过最大领取金额")]
     ExceedMaxClaimAmount,
-} 
+}
+
+#[derive(Accounts)]
+pub struct Initialize {} 

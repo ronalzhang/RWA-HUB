@@ -3,7 +3,10 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use solana_program::program::invoke;
 use solana_program::system_instruction;
 
-declare_id!("rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+// 这是一个示例合约，用于RWA-Hub交易功能
+// 请根据实际需求修改
+
+declare_id!("9AcvoQmz22KRcMhkLkeSkKs8W7ru6oae8GHcxrS83fKz");
 
 #[program]
 pub mod rwa_trade {
@@ -262,4 +265,7 @@ pub enum ErrorCode {
     Overflow,
     #[msg("无效的手续费金额")]
     InvalidFeeAmount,
-} 
+}
+
+#[derive(Accounts)]
+pub struct Initialize {} 

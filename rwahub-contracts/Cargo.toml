@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "src/programs/rwa-trade",
+    "src/programs/rwa-dividend",
+]
+resolver = "2"
+
+[profile.release]
+overflow-checks = true 
