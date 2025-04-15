@@ -36,16 +36,12 @@ def create_app(config_name='development'):
     
     # 添加自定义过滤器
     @app.template_filter('number_format')
-    def number_format_filter(value):
+    def number_format_filter(value, field_name=None):
+        """格式化数字，根据字段名决定精度"""
         try:
             if isinstance(value, (int, float, Decimal)):
-                # 简化实现，只检查g对象中的格式化标记
-                if hasattr(g, 'formatting_field_name'):
-                    field_name = g.formatting_field_name
-                    # 重置标志，避免影响后续格式化
-                    delattr(g, 'formatting_field_name')
-                    
-                    # 根据字段名确定格式化精度
+                # 根据字段名确定格式化精度
+                if field_name:
                     # 代币价格: 6位小数
                     if 'token_price' in field_name or 'price' in field_name:
                         return "{:,.6f}".format(float(value))
@@ -54,20 +50,28 @@ def create_app(config_name='development'):
                         return "{:,.2f}".format(float(value))
                     # 代币供应量、剩余供应量: 0位小数
                     elif any(field in field_name for field in ['token_supply', 'remaining_supply']):
-                        if isinstance(value, int) or value.is_integer():
-                            return "{:,}".format(int(value))
-                        return "{:,.0f}".format(float(value))
+                        # 检查是否为整数或可以无损转换为整数
+                        float_value = float(value)
+                        if float_value == int(float_value):
+                            return "{:,}".format(int(float_value))
+                        else:
+                            # 对于非整数的供应量（理论上不应该，但做兼容处理），保留2位小数
+                            return "{:,.2f}".format(float_value)
                 
-                # 如果无法确定变量名或不在上述规则中，使用默认格式化规则
-                if isinstance(value, int) or value.is_integer():
-                    return "{:,}".format(int(value))
-                
-                # 默认使用2位小数
-                return "{:,.2f}".format(float(value))
+                # 如果没有提供字段名或不匹配任何规则，使用默认格式化
+                # 检查是否为整数或可以无损转换为整数
+                float_value = float(value)
+                if float_value == int(float_value):
+                    return "{:,}".format(int(float_value))
+                else:
+                    # 默认保留2位小数
+                    return "{:,.2f}".format(float_value)
+            
+            # 如果输入不是数字类型，直接返回原值
             return value
         except (ValueError, TypeError) as e:
-            app.logger.error(f"格式化数字出错: {str(e)}")
-            return value
+            app.logger.error(f"格式化数字出错 (field: {field_name}, value: {value}): {str(e)}")
+            return value # 出错时返回原值
             
     @app.template_filter('from_json')
     def from_json_filter(value):
