@@ -111,12 +111,25 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 在页面加载时初始化
     document.addEventListener('DOMContentLoaded', async function() {
+        console.log('DOMContentLoaded 事件触发');
         try {
+            // 尝试初始化Solana库
             await initSolanaLibs();
             console.log('Solana库初始化完成');
+            
+            // 在这里可以安全地执行依赖Solana库的代码
+            // 例如，更新UI元素，绑定事件监听器等
+            // 确保这些操作也在try块内部，或者在initSolanaLibs成功后执行
+            
         } catch (error) {
-            console.error('Solana库初始化失败:', error);
+            console.error('Solana库初始化过程中发生错误:', error);
+            // 在这里可以向用户显示错误信息，或者禁用依赖Solana库的功能
+            // 例如: document.getElementById('buyButton').disabled = true;
+            //         document.getElementById('solanaErrorMsg').textContent = 'Solana功能加载失败，请稍后重试。';
         }
+        
+        // 其他不依赖Solana库的DOM操作可以放在这里
+        console.log('DOMContentLoaded 事件处理完成');
     });
 </script>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
