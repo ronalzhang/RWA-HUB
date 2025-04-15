@@ -18,10 +18,8 @@
             {% for asset in assets %}
             <div class="col-md-4">
                 {% if asset.status == 2 %}
-                <div class="text-decoration-none asset-card-clickable" 
-                   data-token-symbol="{{ asset.token_symbol }}"
-                   data-href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}"
-                   onclick="handleAssetCardClick(event, this)">
+                <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" 
+                   class="text-decoration-none asset-card-link">
                     <div class="card h-100">
                         <!-- 资产图片 -->
                         <div class="position-relative">
@@ -82,7 +80,7 @@
                             </p>
                         </div>
                     </div>
-                </div>
+                </a>
                 {% endif %}
             </div>
             {% endfor %}
@@ -128,20 +126,11 @@
         display: flex;
         flex-direction: column;
         background-color: #fff;
-        cursor: pointer; /* 添加指针样式表明可点击 */
     }
 
     #assets .card:hover {
         transform: translateY(-5px);
         box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-    }
-    
-    /* 可点击资产卡片的样式 */
-    .asset-card-clickable {
-        cursor: pointer;
-        display: block;
-        text-decoration: none;
-        color: inherit;
     }
 
     /* 修复标题和代币符号布局 */
@@ -202,25 +191,6 @@
 </style>
 
 <script>
-    // 处理资产卡片点击事件
-    function handleAssetCardClick(event, element) {
-        // 防止事件冒泡
-        event.stopPropagation();
-        
-        // 获取目标URL
-        const url = element.getAttribute('data-href');
-        const tokenSymbol = element.getAttribute('data-token-symbol');
-        
-        console.log('资产卡片点击:', tokenSymbol);
-        console.log('目标URL:', url);
-        
-        // 直接强制跳转
-        window.location.replace(url);
-        
-        // 防止其他事件处理器
-        return false;
-    }
-
     document.addEventListener('DOMContentLoaded', function() {
         const cards = document.querySelectorAll('#assets .card');
         
@@ -247,6 +217,17 @@
                 card.style.boxShadow = '0 2px 10px rgba(0,0,0,0.05)';
             });
         }, 100);
+        
+        // 可以选择性保留调试日志，或移除
+        const assetLinks = document.querySelectorAll('.asset-card-link');
+        assetLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                const tokenSymbol = this.getAttribute('data-token-symbol'); // data-token-symbol 可能在a标签上没有，需要确认
+                console.log(`资产列表页 - 卡片点击事件触发 - 符号: ${tokenSymbol}`);
+                console.log(`目标 href: ${this.href}`);
+                // 不阻止默认行为，让<a>标签的默认跳转发生
+            });
+        });
     });
 </script>
 {% endblock %}

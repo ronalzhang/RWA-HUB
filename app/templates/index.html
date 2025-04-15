@@ -63,10 +63,8 @@
                 {% for asset in assets %}
                 <div class="col-md-4" data-aos="fade-up" data-aos-delay="{{ loop.index * 100 }}">
                     {% if asset.status == 2 %}
-                    <div class="text-decoration-none home-asset-card-clickable" 
-                       data-token-symbol="{{ asset.token_symbol }}"
-                       data-href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}"
-                       onclick="handleHomeAssetCardClick(event, this)">
+                    <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" 
+                       class="text-decoration-none home-asset-card-link">
                         <div class="card h-100">
                             <!-- Asset Image -->
                             <div class="position-relative">
@@ -127,7 +125,7 @@
                                 </p>
                             </div>
                         </div>
-                    </div>
+                    </a>
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -241,75 +239,48 @@
         window.location.href = "{{ url_for('assets.create_asset_page') }}";
     });
     
-    // 处理首页资产卡片点击事件
-    function handleHomeAssetCardClick(event, element) {
-        // 防止事件冒泡
-        event.stopPropagation();
-        
-        // 获取目标URL
-        const url = element.getAttribute('data-href');
-        const tokenSymbol = element.getAttribute('data-token-symbol');
-        
-        console.log('首页资产卡片点击:', tokenSymbol);
-        console.log('目标URL:', url);
-        
-        // 直接强制跳转
-        window.location.replace(url);
-        
-        // 防止其他事件处理器
-        return false;
-    }
-
     document.addEventListener('DOMContentLoaded', function() {
         console.log("DOM加载完成，开始处理资产卡片");
         const cards = document.querySelectorAll('#assets .card');
         console.log("找到资产卡片数量:", cards.length);
         
-        // 强制显示所有资产卡片
+        // 鼠标交互效果 - 保持
         cards.forEach((card, index) => {
-            console.log("处理卡片:", index);
-            card.style.display = "block";
-            card.style.border = "2px solid #007bff";
-            card.style.minHeight = "200px";
-            card.style.transform = "translateY(0)";
-            card.style.opacity = "1";
-            card.style.visibility = "visible";
-            card.style.cursor = "pointer"; // 添加指针样式
-            
-            // 鼠标交互效果
             card.addEventListener('mouseenter', function() {
                 this.style.transform = 'translateY(-10px)';
                 this.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
                 this.style.transition = 'all 0.3s ease';
-                this.style.border = "2px solid #ff5500";
             });
             
             card.addEventListener('mouseleave', function() {
                 this.style.transform = 'translateY(0)';
                 this.style.boxShadow = '0 2px 10px rgba(0,0,0,0.05)';
                 this.style.transition = 'all 0.3s ease';
-                this.style.border = "2px solid #007bff";
             });
         });
         
-        // 禁用AOS动画防止干扰
+        // 如果需要，重新初始化AOS
         if (typeof AOS !== 'undefined') {
-            console.log("禁用AOS动画");
-            AOS.init({ disable: true });
+            AOS.init(); // 重新启用AOS
         }
         
         console.log("资产卡片处理完成");
+        
+        // 可以选择性保留调试日志，或移除
+        const assetLinks = document.querySelectorAll('.home-asset-card-link');
+        assetLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                const tokenSymbol = this.getAttribute('data-token-symbol'); // data-token-symbol 可能在a标签上没有，需要确认
+                console.log(`首页 - 卡片点击事件触发 - 符号: ${tokenSymbol}`);
+                console.log(`目标 href: ${this.href}`);
+                // 不阻止默认行为，让<a>标签的默认跳转发生
+            });
+        });
     });
 </script>
 
 <style>
-    /* 可点击资产卡片的样式 */
-    .home-asset-card-clickable {
-        cursor: pointer;
-        display: block;
-        text-decoration: none;
-        color: inherit;
-    }
+    /* 移除 .home-asset-card-clickable 样式 */
 </style>
 </div>
 {% endblock %}
