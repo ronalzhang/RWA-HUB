@@ -337,8 +337,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // 全局变量
             // 使用字符串方式包裹Jinja2变量，避免linter错误
             const assetId = "{{ asset.id|default(0) }}";
-            const assetPrice = "{{ asset.price|default(asset.token_price|default(0)) }}";
-            const totalSupply = "{{ asset.total_supply|default(asset.token_supply|default(0)) }}";
+            const assetPrice = "{{ asset.token_price|default(0) }}"; // 修正: 使用 asset.token_price
+            const totalSupply = "{{ asset.token_supply|default(0) }}"; // 修正: 使用 asset.token_supply
             
             // 从后端获取正确计算的剩余供应量
             let remainingSupply = "{{ remaining_supply|default(0) }}";
