@@ -1046,14 +1046,6 @@
             const walletBtn = document.getElementById('walletBtn');
             const walletMenu = document.getElementById('walletMenu');
             
-            // 检查点击是否是资产卡片链接（资产详情跳转）
-            const assetCardLink = event.target.closest('a[href*="/assets/"]');
-            if (assetCardLink) {
-                // 如果点击的是资产卡片链接，不处理事件，让默认行为继续
-                console.log('点击了资产卡片，允许跳转:', assetCardLink.href);
-                return;
-            }
-            
             // 如果点击的不是钱包按钮或钱包菜单内部元素
             if (walletMenu && walletMenu.classList.contains('show') && 
                 !walletBtn.contains(event.target) && 
