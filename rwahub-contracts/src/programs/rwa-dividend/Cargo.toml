@@ -1,12 +1,12 @@
 [package]
-name = "rwa-dividend"
+name = "rwa-trade"
 version = "0.1.0"
-description = "RWA-Hub 分红合约"
+description = "RWA-Hub 交易合约"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "rwa_dividend"
+name = "rwa_trade"
 
 [features]
 no-entrypoint = []
@@ -14,8 +14,7 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
-
 [dependencies]
-anchor-lang = "0.31.0"
-anchor-spl = "0.31.0"
-solana-program = "=2.1.0" 
+anchor-lang = "0.28.0"
+anchor-spl = "0.28.0"
+

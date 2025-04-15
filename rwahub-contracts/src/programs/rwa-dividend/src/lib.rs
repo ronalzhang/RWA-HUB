@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
-use solana_program::program::invoke;
-use solana_program::system_instruction;
+use anchor_lang::solana_program::program::invoke;
+use anchor_lang::solana_program::system_instruction;
 
 // 这是一个示例合约，用于RWA-Hub分红功能
 // 请根据实际需求修改
