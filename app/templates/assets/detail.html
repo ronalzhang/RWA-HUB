@@ -1198,6 +1198,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const amountInput = document.getElementById('purchase-amount');
                 const totalPriceDisplay = document.getElementById('totalPrice');
                 const buyButton = document.getElementById('buy-button');
+                
+                // 获取分红按钮
                 const dividendBtn = document.getElementById('dividendManagementBtn');
                 const dividendBtnMobile = document.getElementById('dividendManagementBtnMobile');
                 const dividendBtnMedium = document.getElementById('dividendManagementBtnMedium');
@@ -1211,17 +1213,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 function updateBuyButtonState() {
                     console.log('{{ _("Updating buy button status, current wallet status") }}:', window.walletState);
                     
-                    // 同时更新分红按钮状态
+                    // 同时显示并更新分红按钮状态
                     const updateDividendButtons = (isConnected) => {
                         const buttons = [dividendBtn, dividendBtnMobile, dividendBtnMedium];
                         buttons.forEach(btn => {
                             if (btn) {
+                                // 首先显示按钮
+                                btn.style.display = 'inline-flex';
+                                
                                 if (isConnected) {
                                     btn.classList.remove('disabled');
                                     btn.style.pointerEvents = 'auto';
                                 } else {
                                     btn.classList.add('disabled');
                                     btn.style.pointerEvents = 'none';
+                                    btn.setAttribute('title', '{{ _("Please connect wallet first") }}');
                                 }
                             }
                         });
@@ -1278,8 +1284,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         const tokenPrice = parseFloat("{{ asset.token_price }}");
                         const totalPrice = amount * tokenPrice;
                         if (totalPriceDisplay) {
-                            // 将小数位数从6位改为2位，提升用户体验
-                            totalPriceDisplay.value = totalPrice.toFixed(2) + " USDC";
+                            // 不添加USDC单位，因为HTML中已有USDC单位标签
+                            totalPriceDisplay.value = totalPrice.toFixed(2);
                         }
                     });
                     
