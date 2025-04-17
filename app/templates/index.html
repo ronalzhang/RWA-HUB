@@ -277,6 +277,31 @@
             });
         });
     });
+
+    // 处理首页资产卡片点击事件
+    function handleHomeAssetCardClick(event, element) {
+        // 防止事件冒泡
+        event.stopPropagation();
+        
+        // 获取目标URL
+        const url = element.getAttribute('data-href');
+        const tokenSymbol = element.getAttribute('data-token-symbol');
+        
+        console.log('首页资产卡片点击:', tokenSymbol);
+        console.log('目标URL:', url);
+        
+        // 检查URL是否正确
+        if (!url || url.indexOf('/assets/') !== 0) {
+            console.error('无效的资产详情URL:', url);
+            return false;
+        }
+        
+        // 直接强制跳转 - 使用href而不是replace，避免历史记录问题
+        window.location.href = url;
+        
+        // 防止其他事件处理器
+        return false;
+    }
 </script>
 
 <style>
