@@ -1078,7 +1078,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else if (trade.status === 'pending_confirmation') {
                         statusText = '{{ _("Confirming") }}';
                         statusClass = 'text-warning';
-                    }
+                        }
                         
                         // 处理交易哈希 - 确保不会太长导致换行
                         let txHashDisplay = '{{ _("N/A") }}';
@@ -1650,7 +1650,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const confirmTotal = document.getElementById('confirm-total');
                     const platformFeeDisplay = document.getElementById('platform-fee'); // 移除这个显示，因为对用户不透明
                     const actualPaymentDisplay = document.getElementById('actual-payment'); // 移除这个显示
-
+                    
                     if (confirmAmount) confirmAmount.value = amount;
                     // 显示总支付金额
                     if (confirmTotal) confirmTotal.value = `${parseFloat(total_amount).toFixed(2)} USDC`; 
@@ -1658,10 +1658,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 隐藏平台费和卖家支付的显示
                      if (platformFeeDisplay) platformFeeDisplay.closest('.mb-3').style.display = 'none';
                      if (actualPaymentDisplay) actualPaymentDisplay.closest('.mb-3').style.display = 'none';
-
+                    
                     const buyModal = new bootstrap.Modal(document.getElementById('buyModal'));
                     buyModal.show();
-
+                    
                     // 3. 等待用户在模态框中确认
                     return new Promise((resolve, reject) => {
                         window.confirmPurchase = async function() {
@@ -1741,10 +1741,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // TODO: 后续可以考虑启动一个轮询来检查交易状态，或者提示用户刷新查看
                                 setTimeout(async () => {
                                      showInfo('{{ _("Refreshing transaction history...") }}');
-                                     await refreshAssetInfo();
+                                await refreshAssetInfo();
                                      loadTradeHistory(1); // 刷新交易历史
                                 }, 3000); // 延迟刷新
-
+                                
                                 resolve(true);
 
                             } catch (error) {
@@ -1916,7 +1916,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 使用默认文案
                     return {
                         success: true,
-                        message: "{{ _('📈 Share to earn commission! Invite friends to invest, and you can get up to 30% promotion commission! The link is exclusively yours, lifetime commission benefits, the more friends, the more rewards!') }}"
+                        message: "{{ _('📈 Share to earn commission! Invite friends to invest, and you can get up to 30%% promotion commission! The link is exclusively yours, lifetime commission benefits, the more friends, the more rewards!') }}"
                     };
                 })
                 .then(data => {
@@ -3311,7 +3311,7 @@ async function transferUSDC(fromAddress, toAddress, amount) {
 }
 
 // 确保函数在全局作用域可用
-window.transferUSDC = transferUSDC; 
+window.transferUSDC = transferUSDC;
 */
 </script>
 

@@ -25,6 +25,7 @@ import traceback
 import uuid
 import time
 import logging
+from sqlalchemy import text
 
 # 页面路由
 @assets_bp.route("/")
@@ -183,9 +184,10 @@ def asset_detail_by_symbol(token_symbol):
         # 获取资产累计分红数据
         total_dividends = 0
         try:
-            from app.models import Dividend
-            dividends = Dividend.query.filter_by(asset_id=asset.id, status='confirmed').all()
-            total_dividends = sum(dividend.amount for dividend in dividends)
+            # 直接使用SQL查询，避免payment_token字段不存在的问题
+            sql = text("SELECT SUM(amount) FROM dividends WHERE asset_id = :asset_id AND status = 'confirmed'")
+            result = db.session.execute(sql, {"asset_id": asset.id}).fetchone()
+            total_dividends = result[0] if result[0] else 0
         except Exception as div_e:
             current_app.logger.error(f'[DETAIL_PAGE_DIVIDEND_ERROR] 获取累计分红数据失败: {str(div_e)}')
         
@@ -199,7 +201,7 @@ def asset_detail_by_symbol(token_symbol):
             'current_user_address': current_user_address,
             'total_dividends': total_dividends,
             'platform_fee_address': Config.PLATFORM_FEE_ADDRESS,
-            'PLATFORM_FEE_RATE': Config.PLATFORM_FEE_RATE
+            'PLATFORM_FEE_RATE': getattr(Config, 'PLATFORM_FEE_RATE', 0.035)
         }
         current_app.logger.info(f'[DETAIL_PAGE_CONTEXT] Context keys: {list(context.keys())}')
 
