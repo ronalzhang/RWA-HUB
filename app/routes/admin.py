@@ -1,6 +1,6 @@
 from flask import (
     Blueprint, render_template, request, redirect, url_for, 
-    flash, session, jsonify, current_app, g, after_this_request, make_response, send_file, send_from_directory
+    flash, session, jsonify, current_app, g, after_this_request, make_response, send_file, send_from_directory, abort
 )
 from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.trade import Trade, TradeStatus, TradeType
@@ -15,7 +15,7 @@ from app.models.income import PlatformIncome as DBPlatformIncome, IncomeType
 from app.models.commission import Commission
 from app.models.admin import DashboardStats
 from dateutil.relativedelta import relativedelta
-from datetime import datetime, timedelta, time, date
+from datetime import datetime, timedelta, time, date, timezone
 from functools import wraps
 import json
 import os
@@ -34,6 +34,7 @@ import datetime
 import calendar
 import io
 import csv
+from app.utils.datetime_compat import get_utc_now, get_utc_today  # 导入兼容函数
 
 # 从routes/__init__.py中获取蓝图
 from . import admin_bp, admin_api_bp
@@ -246,8 +247,7 @@ def index():
         
         return render_template('admin/dashboard.html', admin_info=admin_info)
     except Exception as e:
-        current_app.logger.error(f'访问后台管理页面失败：{str(e)}')
-        flash('系统错误，请稍后重试', 'error')
+        current_app.logger.warning(f'访问后台管理页面失败：{str(e)}')
         return redirect(url_for('main.index'))
 
 @admin_bp.route('/dashboard')
@@ -296,13 +296,156 @@ def edit_asset(asset_id):
 @admin_page_required
 def assets():
     """资产管理页面"""
-    return render_template('admin/assets.html')
+    try:
+        # 获取所有资产
+        assets = Asset.query.all()
+        return render_template('admin/assets.html', assets=assets)
+    except Exception as e:
+        current_app.logger.warning(f'资产管理页面加载失败: {str(e)}')
+        flash('资产数据加载失败', 'danger')
+        return redirect(url_for('admin.index'))
 
 @admin_bp.route('/users')
 @admin_page_required
 def users():
     """用户管理页面"""
-    return render_template('admin/users.html')
+    try:
+        users = User.query.all()
+        return render_template('admin/users.html', users=users)
+    except Exception as e:
+        current_app.logger.warning(f'用户管理页面加载失败: {str(e)}')
+        flash('用户数据加载失败', 'danger')
+        return redirect(url_for('admin.index'))
+
+@admin_bp.route('/trades')
+@admin_page_required
+def trades():
+    """交易管理页面"""
+    try:
+        trades = Trade.query.order_by(Trade.created_at.desc()).all()
+        return render_template('admin/trades.html', trades=trades)
+    except Exception as e:
+        current_app.logger.warning(f'交易管理页面加载失败: {str(e)}')
+        flash('交易数据加载失败', 'danger')
+        return redirect(url_for('admin.index'))
+
+@admin_bp.route('/export/assets')
+@admin_page_required
+def export_assets():
+    """导出资产数据"""
+    try:
+        # 获取所有资产
+        assets = Asset.query.all()
+        
+        # 创建CSV文件
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 写入表头
+        writer.writerow(['ID', '名称', '代币符号', '发行方', '状态', '总供应量', '价格'])
+        
+        # 写入数据
+        for asset in assets:
+            writer.writerow([
+                asset.id,
+                asset.name,
+                asset.token_symbol,
+                asset.issuer,
+                asset.status,
+                asset.total_supply,
+                asset.price
+            ])
+        
+        # 返回CSV文件
+        output.seek(0)
+        return send_file(
+            io.BytesIO(output.getvalue().encode('utf-8-sig')),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f'assets_{datetime.datetime.now().strftime("%Y%m%d%H%M%S")}.csv'
+        )
+    except Exception as e:
+        current_app.logger.warning(f'导出资产数据失败: {str(e)}')
+        flash('导出资产数据失败', 'danger')
+        return redirect(url_for('admin.assets'))
+
+@admin_bp.route('/export/users')
+@admin_page_required
+def export_users():
+    """导出用户数据"""
+    try:
+        # 获取所有用户
+        users = User.query.all()
+        
+        # 创建CSV文件
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 写入表头
+        writer.writerow(['ID', '用户名', '邮箱', '钱包地址', '注册时间'])
+        
+        # 写入数据
+        for user in users:
+            writer.writerow([
+                user.id,
+                user.username,
+                user.email,
+                user.wallet_address,
+                user.created_at
+            ])
+        
+        # 返回CSV文件
+        output.seek(0)
+        return send_file(
+            io.BytesIO(output.getvalue().encode('utf-8-sig')),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f'users_{datetime.datetime.now().strftime("%Y%m%d%H%M%S")}.csv'
+        )
+    except Exception as e:
+        current_app.logger.warning(f'导出用户数据失败: {str(e)}')
+        flash('导出用户数据失败', 'danger')
+        return redirect(url_for('admin.users'))
+
+@admin_bp.route('/export/trades')
+@admin_page_required
+def export_trades():
+    """导出交易数据"""
+    try:
+        # 获取所有交易
+        trades = Trade.query.all()
+        
+        # 创建CSV文件
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 写入表头
+        writer.writerow(['ID', '资产ID', '用户ID', '数量', '金额', '状态', '创建时间'])
+        
+        # 写入数据
+        for trade in trades:
+            writer.writerow([
+                trade.id,
+                trade.asset_id,
+                trade.user_id,
+                trade.quantity,
+                trade.amount,
+                trade.status,
+                trade.created_at
+            ])
+        
+        # 返回CSV文件
+        output.seek(0)
+        return send_file(
+            io.BytesIO(output.getvalue().encode('utf-8-sig')),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f'trades_{datetime.datetime.now().strftime("%Y%m%d%H%M%S")}.csv'
+        )
+    except Exception as e:
+        current_app.logger.warning(f'导出交易数据失败: {str(e)}')
+        flash('导出交易数据失败', 'danger')
+        return redirect(url_for('admin.trades'))
 
 @admin_bp.route('/logout')
 def logout():
@@ -333,7 +476,7 @@ def get_admin_stats():
         current_app.logger.info(f"访问统计API，地址: {eth_address}")
         
         # 当前日期
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).replace(tzinfo=None).date()
         
         # 查询DashboardStats表中的统计数据
         stats = {}
@@ -471,6 +614,7 @@ def approve_admin_asset(asset_id):
         
     try:
         asset.status = AssetStatus.APPROVED.value  # 使用 .value 确保设置数值
+        asset.approved_at = get_utc_now()
         db.session.commit()
         current_app.logger.info(f'资产 {asset_id} 审核通过')
         return jsonify({'message': '审核通过成功'}), 200
@@ -846,7 +990,7 @@ def approve_assets():
         # 更新资产状态
         for asset in assets:
             asset.status = AssetStatus.APPROVED.value
-            asset.approved_at = datetime.utcnow()
+            asset.approved_at = get_utc_now()
             asset.approved_by = g.eth_address
             
         try:
@@ -887,7 +1031,7 @@ def batch_approve_assets():
                 
             # 更新资产状态
             asset.status = AssetStatus.APPROVED.value
-            asset.approved_at = datetime.utcnow()
+            asset.approved_at = get_utc_now()
             asset.approved_by = eth_address
             
             # 不需要移动文件，因为已经存储在七牛云上
@@ -1045,7 +1189,7 @@ def get_visit_stats():
         period = request.args.get('period', 'daily')
         
         # 当前日期时间
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         today = now.date()
         
         labels = []
@@ -1191,7 +1335,7 @@ def get_income_stats():
         dividend_fee_percent = round((total_dividend_fee / total_income * 100) if total_income > 0 else 0, 2)
         
         # 获取今日交易手续费
-        today = datetime.utcnow().date()
+        today = get_utc_today()
         today_start = datetime.combine(today, datetime.min.time())
         today_end = datetime.combine(today, datetime.max.time())
         
@@ -1897,7 +2041,7 @@ def get_billing_stats():
     """获取账单统计信息"""
     try:
         # 获取今日账单总额
-        today = datetime.utcnow().date()
+        today = get_utc_today()
         today_start = datetime.combine(today, time.min)
         today_end = datetime.combine(today, time.max)
         
