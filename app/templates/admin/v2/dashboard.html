@@ -1,0 +1,40 @@
+// 获取交易统计
+function fetchTradeStats() {
+    fetch('/admin/v2/api/dashboard/stats')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                console.error('Error fetching trade stats:', data.error);
+                // 显示友好的错误信息
+                document.getElementById('totalTradeVolume').textContent = '加载失败';
+                document.getElementById('todayTradeVolume').textContent = '加载失败';
+                document.getElementById('averageTradeValue').textContent = '加载失败';
+                return;
+            }
+            
+            // 正常更新UI
+            document.getElementById('totalTradeVolume').textContent = formatCurrency(data.total_volume || 0);
+            document.getElementById('todayTradeVolume').textContent = formatCurrency(data.today_volume || 0);
+            document.getElementById('averageTradeValue').textContent = formatCurrency(data.average_trade_value || 0);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            // 显示友好的错误信息
+            document.getElementById('totalTradeVolume').textContent = '加载失败';
+            document.getElementById('todayTradeVolume').textContent = '加载失败';
+            document.getElementById('averageTradeValue').textContent = '加载失败';
+        });
+}
+
+// 格式化货币显示
+function formatCurrency(value) {
+    return '$ ' + parseFloat(value).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+} 

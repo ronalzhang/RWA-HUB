@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONFIG = {
     # 区块链配置
     "SOLANA_RPC_URL": "https://api.mainnet-beta.solana.com",
+    "SOLANA_ENDPOINT": "https://api.mainnet-beta.solana.com",
     "SOLANA_WALLET_PRIVATE_KEY": "",
     "ETH_RPC_URL": "https://mainnet.infura.io/v3/your-infura-key",
     "ETH_WALLET_PRIVATE_KEY": "",
