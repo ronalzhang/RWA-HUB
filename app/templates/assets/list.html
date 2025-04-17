@@ -18,8 +18,10 @@
             {% for asset in assets %}
             <div class="col-md-4">
                 {% if asset.status == 2 %}
-                <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" 
-                   class="text-decoration-none asset-card-link">
+                <div class="text-decoration-none asset-card-clickable" 
+                   data-token-symbol="{{ asset.token_symbol }}"
+                   data-href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}"
+                   onclick="handleAssetCardClick(event, this)">
                     <div class="card h-100">
                         <!-- 资产图片 -->
                         <div class="position-relative">
@@ -80,7 +82,7 @@
                             </p>
                         </div>
                     </div>
-                </a>
+                </div>
                 {% endif %}
             </div>
             {% endfor %}
@@ -126,6 +128,7 @@
         display: flex;
         flex-direction: column;
         background-color: #fff;
+        cursor: pointer; /* 添加指针样式表明可点击 */
     }
 
     #assets .card:hover {
@@ -187,6 +190,15 @@
     .col-12 .text-center.py-5 {
         margin-top: 50px;
         margin-bottom: 50px;
+    }
+
+    /* 可点击资产卡片的样式 */
+    .asset-card-clickable {
+        cursor: pointer;
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        height: 100%;
     }
 </style>
 
