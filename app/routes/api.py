@@ -3134,3 +3134,125 @@ def confirm_payment(trade_id):
         db.session.rollback()
         current_app.logger.error(f"确认支付失败 (Trade ID: {trade_id}): {str(e)}")
         return jsonify({'success': False, 'error': f'确认支付失败: {str(e)}'}), 500
+
+@api_bp.route('/user/wallet/balance')
+def get_wallet_balance():
+    """
+    获取钱包余额
+    支持从URL参数、请求头或Cookie获取地址
+    优先级：URL参数 > 请求头 > Cookie
+    """
+    try:
+        # 初始化返回结构
+        balances = {
+            'USDC': 0,
+            'SOL': 0,
+            'ETH': 0
+        }
+        
+        # 从多个来源获取地址
+        address = None
+        
+        # 尝试从请求参数获取
+        if request.args.get('address'):
+            address = request.args.get('address')
+            
+        # 尝试从请求头获取
+        if not address and request.headers.get('X-Eth-Address'):
+            address = request.headers.get('X-Eth-Address')
+            
+        # 尝试从Cookie获取
+        if not address and request.cookies.get('eth_address'):
+            address = request.cookies.get('eth_address')
+            
+        # 如果没有找到地址
+        if not address:
+            current_app.logger.warning('未提供钱包地址，返回默认值')
+            return jsonify({
+                'success': True,
+                'balance': balances['USDC'],
+                'balances': balances,
+                'currency': 'USDC',
+                'is_real_data': False
+            }), 400
+        
+        # 记录查询的地址（安全考虑，只显示部分地址）
+        safe_address = address[:4] + '...' + address[-4:] if len(address) > 8 else address
+        current_app.logger.info(f'查询钱包余额: {safe_address}')
+        
+        # 检测钱包类型
+        wallet_type = request.args.get('wallet_type', 'ethereum')
+        if address.startswith('0x'):
+            wallet_type = 'ethereum'
+        else:
+            wallet_type = 'solana'
+        
+        current_app.logger.info(f'钱包类型: {wallet_type}')
+        
+        # 根据钱包类型获取余额
+        if wallet_type == 'solana':
+            try:
+                # 导入Solana客户端
+                from app.blockchain.solana import get_sol_balance
+                
+                # 获取SOL余额
+                sol_balance = get_sol_balance(address)
+                if sol_balance is not None:
+                    balances['SOL'] = sol_balance
+                    current_app.logger.info(f'SOL余额: {sol_balance}')
+                else:
+                    current_app.logger.warning('无法获取SOL余额，返回0')
+                    balances['SOL'] = 0
+                
+                # 获取USDC余额 - USDC Token在Solana上的地址
+                # Solana主网USDC代币地址
+                usdc_token_address = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+                try:
+                    from app.blockchain.asset_service import AssetService
+                    # 调用获取SPL代币余额的方法
+                    usdc_balance = AssetService.get_token_balance(wallet_address=address, token_mint_address=usdc_token_address)
+                    balances['USDC'] = usdc_balance
+                    current_app.logger.info(f'USDC余额: {usdc_balance}')
+                except Exception as usdc_err:
+                    # 降低日志级别为warning，减少错误日志记录
+                    current_app.logger.warning(f'获取USDC余额失败: {str(usdc_err)}')
+                    # 获取USDC失败不影响整体结果，保持USDC=0
+            except Exception as sol_err:
+                # 降低日志级别为warning，减少错误日志记录
+                current_app.logger.warning(f'获取SOL余额失败: {str(sol_err)}')
+                balances['SOL'] = 0
+                
+        else:
+            # 如果是以太坊钱包，可以添加以太坊余额查询逻辑
+            try:
+                # 导入以太坊客户端
+                from app.blockchain.ethereum import get_usdc_balance, get_eth_balance
+                
+                # 获取ETH余额
+                eth_balance = get_eth_balance(address)
+                if eth_balance is not None:
+                    balances['ETH'] = eth_balance
+                    current_app.logger.info(f'ETH余额: {eth_balance}')
+                
+                # 获取USDC余额
+                usdc_balance = get_usdc_balance(address)
+                if usdc_balance is not None:
+                    balances['USDC'] = usdc_balance
+                    current_app.logger.info(f'USDC余额: {usdc_balance}')
+            except Exception as eth_err:
+                # 降低日志级别为warning，减少错误日志记录
+                current_app.logger.warning(f'获取以太坊余额失败: {str(eth_err)}')
+            
+        current_app.logger.info(f'返回真实余额数据: USDC={balances["USDC"]}, SOL={balances["SOL"]}')
+        
+        return jsonify({
+            'success': True,
+            'balance': balances['USDC'],  # 保持兼容性
+            'balances': balances,
+            'currency': 'USDC',
+            'is_real_data': True
+        }), 200
+    except Exception as e:
+        # 仅记录严重错误，减少exc_info使用
+        current_app.logger.error(f'获取钱包余额失败: {str(e)}')
+        return jsonify({'success': False, 'error': f'获取钱包余额失败: {str(e)}'}), 500
