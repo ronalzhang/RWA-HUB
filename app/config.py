@@ -66,6 +66,7 @@ class Config:
     SOLANA_PROGRAM_ID = os.environ.get('SOLANA_PROGRAM_ID')
     SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT')
     PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd')
+    PLATFORM_FEE_RATE = float(os.environ.get('PLATFORM_FEE_RATE', 0.035))  # 3.5%平台费率
     
     # 智能合约ID
     RWA_TRADE_PROGRAM_ID = os.environ.get('RWA_TRADE_PROGRAM_ID', 'rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
