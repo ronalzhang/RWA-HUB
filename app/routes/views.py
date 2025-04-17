@@ -64,26 +64,6 @@ def register():
 def create_asset():
     return render_template('assets/create.html')
 
-@assets_bp.route('/<int:asset_id>')
-def asset_detail(asset_id):
-    """资产详情页面"""
-    logger = logging.getLogger(__name__)
-    
-    try:
-        logger.info(f"正在访问资产详情页面: asset_id={asset_id}")
-        
-        # 获取资产对象
-        asset = Asset.query.get_or_404(asset_id)
-        logger.info(f"获取资产数据成功: name='{asset.name}', token_symbol='{asset.token_symbol}', token_supply={asset.token_supply}")
-        
-        # 使用token_symbol进行重定向
-        return redirect(url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol))
-        
-    except Exception as e:
-        logger.error(f"访问资产详情页面出错: {str(e)}")
-        flash('访问资产详情失败，请返回资产列表页面重试', 'error')
-        return redirect(url_for('assets.list_assets_page'))
-
 # 管理页面路由
 @assets_bp.route('/manage')
 def manage_assets():
