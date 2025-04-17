@@ -1198,6 +1198,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const amountInput = document.getElementById('purchase-amount');
                 const totalPriceDisplay = document.getElementById('totalPrice');
                 const buyButton = document.getElementById('buy-button');
+                const dividendBtn = document.getElementById('dividendManagementBtn');
+                const dividendBtnMobile = document.getElementById('dividendManagementBtnMobile');
+                const dividendBtnMedium = document.getElementById('dividendManagementBtnMedium');
                 
                 if (!amountInput || !totalPriceDisplay || !buyButton) {
                     console.error('{{ _("Cannot find trade form elements") }}');
@@ -1208,15 +1211,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 function updateBuyButtonState() {
                     console.log('{{ _("Updating buy button status, current wallet status") }}:', window.walletState);
                     
+                    // 同时更新分红按钮状态
+                    const updateDividendButtons = (isConnected) => {
+                        const buttons = [dividendBtn, dividendBtnMobile, dividendBtnMedium];
+                        buttons.forEach(btn => {
+                            if (btn) {
+                                if (isConnected) {
+                                    btn.classList.remove('disabled');
+                                    btn.style.pointerEvents = 'auto';
+                                } else {
+                                    btn.classList.add('disabled');
+                                    btn.style.pointerEvents = 'none';
+                                }
+                            }
+                        });
+                    };
+                    
                     // 如果钱包已连接
                     if (window.walletState && (window.walletState.isConnected || window.walletState.connected)) {
                         buyButton.disabled = false;
                         buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>{{ _("Buy") }}';
                         console.log('{{ _("Wallet connected, enabling buy button") }}');
+                        updateDividendButtons(true);
                     } else {
                         buyButton.disabled = true;
                         buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>{{ _("Connect Wallet First") }}';
                         console.log('{{ _("Wallet not connected, disabling buy button") }}');
+                        updateDividendButtons(false);
                     }
                 }
                 
@@ -1254,11 +1275,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     amountInput.addEventListener('input', function() {
                         // 计算总价并更新显示
                         const amount = parseFloat(this.value) || 0;
-                        const tokenPrice = parseFloat(assetPrice);
+                        const tokenPrice = parseFloat("{{ asset.token_price }}");
                         const totalPrice = amount * tokenPrice;
                         if (totalPriceDisplay) {
                             // 将小数位数从6位改为2位，提升用户体验
-                            totalPriceDisplay.value = totalPrice.toFixed(2);
+                            totalPriceDisplay.value = totalPrice.toFixed(2) + " USDC";
                         }
                     });
                     
