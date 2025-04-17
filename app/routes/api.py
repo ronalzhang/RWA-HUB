@@ -1063,7 +1063,7 @@ def get_asset_holders(asset_id):
         current_app.logger.error(f'获取资产持有人信息失败: {str(e)}')
         return jsonify({'error': '获取持有人信息失败'}), 500
 
-@api_bp.route('/wallet/balance', methods=['GET'])
+@api_bp.route('/wallet/balance', methods=['GET'], endpoint='get_wallet_balance_endpoint')
 def get_wallet_balance():
     """获取用户钱包的USDC和SOL余额"""
     address = request.args.get('address')
@@ -3135,8 +3135,8 @@ def confirm_payment(trade_id):
         current_app.logger.error(f"确认支付失败 (Trade ID: {trade_id}): {str(e)}")
         return jsonify({'success': False, 'error': f'确认支付失败: {str(e)}'}), 500
 
-@api_bp.route('/user/wallet/balance')
-def get_wallet_balance():
+@api_bp.route('/user/wallet/balance', endpoint='get_user_wallet_balance')
+def get_user_wallet_balance():
     """
     获取钱包余额
     支持从URL参数、请求头或Cookie获取地址
