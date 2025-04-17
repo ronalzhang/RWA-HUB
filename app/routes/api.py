@@ -2967,7 +2967,7 @@ def create_trade():
             trader_address=trader_address,
             amount=amount,
             price=price,
-            total_price=amount * price,
+            total=amount * price,
             type=trade_type,
             status=TradeStatus.PENDING_PAYMENT.value, # 初始状态
             tx_hash=None # 初始无哈希
@@ -3047,7 +3047,7 @@ def prepare_purchase():
             trader_address=buyer_address,
             amount=amount,
             price=price,
-            total_price=total_price,
+            total=total_price,
             type='buy',
             status=TradeStatus.PENDING_PAYMENT.value, # 等待前端支付
             payment_details=json.dumps({ # 存储用于支付的信息

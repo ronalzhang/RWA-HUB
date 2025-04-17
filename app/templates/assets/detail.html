@@ -929,6 +929,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         } else if (trade.status === 'failed' || trade.status === 3 || trade.status === '3') {
                             statusText = '{{ _("Failed") }}';
                             statusClass = 'text-danger';
+                        } else if (trade.status === 'pending_payment') {
+                            statusText = '{{ _("Waiting Payment") }}';
+                            statusClass = 'text-info';
+                        } else if (trade.status === 'pending_confirmation') {
+                            statusText = '{{ _("Confirming") }}';
+                            statusClass = 'text-warning';
                         }
                         
                         // 处理交易哈希
@@ -979,7 +985,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     'pending': '{{ _("Processing") }}',
                     'completed': '{{ _("Completed") }}',
                     'failed': '{{ _("Failed") }}',
-                    'cancelled': '{{ _("Cancelled") }}'
+                    'cancelled': '{{ _("Cancelled") }}',
+                    'pending_payment': '{{ _("Waiting Payment") }}',
+                    'pending_confirmation': '{{ _("Confirming") }}'
                 };
                 return statusMap[status] || status;
             }
@@ -1064,7 +1072,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else if (trade.status === 'failed' || trade.status === 3 || trade.status === '3') {
                             statusText = '{{ _("Failed") }}';
                         statusClass = 'text-danger';
-                        }
+                    } else if (trade.status === 'pending_payment') {
+                        statusText = '{{ _("Waiting Payment") }}';
+                        statusClass = 'text-info';
+                    } else if (trade.status === 'pending_confirmation') {
+                        statusText = '{{ _("Confirming") }}';
+                        statusClass = 'text-warning';
+                    }
                         
                         // 处理交易哈希 - 确保不会太长导致换行
                         let txHashDisplay = '{{ _("N/A") }}';
