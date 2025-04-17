@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}{{ _('Error') }} - RWA-HUB{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-5 text-center">
+                    <i class="fas fa-exclamation-triangle text-danger fa-4x mb-4"></i>
+                    <h2 class="mb-4">{{ _('An Error Occurred') }}</h2>
+                    
+                    {% if error %}
+                    <p class="lead mb-4">{{ error }}</p>
+                    {% else %}
+                    <p class="lead mb-4">{{ _('We encountered an unexpected problem. Please try again later.') }}</p>
+                    {% endif %}
+                    
+                    <div class="mt-5">
+                        <a href="{{ url_for('main.index') }}" class="btn btn-primary me-3">
+                            <i class="fas fa-home me-2"></i>{{ _('Return to Home') }}
+                        </a>
+                        <a href="{{ url_for('assets.list_assets_page') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-list me-2"></i>{{ _('View Asset List') }}
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

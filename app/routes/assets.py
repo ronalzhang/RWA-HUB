@@ -127,16 +127,20 @@ def asset_detail_by_symbol(token_symbol):
     """资产详情页面 - 使用token_symbol"""
     try:
         # 添加更详细的日志
-        current_app.logger.info(f'[DETAIL_PAGE_DEBUG] 访问资产详情页面开始，URL路径: {request.path}, Token Symbol: {token_symbol}')
-        current_app.logger.info(f'[DETAIL_PAGE_HEADERS] User-Agent: {request.headers.get("User-Agent")}')
+        current_app.logger.info(f'[DETAIL_PAGE_START] 访问资产详情页面，Token Symbol: {token_symbol}')
+        current_app.logger.info(f'[DETAIL_PAGE_DEBUG] URL路径: {request.path}, User-Agent: {request.headers.get("User-Agent")}')
         
         # 获取资产信息
-        asset = Asset.query.filter_by(token_symbol=token_symbol).first_or_404()
+        asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+        if not asset:
+            current_app.logger.error(f'[DETAIL_PAGE_ERROR] 资产不存在: {token_symbol}')
+            flash(_('Asset not found'), 'danger')
+            return render_template('error.html', error=_('Asset not found')), 404
+            
         current_app.logger.info(f'[DETAIL_PAGE_DEBUG] 找到资产: ID={asset.id}, 名称={asset.name}, 状态={asset.status}')
         
         # 获取用户钱包地址
         current_user_address = get_eth_address()
-        current_app.logger.info(f'[DETAIL_PAGE_DEBUG] 当前用户钱包: {current_user_address}')
         
         # 处理推荐人参数
         referrer = request.args.get('ref') or request.args.get('referrer')
@@ -194,30 +198,25 @@ def asset_detail_by_symbol(token_symbol):
             'is_admin_user': is_admin_user,
             'current_user_address': current_user_address,
             'total_dividends': total_dividends,
-            'platform_fee_address': Config.PLATFORM_FEE_ADDRESS
+            'platform_fee_address': Config.PLATFORM_FEE_ADDRESS,
+            'PLATFORM_FEE_RATE': Config.PLATFORM_FEE_RATE
         }
         current_app.logger.info(f'[DETAIL_PAGE_CONTEXT] Context keys: {list(context.keys())}')
 
-        # Render detail page
-        rendered_html = render_template('assets/detail.html', **context)
-
-        # Log after successful rendering (if we get here)
-        current_app.logger.info(f'[DETAIL_PAGE_RENDER_SUCCESS] 成功渲染 detail.html for {token_symbol}.')
-        return rendered_html # Return the rendered HTML
+        # 直接返回渲染的HTML，避免任何重定向
+        return render_template('assets/detail.html', **context)
                               
     except Exception as e:
-        # Log the exception *before* redirecting, ensuring it gets written
+        # Log the exception
         current_app.logger.error(f'[DETAIL_PAGE_EXCEPTION] 访问资产详情页面 {token_symbol} 时捕获到异常!')
-        current_app.logger.exception(f'[DETAIL_PAGE_TRACEBACK] Exception details for {token_symbol}:')
+        current_app.logger.exception(e)
         
         # 添加具体错误信息到日志中
         tb_info = traceback.format_exc()
         current_app.logger.error(f'[DETAIL_PAGE_ERROR] 详细错误信息:\n{tb_info}')
         
-        # 使用flash通知用户
-        flash(_('Failed to access asset detail page'), 'danger')
-        current_app.logger.warning(f'[DETAIL_PAGE_REDIRECT] 即将重定向到 list_assets_page due to exception for {token_symbol}.')
-        return redirect(url_for('assets.list_assets_page'))
+        # 渲染错误页面而不是重定向
+        return render_template('error.html', error=_('Error accessing asset details')), 500
 
 @assets_bp.route('/create')
 @eth_address_required
