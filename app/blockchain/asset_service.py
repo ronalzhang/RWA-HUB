@@ -16,7 +16,7 @@ from flask import current_app, g
 from app.models.user import User
 from app.models.transaction import Transaction as DBTransaction, TransactionType, TransactionStatus
 from app.models.holding import Holding
-from app.utils.config import get_config
+from app.utils.config import load_config
 from app.utils.constants import MIN_SOL_BALANCE
 from app.utils.transaction_helpers import record_fee_transaction
 from app.utils.solana_compat.rpc.api import Client
