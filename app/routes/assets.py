@@ -26,6 +26,8 @@ import uuid
 import time
 import logging
 from sqlalchemy import text
+import qrcode
+from io import BytesIO
 
 # 页面路由
 @assets_bp.route("/")
@@ -98,9 +100,8 @@ def list_assets_page():
                              is_admin=is_admin_user)
 
     except Exception as e:
-        current_app.logger.error(f'获取资产列表失败: {str(e)}')
-        import traceback
-        current_app.logger.error(traceback.format_exc())  # 添加详细的错误堆栈
+        current_app.logger.warning(f'获取资产列表失败: {str(e)}')
+        current_app.logger.warning(traceback.format_exc())  # 添加详细的错误堆栈
         return render_template('assets/list.html', 
                              assets=[], 
                              pagination=None,
@@ -119,8 +120,8 @@ def asset_detail_page(asset_id):
         # 转向新格式URL
         return redirect(url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol), code=301)
     except Exception as e:
-        current_app.logger.error(f'获取资产详情失败: {str(e)}')
-        flash('获取资产详情失败，请稍后重试', 'error')
+        current_app.logger.warning(f'获取资产详情失败: {str(e)}')
+        flash('获取资产详情失败，请稍后重试', 'warning')
         return redirect(url_for('assets.list_assets_page'))
 
 @assets_bp.route("/<string:token_symbol>")
@@ -234,8 +235,8 @@ def create_asset_page():
         current_app.logger.info(f'用户 {g.eth_address} 访问创建资产页面')
         return render_template('assets/create.html', creator_address=g.eth_address)
     except Exception as e:
-        current_app.logger.error(f'加载创建资产页面失败: {str(e)}')
-        flash('系统错误，请稍后重试', 'error')
+        current_app.logger.warning(f'加载创建资产页面失败: {str(e)}')
+        flash('系统错误，请稍后重试', 'warning')
         return redirect(url_for('main.index'))
 
 @assets_bp.route('/<int:asset_id>/edit')
@@ -247,8 +248,8 @@ def edit_asset_page(asset_id):
         asset = Asset.query.get_or_404(asset_id)
         return redirect(url_for('assets.edit_asset_by_symbol', token_symbol=asset.token_symbol))
     except Exception as e:
-        current_app.logger.error(f"访问资产编辑页面失败: {str(e)}", exc_info=True)
-        flash('访问资产编辑页面失败', 'danger')
+        current_app.logger.warning(f"访问资产编辑页面失败: {str(e)}", exc_info=True)
+        flash('访问资产编辑页面失败', 'warning')
         return redirect(url_for('assets.list_assets_page'))
 
 @assets_bp.route("/<string:token_symbol>/edit")
@@ -297,7 +298,7 @@ def edit_asset_by_symbol(token_symbol):
         
         if not (is_admin_user or is_owner):
             current_app.logger.warning(f"非管理员或所有者访问尝试：{eth_address}")
-            flash('您没有权限编辑此资产', 'danger')
+            flash('您没有权限编辑此资产', 'warning')
             return redirect(url_for('assets.asset_detail_by_symbol', token_symbol=token_symbol))
         
         # 如果资产已上链，不允许编辑
@@ -309,8 +310,8 @@ def edit_asset_by_symbol(token_symbol):
         return render_template('assets/edit.html', asset=asset, can_edit=True)
         
     except Exception as e:
-        current_app.logger.error(f"访问资产编辑页面失败: {str(e)}", exc_info=True)
-        flash('访问资产编辑页面失败', 'danger')
+        current_app.logger.warning(f"访问资产编辑页面失败: {str(e)}", exc_info=True)
+        flash('访问资产编辑页面失败', 'warning')
         return redirect(url_for('assets.list_assets_page'))
 
 @assets_bp.route('/proxy/<string:file_type>/<path:file_path>')
@@ -326,11 +327,11 @@ def proxy_file(file_type, file_path):
             return send_from_directory('static/uploads', file_path[8:])
             
         # 如果都不是，返回404
-        current_app.logger.error(f"文件不存在: {file_path}")
+        current_app.logger.warning(f"文件不存在: {file_path}")
         abort(404)
             
     except Exception as e:
-        current_app.logger.error(f"文件请求失败: {str(e)}")
+        current_app.logger.warning(f"文件请求失败: {str(e)}")
         abort(500)
 
 @assets_bp.route('/proxy-image/<path:image_path>')
@@ -397,15 +398,15 @@ def proxy_image(image_path):
                     file_path = path
                     break
             else:
-                current_app.logger.error(f"找不到图片: {image_path}")
-                current_app.logger.error(f"尝试的路径: {search_paths}")
+                current_app.logger.warning(f"找不到图片: {image_path}")
+                current_app.logger.warning(f"尝试的路径: {search_paths}")
                 abort(404)
         
         current_app.logger.info(f"尝试提供文件: {file_path}")
         
         # 检查文件是否存在
         if not os.path.isfile(file_path):
-            current_app.logger.error(f"文件不存在: {file_path}")
+            current_app.logger.warning(f"文件不存在: {file_path}")
             
             # 搜索整个uploads目录
             import glob
@@ -416,13 +417,13 @@ def proxy_image(image_path):
                 file_path = global_search[0]
                 current_app.logger.info(f"全局搜索找到文件: {file_path}")
             else:
-                current_app.logger.error(f"尝试的所有路径: {search_paths}")
-                current_app.logger.error(f"全局搜索未找到文件: {filename}")
+                current_app.logger.warning(f"尝试的所有路径: {search_paths}")
+                current_app.logger.warning(f"全局搜索未找到文件: {filename}")
                 abort(404)
         
         # 检查文件权限
         if not os.access(file_path, os.R_OK):
-            current_app.logger.error(f"文件无读取权限: {file_path}")
+            current_app.logger.warning(f"文件无读取权限: {file_path}")
             abort(403)
         
         # 获取MIME类型
@@ -440,8 +441,8 @@ def proxy_image(image_path):
         
     except Exception as e:
         import traceback
-        current_app.logger.error(f"代理图片错误: {str(e)}")
-        current_app.logger.error(traceback.format_exc())
+        current_app.logger.warning(f"代理图片错误: {str(e)}")
+        current_app.logger.warning(traceback.format_exc())
         abort(500)
 
 @assets_api_bp.route('/generate-token-symbol', methods=['POST'])
@@ -744,7 +745,7 @@ def dividend_page_by_symbol(token_symbol):
         
         if not (is_admin_user or is_owner):
             current_app.logger.warning(f"非管理员或所有者访问尝试：{eth_address}")
-            flash('您没有权限管理此资产的分红', 'danger')
+            flash('您没有权限管理此资产的分红', 'warning')
             return redirect(url_for('assets.asset_detail_by_symbol', token_symbol=token_symbol))
         
         # 计算剩余供应量
@@ -764,8 +765,8 @@ def dividend_page_by_symbol(token_symbol):
                               can_manage=True)
                               
     except Exception as e:
-        current_app.logger.error(f"访问资产分红页面失败: {str(e)}", exc_info=True)
-        flash('访问资产分红页面失败', 'danger')
+        current_app.logger.warning(f"访问资产分红页面失败: {str(e)}", exc_info=True)
+        flash('访问资产分红页面失败', 'warning')
         return redirect(url_for('assets.list_assets_page'))
 
 @assets_api_bp.route('/check_token_symbol')
@@ -845,3 +846,36 @@ def get_eth_address():
         current_app.logger.info(f'最终使用地址: {eth_address}')
     
     return eth_address
+
+@assets_bp.route('/<asset_id>/qrcode')
+def get_asset_qrcode(asset_id):
+    try:
+        asset = Asset.query.get(asset_id)
+        if not asset:
+            current_app.logger.warning(f"请求不存在的资产二维码: {asset_id}")
+            return jsonify({'success': False, 'message': '资产不存在'}), 404
+        
+        # 生成资产详情页的URL
+        asset_url = url_for('assets.asset_detail', asset_id=asset_id, _external=True)
+        
+        # 生成二维码
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(asset_url)
+        qr.make(fit=True)
+        
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # 将图像转换为BytesIO对象
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+        
+        return send_file(buffer, mimetype='image/png')
+    except Exception as e:
+        current_app.logger.warning(f"生成资产二维码失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'生成二维码失败: {str(e)}'}), 500
