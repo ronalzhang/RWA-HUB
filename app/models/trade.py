@@ -13,6 +13,8 @@ class TradeStatus(enum.Enum):
     PENDING = 'pending'    # 待处理
     COMPLETED = 'completed'  # 已完成
     FAILED = 'failed'  # 失败
+    PENDING_PAYMENT = 'pending_payment'  # 等待支付
+    PENDING_CONFIRMATION = 'pending_confirmation'  # 等待链上确认
 
 class Trade(db.Model):
     """交易记录模型"""
@@ -36,6 +38,7 @@ class Trade(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     gas_used = db.Column(db.Numeric, nullable=True)  # 交易使用的gas量
     is_self_trade = db.Column(db.Boolean, nullable=False, default=False)  # 是否是自交易(和自己交易)
+    payment_details = db.Column(db.Text)  # 支付详情，JSON格式
 
     # 添加与 Asset 的关系
     asset = db.relationship("Asset", back_populates="trades")
