@@ -63,10 +63,10 @@
                 {% for asset in assets %}
                 <div class="col-md-4" data-aos="fade-up" data-aos-delay="{{ loop.index * 100 }}">
                     {% if asset.status == 2 %}
-                    <div class="text-decoration-none home-asset-card-clickable" 
+                    <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" 
+                       class="text-decoration-none home-asset-card-link"
                        data-token-symbol="{{ asset.token_symbol }}"
-                       data-href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}"
-                       onclick="handleHomeAssetCardClick(event, this)">
+                       onclick="forceHomeAssetCardClick(event, this)">
                         <div class="card h-100">
                             <!-- Asset Image -->
                             <div class="position-relative">
@@ -127,7 +127,7 @@
                                 </p>
                             </div>
                         </div>
-                    </div>
+                    </a>
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -269,7 +269,7 @@
         console.log("资产卡片处理完成");
         
         // 可以选择性保留调试日志，或移除
-        const assetLinks = document.querySelectorAll('.home-asset-card-clickable');
+        const assetLinks = document.querySelectorAll('.home-asset-card-link');
         assetLinks.forEach(link => {
             link.addEventListener('click', function(e) {
                 const tokenSymbol = this.getAttribute('data-token-symbol'); // data-token-symbol 可能在a标签上没有，需要确认
@@ -306,8 +306,35 @@
     }
 </script>
 
+<!-- 全局点击处理函数 -->
+<script>
+    // 强制资产卡片点击处理 - 全局函数
+    function forceHomeAssetCardClick(event, element) {
+        // 防止默认行为
+        event.preventDefault();
+        
+        // 获取原始href
+        const url = element.href;
+        const tokenSymbol = element.getAttribute('data-token-symbol');
+        
+        console.log('首页资产卡片强制点击:', tokenSymbol);
+        console.log('目标URL:', url);
+        
+        // 检查是否是资产详情URL
+        if (url.indexOf('/assets/') === -1) {
+            console.error('无效的资产详情URL:', url);
+            return false;
+        }
+        
+        // 使用window.open打开新页面，确保完全避开可能的缓存或历史问题
+        window.open(url, '_self');
+        
+        return false;
+    }
+</script>
+
 <style>
-    /* 移除 .home-asset-card-clickable 样式 */
+    /* 移除 .home-asset-card-link 样式 */
 </style>
 </div>
 {% endblock %}

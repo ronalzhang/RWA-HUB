@@ -18,10 +18,10 @@
             {% for asset in assets %}
             <div class="col-md-4">
                 {% if asset.status == 2 %}
-                <div class="text-decoration-none asset-card-clickable" 
+                <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" 
+                   class="text-decoration-none asset-card-link"
                    data-token-symbol="{{ asset.token_symbol }}"
-                   data-href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}"
-                   onclick="handleAssetCardClick(event, this)">
+                   onclick="forceAssetCardClick(event, this)">
                     <div class="card h-100">
                         <!-- 资产图片 -->
                         <div class="position-relative">
@@ -82,7 +82,7 @@
                             </p>
                         </div>
                     </div>
-                </div>
+                </a>
                 {% endif %}
             </div>
             {% endfor %}
@@ -255,6 +255,33 @@
             return false;
         }
     });
+</script>
+
+<!-- 全局点击处理函数 -->
+<script>
+    // 强制资产卡片点击处理 - 全局函数
+    function forceAssetCardClick(event, element) {
+        // 防止默认行为
+        event.preventDefault();
+        
+        // 获取原始href
+        const url = element.href;
+        const tokenSymbol = element.getAttribute('data-token-symbol');
+        
+        console.log('资产卡片强制点击:', tokenSymbol);
+        console.log('目标URL:', url);
+        
+        // 检查是否是资产详情URL
+        if (url.indexOf('/assets/') === -1) {
+            console.error('无效的资产详情URL:', url);
+            return false;
+        }
+        
+        // 使用window.open打开新页面，确保完全避开可能的缓存或历史问题
+        window.open(url, '_self');
+        
+        return false;
+    }
 </script>
 {% endblock %}
 
