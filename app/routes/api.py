@@ -39,7 +39,8 @@ from app.models.referral import UserReferral, CommissionRecord, DistributionSett
 from decimal import Decimal, ROUND_HALF_UP
 from app.tasks import monitor_creation_payment # 假设后台任务在这里定义
 
-api_bp = Blueprint('api', __name__)
+# 从__init__.py中导入api_bp，而不是重新定义
+from app.routes import api_bp
 
 # 允许的文件扩展名
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'webp'}
