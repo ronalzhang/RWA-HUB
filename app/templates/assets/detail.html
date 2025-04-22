@@ -1714,18 +1714,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     console.log("准备确认购买:", purchaseData);
                     
-                    // 调用wallet.js中的confirmPurchase函数执行购买
+                    // 调用全局的confirmPurchase函数执行购买
                     if (typeof window.confirmPurchase === 'function') {
                         // 使用全局confirmPurchase函数
                         await window.confirmPurchase(purchaseData, document.getElementById('buyModal'), confirmButton);
-                    } else if (typeof window.walletState.confirmPurchase === 'function') {
-                        // 或者使用钱包状态中的confirmPurchase方法
-                        await window.walletState.confirmPurchase(purchaseData);
                     } else {
                         throw new Error('{{ _("Purchase function not available") }}');
                     }
-                    
-                    // 隐藏模态框 (成功情况下将在confirmPurchase函数中处理)
                     
                 } catch (error) {
                     console.error('确认购买失败:', error);
@@ -1747,7 +1742,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 更新确认模态框，移除平台费和卖家支付信息
             const buyModalHtml = `
                 <div class="modal fade" id="buyModal" tabindex="-1" aria-labelledby="buyModalLabel" aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
                                 <h5 class="modal-title" id="buyModalLabel">{{ _("Confirm Purchase") }}</h5>
@@ -1755,28 +1750,33 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                             <div class="modal-body">
                                 <div class="mb-3">
-                                    <label for="confirm-amount" class="form-label">{{ _("Amount") }}</label>
+                                    <label for="confirm-amount" class="form-label">{{ _("Purchase Amount") }}</label>
                                     <input type="text" class="form-control" id="confirm-amount" readonly>
                                 </div>
                                 <div class="mb-3">
-                                    <label for="confirm-total" class="form-label">{{ _("Total Payment") }}</label>
+                                    <label for="confirm-total" class="form-label">{{ _("Total Cost") }}</label>
                                     <input type="text" class="form-control" id="confirm-total" readonly>
                                 </div>
-                                <div class="alert alert-info">
-                                    {{ _("By confirming this purchase, you agree to pay the total amount shown above. Make sure your wallet has enough USDC for this transaction.") }}
-                                </div>
+                                
+                                <!-- 错误信息显示区域 -->
+                                <div id="buyModalError" class="alert alert-danger" style="display: none;"></div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _("Cancel") }}</button>
-                                <button type="button" class="btn btn-primary" onclick="confirmPurchase()">{{ _("Confirm Purchase & Pay") }}</button>
+                                <button type="button" class="btn btn-primary" id="confirmPurchaseBtn">{{ _("Confirm Purchase & Pay") }}</button>
                             </div>
                         </div>
                     </div>
                 </div>
             `;
-
-            // 将模态框添加到页面
-            document.body.insertAdjacentHTML('beforeend', buyModalHtml);
+            
+            // 确保模态框HTML已添加到页面，仅添加一次
+            if (!document.getElementById('buyModal')) {
+                document.body.insertAdjacentHTML('beforeend', buyModalHtml);
+                
+                // 使用事件监听器而不是内联onclick
+                document.getElementById('confirmPurchaseBtn').addEventListener('click', confirmPurchase);
+            }
 
             // 添加单独刷新钱包资产列表的函数 - 使用全局loadUserAssets函数替代
             function refreshWalletAssets() {

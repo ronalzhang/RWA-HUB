@@ -3633,3 +3633,116 @@ function showError(message, container = null) {
          alert(message); // Simple alert fallback
      }
 }
+
+// 将confirmPurchase函数设置为全局函数以便于其他模块调用
+window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) {
+    console.log("全局confirmPurchase调用，数据:", purchaseData);
+    const modalErrorDiv = modalElement?.querySelector('#buyModalError');
+    if (modalErrorDiv) modalErrorDiv.style.display = 'none'; // 清除之前的错误
+
+    if (confirmBtn) setButtonLoading(confirmBtn, '处理中...');
+    showLoadingState('通过钱包处理付款中...');
+
+    try {
+        // 提取必要数据（确保字段名称与API响应匹配）
+        const recipient = purchaseData.recipient_address;
+        const totalAmount = parseFloat(purchaseData.total_cost); // 使用total_cost进行转账
+        const assetId = purchaseData.asset_id;
+        const purchaseAmount = parseInt(purchaseData.amount); // 代币数量
+
+        if (!recipient || isNaN(totalAmount) || totalAmount <= 0 || !assetId || isNaN(purchaseAmount) || purchaseAmount <= 0) {
+            throw new Error('确认的购买数据无效');
+        }
+
+        console.log(`尝试向${recipient}转账${totalAmount} USDC`);
+
+        // --- 步骤1: 钱包转账 ---
+        const signature = await walletState.transferSolanaToken('USDC', recipient, totalAmount);
+
+        if (!signature) {
+            // 转账失败或被用户拒绝
+            throw new Error('钱包转账失败或被取消');
+        }
+        
+        console.log(`钱包转账成功。签名: ${signature}`);
+        showLoadingState(`完成购买...`); // 更新加载信息
+
+        // --- 步骤2: 在后端执行购买 ---
+        const executeResponse = await fetch('/api/trades/confirm_payment', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Wallet-Address': walletState.address // 发送钱包地址
+            },
+            body: JSON.stringify({
+                asset_id: assetId,
+                amount: purchaseAmount, // 发送购买的代币数量
+                signature: signature // 发送Solana交易签名
+            })
+        });
+
+        if (!executeResponse.ok) {
+             let errorMsg = `完成购买失败。状态: ${executeResponse.status}`;
+            try {
+                const errData = await executeResponse.json();
+                errorMsg = errData.error || errorMsg;
+            } catch (e) { /* 忽略JSON解析错误 */ }
+            throw new Error(errorMsg);
+        }
+
+        const executeData = await executeResponse.json();
+        console.log('购买成功执行:', executeData);
+
+        // --- 成功 ---
+        if (modalElement) {
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            if (modal) modal.hide();
+        }
+        showSuccess(executeData.message || '购买成功!');
+        
+        // 刷新页面数据
+        if (window.refreshAssetInfoNow) {
+            window.refreshAssetInfoNow();
+        } else {
+            setTimeout(() => window.location.reload(), 2000); // 2秒后简单刷新
+        }
+
+    } catch (error) {
+        console.error('购买确认失败:', error);
+        // 在模态框内显示错误
+        if (modalErrorDiv) {
+            modalErrorDiv.textContent = error.message || '确认过程中发生意外错误';
+            modalErrorDiv.style.display = 'block';
+        } else {
+            showError(error.message || '确认过程中发生意外错误');
+        }
+    } finally {
+        hideLoadingState();
+        if (confirmBtn) resetButton(confirmBtn); // 重置模态框的确认按钮
+    }
+};
+
+// 确保在DOM加载完成后连接钱包
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('页面加载完成，初始化钱包...');
+    
+    // 初始化钱包状态
+    if (window.walletState) {
+        walletState.init().catch(e => console.error('钱包初始化失败:', e));
+    }
+    
+    // 确保全局函数可用
+    if (!window.showLoadingState) {
+        window.showLoadingState = function(message) {
+            console.log('显示加载状态:', message);
+            // 实现加载状态显示逻辑
+        };
+    }
+    
+    if (!window.hideLoadingState) {
+        window.hideLoadingState = function() {
+            console.log('隐藏加载状态');
+            // 实现隐藏加载状态逻辑
+        };
+    }
+});
