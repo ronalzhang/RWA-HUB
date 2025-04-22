@@ -536,6 +536,7 @@ def get_trades():
                 'total': float(trade.total) if trade.total else 0,
                 'status': trade.status,
                 'trader_address': trade.trader_address,
+                'tx_hash': trade.tx_hash,
                 'created_at': trade.created_at.strftime('%Y-%m-%d %H:%M:%S') if trade.created_at else None
             }
             trade_list.append(trade_dict)
@@ -3147,68 +3148,128 @@ def confirm_payment(trade_id):
         current_app.logger.error(f"确认支付失败 (Trade ID: {trade_id}): {str(e)}")
         return jsonify({'success': False, 'error': f'确认支付失败: {str(e)}'}), 500
 
+# 新增：执行购买接口
+@api_bp.route('/trades/execute_purchase', methods=['POST'])
+@eth_address_required
+def execute_purchase():
+    """接收前端传来的钱包交易信息，完成资产购买确认"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '无效的请求数据'}), 400
+
+        asset_id = data.get('asset_id')
+        amount = data.get('amount')
+        signature = data.get('signature')  # Solana交易签名
+
+        if not all([asset_id, amount, signature]):
+            return jsonify({'success': False, 'error': '缺少必要参数 (asset_id, amount, signature)'}), 400
+
+        # 参数验证
+        try:
+            asset_id = int(asset_id)
+            amount = int(amount)  # 购买数量应该是整数
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': '无效的数字格式'}), 400
+
+        if amount <= 0:
+            return jsonify({'success': False, 'error': '购买数量必须为正数'}), 400
+
+        # 获取资产信息
+        asset = Asset.query.get(asset_id)
+        if not asset:
+            return jsonify({'success': False, 'error': '资产不存在'}), 404
+
+        # 获取买家钱包地址
+        buyer_address = g.eth_address
+
+        # 查找该用户最近的待支付交易
+        pending_trade = Trade.query.filter_by(
+            asset_id=asset_id,
+            trader_address=buyer_address,
+            type='buy',
+            status=TradeStatus.PENDING_PAYMENT.value
+        ).order_by(Trade.created_at.desc()).first()
+
+        if not pending_trade:
+            return jsonify({'success': False, 'error': '未找到待支付的交易'}), 404
+
+        # 验证交易金额是否匹配
+        if pending_trade.amount != Decimal(str(amount)):
+            current_app.logger.warning(f"交易金额不匹配: 预期 {pending_trade.amount}, 收到 {amount}")
+            return jsonify({
+                'success': False, 
+                'error': f'交易金额不匹配 (预期: {pending_trade.amount}, 收到: {amount})'
+            }), 400
+
+        # 更新交易记录
+        pending_trade.tx_hash = signature
+        pending_trade.status = TradeStatus.PENDING_CONFIRMATION.value  # 更新状态为等待链上确认
+        
+        # 更新交易详情
+        details = json.loads(pending_trade.payment_details) if pending_trade.payment_details else {}
+        details['payment_executed_at'] = datetime.utcnow().isoformat()
+        details['signature'] = signature
+        pending_trade.payment_details = json.dumps(details)
+
+        # 可以在这里添加特定链的交易验证逻辑
+        # TODO: 验证Solana交易是否有效
+        
+        # 为了快速测试，直接将交易标记为已完成
+        # 在生产环境中，应该通过后台任务验证交易后再标记为已完成
+        pending_trade.status = TradeStatus.COMPLETED.value
+        pending_trade.completed_at = datetime.utcnow()
+
+        db.session.commit()
+
+        current_app.logger.info(f"购买执行成功 (Trade ID: {pending_trade.id}, Asset: {asset_id}, 金额: {amount}, 签名: {signature})")
+
+        # TODO: 在这里触发后台任务，监控交易最终确认并更新资产所有权
+        # from app.tasks import monitor_and_complete_purchase # 示例
+        # monitor_and_complete_purchase.delay(pending_trade.id, signature)
+
+        return jsonify({
+            'success': True,
+            'trade_id': pending_trade.id,
+            'message': '购买交易已成功执行，资产将在几分钟内更新'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"执行购买失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'执行购买失败: {str(e)}'}), 500
+
 @api_bp.route('/user/wallet/balance', endpoint='get_user_wallet_balance')
 def get_user_wallet_balance():
-    """
-    获取钱包余额
-    支持从URL参数、请求头或Cookie获取地址
-    优先级：URL参数 > 请求头 > Cookie
-    """
+    """获取用户钱包的USDC和SOL余额"""
+    address = request.args.get('address')
+    wallet_type = request.args.get('wallet_type', 'ethereum')
+    
+    if not address:
+        return jsonify({'success': False, 'error': '缺少钱包地址'}), 400
+    
+    current_app.logger.info(f'获取钱包余额请求 - 地址: {address}, 类型: {wallet_type}')
+    
     try:
-        # 初始化返回结构
+        # 创建返回结果
         balances = {
             'USDC': 0,
-            'SOL': 0,
-            'ETH': 0
+            'SOL': 0
         }
         
-        # 从多个来源获取地址
-        address = None
-        
-        # 尝试从请求参数获取
-        if request.args.get('address'):
-            address = request.args.get('address')
-            
-        # 尝试从请求头获取
-        if not address and request.headers.get('X-Eth-Address'):
-            address = request.headers.get('X-Eth-Address')
-            
-        # 尝试从Cookie获取
-        if not address and request.cookies.get('eth_address'):
-            address = request.cookies.get('eth_address')
-            
-        # 如果没有找到地址
-        if not address:
-            current_app.logger.warning('未提供钱包地址，返回默认值')
-            return jsonify({
-                'success': True,
-                'balance': balances['USDC'],
-                'balances': balances,
-                'currency': 'USDC',
-                'is_real_data': False
-            }), 400
-        
-        # 记录查询的地址（安全考虑，只显示部分地址）
-        safe_address = address[:4] + '...' + address[-4:] if len(address) > 8 else address
-        current_app.logger.info(f'查询钱包余额: {safe_address}')
-        
-        # 检测钱包类型
-        wallet_type = request.args.get('wallet_type', 'ethereum')
-        if address.startswith('0x'):
-            wallet_type = 'ethereum'
-        else:
-            wallet_type = 'solana'
-        
-        current_app.logger.info(f'钱包类型: {wallet_type}')
-        
-        # 根据钱包类型获取余额
-        if wallet_type == 'solana':
+        # 根据钱包类型设置不同余额
+        if wallet_type == 'phantom':
+            # 查询Solana钱包的SOL余额
             try:
-                # 导入Solana客户端
-                from app.blockchain.solana import get_sol_balance
+                # 导入区块链客户端
+                from app.blockchain.solana import SolanaClient
+                
+                # 创建只读Solana客户端实例，用于查询用户钱包
+                solana_client = SolanaClient(wallet_address=address)
                 
                 # 获取SOL余额
-                sol_balance = get_sol_balance(address)
+                sol_balance = solana_client.get_balance()
+                
                 if sol_balance is not None:
                     balances['SOL'] = sol_balance
                     current_app.logger.info(f'SOL余额: {sol_balance}')
