@@ -22,9 +22,9 @@ python issue_asset.py --name <资产名称> --type <资产类型> --blockchain <
 - `--name, -n`: 资产名称（必填）
 - `--type, -t`: 资产类型（必填），支持的类型:
   - real_estate: 不动产
+  - similar_assets: 类似资产
   - art: 艺术品
   - commodity: 商品
-  - fund: 基金
   - bond: 债券
   - stock: 股票
 - `--description, -d`: 资产描述（可选）
