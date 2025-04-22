@@ -121,3 +121,14 @@ app/docs/
 # 允许docs目录
 !docs/
 !docs/*
+
+# 备份目录
+/backups/
+/archived_backups/
+
+# 临时脚本和工具
+/load_db_config.py
+
+# 本地环境文件
+.env.local
+.env.development
