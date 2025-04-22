@@ -2538,7 +2538,16 @@ def execute_transfer():
                 
         token_symbol = data.get('token_symbol')
         to_address = data.get('to_address')
-        amount = float(data.get('amount'))
+        
+        # 数字格式处理
+        try:
+            amount_str = data.get('amount')
+            amount = float(amount_str) if isinstance(amount_str, str) else data.get('amount')
+            current_app.logger.info(f"金额转换: 原始值={amount_str}, 类型={type(amount_str)}, 转换后={amount}, 类型={type(amount)}")
+        except Exception as e:
+            current_app.logger.error(f"金额转换失败: {str(e)}, 原始值: {data.get('amount')}")
+            return jsonify({'success': False, 'error': f'无效的金额格式: {data.get("amount")}'}), 400
+        
         from_address = data.get('from_address')
         
         # 验证发送方地址匹配已连接的钱包地址
@@ -3013,34 +3022,31 @@ def prepare_purchase():
         amount_str = data.get('amount') # 前端传递购买的数量
 
         if not all([asset_id, amount_str]):
-            return jsonify({'success': False, 'error': '缺少必要参数 (asset_id, amount)'}), 400
-
-        # 参数校验
-        try:
-            asset_id = int(asset_id)
-            amount = Decimal(amount_str)
-        except (ValueError, TypeError):
-            return jsonify({'success': False, 'error': '无效的数字格式'}), 400
+            return jsonify({'success': False, 'error': '缺少必要参数'}), 400
             
-        if amount <= 0:
-            return jsonify({'success': False, 'error': '购买数量必须为正数'}), 400
+        try:
+            # 确保金额是有效的浮点数或整数
+            amount = float(amount_str) if isinstance(amount_str, str) else amount_str
+            if not isinstance(amount, (int, float)) or amount <= 0:
+                raise ValueError(f"金额必须大于0，当前值: {amount}")
+        except Exception as e:
+            current_app.logger.error(f"金额转换失败: {str(e)}, 原始值: {amount_str}")
+            return jsonify({'success': False, 'error': f'无效的数字格式: {amount_str}'}), 400
 
         # 获取资产信息
         asset = Asset.query.get(asset_id)
         if not asset:
-            return jsonify({'success': False, 'error': '资产不存在'}), 404
+            return jsonify({'success': False, 'error': '找不到指定资产'}), 404
+
+        if asset.status != AssetStatus.ACTIVE.value:
+            return jsonify({'success': False, 'error': '该资产当前不可交易'}), 400
+
+        # 使用户钱包地址，优先使用g.eth_address (通过eth_address_required装饰器设置)
+        trader_address = g.eth_address
+        if not trader_address:
+            return jsonify({'success': False, 'error': '未提供交易者钱包地址'}), 400
             
-        # 确保资产价格有效
-        if asset.token_price is None or asset.token_price <= 0:
-             return jsonify({'success': False, 'error': '资产价格无效'}), 400
-             
-        price = Decimal(asset.token_price)
-
-        # 检查资产状态是否允许交易
-        if asset.status != AssetStatus.ON_CHAIN.value:
-             return jsonify({'success': False, 'error': '资产当前状态不允许交易'}), 400
-
-        # TODO: 再次检查购买数量是否超过剩余供应量 (需要可靠的链上数据源)
+        current_app.logger.info(f"准备购买 - 用户: {trader_address}, 资产: {asset.id}, 数量: {amount}")
 
         # 从配置读取平台费率 (基点, e.g., 350 for 3.5%) 和平台收款地址
         platform_fee_basis_points = get_config_value('PLATFORM_FEE_BASIS_POINTS', default=350, required=True) # 示例：默认3.5%

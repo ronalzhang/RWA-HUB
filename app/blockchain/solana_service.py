@@ -274,9 +274,16 @@ def execute_transfer_transaction(
             
         if not to_address or not isinstance(to_address, str) or len(to_address) < 32:
             raise ValueError(f"无效的接收方地址: {to_address}")
-            
-        if not amount or not isinstance(amount, (int, float)) or amount <= 0:
-            raise ValueError(f"无效的转账金额: {amount}")
+        
+        # 确保金额是浮点数    
+        try:
+            if isinstance(amount, str):
+                amount = float(amount)
+            if not isinstance(amount, (int, float)) or amount <= 0:
+                raise ValueError(f"无效的转账金额: {amount}")
+        except Exception as e:
+            logger.error(f"金额转换失败: {str(e)}, 原始值: {amount}, 类型: {type(amount)}")
+            raise ValueError(f"无效的转账金额格式: {amount}")
         
         # 创建交易所需参数
         logger.info("准备创建交易参数...")
