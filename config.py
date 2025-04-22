@@ -2,7 +2,13 @@
 SOLANA_PROGRAM_ID = os.environ.get('SOLANA_PROGRAM_ID', 'rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX') # 示例ID，请替换
 
 # 新增：平台手续费基点 (例如 100 代表 1%)
-PLATFORM_FEE_BASIS_POINTS = int(os.environ.get('PLATFORM_FEE_BASIS_POINTS', '100'))
+PLATFORM_FEE_BASIS_POINTS = int(os.environ.get('PLATFORM_FEE_BASIS_POINTS', '150'))
+
+# 购买合约地址
+PURCHASE_CONTRACT_ADDRESS = os.environ.get('PURCHASE_CONTRACT_ADDRESS', 'rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
+
+# 平台手续费收款地址
+PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd')
 
 # 其他配置...
 # 如果有其他配置类，请确保添加到合适的类中或保持在全局 
