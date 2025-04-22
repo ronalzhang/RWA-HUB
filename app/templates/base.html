@@ -1283,23 +1283,7 @@
     
     <!-- 添加加载状态控制函数 -->
     <script>
-        function showLoadingState(message = '{{ _("Processing...") }}') {
-            const overlay = document.getElementById('loadingOverlay');
-            const msgElement = document.getElementById('loadingMessage');
-            if (overlay) {
-                if (msgElement) {
-                    msgElement.textContent = message;
-                }
-                overlay.style.display = 'flex'; // 使用 flex 居中
-            }
-        }
-
-        function hideLoadingState() {
-            const overlay = document.getElementById('loadingOverlay');
-            if (overlay) {
-                overlay.style.display = 'none';
-            }
-        }
+        // 移除此处重复的showLoadingState和hideLoadingState函数，使用下方的定义
         
         // --- 新增按钮状态控制函数 ---
         function setButtonLoading(button, loadingText = '{{ _("Processing...") }}') {
