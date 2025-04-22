@@ -304,14 +304,14 @@ document.addEventListener('DOMContentLoaded', function() {
         <script type="text/javascript">
             // 初始化资产配置
             var ASSET_CONFIG = {};
-            ASSET_CONFIG.id = {{ asset.id }};
+            ASSET_CONFIG.id = parseInt("{{ asset.id }}");
             ASSET_CONFIG.tokenSymbol = "{{ asset.token_symbol }}";
-            ASSET_CONFIG.tokenSupply = {{ asset.token_supply }};
-            ASSET_CONFIG.remainingSupply = {{ remaining_supply }};
-            ASSET_CONFIG.pricePerToken = {{ asset.price_per_token }};
-            ASSET_CONFIG.status = {{ asset.status }};
+            ASSET_CONFIG.tokenSupply = parseFloat("{{ asset.token_supply }}");
+            ASSET_CONFIG.remainingSupply = parseFloat("{{ remaining_supply }}");
+            ASSET_CONFIG.pricePerToken = parseFloat("{{ asset.price_per_token }}");
+            ASSET_CONFIG.status = parseInt("{{ asset.status }}");
             ASSET_CONFIG.platformFeeAddress = "{{ platform_fee_address }}";
-            ASSET_CONFIG.platformFeeRate = {{ PLATFORM_FEE_RATE }};
+            ASSET_CONFIG.platformFeeRate = parseFloat("{{ PLATFORM_FEE_RATE }}");
 
             // 当前资产对象，用于全局引用
             var currentAsset = {
@@ -359,15 +359,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 try {
                     console.log('页面已加载，初始化资产详情页...');
                     
-                    // 初始化资产配置 - 使用已定义的变量，避免重复定义
-                    ASSET_CONFIG.id = {{ asset.id }};
+                    // 初始化资产配置 - 确保类型正确
+                    ASSET_CONFIG.id = parseInt("{{ asset.id }}");
                     ASSET_CONFIG.tokenSymbol = "{{ asset.token_symbol }}";
-                    ASSET_CONFIG.tokenSupply = {{ asset.token_supply }};
-                    ASSET_CONFIG.remainingSupply = {{ remaining_supply }};
-                    ASSET_CONFIG.pricePerToken = {{ asset.price_per_token }};
-                    ASSET_CONFIG.status = {{ asset.status }};
+                    ASSET_CONFIG.tokenSupply = parseFloat("{{ asset.token_supply }}");
+                    ASSET_CONFIG.remainingSupply = parseFloat("{{ remaining_supply }}");
+                    ASSET_CONFIG.pricePerToken = parseFloat("{{ asset.price_per_token }}");
+                    ASSET_CONFIG.status = parseInt("{{ asset.status }}");
                     ASSET_CONFIG.platformFeeAddress = "{{ platform_fee_address }}";
-                    ASSET_CONFIG.platformFeeRate = {{ PLATFORM_FEE_RATE }};
+                    ASSET_CONFIG.platformFeeRate = parseFloat("{{ PLATFORM_FEE_RATE }}");
                     
                     // 初始化刷新按钮
                     initRefreshButton();
@@ -1357,6 +1357,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
+                // 设置加载超时
+                const timeout = 10000; // 10秒超时
+                let didTimeout = false;
+                const timeoutId = setTimeout(() => {
+                    didTimeout = true;
+                    console.warn('{{ _("Loading total dividends timed out") }}');
+                    totalDividendsElement.innerHTML = '<span class="text-warning">{{ _("Timeout") }}</span>';
+                }, timeout);
+                
                 try {
                     console.log('{{ _("Loading total dividend information...") }}');
                     
@@ -1377,6 +1386,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 获取资产分红统计信息
                     const response = await fetch(`/api/assets/symbol/${tokenSymbol}/dividend_stats`);
                     
+                    // 清除超时定时器
+                    clearTimeout(timeoutId);
+                    
+                    // 如果已经超时，则不更新UI
+                    if (didTimeout) return;
+                    
                     if (!response.ok) {
                         console.error('{{ _("Dividend data API request failed") }}:', response.status, response.statusText);
                         throw new Error(`{{ _("Failed to load dividend stats") }}: ${response.status}`);
@@ -1393,8 +1408,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         totalDividendsElement.innerHTML = '0 USDC';
                     }
                 } catch (error) {
-                    console.error('{{ _("Failed to load total dividend information") }}:', error);
-                    totalDividendsElement.innerHTML = '{{ _("Failed to load") }}';
+                    // 清除超时定时器
+                    clearTimeout(timeoutId);
+                    
+                    // 如果没有超时，则显示错误信息
+                    if (!didTimeout) {
+                        console.error('{{ _("Failed to load total dividend information") }}:', error);
+                        totalDividendsElement.innerHTML = '<span class="text-danger">{{ _("Failed to load") }}</span>';
+                    }
                 }
             }
 
@@ -2234,7 +2255,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         <div class="col-md-6">
                             <p><strong>{{ _('Total Distributed') }}:</strong> <span id="totalDividendsDistributed">{{ _('Loading') }}...</span></p>
-                            <p><strong>{{ _('Next Distribution') }}:</strong> {{ asset.next_dividend_date|default(_('To be announced'), true) }}</p>
+                            <p><strong>{{ _('Next Distribution') }}:</strong> {{ asset.next_dividend_date|default('TBA', true) }}</p>
                                 </div>
                             </div>
                     
@@ -3348,5 +3369,4 @@ window.transferUSDC = transferUSDC;
              console.log('Initial status is final. Polling not required.');
         }
     });
-</div>
 
