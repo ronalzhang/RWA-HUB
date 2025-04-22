@@ -1742,28 +1742,46 @@ document.addEventListener('DOMContentLoaded', function() {
             // 更新确认模态框，移除平台费和卖家支付信息
             const buyModalHtml = `
                 <div class="modal fade" id="buyModal" tabindex="-1" aria-labelledby="buyModalLabel" aria-hidden="true">
-                    <div class="modal-dialog">
+                    <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content">
                             <div class="modal-header">
                                 <h5 class="modal-title" id="buyModalLabel">{{ _("Confirm Purchase") }}</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
-                                <div class="mb-3">
-                                    <label for="confirm-amount" class="form-label">{{ _("Purchase Amount") }}</label>
-                                    <input type="text" class="form-control" id="confirm-amount" readonly>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="confirm-total" class="form-label">{{ _("Total Cost") }}</label>
-                                    <input type="text" class="form-control" id="confirm-total" readonly>
-                                </div>
-                                
+                                <p>{{ _('Please review the details before confirming your purchase:') }}</p>
+                                <ul class="list-group list-group-flush mb-3">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Asset') }}: <strong id="modalAssetName"></strong>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Amount (Tokens)') }}: <strong id="modalAmount"></strong>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Price per Token') }}: <span id="modalPricePerToken"></span> USDC
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Subtotal') }}: <span id="modalSubtotal"></span> USDC
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Platform Fee') }}: <span id="modalFee"></span> USDC
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center fs-5">
+                                        <strong>{{ _('Total Cost') }}:</strong> <strong id="modalTotalCost" class="text-primary"></strong> <strong class="text-primary">USDC</strong>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center" style="font-size: 0.8em; color: #6c757d;">
+                                        <span class="me-2">{{ _('Recipient Address') }}:</span> <code id="modalRecipientAddress" class="text-break" style="font-size: 0.9em;"></code>
+                                    </li>
+                                </ul>
                                 <!-- 错误信息显示区域 -->
                                 <div id="buyModalError" class="alert alert-danger" style="display: none;"></div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _("Cancel") }}</button>
-                                <button type="button" class="btn btn-primary" id="confirmPurchaseBtn">{{ _("Confirm Purchase & Pay") }}</button>
+                                <button type="button" class="btn btn-primary" id="confirmPurchaseBtn">
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                                    {{ _("Confirm Purchase & Pay") }}
+                                </button>
                             </div>
                         </div>
                     </div>

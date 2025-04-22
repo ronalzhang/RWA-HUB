@@ -3436,10 +3436,30 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
             console.log('购买准备成功:', prepareData);
 
             // 确保prepareData包含必要的字段
-            if (!prepareData.asset_name) prepareData.asset_name = document.querySelector('h4')?.textContent || '未知资产';
-            prepareData.price_per_token = pricePerToken || prepareData.price_per_token || 0;
+            if (!prepareData.asset_name) prepareData.asset_name = document.querySelector('.asset-name, h1, h2, h3, h4')?.textContent?.trim() || '未知资产';
+            
+            // 确保价格数据正确
+            prepareData.price_per_token = parseFloat(pricePerToken) || prepareData.price_per_token || 0;
+            prepareData.amount = parseInt(amount);
             prepareData.asset_id = assetId;
-            prepareData.amount = amount;
+            
+            // 计算小计（如果API没有提供）
+            if (!prepareData.subtotal && prepareData.price_per_token && prepareData.amount) {
+                prepareData.subtotal = prepareData.price_per_token * prepareData.amount;
+            }
+            
+            // 确保总成本有值
+            if (!prepareData.total_cost && prepareData.total_amount) {
+                prepareData.total_cost = prepareData.total_amount;
+            } else if (!prepareData.total_cost && prepareData.subtotal) {
+                // 如果没有平台费用数据，但有小计，则使用小计作为总成本
+                prepareData.total_cost = prepareData.subtotal;
+            }
+            
+            // 确保接收地址存在
+            if (!prepareData.recipient_address && prepareData.seller_address) {
+                prepareData.recipient_address = prepareData.seller_address;
+            }
 
             // 显示确认模态框
             showBuyModal(prepareData);
