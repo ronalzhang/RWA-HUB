@@ -88,6 +88,23 @@ if not in_app_environment:
     # 确保数据库表存在
     Base.metadata.create_all(engine)
 
+# 资产类型映射 - 数值到文本
+ASSET_TYPE_TO_TEXT = {
+    10: 'real_estate',
+    20: 'fund',
+    30: 'art',
+    40: 'commodity',
+    50: 'bond',
+    60: 'stock'
+}
+
+# 状态码映射
+STATUS_MAP = {
+    "active": 1,
+    "inactive": 0,
+    "pending": 2
+}
+
 def validate_ethereum_address(address):
     """验证以太坊地址格式"""
     if not address.startswith('0x'):
@@ -150,7 +167,10 @@ def update_asset_onchain(token_symbol, contract_address, tx_hash=None, status="a
         
         # 更新资产信息
         asset.token_address = contract_address
-        asset.status = status
+        
+        # 转换状态为数字状态码
+        status_code = STATUS_MAP.get(status.lower(), 2)  # 默认为pending (2)
+        asset.status = status_code
         
         # 更新区块链详情
         blockchain_details["onchain_update_time"] = datetime.utcnow().isoformat()
@@ -183,13 +203,30 @@ def display_updated_asset(asset):
     for c in asset.__table__.columns:
         value = getattr(asset, c.name)
         asset_dict[c.name] = value
+    
+    # 获取资产类型的文本描述
+    asset_type_value = asset_dict.get('asset_type')
+    if isinstance(asset_type_value, int) or (asset_type_value and str(asset_type_value).isdigit()):
+        asset_type_int = int(asset_type_value)
+        asset_type_text = ASSET_TYPE_TO_TEXT.get(asset_type_int, f"未知类型({asset_type_int})")
+    else:
+        asset_type_text = str(asset_type_value)
+    
+    # 获取状态文本
+    status_int = asset_dict.get('status')
+    if isinstance(status_int, int) or (status_int and str(status_int).isdigit()):
+        status_map_reverse = {v: k for k, v in STATUS_MAP.items()}
+        status_text = status_map_reverse.get(int(status_int), f"未知状态({status_int})")
+    else:
+        status_text = str(status_int)
         
     print("\n===== 资产已更新 =====")
     print(f"资产ID: {asset_dict['id']}")
     print(f"资产名称: {asset_dict['name']}")
+    print(f"资产类型: {asset_type_text} ({asset_dict['asset_type']})")
     print(f"代币符号: {asset_dict['token_symbol']}")
     print(f"代币地址: {asset_dict.get('token_address', 'N/A')}")
-    print(f"状态: {asset_dict['status']}")
+    print(f"状态: {status_text} ({asset_dict['status']})")
     print(f"部署交易哈希: {asset_dict.get('deployment_tx_hash', 'N/A')}")
     print(f"更新时间: {asset_dict['updated_at']}")
     
@@ -215,7 +252,10 @@ def list_assets(filter_status=None):
         # 查询资产
         query = session.query(Asset)
         if filter_status:
-            query = query.filter(Asset.status == filter_status)
+            # 转换状态文本为状态码
+            status_code = STATUS_MAP.get(filter_status.lower())
+            if status_code is not None:
+                query = query.filter(Asset.status == status_code)
         
         assets = query.all()
         
@@ -229,10 +269,26 @@ def list_assets(filter_status=None):
             for c in asset.__table__.columns:
                 value = getattr(asset, c.name)
                 asset_dict[c.name] = value
+            
+            # 获取资产类型的文本描述
+            asset_type_value = asset_dict.get('asset_type')
+            if isinstance(asset_type_value, int) or (asset_type_value and str(asset_type_value).isdigit()):
+                asset_type_int = int(asset_type_value)
+                asset_type_text = ASSET_TYPE_TO_TEXT.get(asset_type_int, f"未知类型({asset_type_int})")
+            else:
+                asset_type_text = str(asset_type_value)
+            
+            # 获取状态文本
+            status_int = asset_dict.get('status')
+            if isinstance(status_int, int) or (status_int and str(status_int).isdigit()):
+                status_map_reverse = {v: k for k, v in STATUS_MAP.items()}
+                status_text = status_map_reverse.get(int(status_int), f"未知状态({status_int})")
+            else:
+                status_text = str(status_int)
                 
             print(f"代币符号: {asset_dict['token_symbol']}")
             print(f"名称: {asset_dict['name']}")
-            print(f"类型: {asset_dict['asset_type']}")
+            print(f"类型: {asset_type_text} ({asset_dict['asset_type']})")
             
             # 尝试获取区块链信息
             blockchain = "未知"
@@ -244,7 +300,7 @@ def list_assets(filter_status=None):
                     pass
                     
             print(f"区块链: {blockchain}")
-            print(f"状态: {asset_dict['status']}")
+            print(f"状态: {status_text} ({asset_dict['status']})")
             print(f"代币地址: {asset_dict.get('token_address', '未设置')}")
             print("-" * 50)
     except Exception as e:

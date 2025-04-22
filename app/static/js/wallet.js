@@ -3686,10 +3686,10 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
         }
         
         console.log(`钱包转账成功。签名: ${signature}`);
-        showLoadingState(`完成购买...`); // 更新加载信息
+        showLoadingState(`完成购买...`); // 更新加载
 
         // --- 步骤2: 在后端执行购买 ---
-        const executeResponse = await fetch('/api/trades/confirm_payment', {
+        const executeResponse = await fetch('/api/trades/execute_purchase', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -3703,16 +3703,24 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
             })
         });
 
+        let executeData;
         if (!executeResponse.ok) {
-             let errorMsg = `完成购买失败。状态: ${executeResponse.status}`;
+            let errorMsg = `完成购买失败。状态: ${executeResponse.status}`;
             try {
-                const errData = await executeResponse.json();
-                errorMsg = errData.error || errorMsg;
-            } catch (e) { /* 忽略JSON解析错误 */ }
+                const errorText = await executeResponse.text();
+                console.error('服务器错误响应:', errorText);
+                try {
+                    const errData = JSON.parse(errorText);
+                    errorMsg = errData.error || errorMsg;
+                } catch (jsonError) {
+                    errorMsg = errorText || errorMsg;
+                }
+            } catch (e) { /* 忽略文本获取错误 */ }
             throw new Error(errorMsg);
+        } else {
+            executeData = await executeResponse.json();
         }
-
-        const executeData = await executeResponse.json();
+        
         console.log('购买成功执行:', executeData);
 
         // --- 成功 ---
@@ -3740,9 +3748,9 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
         }
     } finally {
         hideLoadingState();
-        if (confirmBtn) resetButton(confirmBtn); // 重置模态框的确认按钮
+        if (confirmBtn) resetButton(confirmBtn);
     }
-};
+}
 
 // 确保在DOM加载完成后连接钱包
 document.addEventListener('DOMContentLoaded', function() {

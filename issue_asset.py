@@ -94,17 +94,43 @@ if not in_app_environment:
     def generate_id():
         return str(uuid.uuid4())
 
+# 资产类型映射 - 文本到数值
+ASSET_TYPE_TO_CODE = {
+    'real_estate': 10,
+    'fund': 20,
+    'art': 30,
+    'commodity': 40,
+    'bond': 50,
+    'stock': 60
+}
+
+# 资产类型映射 - 数值到文本
+ASSET_TYPE_TO_TEXT = {
+    10: 'real_estate',
+    20: 'fund',
+    30: 'art',
+    40: 'commodity',
+    50: 'bond',
+    60: 'stock'
+}
+
 # 支持的资产类型
-ASSET_TYPES = ['real_estate', 'art', 'commodity', 'fund', 'bond', 'stock']
+ASSET_TYPES = list(ASSET_TYPE_TO_CODE.keys())
 # 支持的区块链
 BLOCKCHAINS = ['ethereum', 'solana', 'binance', 'polygon']
 
 def generate_token_symbol(asset_type, name):
     """根据资产类型和名称生成唯一的代币符号"""
-    prefix = asset_type[0].upper()
+    # 获取资产类型的第一个字母
+    if isinstance(asset_type, int):
+        text_type = ASSET_TYPE_TO_TEXT.get(asset_type, "unknown")
+        prefix = text_type[0].upper()
+    else:
+        prefix = asset_type[0].upper()
+        
     # 生成随机后缀
     suffix = str(uuid.uuid4().int)[:6]
-    return f"{prefix}{name[:2].upper()}-{suffix}"
+    return f"R{prefix}-{suffix}"
 
 def create_asset(name, asset_type, description, blockchain, issuer_address, metadata=None):
     """创建新资产"""
@@ -118,8 +144,16 @@ def create_asset(name, asset_type, description, blockchain, issuer_address, meta
         # 生成唯一ID
         asset_id = generate_id()
         
+        # 资产类型转换为数值
+        if isinstance(asset_type, str) and asset_type.lower() in ASSET_TYPE_TO_CODE:
+            asset_type_code = ASSET_TYPE_TO_CODE[asset_type.lower()]
+        elif isinstance(asset_type, int) and asset_type in ASSET_TYPE_TO_TEXT:
+            asset_type_code = asset_type
+        else:
+            asset_type_code = 10  # 默认为不动产
+        
         # 生成代币符号
-        token_symbol = generate_token_symbol(asset_type, name)
+        token_symbol = generate_token_symbol(asset_type_code, name)
         
         # 解析元数据
         meta_dict = {}
@@ -152,7 +186,7 @@ def create_asset(name, asset_type, description, blockchain, issuer_address, meta
             id=asset_id,
             name=name,
             description=description,
-            asset_type=asset_type.lower(),
+            asset_type=asset_type_code,
             token_symbol=token_symbol,
             location=location,
             area=area,
@@ -190,14 +224,22 @@ def display_asset_info(asset):
         value = getattr(asset, c.name)
         asset_dict[c.name] = value
     
+    # 获取资产类型的文本描述
+    asset_type_value = asset_dict.get('asset_type')
+    if isinstance(asset_type_value, int) or (asset_type_value and str(asset_type_value).isdigit()):
+        asset_type_int = int(asset_type_value)
+        asset_type_text = ASSET_TYPE_TO_TEXT.get(asset_type_int, f"未知类型({asset_type_int})")
+    else:
+        asset_type_text = str(asset_type_value)
+    
     print("\n===== 新资产已创建 =====")
     print(f"资产ID: {asset_dict['id']}")
     print(f"资产名称: {asset_dict['name']}")
-    print(f"资产类型: {asset_dict['asset_type']}")
+    print(f"资产类型: {asset_type_text} ({asset_dict['asset_type']})")
     print(f"代币符号: {asset_dict['token_symbol']}")
     print(f"状态: {asset_dict['status']}")
     
-    if asset_dict.get('asset_type', '').lower() == 'real_estate':
+    if asset_type_text == 'real_estate':
         print(f"\n----- 不动产信息 -----")
         print(f"位置: {asset_dict.get('location', 'N/A')}")
         print(f"面积: {asset_dict.get('area', 'N/A')}")
