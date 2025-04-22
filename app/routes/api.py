@@ -3142,11 +3142,28 @@ def confirm_payment(trade_id):
         trade.tx_hash = tx_hash # 存储智能合约交易哈希
         trade.status = TradeStatus.PENDING_CONFIRMATION.value # 更新状态为等待链上确认
         
-        # 可选：更新 payment_details
-        details = json.loads(trade.payment_details) if trade.payment_details else {}
-        details['payment_initiated_at'] = datetime.utcnow().isoformat()
-        details['initial_tx_hash'] = tx_hash
-        trade.payment_details = json.dumps(details)
+        # 更新交易详情 - 修复点：确保payment_details始终是JSON字符串
+        try:
+            if trade.payment_details and isinstance(trade.payment_details, str):
+                details = json.loads(trade.payment_details)
+            else:
+                details = {} if trade.payment_details is None else trade.payment_details
+                
+            if not isinstance(details, dict):
+                details = {}
+                
+            details['payment_initiated_at'] = datetime.utcnow().isoformat()
+            details['initial_tx_hash'] = tx_hash
+            # 确保序列化为JSON字符串
+            trade.payment_details = json.dumps(details)
+            current_app.logger.info(f"已更新交易详情: {trade.payment_details}")
+        except Exception as detail_error:
+            current_app.logger.error(f"更新交易详情时出错: {str(detail_error)}")
+            # 创建新的详情对象
+            trade.payment_details = json.dumps({
+                'payment_initiated_at': datetime.utcnow().isoformat(),
+                'initial_tx_hash': tx_hash
+            })
 
         db.session.commit()
 
@@ -3206,11 +3223,31 @@ def confirm_payment_from_post():
         pending_trade.tx_hash = signature
         pending_trade.status = TradeStatus.PENDING_CONFIRMATION.value  # 更新状态为等待链上确认
         
-        # 更新交易详情
-        details = json.loads(pending_trade.payment_details) if pending_trade.payment_details else {}
-        details['payment_executed_at'] = datetime.utcnow().isoformat()
-        details['signature'] = signature
-        pending_trade.payment_details = json.dumps(details)
+        # 更新交易详情 - 修复点：确保payment_details始终是JSON字符串
+        try:
+            if pending_trade.payment_details and isinstance(pending_trade.payment_details, str):
+                details = json.loads(pending_trade.payment_details)
+            else:
+                details = {} if pending_trade.payment_details is None else pending_trade.payment_details
+                
+            if not isinstance(details, dict):
+                details = {}
+                
+            details['payment_executed_at'] = datetime.utcnow().isoformat()
+            details['signature'] = signature
+            # 确保序列化为JSON字符串
+            pending_trade.payment_details = json.dumps(details)
+            current_app.logger.info(f"已更新交易详情: {pending_trade.payment_details}")
+        except Exception as detail_error:
+            current_app.logger.error(f"更新交易详情时出错: {str(detail_error)}")
+            # 创建新的详情对象
+            pending_trade.payment_details = json.dumps({
+                'payment_executed_at': datetime.utcnow().isoformat(),
+                'signature': signature,
+                'platform_fee_basis_points': 350,
+                'platform_address': "HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd",
+                'seller_address': pending_trade.recipient_address
+            })
         
         # 为了快速测试，直接将交易标记为已完成
         pending_trade.status = TradeStatus.COMPLETED.value
@@ -3237,45 +3274,43 @@ def confirm_payment_from_post():
 def execute_purchase():
     """接收前端传来的钱包交易信息，完成资产购买确认"""
     try:
+        # 获取请求数据
         data = request.get_json()
+        current_app.logger.info(f"收到execute_purchase请求: {data}")
+        
         if not data:
             return jsonify({'success': False, 'error': '无效的请求数据'}), 400
-
+            
+        # 验证必要参数
         asset_id = data.get('asset_id')
         amount = data.get('amount')
-        signature = data.get('signature')  # Solana交易签名
-
-        if not all([asset_id, amount, signature]):
-            return jsonify({'success': False, 'error': '缺少必要参数 (asset_id, amount, signature)'}), 400
-
-        # 参数验证
-        try:
-            asset_id = int(asset_id)
-            amount = int(amount)  # 购买数量应该是整数
-        except (ValueError, TypeError):
-            return jsonify({'success': False, 'error': '无效的数字格式'}), 400
-
-        if amount <= 0:
-            return jsonify({'success': False, 'error': '购买数量必须为正数'}), 400
-
-        # 获取资产信息
-        asset = Asset.query.get(asset_id)
-        if not asset:
-            return jsonify({'success': False, 'error': '资产不存在'}), 404
-
-        # 获取买家钱包地址
-        buyer_address = g.eth_address
-
+        signature = data.get('signature')  # Solana交易签名/哈希
+        
+        if not asset_id:
+            return jsonify({'success': False, 'error': '缺少必要参数 (asset_id)'}), 400
+            
+        if not amount:
+            return jsonify({'success': False, 'error': '缺少必要参数 (amount)'}), 400
+            
+        if not signature:
+            return jsonify({'success': False, 'error': '缺少必要参数 (signature)'}), 400
+            
         # 查找该用户最近的待支付交易
+        buyer_address = g.eth_address
+        current_app.logger.info(f"查找用户 {buyer_address} 针对资产 {asset_id} 的待支付交易")
+        
         pending_trade = Trade.query.filter_by(
             asset_id=asset_id,
             trader_address=buyer_address,
             type='buy',
             status=TradeStatus.PENDING_PAYMENT.value
         ).order_by(Trade.created_at.desc()).first()
-
+        
         if not pending_trade:
+            current_app.logger.warning(f"未找到待支付的交易 (asset_id: {asset_id}, buyer: {buyer_address})")
             return jsonify({'success': False, 'error': '未找到待支付的交易'}), 404
+            
+        current_app.logger.info(f"找到待处理交易 ID: {pending_trade.id}, 状态: {pending_trade.status}")
 
         # 验证交易金额是否匹配
         if pending_trade.amount != Decimal(str(amount)):
@@ -3289,11 +3324,31 @@ def execute_purchase():
         pending_trade.tx_hash = signature
         pending_trade.status = TradeStatus.PENDING_CONFIRMATION.value  # 更新状态为等待链上确认
         
-        # 更新交易详情
-        details = json.loads(pending_trade.payment_details) if pending_trade.payment_details else {}
-        details['payment_executed_at'] = datetime.utcnow().isoformat()
-        details['signature'] = signature
-        pending_trade.payment_details = json.dumps(details)
+        # 更新交易详情 - 修复点：确保payment_details始终是JSON字符串
+        try:
+            if pending_trade.payment_details and isinstance(pending_trade.payment_details, str):
+                details = json.loads(pending_trade.payment_details)
+            else:
+                details = {} if pending_trade.payment_details is None else pending_trade.payment_details
+                
+            if not isinstance(details, dict):
+                details = {}
+                
+            details['payment_executed_at'] = datetime.utcnow().isoformat()
+            details['signature'] = signature
+            # 确保序列化为JSON字符串
+            pending_trade.payment_details = json.dumps(details)
+            current_app.logger.info(f"已更新交易详情: {pending_trade.payment_details}")
+        except Exception as detail_error:
+            current_app.logger.error(f"更新交易详情时出错: {str(detail_error)}")
+            # 创建新的详情对象
+            pending_trade.payment_details = json.dumps({
+                'payment_executed_at': datetime.utcnow().isoformat(),
+                'signature': signature,
+                'platform_fee_basis_points': 350,
+                'platform_address': "HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd",
+                'seller_address': pending_trade.recipient_address
+            })
 
         # 可以在这里添加特定链的交易验证逻辑
         # TODO: 验证Solana交易是否有效
@@ -3316,7 +3371,7 @@ def execute_purchase():
             'trade_id': pending_trade.id,
             'message': '购买交易已成功执行，资产将在几分钟内更新'
         }), 200
-
+        
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"执行购买失败: {str(e)}")
