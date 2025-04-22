@@ -11,8 +11,8 @@ else:
     print(f"未找到环境变量文件: {dotenv_path}")
 
 class Config:
-    PURCHASE_CONTRACT_ADDRESS = os.environ.get("PURCHASE_CONTRACT_ADDRESS", "rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
+    PURCHASE_CONTRACT_ADDRESS = os.environ.get('PURCHASE_CONTRACT_ADDRESS', 'rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql://rwa_hub_user:password@localhost/rwa_hub')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static/uploads')
@@ -108,5 +108,4 @@ config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
     'default': DevelopmentConfig
-} 
-# 添加购买合约地址配置
+}
