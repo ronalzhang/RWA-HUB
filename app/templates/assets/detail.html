@@ -514,90 +514,103 @@ document.addEventListener('DOMContentLoaded', function() {
              * 检查是否有权限访问分红管理
              */
             async function checkDividendManagementAccess() {
-                try {
-                    console.log('检查分红管理权限...');
-                    
-                    // 获取所有分红按钮
-                    const dividendBtns = [
-                        document.getElementById('dividendManagementBtn'),         // 正常屏幕
-                        document.getElementById('dividendManagementBtnMobile'),   // 移动版
-                        document.getElementById('dividendManagementBtnMedium')    // 中等屏幕
-                    ].filter(btn => btn); // 过滤掉null值
-                    
-                    // 默认隐藏所有按钮
-                    dividendBtns.forEach(btn => {
-                        btn.style.display = 'none';
-                    });
-                    
-                    // 检查钱包连接状态
-                    const isConnected = window.walletState && (window.walletState.isConnected || window.walletState.connected) && window.walletState.address;
-                    if (!isConnected) {
-                        console.log('钱包未连接，隐藏分红按钮');
-                        return; 
-                    }
-                    
-                    // 钱包已连接，检查权限
-                    const isWalletAdmin = window.walletState.isAdmin === true;
-                    const isOwnerFrontend = "{{ is_owner|lower }}" === "true";
-                    const isAdminFrontend = "{{ is_admin_user|lower }}" === "true";
-                    const currentAddress = '{{ current_user_address|default("", true) }}';
-                    const connectedAddress = window.walletState.address;
-                    
-                    let hasPermission = false;
-                    
-                    if (isWalletAdmin) {
-                        console.log('权限确认: 管理员 (来自钱包状态)');
-                        hasPermission = true;
-                    } else if (currentAddress.toLowerCase() === connectedAddress.toLowerCase() && (isOwnerFrontend || isAdminFrontend)) {
-                        console.log('权限确认: 所有者或管理员 (来自后端)');
-                        hasPermission = true;
-                    } else if (currentAddress.toLowerCase() !== connectedAddress.toLowerCase()) {
-                        console.log(`地址不匹配，调用API检查权限: ${connectedAddress}`);
-                        // 如果地址不匹配，调用API检查
-                        try {
-                            const response = await fetch(`/api/assets/${ASSET_CONFIG.id}/check_owner`, {
-                                headers: { 'X-Eth-Address': connectedAddress }
-                            });
-                            if (response.ok) {
-                                const data = await response.json();
-                                if (data.is_owner || data.is_admin) {
-                                    console.log('权限确认: 所有者或管理员 (来自API)');
-                                    hasPermission = true;
-                                }
-                            }
-                        } catch (apiError) {
-                            console.error('API权限检查失败:', apiError);
-                        }
-                    }
-                    
-                    // 如果有权限，则显示按钮
-                    if (hasPermission) {
-                        console.log('用户有权限，显示分红按钮');
-                        const dividendUrl = `/assets/${ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${connectedAddress}`;
-                        dividendBtns.forEach(btn => {
-                            btn.href = dividendUrl;
-                            btn.classList.remove('disabled'); // 确保移除禁用状态
-                            btn.style.pointerEvents = 'auto';
-                            btn.removeAttribute('title');
-                            if (btn.id === 'dividendManagementBtn') {
-                                btn.style.display = 'inline-flex';
-                            } else {
-                                btn.style.display = 'block';
-                            }
+                const functionStartTime = Date.now();
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 开始执行`);
+                
+                // 获取所有分红按钮
+                const dividendBtns = [
+                    document.getElementById('dividendManagementBtn'),
+                    document.getElementById('dividendManagementBtnMobile'),
+                    document.getElementById('dividendManagementBtnMedium')
+                ].filter(btn => btn); // 过滤掉null值
+                
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 找到 ${dividendBtns.length} 个分红按钮`);
+
+                // **核心逻辑：默认强制隐藏**
+                dividendBtns.forEach(btn => {
+                    btn.style.display = 'none';
+                });
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 已强制隐藏所有按钮`);
+                
+                // 检查钱包连接状态
+                const isConnected = window.walletState && (window.walletState.isConnected || window.walletState.connected) && window.walletState.address;
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 钱包连接状态: ${isConnected}`);
+                
+                if (!isConnected) {
+                    console.log(`[${functionStartTime}] checkDividendManagementAccess: 钱包未连接，结束执行`);
+                    return; 
+                }
+                
+                // 钱包已连接，检查权限
+                const connectedAddress = window.walletState.address;
+                const isWalletAdmin = window.walletState.isAdmin === true;
+                const isOwnerFrontend = "{{ is_owner|lower }}" === "true";
+                const isAdminFrontend = "{{ is_admin_user|lower }}" === "true";
+                const currentAddress = '{{ current_user_address|default("", true) }}'; // 后端渲染时的地址
+                
+                let hasPermission = false;
+                let permissionSource = '无';
+                
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 权限检查输入: isWalletAdmin=${isWalletAdmin}, isOwnerFrontend=${isOwnerFrontend}, isAdminFrontend=${isAdminFrontend}, currentAddress=${currentAddress}, connectedAddress=${connectedAddress}`);
+                
+                if (isWalletAdmin) {
+                    permissionSource = '钱包状态';
+                    hasPermission = true;
+                } else if (currentAddress.toLowerCase() === connectedAddress.toLowerCase() && (isOwnerFrontend || isAdminFrontend)) {
+                    permissionSource = '后端渲染';
+                    hasPermission = true;
+                } else {
+                    // 尝试API检查 (即使地址匹配也检查，作为备用或强制实时验证)
+                    permissionSource = 'API检查中';
+                    console.log(`[${functionStartTime}] checkDividendManagementAccess: 调用API检查权限: ${connectedAddress}`);
+                    try {
+                        const response = await fetch(`/api/assets/${ASSET_CONFIG.id}/check_owner`, {
+                            headers: { 'X-Eth-Address': connectedAddress },
+                            cache: 'no-cache' // 避免缓存
                         });
-                    } else {
-                        console.log('用户无权限，保持分红按钮隐藏');
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.is_owner || data.is_admin) {
+                                permissionSource = 'API确认';
+                                hasPermission = true;
+                            } else {
+                                permissionSource = 'API拒绝';
+                            }
+                        } else {
+                             permissionSource = `API错误(${response.status})`;
+                        }
+                    } catch (apiError) {
+                        console.error('API权限检查失败:', apiError);
+                        permissionSource = 'API异常';
                     }
-                } catch (error) {
-                    console.error('检查管理权限失败:', error);
-                    // 出错时确保按钮隐藏
-                     const dividendBtns = [
-                        document.getElementById('dividendManagementBtn'),
-                        document.getElementById('dividendManagementBtnMobile'),
-                        document.getElementById('dividendManagementBtnMedium')
-                    ].filter(btn => btn);
+                }
+                
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 权限检查结果: hasPermission=${hasPermission}, 来源=${permissionSource}`);
+                
+                // **核心逻辑：仅在有权限时显示**
+                if (hasPermission) {
+                    console.log(`[${functionStartTime}] checkDividendManagementAccess: 权限通过，准备显示按钮`);
+                    const dividendUrl = `/assets/${ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${connectedAddress}`;
+                    dividendBtns.forEach(btn => {
+                        btn.href = dividendUrl;
+                        btn.classList.remove('disabled'); 
+                        btn.style.pointerEvents = 'auto';
+                        btn.removeAttribute('title');
+                        if (btn.id === 'dividendManagementBtn') {
+                            btn.style.display = 'inline-flex';
+                        } else {
+                            btn.style.display = 'block';
+                        }
+                        console.log(`[${functionStartTime}] checkDividendManagementAccess: 已显示按钮 ${btn.id}`);
+                    });
+                } else {
+                    console.log(`[${functionStartTime}] checkDividendManagementAccess: 权限未通过，保持按钮隐藏`);
+                    // 再次确认隐藏（理论上不需要，因为开头已隐藏）
                     dividendBtns.forEach(btn => { btn.style.display = 'none'; });
                 }
+                
+                const functionEndTime = Date.now();
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 执行完毕 (耗时: ${functionEndTime - functionStartTime}ms)`);
             }
 
             // 翻页相关变量
