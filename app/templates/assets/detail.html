@@ -524,12 +524,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById('dividendManagementBtnMedium')    // 中等屏幕
                     ];
                     
+                    // 先隐藏所有按钮
+                    dividendBtns.forEach(btn => {
+                        if (btn) {
+                            btn.style.display = 'none';
+                            console.log('隐藏分红按钮:', btn.id);
+                        }
+                    });
+                    
                     // 首先检查钱包连接状态 - 使用多种可能的标志
                     if (!window.walletState || 
                         !(window.walletState.isConnected || window.walletState.connected) || 
                         !window.walletState.address) {
-                        console.log('钱包未连接，确保分红管理按钮隐藏');
-                        return; // 按钮已在HTML中默认隐藏，这里直接返回
+                        console.log('钱包未连接，保持分红管理按钮隐藏');
+                        return; // 按钮已隐藏，这里直接返回
                     }
                     
                     // 直接检查walletState中的isAdmin状态
@@ -1282,16 +1290,41 @@ document.addEventListener('DOMContentLoaded', function() {
                         // 计算总价并更新显示
                         const amount = parseFloat(this.value) || 0;
                         const tokenPrice = parseFloat("{{ asset.token_price }}");
+                        
+                        // 确保价格有效
+                        if (isNaN(tokenPrice) || tokenPrice <= 0) {
+                            console.error('资产价格无效:', tokenPrice);
+                            if (totalPriceDisplay) {
+                                totalPriceDisplay.value = '价格数据无效';
+                            }
+                            return;
+                        }
+                        
+                        // 计算总价
                         const totalPrice = amount * tokenPrice;
                         if (totalPriceDisplay) {
-                            // 不添加USDC单位，因为HTML中已有USDC单位标签
+                            // 强制两位小数，显示更友好
                             totalPriceDisplay.value = totalPrice.toFixed(2);
+                            console.log(`计算总价: ${amount} × ${tokenPrice} = ${totalPrice.toFixed(2)} USDC`);
                         }
                     });
                     
                     // 触发一次初始化
                     amountInput.dispatchEvent(new Event('input'));
                 }
+                
+                // 确保总价在页面初始化时正确显示
+                setTimeout(function() {
+                    const amount = parseFloat(document.getElementById('purchase-amount')?.value) || 0;
+                    const tokenPrice = parseFloat("{{ asset.token_price }}");
+                    const totalPrice = amount * tokenPrice;
+                    const totalPriceEl = document.getElementById('totalPrice');
+                    
+                    if (totalPriceEl && !isNaN(totalPrice)) {
+                        totalPriceEl.value = totalPrice.toFixed(2);
+                        console.log('初始化总价:', totalPrice.toFixed(2));
+                    }
+                }, 500);
             }
 
             // 获取钱包状态
