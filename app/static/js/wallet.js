@@ -3270,3 +3270,311 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+// --- DOMContentLoaded Listener (or equivalent setup) ---
+document.addEventListener('DOMContentLoaded', async () => {
+    // ... other initializations ...
+    // Ensure walletState.init() is called here or elsewhere appropriately
+    // await walletState.init(); 
+
+    // --- Asset Detail Page Specific Logic ---
+    const buyButton = document.getElementById('buy-button');
+    const purchaseAmountInput = document.getElementById('purchase-amount');
+    const totalPriceDisplay = document.getElementById('totalPrice');
+    // Assume assetId is available globally or passed differently
+    // const assetId = document.body.dataset.assetId; // Example
+    
+    // Check if we are on the asset detail page by checking for the buy button
+    if (buyButton && purchaseAmountInput && totalPriceDisplay) {
+        console.log('Asset detail page elements found. Setting up purchase listeners.');
+        
+        // Ensure assetId is available (might need adjustment based on actual implementation)
+        const assetId = buyButton.closest('[data-asset-id]')?.dataset.assetId || window.location.pathname.split('/').pop();
+        if (!assetId) {
+            console.error("Asset ID not found for purchase button.");
+            return; 
+        }
+        console.log(`Asset ID for purchase: ${assetId}`);
+
+        // Get price per token (assuming it's stored as a data attribute)
+        const pricePerToken = parseFloat(buyButton.dataset.tokenPrice || document.querySelector('[data-token-price]')?.dataset.tokenPrice || '0');
+         if (pricePerToken <= 0) {
+             console.warn("Token price not found or invalid, cannot calculate total.");
+         }
+
+        // Function to update total price
+        const updateTotalPrice = () => {
+            const amount = parseInt(purchaseAmountInput.value) || 0;
+            if (amount > 0 && pricePerToken > 0) {
+                totalPriceDisplay.value = (amount * pricePerToken).toFixed(2);
+            } else {
+                totalPriceDisplay.value = '0.00';
+            }
+        };
+
+        purchaseAmountInput.addEventListener('input', updateTotalPrice);
+        updateTotalPrice(); // Initial calculation
+
+        // Attach handleBuy to the buy button
+        buyButton.addEventListener('click', async () => {
+             // Pass necessary data including assetId and price
+            await handleBuy(assetId, purchaseAmountInput, buyButton, pricePerToken); 
+        });
+
+    } else {
+         console.log('Purchase elements not found on this page.');
+    }
+    // ... other page specific logic ...
+});
+
+
+// --- Purchase Functions ---
+
+/**
+ * Handles the initial "Buy" button click.
+ * Prepares the purchase by calling the backend and shows the confirmation modal.
+ */
+async function handleBuy(assetId, amountInput, buttonElement, pricePerToken) {
+    console.log(`handleBuy called for asset ${assetId}`);
+    const buyErrorDiv = document.getElementById('buy-error'); // Error display near buy button
+    buyErrorDiv.style.display = 'none'; // Clear previous errors
+
+    if (!walletState.connected) {
+        showError('{{ _("Please connect wallet first") }}');
+        // Optionally open wallet selector: walletState.openWalletSelector();
+        return;
+    }
+
+    const amount = parseInt(amountInput.value);
+    const maxAmount = parseInt(amountInput.max);
+
+    if (isNaN(amount) || amount <= 0) {
+        showError('{{ _("Please enter a valid purchase amount") }}', buyErrorDiv);
+        return;
+    }
+    if (!isNaN(maxAmount) && amount > maxAmount) {
+         showError(`{{ _("Amount exceeds available tokens") }} (${maxAmount})`, buyErrorDiv);
+        return;
+    }
+
+
+    setButtonLoading(buttonElement, '{{ _("Preparing...") }}');
+    showLoadingState('{{ _("Preparing purchase...") }}');
+
+    try {
+        const response = await fetch('/api/trades/prepare_purchase', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // Add Authorization header if needed
+                'X-Wallet-Address': walletState.address // Send wallet address for backend checks
+            },
+            body: JSON.stringify({
+                asset_id: assetId,
+                amount: amount
+            })
+        });
+
+        if (!response.ok) {
+            let errorMsg = `{{ _("Failed to prepare purchase") }}. Status: ${response.status}`;
+            try {
+                const errData = await response.json();
+                errorMsg = errData.error || errorMsg;
+            } catch (e) { /* Ignore JSON parsing error */ }
+            throw new Error(errorMsg);
+        }
+
+        const prepareData = await response.json();
+        console.log('Purchase prepared:', prepareData);
+
+        // !!! --- MODIFICATION: Call showBuyModal --- !!!
+        // Ensure prepareData includes necessary fields like:
+        // asset_name, amount, price_per_token, subtotal, fee, total_cost, recipient_address, asset_id
+         if (!prepareData.asset_name) prepareData.asset_name = document.querySelector('h4')?.textContent || 'Unknown Asset'; // Fallback
+         prepareData.price_per_token = pricePerToken; // Pass price from frontend if not in API response
+         prepareData.asset_id = assetId; // Ensure assetId is part of the data passed on
+         prepareData.amount = amount; // Ensure the requested amount is passed on
+
+        showBuyModal(prepareData); 
+
+    } catch (error) {
+        console.error('Purchase preparation failed:', error);
+        showError(error.message || '{{ _("An unexpected error occurred") }}', buyErrorDiv);
+    } finally {
+        hideLoadingState();
+        resetButton(buttonElement);
+    }
+}
+
+/**
+ * Populates and shows the purchase confirmation modal.
+ * @param {object} prepareData - Data returned from the /api/trades/prepare_purchase endpoint.
+ */
+function showBuyModal(prepareData) {
+    console.log("Showing buy modal with data:", prepareData);
+    try {
+        const modalElement = document.getElementById('buyModal');
+        if (!modalElement) {
+            console.error('Buy modal element not found!');
+            showError('{{ _("UI Error: Could not display confirmation.") }}');
+            return;
+        }
+
+        // Get or initialize Bootstrap modal instance
+        const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+
+        // --- Populate Modal Content ---
+        // Use helper function to safely set text content
+        const setText = (id, text) => {
+            const el = modalElement.querySelector(`#${id}`);
+            if (el) el.textContent = text !== null && typeof text !== 'undefined' ? text : 'N/A';
+             else console.warn(`Modal element #${id} not found`);
+        };
+         const setCode = (id, text) => {
+             const el = modalElement.querySelector(`#${id}`);
+             if (el) el.textContent = text || 'N/A';
+             else console.warn(`Modal element #${id} not found`);
+        };
+
+        setText('modalAssetName', prepareData.asset_name);
+        setText('modalAmount', prepareData.amount);
+        setText('modalPricePerToken', prepareData.price_per_token?.toFixed(2) || 'N/A');
+        setText('modalSubtotal', prepareData.subtotal?.toFixed(2) || 'N/A');
+        setText('modalFee', prepareData.fee?.toFixed(2) || 'N/A');
+        setText('modalTotalCost', prepareData.total_cost?.toFixed(2) || 'N/A');
+        setCode('modalRecipientAddress', prepareData.recipient_address);
+
+
+        // Clear previous errors
+        const modalErrorDiv = modalElement.querySelector('#buyModalError');
+        if (modalErrorDiv) modalErrorDiv.style.display = 'none';
+
+        // --- Setup Confirm Button ---
+        const confirmBtn = modalElement.querySelector('#confirmPurchaseBtn');
+        if (!confirmBtn) {
+            console.error('Confirm purchase button not found in modal!');
+            return;
+        }
+        
+        // **Important:** Remove previous listener to avoid duplicates. Cloning is a robust way.
+        const newConfirmBtn = confirmBtn.cloneNode(true);
+        // Make sure the spinner is initially hidden on the clone
+        const spinner = newConfirmBtn.querySelector('.spinner-border');
+        if (spinner) spinner.style.display = 'none';
+        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+
+        // Attach new event listener to the cloned button
+        newConfirmBtn.addEventListener('click', async () => {
+            // Pass the *original* prepareData which contains all context
+            await confirmPurchase(prepareData, modalElement, newConfirmBtn); 
+        }, { once: true }); // Use { once: true } as an alternative way to prevent multiple clicks if cloning isn't preferred
+
+        // Show the modal
+        modal.show();
+
+    } catch (error) {
+        console.error("Error setting up or showing buy modal:", error);
+        showError(`{{ _("UI Error: Could not display confirmation.") }} ${error.message}`);
+    }
+}
+
+
+/**
+ * Handles the actual purchase confirmation: wallet transfer and backend execution call.
+ * @param {object} purchaseData - Data originally from prepare_purchase, passed from showBuyModal.
+ * @param {HTMLElement} modalElement - The modal DOM element.
+ * @param {HTMLElement} confirmBtn - The confirmation button element.
+ */
+async function confirmPurchase(purchaseData, modalElement, confirmBtn) {
+    console.log("confirmPurchase called with data:", purchaseData);
+    const modalErrorDiv = modalElement.querySelector('#buyModalError');
+    modalErrorDiv.style.display = 'none'; // Clear previous errors
+
+    setButtonLoading(confirmBtn, '{{ _("Processing...") }}');
+    showLoadingState('{{ _("Processing payment via wallet...") }}');
+
+    try {
+        // Extract necessary data (ensure field names match API response)
+        const recipient = purchaseData.recipient_address;
+        const totalAmount = parseFloat(purchaseData.total_cost); // Use total_cost for transfer
+        const assetId = purchaseData.asset_id;
+        const purchaseAmount = parseInt(purchaseData.amount); // The number of tokens
+
+        if (!recipient || isNaN(totalAmount) || totalAmount <= 0 || !assetId || isNaN(purchaseAmount) || purchaseAmount <= 0) {
+            throw new Error('{{ _("Invalid purchase data for confirmation.") }}');
+        }
+
+        console.log(`Attempting to transfer ${totalAmount} USDC to ${recipient}`);
+
+        // --- Step 1: Wallet Transfer ---
+        const signature = await walletState.transferSolanaToken('USDC', recipient, totalAmount);
+
+        if (!signature) {
+            // Transfer failed or was rejected by user
+            throw new Error('{{ _("Wallet transfer failed or was cancelled.") }}');
+        }
+        
+        console.log(`Wallet transfer successful. Signature: ${signature}`);
+        showLoadingState(`{{ _("Finalizing purchase...") }}`); // Update loading message
+
+        // --- Step 2: Execute Purchase on Backend ---
+        const executeResponse = await fetch('/api/trades/execute_purchase', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Wallet-Address': walletState.address // Send wallet address
+            },
+            body: JSON.stringify({
+                asset_id: assetId,
+                amount: purchaseAmount, // Send the number of tokens purchased
+                signature: signature // Send the Solana transaction signature
+            })
+        });
+
+        if (!executeResponse.ok) {
+             let errorMsg = `{{ _("Failed to finalize purchase") }}. Status: ${executeResponse.status}`;
+            try {
+                const errData = await executeResponse.json();
+                errorMsg = errData.error || errorMsg;
+            } catch (e) { /* Ignore JSON parsing error */ }
+            throw new Error(errorMsg);
+        }
+
+        const executeData = await executeResponse.json();
+        console.log('Purchase executed successfully:', executeData);
+
+        // --- Success ---
+        bootstrap.Modal.getInstance(modalElement).hide();
+        showSuccess(executeData.message || '{{ _("Purchase successful!") }}');
+        
+        // Optional: Refresh page data or redirect
+         setTimeout(() => window.location.reload(), 2000); // Simple refresh after 2s
+
+    } catch (error) {
+        console.error('Purchase confirmation failed:', error);
+        // Show error inside the modal
+        modalErrorDiv.textContent = error.message || '{{ _("An unexpected error occurred during confirmation.") }}';
+        modalErrorDiv.style.display = 'block';
+    } finally {
+        hideLoadingState();
+        resetButton(confirmBtn); // Reset the modal's confirm button
+    }
+}
+
+// Helper functions (ensure they exist or add them)
+function showSuccess(message, container = null) {
+    // Implementation depends on how you want to show success (e.g., toast, alert)
+    console.log("SUCCESS:", message);
+    alert(message); // Simple alert for now
+}
+
+function showError(message, container = null) {
+     // Implementation depends on how you want to show errors
+    console.error("ERROR:", message);
+     if (container) {
+         container.textContent = message;
+         container.style.display = 'block';
+     } else {
+         alert(message); // Simple alert fallback
+     }
+}
