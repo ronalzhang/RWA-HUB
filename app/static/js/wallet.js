@@ -3339,91 +3339,178 @@ document.addEventListener('DOMContentLoaded', async () => {
  * 处理"Buy"按钮的点击事件
  * 通过调用后端API准备购买并显示确认模态框
  */
-async function handleBuy(assetId, amountInput, buttonElement, pricePerToken) {
-    console.log(`handleBuy called for asset ${assetId}`);
-    
-    // 确保所有参数都存在
-    if (!assetId || !amountInput || !buttonElement) {
-        console.error('handleBuy: 缺少必要参数', { assetId, amountInput, buttonElement });
-        showError('系统错误：缺少必要参数');
-        return;
-    }
-    
-    const buyErrorDiv = document.getElementById('buy-error');
-    if (buyErrorDiv) buyErrorDiv.style.display = 'none'; // 清除先前的错误
-
-    // 检查钱包连接状态
-    if (!walletState || !walletState.connected || !walletState.address) {
-        showError('请先连接钱包');
-        return;
-    }
-
-    // 验证购买数量
-    const amount = parseInt(amountInput.value);
-    const maxAmount = parseInt(amountInput.max || Number.MAX_SAFE_INTEGER);
-
-    if (isNaN(amount) || amount <= 0) {
-        showError('请输入有效的购买数量', buyErrorDiv);
-        return;
-    }
-    
-    if (!isNaN(maxAmount) && amount > maxAmount) {
-        showError(`购买数量超过可用代币数量 (${maxAmount})`, buyErrorDiv);
-        return;
-    }
-
-    // 设置加载状态
-    setButtonLoading(buttonElement, '准备中...');
-    showLoadingState('正在准备购买...');
-
+async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerToken) {
     try {
-        // 获取钱包地址
-        const walletAddress = walletState.address;
-        console.log(`使用钱包地址: ${walletAddress}`);
+        console.log(`handleBuy 被调用，参数:`, {assetIdOrEvent, amountInput, buttonElement, pricePerToken});
+        
+        // 检测如果第一个参数是事件对象，说明是通过内联onclick调用的
+        // 此时需要自动查找页面上的元素
+        if (assetIdOrEvent instanceof Event || (assetIdOrEvent && typeof assetIdOrEvent === 'object' && assetIdOrEvent.type)) {
+            console.log('检测到事件对象作为参数，自动查找页面元素');
+            
+            // 保存事件对象，以便阻止默认行为
+            const event = assetIdOrEvent;
+            if (event && event.preventDefault) {
+                event.preventDefault();
+            }
+            
+            // 查找当前页面的资产ID - 从URL中提取
+            const pathParts = window.location.pathname.split('/');
+            let assetId = pathParts[pathParts.length - 1];
+            // 如果资产ID看起来不像资产ID (以RH-开头)，尝试其他方式
+            if (!assetId || !assetId.startsWith('RH-')) {
+                assetId = document.querySelector('[data-asset-id]')?.dataset.assetId;
+                if (!assetId) {
+                    // 尝试获取ID的最后手段 - 查找页面中可能包含资产ID的标题或容器
+                    const possibleTitleElement = document.querySelector('h2, h1, .asset-id');
+                    if (possibleTitleElement && possibleTitleElement.textContent.includes('RH-')) {
+                        const match = possibleTitleElement.textContent.match(/RH-\d+/);
+                        if (match) assetId = match[0];
+                    }
+                }
+            }
+            
+            // 查找必要的输入和按钮元素
+            if (!amountInput) amountInput = document.getElementById('purchase-amount');
+            if (!buttonElement) {
+                // 如果事件有目标元素，使用它
+                if (event && event.currentTarget) {
+                    buttonElement = event.currentTarget;
+                } else {
+                    buttonElement = document.getElementById('buy-button');
+                }
+            }
+            
+            // 查找代币价格
+            if (!pricePerToken || isNaN(parseFloat(pricePerToken))) {
+                const priceElement = document.querySelector('[data-token-price]');
+                if (priceElement) {
+                    pricePerToken = parseFloat(priceElement.dataset.tokenPrice);
+                } else {
+                    // 尝试从页面中查找价格文本
+                    const priceTextElement = document.querySelector('.token-price, .price');
+                    if (priceTextElement) {
+                        const priceText = priceTextElement.textContent;
+                        const match = priceText.match(/[\d.,]+/);
+                        if (match) pricePerToken = parseFloat(match[0].replace(/,/g, ''));
+                    }
+                }
+            }
+            
+            console.log('自动识别参数结果：', {assetId, amountInput, buttonElement, pricePerToken});
+            
+            // 使用查找到的参数再次调用自身
+            return handleBuy(assetId, amountInput, buttonElement, pricePerToken);
+        }
+        
+        // 正常流程 - 使用传入的参数
+        let assetId = assetIdOrEvent; // 第一个参数现在是assetId
+        
+        // 确保所有参数都存在
+        if (!assetId || typeof assetId !== 'string') {
+            console.error('handleBuy: 缺少必要参数：资产ID必须是字符串', assetId);
+            showError('系统错误：缺少必要参数(资产ID)');
+            return;
+        }
+        
+        if (!amountInput || !amountInput.value) {
+            console.error('handleBuy: 缺少必要参数：购买数量输入框');
+            showError('系统错误：无法读取购买数量');
+            return;
+        }
+        
+        if (!buttonElement) {
+            console.warn('handleBuy: 缺少按钮元素，将不会显示加载状态');
+            // 继续执行，不强制返回
+        }
+        
+        console.log(`开始处理资产购买: ${assetId}`);
+        
+        const buyErrorDiv = document.getElementById('buy-error');
+        if (buyErrorDiv) buyErrorDiv.style.display = 'none'; // 清除先前的错误
 
-        // API请求
-        const response = await fetch('/api/trades/prepare_purchase', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Wallet-Address': walletAddress,
-                // 尝试添加备用的authorization头
-                'Authorization': `Wallet ${walletAddress}`
-            },
-            body: JSON.stringify({
-                asset_id: assetId,
-                amount: amount,
-                wallet_address: walletAddress  // 在请求体中也发送钱包地址
-            })
-        });
-
-        if (!response.ok) {
-            let errorMsg = `准备购买失败。状态: ${response.status}`;
-            try {
-                const errData = await response.json();
-                errorMsg = errData.error || errorMsg;
-            } catch (e) { /* 忽略JSON解析错误 */ }
-            throw new Error(errorMsg);
+        // 检查钱包连接状态
+        if (!walletState || !walletState.connected || !walletState.address) {
+            showError('请先连接钱包');
+            return;
         }
 
-        const prepareData = await response.json();
-        console.log('购买准备成功:', prepareData);
+        // 验证购买数量
+        const amount = parseInt(amountInput.value);
+        const maxAmount = parseInt(amountInput.max || Number.MAX_SAFE_INTEGER);
 
-        // 确保prepareData包含必要的字段
-        if (!prepareData.asset_name) prepareData.asset_name = document.querySelector('h4')?.textContent || '未知资产';
-        prepareData.price_per_token = pricePerToken;
-        prepareData.asset_id = assetId;
-        prepareData.amount = amount;
+        if (isNaN(amount) || amount <= 0) {
+            showError('请输入有效的购买数量', buyErrorDiv);
+            return;
+        }
+        
+        if (!isNaN(maxAmount) && amount > maxAmount) {
+            showError(`购买数量超过可用代币数量 (${maxAmount})`, buyErrorDiv);
+            return;
+        }
 
-        // 显示确认模态框
-        showBuyModal(prepareData);
+        // 设置加载状态
+        if (buttonElement) {
+            setButtonLoading(buttonElement, '准备中...');
+        }
+        showLoadingState('正在准备购买...');
 
-    } catch (error) {
-        console.error('购买准备失败:', error);
-        showError(error.message || '发生意外错误', buyErrorDiv);
-    } finally {
+        try {
+            // 获取钱包地址
+            const walletAddress = walletState.address;
+            console.log(`使用钱包地址: ${walletAddress}`);
+
+            // API请求
+            const response = await fetch('/api/trades/prepare_purchase', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Wallet-Address': walletAddress,
+                    // 尝试添加备用的authorization头
+                    'Authorization': `Wallet ${walletAddress}`
+                },
+                body: JSON.stringify({
+                    asset_id: assetId,
+                    amount: amount,
+                    wallet_address: walletAddress  // 在请求体中也发送钱包地址
+                })
+            });
+
+            if (!response.ok) {
+                let errorMsg = `准备购买失败。状态: ${response.status}`;
+                try {
+                    const errData = await response.json();
+                    errorMsg = errData.error || errorMsg;
+                } catch (e) { /* 忽略JSON解析错误 */ }
+                throw new Error(errorMsg);
+            }
+
+            const prepareData = await response.json();
+            console.log('购买准备成功:', prepareData);
+
+            // 确保prepareData包含必要的字段
+            if (!prepareData.asset_name) prepareData.asset_name = document.querySelector('h4')?.textContent || '未知资产';
+            prepareData.price_per_token = pricePerToken || prepareData.price_per_token || 0;
+            prepareData.asset_id = assetId;
+            prepareData.amount = amount;
+
+            // 显示确认模态框
+            showBuyModal(prepareData);
+
+        } catch (error) {
+            console.error('购买准备失败:', error);
+            showError(error.message || '发生意外错误', buyErrorDiv);
+        } finally {
+            hideLoadingState();
+            if (buttonElement) {
+                resetButton(buttonElement);
+            }
+        }
+    } catch (unexpected) {
+        // 捕获所有意外错误，确保不会导致页面崩溃
+        console.error('handleBuy函数发生意外错误:', unexpected);
+        showError('处理购买请求时发生意外错误，请刷新页面后重试');
         hideLoadingState();
-        resetButton(buttonElement);
     }
 }
 
