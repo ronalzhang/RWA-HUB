@@ -1381,5 +1381,37 @@
     </div>
     <!-- End Purchase Confirmation Modal -->
 
+    <!-- 全局加载遮罩 -->
+    <div id="global-loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;">
+        <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+            <span class="visually-hidden">{{ _('Loading...') }}</span>
+        </div>
+        <p class="text-light mt-3" id="loading-message">{{ _('Processing...') }}</p>
+    </div>
+
+    <script>
+        // 全局加载状态管理函数
+        function showLoadingState(message = '{{ _("Processing...") }}') {
+            const overlay = document.getElementById('global-loading-overlay');
+            const messageElement = document.getElementById('loading-message');
+            
+            if (overlay && messageElement) {
+                messageElement.textContent = message;
+                overlay.style.display = 'flex';
+            } else {
+                console.warn('加载状态遮罩元素未找到');
+            }
+        }
+        
+        function hideLoadingState() {
+            const overlay = document.getElementById('global-loading-overlay');
+            if (overlay) {
+                overlay.style.display = 'none';
+            } else {
+                console.warn('加载状态遮罩元素未找到');
+            }
+        }
+    </script>
+
 </body>
 </html>
