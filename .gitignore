@@ -117,3 +117,7 @@ docs/
 app/docs/
 *.md
 !README.md
+
+# 允许docs目录
+!docs/
+!docs/*
