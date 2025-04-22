@@ -42,7 +42,7 @@ class Asset(Base):
     token_symbol = Column(String(50), nullable=True, unique=True)
     blockchain = Column(String(50), nullable=True)
     contract_address = Column(String(255), nullable=True)
-    metadata = Column(Text, nullable=True)
+    meta_data = Column(Text, nullable=True)
     status = Column(String(50), default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -96,7 +96,7 @@ def create_asset(name, asset_type, description, blockchain, issuer_address, meta
             asset_type=asset_type.lower(),
             token_symbol=token_symbol,
             blockchain=blockchain.lower(),
-            metadata=json.dumps(meta_dict, ensure_ascii=False),
+            meta_data=json.dumps(meta_dict, ensure_ascii=False),
             status="pending"
         )
         
@@ -123,14 +123,14 @@ def display_asset_info(asset):
     print(f"状态: {asset.status}")
     
     # 显示元数据
-    if asset.metadata:
+    if asset.meta_data:
         try:
-            metadata = json.loads(asset.metadata)
+            metadata = json.loads(asset.meta_data)
             print("\n----- 元数据 -----")
             for key, value in metadata.items():
                 print(f"{key}: {value}")
         except:
-            print(f"元数据: {asset.metadata}")
+            print(f"元数据: {asset.meta_data}")
 
 def validate_asset_type(value):
     """验证资产类型是否支持"""

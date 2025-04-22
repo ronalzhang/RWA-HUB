@@ -33,16 +33,16 @@ class Asset(Base):
     token_symbol = Column(String(50), nullable=True, unique=True)
     blockchain = Column(String(50), nullable=True)
     contract_address = Column(String(255), nullable=True)
-    metadata = Column(Text, nullable=True)
+    meta_data = Column(Text, nullable=True)  # 重命名为meta_data以避免与SQLAlchemy保留字冲突
     status = Column(String(50), default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self):
         result = {c.name: getattr(self, c.name) for c in self.__table__.columns}
-        if self.metadata:
+        if self.meta_data:
             try:
-                result['metadata'] = json.loads(self.metadata)
+                result['meta_data'] = json.loads(self.meta_data)
             except:
                 pass
         return result
@@ -88,8 +88,8 @@ def format_asset_info(asset):
     ]
     
     # 尝试解析和展示元数据
-    if isinstance(asset_dict['metadata'], dict):
-        metadata = asset_dict['metadata']
+    if isinstance(asset_dict.get('meta_data'), dict):
+        metadata = asset_dict['meta_data']
         output.append("\n----- 元数据 -----")
         
         if 'issuer_address' in metadata:
