@@ -1299,6 +1299,34 @@
             }
         }
         
+        // --- 新增按钮状态控制函数 ---
+        function setButtonLoading(button, loadingText = '{{ _("Processing...") }}') {
+            if (!button) return;
+            // 保存原始HTML和禁用状态
+            button.dataset.originalHtml = button.innerHTML;
+            button.dataset.originalDisabled = button.disabled;
+            
+            // 设置加载状态
+            button.disabled = true;
+            button.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ${loadingText}`;
+        }
+
+        function resetButton(button) {
+            if (!button || typeof button.dataset.originalHtml === 'undefined') return;
+            
+            // 恢复原始状态
+            button.innerHTML = button.dataset.originalHtml;
+            // 只有当原始状态不是禁用时才启用按钮
+            if (button.dataset.originalDisabled !== 'true') {
+                button.disabled = false;
+            }
+            
+            // 清理保存的数据
+            delete button.dataset.originalHtml;
+            delete button.dataset.originalDisabled;
+        }
+        // --- 结束新增按钮状态控制函数 ---
+
         /**
          * 检查是否有权限访问分红管理
          */
