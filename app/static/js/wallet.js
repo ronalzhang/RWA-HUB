@@ -3281,28 +3281,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     const buyButton = document.getElementById('buy-button');
     const purchaseAmountInput = document.getElementById('purchase-amount');
     const totalPriceDisplay = document.getElementById('totalPrice');
-    // Assume assetId is available globally or passed differently
-    // const assetId = document.body.dataset.assetId; // Example
     
     // Check if we are on the asset detail page by checking for the buy button
     if (buyButton && purchaseAmountInput && totalPriceDisplay) {
         console.log('Asset detail page elements found. Setting up purchase listeners.');
         
-        // Ensure assetId is available (might need adjustment based on actual implementation)
-        const assetId = buyButton.closest('[data-asset-id]')?.dataset.assetId || window.location.pathname.split('/').pop();
+        // 获取资产ID - 从URL中提取
+        const pathParts = window.location.pathname.split('/');
+        let assetId = pathParts[pathParts.length - 1];
+        // 如果资产ID以RH-开头，则使用该ID
+        if (!assetId.startsWith('RH-')) {
+            // 尝试从页面中其他位置获取
+            assetId = document.querySelector('[data-asset-id]')?.dataset.assetId;
+        }
+        
         if (!assetId) {
-            console.error("Asset ID not found for purchase button.");
+            console.error("无法确定资产ID");
             return; 
         }
-        console.log(`Asset ID for purchase: ${assetId}`);
+        console.log(`资产ID: ${assetId}`);
 
-        // Get price per token (assuming it's stored as a data attribute)
-        const pricePerToken = parseFloat(buyButton.dataset.tokenPrice || document.querySelector('[data-token-price]')?.dataset.tokenPrice || '0');
-         if (pricePerToken <= 0) {
-             console.warn("Token price not found or invalid, cannot calculate total.");
-         }
+        // 获取代币价格
+        const pricePerToken = parseFloat(buyButton.dataset.tokenPrice || '0');
+        if (pricePerToken <= 0) {
+            console.warn("未找到有效的代币价格，无法计算总额");
+        }
 
-        // Function to update total price
+        // 更新总价格的函数
         const updateTotalPrice = () => {
             const amount = parseInt(purchaseAmountInput.value) || 0;
             if (amount > 0 && pricePerToken > 0) {
@@ -3312,17 +3317,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         };
 
+        // 添加输入事件监听器
         purchaseAmountInput.addEventListener('input', updateTotalPrice);
-        updateTotalPrice(); // Initial calculation
+        updateTotalPrice(); // 初始计算
 
-        // Attach handleBuy to the buy button
-        buyButton.addEventListener('click', async () => {
-             // Pass necessary data including assetId and price
-            await handleBuy(assetId, purchaseAmountInput, buyButton, pricePerToken); 
+        // 修改后的购买按钮点击事件处理
+        buyButton.addEventListener('click', () => {
+            // 明确传递所有必要参数，不再使用event对象
+            handleBuy(assetId, purchaseAmountInput, buyButton, pricePerToken);
         });
-
     } else {
-         console.log('Purchase elements not found on this page.');
+        console.log('当前页面不包含购买元素');
     }
     // ... other page specific logic ...
 });
@@ -3331,75 +3336,91 @@ document.addEventListener('DOMContentLoaded', async () => {
 // --- Purchase Functions ---
 
 /**
- * Handles the initial "Buy" button click.
- * Prepares the purchase by calling the backend and shows the confirmation modal.
+ * 处理"Buy"按钮的点击事件
+ * 通过调用后端API准备购买并显示确认模态框
  */
 async function handleBuy(assetId, amountInput, buttonElement, pricePerToken) {
     console.log(`handleBuy called for asset ${assetId}`);
-    const buyErrorDiv = document.getElementById('buy-error'); // Error display near buy button
-    buyErrorDiv.style.display = 'none'; // Clear previous errors
+    
+    // 确保所有参数都存在
+    if (!assetId || !amountInput || !buttonElement) {
+        console.error('handleBuy: 缺少必要参数', { assetId, amountInput, buttonElement });
+        showError('系统错误：缺少必要参数');
+        return;
+    }
+    
+    const buyErrorDiv = document.getElementById('buy-error');
+    if (buyErrorDiv) buyErrorDiv.style.display = 'none'; // 清除先前的错误
 
-    if (!walletState.connected) {
-        showError('{{ _("Please connect wallet first") }}');
-        // Optionally open wallet selector: walletState.openWalletSelector();
+    // 检查钱包连接状态
+    if (!walletState || !walletState.connected || !walletState.address) {
+        showError('请先连接钱包');
         return;
     }
 
+    // 验证购买数量
     const amount = parseInt(amountInput.value);
-    const maxAmount = parseInt(amountInput.max);
+    const maxAmount = parseInt(amountInput.max || Number.MAX_SAFE_INTEGER);
 
     if (isNaN(amount) || amount <= 0) {
-        showError('{{ _("Please enter a valid purchase amount") }}', buyErrorDiv);
+        showError('请输入有效的购买数量', buyErrorDiv);
         return;
     }
+    
     if (!isNaN(maxAmount) && amount > maxAmount) {
-         showError(`{{ _("Amount exceeds available tokens") }} (${maxAmount})`, buyErrorDiv);
+        showError(`购买数量超过可用代币数量 (${maxAmount})`, buyErrorDiv);
         return;
     }
 
-
-    setButtonLoading(buttonElement, '{{ _("Preparing...") }}');
-    showLoadingState('{{ _("Preparing purchase...") }}');
+    // 设置加载状态
+    setButtonLoading(buttonElement, '准备中...');
+    showLoadingState('正在准备购买...');
 
     try {
+        // 获取钱包地址
+        const walletAddress = walletState.address;
+        console.log(`使用钱包地址: ${walletAddress}`);
+
+        // API请求
         const response = await fetch('/api/trades/prepare_purchase', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                // Add Authorization header if needed
-                'X-Wallet-Address': walletState.address // Send wallet address for backend checks
+                'X-Wallet-Address': walletAddress,
+                // 尝试添加备用的authorization头
+                'Authorization': `Wallet ${walletAddress}`
             },
             body: JSON.stringify({
                 asset_id: assetId,
-                amount: amount
+                amount: amount,
+                wallet_address: walletAddress  // 在请求体中也发送钱包地址
             })
         });
 
         if (!response.ok) {
-            let errorMsg = `{{ _("Failed to prepare purchase") }}. Status: ${response.status}`;
+            let errorMsg = `准备购买失败。状态: ${response.status}`;
             try {
                 const errData = await response.json();
                 errorMsg = errData.error || errorMsg;
-            } catch (e) { /* Ignore JSON parsing error */ }
+            } catch (e) { /* 忽略JSON解析错误 */ }
             throw new Error(errorMsg);
         }
 
         const prepareData = await response.json();
-        console.log('Purchase prepared:', prepareData);
+        console.log('购买准备成功:', prepareData);
 
-        // !!! --- MODIFICATION: Call showBuyModal --- !!!
-        // Ensure prepareData includes necessary fields like:
-        // asset_name, amount, price_per_token, subtotal, fee, total_cost, recipient_address, asset_id
-         if (!prepareData.asset_name) prepareData.asset_name = document.querySelector('h4')?.textContent || 'Unknown Asset'; // Fallback
-         prepareData.price_per_token = pricePerToken; // Pass price from frontend if not in API response
-         prepareData.asset_id = assetId; // Ensure assetId is part of the data passed on
-         prepareData.amount = amount; // Ensure the requested amount is passed on
+        // 确保prepareData包含必要的字段
+        if (!prepareData.asset_name) prepareData.asset_name = document.querySelector('h4')?.textContent || '未知资产';
+        prepareData.price_per_token = pricePerToken;
+        prepareData.asset_id = assetId;
+        prepareData.amount = amount;
 
-        showBuyModal(prepareData); 
+        // 显示确认模态框
+        showBuyModal(prepareData);
 
     } catch (error) {
-        console.error('Purchase preparation failed:', error);
-        showError(error.message || '{{ _("An unexpected error occurred") }}', buyErrorDiv);
+        console.error('购买准备失败:', error);
+        showError(error.message || '发生意外错误', buyErrorDiv);
     } finally {
         hideLoadingState();
         resetButton(buttonElement);
