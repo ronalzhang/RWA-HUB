@@ -3340,115 +3340,59 @@ document.addEventListener('DOMContentLoaded', async () => {
  * 通过调用后端API准备购买并显示确认模态框
  */
 async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerToken) {
+    console.log(`handleBuy 被调用，参数:`, {assetIdOrEvent, amountInput, buttonElement, pricePerToken});
     try {
-        console.log(`handleBuy 被调用，参数:`, {assetIdOrEvent, amountInput, buttonElement, pricePerToken});
+        // 处理不同的调用方式 - 统一确定参数
+        let assetId, buyErrorDiv;
         
-        // 检测如果第一个参数是事件对象，说明是通过内联onclick调用的
-        // 此时需要自动查找页面上的元素
-        if (assetIdOrEvent instanceof Event || (assetIdOrEvent && typeof assetIdOrEvent === 'object' && assetIdOrEvent.type)) {
-            console.log('检测到事件对象作为参数，自动查找页面元素');
+        // 如果第一个参数是事件对象
+        if (typeof assetIdOrEvent === 'object' && assetIdOrEvent.type === 'click') {
+            const targetElement = assetIdOrEvent.currentTarget || assetIdOrEvent.target;
+            assetId = targetElement.getAttribute('data-asset-id');
             
-            // 保存事件对象，以便阻止默认行为
-            const event = assetIdOrEvent;
-            if (event && event.preventDefault) {
-                event.preventDefault();
-            }
+            // 获取数量输入元素
+            amountInput = document.getElementById('purchase-amount');
+            buttonElement = targetElement;
             
-            // 查找当前页面的资产ID - 从URL中提取
-            const pathParts = window.location.pathname.split('/');
-            let assetId = pathParts[pathParts.length - 1];
-            // 如果资产ID看起来不像资产ID (以RH-开头)，尝试其他方式
-            if (!assetId || !assetId.startsWith('RH-')) {
-                assetId = document.querySelector('[data-asset-id]')?.dataset.assetId;
-                if (!assetId) {
-                    // 尝试获取ID的最后手段 - 查找页面中可能包含资产ID的标题或容器
-                    const possibleTitleElement = document.querySelector('h2, h1, .asset-id');
-                    if (possibleTitleElement && possibleTitleElement.textContent.includes('RH-')) {
-                        const match = possibleTitleElement.textContent.match(/RH-\d+/);
-                        if (match) assetId = match[0];
-                    }
-                }
-            }
-            
-            // 查找必要的输入和按钮元素
-            if (!amountInput) amountInput = document.getElementById('purchase-amount');
-            if (!buttonElement) {
-                // 如果事件有目标元素，使用它
-                if (event && event.currentTarget) {
-                    buttonElement = event.currentTarget;
-                } else {
-                    buttonElement = document.getElementById('buy-button');
-                }
-            }
-            
-            // 查找代币价格
-            if (!pricePerToken || isNaN(parseFloat(pricePerToken))) {
-                const priceElement = document.querySelector('[data-token-price]');
-                if (priceElement) {
-                    pricePerToken = parseFloat(priceElement.dataset.tokenPrice);
-                } else {
-                    // 尝试从页面中查找价格文本
-                    const priceTextElement = document.querySelector('.token-price, .price');
-                    if (priceTextElement) {
-                        const priceText = priceTextElement.textContent;
-                        const match = priceText.match(/[\d.,]+/);
-                        if (match) pricePerToken = parseFloat(match[0].replace(/,/g, ''));
-                    }
-                }
-            }
-            
-            console.log('自动识别参数结果：', {assetId, amountInput, buttonElement, pricePerToken});
-            
-            // 使用查找到的参数再次调用自身
-            return handleBuy(assetId, amountInput, buttonElement, pricePerToken);
+            // 尝试获取代币价格
+            pricePerToken = parseFloat(targetElement.getAttribute('data-token-price'));
+        } else {
+            // 直接使用传入的参数
+            assetId = assetIdOrEvent;
         }
         
-        // 正常流程 - 使用传入的参数
-        let assetId = assetIdOrEvent; // 第一个参数现在是assetId
-        
-        // 确保所有参数都存在
-        if (!assetId || typeof assetId !== 'string') {
+        // 验证资产ID
+        if (!assetId) {
             console.error('handleBuy: 缺少必要参数：资产ID必须是字符串', assetId);
-            showError('系统错误：缺少必要参数(资产ID)');
-            return;
+            return false;
         }
         
-        if (!amountInput || !amountInput.value) {
+        // 获取和验证购买数量
+        if (!amountInput) {
             console.error('handleBuy: 缺少必要参数：购买数量输入框');
-            showError('系统错误：无法读取购买数量');
-            return;
+            return false;
         }
         
+        // 处理按钮元素
         if (!buttonElement) {
             console.warn('handleBuy: 缺少按钮元素，将不会显示加载状态');
-            // 继续执行，不强制返回
         }
         
-        console.log(`开始处理资产购买: ${assetId}`);
+        // 获取错误显示区域
+        buyErrorDiv = document.getElementById('buy-error');
         
-        const buyErrorDiv = document.getElementById('buy-error');
-        if (buyErrorDiv) buyErrorDiv.style.display = 'none'; // 清除先前的错误
-
-        // 检查钱包连接状态
-        if (!walletState || !walletState.connected || !walletState.address) {
-            showError('请先连接钱包');
-            return;
-        }
-
-        // 验证购买数量
-        const amount = parseInt(amountInput.value);
-        const maxAmount = parseInt(amountInput.max || Number.MAX_SAFE_INTEGER);
-
+        // 获取并验证数量
+        let amount = parseFloat(amountInput.value);
+        
+        // 验证数量有效性
         if (isNaN(amount) || amount <= 0) {
             showError('请输入有效的购买数量', buyErrorDiv);
-            return;
+            return false;
         }
         
-        if (!isNaN(maxAmount) && amount > maxAmount) {
-            showError(`购买数量超过可用代币数量 (${maxAmount})`, buyErrorDiv);
-            return;
-        }
-
+        // 确保数量是整数
+        amount = Math.floor(amount);
+        
         // 设置加载状态
         if (buttonElement) {
             setButtonLoading(buttonElement, '准备中...');
@@ -3460,7 +3404,7 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
             const walletAddress = walletState.address;
             console.log(`使用钱包地址: ${walletAddress}`);
 
-            // API请求
+            // API请求 - 确保数字格式正确
             const response = await fetch('/api/trades/prepare_purchase', {
                 method: 'POST',
                 headers: {
@@ -3472,7 +3416,7 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
                 },
                 body: JSON.stringify({
                     asset_id: assetId,
-                    amount: amount.toString(), // 将amount转换为字符串格式
+                    amount: String(amount), // 使用String函数确保转换为字符串
                     // 请求体中的钱包地址同样保留，但主要依赖请求头
                     wallet_address: walletAddress
                 })
