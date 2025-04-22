@@ -8,10 +8,6 @@ import json
 import uuid
 import logging
 from datetime import datetime
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, String, Text, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 
 # 配置日志
 logging.basicConfig(
@@ -21,34 +17,82 @@ logging.basicConfig(
 )
 logger = logging.getLogger('issue_asset')
 
-# 加载环境变量
-load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://rwa_hub_user:password@localhost/rwa_hub")
-PURCHASE_CONTRACT_ADDRESS = os.getenv("PURCHASE_CONTRACT_ADDRESS", "")
+# 检查是否在应用内运行
+in_app_environment = True
+try:
+    # 设置路径和环境变量
+    app_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+    if os.path.exists(os.path.join(app_path, 'app')):
+        sys.path.append(app_path)
+        os.environ['FLASK_ENV'] = 'development'
+        
+        # 尝试导入应用模型和工具
+        from app.models.asset import Asset
+        from app.utils.db import get_db_session
+        from app.utils.common import generate_id
+        logger.info("使用RWA-HUB应用内置模型")
+    else:
+        in_app_environment = False
+except ImportError:
+    in_app_environment = False
 
-# 初始化数据库连接
-engine = create_engine(DATABASE_URL)
-Session = sessionmaker(bind=engine)
-Base = declarative_base()
-
-# 定义模型
-class Asset(Base):
-    __tablename__ = 'assets'
+# 如果不在应用内，则使用独立模型
+if not in_app_environment:
+    logger.info("未能导入应用模型，使用独立模型")
+    from dotenv import load_dotenv
+    from sqlalchemy import create_engine, Column, String, Text, DateTime
+    from sqlalchemy.ext.declarative import declarative_base
+    from sqlalchemy.orm import sessionmaker
     
-    id = Column(String(255), primary_key=True)
-    name = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
-    asset_type = Column(String(50), nullable=False)
-    token_symbol = Column(String(50), nullable=True, unique=True)
-    blockchain = Column(String(50), nullable=True)
-    contract_address = Column(String(255), nullable=True)
-    meta_data = Column(Text, nullable=True)
-    status = Column(String(50), default="pending")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-# 确保数据库表存在
-Base.metadata.create_all(engine)
+    # 加载环境变量
+    load_dotenv()
+    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://rwa_hub_user:password@localhost/rwa_hub")
+    
+    # 初始化数据库连接
+    engine = create_engine(DATABASE_URL)
+    Session = sessionmaker(bind=engine)
+    Base = declarative_base()
+    
+    # 定义模型 - 确保与应用模型结构一致
+    class Asset(Base):
+        __tablename__ = 'assets'
+        
+        id = Column(String(255), primary_key=True)
+        name = Column(String(255), nullable=False)
+        description = Column(Text, nullable=True)
+        asset_type = Column(String(50), nullable=False)
+        location = Column(String(255), nullable=True)
+        area = Column(String(50), nullable=True)
+        total_value = Column(String(50), nullable=True)
+        token_symbol = Column(String(50), nullable=True, unique=True)
+        token_price = Column(String(50), nullable=True)
+        token_supply = Column(String(50), nullable=True)
+        token_address = Column(String(255), nullable=True)
+        annual_revenue = Column(String(50), nullable=True)
+        images = Column(Text, nullable=True)
+        documents = Column(Text, nullable=True)
+        status = Column(String(50), default="pending")
+        reject_reason = Column(Text, nullable=True)
+        owner_address = Column(String(255), nullable=True)
+        creator_address = Column(String(255), nullable=True)
+        created_at = Column(DateTime, default=datetime.utcnow)
+        updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+        deleted_at = Column(DateTime, nullable=True)
+        remaining_supply = Column(String(50), nullable=True)
+        blockchain_details = Column(Text, nullable=True)
+        deployment_tx_hash = Column(String(255), nullable=True)
+        payment_details = Column(Text, nullable=True)
+        payment_confirmed = Column(String(10), default="false")
+        payment_confirmed_at = Column(DateTime, nullable=True)
+        approved_at = Column(DateTime, nullable=True)
+        approved_by = Column(String(255), nullable=True)
+    
+    # 确保数据库表存在
+    Base.metadata.create_all(engine)
+    
+    # 定义生成ID的函数
+    def generate_id():
+        return str(uuid.uuid4())
 
 # 支持的资产类型
 ASSET_TYPES = ['real_estate', 'art', 'commodity', 'fund', 'bond', 'stock']
@@ -64,29 +108,44 @@ def generate_token_symbol(asset_type, name):
 
 def create_asset(name, asset_type, description, blockchain, issuer_address, metadata=None):
     """创建新资产"""
-    session = Session()
     try:
+        # 获取数据库会话
+        if in_app_environment:
+            session = get_db_session()
+        else:
+            session = Session()
+        
         # 生成唯一ID
-        asset_id = str(uuid.uuid4())
+        asset_id = generate_id()
         
         # 生成代币符号
         token_symbol = generate_token_symbol(asset_type, name)
         
-        # 准备元数据
-        meta_dict = {
-            "issuer_address": issuer_address,
-            "creation_date": datetime.utcnow().isoformat()
-        }
-        
-        # 合并自定义元数据
+        # 解析元数据
+        meta_dict = {}
         if metadata:
             try:
                 if isinstance(metadata, str):
-                    meta_dict.update(json.loads(metadata))
+                    meta_dict = json.loads(metadata)
                 else:
-                    meta_dict.update(metadata)
+                    meta_dict = metadata
             except json.JSONDecodeError:
-                logger.warning("无法解析提供的元数据JSON，将使用默认元数据")
+                logger.warning("无法解析提供的元数据JSON，将使用空元数据")
+        
+        # 提取特定字段
+        location = meta_dict.get('location', '')
+        area = meta_dict.get('area', '')
+        total_value = meta_dict.get('total_value', '')
+        annual_revenue = meta_dict.get('annual_revenue', '')
+        token_price = meta_dict.get('token_price', '0')
+        token_supply = meta_dict.get('token_supply', '0')
+        
+        # 处理区块链信息
+        blockchain_details = {
+            "blockchain": blockchain.lower(),
+            "issuer_address": issuer_address,
+            "creation_date": datetime.utcnow().isoformat()
+        }
         
         # 创建资产记录
         asset = Asset(
@@ -95,8 +154,16 @@ def create_asset(name, asset_type, description, blockchain, issuer_address, meta
             description=description,
             asset_type=asset_type.lower(),
             token_symbol=token_symbol,
-            blockchain=blockchain.lower(),
-            meta_data=json.dumps(meta_dict, ensure_ascii=False),
+            location=location,
+            area=area,
+            total_value=total_value,
+            annual_revenue=annual_revenue,
+            token_price=token_price,
+            token_supply=token_supply,
+            remaining_supply=token_supply,
+            creator_address=issuer_address,
+            owner_address=issuer_address,
+            blockchain_details=json.dumps(blockchain_details, ensure_ascii=False),
             status="pending"
         )
         
@@ -106,31 +173,50 @@ def create_asset(name, asset_type, description, blockchain, issuer_address, meta
         logger.info(f"资产创建成功: ID={asset_id}, 代币符号={token_symbol}")
         return asset
     except Exception as e:
-        session.rollback()
+        if 'session' in locals():
+            session.rollback()
         logger.error(f"创建资产失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise
     finally:
-        session.close()
+        if 'session' in locals() and not in_app_environment:
+            session.close()
 
 def display_asset_info(asset):
     """显示资产信息"""
-    print("\n===== 新资产已创建 =====")
-    print(f"资产ID: {asset.id}")
-    print(f"资产名称: {asset.name}")
-    print(f"资产类型: {asset.asset_type}")
-    print(f"代币符号: {asset.token_symbol}")
-    print(f"区块链: {asset.blockchain}")
-    print(f"状态: {asset.status}")
+    asset_dict = {}
+    for c in asset.__table__.columns:
+        value = getattr(asset, c.name)
+        asset_dict[c.name] = value
     
-    # 显示元数据
-    if asset.meta_data:
+    print("\n===== 新资产已创建 =====")
+    print(f"资产ID: {asset_dict['id']}")
+    print(f"资产名称: {asset_dict['name']}")
+    print(f"资产类型: {asset_dict['asset_type']}")
+    print(f"代币符号: {asset_dict['token_symbol']}")
+    print(f"状态: {asset_dict['status']}")
+    
+    if asset_dict.get('asset_type', '').lower() == 'real_estate':
+        print(f"\n----- 不动产信息 -----")
+        print(f"位置: {asset_dict.get('location', 'N/A')}")
+        print(f"面积: {asset_dict.get('area', 'N/A')}")
+        print(f"总价值: {asset_dict.get('total_value', 'N/A')}")
+        print(f"年收益率: {asset_dict.get('annual_revenue', 'N/A')}")
+    
+    print(f"\n----- 代币信息 -----")
+    print(f"代币价格: {asset_dict.get('token_price', 'N/A')}")
+    print(f"代币总供应量: {asset_dict.get('token_supply', 'N/A')}")
+    print(f"剩余供应量: {asset_dict.get('remaining_supply', 'N/A')}")
+    
+    if asset_dict.get('blockchain_details'):
         try:
-            metadata = json.loads(asset.meta_data)
-            print("\n----- 元数据 -----")
-            for key, value in metadata.items():
+            blockchain_details = json.loads(asset_dict['blockchain_details'])
+            print("\n----- 区块链信息 -----")
+            for key, value in blockchain_details.items():
                 print(f"{key}: {value}")
         except:
-            print(f"元数据: {asset.meta_data}")
+            print(f"区块链信息: {asset_dict['blockchain_details']}")
 
 def validate_asset_type(value):
     """验证资产类型是否支持"""
@@ -170,21 +256,48 @@ if __name__ == "__main__":
         help=f"区块链平台, 支持的区块链: {', '.join(BLOCKCHAINS)}"
     )
     parser.add_argument("--issuer", "-i", required=True, help="发行人区块链地址")
+    parser.add_argument("--location", "-l", help="资产位置 (适用于不动产)")
+    parser.add_argument("--area", "-a", help="面积 (适用于不动产)")
+    parser.add_argument("--value", "-v", help="总价值")
+    parser.add_argument("--revenue", "-r", help="年收益率 (百分比)")
+    parser.add_argument("--price", "-p", help="代币单价")
+    parser.add_argument("--supply", "-s", help="代币总供应量")
     parser.add_argument("--metadata-file", "-m", help="JSON格式的元数据文件路径")
     parser.add_argument("--metadata-json", "-j", help="直接提供JSON格式的元数据")
     
     args = parser.parse_args()
     
     # 处理元数据
-    metadata = None
+    metadata = {}
+    
+    # 添加命令行参数中的元数据
+    if args.location:
+        metadata['location'] = args.location
+    if args.area:
+        metadata['area'] = args.area
+    if args.value:
+        metadata['total_value'] = args.value
+    if args.revenue:
+        metadata['annual_revenue'] = args.revenue
+    if args.price:
+        metadata['token_price'] = args.price
+    if args.supply:
+        metadata['token_supply'] = args.supply
+    
+    # 加载文件或JSON字符串中的元数据
+    file_metadata = None
     if args.metadata_file:
-        metadata = load_metadata_from_file(args.metadata_file)
+        file_metadata = load_metadata_from_file(args.metadata_file)
     elif args.metadata_json:
         try:
-            metadata = json.loads(args.metadata_json)
+            file_metadata = json.loads(args.metadata_json)
         except json.JSONDecodeError:
             logger.error("提供的JSON元数据格式无效")
             sys.exit(1)
+    
+    # 合并元数据
+    if file_metadata:
+        metadata.update(file_metadata)
     
     try:
         # 创建资产
@@ -201,7 +314,7 @@ if __name__ == "__main__":
         display_asset_info(asset)
         
         print("\n资产发行成功! 要查询此资产信息，可以运行:")
-        print(f"python query_asset.py {asset.token_symbol}")
+        print(f"rwa-tool query_asset {asset.token_symbol}")
         
         sys.exit(0)
     except Exception as e:
