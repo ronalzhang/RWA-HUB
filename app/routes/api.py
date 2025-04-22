@@ -2936,9 +2936,20 @@ def create_trade():
         # 参数校验
         try:
             asset_id = int(asset_id)
-            amount = Decimal(amount_str)
-            price = Decimal(price_str)
+            # 先尝试确保amount_str是一个整数字符串
+            try:
+                amount = int(amount_str)
+                amount = Decimal(amount)  # 转换为Decimal用于后续计算
+            except (ValueError, TypeError):
+                # 如果不能直接转为整数，尝试作为浮点数处理并取整
+                try:
+                    amount = int(float(amount_str))
+                    amount = Decimal(amount)
+                except (ValueError, TypeError):
+                    # 如果还是失败，尝试直接使用Decimal
+                    amount = Decimal(amount_str)
         except (ValueError, TypeError):
+            current_app.logger.error(f"无效的数字格式: asset_id={asset_id}, amount={amount_str}")
             return jsonify({'success': False, 'error': '无效的数字格式'}), 400
             
         if amount <= 0 or price <= 0:
