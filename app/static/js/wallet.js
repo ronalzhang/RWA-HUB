@@ -3472,7 +3472,7 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
                 },
                 body: JSON.stringify({
                     asset_id: assetId,
-                    amount: amount,
+                    amount: amount.toString(), // 将amount转换为字符串格式
                     // 请求体中的钱包地址同样保留，但主要依赖请求头
                     wallet_address: walletAddress
                 })
