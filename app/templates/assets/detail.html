@@ -522,86 +522,81 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById('dividendManagementBtn'),         // 正常屏幕
                         document.getElementById('dividendManagementBtnMobile'),   // 移动版
                         document.getElementById('dividendManagementBtnMedium')    // 中等屏幕
-                    ];
+                    ].filter(btn => btn); // 过滤掉null值
                     
-                    // 先隐藏所有按钮
+                    // 默认隐藏所有按钮
                     dividendBtns.forEach(btn => {
-                        if (btn) {
-                            btn.style.display = 'none';
-                            console.log('隐藏分红按钮:', btn.id);
-                        }
+                        btn.style.display = 'none';
                     });
                     
-                    // 首先检查钱包连接状态 - 使用多种可能的标志
-                    if (!window.walletState || 
-                        !(window.walletState.isConnected || window.walletState.connected) || 
-                        !window.walletState.address) {
-                        console.log('钱包未连接，保持分红管理按钮隐藏');
-                        return; // 按钮已隐藏，这里直接返回
+                    // 检查钱包连接状态
+                    const isConnected = window.walletState && (window.walletState.isConnected || window.walletState.connected) && window.walletState.address;
+                    if (!isConnected) {
+                        console.log('钱包未连接，隐藏分红按钮');
+                        return; 
                     }
                     
-                    // 直接检查walletState中的isAdmin状态
+                    // 钱包已连接，检查权限
                     const isWalletAdmin = window.walletState.isAdmin === true;
-                    
-                    // 前端渲染时的权限判断
                     const isOwnerFrontend = "{{ is_owner|lower }}" === "true";
                     const isAdminFrontend = "{{ is_admin_user|lower }}" === "true";
-                    
-                    console.log('权限状态检查：wallet_admin=', isWalletAdmin, 'owner=', isOwnerFrontend, 'admin=', isAdminFrontend);
-                    
-                    // 如果当前地址不匹配模板渲染时的地址，需要重新检查权限
                     const currentAddress = '{{ current_user_address|default("", true) }}';
                     const connectedAddress = window.walletState.address;
                     
-                    // 权限判断逻辑，必须至少满足一个条件：
-                    // 1. wallet中确认是管理员
-                    // 2. 地址匹配且前端渲染确认是管理员或所有者
                     let hasPermission = false;
                     
-                    // 如果wallet中已经确认是管理员
                     if (isWalletAdmin) {
-                        console.log('钱包状态确认用户是管理员');
+                        console.log('权限确认: 管理员 (来自钱包状态)');
                         hasPermission = true;
-                    }
-                    // 如果地址匹配且前端渲染已经确认有权限
-                    else if (currentAddress.toLowerCase() === connectedAddress.toLowerCase() && 
-                             (isOwnerFrontend || isAdminFrontend)) {
-                        console.log('前端模板确认用户有权限访问分红管理功能');
+                    } else if (currentAddress.toLowerCase() === connectedAddress.toLowerCase() && (isOwnerFrontend || isAdminFrontend)) {
+                        console.log('权限确认: 所有者或管理员 (来自后端)');
                         hasPermission = true;
-                    }
-                    // 如果地址不匹配，需要通过API重新检查权限
-                    else if (currentAddress.toLowerCase() !== connectedAddress.toLowerCase()) {
-                        console.log(`地址不匹配: 模板=${currentAddress}, 当前连接=${connectedAddress}`);
-                        return await checkOwnershipViaApi(connectedAddress);
-                    }
-                    
-                    // 如果有权限，显示所有按钮
-                    if (hasPermission) {
-                        const walletAddress = window.walletState.address;
-                        const dividendUrl = `/assets/${ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${walletAddress}`;
-                        
-                        // 更新所有按钮
-                        dividendBtns.forEach(btn => {
-                            if (btn) {
-                                btn.href = dividendUrl;
-                                // 根据按钮类型设置不同的显示样式
-                                if (btn.id === 'dividendManagementBtn') {
-                                    btn.style.display = 'inline-flex';
-                                } else if (btn.id === 'dividendManagementBtnMobile') {
-                                    btn.style.display = 'block';
-                                } else if (btn.id === 'dividendManagementBtnMedium') {
-                                    btn.style.display = 'block';
+                    } else if (currentAddress.toLowerCase() !== connectedAddress.toLowerCase()) {
+                        console.log(`地址不匹配，调用API检查权限: ${connectedAddress}`);
+                        // 如果地址不匹配，调用API检查
+                        try {
+                            const response = await fetch(`/api/assets/${ASSET_CONFIG.id}/check_owner`, {
+                                headers: { 'X-Eth-Address': connectedAddress }
+                            });
+                            if (response.ok) {
+                                const data = await response.json();
+                                if (data.is_owner || data.is_admin) {
+                                    console.log('权限确认: 所有者或管理员 (来自API)');
+                                    hasPermission = true;
                                 }
                             }
+                        } catch (apiError) {
+                            console.error('API权限检查失败:', apiError);
+                        }
+                    }
+                    
+                    // 如果有权限，则显示按钮
+                    if (hasPermission) {
+                        console.log('用户有权限，显示分红按钮');
+                        const dividendUrl = `/assets/${ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${connectedAddress}`;
+                        dividendBtns.forEach(btn => {
+                            btn.href = dividendUrl;
+                            btn.classList.remove('disabled'); // 确保移除禁用状态
+                            btn.style.pointerEvents = 'auto';
+                            btn.removeAttribute('title');
+                            if (btn.id === 'dividendManagementBtn') {
+                                btn.style.display = 'inline-flex';
+                            } else {
+                                btn.style.display = 'block';
+                            }
                         });
-                        
-                        console.log('已显示所有分红管理按钮');
                     } else {
-                        console.log('用户无权限访问分红管理功能，保持按钮隐藏');
+                        console.log('用户无权限，保持分红按钮隐藏');
                     }
                 } catch (error) {
                     console.error('检查管理权限失败:', error);
-                    // 出错时保持按钮隐藏状态
+                    // 出错时确保按钮隐藏
+                     const dividendBtns = [
+                        document.getElementById('dividendManagementBtn'),
+                        document.getElementById('dividendManagementBtnMobile'),
+                        document.getElementById('dividendManagementBtnMedium')
+                    ].filter(btn => btn);
+                    dividendBtns.forEach(btn => { btn.style.display = 'none'; });
                 }
             }
 
@@ -1221,38 +1216,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 function updateBuyButtonState() {
                     console.log('{{ _("Updating buy button status, current wallet status") }}:', window.walletState);
                     
-                    // 同时显示并更新分红按钮状态
-                    const updateDividendButtons = (isConnected) => {
-                        const buttons = [dividendBtn, dividendBtnMobile, dividendBtnMedium];
-                        buttons.forEach(btn => {
-                            if (btn) {
-                                // 首先显示按钮
-                                btn.style.display = 'inline-flex';
-                                
-                                if (isConnected) {
-                                    btn.classList.remove('disabled');
-                                    btn.style.pointerEvents = 'auto';
-                                } else {
-                                    btn.classList.add('disabled');
-                                    btn.style.pointerEvents = 'none';
-                                    btn.setAttribute('title', '{{ _("Please connect wallet first") }}');
-                                }
-                            }
-                        });
-                    };
-                    
-                    // 如果钱包已连接
-                    if (window.walletState && (window.walletState.isConnected || window.walletState.connected)) {
-                        buyButton.disabled = false;
-                        buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>{{ _("Buy") }}';
-                        console.log('{{ _("Wallet connected, enabling buy button") }}');
-                        updateDividendButtons(true);
-                    } else {
-                        buyButton.disabled = true;
-                        buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>{{ _("Connect Wallet First") }}';
-                        console.log('{{ _("Wallet not connected, disabling buy button") }}');
-                        updateDividendButtons(false);
+                    // 获取购买按钮
+                    const buyBtn = document.getElementById('buy-button');
+                    const isConnected = window.walletState && (window.walletState.isConnected || window.walletState.connected);
+
+                    // 更新购买按钮
+                    if (buyBtn) {
+                        if (isConnected) {
+                            buyBtn.disabled = false;
+                            buyBtn.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>{{ _("Buy") }}';
+                            buyBtn.removeAttribute('title');
+                        } else {
+                            buyBtn.disabled = true;
+                            buyBtn.innerHTML = '<i class="fas fa-wallet me-2"></i>{{ _("Connect Wallet First") }}';
+                            buyBtn.title = '{{ _("Please connect wallet first") }}';
+                        }
                     }
+                    
+                    // 调用检查分红按钮可见性逻辑
+                    checkDividendManagementAccess(); 
                 }
                 
                 // 初始状态检查
