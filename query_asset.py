@@ -94,6 +94,16 @@ if not in_app_environment:
         created_at = Column(DateTime, default=datetime.utcnow)
         updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+# 资产类型映射
+ASSET_TYPE_MAP = {
+    10: 'real_estate',
+    20: 'fund',
+    30: 'art',
+    40: 'commodity',
+    50: 'bond',
+    60: 'stock'
+}
+
 def format_asset_info(asset):
     """格式化资产信息输出"""
     asset_dict = {}
@@ -101,11 +111,19 @@ def format_asset_info(asset):
         value = getattr(asset, c.name)
         asset_dict[c.name] = value
         
+    # 获取资产类型的文本描述
+    asset_type_value = asset_dict.get('asset_type')
+    if isinstance(asset_type_value, int) or asset_type_value and asset_type_value.isdigit():
+        asset_type_int = int(asset_type_value)
+        asset_type_text = ASSET_TYPE_MAP.get(asset_type_int, f"未知类型({asset_type_int})")
+    else:
+        asset_type_text = str(asset_type_value)
+    
     output = [
         f"\n===== 资产详情 =====",
         f"资产ID: {asset_dict['id']}",
         f"资产名称: {asset_dict['name']}",
-        f"资产类型: {asset_dict['asset_type']}",
+        f"资产类型: {asset_type_text} ({asset_dict['asset_type']})",
         f"代币符号: {asset_dict['token_symbol']}",
         f"代币价格: {asset_dict.get('token_price', 'N/A')}",
         f"代币总供应量: {asset_dict.get('token_supply', 'N/A')}",
@@ -118,7 +136,7 @@ def format_asset_info(asset):
     ]
     
     # 如果是不动产，显示相关字段
-    if asset_dict.get('asset_type', '').lower() == 'real_estate' and asset_dict.get('location'):
+    if asset_type_text == 'real_estate' and asset_dict.get('location'):
         output.extend([
             f"\n----- 不动产信息 -----",
             f"位置: {asset_dict.get('location', 'N/A')}",
