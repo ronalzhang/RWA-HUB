@@ -108,3 +108,5 @@ config = {
     'production': ProductionConfig,
     'default': DevelopmentConfig
 } 
+# 添加购买合约地址配置
+Config.PURCHASE_CONTRACT_ADDRESS = os.environ.get('PURCHASE_CONTRACT_ADDRESS', 'rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
