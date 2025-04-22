@@ -203,6 +203,7 @@ def _get_asset_details(asset):
         'annual_revenue': asset.annual_revenue,
         'status': status_value,
         'owner_address': asset.owner_address,
+        'creator_address': asset.creator_address,  # 添加发起人地址
         'created_at': asset.created_at.strftime('%Y-%m-%d %H:%M:%S') if asset.created_at else None,
         'updated_at': asset.updated_at.strftime('%Y-%m-%d %H:%M:%S') if asset.updated_at else None,
         'remaining_supply': asset.remaining_supply,
