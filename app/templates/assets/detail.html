@@ -1416,24 +1416,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 模拟区块链交易流程
             async function simulateTransaction() {
-                console.log('{{ _("Simulating blockchain transaction process...") }}');
-                
-                // 模拟交易提交
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                console.log('{{ _("Transaction submitted to network") }}');
-                
-                // 模拟交易确认过程
-                for (let i = 1; i <= 3; i++) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    console.log(`{{ _("Received confirmation") }} ${i}`);
-                }
-                
-                console.log('{{ _("Transaction completed") }}');
-                return {
-                    txHash: 'mock_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15),
-                    confirmations: 3,
-                    status: 'confirmed'
-                };
+                 console.log('{{ _("Simulating blockchain transaction process...") }}');
+                 
+                 // 模拟交易提交
+                 await new Promise(resolve => setTimeout(resolve, 1000));
+                 console.log('{{ _("Transaction submitted to network") }}');
+                 
+                 // 模拟交易确认过程
+                 for (let i = 1; i <= 3; i++) {
+                     await new Promise(resolve => setTimeout(resolve, 500));
+                     console.log(`{{ _("Received confirmation") }} ${i}`);
+                 }
+                 
+                 console.log('{{ _("Transaction completed") }}');
+                 return {
+                     txHash: 'mock_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15),
+                     confirmations: 3,
+                     status: 'confirmed'
+                 };
             }
 
             // 缩短地址显示
@@ -1564,229 +1564,219 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
             // 处理购买按钮点击
-            async function handleBuy() {
-                const buyButton = document.getElementById('buy-button');
+            async function handleBuy(e) {
+                e.preventDefault();
+                
+                // 显示加载状态
+                if (typeof window.showLoadingState === 'function') {
+                    window.showLoadingState('正在处理购买请求...');
+                } else {
+                    console.log('显示加载状态');
+                }
+                
+                const buyButton = document.getElementById('buyButton');
                 const originalButtonText = buyButton.innerHTML;
                 
+                // 设置按钮为加载中状态
+                buyButton.disabled = true;
+                buyButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> {{ _("Processing...") }}';
+                
+                // 获取表单数据
+                const buyForm = document.getElementById('buyForm');
+                const formData = new FormData(buyForm);
+                const amount = formData.get('amount');
+                const tokenId = formData.get('token_id');
+                const assetId = formData.get('asset_id');
+                const price = formData.get('price');
+                const currency = formData.get('currency');
+                
+                // 格式化数字 - 确保没有逗号
+                const cleanAmount = amount.toString().replace(/,/g, '');
+                const cleanPrice = price.toString().replace(/,/g, '');
+                
+                // 格式化数字后的日志
+                console.log('购买信息:', {
+                    tokenId,
+                    assetId,
+                    amount: cleanAmount,
+                    formattedAmount: parseFloat(cleanAmount).toFixed(6),
+                    price: cleanPrice,
+                    formattedPrice: parseFloat(cleanPrice).toFixed(6),
+                    currency
+                });
+                
+                // 将清理后的数字设置回表单
+                const cleanFormData = new FormData();
+                cleanFormData.append('token_id', tokenId);
+                cleanFormData.append('asset_id', assetId);
+                cleanFormData.append('amount', parseFloat(cleanAmount).toFixed(6));
+                cleanFormData.append('price', parseFloat(cleanPrice).toFixed(6));
+                cleanFormData.append('currency', currency);
+                
                 try {
-                    setButtonLoading(buyButton, '{{ _("Processing...") }}');
-
-                    // 获取购买数量
-                    const amountInput = document.getElementById('purchase-amount');
-                    if (!amountInput) throw new Error('{{ _("Cannot find quantity input field") }}');
-                    const amount = parseFloat(amountInput.value);
-                    if (isNaN(amount) || amount <= 0) throw new Error('{{ _("Please enter a valid purchase quantity") }}');
-
-                    // 获取钱包地址
-                    const walletAddress = await getWalletAddress();
-                    if (!walletAddress) throw new Error('{{ _("Please connect wallet first") }}');
-
-                    // ----- 新流程开始 -----
-                    // 1. 调用后端准备购买接口
-                    showLoadingState('{{ _("Preparing transaction...") }}');
-                    const prepareResponse = await fetch('/api/trades/prepare_purchase', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Eth-Address': walletAddress
-                        },
-                        body: JSON.stringify({
-                            asset_id: parseInt("{{ asset.id }}"),
-                            amount: amount.toString()
-                        })
-                    });
-                    
-                    hideLoadingState();
-                    if (!prepareResponse.ok) {
-                        const errorData = await prepareResponse.json();
-                        throw new Error('{{ _("Failed to prepare purchase") }}: ' + (errorData.error || 'Unknown error'));
+                    // 检查钱包连接状态
+                    if (!window.walletState || !window.walletState.isConnected) {
+                        throw new Error('{{ _("Please connect your wallet first") }}');
                     }
 
-                    const prepareData = await prepareResponse.json();
-                    const { trade_id, total_amount, seller_address, platform_fee_basis_points, purchase_contract_address } = prepareData;
-
-                    // 2. 显示确认模态框（使用从后端获取的数据）
-                    const confirmAmount = document.getElementById('confirm-amount');
-                    const confirmTotal = document.getElementById('confirm-total');
-                    const platformFeeDisplay = document.getElementById('platform-fee'); // 移除这个显示，因为对用户不透明
-                    const actualPaymentDisplay = document.getElementById('actual-payment'); // 移除这个显示
-                    
-                    if (confirmAmount) confirmAmount.value = amount;
-                    // 显示总支付金额
-                    if (confirmTotal) confirmTotal.value = `${parseFloat(total_amount).toFixed(2)} USDC`; 
-                    
-                    // 隐藏平台费和卖家支付的显示
-                     if (platformFeeDisplay) platformFeeDisplay.closest('.mb-3').style.display = 'none';
-                     if (actualPaymentDisplay) actualPaymentDisplay.closest('.mb-3').style.display = 'none';
-                    
-                    const buyModal = new bootstrap.Modal(document.getElementById('buyModal'));
-                    buyModal.show();
-                    
-                    // 3. 等待用户在模态框中确认
                     return new Promise((resolve, reject) => {
-                        window.confirmPurchase = async function() {
-                            try {
-                                buyModal.hide();
-                                setButtonLoading(buyButton, '{{ _("Calling Wallet...") }}');
-                                showLoadingState('{{ _("Calling wallet to sign transaction...") }}');
-
-                                // 4. 调用智能合约
-                                if (!window.walletState || !window.walletState.callPurchaseContract) {
-                                     throw new Error('{{ _("Wallet function callPurchaseContract is not available.") }}');
-                                }
-
-                                // 确保资产信息已加载到全局变量 (假设 refreshAssetInfo 会填充 window.currentAssetInfo)
-                                if (!window.currentAsset || !window.currentAsset.asset_account_address || !window.currentAsset.price) {
-                                    console.log('资产信息未加载，尝试重新加载...');
-                                    try {
-                                        await refreshAssetInfo(); // 尝试加载
-                                        if (!window.currentAsset || !window.currentAsset.asset_account_address || !window.currentAsset.price) {
-                                            throw new Error('无法加载必要的资产信息 (账户地址或价格)');
-                                        }
-                                    } catch (refreshError) {
-                                        console.error('刷新资产信息失败:', refreshError);
-                                        throw new Error('{{ _("Failed to load asset details. Cannot proceed with purchase.") }}');
-                                    }
-                                }
-
-                                // 构建调用智能合约的参数 (适配新的 callPurchaseContract)
-                                const contractParams = {
-                                    contractAddress: purchase_contract_address, // 这是程序ID
-                                    assetId: "{{ asset.id }}", // 添加 assetId
-                                    buyerAddress: walletAddress,
-                                    sellerAddress: seller_address,
-                                    totalAmount: parseFloat(total_amount) // 传递总支付金额
-                                    // 移除 platformFeeBasisPoints
-                                };
-
-                                current_app.logger.info('Calling purchase contract with params:', contractParams);
-
-                                // 调用钱包与智能合约交互
-                                const contractResult = await window.walletState.callPurchaseContract(contractParams);
-                                
-                                hideLoadingState();
-
-                                if (!contractResult || !contractResult.success || !contractResult.txHash) {
-                                    throw new Error('{{ _("Contract interaction failed or rejected by user.") }} ' + (contractResult.error || ''));
-                                }
-
-                                const txHash = contractResult.txHash;
-                                current_app.logger.info('Contract interaction successful, TxHash:', txHash);
-                                setButtonLoading(buyButton, '{{ _("Confirming Payment...") }}');
-                                showLoadingState('{{ _("Confirming payment with server...") }}');
-
-                                // 5. 调用后端确认支付接口
-                                const confirmResponse = await fetch(`/api/trades/confirm_payment/${trade_id}`, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'X-Eth-Address': walletAddress
-                                    },
-                                    body: JSON.stringify({ tx_hash: txHash })
-                                });
-                                
-                                hideLoadingState();
-
-                                if (!confirmResponse.ok) {
-                                    const errorData = await confirmResponse.json();
-                                    // 即使确认失败，交易也已发送，提示用户检查钱包
-                                    showError('{{ _("Transaction sent, but failed to confirm with server. Please check your wallet and transaction history.") }} ' + (errorData.error || ''));
-                                    reject(new Error('{{ _("Failed to confirm payment") }}: ' + (errorData.error || 'Unknown error')));
-                                    return; 
-                                }
-
-                                // 6. 显示初步成功消息，并提示用户等待链上确认
-                                showSuccess('{{ _("Transaction sent successfully! Waiting for blockchain confirmation...") }}');
-                                
-                                // TODO: 后续可以考虑启动一个轮询来检查交易状态，或者提示用户刷新查看
-                                setTimeout(async () => {
-                                     showInfo('{{ _("Refreshing transaction history...") }}');
-                                await refreshAssetInfo();
-                                     loadTradeHistory(1); // 刷新交易历史
-                                }, 3000); // 延迟刷新
-                                
-                                resolve(true);
-
-                            } catch (error) {
-                                hideLoadingState();
-                                console.error('{{ _("Purchase confirmation failed") }}:', error);
-                                showError(error.message || '{{ _("Purchase failed, please try again later") }}');
-                                reject(error); // Reject the promise on error
-                            } finally {
-                                resetButton(buyButton, originalButtonText);
+                        // 准备购买请求
+                        fetch('/api/trades/prepare_purchase', {
+                            method: 'POST',
+                            body: cleanFormData,
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
                             }
-                        };
-                        
-                        // 如果用户关闭了模态框而未确认
-                        const modalElement = document.getElementById('buyModal');
-                        modalElement.addEventListener('hidden.bs.modal', () => {
-                             // 检查 confirmPurchase 是否已经被调用（即用户是否点击了确认）
-                             // 如果没有，意味着用户取消了操作
-                             if (typeof window.confirmPurchase !== 'undefined') {
-                                // 清除函数，防止后续意外调用
-                                delete window.confirmPurchase; 
-                                resetButton(buyButton, originalButtonText);
-                                console.log('Purchase cancelled by user.');
-                                reject(new Error('Purchase cancelled by user.')); // Reject if cancelled
-                             }
-                        }, { once: true }); // Use once to avoid multiple listeners
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(data => {
+                                    throw new Error(data.error || '{{ _("Server error") }}');
+                                });
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (!data.success) {
+                                throw new Error(data.error || '{{ _("Failed to prepare purchase") }}');
+                            }
+                            
+                            console.log('购买准备成功:', data);
+                            
+                            // 显示确认购买模态框
+                            const buyModal = new bootstrap.Modal(document.getElementById('buyModal'));
+                            document.getElementById('confirm-amount').value = cleanAmount;
+                            document.getElementById('confirm-total').value = data.total_amount + ' USDC';
+                            
+                            // 存储交易ID和其他必要数据，用于确认时调用
+                            window.pendingPurchase = {
+                                trade_id: data.trade_id,
+                                total: data.total_amount,
+                                amount: cleanAmount,
+                                total_cost: data.total_amount,
+                                seller: data.seller_address,
+                                recipient_address: data.seller_address,
+                                platform_fee_basis_points: data.platform_fee_basis_points,
+                                contract_address: data.purchase_contract_address
+                            };
+                            
+                            buyModal.show();
+                            resolve(data);
+                        })
+                        .catch(error => {
+                            console.error('购买准备失败:', error);
+                            hideLoadingState();
+                            showError(error.message || '{{ _("Failed to prepare purchase") }}');
+                            reject(error);
+                        });
                     });
                 } catch (error) {
+                    console.error('购买处理错误:', error);
                     hideLoadingState();
-                    console.error('{{ _("Purchase process failed") }}:', error);
-                    showError(error.message || '{{ _("Purchase process failed") }}');
-                    resetButton(buyButton, originalButtonText);
-                    return false; // Return false on initial error
+                    showError(error.message || '{{ _("An error occurred during purchase") }}');
+                    throw error;
+                }
+            }
+
+            // 确认购买函数 - 从购买模态框调用
+            async function confirmPurchase() {
+                // 检查是否有待处理的购买
+                if (!window.pendingPurchase || !window.pendingPurchase.trade_id) {
+                    showError('{{ _("No pending purchase to confirm") }}');
+                    return;
+                }
+                
+                // 显示加载状态
+                if (typeof window.showLoadingState === 'function') {
+                    window.showLoadingState('{{ _("Confirming your purchase...") }}');
+                }
+                
+                // 禁用确认按钮
+                const confirmButton = document.querySelector('#buyModal .btn-primary');
+                if (confirmButton) {
+                    confirmButton.disabled = true;
+                    confirmButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> {{ _("Processing...") }}';
+                }
+                
+                try {
+                    // 获取钱包状态
+                    if (!window.walletState || !window.walletState.isConnected) {
+                        throw new Error('{{ _("Wallet is not connected") }}');
+                    }
+                    
+                    // 提取购买数据，使用pendingPurchase中的信息
+                    const purchaseData = {
+                        asset_id: {{ asset.id }},
+                        amount: window.pendingPurchase.amount,
+                        total_cost: window.pendingPurchase.total_cost,
+                        recipient_address: window.pendingPurchase.recipient_address || "{{ asset.creator_address }}"
+                    };
+                    
+                    console.log("准备确认购买:", purchaseData);
+                    
+                    // 调用wallet.js中的confirmPurchase函数执行购买
+                    if (typeof window.confirmPurchase === 'function') {
+                        // 使用全局confirmPurchase函数
+                        await window.confirmPurchase(purchaseData, document.getElementById('buyModal'), confirmButton);
+                    } else if (typeof window.walletState.confirmPurchase === 'function') {
+                        // 或者使用钱包状态中的confirmPurchase方法
+                        await window.walletState.confirmPurchase(purchaseData);
+                    } else {
+                        throw new Error('{{ _("Purchase function not available") }}');
+                    }
+                    
+                    // 隐藏模态框 (成功情况下将在confirmPurchase函数中处理)
+                    
+                } catch (error) {
+                    console.error('确认购买失败:', error);
+                    showError(error.message || '{{ _("Failed to confirm purchase") }}');
+                    
+                    // 恢复确认按钮状态
+                    if (confirmButton) {
+                        confirmButton.disabled = false;
+                        confirmButton.innerHTML = '{{ _("Confirm Purchase & Pay") }}';
+                    }
+                } finally {
+                    // 隐藏加载状态
+                    if (typeof window.hideLoadingState === 'function') {
+                        window.hideLoadingState();
+                    }
                 }
             }
 
             // 更新确认模态框，移除平台费和卖家支付信息
             const buyModalHtml = `
-            <div class="modal fade" id="buyModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">{{ _("Confirm Purchase") }}</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="mb-3">
-                                <label class="form-label">{{ _("Purchase Quantity") }}</label>
-                                <input type="text" class="form-control" id="confirm-amount" readonly>
+                <div class="modal fade" id="buyModal" tabindex="-1" aria-labelledby="buyModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="buyModalLabel">{{ _("Confirm Purchase") }}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label">{{ _("Total Payment Amount") }}</label>
-                                <input type="text" class="form-control" id="confirm-total" readonly>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label for="confirm-amount" class="form-label">{{ _("Amount") }}</label>
+                                    <input type="text" class="form-control" id="confirm-amount" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="confirm-total" class="form-label">{{ _("Total Payment") }}</label>
+                                    <input type="text" class="form-control" id="confirm-total" readonly>
+                                </div>
+                                <div class="alert alert-info">
+                                    {{ _("By confirming this purchase, you agree to pay the total amount shown above. Make sure your wallet has enough USDC for this transaction.") }}
+                                </div>
                             </div>
-                            <!-- 移除平台费和卖家支付显示 -->
-                            <!-- <div class="mb-3" style="display: none;"> -->
-                            <!--    <label class="form-label">{{ _("Platform Fee") }} ({{ (PLATFORM_FEE_RATE * 100)|round(1)|default(3.5) }}%)</label> -->
-                            <!--    <input type="text" class="form-control" id="platform-fee" readonly> -->
-                            <!-- </div> -->
-                            <!-- <div class="mb-3" style="display: none;"> -->
-                            <!--    <label class="form-label">{{ _("Actual Payment to Seller") }}</label> -->
-                            <!--    <input type="text" class="form-control" id="actual-payment" readonly> -->
-                            <!-- </div> -->
-                             <div class="alert alert-info mt-3">
-                                <i class="fas fa-info-circle me-2"></i>
-                                {{ _("Confirming will initiate a transaction request in your wallet for the total amount.") }}
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _("Cancel") }}</button>
+                                <button type="button" class="btn btn-primary" onclick="confirmPurchase()">{{ _("Confirm Purchase & Pay") }}</button>
                             </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _("Cancel") }}</button>
-                            <button type="button" class="btn btn-primary" onclick="confirmPurchase()">{{ _("Confirm Purchase & Pay") }}</button>
                         </div>
                     </div>
                 </div>
-            </div>
             `;
 
-            // 在页面加载时添加模态框
-            document.addEventListener('DOMContentLoaded', () => {
-                if (!document.getElementById('buyModal')) {
-                    document.body.insertAdjacentHTML('beforeend', buyModalHtml);
-                }
-            });
+            // 将模态框添加到页面
+            document.body.insertAdjacentHTML('beforeend', buyModalHtml);
 
             // 添加单独刷新钱包资产列表的函数 - 使用全局loadUserAssets函数替代
             function refreshWalletAssets() {
