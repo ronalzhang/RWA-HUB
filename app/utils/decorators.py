@@ -42,6 +42,13 @@ def eth_address_required(f):
                 g.eth_address = eth_address
                 current_app.logger.info(f"从请求头获取钱包地址: {eth_address}")
         
+        # 检查Wallet-Address头部
+        if not eth_address and 'X-Wallet-Address' in request.headers:
+            eth_address = request.headers.get('X-Wallet-Address')
+            if eth_address:
+                g.eth_address = eth_address
+                current_app.logger.info(f"从X-Wallet-Address请求头获取钱包地址: {eth_address}")
+        
         # 检查cookie
         if not eth_address:
             eth_address = request.cookies.get('eth_address')
