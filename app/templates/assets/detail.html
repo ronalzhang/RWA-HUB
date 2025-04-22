@@ -2338,7 +2338,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                             <div id="buy-error" class="alert alert-danger" style="display: none;"></div>
                         
-                        <button type="button" id="buy-button" class="btn btn-primary w-100 py-2">
+                        <button type="button" id="buy-button" class="btn btn-primary w-100 py-2" data-token-price="{{ asset.token_price }}">
                                 <i class="fas fa-shopping-cart me-2"></i>{{ _('Buy') }}
                             </button>
                     </form>
