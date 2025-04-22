@@ -3513,10 +3513,10 @@ function showBuyModal(prepareData) {
 
         setText('modalAssetName', prepareData.asset_name);
         setText('modalAmount', prepareData.amount);
-        setText('modalPricePerToken', prepareData.price_per_token?.toFixed(2) || 'N/A');
-        setText('modalSubtotal', prepareData.subtotal?.toFixed(2) || 'N/A');
-        setText('modalFee', prepareData.fee?.toFixed(2) || 'N/A');
-        setText('modalTotalCost', prepareData.total_cost?.toFixed(2) || 'N/A');
+        setText('modalPricePerToken', typeof prepareData.price_per_token === 'number' ? prepareData.price_per_token.toFixed(2) : parseFloat(prepareData.price_per_token)?.toFixed(2) || 'N/A');
+        setText('modalSubtotal', typeof prepareData.subtotal === 'number' ? prepareData.subtotal.toFixed(2) : parseFloat(prepareData.subtotal)?.toFixed(2) || 'N/A');
+        setText('modalFee', typeof prepareData.fee === 'number' ? prepareData.fee.toFixed(2) : parseFloat(prepareData.fee)?.toFixed(2) || 'N/A');
+        setText('modalTotalCost', typeof prepareData.total_cost === 'number' ? prepareData.total_cost.toFixed(2) : parseFloat(prepareData.total_cost)?.toFixed(2) || 'N/A');
         setCode('modalRecipientAddress', prepareData.recipient_address);
 
 
