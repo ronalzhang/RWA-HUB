@@ -2506,7 +2506,7 @@ async connectPhantom(isReconnect = false) {
                     body: JSON.stringify({
                         token_symbol: tokenSymbol,
                         to_address: to,
-                        amount: amount,
+                        amount: parseInt(amount, 10) + "",
                     from_address: fromAddress
                     })
                 });
