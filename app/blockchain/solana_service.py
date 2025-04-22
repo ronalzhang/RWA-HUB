@@ -320,20 +320,42 @@ def execute_transfer_transaction(
             result = solana_connection.rpc_client._make_request(
                 "sendTransaction",
                 [transaction_base58, {
-                    "skipPreflight": False,
-                    "preflightCommitment": "confirmed"
+                    "skipPreflight": True,  # 减少预检错误
+                    "preflightCommitment": "processed"  # 使用更快的确认级别
                 }]
             )
             
             # 详细记录结果
-            logger.info(f"发送交易响应: {json.dumps(result, indent=2)}")
+            # 避免JSON序列化错误
+            try:
+                result_str = json.dumps(result, indent=2)
+                logger.info(f"发送交易响应: {result_str}")
+            except Exception as json_error:
+                logger.error(f"无法序列化响应: {str(json_error)}")
+                logger.info(f"原始响应类型: {type(result)}")
             
             # 获取交易签名
-            signature = result.get('result', None)
+            signature = None
+            try:
+                if isinstance(result, dict) and 'result' in result:
+                    signature = result['result']
+            except Exception as e:
+                logger.error(f"提取签名失败: {str(e)}")
             
             if not signature:
-                error_info = result.get('error', {})
-                error_message = error_info.get('message', '未知错误') if isinstance(error_info, dict) else str(error_info)
+                error_info = {}
+                error_message = "未知错误"
+                
+                try:
+                    if isinstance(result, dict) and 'error' in result:
+                        error_info = result['error']
+                        if isinstance(error_info, dict) and 'message' in error_info:
+                            error_message = error_info['message']
+                        else:
+                            error_message = str(error_info)
+                except Exception as e:
+                    logger.error(f"提取错误信息失败: {str(e)}")
+                    
                 logger.error(f"未获取到交易签名，错误: {error_message}")
                 raise Exception(f"未获取到交易签名: {error_message}")
                 

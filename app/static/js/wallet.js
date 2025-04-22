@@ -2506,8 +2506,8 @@ async connectPhantom(isReconnect = false) {
                     body: JSON.stringify({
                         token_symbol: tokenSymbol,
                         to_address: to,
-                        amount: parseInt(amount, 10) + "",
-                    from_address: fromAddress
+                        amount: parseFloat(amount).toString(), // 修改为parseFloat并转换为字符串
+                        from_address: fromAddress
                     })
                 });
                 
@@ -3597,7 +3597,8 @@ async function confirmPurchase(purchaseData, modalElement, confirmBtn) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Wallet-Address': walletState.address // Send wallet address
+                'X-Wallet-Address': walletState.address, // 添加钱包地址
+                'X-Eth-Address': walletState.address // 为兼容性保留
             },
             body: JSON.stringify({
                 asset_id: assetId,
@@ -3692,7 +3693,8 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Wallet-Address': walletState.address // 发送钱包地址
+                'X-Wallet-Address': walletState.address, // 发送钱包地址
+                'X-Eth-Address': walletState.address // 为兼容性保留
             },
             body: JSON.stringify({
                 asset_id: assetId,
