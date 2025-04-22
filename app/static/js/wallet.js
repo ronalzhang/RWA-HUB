@@ -3465,14 +3465,16 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-Eth-Address': walletAddress,
+                    // 下面的头字段保留作为兼容但不再是主要用途
                     'X-Wallet-Address': walletAddress,
-                    // 尝试添加备用的authorization头
                     'Authorization': `Wallet ${walletAddress}`
                 },
                 body: JSON.stringify({
                     asset_id: assetId,
                     amount: amount,
-                    wallet_address: walletAddress  // 在请求体中也发送钱包地址
+                    // 请求体中的钱包地址同样保留，但主要依赖请求头
+                    wallet_address: walletAddress
                 })
             });
 
