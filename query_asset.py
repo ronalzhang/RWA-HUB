@@ -97,7 +97,7 @@ if not in_app_environment:
 # 资产类型映射
 ASSET_TYPE_MAP = {
     10: 'real_estate',
-    20: 'fund',
+    20: 'similar_assets',
     30: 'art',
     40: 'commodity',
     50: 'bond',
