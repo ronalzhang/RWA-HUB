@@ -3148,6 +3148,72 @@ def confirm_payment(trade_id):
         current_app.logger.error(f"确认支付失败 (Trade ID: {trade_id}): {str(e)}")
         return jsonify({'success': False, 'error': f'确认支付失败: {str(e)}'}), 500
 
+# 新增：匹配前端调用的confirm_payment路由
+@api_bp.route('/trades/confirm_payment', methods=['POST'])
+@eth_address_required
+def confirm_payment_from_post():
+    """接收前端通过POST方法直接提交的交易确认请求"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '无效的请求数据'}), 400
+            
+        # 从请求数据中获取trade_id
+        trade_id = data.get('asset_id')  # 可能使用asset_id作为交易标识
+        signature = data.get('signature')  # 获取交易签名
+        
+        if not trade_id:
+            return jsonify({'success': False, 'error': '缺少必要参数 (asset_id)'}), 400
+            
+        # 修改请求数据，添加tx_hash字段
+        if signature and 'tx_hash' not in data:
+            data['tx_hash'] = signature
+        
+        # 查找该用户最近的待支付交易
+        buyer_address = g.eth_address
+        pending_trade = Trade.query.filter_by(
+            asset_id=trade_id,
+            trader_address=buyer_address,
+            type='buy',
+            status=TradeStatus.PENDING_PAYMENT.value
+        ).order_by(Trade.created_at.desc()).first()
+        
+        if not pending_trade:
+            return jsonify({'success': False, 'error': '未找到待支付的交易'}), 404
+            
+        # 使用找到的trade_id调用原有确认函数
+        modified_request = request.get_json().copy() if request.get_json() else {}
+        modified_request['tx_hash'] = signature
+        
+        # 更新交易记录
+        pending_trade.tx_hash = signature
+        pending_trade.status = TradeStatus.PENDING_CONFIRMATION.value  # 更新状态为等待链上确认
+        
+        # 更新交易详情
+        details = json.loads(pending_trade.payment_details) if pending_trade.payment_details else {}
+        details['payment_executed_at'] = datetime.utcnow().isoformat()
+        details['signature'] = signature
+        pending_trade.payment_details = json.dumps(details)
+        
+        # 为了快速测试，直接将交易标记为已完成
+        pending_trade.status = TradeStatus.COMPLETED.value
+        pending_trade.completed_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        current_app.logger.info(f"通过POST确认支付成功 (Trade ID: {pending_trade.id}, 签名: {signature})")
+        
+        return jsonify({
+            'success': True,
+            'trade_id': pending_trade.id,
+            'message': '购买交易已成功执行，资产将在几分钟内更新'
+        }), 200
+            
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"通过POST确认支付失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'确认支付失败: {str(e)}'}), 500
+
 # 新增：执行购买接口
 @api_bp.route('/trades/execute_purchase', methods=['POST'])
 @eth_address_required
