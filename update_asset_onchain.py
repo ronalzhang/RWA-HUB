@@ -40,7 +40,7 @@ class Asset(Base):
     token_symbol = Column(String(50), nullable=True, unique=True)
     blockchain = Column(String(50), nullable=True)
     contract_address = Column(String(255), nullable=True)
-    metadata = Column(Text, nullable=True)
+    meta_data = Column(Text, nullable=True)  # 重命名为meta_data以避免与SQLAlchemy保留字冲突
     status = Column(String(50), default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -98,9 +98,9 @@ def update_asset_onchain(token_symbol, contract_address, tx_hash=None, status="a
         
         # 更新元数据
         metadata = {}
-        if asset.metadata:
+        if asset.meta_data:
             try:
-                metadata = json.loads(asset.metadata)
+                metadata = json.loads(asset.meta_data)
             except json.JSONDecodeError:
                 logger.warning("无法解析现有元数据，将创建新的元数据")
                 metadata = {}
@@ -110,7 +110,7 @@ def update_asset_onchain(token_symbol, contract_address, tx_hash=None, status="a
         if tx_hash:
             metadata["deployment_tx_hash"] = tx_hash
         
-        asset.metadata = json.dumps(metadata, ensure_ascii=False)
+        asset.meta_data = json.dumps(metadata, ensure_ascii=False)
         asset.updated_at = datetime.utcnow()
         
         session.commit()
@@ -135,14 +135,14 @@ def display_updated_asset(asset):
     print(f"更新时间: {asset.updated_at}")
     
     # 显示元数据
-    if asset.metadata:
+    if asset.meta_data:
         try:
-            metadata = json.loads(asset.metadata)
+            metadata = json.loads(asset.meta_data)
             print("\n----- 元数据 -----")
             for key, value in metadata.items():
                 print(f"{key}: {value}")
         except:
-            print(f"元数据: {asset.metadata}")
+            print(f"元数据: {asset.meta_data}")
 
 def list_assets(filter_status=None):
     """列出所有资产或按状态筛选资产"""
