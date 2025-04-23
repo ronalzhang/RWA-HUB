@@ -3081,31 +3081,32 @@ def prepare_purchase():
             if not amount_str:
                 return jsonify({'error': '缺少数量参数'}), 400
             
+            # 先尝试转换为整数（大多数情况）
             try:
-                # 尝试转换为浮点数
-                amount_float = float(amount_str)
-                
-                # 检查是否为正数
-                if amount_float <= 0:
+                amount_int = int(amount_str)
+                if amount_int <= 0:
                     return jsonify({'error': '数量必须大于0'}), 400
-                    
-                # 检查是否为整数
-                if amount_float % 1 != 0:
-                    return jsonify({'error': '数量必须是整数'}), 400
-                    
+                
                 # 确保最小数量为1
-                amount_float = max(1, int(amount_float))
-                amount = str(amount_float)
+                amount = str(max(1, amount_int))
+                current_app.logger.info(f"整数转换成功: {amount_str} -> {amount}")
             except (ValueError, TypeError):
-                current_app.logger.error(f"金额格式转换错误: {amount}")
-                return jsonify({'error': '无效的金额格式'}), 400
-                
-            # 检查是否>=1
-            if int(amount) < 1:
-                current_app.logger.warning(f"收到无效数量: {amount}，最小数量为1")
-                return jsonify({'success': False, 'error': '代币购买数量必须大于或等于1'}), 400
-                
-            current_app.logger.info(f"处理后的代币数量: {amount}")
+                # 如果不是整数，再尝试转换为浮点数
+                try:
+                    amount_float = float(amount_str)
+                    if amount_float <= 0:
+                        return jsonify({'error': '数量必须大于0'}), 400
+                    
+                    # 检查是否为整数
+                    if amount_float != int(amount_float):
+                        return jsonify({'error': '数量必须是整数'}), 400
+                        
+                    # 确保最小数量为1
+                    amount = str(max(1, int(amount_float)))
+                    current_app.logger.info(f"浮点数转换成功: {amount_str} -> {amount}")
+                except (ValueError, TypeError):
+                    current_app.logger.error(f"金额格式转换错误: {amount_str}")
+                    return jsonify({'error': '无效的金额格式'}), 400
         except Exception as e:
             current_app.logger.error(f"数量转换失败: {str(e)}, 原始值: {amount_str}")
             return jsonify({'success': False, 'error': f'无效的数字格式: {amount_str}'}), 400
