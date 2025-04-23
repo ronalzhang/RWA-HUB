@@ -2624,12 +2624,8 @@ def execute_transfer():
         })
             
     except Exception as e:
-        # 添加详细日志记录
-        import traceback
-        error_traceback = traceback.format_exc()
-        current_app.logger.error(f"处理转账请求时捕获到未处理异常: {str(e)}")
-        current_app.logger.error(f"Traceback:\n{error_traceback}")
-        return jsonify({'success': False, 'error': f'处理请求失败: 服务内部错误'}), 500
+        current_app.logger.error(f"处理转账请求失败: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
 
 # 添加新的区块链交易相关API路由
 @api_bp.route('/trades/<int:trade_id>', methods=['GET'])
@@ -3100,7 +3096,7 @@ def prepare_purchase():
                 return jsonify({'error': '无效的金额格式'}), 400
                 
             # 检查是否>=1
-            if amount < 1:
+            if int(amount) < 1:
                 current_app.logger.warning(f"收到无效数量: {amount}，最小数量为1")
                 return jsonify({'success': False, 'error': '代币购买数量必须大于或等于1'}), 400
                 

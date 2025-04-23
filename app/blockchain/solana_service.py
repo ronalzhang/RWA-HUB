@@ -303,15 +303,11 @@ def execute_transfer_transaction(
     Returns:
         str: 交易签名或包含错误信息的字典
     """
-    # === Step 0: Mark Start ===
-    logger.info(f"[execute_transfer_transaction] START")
     try:
-        # === Step 1: Log Params ===
-        logger.info(f"[execute_transfer_transaction] Step 1: Logging Params")
+        # 1. 详细记录输入参数
         logger.info(f"转账参数: token={token_symbol}, from={from_address}({type(from_address).__name__}), to={to_address}({type(to_address).__name__}), amount={amount}({type(amount).__name__})")
         
-        # === Step 2: Check Integrity ===
-        logger.info(f"[execute_transfer_transaction] Step 2: Checking Param Integrity")
+        # 2. 检查参数完整性
         if not all([token_symbol, from_address, to_address, amount]):
             missing = []
             if not token_symbol: missing.append("token_symbol")
@@ -319,71 +315,66 @@ def execute_transfer_transaction(
             if not to_address: missing.append("to_address")
             if not amount: missing.append("amount")
             error_msg = f"缺少必要参数: {', '.join(missing)}"
-            logger.error(f"[execute_transfer_transaction] Failed Step 2: {error_msg}")
+            logger.error(error_msg)
             return {"success": False, "error": error_msg}
         
-        # === Step 3: Validate Amount ===
-        logger.info(f"[execute_transfer_transaction] Step 3: Validating Amount")
+        # 3. 验证并处理金额 - 确保是整数不小于1
         try:
             # 尝试转换为数字
             if isinstance(amount, str):
                 amount = amount.strip()
                 if not amount:
                     error_msg = "金额不能为空"
-                    logger.error(f"[execute_transfer_transaction] Failed Step 3a: {error_msg}")
+                    logger.error(error_msg)
                     return {"success": False, "error": error_msg}
                 # 检查是否包含小数点，如果有则错误
                 if '.' in amount:
                     error_msg = "代币数量必须是整数（不可分割）"
-                    logger.error(f"[execute_transfer_transaction] Failed Step 3b: {error_msg}")
+                    logger.error(error_msg)
                     return {"success": False, "error": error_msg}
                 amount = int(amount)
             else:
                 # 如果是浮点数且有小数部分
                 if isinstance(amount, float) and amount != int(amount):
                     error_msg = "代币数量必须是整数（不可分割）"
-                    logger.error(f"[execute_transfer_transaction] Failed Step 3c: {error_msg}")
+                    logger.error(error_msg)
                     return {"success": False, "error": error_msg}
                 amount = int(amount)
             
             # 检查是否>=1
             if amount < 1:
                 error_msg = "代币数量必须大于或等于1"
-                logger.error(f"[execute_transfer_transaction] Failed Step 3d: {error_msg}")
+                logger.error(error_msg)
                 return {"success": False, "error": error_msg}
                 
-            logger.info(f"[execute_transfer_transaction] Step 3 OK: Validated Amount = {amount}")
+            logger.info(f"验证后的金额: {amount}")
         except Exception as e:
             error_msg = f"金额格式无效: {str(e)}"
-            logger.error(f"[execute_transfer_transaction] Failed Step 3 Exception: {error_msg}")
+            logger.error(error_msg)
             return {"success": False, "error": error_msg}
         
-        # === Step 4: Validate Addresses ===
-        logger.info(f"[execute_transfer_transaction] Step 4: Validating Addresses")
+        # 4. 验证地址格式
         if not validate_solana_address(from_address):
             error_msg = f"发送方地址格式无效: {from_address}"
-            logger.error(f"[execute_transfer_transaction] Failed Step 4a: {error_msg}")
+            logger.error(error_msg)
             return {"success": False, "error": error_msg}
             
         if not validate_solana_address(to_address):
             error_msg = f"接收方地址格式无效: {to_address}"
-            logger.error(f"[execute_transfer_transaction] Failed Step 4b: {error_msg}")
+            logger.error(error_msg)
             return {"success": False, "error": error_msg}
-        logger.info(f"[execute_transfer_transaction] Step 4 OK: Addresses Validated")
-
-        # === Step 5: Create Solana Client ===
-        logger.info(f"[execute_transfer_transaction] Step 5: Creating Solana Client")
+        
+        # 5. 创建Solana客户端实例
         try:
             from app.utils.solana import SolanaClient
             solana_client = SolanaClient()
-            logger.info("[execute_transfer_transaction] Step 5 OK: Solana Client Created")
+            logger.info("成功创建Solana客户端")
         except Exception as e:
             error_msg = f"创建Solana客户端失败: {str(e)}"
-            logger.error(f"[execute_transfer_transaction] Failed Step 5: {error_msg}", exc_info=True)
+            logger.error(error_msg)
             return {"success": False, "error": error_msg}
         
-        # === Step 6: Get Token Mint Address ===
-        logger.info(f"[execute_transfer_transaction] Step 6: Getting Token Mint Address")
+        # 6. 获取代币铸造地址
         try:
             token_mapping = {
                 "USDC": USDC_MINT,
@@ -392,31 +383,29 @@ def execute_transfer_transaction(
             
             if token_symbol not in token_mapping:
                 error_msg = f"不支持的代币: {token_symbol}"
-                logger.error(f"[execute_transfer_transaction] Failed Step 6a: {error_msg}")
+                logger.error(error_msg)
                 return {"success": False, "error": error_msg}
                 
             token_mint = token_mapping[token_symbol]
-            logger.info(f"[execute_transfer_transaction] Step 6 OK: Token Mint = {token_mint}")
+            logger.info(f"代币铸造地址: {token_mint}")
         except Exception as e:
             error_msg = f"获取代币铸造地址失败: {str(e)}"
-            logger.error(f"[execute_transfer_transaction] Failed Step 6 Exception: {error_msg}")
+            logger.error(error_msg)
             return {"success": False, "error": error_msg}
         
-        # === Step 7: Get Token Accounts ===
-        logger.info(f"[execute_transfer_transaction] Step 7: Getting Token Accounts")
+        # 7. 获取发送方和接收方代币账户
         try:
-            logger.info(f"[execute_transfer_transaction] Step 7a: Getting Sender Token Account for {from_address}")
             sender_token_account = solana_client._get_token_account(from_address, token_mint)
-            logger.info(f"[execute_transfer_transaction] Step 7b: Getting Recipient Token Account for {to_address}")
             recipient_token_account = solana_client._get_token_account(to_address, token_mint)
-            logger.info(f"[execute_transfer_transaction] Step 7 OK: Sender TA = {sender_token_account}, Recipient TA = {recipient_token_account}")
+            
+            logger.info(f"发送方代币账户: {sender_token_account}")
+            logger.info(f"接收方代币账户: {recipient_token_account}")
         except Exception as e:
             error_msg = f"获取代币账户失败: {str(e)}"
-            logger.error(f"[execute_transfer_transaction] Failed Step 7: {error_msg}", exc_info=True)
+            logger.error(error_msg)
             return {"success": False, "error": error_msg}
         
-        # === Step 8: Call Transfer Function ===
-        logger.info(f"[execute_transfer_transaction] Step 8: Calling solana_client.transfer_token")
+        # 8. 构建并发送转账交易
         try:
             # 使用现有的基础设施来发送交易
             signature = solana_client.transfer_token(
@@ -426,22 +415,16 @@ def execute_transfer_transaction(
                 amount=amount
             )
             
-            logger.info(f"[execute_transfer_transaction] Step 8 OK: Transfer successful, signature: {signature}")
-            # === Step 9: Return Success ===
-            logger.info(f"[execute_transfer_transaction] END - SUCCESS")
+            logger.info(f"转账交易发送成功，签名: {signature}")
             return signature
         except Exception as e:
             error_msg = f"发送转账交易失败: {str(e)}"
-            logger.error(f"[execute_transfer_transaction] Failed Step 8: {error_msg}", exc_info=True)
-            # === Step 9: Return Failure ===
-            logger.info(f"[execute_transfer_transaction] END - FAILURE (Transfer Exception)")
+            logger.error(error_msg, exc_info=True)
             return {"success": False, "error": error_msg}
             
     except Exception as e:
-        # === Catch All ===
-        error_msg = f"执行Solana转账时发生意外错误: {str(e)}"
-        logger.error(f"[execute_transfer_transaction] UNEXPECTED FAILURE: {error_msg}", exc_info=True)
-        logger.info(f"[execute_transfer_transaction] END - FAILURE (Outer Exception)")
+        error_msg = f"执行Solana转账失败: {str(e)}"
+        logger.error(error_msg, exc_info=True)
         return {"success": False, "error": error_msg}
 
 def prepare_transaction(user_address, asset_id, token_symbol, amount, price, trade_id):
