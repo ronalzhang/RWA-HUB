@@ -301,45 +301,131 @@ def execute_transfer_transaction(
         amount (float): 转账金额
         
     Returns:
-        str: 交易签名
+        str: 交易签名或包含错误信息的字典
     """
     try:
-        logging.info(f"准备执行Solana转账交易: {token_symbol}, 从 {from_address} 到 {to_address}, 金额: {amount}")
+        # 1. 详细记录输入参数
+        logger.info(f"转账参数: token={token_symbol}, from={from_address}({type(from_address).__name__}), to={to_address}({type(to_address).__name__}), amount={amount}({type(amount).__name__})")
         
-        # 验证地址格式
+        # 2. 检查参数完整性
+        if not all([token_symbol, from_address, to_address, amount]):
+            missing = []
+            if not token_symbol: missing.append("token_symbol")
+            if not from_address: missing.append("from_address")
+            if not to_address: missing.append("to_address")
+            if not amount: missing.append("amount")
+            error_msg = f"缺少必要参数: {', '.join(missing)}"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
+        
+        # 3. 验证并处理金额 - 确保是整数不小于1
+        try:
+            # 尝试转换为数字
+            if isinstance(amount, str):
+                amount = amount.strip()
+                if not amount:
+                    error_msg = "金额不能为空"
+                    logger.error(error_msg)
+                    return {"success": False, "error": error_msg}
+                # 检查是否包含小数点，如果有则错误
+                if '.' in amount:
+                    error_msg = "代币数量必须是整数（不可分割）"
+                    logger.error(error_msg)
+                    return {"success": False, "error": error_msg}
+                amount = int(amount)
+            else:
+                # 如果是浮点数且有小数部分
+                if isinstance(amount, float) and amount != int(amount):
+                    error_msg = "代币数量必须是整数（不可分割）"
+                    logger.error(error_msg)
+                    return {"success": False, "error": error_msg}
+                amount = int(amount)
+            
+            # 检查是否>=1
+            if amount < 1:
+                error_msg = "代币数量必须大于或等于1"
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+                
+            logger.info(f"验证后的金额: {amount}")
+        except Exception as e:
+            error_msg = f"金额格式无效: {str(e)}"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
+        
+        # 4. 验证地址格式
         if not validate_solana_address(from_address):
-            raise ValueError(f"发送方地址格式无效: {from_address}")
+            error_msg = f"发送方地址格式无效: {from_address}"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
             
         if not validate_solana_address(to_address):
-            raise ValueError(f"接收方地址格式无效: {to_address}")
+            error_msg = f"接收方地址格式无效: {to_address}"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
+        
+        # 5. 创建Solana客户端实例
+        try:
+            from app.utils.solana import SolanaClient
+            solana_client = SolanaClient()
+            logger.info("成功创建Solana客户端")
+        except Exception as e:
+            error_msg = f"创建Solana客户端失败: {str(e)}"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
+        
+        # 6. 获取代币铸造地址
+        try:
+            token_mapping = {
+                "USDC": USDC_MINT,
+                # 其他代币映射...
+            }
             
-        # 获取服务钱包密钥
-        wallet_key = _get_service_wallet_key()
+            if token_symbol not in token_mapping:
+                error_msg = f"不支持的代币: {token_symbol}"
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+                
+            token_mint = token_mapping[token_symbol]
+            logger.info(f"代币铸造地址: {token_mint}")
+        except Exception as e:
+            error_msg = f"获取代币铸造地址失败: {str(e)}"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
         
-        # 查询代币铸造地址
-        token_mint = _get_token_mint_address(token_symbol)
-        if not token_mint:
-            raise ValueError(f"找不到代币 {token_symbol} 的铸造地址")
+        # 7. 获取发送方和接收方代币账户
+        try:
+            sender_token_account = solana_client._get_token_account(from_address, token_mint)
+            recipient_token_account = solana_client._get_token_account(to_address, token_mint)
             
-        # 创建Solana客户端
-        client = solana_client.get_client()
+            logger.info(f"发送方代币账户: {sender_token_account}")
+            logger.info(f"接收方代币账户: {recipient_token_account}")
+        except Exception as e:
+            error_msg = f"获取代币账户失败: {str(e)}"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
         
-        # 构建并发送转账交易
-        signature = _send_token_transfer(
-            client, 
-            wallet_key, 
-            token_mint,
-            from_address,
-            to_address,
-            amount
-        )
-        
-        logging.info(f"Solana转账交易已发送，签名: {signature}")
-        return signature
+        # 8. 构建并发送转账交易
+        try:
+            # 使用现有的基础设施来发送交易
+            signature = solana_client.transfer_token(
+                token_mint=token_mint,
+                from_address=from_address,
+                to_address=to_address,
+                amount=amount
+            )
+            
+            logger.info(f"转账交易发送成功，签名: {signature}")
+            return signature
+        except Exception as e:
+            error_msg = f"发送转账交易失败: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return {"success": False, "error": error_msg}
+            
     except Exception as e:
-        logging.error(f"执行Solana转账失败: {str(e)}", exc_info=True)
-        # 返回明确的错误消息而不是抛出异常
-        raise ValueError(f"执行Solana转账失败: {str(e)}")
+        error_msg = f"执行Solana转账失败: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return {"success": False, "error": error_msg}
 
 def prepare_transaction(user_address, asset_id, token_symbol, amount, price, trade_id):
     """
@@ -458,4 +544,67 @@ def check_transaction(signature):
         return {
             "confirmed": False,
             "error": f"检查交易失败: {str(e)}"
-        } 
+        }
+
+def _get_token_account(self, owner_address, token_mint):
+    """
+    获取用户的代币账户地址
+    
+    Args:
+        owner_address: 所有者地址
+        token_mint: 代币铸造地址
+        
+    Returns:
+        代币账户地址
+    """
+    try:
+        logger.info(f"获取代币账户 - 所有者: {owner_address}({type(owner_address).__name__}), 代币铸造: {token_mint}({type(token_mint).__name__})")
+        
+        # 确保地址是PublicKey对象或正确的字符串格式
+        if isinstance(owner_address, str):
+            # 清理地址字符串
+            owner_address = owner_address.strip()
+            logger.debug(f"处理所有者地址: {owner_address}, 长度: {len(owner_address)}")
+            # 转换为PublicKey对象
+            try:
+                owner_pubkey = PublicKey(owner_address)
+                logger.debug(f"成功创建所有者PublicKey对象")
+            except Exception as pk_error:
+                logger.error(f"转换所有者地址为PublicKey失败: {str(pk_error)}")
+                raise ValueError(f"无效的所有者地址格式: {owner_address} - {str(pk_error)}")
+        else:
+            owner_pubkey = owner_address
+        
+        # 同样处理token_mint
+        if isinstance(token_mint, str):
+            token_mint = token_mint.strip()
+            logger.debug(f"处理代币铸造地址: {token_mint}, 长度: {len(token_mint)}")
+            try:
+                token_mint_pubkey = PublicKey(token_mint)
+                logger.debug(f"成功创建代币铸造PublicKey对象")
+            except Exception as pk_error:
+                logger.error(f"转换代币铸造地址为PublicKey失败: {str(pk_error)}")
+                raise ValueError(f"无效的代币铸造地址格式: {token_mint} - {str(pk_error)}")
+        else:
+            token_mint_pubkey = token_mint
+        
+        # 获取关联代币账户地址
+        try:
+            from spl.token.instructions import get_associated_token_address
+            token_account = get_associated_token_address(
+                owner_pubkey,
+                token_mint_pubkey
+            )
+            logger.info(f"获取到代币账户: {token_account}")
+            return token_account
+        except Exception as e:
+            logger.error(f"获取关联代币账户失败: {str(e)}")
+            raise ValueError(f"无法获取关联代币账户: {str(e)}")
+        
+    except Exception as e:
+        logger.error(f"获取代币账户失败: {str(e)}", exc_info=True)
+        # 提供更具体的错误信息
+        if "public key" in str(e).lower():
+            raise ValueError(f"无效的公钥格式: {str(e)}")
+        # 重新抛出异常
+        raise 
