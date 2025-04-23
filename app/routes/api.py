@@ -3307,6 +3307,20 @@ def execute_purchase():
         if not signature:
             return jsonify({'success': False, 'error': '缺少必要参数 (signature)'}), 400
             
+        # 确保signature是字符串
+        if not isinstance(signature, str):
+            current_app.logger.warning(f"收到非字符串类型的signature: {type(signature)}, 值: {signature}")
+            # 如果signature不是字符串，尝试转换或提取有效部分
+            if isinstance(signature, dict) and 'txHash' in signature:
+                signature = signature['txHash']
+            elif isinstance(signature, dict) and 'signature' in signature:
+                signature = signature['signature']
+            else:
+                # 如果无法提取，则转为JSON字符串
+                signature = json.dumps(signature)
+                
+        current_app.logger.info(f"处理后的签名: {signature}")
+            
         # 查找该用户最近的待支付交易
         buyer_address = g.eth_address
         current_app.logger.info(f"查找用户 {buyer_address} 针对资产 {asset_id} 的待支付交易")
@@ -3333,7 +3347,7 @@ def execute_purchase():
             }), 400
 
         # 更新交易记录
-        pending_trade.tx_hash = signature
+        pending_trade.tx_hash = signature  # 确保这里存储的是字符串
         pending_trade.status = TradeStatus.PENDING_CONFIRMATION.value  # 更新状态为等待链上确认
         
         # 更新交易详情 - 修复点：确保payment_details始终是JSON字符串
@@ -3347,7 +3361,7 @@ def execute_purchase():
                 details = {}
                 
             details['payment_executed_at'] = datetime.utcnow().isoformat()
-            details['signature'] = signature
+            details['signature'] = signature  # 确保这里存储的是字符串
             # 确保序列化为JSON字符串
             pending_trade.payment_details = json.dumps(details)
             current_app.logger.info(f"已更新交易详情: {pending_trade.payment_details}")
@@ -3386,7 +3400,7 @@ def execute_purchase():
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"执行购买失败: {str(e)}")
+        current_app.logger.error(f"执行购买失败: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': f'执行购买失败: {str(e)}'}), 500
 
 @api_bp.route('/user/wallet/balance', endpoint='get_user_wallet_balance')

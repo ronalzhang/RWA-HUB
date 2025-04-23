@@ -3582,14 +3582,17 @@ async function confirmPurchase(purchaseData, modalElement, confirmBtn) {
         console.log(`Attempting to transfer ${totalAmount} USDC to ${recipient}`);
 
         // --- Step 1: Wallet Transfer ---
-        const signature = await walletState.transferSolanaToken('USDC', recipient, totalAmount);
+        const transferResult = await walletState.transferSolanaToken('USDC', recipient, totalAmount);
 
-        if (!signature) {
-            // Transfer failed or was rejected by user
-            throw new Error('{{ _("Wallet transfer failed or was cancelled.") }}');
+        if (!transferResult || !transferResult.success) {
+            // 转账失败或被用户拒绝
+            throw new Error(transferResult?.error || '钱包转账失败或被取消');
         }
         
-        console.log(`Wallet transfer successful. Signature: ${signature}`);
+        // 获取交易签名
+        const signature = transferResult.txHash;
+        
+        console.log(`钱包转账成功。签名: ${signature}`);
         showLoadingState(`{{ _("Finalizing purchase...") }}`); // Update loading message
 
         // --- Step 2: Execute Purchase on Backend ---
@@ -3678,12 +3681,15 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
         console.log(`尝试向${recipient}转账${totalAmount} USDC`);
 
         // --- 步骤1: 钱包转账 ---
-        const signature = await walletState.transferSolanaToken('USDC', recipient, totalAmount);
+        const transferResult = await walletState.transferSolanaToken('USDC', recipient, totalAmount);
 
-        if (!signature) {
+        if (!transferResult || !transferResult.success) {
             // 转账失败或被用户拒绝
-            throw new Error('钱包转账失败或被取消');
+            throw new Error(transferResult?.error || '钱包转账失败或被取消');
         }
+        
+        // 获取交易签名
+        const signature = transferResult.txHash;
         
         console.log(`钱包转账成功。签名: ${signature}`);
         showLoadingState(`完成购买...`); // 更新加载
