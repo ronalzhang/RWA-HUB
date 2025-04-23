@@ -3382,22 +3382,21 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
         buyErrorDiv = document.getElementById('buy-error');
         
         // 获取并验证数量
-        let amount = parseFloat(amountInput.value);
+        let amount = amountInput.value;
+        console.log("原始输入金额:", amount, "类型:", typeof amount);
+        
+        // 尝试转换为数字并验证
+        let amountNum = parseInt(amount, 10);
         
         // 验证数量有效性
-        if (isNaN(amount) || amount <= 0) {
+        if (isNaN(amountNum) || amountNum <= 0) {
             showError('请输入有效的购买数量', buyErrorDiv);
             return false;
         }
         
-        // 检查是否是整数
-        if (amount % 1 !== 0) {
-            showError('购买数量必须是整数', buyErrorDiv);
-            return false;
-        }
-        
         // 确保数量是整数且不小于1
-        amount = Math.max(1, Math.floor(amount));
+        amountNum = Math.max(1, Math.floor(amountNum));
+        console.log("处理后的金额:", amountNum);
         
         // 设置加载状态
         if (buttonElement) {
@@ -3422,8 +3421,8 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
                 },
                 body: JSON.stringify({
                     asset_id: assetId,
-                    // 确保amount是一个有效的整数而不是字符串
-                    amount: parseInt(amount, 10),
+                    // 发送整数金额
+                    amount: amountNum,
                     // 请求体中的钱包地址同样保留，但主要依赖请求头
                     wallet_address: walletAddress
                 })
