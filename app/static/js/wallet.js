@@ -3385,8 +3385,8 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
         let amount = amountInput.value;
         console.log("原始输入金额:", amount, "类型:", typeof amount);
         
-        // 尝试转换为数字并验证
-        let amountNum = parseInt(amount, 10);
+        // 尝试转换为数字并验证 - 使用parseFloat支持小数
+        let amountNum = parseFloat(amount);
         
         // 验证数量有效性
         if (isNaN(amountNum) || amountNum <= 0) {
@@ -3394,8 +3394,8 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
             return false;
         }
         
-        // 确保数量是整数且不小于1
-        amountNum = Math.max(1, Math.floor(amountNum));
+        // 确保数量是正数且不小于1
+        amountNum = Math.max(1, amountNum);
         console.log("处理后的金额:", amountNum);
         
         // 设置加载状态
@@ -3421,7 +3421,7 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
                 },
                 body: JSON.stringify({
                     asset_id: assetId,
-                    // 发送整数金额
+                    // 发送数字类型的金额，不转字符串
                     amount: amountNum,
                     // 请求体中的钱包地址同样保留，但主要依赖请求头
                     wallet_address: walletAddress
