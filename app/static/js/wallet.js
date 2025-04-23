@@ -3382,21 +3382,26 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
         buyErrorDiv = document.getElementById('buy-error');
         
         // 获取并验证数量
-        let amount = amountInput.value;
+        const amount = amountInput.value;
         console.log("原始输入金额:", amount, "类型:", typeof amount);
         
-        // 尝试转换为数字并验证 - 使用parseFloat支持小数
-        let amountNum = parseFloat(amount);
-        
-        // 验证数量有效性
-        if (isNaN(amountNum) || amountNum <= 0) {
-            showError('请输入有效的购买数量', buyErrorDiv);
+        // 将输入金额强制转换为数字类型，确保发送正确的格式
+        let amountNum;
+        try {
+            // 尝试转换为浮点数
+            amountNum = parseFloat(amount);
+            if (isNaN(amountNum) || amountNum <= 0) {
+                showError('请输入有效的购买数量', buyErrorDiv);
+                return false;
+            }
+            // 确保金额是正数
+            amountNum = Math.max(1, amountNum);
+            console.log("处理后的金额:", amountNum, "类型:", typeof amountNum);
+        } catch (e) {
+            console.error("金额转换失败:", e);
+            showError('无效的购买数量格式', buyErrorDiv);
             return false;
         }
-        
-        // 确保数量是正数且不小于1
-        amountNum = Math.max(1, amountNum);
-        console.log("处理后的金额:", amountNum);
         
         // 设置加载状态
         if (buttonElement) {
@@ -3409,23 +3414,25 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
             const walletAddress = walletState.address;
             console.log(`使用钱包地址: ${walletAddress}`);
 
+            // 准备请求数据对象，确保所有字段都是正确的类型
+            const requestData = {
+                asset_id: assetId,
+                amount: amountNum,  // 数字类型的金额
+                wallet_address: walletAddress
+            };
+            
+            console.log("发送到后端的数据:", JSON.stringify(requestData));
+
             // API请求 - 确保数字格式正确
             const response = await fetch('/api/trades/prepare_purchase', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Eth-Address': walletAddress,
-                    // 下面的头字段保留作为兼容但不再是主要用途
                     'X-Wallet-Address': walletAddress,
                     'Authorization': `Wallet ${walletAddress}`
                 },
-                body: JSON.stringify({
-                    asset_id: assetId,
-                    // 发送数字类型的金额，不转字符串
-                    amount: amountNum,
-                    // 请求体中的钱包地址同样保留，但主要依赖请求头
-                    wallet_address: walletAddress
-                })
+                body: JSON.stringify(requestData)
             });
 
             if (!response.ok) {
@@ -3442,10 +3449,10 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
 
             // 确保prepareData包含必要的字段
             if (!prepareData.asset_name) prepareData.asset_name = document.querySelector('.asset-name, h1, h2, h3, h4')?.textContent?.trim() || '未知资产';
-            
+        
             // 确保价格数据正确
             prepareData.price_per_token = parseFloat(pricePerToken) || prepareData.price_per_token || 0;
-            prepareData.amount = parseInt(amount);
+            prepareData.amount = amountNum;
             prepareData.asset_id = assetId;
             
             // 计算小计（如果API没有提供）
