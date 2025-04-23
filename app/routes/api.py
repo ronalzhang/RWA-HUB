@@ -3076,26 +3076,35 @@ def prepare_purchase():
         if amount_data is None:
             return jsonify({'success': False, 'error': '缺少数量参数'}), 400
         
-        # 简化金额处理逻辑 - 统一转换为整数
+        # 简化金额处理逻辑 - 尝试转换为浮点数，然后检查是否为整数
         try:
             # 对不同类型做适当处理
             if isinstance(amount_data, str):
                 # 移除空格并尝试转换
                 amount_clean = amount_data.strip()
-                amount_int = int(float(amount_clean))
+                amount_float = float(amount_clean)
             elif isinstance(amount_data, (int, float)):
-                # 数字类型直接转整数
-                amount_int = int(amount_data)
+                # 数字类型直接使用
+                amount_float = float(amount_data)
             else:
                 # 其他类型尝试强制转换
-                amount_int = int(amount_data)
+                amount_float = float(amount_data)
                 
             # 验证最小值
-            if amount_int <= 0:
+            if amount_float <= 0:
                 return jsonify({'success': False, 'error': '数量必须大于0'}), 400
                 
+            # 检查是否为整数
+            if amount_float != int(amount_float):
+                current_app.logger.warning(f"非整数金额: {amount_float}，将自动转为整数")
+            
+            # 转换为整数用于处理
+            amount_int = int(amount_float)
+            if amount_int < 1:
+                amount_int = 1  # 确保最小为1
+                
             # 记录转换结果
-            current_app.logger.info(f"金额转换结果: 原始数据={amount_data} -> 整数={amount_int}")
+            current_app.logger.info(f"金额转换结果: 原始数据={amount_data} -> 浮点数={amount_float} -> 整数={amount_int}")
         except (ValueError, TypeError) as e:
             # 详细记录转换错误
             current_app.logger.error(f"金额转换失败: {str(e)}, 原始值: {amount_data}, 类型: {type(amount_data).__name__}")
