@@ -2524,13 +2524,13 @@ def execute_transfer():
     try:
         # 检查钱包连接状态
         if not g.eth_address:
-            current_app.logger.error("未检测到钱包地址")
+            current_app.logger.error("未检测到钱包地址，请求头信息: " + str(request.headers))
             return jsonify({'success': False, 'error': '请先连接钱包'}), 401
             
         # 获取请求数据
         data = request.get_json()
         if not data:
-            current_app.logger.error("请求数据为空")
+            current_app.logger.error("请求数据为空，请求内容: " + str(request.data))
             return jsonify({'success': False, 'error': '无效的请求数据'}), 400
             
         # 记录请求数据，帮助调试
@@ -2538,10 +2538,10 @@ def execute_transfer():
             
         # 检查必要字段
         required_fields = ['token_symbol', 'to_address', 'amount', 'from_address']
-        for field in required_fields:
-            if field not in data:
-                current_app.logger.error(f"缺少必要字段: {field}")
-                return jsonify({'success': False, 'error': f'缺少必要字段: {field}'}), 400
+        missing_fields = [field for field in required_fields if field not in data]
+        if missing_fields:
+            current_app.logger.error(f"缺少必要字段: {missing_fields}")
+            return jsonify({'success': False, 'error': f'缺少必要字段: {", ".join(missing_fields)}'}), 400
                 
         token_symbol = data.get('token_symbol')
         to_address = data.get('to_address')
@@ -2551,9 +2551,20 @@ def execute_transfer():
             amount_str = data.get('amount')
             current_app.logger.info(f"处理金额数据: {amount_str}, 类型: {type(amount_str)}")
             
-            # 尝试转换为浮点数
-            amount = float(amount_str) if isinstance(amount_str, str) else float(data.get('amount'))
+            # 尝试转换为浮点数，支持多种格式
+            if isinstance(amount_str, str):
+                # 清理字符串，移除任何可能影响解析的字符
+                clean_amount_str = amount_str.strip().replace(',', '.')
+                amount = float(clean_amount_str)
+            else:
+                amount = float(amount_str)
+                
             current_app.logger.info(f"金额转换结果: {amount}, 类型: {type(amount)}")
+            
+            # 确保金额大于0
+            if amount <= 0:
+                raise ValueError(f"金额必须大于0，当前值: {amount}")
+                
         except Exception as e:
             current_app.logger.error(f"金额转换失败: {str(e)}, 原始值: {data.get('amount')}")
             return jsonify({'success': False, 'error': f'无效的金额格式: {data.get("amount")}'}), 400
@@ -2592,7 +2603,7 @@ def execute_transfer():
         })
             
     except Exception as e:
-        current_app.logger.error(f"处理转账请求失败: {str(e)}")
+        current_app.logger.error(f"处理转账请求失败: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
 
 # 添加新的区块链交易相关API路由
@@ -3038,7 +3049,7 @@ def prepare_purchase():
             
         try:
             # 确保金额是有效的浮点数或整数
-            amount = float(amount_str) if isinstance(amount_str, str) else amount_str
+            amount = float(amount_str) if isinstance(amount_str, str) else float(amount_str)
             if not isinstance(amount, (int, float)) or amount <= 0:
                 raise ValueError(f"金额必须大于0，当前值: {amount}")
         except Exception as e:
