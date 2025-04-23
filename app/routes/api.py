@@ -3047,13 +3047,41 @@ def prepare_purchase():
         if not all([asset_id, amount_str]):
             return jsonify({'success': False, 'error': '缺少必要参数'}), 400
             
+        # 记录原始输入
+        current_app.logger.info(f"购买准备 - 原始输入: asset_id={asset_id}, amount={amount_str}({type(amount_str).__name__})")
+            
         try:
-            # 确保金额是有效的浮点数或整数
-            amount = float(amount_str) if isinstance(amount_str, str) else float(amount_str)
-            if not isinstance(amount, (int, float)) or amount <= 0:
-                raise ValueError(f"金额必须大于0，当前值: {amount}")
+            # 验证金额是否存在并且是数字
+            if not amount_str:
+                return jsonify({'error': '缺少数量参数'}), 400
+            
+            try:
+                # 尝试转换为浮点数
+                amount_float = float(amount_str)
+                
+                # 检查是否为正数
+                if amount_float <= 0:
+                    return jsonify({'error': '数量必须大于0'}), 400
+                    
+                # 检查是否为整数
+                if amount_float % 1 != 0:
+                    return jsonify({'error': '数量必须是整数'}), 400
+                    
+                # 确保最小数量为1
+                amount_float = max(1, int(amount_float))
+                amount = str(amount_float)
+            except (ValueError, TypeError):
+                current_app.logger.error(f"金额格式转换错误: {amount}")
+                return jsonify({'error': '无效的金额格式'}), 400
+                
+            # 检查是否>=1
+            if amount < 1:
+                current_app.logger.warning(f"收到无效数量: {amount}，最小数量为1")
+                return jsonify({'success': False, 'error': '代币购买数量必须大于或等于1'}), 400
+                
+            current_app.logger.info(f"处理后的代币数量: {amount}")
         except Exception as e:
-            current_app.logger.error(f"金额转换失败: {str(e)}, 原始值: {amount_str}")
+            current_app.logger.error(f"数量转换失败: {str(e)}, 原始值: {amount_str}")
             return jsonify({'success': False, 'error': f'无效的数字格式: {amount_str}'}), 400
 
         # 获取资产信息
@@ -3077,7 +3105,8 @@ def prepare_purchase():
         purchase_contract_address = get_config_value('PURCHASE_CONTRACT_ADDRESS', required=True) # 智能合约地址
 
         # 计算总价
-        total_price = (amount * price).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP) # 保留6位小数
+        price = Decimal(str(asset.token_price)) if asset.token_price else Decimal('0')
+        total_price = (Decimal(amount) * price).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP) # 保留6位小数
 
         # 获取购买者和卖家地址
         buyer_address = g.eth_address
@@ -3119,7 +3148,7 @@ def prepare_purchase():
         return jsonify({'success': False, 'error': f'服务器配置错误: {str(ve)}'}), 500
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"准备购买交易失败: {str(e)}")
+        current_app.logger.error(f"准备购买交易失败: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': f'准备购买交易失败: {str(e)}'}), 500
 
 # 新增：确认支付接口
