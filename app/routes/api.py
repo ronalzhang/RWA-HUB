@@ -2583,15 +2583,36 @@ def execute_transfer():
         # 执行真实的链上转账
         from app.blockchain.solana_service import execute_transfer_transaction
         
+        # 将amount转换为整数传递给服务函数
+        try:
+            amount_int = int(amount)
+        except ValueError:
+            current_app.logger.error(f"无法将金额转换为整数: {amount}")
+            return jsonify({'success': False, 'error': f'内部错误：金额格式无效'}), 500
+
         # 执行转账交易
-        signature = execute_transfer_transaction(
+        transfer_result = execute_transfer_transaction(
             token_symbol=token_symbol,
             from_address=from_address,
             to_address=to_address,
-            amount=amount
+            amount=amount_int # 传递整数金额
         )
         
-        # 记录成功信息
+        # 检查服务函数的返回结果
+        if isinstance(transfer_result, dict) and not transfer_result.get('success', True):
+            # 如果返回的是错误字典
+            error_message = transfer_result.get('error', '执行转账时发生未知错误')
+            current_app.logger.error(f"执行转账服务函数返回错误: {error_message}")
+            # 根据错误类型判断返回400还是500
+            status_code = 400 if "无效" in error_message or "格式" in error_message else 500
+            return jsonify({'success': False, 'error': error_message}), status_code
+        elif not isinstance(transfer_result, str):
+            # 如果返回的不是字符串签名也不是错误字典，则认为是内部错误
+            current_app.logger.error(f"执行转账服务函数返回了意外的类型: {type(transfer_result)}, 值: {transfer_result}")
+            return jsonify({'success': False, 'error': '执行转账时发生意外错误'}), 500
+
+        # 如果返回的是签名字符串
+        signature = transfer_result
         current_app.logger.info(f"转账交易已发送，签名: {signature}")
         
         # 返回成功结果
