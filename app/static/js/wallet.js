@@ -2506,7 +2506,7 @@ async connectPhantom(isReconnect = false) {
                     body: JSON.stringify({
                         token_symbol: tokenSymbol,
                         to_address: to,
-                        amount: parseFloat(amount).toString(), // 修改为parseFloat并转换为字符串
+                        amount: Number(amount).toString(), // 修改为parseFloat并转换为字符串
                         from_address: fromAddress
                     })
                 });
@@ -3423,7 +3423,7 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
                 body: JSON.stringify({
                     asset_id: assetId,
                     // 确保amount是一个有效的整数而不是字符串
-                    amount: parseInt(amount, 10),
+                    amount: Number(amount).toString(),
                     // 请求体中的钱包地址同样保留，但主要依赖请求头
                     wallet_address: walletAddress
                 })

@@ -327,12 +327,20 @@ def execute_transfer_transaction(
                     error_msg = "金额不能为空"
                     logger.error(error_msg)
                     return {"success": False, "error": error_msg}
-                # 检查是否包含小数点，如果有则错误
-                if '.' in amount:
-                    error_msg = "代币数量必须是整数（不可分割）"
+                
+                # 尝试转换为浮点数
+                try:
+                    amount_float = float(amount)
+                    # 检查是否为整数值（即使是浮点数表示）
+                    if amount_float != int(amount_float):
+                        error_msg = "代币数量必须是整数（不可分割）"
+                        logger.error(error_msg)
+                        return {"success": False, "error": error_msg}
+                    amount = int(amount_float)  # 转换为整数
+                except ValueError:
+                    error_msg = f"无法将金额'{amount}'转换为数字"
                     logger.error(error_msg)
                     return {"success": False, "error": error_msg}
-                amount = int(amount)
             else:
                 # 如果是浮点数且有小数部分
                 if isinstance(amount, float) and amount != int(amount):

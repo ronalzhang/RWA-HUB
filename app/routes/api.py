@@ -2558,6 +2558,11 @@ def execute_transfer():
                 amount = float(clean_amount_str)
             else:
                 amount = float(amount_str)
+            
+            # 检查是否为整数值
+            if amount != int(amount):
+                current_app.logger.error(f"金额必须是整数: {amount}")
+                return jsonify({'success': False, 'error': f'代币数量必须是整数，收到的值: {amount}'}), 400
                 
             current_app.logger.info(f"金额转换结果: {amount}, 类型: {type(amount)}")
             
