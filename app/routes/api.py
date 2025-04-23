@@ -2624,8 +2624,12 @@ def execute_transfer():
         })
             
     except Exception as e:
-        current_app.logger.error(f"处理转账请求失败: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': f'处理请求失败: {str(e)}'}), 500
+        # 添加详细日志记录
+        import traceback
+        error_traceback = traceback.format_exc()
+        current_app.logger.error(f"处理转账请求时捕获到未处理异常: {str(e)}")
+        current_app.logger.error(f"Traceback:\n{error_traceback}")
+        return jsonify({'success': False, 'error': f'处理请求失败: 服务内部错误'}), 500
 
 # 添加新的区块链交易相关API路由
 @api_bp.route('/trades/<int:trade_id>', methods=['GET'])
