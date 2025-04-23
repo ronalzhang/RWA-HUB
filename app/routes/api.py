@@ -3395,11 +3395,15 @@ def execute_purchase():
         current_app.logger.info(f"找到待处理交易 ID: {pending_trade.id}, 状态: {pending_trade.status}")
 
         # 验证交易金额是否匹配
-        if pending_trade.amount != Decimal(str(amount)):
-            current_app.logger.warning(f"交易金额不匹配: 预期 {pending_trade.amount}, 收到 {amount}")
+        # 确保使用整数比较整数，避免类型不匹配
+        amount_int = int(amount) if amount else 0
+        current_app.logger.info(f"金额比较: 预期={pending_trade.amount}(类型:{type(pending_trade.amount).__name__}), 收到={amount_int}(类型:{type(amount_int).__name__})")
+        
+        if pending_trade.amount != amount_int:
+            current_app.logger.warning(f"交易金额不匹配: 预期 {pending_trade.amount}, 收到 {amount_int}")
             return jsonify({
                 'success': False, 
-                'error': f'交易金额不匹配 (预期: {pending_trade.amount}, 收到: {amount})'
+                'error': f'交易金额不匹配 (预期: {pending_trade.amount}, 收到: {amount_int})'
             }), 400
 
         # 更新交易记录
