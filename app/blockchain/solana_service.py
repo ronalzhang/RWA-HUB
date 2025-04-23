@@ -244,6 +244,47 @@ def send_transaction_with_signature(
         raise Exception(f"发送交易失败: {str(e)}")
 
 
+def validate_solana_address(address):
+    """
+    验证Solana地址格式是否有效
+    
+    Args:
+        address (str): 要验证的Solana地址
+        
+    Returns:
+        bool: 如果地址格式有效返回True，否则返回False
+    """
+    try:
+        # 确保地址是字符串
+        if not isinstance(address, str):
+            logging.error(f"地址不是字符串: {type(address)}")
+            return False
+            
+        # 去除空白字符
+        address = address.strip()
+        
+        # 检查基本格式
+        if len(address) < 32:
+            logging.error(f"地址长度不正确: {len(address)}")
+            return False
+            
+        # 尝试从base58解码(这是Solana地址的编码方式)
+        try:
+            import base58
+            decoded = base58.b58decode(address)
+            if len(decoded) != 32:
+                logging.error(f"解码后地址长度不正确: {len(decoded)}")
+                return False
+        except Exception as e:
+            logging.error(f"地址base58解码失败: {str(e)}")
+            return False
+            
+        return True
+    except Exception as e:
+        logging.error(f"验证Solana地址时出错: {str(e)}")
+        return False
+
+
 def execute_transfer_transaction(
     token_symbol: str,
     from_address: str,
@@ -251,10 +292,10 @@ def execute_transfer_transaction(
     amount: float
 ) -> str:
     """
-    执行真实的Solana链上转账交易
+    执行Solana代币转账交易
     
     Args:
-        token_symbol (str): 代币符号，如'USDC'
+        token_symbol (str): 代币符号，例如 "USDC"
         from_address (str): 发送方地址
         to_address (str): 接收方地址
         amount (float): 转账金额
@@ -263,156 +304,42 @@ def execute_transfer_transaction(
         str: 交易签名
     """
     try:
-        logger.info(f"执行真实Solana转账 - 代币: {token_symbol}, 发送方: {from_address}, 接收方: {to_address}, 金额: {amount}")
+        logging.info(f"准备执行Solana转账交易: {token_symbol}, 从 {from_address} 到 {to_address}, 金额: {amount}")
         
-        # 验证输入参数
-        if not token_symbol or not isinstance(token_symbol, str):
-            raise ValueError(f"无效的代币符号: {token_symbol}")
+        # 验证地址格式
+        if not validate_solana_address(from_address):
+            raise ValueError(f"发送方地址格式无效: {from_address}")
             
-        if not from_address or not isinstance(from_address, str) or len(from_address) < 32:
-            raise ValueError(f"无效的发送方地址: {from_address}")
+        if not validate_solana_address(to_address):
+            raise ValueError(f"接收方地址格式无效: {to_address}")
             
-        if not to_address or not isinstance(to_address, str) or len(to_address) < 32:
-            raise ValueError(f"无效的接收方地址: {to_address}")
+        # 获取服务钱包密钥
+        wallet_key = _get_service_wallet_key()
         
-        # 确保金额是浮点数    
-        try:
-            if isinstance(amount, str):
-                amount = float(amount)
-            if not isinstance(amount, (int, float)) or amount <= 0:
-                raise ValueError(f"无效的转账金额: {amount}")
-        except Exception as e:
-            logger.error(f"金额转换失败: {str(e)}, 原始值: {amount}, 类型: {type(amount)}")
-            raise ValueError(f"无效的转账金额格式: {amount}")
+        # 查询代币铸造地址
+        token_mint = _get_token_mint_address(token_symbol)
+        if not token_mint:
+            raise ValueError(f"找不到代币 {token_symbol} 的铸造地址")
+            
+        # 创建Solana客户端
+        client = solana_client.get_client()
         
-        # 创建交易所需参数
-        logger.info("准备创建交易参数...")
-        transaction_bytes, message_bytes = prepare_transfer_transaction(
-            token_symbol=token_symbol,
-            from_address=from_address,
-            to_address=to_address,
-            amount=amount
+        # 构建并发送转账交易
+        signature = _send_token_transfer(
+            client, 
+            wallet_key, 
+            token_mint,
+            from_address,
+            to_address,
+            amount
         )
-        logger.info(f"交易参数创建成功，交易数据大小: {len(transaction_bytes)}字节")
         
-        # 获取系统服务钱包（如果是管理员操作时使用）
-        from app.utils.solana import SolanaClient
-        logger.info("初始化Solana客户端...")
-        solana_client = SolanaClient()
-        
-        # 使用Solana客户端发送交易
-        try:
-            # 序列化交易并使用Base58编码(而不是Base64)
-            transaction_base58 = base58.b58encode(transaction_bytes).decode('utf-8')
-            logger.info(f"交易序列化完成，Base58编码大小: {len(transaction_base58)}字符")
-            
-            # 检查连接状态
-            try:
-                slot_response = solana_connection.get_slot()
-                logger.info(f"Solana网络连接正常，当前slot: {slot_response.get('result', 'unknown')}")
-            except Exception as conn_error:
-                logger.error(f"检查Solana网络连接失败: {str(conn_error)}")
-                raise Exception(f"Solana网络连接失败: {str(conn_error)}")
-            
-            # 发送交易到Solana网络
-            logger.info("开始发送交易到Solana网络...")
-            # 直接使用RPC客户端发送原始交易数据，使用Base58编码
-            result = solana_connection.rpc_client._make_request(
-                "sendTransaction",
-                [transaction_base58, {
-                    "skipPreflight": True,  # 减少预检错误
-                    "preflightCommitment": "processed"  # 使用更快的确认级别
-                }]
-            )
-            
-            # 详细记录结果
-            # 避免JSON序列化错误
-            try:
-                result_str = json.dumps(result, indent=2)
-                logger.info(f"发送交易响应: {result_str}")
-            except Exception as json_error:
-                logger.error(f"无法序列化响应: {str(json_error)}")
-                logger.info(f"原始响应类型: {type(result)}")
-            
-            # 获取交易签名
-            signature = None
-            try:
-                if isinstance(result, dict) and 'result' in result:
-                    signature = result['result']
-            except Exception as e:
-                logger.error(f"提取签名失败: {str(e)}")
-            
-            if not signature:
-                error_info = {}
-                error_message = "未知错误"
-                
-                try:
-                    if isinstance(result, dict) and 'error' in result:
-                        error_info = result['error']
-                        if isinstance(error_info, dict) and 'message' in error_info:
-                            error_message = error_info['message']
-                        else:
-                            error_message = str(error_info)
-                except Exception as e:
-                    logger.error(f"提取错误信息失败: {str(e)}")
-                    
-                logger.error(f"未获取到交易签名，错误: {error_message}")
-                raise Exception(f"未获取到交易签名: {error_message}")
-                
-            logger.info(f"交易已发送到Solana网络，签名: {signature}")
-            
-            # 创建交易记录
-            try:
-                # 寻找相关资产
-                asset = Asset.query.filter_by(token_symbol=token_symbol).first()
-                if not asset:
-                    logger.warning(f"未找到与符号 {token_symbol} 匹配的资产")
-                
-                # 创建交易记录
-                trade = Trade(
-                    trade_type=TradeType.PLATFORM_FEE,
-                    trader_address=from_address,
-                    amount=amount,
-                    price=1.0,  # 平台费以1:1比例计算
-                    asset_id=asset.id if asset else None,
-                    token_amount=amount,  # 使用实际金额作为代币数量
-                    status='processing',  # 设置状态为处理中，表示已发送但未确认
-                    tx_hash=signature
-                )
-                
-                db.session.add(trade)
-                db.session.commit()
-                
-                logger.info(f"已创建交易记录 ID: {trade.id}, 签名: {signature}, 状态: processing")
-                
-                # 启动异步任务监控交易确认状态
-                try:
-                    from app.tasks import monitor_transaction_confirmation
-                    monitor_transaction_confirmation.delay('monitor_transaction_confirmation', signature, trade.id)
-                    logger.info(f"已启动交易确认监控任务，交易ID: {trade.id}")
-                except Exception as task_error:
-                    logger.error(f"启动交易确认监控任务失败: {str(task_error)}")
-                
-            except Exception as db_error:
-                logger.error(f"创建交易记录失败: {str(db_error)}")
-                # 交易记录创建失败不影响流程，继续返回签名
-            
-            logger.info(f"Solana交易已成功处理，签名: {signature}")
-            
-            return signature
-            
-        except Exception as tx_error:
-            logger.error(f"发送Solana交易失败: {str(tx_error)}")
-            # 记录更详细的错误信息
-            import traceback
-            logger.error(f"错误详情: {traceback.format_exc()}")
-            raise Exception(f"发送Solana交易失败: {str(tx_error)}")
-        
+        logging.info(f"Solana转账交易已发送，签名: {signature}")
+        return signature
     except Exception as e:
-        logger.error(f"执行Solana转账失败: {str(e)}")
-        import traceback
-        logger.error(f"错误堆栈: {traceback.format_exc()}")
-        raise Exception(f"执行Solana转账失败: {str(e)}")
+        logging.error(f"执行Solana转账失败: {str(e)}", exc_info=True)
+        # 返回明确的错误消息而不是抛出异常
+        raise ValueError(f"执行Solana转账失败: {str(e)}")
 
 def prepare_transaction(user_address, asset_id, token_symbol, amount, price, trade_id):
     """
