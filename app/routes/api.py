@@ -3143,7 +3143,7 @@ def prepare_purchase():
         new_trade = Trade(
             asset_id=asset_id,
             trader_address=buyer_address,
-            amount=amount,
+            amount=int(amount),  # 确保amount是整数
             price=price,
             total=total_price,
             type='buy',
