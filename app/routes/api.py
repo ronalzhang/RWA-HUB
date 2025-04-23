@@ -3081,78 +3081,69 @@ def prepare_purchase():
         if not asset_id_raw:
             current_app.logger.error("缺少资产ID参数")
             return jsonify({'success': False, 'error': '缺少资产ID参数'}), 400
-            
-        # 尝试获取资产ID - 支持多种形式 (数字ID或字符串格式如"RH-108235")
+
+        # 极度简化的资产ID处理
+        current_app.logger.info(f"尝试获取资产ID - 类型:{type(asset_id_raw).__name__}, 值:{asset_id_raw}")
+        
         try:
-            # 如果是RH-格式，则直接使用
-            if isinstance(asset_id_raw, str) and asset_id_raw.startswith('RH-'):
-                # 尝试从RH-XXXXX格式中提取数字部分
-                asset_id_number = asset_id_raw.split('-')[1] if '-' in asset_id_raw else asset_id_raw
-                # 查询是否存在此符号的资产
+            # 直接使用数字ID查询
+            if isinstance(asset_id_raw, (int, float)) or (isinstance(asset_id_raw, str) and asset_id_raw.isdigit()):
+                numeric_id = int(asset_id_raw)
+                current_app.logger.info(f"使用数字ID查询: {numeric_id}")
+                asset = Asset.query.get(numeric_id)
+                if asset:
+                    asset_id = asset.id
+                    current_app.logger.info(f"找到资产: ID={asset.id}, 名称={asset.name}, 符号={asset.token_symbol}")
+                else:
+                    current_app.logger.error(f"未找到ID为{numeric_id}的资产")
+                    return jsonify({'success': False, 'error': f'找不到ID为{numeric_id}的资产'}), 404
+            
+            # 使用符号查询
+            elif isinstance(asset_id_raw, str) and asset_id_raw.startswith('RH-'):
+                current_app.logger.info(f"使用符号查询: {asset_id_raw}")
                 asset = Asset.query.filter_by(token_symbol=asset_id_raw).first()
                 if asset:
                     asset_id = asset.id
-                    current_app.logger.info(f"通过符号{asset_id_raw}找到资产ID: {asset_id}")
+                    current_app.logger.info(f"找到资产: ID={asset.id}, 名称={asset.name}, 符号={asset.token_symbol}")
                 else:
-                    # 尝试转换为整数ID
-                    try:
-                        asset_id = int(asset_id_number)
-                        current_app.logger.info(f"将符号{asset_id_raw}转换为资产ID: {asset_id}")
-                    except (ValueError, TypeError):
-                        # 如果转换失败，直接使用原始值
-                        asset_id = asset_id_raw
-                        current_app.logger.info(f"使用原始资产ID: {asset_id}")
+                    current_app.logger.error(f"未找到符号为{asset_id_raw}的资产")
+                    return jsonify({'success': False, 'error': f'找不到符号为{asset_id_raw}的资产'}), 404
+            
+            # 无法处理的情况
             else:
-                # 尝试转换为整数ID
-                try:
-                    asset_id = int(asset_id_raw)
-                    current_app.logger.info(f"将{asset_id_raw}转换为数字资产ID: {asset_id}")
-                except (ValueError, TypeError):
-                    # 如果转换失败，直接使用原始值
-                    asset_id = asset_id_raw
-                    current_app.logger.info(f"使用原始资产ID字符串: {asset_id}")
-        except Exception as e:
-            current_app.logger.error(f"处理资产ID时出错: {str(e)}")
-            return jsonify({'success': False, 'error': f'无效的资产ID格式: {str(e)}'}), 400
-
-        # 验证金额参数
-        if amount_data is None:
-            current_app.logger.error("金额参数为空")
-            return jsonify({'success': False, 'error': '缺少数量参数'}), 400
+                current_app.logger.error(f"无法处理的资产ID格式: {asset_id_raw}")
+                return jsonify({'success': False, 'error': f'无效的资产ID格式: {asset_id_raw}'}), 400
         
-        # 简化金额处理逻辑 - 强制转换为整数
+        except Exception as e:
+            current_app.logger.error(f"查询资产时出错: {str(e)}")
+            return jsonify({'success': False, 'error': f'查询资产失败: {str(e)}'}), 500
+            
+        # 极度简化的金额处理 - 确保接受任何格式的正数
         try:
-            # 先确保我们有一个浮点数
-            if isinstance(amount_data, str):
-                amount_float = float(amount_data.strip())
-            else:
-                amount_float = float(amount_data)
+            # 尝试转换金额
+            if amount_data is None:
+                current_app.logger.error("金额参数为空")
+                return jsonify({'success': False, 'error': '缺少数量参数'}), 400
                 
-            # 验证金额是否为正数
-            if amount_float <= 0:
-                current_app.logger.error(f"金额必须大于0: {amount_float}")
+            # 转换为字符串，然后转数字，最后取整
+            amount_str = str(amount_data).strip()
+            amount_num = float(amount_str)
+            
+            if amount_num <= 0:
+                current_app.logger.error(f"金额必须大于0: {amount_num}")
                 return jsonify({'success': False, 'error': '数量必须大于0'}), 400
                 
-            # 转换为整数 (资产数量必须是整数)
-            amount_int = max(1, int(amount_float))
+            # 取整
+            amount = max(1, int(amount_num))
+            current_app.logger.info(f"金额处理完成: {amount_data} -> {amount}")
             
-            # 简化流程：直接使用字符串格式
-            amount = str(amount_int)
-            
-            # 记录转换结果
-            current_app.logger.info(f"金额转换: {amount_data} ({type(amount_data).__name__}) -> {amount_float} (float) -> {amount_int} (int) -> {amount} (str)")
         except Exception as e:
-            current_app.logger.error(f"金额转换失败: {e}, 原始值: {amount_data}, 类型: {type(amount_data).__name__}")
+            current_app.logger.error(f"处理金额时出错: {str(e)}, 原始值: {amount_data}")
             return jsonify({'success': False, 'error': f'无效的数字格式: {str(e)}'}), 400
 
-        # 获取资产信息
-        asset = Asset.query.get(asset_id)
-        if not asset:
-            current_app.logger.error(f"找不到资产ID: {asset_id}")
-            return jsonify({'success': False, 'error': '找不到指定资产'}), 404
-
+        # 检查资产状态
         if asset.status != AssetStatus.ACTIVE.value:
-            current_app.logger.error(f"资产状态非活跃: {asset_id}, 状态: {asset.status}")
+            current_app.logger.error(f"资产状态非活跃: {asset.id}, 状态: {asset.status}")
             return jsonify({'success': False, 'error': '该资产当前不可交易'}), 400
 
         # 使用户钱包地址，优先使用g.eth_address (通过eth_address_required装饰器设置)
@@ -3178,9 +3169,9 @@ def prepare_purchase():
 
         # 创建交易记录 - 确保amount字段为整数
         new_trade = Trade(
-            asset_id=asset_id,
+            asset_id=asset.id,
             trader_address=buyer_address,
-            amount=int(amount),  # 明确使用整数
+            amount=amount,  # 明确使用整数
             price=price,
             total=total_price,
             type='buy',
@@ -3195,7 +3186,7 @@ def prepare_purchase():
         db.session.add(new_trade)
         db.session.commit()
 
-        current_app.logger.info(f"准备购买交易 (ID: {new_trade.id}) for asset {asset_id}, amount {amount}, total {total_price}.")
+        current_app.logger.info(f"准备购买交易 (ID: {new_trade.id}) for asset {asset.id}, amount {amount}, total {total_price}.")
 
         # 返回给前端调用智能合约所需的信息
         result = {
