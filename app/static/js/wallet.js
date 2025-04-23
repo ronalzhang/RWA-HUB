@@ -3390,8 +3390,14 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
             return false;
         }
         
-        // 确保数量是整数
-        amount = Math.floor(amount);
+        // 检查是否是整数
+        if (amount % 1 !== 0) {
+            showError('购买数量必须是整数', buyErrorDiv);
+            return false;
+        }
+        
+        // 确保数量是整数且不小于1
+        amount = Math.max(1, Math.floor(amount));
         
         // 设置加载状态
         if (buttonElement) {
