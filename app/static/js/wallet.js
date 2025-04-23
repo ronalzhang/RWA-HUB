@@ -3416,7 +3416,7 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
 
             // 准备请求数据对象，确保所有字段都是正确的类型
             const requestData = {
-                asset_id: assetId,
+                asset_id: assetId.toString(),  // 确保asset_id始终是字符串类型
                 amount: amountNum,  // 数字类型的金额
                 wallet_address: walletAddress
             };
