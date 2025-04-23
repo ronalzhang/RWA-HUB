@@ -2506,7 +2506,7 @@ async connectPhantom(isReconnect = false) {
                     body: JSON.stringify({
                         token_symbol: tokenSymbol,
                         to_address: to,
-                        amount: Number(amount).toString(), // 修改为parseFloat并转换为字符串
+                        amount: parseFloat(amount).toString(), // 使用parseFloat保留小数
                         from_address: fromAddress
                     })
                 });
@@ -3577,9 +3577,9 @@ async function confirmPurchase(purchaseData, modalElement, confirmBtn) {
     try {
         // Extract necessary data (ensure field names match API response)
         const recipient = purchaseData.recipient_address;
-        const totalAmount = parseFloat(purchaseData.total_cost); // Use total_cost for transfer
+        const totalAmount = parseFloat(purchaseData.total_cost || purchaseData.total_amount); // 确保处理各种格式的总金额
         const assetId = purchaseData.asset_id;
-        const purchaseAmount = parseInt(purchaseData.amount); // The number of tokens
+        const purchaseAmount = parseInt(purchaseData.amount); // 购买的代币数量是整数
 
         if (!recipient || isNaN(totalAmount) || totalAmount <= 0 || !assetId || isNaN(purchaseAmount) || purchaseAmount <= 0) {
             throw new Error('{{ _("Invalid purchase data for confirmation.") }}');
@@ -3676,7 +3676,7 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
     try {
         // 提取必要数据（确保字段名称与API响应匹配）
         const recipient = purchaseData.recipient_address;
-        const totalAmount = parseFloat(purchaseData.total_cost); // 使用total_cost进行转账
+        const totalAmount = parseFloat(purchaseData.total_cost || purchaseData.total_amount); // 使用total_cost进行转账
         const assetId = purchaseData.asset_id;
         const purchaseAmount = parseInt(purchaseData.amount); // 代币数量
 

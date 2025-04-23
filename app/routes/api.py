@@ -2559,11 +2559,8 @@ def execute_transfer():
             else:
                 amount = float(amount_str)
             
-            # 检查是否为整数值
-            if amount != int(amount):
-                current_app.logger.error(f"金额必须是整数: {amount}")
-                return jsonify({'success': False, 'error': f'代币数量必须是整数，收到的值: {amount}'}), 400
-                
+            # 我们不再严格要求整数值，而是允许小数
+            # USDC支持小数点后6位
             current_app.logger.info(f"金额转换结果: {amount}, 类型: {type(amount)}")
             
             # 确保金额大于0
@@ -3068,48 +3065,41 @@ def prepare_purchase():
             return jsonify({'success': False, 'error': '无效的请求数据'}), 400
 
         asset_id = data.get('asset_id')
-        amount_str = data.get('amount') # 前端传递购买的数量
+        amount_data = data.get('amount') # 前端传递购买的数量
 
-        if not all([asset_id, amount_str]):
-            return jsonify({'success': False, 'error': '缺少必要参数'}), 400
-            
         # 记录原始输入
-        current_app.logger.info(f"购买准备 - 原始输入: asset_id={asset_id}, amount={amount_str}({type(amount_str).__name__})")
+        current_app.logger.info(f"购买准备 - 原始输入: asset_id={asset_id}, amount={amount_data}, 类型: {type(amount_data).__name__}")
             
+        if not asset_id:
+            return jsonify({'success': False, 'error': '缺少资产ID参数'}), 400
+            
+        if amount_data is None:
+            return jsonify({'success': False, 'error': '缺少数量参数'}), 400
+        
+        # 简化金额处理逻辑 - 统一转换为整数
         try:
-            # 验证金额是否存在并且是数字
-            if not amount_str:
-                return jsonify({'error': '缺少数量参数'}), 400
-            
-            # 先尝试转换为整数（大多数情况）
-            try:
-                amount_int = int(amount_str)
-                if amount_int <= 0:
-                    return jsonify({'error': '数量必须大于0'}), 400
+            # 对不同类型做适当处理
+            if isinstance(amount_data, str):
+                # 移除空格并尝试转换
+                amount_clean = amount_data.strip()
+                amount_int = int(float(amount_clean))
+            elif isinstance(amount_data, (int, float)):
+                # 数字类型直接转整数
+                amount_int = int(amount_data)
+            else:
+                # 其他类型尝试强制转换
+                amount_int = int(amount_data)
                 
-                # 确保最小数量为1
-                amount = str(max(1, amount_int))
-                current_app.logger.info(f"整数转换成功: {amount_str} -> {amount}")
-            except (ValueError, TypeError):
-                # 如果不是整数，再尝试转换为浮点数
-                try:
-                    amount_float = float(amount_str)
-                    if amount_float <= 0:
-                        return jsonify({'error': '数量必须大于0'}), 400
-                    
-                    # 检查是否为整数
-                    if amount_float != int(amount_float):
-                        return jsonify({'error': '数量必须是整数'}), 400
-                        
-                    # 确保最小数量为1
-                    amount = str(max(1, int(amount_float)))
-                    current_app.logger.info(f"浮点数转换成功: {amount_str} -> {amount}")
-                except (ValueError, TypeError):
-                    current_app.logger.error(f"金额格式转换错误: {amount_str}")
-                    return jsonify({'error': '无效的金额格式'}), 400
-        except Exception as e:
-            current_app.logger.error(f"数量转换失败: {str(e)}, 原始值: {amount_str}")
-            return jsonify({'success': False, 'error': f'无效的数字格式: {amount_str}'}), 400
+            # 验证最小值
+            if amount_int <= 0:
+                return jsonify({'success': False, 'error': '数量必须大于0'}), 400
+                
+            # 记录转换结果
+            current_app.logger.info(f"金额转换结果: 原始数据={amount_data} -> 整数={amount_int}")
+        except (ValueError, TypeError) as e:
+            # 详细记录转换错误
+            current_app.logger.error(f"金额转换失败: {str(e)}, 原始值: {amount_data}, 类型: {type(amount_data).__name__}")
+            return jsonify({'success': False, 'error': '无效的数字格式'}), 400
 
         # 获取资产信息
         asset = Asset.query.get(asset_id)
@@ -3124,7 +3114,7 @@ def prepare_purchase():
         if not trader_address:
             return jsonify({'success': False, 'error': '未提供交易者钱包地址'}), 400
             
-        current_app.logger.info(f"准备购买 - 用户: {trader_address}, 资产: {asset.id}, 数量: {amount}")
+        current_app.logger.info(f"准备购买 - 用户: {trader_address}, 资产: {asset.id}, 数量: {amount_int}")
 
         # 从配置读取平台费率 (基点, e.g., 350 for 3.5%) 和平台收款地址
         platform_fee_basis_points = get_config_value('PLATFORM_FEE_BASIS_POINTS', default=350, required=True) # 示例：默认3.5%
@@ -3133,17 +3123,17 @@ def prepare_purchase():
 
         # 计算总价
         price = Decimal(str(asset.token_price)) if asset.token_price else Decimal('0')
-        total_price = (Decimal(amount) * price).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP) # 保留6位小数
+        total_price = (Decimal(amount_int) * price).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP) # 保留6位小数
 
         # 获取购买者和卖家地址
         buyer_address = g.eth_address
         seller_address = asset.creator_address # 假设资产创建者即卖家
 
-        # 创建交易记录
+        # 创建交易记录 - 确保amount字段为整数
         new_trade = Trade(
             asset_id=asset_id,
             trader_address=buyer_address,
-            amount=int(amount),  # 确保amount是整数
+            amount=amount_int,  # 明确使用整数
             price=price,
             total=total_price,
             type='buy',
@@ -3158,7 +3148,7 @@ def prepare_purchase():
         db.session.add(new_trade)
         db.session.commit()
 
-        current_app.logger.info(f"准备购买交易 (ID: {new_trade.id}) for asset {asset_id}, amount {amount}, total {total_price}.")
+        current_app.logger.info(f"准备购买交易 (ID: {new_trade.id}) for asset {asset_id}, amount {amount_int}, total {total_price}.")
 
         # 返回给前端调用智能合约所需的信息
         return jsonify({
