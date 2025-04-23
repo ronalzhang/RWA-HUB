@@ -3071,17 +3071,50 @@ def prepare_purchase():
             return jsonify({'success': False, 'error': '无效的请求数据'}), 400
 
         # 获取关键参数
-        asset_id = data.get('asset_id')
+        asset_id_raw = data.get('asset_id')
         amount_data = data.get('amount')
             
         # 记录原始输入详情
-        current_app.logger.info(f"购买准备 - 原始输入: asset_id={asset_id}，amount={amount_data}，type(amount)={type(amount_data).__name__}")
+        current_app.logger.info(f"购买准备 - 原始输入: asset_id={asset_id_raw}({type(asset_id_raw).__name__})，amount={amount_data}({type(amount_data).__name__})")
             
-        # 验证资产ID
-        if not asset_id:
+        # 验证并标准化asset_id
+        if not asset_id_raw:
             current_app.logger.error("缺少资产ID参数")
             return jsonify({'success': False, 'error': '缺少资产ID参数'}), 400
             
+        # 尝试获取资产ID - 支持多种形式 (数字ID或字符串格式如"RH-108235")
+        try:
+            # 如果是RH-格式，则直接使用
+            if isinstance(asset_id_raw, str) and asset_id_raw.startswith('RH-'):
+                # 尝试从RH-XXXXX格式中提取数字部分
+                asset_id_number = asset_id_raw.split('-')[1] if '-' in asset_id_raw else asset_id_raw
+                # 查询是否存在此符号的资产
+                asset = Asset.query.filter_by(token_symbol=asset_id_raw).first()
+                if asset:
+                    asset_id = asset.id
+                    current_app.logger.info(f"通过符号{asset_id_raw}找到资产ID: {asset_id}")
+                else:
+                    # 尝试转换为整数ID
+                    try:
+                        asset_id = int(asset_id_number)
+                        current_app.logger.info(f"将符号{asset_id_raw}转换为资产ID: {asset_id}")
+                    except (ValueError, TypeError):
+                        # 如果转换失败，直接使用原始值
+                        asset_id = asset_id_raw
+                        current_app.logger.info(f"使用原始资产ID: {asset_id}")
+            else:
+                # 尝试转换为整数ID
+                try:
+                    asset_id = int(asset_id_raw)
+                    current_app.logger.info(f"将{asset_id_raw}转换为数字资产ID: {asset_id}")
+                except (ValueError, TypeError):
+                    # 如果转换失败，直接使用原始值
+                    asset_id = asset_id_raw
+                    current_app.logger.info(f"使用原始资产ID字符串: {asset_id}")
+        except Exception as e:
+            current_app.logger.error(f"处理资产ID时出错: {str(e)}")
+            return jsonify({'success': False, 'error': f'无效的资产ID格式: {str(e)}'}), 400
+
         # 验证金额参数
         if amount_data is None:
             current_app.logger.error("金额参数为空")
