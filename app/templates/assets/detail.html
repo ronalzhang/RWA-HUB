@@ -2299,15 +2299,27 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="text-muted">{{ _('Asset Name') }}:</span>
                             <span>{{ asset.name }}</span>
-                                            </div>
+                        </div>
+                        {% if asset.token_address %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">{{ _('Token Address') }}:</span>
+                            <div>
+                                <span id="tokenAddressFull" style="display: none;">{{ asset.token_address }}</span>
+                                <span title="{{ asset.token_address }}">{{ asset.token_address[:6] }}...{{ asset.token_address[-4:] }}</span>
+                                <button class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1" onclick="copyToClipboard('tokenAddressFull', this)" style="font-size: 0.7em;">
+                                    <i class="far fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% endif %}
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="text-muted">{{ _('Token Price') }}:</span>
                             <span class="fw-bold fs-5">{{ asset.token_price|number_format(field_name='token_price') }} USDC</span>
-                                </div>
+                        </div>
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="text-muted">{{ _('Token Supply') }}:</span>
                             <span>{{ asset.token_supply|number_format(field_name='token_supply') }}</span>
-                            </div>
+                        </div>
                         <div class="d-flex justify-content-between align-items-center mb-4">
                             <span class="text-muted">{{ _('Available Tokens') }}:</span>
                             <span id="availableTokens">{{ remaining_supply|number_format(field_name='remaining_supply') }}</span>
