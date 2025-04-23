@@ -3060,70 +3060,75 @@ def create_trade():
 def prepare_purchase():
     """准备购买交易，创建待支付记录并返回给前端调用智能合约所需信息"""
     try:
+        # 获取请求数据
         data = request.get_json()
+        
+        # 记录完整的请求数据
+        current_app.logger.info(f"收到购买准备请求: {data}")
+        
         if not data:
+            current_app.logger.error("请求体为空")
             return jsonify({'success': False, 'error': '无效的请求数据'}), 400
 
+        # 获取关键参数
         asset_id = data.get('asset_id')
-        amount_data = data.get('amount') # 前端传递购买的数量
-
-        # 记录原始输入
-        current_app.logger.info(f"购买准备 - 原始输入: asset_id={asset_id}, amount={amount_data}, 类型: {type(amount_data).__name__}")
+        amount_data = data.get('amount')
             
+        # 记录原始输入详情
+        current_app.logger.info(f"购买准备 - 原始输入: asset_id={asset_id}，amount={amount_data}，type(amount)={type(amount_data).__name__}")
+            
+        # 验证资产ID
         if not asset_id:
+            current_app.logger.error("缺少资产ID参数")
             return jsonify({'success': False, 'error': '缺少资产ID参数'}), 400
             
+        # 验证金额参数
         if amount_data is None:
+            current_app.logger.error("金额参数为空")
             return jsonify({'success': False, 'error': '缺少数量参数'}), 400
         
-        # 简化金额处理逻辑 - 尝试转换为浮点数，然后检查是否为整数
+        # 简化金额处理逻辑 - 强制转换为整数
         try:
-            # 对不同类型做适当处理
+            # 先确保我们有一个浮点数
             if isinstance(amount_data, str):
-                # 移除空格并尝试转换
-                amount_clean = amount_data.strip()
-                amount_float = float(amount_clean)
-            elif isinstance(amount_data, (int, float)):
-                # 数字类型直接使用
-                amount_float = float(amount_data)
+                amount_float = float(amount_data.strip())
             else:
-                # 其他类型尝试强制转换
                 amount_float = float(amount_data)
                 
-            # 验证最小值
+            # 验证金额是否为正数
             if amount_float <= 0:
+                current_app.logger.error(f"金额必须大于0: {amount_float}")
                 return jsonify({'success': False, 'error': '数量必须大于0'}), 400
                 
-            # 检查是否为整数
-            if amount_float != int(amount_float):
-                current_app.logger.warning(f"非整数金额: {amount_float}，将自动转为整数")
+            # 转换为整数 (资产数量必须是整数)
+            amount_int = max(1, int(amount_float))
             
-            # 转换为整数用于处理
-            amount_int = int(amount_float)
-            if amount_int < 1:
-                amount_int = 1  # 确保最小为1
-                
+            # 简化流程：直接使用字符串格式
+            amount = str(amount_int)
+            
             # 记录转换结果
-            current_app.logger.info(f"金额转换结果: 原始数据={amount_data} -> 浮点数={amount_float} -> 整数={amount_int}")
-        except (ValueError, TypeError) as e:
-            # 详细记录转换错误
-            current_app.logger.error(f"金额转换失败: {str(e)}, 原始值: {amount_data}, 类型: {type(amount_data).__name__}")
-            return jsonify({'success': False, 'error': '无效的数字格式'}), 400
+            current_app.logger.info(f"金额转换: {amount_data} ({type(amount_data).__name__}) -> {amount_float} (float) -> {amount_int} (int) -> {amount} (str)")
+        except Exception as e:
+            current_app.logger.error(f"金额转换失败: {e}, 原始值: {amount_data}, 类型: {type(amount_data).__name__}")
+            return jsonify({'success': False, 'error': f'无效的数字格式: {str(e)}'}), 400
 
         # 获取资产信息
         asset = Asset.query.get(asset_id)
         if not asset:
+            current_app.logger.error(f"找不到资产ID: {asset_id}")
             return jsonify({'success': False, 'error': '找不到指定资产'}), 404
 
         if asset.status != AssetStatus.ACTIVE.value:
+            current_app.logger.error(f"资产状态非活跃: {asset_id}, 状态: {asset.status}")
             return jsonify({'success': False, 'error': '该资产当前不可交易'}), 400
 
         # 使用户钱包地址，优先使用g.eth_address (通过eth_address_required装饰器设置)
         trader_address = g.eth_address
         if not trader_address:
+            current_app.logger.error("未提供交易者钱包地址")
             return jsonify({'success': False, 'error': '未提供交易者钱包地址'}), 400
             
-        current_app.logger.info(f"准备购买 - 用户: {trader_address}, 资产: {asset.id}, 数量: {amount_int}")
+        current_app.logger.info(f"准备购买 - 用户: {trader_address}, 资产: {asset.id}, 数量: {amount}")
 
         # 从配置读取平台费率 (基点, e.g., 350 for 3.5%) 和平台收款地址
         platform_fee_basis_points = get_config_value('PLATFORM_FEE_BASIS_POINTS', default=350, required=True) # 示例：默认3.5%
@@ -3132,7 +3137,7 @@ def prepare_purchase():
 
         # 计算总价
         price = Decimal(str(asset.token_price)) if asset.token_price else Decimal('0')
-        total_price = (Decimal(amount_int) * price).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP) # 保留6位小数
+        total_price = (Decimal(amount) * price).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP) # 保留6位小数
 
         # 获取购买者和卖家地址
         buyer_address = g.eth_address
@@ -3142,7 +3147,7 @@ def prepare_purchase():
         new_trade = Trade(
             asset_id=asset_id,
             trader_address=buyer_address,
-            amount=amount_int,  # 明确使用整数
+            amount=int(amount),  # 明确使用整数
             price=price,
             total=total_price,
             type='buy',
@@ -3157,17 +3162,20 @@ def prepare_purchase():
         db.session.add(new_trade)
         db.session.commit()
 
-        current_app.logger.info(f"准备购买交易 (ID: {new_trade.id}) for asset {asset_id}, amount {amount_int}, total {total_price}.")
+        current_app.logger.info(f"准备购买交易 (ID: {new_trade.id}) for asset {asset_id}, amount {amount}, total {total_price}.")
 
         # 返回给前端调用智能合约所需的信息
-        return jsonify({
+        result = {
             'success': True,
             'trade_id': new_trade.id,
             'total_amount': str(total_price), # 总支付金额 (USDC)
             'seller_address': seller_address,
             'platform_fee_basis_points': platform_fee_basis_points,
-            'purchase_contract_address': purchase_contract_address # 智能合约地址
-        }), 201
+            'purchase_contract_address': purchase_contract_address, # 智能合约地址
+            'asset_name': asset.name
+        }
+        current_app.logger.info(f"返回数据: {result}")
+        return jsonify(result), 201
 
     except ValueError as ve: # 处理配置缺失错误
         current_app.logger.error(f"配置错误: {str(ve)}")
