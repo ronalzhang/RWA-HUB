@@ -87,7 +87,6 @@ check_*.py
 summary.py
 setup_*.py
 force_*.py
-update_*.py
 cleanup_*.py
 create_test_*.py
 
@@ -117,6 +116,7 @@ docs/
 app/docs/
 *.md
 !README.md
+!SCRIPTS_README.md
 
 # 允许docs目录
 !docs/
@@ -132,3 +132,9 @@ app/docs/
 # 本地环境文件
 .env.local
 .env.development
+
+# 允许工具脚本
+!query_asset.py
+!issue_asset.py
+!update_asset_onchain.py
+!deploy_tools.sh
