@@ -3473,6 +3473,7 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
         } catch (error) {
             console.error('购买准备失败:', error);
             showError(error.message || '发生意外错误', buyErrorDiv);
+            return false; // <-- 添加 return false 阻止后续执行
         } finally {
             hideLoadingState();
             if (buttonElement) {
