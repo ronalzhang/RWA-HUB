@@ -3426,7 +3426,7 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
             // 准备请求数据对象，确保所有字段都是正确的类型
             const requestData = {
                 asset_id: assetId.toString(),  // 确保asset_id始终是字符串类型
-                amount: parseInt(amountNum, 10),  // 强制转换为整数
+                amount: amountNum,  // 使用整数类型的金额
                 wallet_address: walletAddress
             };
             
@@ -4069,3 +4069,132 @@ function updateAssetInfoDisplay(asset) {
         console.error("更新资产信息显示出错:", error);
     }
 }
+
+function confirmPurchase() {
+    console.log("购买确认数据:", purchaseData);
+    
+    // 验证字段是否齐全
+    if (!purchaseData || !purchaseData.assetId || !purchaseData.amount || !purchaseData.tradeId) {
+      showError("购买信息不完整，请重试");
+      return;
+    }
+    
+    // 显示加载状态
+    $("#confirmPurchaseBtn").prop("disabled", true).html('<i class="fa fa-spinner fa-spin"></i> 处理中...');
+    $("#cancelPurchaseBtn").prop("disabled", true);
+    
+    // 获取收款人地址和金额
+    const recipientAddress = purchaseData.recipientAddress;
+    const amount = parseFloat(purchaseData.amount);
+    const assetId = purchaseData.assetId;
+    const tradeId = purchaseData.tradeId;
+    
+    // 验证收款人地址
+    if (!recipientAddress || recipientAddress.trim() === "") {
+      showError("收款人地址无效");
+      resetPurchaseButtons();
+      return;
+    }
+    
+    // 验证金额
+    if (isNaN(amount) || amount <= 0) {
+      showError("金额必须大于0");
+      resetPurchaseButtons();
+      return;
+    }
+    
+    console.log(`准备发送 ${amount} USDC 到 ${recipientAddress}`);
+    
+    // 第一步：转移代币
+    transferToken(
+      recipientAddress, 
+      amount.toString(), 
+      "USDC",
+      function(signature) {
+        console.log("代币转移成功，交易签名:", signature);
+        
+        // 显示中间状态
+        $("#confirmPurchaseBtn").html('<i class="fa fa-spinner fa-spin"></i> 确认中...');
+        
+        // 第二步：通知后端更新交易状态
+        confirmPurchaseOnBackend(tradeId, signature);
+      },
+      function(error) {
+        console.error("代币转移失败:", error);
+        showError("代币转移失败: " + error);
+        resetPurchaseButtons();
+      }
+    );
+  }
+  
+  // 新增：后端确认购买
+  function confirmPurchaseOnBackend(tradeId, txHash) {
+    // 准备请求数据
+    const requestData = {
+      trade_id: tradeId,
+      tx_hash: txHash
+    };
+    
+    console.log("发送购买确认请求:", requestData);
+    
+    // 发送请求到后端API
+    $.ajax({
+      url: "/api/trades/confirm_purchase",
+      type: "POST",
+      contentType: "application/json",
+      data: JSON.stringify(requestData),
+      headers: {
+        "X-Wallet-Address": getWalletAddress()
+      },
+      success: function(response) {
+        console.log("购买确认响应:", response);
+        
+        if (response.success) {
+          // 显示成功消息
+          showSuccess("购买成功！资产将在几分钟内添加到您的钱包");
+          
+          // 关闭模态框
+          setTimeout(function() {
+            $("#purchaseModal").modal("hide");
+            
+            // 刷新资产信息
+            if (typeof refreshAssetInfo === 'function') {
+              refreshAssetInfo();
+            } else if (typeof safeRefreshAssetInfo === 'function') {
+              safeRefreshAssetInfo();
+            }
+            
+            // 刷新用户资产列表
+            if (typeof loadUserAssets === 'function') {
+              loadUserAssets();
+            }
+          }, 2000);
+        } else {
+          showError("购买确认失败: " + (response.error || "未知错误"));
+          resetPurchaseButtons();
+        }
+      },
+      error: function(xhr, status, error) {
+        console.error("购买确认请求失败:", xhr.responseText);
+        let errorMessage = "购买确认请求失败";
+        
+        try {
+          const response = JSON.parse(xhr.responseText);
+          if (response.error) {
+            errorMessage += ": " + response.error;
+          }
+        } catch (e) {
+          errorMessage += ": " + error;
+        }
+        
+        showError(errorMessage);
+        resetPurchaseButtons();
+      }
+    });
+  }
+  
+  // 重置购买按钮状态
+  function resetPurchaseButtons() {
+    $("#confirmPurchaseBtn").prop("disabled", false).html('确认购买');
+    $("#cancelPurchaseBtn").prop("disabled", false);
+  }
