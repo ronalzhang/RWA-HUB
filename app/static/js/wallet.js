@@ -3342,6 +3342,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerToken) {
     console.log(`handleBuy 被调用，参数:`, {assetIdOrEvent, amountInput, buttonElement, pricePerToken});
     try {
+        // 防止重复调用的标记
+        const currentTime = new Date().getTime();
+        if (window.lastHandleBuyCall && (currentTime - window.lastHandleBuyCall < 500)) {
+            console.log('阻止handleBuy短时间内的重复调用');
+            return false;
+        }
+        window.lastHandleBuyCall = currentTime;
+        
         // 处理不同的调用方式 - 统一确定参数
         let assetId, buyErrorDiv;
         
@@ -3613,7 +3621,7 @@ async function confirmPurchase(purchaseData, modalElement, confirmBtn) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Wallet-Address': walletState.address, // 添加钱包地址
+                'X-Wallet-Address': walletState.address, // 确保添加钱包地址头部
                 'X-Eth-Address': walletState.address // 为兼容性保留
             },
             body: JSON.stringify({
