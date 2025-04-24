@@ -1209,113 +1209,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // 完整的资产信息刷新函数
-            async function refreshAssetInfo() {
-                console.log('{{ _("Starting complete asset information refresh") }}');
-                
-                try {
-                    // 先更新剩余可购买量
-                    if (typeof updateRemainingSupply === 'function') {
-                        await updateRemainingSupply();
-                    } else {
-                        console.warn('{{ _("updateRemainingSupply function not defined") }}');
-                    }
-                    
-                    // 更新总分红信息
-                    if (typeof loadTotalDividends === 'function') {
-                        await loadTotalDividends();
-                    } else {
-                        console.warn('{{ _("loadTotalDividends function not defined") }}');
-                    }
-                    
-                    // 如果有其他需要刷新的信息，在这里添加
-                    
-                    console.log('{{ _("Asset information refresh completed successfully") }}');
-                    return true;
-                } catch (error) {
-                    console.error('{{ _("Asset information refresh failed") }}:', error);
-                    return false;
-                }
-            }
-
-            // 更新资产剩余供应量
-            async function updateRemainingSupply() {
-                console.log('{{ _("Updating remaining supply information") }}');
-                try {
-                    // 获取显示剩余供应量的元素
-                    const remainingSupplyEl = document.getElementById('remainingSupply');
-                    const remainingSupplyElMobile = document.getElementById('remainingSupplyMobile');
-                    
-                    if (!remainingSupplyEl && !remainingSupplyElMobile) {
-                        console.warn('{{ _("No remaining supply display elements found") }}');
-                        return;
-                    }
-                    
-                    // 构建请求URL
-                    const url = `/api/assets/{{ asset.id }}/info`;
-                    
-                    // 发起API请求
-                    const response = await fetch(url, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Cache-Control': 'no-cache'
-                        }
-                    });
-                    
-                    // 检查响应
-                    if (!response.ok) {
-                        throw new Error(`{{ _("API error") }}: ${response.status}`);
-                    }
-                    
-                    // 解析响应数据
-                    const data = await response.json();
-                    
-                    // 检查数据格式
-                    if (!data || typeof data.remaining_supply === 'undefined') {
-                        throw new Error('{{ _("Invalid response data, missing remaining supply information") }}');
-                    }
-                    
-                    // 提取剩余供应量
-                    const newRemainingSupply = parseInt(data.remaining_supply) || 0;
-                    const lastKnown = window.lastKnownData ? window.lastKnownData.remainingSupply : parseInt("{{ remaining_supply|default(0) }}");
-                    
-                    // 检查是否有变化
-                    const hasChanged = newRemainingSupply !== lastKnown;
-                    
-                    // 更新显示
-                    if (remainingSupplyEl) {
-                        remainingSupplyEl.textContent = newRemainingSupply.toLocaleString();
-                        if (hasChanged) remainingSupplyEl.classList.add('highlight-change');
-                    }
-                    
-                    if (remainingSupplyElMobile) {
-                        remainingSupplyElMobile.textContent = newRemainingSupply.toLocaleString();
-                        if (hasChanged) remainingSupplyElMobile.classList.add('highlight-change');
-                    }
-                    
-                    // 更新最后已知数据
-                    if (!window.lastKnownData) {
-                        window.lastKnownData = {};
-                    }
-                    window.lastKnownData.remainingSupply = newRemainingSupply;
-                    
-                    // 在一段时间后移除高亮
-                    if (hasChanged) {
-                        setTimeout(() => {
-                            if (remainingSupplyEl) remainingSupplyEl.classList.remove('highlight-change');
-                            if (remainingSupplyElMobile) remainingSupplyElMobile.classList.remove('highlight-change');
-                        }, 2000);
-                    }
-                    
-                    console.log(`{{ _("Remaining supply updated") }}: ${newRemainingSupply}`);
-                    return newRemainingSupply;
-                } catch (error) {
-                    console.error('{{ _("Failed to update remaining supply") }}:', error);
-                    return null;
-                }
-            }
-
             // 设置交易表单
             function setupTradeForm() {
                 const amountInput = document.getElementById('purchase-amount');
@@ -1452,125 +1345,1405 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // 计算分红相关数据
-            function calculateDividend() {
-                const amount = parseFloat(document.getElementById('dividendAmount').value) || 0;
-                const holdersCount = parseInt(document.getElementById('holdersCount').value) || 0;
-                
-                // 计算平台手续费 (1.5%)
-                const platformFee = amount * 0.015;
-                document.getElementById('platformFee').value = platformFee.toFixed(2) + ' USDC';
-                
-                // 计算预估Gas费用
-                const estimatedGas = calculateEstimatedGas(holdersCount);
-                document.getElementById('estimatedGas').value = estimatedGas + ' ETH';
-                
-                // 计算每代币分红金额
-                const actualAmount = amount - platformFee;
-                const perTokenDividend = actualAmount / parseInt('{{ asset.token_supply }}');
-                document.getElementById('perTokenDividend').value = perTokenDividend.toFixed(6) + ' USDC';
+            // 显示成功消息
+            function showSuccess(message) {
+                showMessage(message, 'success');
             }
 
-            // 计算预估Gas费用
-            function calculateEstimatedGas(holdersCount) {
-                // 基础Gas消耗
-                const baseGas = 111000; // approve + transferFrom
-                // 每个接收者的Gas消耗
-                const perHolderGas = 35000;
-                // 总Gas消耗
-                const totalGas = baseGas + (perHolderGas * holdersCount);
-                // 假设Gas价格为30 Gwei
-                const gasPrice = 30e-9;
-                return (totalGas * gasPrice).toFixed(4);
-            }
-
-            // 发起分红
-            async function startDividend() {
+            // 加载累计分红信息
+            async function loadTotalDividends() {
+                const totalDividendsElement = document.getElementById('totalDividendsDistributed');
+                if (!totalDividendsElement) {
+                    console.error('{{ _("Could not find total dividends display element") }}');
+                    return;
+                }
+                
+                // 设置加载超时
+                const timeout = 10000; // 10秒超时
+                let didTimeout = false;
+                const timeoutId = setTimeout(() => {
+                    didTimeout = true;
+                    console.warn('{{ _("Loading total dividends timed out") }}');
+                    totalDividendsElement.innerHTML = '<span class="text-warning">{{ _("Timeout") }}</span>';
+                }, timeout);
+                
                 try {
-                    const amount = document.getElementById('dividendAmount').value;
-                    if (amount < 10000) {
-                        alert('分红金额不能小于10,000 USDC');
-                        return;
+                    console.log('{{ _("Loading total dividend information...") }}');
+                    
+                    // 显示加载中状态
+                    totalDividendsElement.innerHTML = `
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                <span class="visually-hidden">{{ _('Loading') }}...</span>
+                            </div>
+                            <span>{{ _('Loading') }}...</span>
+                        </div>
+                    `;
+                    
+                    // 获取资产符号
+                    const tokenSymbol = ASSET_CONFIG.tokenSymbol || "{{ asset.token_symbol }}";
+                    console.log('{{ _("Retrieving asset dividend statistics, asset symbol") }}:', tokenSymbol);
+                    
+                    // 获取资产分红统计信息
+                    const response = await fetch(`/api/assets/symbol/${tokenSymbol}/dividend_stats`);
+                    
+                    // 清除超时定时器
+                    clearTimeout(timeoutId);
+                    
+                    // 如果已经超时，则不更新UI
+                    if (didTimeout) return;
+                    
+                    if (!response.ok) {
+                        console.error('{{ _("Dividend data API request failed") }}:', response.status, response.statusText);
+                        throw new Error(`{{ _("Failed to load dividend stats") }}: ${response.status}`);
                     }
                     
-                    const response = await fetch(`/api/assets/${asset.id}/dividend`, {
-                        method: 'POST',
+                    const stats = await response.json();
+                    console.log('{{ _("Dividend statistics data") }}:', stats);
+                    
+                    if (stats.total_amount !== undefined) {
+                        // 显示格式化的累计分红金额
+                        totalDividendsElement.innerHTML = `${Number(stats.total_amount).toLocaleString()} USDC`;
+                    } else {
+                        // 如果没有分红数据，显示0
+                        totalDividendsElement.innerHTML = '0 USDC';
+                    }
+                } catch (error) {
+                    // 清除超时定时器
+                    clearTimeout(timeoutId);
+                    
+                    // 如果没有超时，则显示错误信息
+                    if (!didTimeout) {
+                    console.error('{{ _("Failed to load total dividend information") }}:', error);
+                        totalDividendsElement.innerHTML = '<span class="text-danger">{{ _("Failed to load") }}</span>';
+                    }
+                }
+            }
+
+            // 模拟区块链交易流程
+            async function simulateTransaction() {
+                console.log('{{ _("Simulating blockchain transaction process...") }}');
+                
+                // 模拟交易提交
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                console.log('{{ _("Transaction submitted to network") }}');
+                
+                // 模拟交易确认过程
+                for (let i = 1; i <= 3; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    console.log(`{{ _("Received confirmation") }} ${i}`);
+                }
+                
+                console.log('{{ _("Transaction completed") }}');
+                return {
+                    txHash: 'mock_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15),
+                    confirmations: 3,
+                    status: 'confirmed'
+                };
+            }
+
+            // 缩短地址显示
+            function shortenAddress(address) {
+                if (!address) return '';
+                return address.substring(0, 6) + '...' + address.substring(address.length - 4);
+            }
+
+            // 初始化钱包连接 - 简化版
+
+            // 辅助函数：更新base.html中的钱包UI
+            
+            // 获取Cookie
+            function getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
+            }
+
+            // 通过API检查权限
+            async function checkOwnershipViaApi(address) {
+                console.log(`{{ _("Checking permissions for address") }} ${address} {{ _("via API") }}...`);
+                try {
+                    // 获取所有分红按钮
+                    const dividendBtns = [
+                        document.getElementById('dividendManagementBtn'),         // 正常屏幕
+                        document.getElementById('dividendManagementBtnMobile'),   // 移动版
+                        document.getElementById('dividendManagementBtnMedium')    // 中等屏幕
+                    ];
+                    
+                    // 首先隐藏所有按钮
+                    dividendBtns.forEach(btn => {
+                        if (btn) btn.style.display = 'none';
+                    });
+                    
+                    const response = await fetch(`/api/assets/${ASSET_CONFIG.id}/check_owner`, {
                         headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            amount: amount
-                        })
+                            'X-Eth-Address': address
+                        }
                     });
                     
                     if (!response.ok) {
-                        throw new Error('发起分红失败');
+                        console.warn('{{ _("API check of asset ownership failed") }}:', response.status);
+                        return; // 已隐藏所有按钮
                     }
                     
                     const data = await response.json();
-                    alert('分红发起成功，请在钱包中确认交易');
-                    location.reload();
+                    console.log('{{ _("API asset ownership check result") }}:', data);
                     
+                    if (data.is_owner || data.is_admin) {
+                        console.log('{{ _("API confirms user has permission to access dividend management functionality") }}');
+                        const dividendUrl = `/assets/${ASSET_CONFIG.token_symbol}/dividend?eth_address=${address}`;
+                        
+                        // 更新所有按钮
+                        dividendBtns.forEach(btn => {
+                            if (btn) {
+                                // 更新URL
+                                btn.href = dividendUrl;
+                                
+                                // 根据按钮类型设置显示样式
+                                if (btn.id === 'dividendManagementBtn') {
+                                    btn.style.display = 'inline-flex';
+                                } else if (btn.id === 'dividendManagementBtnMobile') {
+                                    btn.style.display = 'block';  // 移动版按钮
+                                } else if (btn.id === 'dividendManagementBtnMedium') {
+                                    btn.style.display = 'block';  // 中等屏幕按钮
+                                }
+                            }
+                        });
+                        
+                        console.log('{{ _("Updated and displayed all dividend management buttons") }}');
+                    } else {
+                        console.log('{{ _("API confirms user has no dividend management permissions") }}');
+                        // 已经在函数开始时隐藏了所有按钮
+                    }
                 } catch (error) {
-                    console.error('发起分红失败:', error);
-                    alert(error.message);
+                    console.error('{{ _("API permission check failed") }}:', error);
                 }
             }
 
-            // 显示模态框
-            function showModal(modalId) {
-                const modal = new bootstrap.Modal(document.getElementById(modalId));
-                modal.show();
-            }
+            // 添加立即刷新功能供交易成功后调用
+            window.refreshAssetInfoNow = async function() {
+                try {
+                    console.log('{{ _("Performing immediate refresh...") }}');
+                    await refreshAssetInfo();
+                    // 同时刷新钱包资产列表 - 使用base.html全局函数
+                    if (typeof loadUserAssets === 'function') {
+                        loadUserAssets();
+                    }
+                } catch (error) {
+                    console.error('{{ _("Immediate refresh failed") }}:', error);
+                    
+                    // 紧急备用刷新逻辑
+                    try {
+                        const asset_id = "{{ asset.id|default(0) }}";
+                        const asset_symbol = "{{ asset.token_symbol|default('') }}";
+                        const assetResponse = await fetch(`/api/assets/symbol/${asset_symbol}`);
+                        if (assetResponse.ok) {
+                            const data = await assetResponse.json();
+                            
+                            // 更新剩余供应量
+                            if (data.data && data.data.remaining_supply !== undefined) {
+                                const newRemainingSupply = data.data.remaining_supply;
+                                
+                                // 更新全局变量
+                                remainingSupply = newRemainingSupply;
+                                actualPurchasable = newRemainingSupply;
+                                maxPurchaseAmount = newRemainingSupply;
+                                
+                                // 更新界面显示
+                                const remainingSupplyElement = document.getElementById('remaining-supply');
+                                const maxPurchaseElement = document.getElementById('max-purchase-amount');
+                                
+                                if (remainingSupplyElement) {
+                                    remainingSupplyElement.textContent = newRemainingSupply;
+                                }
+                                
+                                if (maxPurchaseElement) {
+                                    maxPurchaseElement.textContent = newRemainingSupply;
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('{{ _("Backup refresh failed") }}:', error);
+                    }
+                }
+            };
 
-            // 连接钱包函数
-            async function connectWallet() {
-                console.log('开始连接钱包...');
+            // 处理购买按钮点击
+            async function handleBuy(e) {
+                e.preventDefault();
                 
-                // 检查是否已安装MetaMask
-                if (typeof window.ethereum === 'undefined') {
-                    alert('请安装MetaMask或其他兼容的钱包插件');
-                    throw new Error('未安装钱包插件');
+                // 显示加载状态
+                if (typeof window.showLoadingState === 'function') {
+                    window.showLoadingState('正在处理购买请求...');
+                } else {
+                    console.log('显示加载状态');
                 }
+                
+                const buyButton = document.getElementById('buyButton');
+                const originalButtonText = buyButton.innerHTML;
+                
+                // 设置按钮为加载中状态
+                buyButton.disabled = true;
+                buyButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> {{ _("Processing...") }}';
+                
+                // 获取表单数据
+                const buyForm = document.getElementById('buyForm');
+                const formData = new FormData(buyForm);
+                const amount = formData.get('amount');
+                const tokenId = formData.get('token_id');
+                const assetId = formData.get('asset_id');
+                const price = formData.get('price');
+                const currency = formData.get('currency');
+                
+                // 格式化数字 - 确保没有逗号
+                const cleanAmount = amount.toString().replace(/,/g, '');
+                const cleanPrice = price.toString().replace(/,/g, '');
+                
+                // 格式化数字后的日志
+                console.log('购买信息:', {
+                    tokenId,
+                    assetId,
+                    amount: cleanAmount,
+                    formattedAmount: parseFloat(cleanAmount).toFixed(6),
+                    price: cleanPrice,
+                    formattedPrice: parseFloat(cleanPrice).toFixed(6),
+                    currency
+                });
+                
+                // 将清理后的数字设置回表单
+                const cleanFormData = new FormData();
+                cleanFormData.append('token_id', tokenId);
+                cleanFormData.append('asset_id', assetId);
+                cleanFormData.append('amount', parseFloat(cleanAmount).toFixed(6));
+                cleanFormData.append('price', parseFloat(cleanPrice).toFixed(6));
+                cleanFormData.append('currency', currency);
                 
                 try {
-                    // 请求账户授权
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    if (accounts.length === 0) {
-                        throw new Error('用户拒绝连接钱包');
+                    // 检查钱包连接状态
+                    if (!window.walletState || !window.walletState.isConnected) {
+                        throw new Error('{{ _("Please connect your wallet first") }}');
                     }
-                    
-                    console.log('钱包连接成功:', accounts[0]);
-                    
-                    // 更新全局状态 - 保持正确大小写
-                    const walletAddress = accounts[0];
-                    if (typeof window.walletState === 'undefined') {
-                        window.walletState = {};
-                    }
-                    window.walletState.currentAccount = walletAddress;
-                    
-                    // 使用全局变量提升兼容性 - 保持正确大小写
-                    window.walletPublicKey = { toString: () => walletAddress };
-                    
-                    // 设置cookie - 保持正确大小写
-                    document.cookie = `eth_address=${walletAddress}; path=/; max-age=3600`;
-                    
-                    return walletAddress;
+
+                    return new Promise((resolve, reject) => {
+                        // 准备购买请求
+                        fetch('/api/trades/prepare_purchase', {
+                            method: 'POST',
+                            body: cleanFormData,
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(data => {
+                                    throw new Error(data.error || '{{ _("Server error") }}');
+                                });
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (!data.success) {
+                                throw new Error(data.error || '{{ _("Failed to prepare purchase") }}');
+                            }
+                            
+                            console.log('购买准备成功:', data);
+                            
+                            // 显示确认购买模态框
+                            const buyModal = new bootstrap.Modal(document.getElementById('buyModal'));
+                            document.getElementById('confirm-amount').value = cleanAmount;
+                            document.getElementById('confirm-total').value = data.total_amount + ' USDC';
+                            
+                            // 存储交易ID和其他必要数据，用于确认时调用
+                            window.pendingPurchase = {
+                                trade_id: data.trade_id,
+                                total: data.total_amount,
+                                amount: cleanAmount,
+                                total_cost: data.total_amount,
+                                seller: data.seller_address,
+                                recipient_address: data.seller_address,
+                                platform_fee_basis_points: data.platform_fee_basis_points,
+                                contract_address: data.purchase_contract_address
+                            };
+                            
+                            buyModal.show();
+                            resolve(data);
+                        })
+                        .catch(error => {
+                            console.error('购买准备失败:', error);
+                                hideLoadingState();
+                            showError(error.message || '{{ _("Failed to prepare purchase") }}');
+                            reject(error);
+                        });
+                    });
                 } catch (error) {
-                    console.error('连接钱包失败:', error);
+                    console.error('购买处理错误:', error);
+                                hideLoadingState();
+                    showError(error.message || '{{ _("An error occurred during purchase") }}');
                     throw error;
                 }
             }
-        </script>
 
-        <script>
-        </script>
+            // 确认购买函数 - 从购买模态框调用
+            async function confirmPurchase() {
+                // 检查是否有待处理的购买数据
+                if (!window.pendingPurchase) {
+                    console.error("没有待处理的购买数据");
+                                    return; 
+                                }
 
-        {% block scripts %}
-        <script nonce="{{ nonce|default('') }}" version="1.0.1">
-        // 检查钱包连接状态
-        </script>
-        {% endblock %}
+                // 显示加载状态
+                showLoadingState("确认购买中...");
+
+                try {
+                    // 准备调用全局confirmPurchase函数所需数据
+                    const purchaseData = {
+                        asset_id: assetId,
+                        amount: window.pendingPurchase.amount,
+                        total_cost: window.pendingPurchase.total_cost,
+                        recipient_address: window.pendingPurchase.recipient_address || "{{ asset.creator_address }}"
+                    };
+
+                    // 获取模态框和确认按钮元素
+                        const modalElement = document.getElementById('buyModal');
+                    const confirmBtn = document.getElementById('confirmPurchaseBtn');
+
+                    // 调用wallet.js中定义的全局confirmPurchase函数
+                    if (window.confirmPurchase && typeof window.confirmPurchase === 'function') {
+                        await window.confirmPurchase(purchaseData, modalElement, confirmBtn);
+                    } else {
+                        throw new Error('全局confirmPurchase函数未定义');
+                    }
+                } catch (error) {
+                    console.error("支付确认错误:", error);
+                    showToast('支付确认失败: ' + error.message, 'error');
+                    hideLoadingState();
+                }
+            }
+
+            // 更新确认模态框，移除平台费和卖家支付信息
+            const buyModalHtml = `
+                <div class="modal fade" id="buyModal" tabindex="-1" aria-labelledby="buyModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                                <h5 class="modal-title" id="buyModalLabel">{{ _("Confirm Purchase") }}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                                <p>{{ _('Please review the details before confirming your purchase:') }}</p>
+                                <ul class="list-group list-group-flush mb-3">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Asset') }}: <strong id="modalAssetName"></strong>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Amount (Tokens)') }}: <strong id="modalAmount"></strong>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Price per Token') }}: <span id="modalPricePerToken"></span> USDC
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Subtotal') }}: <span id="modalSubtotal"></span> USDC
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        {{ _('Platform Fee') }}: <span id="modalFee"></span> USDC
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center fs-5">
+                                        <strong>{{ _('Total Cost') }}:</strong> <strong id="modalTotalCost" class="text-primary"></strong> <strong class="text-primary">USDC</strong>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center" style="font-size: 0.8em; color: #6c757d;">
+                                        <span class="me-2">{{ _('Recipient Address') }}:</span> <code id="modalRecipientAddress" class="text-break" style="font-size: 0.9em;"></code>
+                                    </li>
+                                </ul>
+                                <!-- 错误信息显示区域 -->
+                                <div id="buyModalError" class="alert alert-danger" style="display: none;"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _("Cancel") }}</button>
+                                <button type="button" class="btn btn-primary" id="confirmPurchaseBtn">
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                                    {{ _("Confirm Purchase & Pay") }}
+                                </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            `;
+
+            // 确保模态框HTML已添加到页面，仅添加一次
+                if (!document.getElementById('buyModal')) {
+                    document.body.insertAdjacentHTML('beforeend', buyModalHtml);
+                
+                // 使用事件监听器而不是内联onclick
+                document.getElementById('confirmPurchaseBtn').addEventListener('click', confirmPurchase);
+                }
+
+            // 添加单独刷新钱包资产列表的函数 - 使用全局loadUserAssets函数替代
+            function refreshWalletAssets() {
+                if (typeof loadUserAssets === 'function') {
+                    console.log('使用全局loadUserAssets函数加载钱包资产');
+                    loadUserAssets();
+                } else {
+                    console.warn('全局loadUserAssets函数不可用');
+                }
+            }
+
+            // 显示消息函数
+            function showMessage(message, type = 'info') {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `alert alert-${type} position-fixed top-0 start-50 translate-middle-x mt-3`;
+                messageDiv.style.zIndex = '9999';
+                messageDiv.innerHTML = message;
+                document.body.appendChild(messageDiv);
+                
+                // 3秒后自动消失
+                setTimeout(() => {
+                    messageDiv.remove();
+                }, 3000);
+            }
+
+            // 显示错误信息
+            function showError(message) {
+                showMessage(message, 'danger');
+            }
+
+            // 获取钱包地址，优先从全局walletState获取
+            function getWalletAddress() {
+                // 优先使用全局钱包状态
+                if (window.walletState && window.walletState.isConnected && window.walletState.address) {
+                    return window.walletState.address;
+                }
+                
+                // 其次使用本地walletPublicKey
+                if (walletPublicKey) {
+                    return walletPublicKey.toString();
+                }
+                
+                // 最后尝试从localStorage获取
+                return localStorage.getItem('walletAddress') || localStorage.getItem('eth_address') || '';
+            }
+
+            // 辅助函数：缩短地址显示
+            function shortenAddress(address) {
+                if (!address) return '';
+                return address.substring(0, 6) + '...' + address.substring(address.length - 4);
+            }
+
+            // 设置页面中的钱包相关元素
+            
+            // 更新页面中的钱包UI - 移到外部作为全局函数
+                // 更新其他元素...
+                // ... 其他代码保持不变
+
+            // 获取Cookie
+            function getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
+            }
+        
+        // 分享资产功能
+        function shareAsset() {
+            // 检查用户是否已连接钱包
+            if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
+                alert('{{ _("Please connect your wallet first to generate your exclusive sharing link") }}');
+                // 调用全局钱包连接函数
+                if (typeof toggleWalletMenu === 'function') {
+                    toggleWalletMenu();
+                }
+                return;
+            }
+            
+            // 获取当前用户的钱包地址
+            const address = window.walletState.address;
+            
+            // 从服务器获取分享文案，如果失败则使用默认文案
+            fetch('/api/share-messages/random')
+                .then(response => response.json())
+                .catch(error => {
+                    console.error('{{ _("Failed to get sharing message") }}:', error);
+                    // 使用默认文案
+                    return {
+                        success: true,
+                        message: "{{ _('📈 Share to earn commission! Invite friends to invest, and you can get up to 30%% promotion commission! The link is exclusively yours, lifetime commission benefits, the more friends, the more rewards!') }}"
+                    };
+                })
+                .then(data => {
+                    const shareMessage = data.message || "{{ _('🔥 Share great opportunities! Invite friends to invest in this quality asset and witness wealth growth together!') }}";
+                    
+                    // 生成分享链接模态框
+                    showShareModal(address, shareMessage);
+                });
+        }
+        
+        // 显示分享模态框
+        function showShareModal(address, shareMessage) {
+            // 生成分享链接模态框
+            const modalHtml = `
+                <div class="modal fade" id="shareModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">分享这个资产</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div id="shareLoading" class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2">正在生成安全的分享链接...</p>
+                                </div>
+                                
+                                <div id="shareContent" style="display:none;">
+                                    <div class="share-message">
+                                        ${shareMessage}
+                                    </div>
+                                    
+                                    <div class="commission-info mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <strong>多级分销收益（永久有效）</strong>
+                                            <span class="info-icon ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<div class='text-start'>
+                                                <p class='mb-1'>您分享链接的收益说明：</p>
+                                                <ul class='ps-3 mb-0'>
+                                                    <li>直接推荐好友购买：您获得30%佣金</li>
+                                                    <li>好友推荐他人购买：您获得15%佣金</li>
+                                                    <li>二级好友再推荐：您仍获得5%佣金</li>
+                                                </ul>
+                                                <p class='mt-1 mb-0 small'>例：好友通过您的链接购买10,000USDC资产，交易佣金250USDC，您立即获得75USDC！</p>
+                                            </div>">
+                                                <i class="fas fa-info-circle text-primary"></i>
+                                            </span>
+                                        </div>
+                                        <div class="commission-tiers mt-2 d-flex justify-content-around text-center">
+                                            <div class="tier">
+                                                <div class="tier-label">一级</div>
+                                                <div class="tier-value">30%</div>
+                                            </div>
+                                            <div class="tier">
+                                                <div class="tier-label">二级</div>
+                                                <div class="tier-value">15%</div>
+                                            </div>
+                                            <div class="tier">
+                                                <div class="tier-label">三级</div>
+                                                <div class="tier-value">5%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">您的专属分享链接:</label>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" id="shareLink" readonly>
+                                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('shareLink')">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                        <small class="form-text text-muted">此链接已加密您的钱包地址，保护您的隐私</small>
+                                    </div>
+                                    <div class="d-flex gap-2 mt-4">
+                                        <button class="btn btn-success flex-grow-1" onclick="copyToClipboard('shareLink')">
+                                            <i class="fas fa-copy me-2"></i>复制链接
+                                        </button>
+                                        <button class="btn btn-primary flex-grow-1" onclick="shareViaWhatsApp()">
+                                            <i class="fab fa-whatsapp me-2"></i>WhatsApp
+                                        </button>
+                                        <button class="btn btn-info flex-grow-1" onclick="shareViaTwitter()">
+                                            <i class="fab fa-twitter me-2"></i>Twitter
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div id="shareError" class="alert alert-danger mt-3" style="display:none;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 添加模态框到页面
+            if (!document.getElementById('shareModal')) {
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+            }
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('shareModal'));
+            modal.show();
+            
+            // 生成短链接
+            generateShortLink(address);
+            
+            // 初始化tooltip
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl, {
+                    html: true,
+                    boundary: 'window'
+                });
+            });
+        }
+        
+        // 生成短链接
+        function generateShortLink(address) {
+            // 显示加载状态
+            document.getElementById('shareLoading').style.display = 'block';
+            document.getElementById('shareContent').style.display = 'none';
+            document.getElementById('shareError').style.display = 'none';
+            
+            // 构建带钱包地址的原始URL
+            const currentUrl = window.location.origin + window.location.pathname;
+            const originalUrl = `${currentUrl}?ref=${encodeURIComponent(address)}`;
+            
+            // 调用短链接API
+            fetch('/api/shortlink/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Eth-Address': address
+                },
+                body: JSON.stringify({
+                    url: originalUrl,
+                    expires_days: 365  // 链接一年后过期
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // 隐藏加载状态
+                document.getElementById('shareLoading').style.display = 'none';
+                
+                if (data.success) {
+                    // 设置分享链接并显示内容
+                    document.getElementById('shareLink').value = data.short_url;
+                    document.getElementById('shareContent').style.display = 'block';
+                } else {
+                    // 显示错误
+                    const errorElement = document.getElementById('shareError');
+                    errorElement.style.display = 'block';
+                    errorElement.textContent = data.error || '生成分享链接失败';
+                }
+            })
+            .catch(error => {
+                // 隐藏加载状态，显示错误
+                document.getElementById('shareLoading').style.display = 'none';
+                const errorElement = document.getElementById('shareError');
+                errorElement.style.display = 'block';
+                errorElement.textContent = '生成分享链接失败: ' + error.message;
+            });
+        }
+        
+        // 复制到剪贴板 (修改以支持隐藏元素)
+        function copyToClipboard(elementId, buttonElement) {
+            const copyTextElement = document.getElementById(elementId);
+            let textToCopy = '';
+            
+            if (copyTextElement.tagName === 'INPUT' || copyTextElement.tagName === 'TEXTAREA') {
+                textToCopy = copyTextElement.value;
+                copyTextElement.select(); // 选择输入框内容以便某些浏览器API工作
+                copyTextElement.setSelectionRange(0, 99999); 
+            } else {
+                // 对于非输入元素（如span），直接获取其文本内容
+                textToCopy = copyTextElement.textContent || copyTextElement.innerText;
+            }
+
+            if (!textToCopy) {
+                console.error('无法获取要复制的文本');
+                return;
+            }
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                // 显示成功提示
+                const originalHtml = buttonElement.innerHTML;
+                buttonElement.innerHTML = '<i class="fas fa-check text-success"></i>';
+            setTimeout(() => {
+                    buttonElement.innerHTML = originalHtml;
+            }, 2000);
+            }).catch(err => {
+                console.error('复制失败:', err);
+                // 可以添加错误提示
+                const originalHtml = buttonElement.innerHTML;
+                buttonElement.innerHTML = '<i class="fas fa-times text-danger"></i>';
+                 setTimeout(() => {
+                    buttonElement.innerHTML = originalHtml;
+                }, 2000);
+            });
+        }
+        
+        // 分享到WhatsApp
+        function shareViaWhatsApp() {
+            const shareText = `查看这个有趣的资产: ${document.getElementById('shareLink').value}`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+        }
+        
+        // 分享到Twitter
+        function shareViaTwitter() {
+            const assetName = "{{ asset.name }}";
+            const shareText = `我发现了一个很棒的资产 ${assetName}，感兴趣的朋友可以来看看: `;
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(document.getElementById('shareLink').value)}`, '_blank');
+        }
+    </script>
+
+    <!-- 返回按钮 -->
+    <a href="{{ url_for('assets.list_assets_page') }}" class="btn btn-link text-muted mb-3">
+        <i class="fas fa-arrow-left me-2"></i>{{ _('Back to List') }}
+    </a>
+
+    <!-- 资产状态标签 -->
+    <!-- 宽屏布局 -->
+    <div class="d-none d-lg-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <h2 class="mb-0">{{ asset.name }}</h2>
+            {% if asset.status == 1 or (asset.status is defined and asset.status is string and 'PENDING' in asset.status) %}
+            <span class="badge bg-warning">{{ _('Pending Review') }}</span>
+            {% elif asset.status == 2 or (asset.status is defined and asset.status is string and 'APPROVED' in asset.status) %}
+            <span class="badge bg-success">{{ _('On Chain') }}</span>
+            {% elif asset.status == 3 or (asset.status is defined and asset.status is string and 'REJECTED' in asset.status) %}
+            <span class="badge bg-danger">{{ _('Rejected') }}</span>
+            {% endif %}
+        </div>
+        <!-- 分红管理按钮 - 管理员和资产所有者可见 -->
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-outline-success" id="shareAssetBtn" onclick="shareAsset()">
+                <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
+            </button>
+            {% if is_admin_user or is_owner %}
+            <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary" id="dividendManagementBtn" data-token-symbol="{{ asset.token_symbol }}" style="display: none;">
+                <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- 中屏和窄屏布局 -->
+    <div class="d-flex d-lg-none flex-column mb-4">
+        <div class="w-100 mb-2">
+            <h2 class="mb-0">{{ asset.name }}</h2>
+        </div>
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                {% if asset.status == 1 or (asset.status is defined and asset.status is string and 'PENDING' in asset.status) %}
+                <span class="badge bg-warning">{{ _('Pending Review') }}</span>
+                {% elif asset.status == 2 or (asset.status is defined and asset.status is string and 'APPROVED' in asset.status) %}
+                <span class="badge bg-success">{{ _('On Chain') }}</span>
+                {% elif asset.status == 3 or (asset.status is defined and asset.status is string and 'REJECTED' in asset.status) %}
+                <span class="badge bg-danger">{{ _('Rejected') }}</span>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-success d-md-none d-block" id="shareAssetBtnMobile" onclick="shareAsset()">
+                    <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
+                </button>
+                <button class="btn btn-outline-success d-none d-md-block d-lg-none" id="shareAssetBtnMedium" onclick="shareAsset()">
+                    <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
+                </button>
+                {% if is_admin_user or is_owner %}
+                <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-sm btn-outline-primary d-md-none d-block" id="dividendManagementBtnMobile" data-token-symbol="{{ asset.token_symbol }}" style="display: none;">
+                    <i class="fas fa-coins me-2"></i>{{ _('Dividend') }}
+                </a>
+                <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary d-none d-md-block d-lg-none" id="dividendManagementBtnMedium" data-token-symbol="{{ asset.token_symbol }}" style="display: none;">
+                    <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片轮播 -->
+    <div class="row mb-4">
+        <div class="col-lg-7">
+            <!-- 资产图片轮播 -->
+            <div id="assetImages" class="carousel slide mb-3" data-bs-ride="carousel">
+                <div class="carousel-inner">
+                    {% if asset.images and asset.images|length > 0 %}
+                    {% for image in asset.images %}
+                    <div class="carousel-item {% if loop.first %}active{% endif %}">
+                            <img src="{{ image }}" class="d-block w-100" alt="{{ _('Asset Image') }}" style="border-radius: 12px; height: 400px; object-fit: cover;">
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                        <div class="carousel-item active">
+                            <div class="bg-light d-flex align-items-center justify-content-center" style="height: 400px; border-radius: 12px;">
+                                <i class="fas fa-image fa-4x text-muted"></i>
+                </div>
+                        </div>
+                    {% endif %}
+                </div>
+                {% if asset.images and asset.images|length > 1 %}
+                <button class="carousel-control-prev" type="button" data-bs-target="#assetImages" data-bs-slide="prev">
+                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">{{ _('Previous') }}</span>
+                </button>
+                <button class="carousel-control-next" type="button" data-bs-target="#assetImages" data-bs-slide="next">
+                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">{{ _('Next') }}</span>
+                </button>
+            {% endif %}
+            </div>
+            
+            <!-- 缩略图导航 -->
+            {% if asset.images and asset.images|length > 1 %}
+            <div class="row g-2 mb-4 clearfix">
+                {% for image in asset.images %}
+                <div class="thumbnail-col">
+                    <img src="{{ image }}" class="img-thumbnail thumbnail-nav" alt="{{ _('Thumbnail') }}" 
+                         data-bs-target="#assetImages" 
+                     data-bs-slide-to="{{ loop.index0 }}"
+                         style="height: 65px; object-fit: cover; cursor: pointer;">
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            
+            <!-- 资产描述 -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ _('Asset Description') }}</h5>
+                    <div>
+                        <span class="badge bg-primary me-1">{{ asset.token_symbol }}</span>
+                        {% if asset.status == 1 %}
+                        <span class="badge bg-warning">{{ _('Pending Review') }}</span>
+                        {% elif asset.status == 2 %}
+                        <span class="badge bg-success">{{ _('On Chain') }}</span>
+                        {% elif asset.status == 3 %}
+                        <span class="badge bg-danger">{{ _('Rejected') }}</span>
+            {% endif %}
+        </div>
+                </div>
+                <div class="card-body">
+                    <p>{{ asset.description|default(_('No description provided'), true) }}</p>
+                    
+                            {% if asset.asset_type == 10 %}
+                    <div class="mt-4">
+                        <h6 class="fw-bold">{{ _('Property Details') }}</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2"><i class="fas fa-map-marker-alt text-muted me-2"></i> <strong>{{ _('Location') }}:</strong> {{ asset.location }}</li>
+                            <li class="mb-2"><i class="fas fa-ruler-combined text-muted me-2"></i> <strong>{{ _('Area') }}:</strong> {{ asset.area|number_format(field_name='area') }} ㎡</li>
+                            {# --- 添加发起人地址信息 --- #}
+                            <li class="mb-2">
+                                <i class="fas fa-user-tie text-muted me-2"></i> 
+                                <strong>{{ _('Creator Address') }}:</strong> 
+                                <span id="creatorAddressFull" style="display: none;">{{ asset.creator_address }}</span>
+                                <span title="{{ asset.creator_address }}">{{ asset.creator_address[:6] }}...{{ asset.creator_address[-4:] }}</span>
+                                <button class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1" onclick="copyToClipboard('creatorAddressFull', this)" style="font-size: 0.7em;">
+                                    <i class="far fa-copy"></i>
+                                </button>
+                            </li>
+                            {# --- 结束添加 --- #}
+                        </ul>
+                            </div>
+                            {% else %}
+                    <div class="mt-4">
+                        <h6 class="fw-bold">{{ _('Asset Details') }}</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2"><i class="fas fa-map-marker-alt text-muted me-2"></i> <strong>{{ _('Location') }}:</strong> {{ asset.location }}</li>
+                            <li class="mb-2"><i class="fas fa-money-bill-wave text-muted me-2"></i> <strong>{{ _('Total Value') }}:</strong> {{ asset.total_value|number_format(field_name='total_value') }} USDC</li>
+                            <li class="mb-2"><i class="fas fa-certificate text-muted me-2"></i> <strong>{{ _('Certification') }}:</strong> {{ asset.certification_type|default('N/A', true) }}</li>
+                            {# --- 添加发起人地址信息 --- #}
+                            <li class="mb-2">
+                                <i class="fas fa-user-tie text-muted me-2"></i> 
+                                <strong>{{ _('Creator Address') }}:</strong> 
+                                <span id="creatorAddressFull" style="display: none;">{{ asset.creator_address }}</span>
+                                <span title="{{ asset.creator_address }}">{{ asset.creator_address[:6] }}...{{ asset.creator_address[-4:] }}</span>
+                                <button class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1" onclick="copyToClipboard('creatorAddressFull', this)" style="font-size: 0.7em;">
+                                    <i class="far fa-copy"></i>
+                                </button>
+                            </li>
+                            {# --- 结束添加 --- #}
+                        </ul>
+                            </div>
+                            {% endif %}
+                    
+                    <!-- 文档下载链接 -->
+                    {% if asset.documents %}
+                    <div class="mt-4">
+                        <h6 class="fw-bold">{{ _('Related Documents') }}</h6>
+                        <div class="list-group">
+                            {% for doc in asset.documents %}
+                            <a href="{{ doc.url }}" class="list-group-item list-group-item-action" target="_blank">
+                                <i class="fas fa-file-pdf me-2 text-danger"></i>{{ doc.name }}
+                            </a>
+                            {% endfor %}
+                                </div>
+                            </div>
+                    {% endif %}
+                        </div>
+                    </div>
+
+            <!-- 累计分红信息 -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">{{ _('Dividend Information') }}</h5>
+                                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>{{ _('Annual Revenue') }}:</strong> {{ asset.annual_revenue|number_format(field_name='annual_revenue') }} USDC</p>
+                            <p><strong>{{ _('Dividend Frequency') }}:</strong> {{ asset.dividend_frequency|default(_('Quarterly'), true) }}</p>
+                            </div>
+                        <div class="col-md-6">
+                            <p><strong>{{ _('Total Distributed') }}:</strong> <span id="totalDividendsDistributed">{{ _('Loading') }}...</span></p>
+                            <p><strong>{{ _('Next Distribution') }}:</strong> {{ asset.next_dividend_date|default('TBA', true) }}</p>
+                                </div>
+                            </div>
+                    
+                    <!-- 分红管理按钮 - 已移到上方按钮组，此处删除 -->
+                            </div>
+                                </div>
+                            </div>
+                            
+        <div class="col-lg-5">
+            <!-- 交易卡片 -->
+            <div class="card sticky-top trade-card" style="top: 90px; z-index: 10;">
+                <div class="card-header">
+                    <h5 class="mb-0">{{ _('Asset Trading') }}</h5>
+                </div>
+                <div class="card-body">
+                    <!-- 资产基本信息 -->
+                    <div class="mb-4">
+                        <h4 class="mb-3">{{ asset.token_symbol }}</h4>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">{{ _('Asset Name') }}:</span>
+                            <span>{{ asset.name }}</span>
+                                            </div>
+                        {% if asset.token_address %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">{{ _('Token Address') }}:</span>
+                            <div>
+                                <span id="tokenAddressFull" style="display: none;">{{ asset.token_address }}</span>
+                                <span title="{{ asset.token_address }}">{{ asset.token_address[:6] }}...{{ asset.token_address[-4:] }}</span>
+                                <button class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1" onclick="copyToClipboard('tokenAddressFull', this)" style="font-size: 0.7em;">
+                                    <i class="far fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">{{ _('Token Price') }}:</span>
+                            <span class="fw-bold fs-5">{{ asset.token_price|number_format(field_name='token_price') }} USDC</span>
+                                </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">{{ _('Token Supply') }}:</span>
+                            <span>{{ asset.token_supply|number_format(field_name='token_supply') }}</span>
+                            </div>
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <span class="text-muted">{{ _('Available Tokens') }}:</span>
+                            <span id="availableTokens">{{ remaining_supply|number_format(field_name='remaining_supply') }}</span>
+                        </div>
+
+                    </div>
+
+                    <!-- 交易表单 -->
+                    <form id="purchase-form">
+                            <div class="mb-3">
+                            <label for="purchase-amount" class="form-label">{{ _('Purchase Amount') }}</label>
+                            <input type="number" class="form-control" id="purchase-amount" min="1" max="{{ remaining_supply }}" value="100" step="1">
+                            <div class="form-text">{{ _('Enter the number of tokens you want to purchase') }}</div>
+                            </div>
+                        
+                        <div class="mb-4">
+                            <label for="totalPrice" class="form-label">{{ _('Total Price') }}</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="totalPrice" readonly>
+                                    <span class="input-group-text">USDC</span>
+                                </div>
+                            </div>
+                        
+                            <div id="buy-error" class="alert alert-danger" style="display: none;"></div>
+                        
+                        <button type="button" id="buy-button" class="btn btn-primary w-100 py-2" data-token-price="{{ asset.token_price }}" data-asset-id="{{ asset.id }}">
+                                <i class="fas fa-shopping-cart me-2"></i>{{ _('Buy') }}
+                            </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 交易历史 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4 trade-history-section">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ _('Transaction History') }}</h5>
+                    <div class="pagination-controls d-flex align-items-center" id="pagination-controls">
+                        <button class="btn btn-sm btn-outline-primary me-2" id="prevPageBtn" disabled>
+                            <i class="fas fa-chevron-left me-1"></i>{{ _('Previous') }}
+                        </button>
+                        <span id="paginationInfo" class="me-2">{{ _('Page') }} <span id="currentPageDisplay">1</span> {{ _('of') }} <span id="totalPagesDisplay">1</span></span>
+                        <button class="btn btn-sm btn-outline-primary" id="nextPageBtn" disabled>
+                            {{ _('Next') }}<i class="fas fa-chevron-right ms-1"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="trade-history" class="mb-3">
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">{{ _('Loading') }}...</span>
+                            </div>
+                            <p class="mt-2 text-muted">{{ _('Loading transaction history') }}...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+            </div>
+</div>
+
+<!-- 分红管理对话框 -->
+<div class="modal fade" id="dividendModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ _('Initiate Dividend') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">{{ _('Current Holders Count') }}</label>
+                    <input type="text" class="form-control" id="holdersCount" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">{{ _('Dividend Amount (USDC)') }}</label>
+                    <input type="number" class="form-control" id="dividendAmount" min="10000" step="1000">
+                    <div class="form-text">{{ _('Minimum dividend amount is 10,000 USDC') }}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">{{ _('Estimated Gas Fee') }}</label>
+                    <input type="text" class="form-control" id="estimatedGas" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">{{ _('Platform Fee') }} (1.5%%)</label>
+                    <input type="text" class="form-control" id="platformFee" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">{{ _('Per Token Dividend Amount') }}</label>
+                    <input type="text" class="form-control" id="perTokenDividend" readonly>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('Cancel') }}</button>
+                <button type="button" class="btn btn-primary" onclick="startDividend()">{{ _('Start Dividend') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* 轮播图样式 */
+.carousel-item img {
+    border-radius: 12px;
+}
+
+.carousel-control-prev,
+.carousel-control-next {
+    width: 40px;
+    height: 40px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 50%;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.carousel-control-prev {
+    left: 10px;
+}
+
+.carousel-control-next {
+    right: 10px;
+}
+
+/* 缩略图导航样式 */
+.thumbnail-nav {
+    transition: all 0.2s;
+    opacity: 0.7;
+    cursor: pointer;
+}
+
+.thumbnail-nav:hover {
+    opacity: 1;
+}
+
+/* 缩略图列样式 - 一行5个 */
+.thumbnail-col {
+    width: 20%;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    float: left;
+}
+
+/* 卡片样式 */
+.card {
+    border-radius: 12px;
+}
+
+.bg-light {
+    background-color: #f8f9fa !important;
+}
+
+/* 按钮样式 */
+.btn-lg {
+    padding: 0.8rem 1.5rem;
+    font-weight: 500;
+}
+
+/* 标签样式 */
+.badge {
+    padding: 0.5em 1em;
+    font-weight: 500;
+}
+
+/* 表格样式 */
+.table th {
+    font-weight: 600;
+    border-top: none;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+/* 交易历史卡片样式优化 */
+@media (max-width: 767.98px) {
+    .card-body {
+        padding: 0.75rem;
+    }
+    
+    .trade-card {
+        margin-bottom: 0.5rem;
+    }
+    
+    .trade-card .card-body {
+        padding: 0.5rem 0.75rem;
+    }
+    
+    .mobile-trade-content {
+        font-size: 0.85rem;
+    }
+    
+    .mobile-trade-content .text-muted {
+        font-size: 0.75rem;
+        margin-right: 0.2rem;
+        color: #6c757d;
+    }
+    
+    .mobile-trade-content .col-6 {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    
+    .hash-mobile {
+        max-width: 100px;
+        display: inline-block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        vertical-align: bottom;
+    }
+    
+    .pagination-controls {
+        font-size: 0.875rem;
+    }
+    
+    .pagination-controls .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* 哈希值显示优化 */
+.hash-value {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .hash-value {
+        max-width: 120px;
+    }
+}
+
+@media (min-width: 992px) {
+    .hash-value {
+        max-width: 150px;
+    }
+}
+
+/* 钱包相关样式在base.html中已定义，此处删除 */
+
+/* 分页控件样式优化 */
+.pagination-controls {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+}
+
+.pagination-controls .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    vertical-align: middle;
+}
+
+.pagination-controls span {
+    vertical-align: middle;
+}
+</style>
+
+<script>
+// 显示指定索引的图片
+function showImage(index) {
+    const carousel = new bootstrap.Carousel(document.getElementById('assetImages'));
+    carousel.to(index);
+}
+
+// 显示分红对话框
+function showDividendModal() {
+    const modal = new bootstrap.Modal(document.getElementById('dividendModal'));
+    modal.show();
+    
+    // 获取持有人数等信息
+    fetchHoldersInfo();
+}
+
+// 获取持有人信息
+async function fetchHoldersInfo() {
+    try {
+        const response = await fetch(`/api/assets/${asset.id}/holders`);
+        const data = await response.json();
+        
+        document.getElementById('holdersCount').value = data.holders_count;
+        
+        // 添加分红金额输入事件
+        document.getElementById('dividendAmount').addEventListener('input', calculateDividend);
+    } catch (error) {
+        console.error('获取持有人信息失败:', error);
+    }
+}
+
+// 计算分红相关数据
+function calculateDividend() {
+    const amount = parseFloat(document.getElementById('dividendAmount').value) || 0;
+    const holdersCount = parseInt(document.getElementById('holdersCount').value) || 0;
+    
+    // 计算平台手续费 (1.5%)
+    const platformFee = amount * 0.015;
+    document.getElementById('platformFee').value = platformFee.toFixed(2) + ' USDC';
+    
+    // 计算预估Gas费用
+    const estimatedGas = calculateEstimatedGas(holdersCount);
+    document.getElementById('estimatedGas').value = estimatedGas + ' ETH';
+    
+    // 计算每代币分红金额
+    const actualAmount = amount - platformFee;
+    const perTokenDividend = actualAmount / parseInt('{{ asset.token_supply }}');
+    document.getElementById('perTokenDividend').value = perTokenDividend.toFixed(6) + ' USDC';
+}
+
+// 计算预估Gas费用
+function calculateEstimatedGas(holdersCount) {
+    // 基础Gas消耗
+    const baseGas = 111000; // approve + transferFrom
+    // 每个接收者的Gas消耗
+    const perHolderGas = 35000;
+    // 总Gas消耗
+    const totalGas = baseGas + (perHolderGas * holdersCount);
+    // 假设Gas价格为30 Gwei
+    const gasPrice = 30e-9;
+    return (totalGas * gasPrice).toFixed(4);
+}
+
+// 发起分红
+async function startDividend() {
+    try {
+        const amount = document.getElementById('dividendAmount').value;
+        if (amount < 10000) {
+            alert('分红金额不能小于10,000 USDC');
+            return;
+        }
+        
+        const response = await fetch(`/api/assets/${asset.id}/dividend`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                amount: amount
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('发起分红失败');
+        }
+        
+        const data = await response.json();
+        alert('分红发起成功，请在钱包中确认交易');
+        location.reload();
+        
+    } catch (error) {
+        console.error('发起分红失败:', error);
+        alert(error.message);
+    }
+}
+
+// 显示模态框
+function showModal(modalId) {
+    const modal = new bootstrap.Modal(document.getElementById(modalId));
+    modal.show();
+}
+
+// 连接钱包函数
+async function connectWallet() {
+    console.log('开始连接钱包...');
+    
+    // 检查是否已安装MetaMask
+    if (typeof window.ethereum === 'undefined') {
+        alert('请安装MetaMask或其他兼容的钱包插件');
+        throw new Error('未安装钱包插件');
+    }
+    
+    try {
+        // 请求账户授权
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        if (accounts.length === 0) {
+            throw new Error('用户拒绝连接钱包');
+        }
+        
+        console.log('钱包连接成功:', accounts[0]);
+        
+        // 更新全局状态 - 保持正确大小写
+        const walletAddress = accounts[0];
+        if (typeof window.walletState === 'undefined') {
+            window.walletState = {};
+        }
+        window.walletState.currentAccount = walletAddress;
+        
+        // 使用全局变量提升兼容性 - 保持正确大小写
+        window.walletPublicKey = { toString: () => walletAddress };
+        
+        // 设置cookie - 保持正确大小写
+        document.cookie = `eth_address=${walletAddress}; path=/; max-age=3600`;
+        
+        return walletAddress;
+    } catch (error) {
+        console.error('连接钱包失败:', error);
+        throw error;
+    }
+}
+</script>
+
+<script>
+</script>
+
+{% block scripts %}
+<script nonce="{{ nonce|default('') }}" version="1.0.1">
+// 检查钱包连接状态
+</script>
+{% endblock %}
     </div>
 </div>
 {% endblock %}
