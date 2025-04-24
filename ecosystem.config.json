@@ -1,1 +1,15 @@
-{"apps":[{"name":"rwa-hub","script":"run.py","interpreter":"venv/bin/python","env":{"DATABASE_URL":"postgresql://rwa_hub_user:3YIeu6i1Nuyb6z8wRAxdctbMJVrSseJB@dpg-cu6b270gph6c73c50eag-a.oregon-postgres.render.com/rwa_hub","FLASK_ENV":"production","SECRET_KEY":"your-secret-key-here","PORT":9000}}]}
+{
+  "apps": [
+    {
+      "name": "rwa-hub",
+      "script": "run.py",
+      "interpreter": "venv/bin/python",
+      "env": {
+        "DATABASE_URL": "postgresql://rwa_hub_user:${DB_PASSWORD}@${DB_HOST}/rwa_hub",
+        "FLASK_ENV": "production",
+        "SECRET_KEY": "${SECRET_KEY}",
+        "PORT": 9000
+      }
+    }
+  ]
+}

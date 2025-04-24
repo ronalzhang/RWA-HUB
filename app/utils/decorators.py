@@ -79,30 +79,58 @@ def wallet_address_required(f):
     def decorated(*args, **kwargs):
         wallet_address = None
         
+        # 记录所有潜在的钱包地址来源，用于调试
+        logging.debug("**开始查找钱包地址**")
+        logging.debug(f"Headers: {dict(request.headers)}")
+        logging.debug(f"Cookies: {request.cookies}")
+        logging.debug(f"Args: {request.args}")
+        
         # 首先检查X-Wallet-Address和X-Eth-Address头部
         wallet_address = request.headers.get('X-Wallet-Address') or request.headers.get('X-Eth-Address')
+        if wallet_address:
+            logging.debug(f"从请求头找到钱包地址: {wallet_address}")
         
         # 如果头部中没有，检查Cookie
         if not wallet_address:
             wallet_address = request.cookies.get('wallet_address') or request.cookies.get('eth_address')
+            if wallet_address:
+                logging.debug(f"从Cookie找到钱包地址: {wallet_address}")
             
         # 如果Cookie中没有，检查URL参数
         if not wallet_address:
             wallet_address = request.args.get('wallet_address') or request.args.get('eth_address')
+            if wallet_address:
+                logging.debug(f"从URL参数找到钱包地址: {wallet_address}")
             
         # 如果URL参数中没有，检查会话
         if not wallet_address and ('wallet_address' in session or 'eth_address' in session):
             wallet_address = session.get('wallet_address') or session.get('eth_address')
+            if wallet_address:
+                logging.debug(f"从会话找到钱包地址: {wallet_address}")
+
+        # 如果是POST请求，检查请求体中是否有地址（适用于JSON和表单数据）
+        if not wallet_address and request.method == 'POST':
+            if request.is_json:
+                json_data = request.get_json(silent=True) or {}
+                wallet_address = json_data.get('wallet_address') or json_data.get('from_address')
+                if wallet_address:
+                    logging.debug(f"从JSON请求体找到钱包地址: {wallet_address}")
+            elif request.form:
+                wallet_address = request.form.get('wallet_address') or request.form.get('eth_address')
+                if wallet_address:
+                    logging.debug(f"从表单数据找到钱包地址: {wallet_address}")
 
         # 如果没有找到钱包地址，记录并继续
         if not wallet_address:
-            logging.warning("无法找到钱包地址")
+            logging.warning("无法找到钱包地址，将继续处理但可能导致部分功能不可用")
             g.wallet_address = None
+            g.eth_address = None
             return f(*args, **kwargs)
         
         # 在g对象中存储钱包地址以便视图函数访问
         g.wallet_address = wallet_address
         g.eth_address = wallet_address  # 为兼容性添加eth_address
+        logging.info(f"已找到并设置钱包地址: {wallet_address}")
         
         return f(*args, **kwargs)
     return decorated
