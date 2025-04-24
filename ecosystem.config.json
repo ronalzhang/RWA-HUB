@@ -5,11 +5,8 @@
       "script": "wsgi.py",
       "interpreter": "venv/bin/python",
       "env": {
-        "DATABASE_URL": "postgresql://rwa_hub_user:${DB_PASSWORD}@${DB_HOST}/rwa_hub",
         "FLASK_ENV": "production",
-        "SECRET_KEY": "${SECRET_KEY}",
-        "PORT": 9000,
-        "PYTHONPATH": "/root/RWA-HUB"
+        "PORT": 9000
       }
     }
   ]
