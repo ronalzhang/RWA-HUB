@@ -24,6 +24,7 @@ class AssetStatus(enum.Enum):
     REJECTED = 3  # 已拒绝
     DELETED = 4    # 已删除
     ON_CHAIN = 2  # 已上链（与APPROVED相同值，保持兼容性）
+    ACTIVE = 2     # 活跃状态（与APPROVED和ON_CHAIN相同值，保持兼容性）
 
 class Asset(db.Model):
     __tablename__ = 'assets'
