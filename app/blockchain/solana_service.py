@@ -332,10 +332,6 @@ def execute_transfer_transaction(
                 try:
                     amount_float = float(amount)
                     # 检查是否为整数值（即使是浮点数表示）
-                    if amount_float != int(amount_float):
-                        error_msg = "代币数量必须是整数（不可分割）"
-                        logger.error(error_msg)
-                        return {"success": False, "error": error_msg}
                     amount = int(amount_float)  # 转换为整数
                 except ValueError:
                     error_msg = f"无法将金额'{amount}'转换为数字"
@@ -343,11 +339,12 @@ def execute_transfer_transaction(
                     return {"success": False, "error": error_msg}
             else:
                 # 如果是浮点数且有小数部分
-                if isinstance(amount, float) and amount != int(amount):
-                    error_msg = "代币数量必须是整数（不可分割）"
+                if isinstance(amount, float):
+                    amount = int(amount)
+                elif not isinstance(amount, int):
+                    error_msg = f"无法处理类型为 {type(amount).__name__} 的金额"
                     logger.error(error_msg)
                     return {"success": False, "error": error_msg}
-                amount = int(amount)
             
             # 检查是否>=1
             if amount < 1:
@@ -362,13 +359,18 @@ def execute_transfer_transaction(
             return {"success": False, "error": error_msg}
         
         # 4. 验证地址格式
-        if not validate_solana_address(from_address):
-            error_msg = f"发送方地址格式无效: {from_address}"
-            logger.error(error_msg)
-            return {"success": False, "error": error_msg}
-            
-        if not validate_solana_address(to_address):
-            error_msg = f"接收方地址格式无效: {to_address}"
+        try:
+            if not validate_solana_address(from_address):
+                error_msg = f"发送方地址格式无效: {from_address}"
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+                
+            if not validate_solana_address(to_address):
+                error_msg = f"接收方地址格式无效: {to_address}"
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+        except Exception as e:
+            error_msg = f"地址验证过程中出错: {str(e)}"
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
         
@@ -403,6 +405,7 @@ def execute_transfer_transaction(
         
         # 7. 获取发送方和接收方代币账户
         try:
+            # 使用改进后的_get_token_account方法
             sender_token_account = solana_client._get_token_account(from_address, token_mint)
             recipient_token_account = solana_client._get_token_account(to_address, token_mint)
             
@@ -416,15 +419,49 @@ def execute_transfer_transaction(
         # 8. 构建并发送转账交易
         try:
             # 使用现有的基础设施来发送交易
-            signature = solana_client.transfer_token(
-                token_mint=token_mint,
-                from_address=from_address,
-                to_address=to_address,
-                amount=amount
-            )
+            transfer_method = getattr(solana_client, "transfer_token", None)
+            if not transfer_method:
+                logger.warning("SolanaClient没有transfer_token方法，尝试使用备用方法")
+                # 使用直接调用API的方式
+                import requests
+                import json
+                
+                transfer_data = {
+                    "token_mint": token_mint,
+                    "from_address": from_address,
+                    "to_address": to_address,
+                    "amount": amount
+                }
+                
+                response = requests.post(
+                    f"{SOLANA_ENDPOINT}/token/transfer",
+                    headers={"Content-Type": "application/json"},
+                    data=json.dumps(transfer_data)
+                )
+                
+                if response.status_code != 200:
+                    error_msg = f"转账请求失败: HTTP {response.status_code} - {response.text}"
+                    logger.error(error_msg)
+                    return {"success": False, "error": error_msg}
+                
+                result = response.json()
+                signature = result.get("signature")
+                
+                if not signature:
+                    error_msg = "响应中缺少交易签名"
+                    logger.error(error_msg)
+                    return {"success": False, "error": error_msg}
+            else:
+                # 使用client的transfer_token方法
+                signature = transfer_method(
+                    token_mint=token_mint,
+                    from_address=from_address,
+                    to_address=to_address,
+                    amount=amount
+                )
             
             logger.info(f"转账交易发送成功，签名: {signature}")
-            return signature
+            return {"success": True, "signature": signature}
         except Exception as e:
             error_msg = f"发送转账交易失败: {str(e)}"
             logger.error(error_msg, exc_info=True)
@@ -573,8 +610,15 @@ def _get_token_account(self, owner_address, token_mint):
             # 清理地址字符串
             owner_address = owner_address.strip()
             logger.debug(f"处理所有者地址: {owner_address}, 长度: {len(owner_address)}")
+            
+            # 如果地址非常短或格式明显无效，提前报错
+            if len(owner_address) < 30:
+                logger.error(f"所有者地址格式无效，长度过短: {owner_address}")
+                raise ValueError(f"无效的所有者地址格式: {owner_address} - 长度过短")
+                
             # 转换为PublicKey对象
             try:
+                from app.utils.solana_compat.publickey import PublicKey
                 owner_pubkey = PublicKey(owner_address)
                 logger.debug(f"成功创建所有者PublicKey对象")
             except Exception as pk_error:
@@ -587,7 +631,14 @@ def _get_token_account(self, owner_address, token_mint):
         if isinstance(token_mint, str):
             token_mint = token_mint.strip()
             logger.debug(f"处理代币铸造地址: {token_mint}, 长度: {len(token_mint)}")
+            
+            # 如果地址非常短或格式明显无效，提前报错
+            if len(token_mint) < 30:
+                logger.error(f"代币铸造地址格式无效，长度过短: {token_mint}")
+                raise ValueError(f"无效的代币铸造地址格式: {token_mint} - 长度过短")
+                
             try:
+                from app.utils.solana_compat.publickey import PublicKey
                 token_mint_pubkey = PublicKey(token_mint)
                 logger.debug(f"成功创建代币铸造PublicKey对象")
             except Exception as pk_error:
@@ -598,7 +649,8 @@ def _get_token_account(self, owner_address, token_mint):
         
         # 获取关联代币账户地址
         try:
-            from spl.token.instructions import get_associated_token_address
+            # 使用兼容层的代码
+            from app.utils.solana_compat.token.instructions import get_associated_token_address
             token_account = get_associated_token_address(
                 owner_pubkey,
                 token_mint_pubkey
@@ -606,7 +658,20 @@ def _get_token_account(self, owner_address, token_mint):
             logger.info(f"获取到代币账户: {token_account}")
             return token_account
         except Exception as e:
-            logger.error(f"获取关联代币账户失败: {str(e)}")
+            logger.error(f"获取关联代币账户失败: {str(e)}", exc_info=True)
+            
+            # 尝试使用原生spl库作为后备选项
+            try:
+                from spl.token.instructions import get_associated_token_address as native_get_ata
+                token_account = native_get_ata(
+                    owner_pubkey,
+                    token_mint_pubkey
+                )
+                logger.info(f"使用原生库获取到代币账户: {token_account}")
+                return token_account
+            except Exception as native_error:
+                logger.error(f"使用原生库获取关联代币账户也失败: {str(native_error)}", exc_info=True)
+            
             raise ValueError(f"无法获取关联代币账户: {str(e)}")
         
     except Exception as e:
