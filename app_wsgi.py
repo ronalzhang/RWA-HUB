@@ -12,8 +12,13 @@ def create_flask_app():
     from app.config import config
     from app.extensions import db, babel, limiter, scheduler, migrate, cors, configure_logging
     
-    # 创建Flask应用实例
-    app = Flask(__name__)
+    # 创建Flask应用实例，指定正确的模板和静态目录
+    app = Flask(
+        __name__,
+        template_folder='app/templates',
+        static_folder='app/static',
+        static_url_path='/static'
+    )
     
     # 加载配置
     config_name = os.getenv('FLASK_ENV', 'production')
