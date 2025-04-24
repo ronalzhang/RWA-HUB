@@ -1277,7 +1277,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 
                 // 添加购买按钮点击事件
-                buyButton.addEventListener('click', handleBuy);
+                if (buyButton) {
+                    // 先移除可能存在的旧事件监听
+                    buyButton.removeEventListener('click', handleBuy);
+                    // 添加新的事件监听
+                    buyButton.addEventListener('click', handleBuy);
+                    console.log('购买按钮成功绑定点击事件');
+                }
                 
                 // 设置输入金额改变时的处理
                 if (amountInput) {
