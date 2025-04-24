@@ -3883,3 +3883,94 @@ def execute_transfer_v2():
             'success': False,
             'error': f'处理请求失败: {str(e)}'
         }), 500
+
+@api_bp.route('/execute_transfer', methods=['POST'])
+def execute_transfer():
+    """
+    执行Solana转账并监控确认状态
+    """
+    # 获取钱包地址 - 同时支持X-Wallet-Address和X-Eth-Address
+    wallet_address = request.headers.get('X-Wallet-Address', '') or request.headers.get('X-Eth-Address', '')
+    
+    # 记录请求信息，便于调试
+    app.logger.info(f"执行转账请求 - 请求头钱包地址: {wallet_address}")
+    app.logger.info(f"请求内容类型: {request.content_type}")
+    
+    # 钱包地址未提供的详细日志
+    if not wallet_address:
+        app.logger.error("执行转账失败: 未提供钱包地址")
+        app.logger.debug(f"请求头: {dict(request.headers)}")
+        return jsonify({"success": False, "error": "未提供钱包地址"}), 400
+    
+    # 获取请求数据，同时支持JSON和表单数据
+    if request.is_json:
+        data = request.get_json()
+    else:
+        try:
+            data = request.form.to_dict()
+        except:
+            data = {}
+    
+    # 验证请求数据存在
+    if not data:
+        app.logger.error("执行转账失败: 请求数据为空")
+        return jsonify({"success": False, "error": "请求数据为空"}), 400
+    
+    # 记录完整的请求数据，便于调试
+    app.logger.info(f"转账请求数据: {data}")
+    
+    # 验证必要参数存在
+    required_fields = ['token_symbol', 'to_address', 'amount']
+    missing_fields = [field for field in required_fields if field not in data]
+    if missing_fields:
+        error_msg = f"缺少必要参数: {', '.join(missing_fields)}"
+        app.logger.error(f"执行转账失败: {error_msg}")
+        return jsonify({"success": False, "error": error_msg}), 400
+    
+    # 从请求中提取参数
+    token_symbol = data.get('token_symbol')
+    to_address = data.get('to_address')
+    
+    # 确保from_address正确
+    from_address = data.get('from_address', wallet_address)
+    
+    # 转换金额为浮点数
+    try:
+        amount = float(data.get('amount'))
+        if amount <= 0:
+            raise ValueError("金额必须大于0")
+        app.logger.info(f"转账金额: {amount} {token_symbol}")
+    except ValueError as e:
+        error_msg = f"金额格式无效: {str(e)}"
+        app.logger.error(f"执行转账失败: {error_msg}")
+        return jsonify({"success": False, "error": error_msg}), 400
+    
+    # 确保from_address与钱包地址匹配，如不匹配，仍继续但记录警告
+    if from_address != wallet_address:
+        app.logger.warning(f"从地址不匹配: 提供的from_address({from_address})与钱包地址({wallet_address})不一致")
+        # 我们使用请求头中的钱包地址作为真正的发送方
+        from_address = wallet_address
+        app.logger.info(f"使用请求头中的钱包地址({wallet_address})作为发送方")
+    
+    # 执行转账
+    try:
+        app.logger.info(f"开始执行转账: {amount} {token_symbol} 从 {from_address} 到 {to_address}")
+        result = execute_transfer_transaction(from_address, to_address, amount, token_symbol)
+        
+        if isinstance(result, dict) and 'error' in result:
+            app.logger.error(f"转账失败: {result['error']}")
+            return jsonify({"success": False, "error": result['error']}), 400
+        
+        # 记录转账成功
+        tx_hash = result
+        app.logger.info(f"转账成功，交易哈希: {tx_hash}")
+        
+        return jsonify({
+            "success": True, 
+            "tx_hash": tx_hash,
+            "message": f"成功向 {to_address} 转账 {amount} {token_symbol}"
+        })
+        
+    except Exception as e:
+        app.logger.exception(f"转账过程中发生异常: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500

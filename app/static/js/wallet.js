@@ -3683,106 +3683,175 @@ function showError(message, container = null) {
 // 将confirmPurchase函数设置为全局函数以便于其他模块调用
 window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) {
     console.log("全局confirmPurchase调用，数据:", purchaseData);
+    
     const modalErrorDiv = modalElement?.querySelector('#buyModalError');
-    if (modalErrorDiv) modalErrorDiv.style.display = 'none'; // 清除之前的错误
-
-    if (confirmBtn) setButtonLoading(confirmBtn, '处理中...');
-    showLoadingState('通过钱包处理付款中...');
-
+    
+    // 验证钱包连接和钱包地址
+    if (!walletState.isConnected || !walletState.address) {
+        console.error("钱包未连接或地址不可用");
+        showError("请先连接钱包");
+        if (modalErrorDiv) {
+            modalErrorDiv.textContent = "请先连接钱包";
+            modalErrorDiv.style.display = "block";
+        }
+        return;
+    }
+    
+    // 验证传入的钱包地址（如果有）与当前连接的钱包地址是否一致
+    if (purchaseData.wallet_address && purchaseData.wallet_address !== walletState.address) {
+        console.warn(`传入的钱包地址(${purchaseData.wallet_address})与当前连接的钱包地址(${walletState.address})不一致，将使用当前连接的钱包地址`);
+    }
+    
+    // 确保一定使用当前连接的钱包地址
+    const walletAddress = walletState.address;
+    console.log("使用钱包地址:", walletAddress);
+    
     try {
-        // 提取必要数据（确保字段名称与API响应匹配）
-        const recipient = purchaseData.recipient_address;
-        const totalAmount = parseFloat(purchaseData.total_cost || purchaseData.total_amount); // 使用total_cost进行转账
-        const assetId = purchaseData.asset_id;
-        const purchaseAmount = parseInt(purchaseData.amount); // 代币数量
-
-        if (!recipient || isNaN(totalAmount) || totalAmount <= 0 || !assetId || isNaN(purchaseAmount) || purchaseAmount <= 0) {
-            throw new Error('确认的购买数据无效');
-        }
-
-        console.log(`尝试向${recipient}转账${totalAmount} USDC`);
-
-        // --- 步骤1: 钱包转账 ---
-        const transferResult = await walletState.transferSolanaToken('USDC', recipient, totalAmount);
-
-        if (!transferResult || !transferResult.success) {
-            // 转账失败或被用户拒绝
-            throw new Error(transferResult?.error || '钱包转账失败或被取消');
+        // 显示按钮加载状态
+        if (confirmBtn) {
+            const spinner = confirmBtn.querySelector('.spinner-border');
+            if (spinner) spinner.style.display = 'inline-block';
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '处理中...';
         }
         
-        // 获取交易签名
-        const signature = transferResult.txHash;
+        // 获取必要的参数
+        const { trade_id, amount, total_cost, recipient_address } = purchaseData;
         
-        console.log(`钱包转账成功。签名: ${signature}`);
-        showLoadingState(`完成购买...`); // 更新加载
-
-        // --- 步骤2: 在后端执行购买 ---
-        const executeResponse = await fetch('/api/trades/execute_purchase', {
+        // 验证参数完整性
+        if (!trade_id) {
+            throw new Error("缺少交易ID");
+        }
+        
+        if (!recipient_address) {
+            throw new Error("缺少接收地址");
+        }
+        
+        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+            throw new Error("无效的购买数量");
+        }
+        
+        if (!total_cost || isNaN(parseFloat(total_cost)) || parseFloat(total_cost) <= 0) {
+            throw new Error("无效的总成本");
+        }
+        
+        // 1. 转移USDC到卖家
+        console.log(`准备转移 ${total_cost} USDC 到 ${recipient_address}`);
+        
+        // 实际转账请求
+        const transferResult = await fetch('/api/execute_transfer', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Wallet-Address': walletState.address, // 发送钱包地址
-                'X-Eth-Address': walletState.address // 为兼容性保留
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-Wallet-Address': walletAddress,
+                'X-Eth-Address': walletAddress
             },
             body: JSON.stringify({
-                asset_id: assetId,
-                amount: purchaseAmount, // 发送购买的代币数量
-                signature: signature // 发送Solana交易签名
+                token_symbol: 'USDC',
+                amount: parseFloat(total_cost),
+                to_address: recipient_address,
+                from_address: walletAddress
             })
         });
-
-        let executeData;
-        if (!executeResponse.ok) {
-            let errorMsg = `完成购买失败。状态: ${executeResponse.status}`;
-            try {
-                const errorText = await executeResponse.text();
-                console.error('服务器错误响应:', errorText);
-                try {
-                    const errData = JSON.parse(errorText);
-                    errorMsg = errData.error || errorMsg;
-                } catch (jsonError) {
-                    errorMsg = errorText || errorMsg;
-                }
-            } catch (e) { /* 忽略文本获取错误 */ }
-            throw new Error(errorMsg);
-        } else {
-            executeData = await executeResponse.json();
+        
+        // 检查转账结果
+        if (!transferResult.ok) {
+            const errorData = await transferResult.json();
+            throw new Error(errorData.error || "转账失败");
         }
         
-        console.log('购买成功执行:', executeData);
-
-        // --- 成功 ---
-        if (modalElement) {
-            const modal = bootstrap.Modal.getInstance(modalElement);
-            if (modal) modal.hide();
+        const transferData = await transferResult.json();
+        console.log("转账结果:", transferData);
+        
+        if (!transferData.success) {
+            throw new Error(transferData.error || "转账处理失败");
         }
-        showSuccess(executeData.message || '购买成功!');
+        
+        // 2. 确认购买
+        console.log("转账成功，现在确认购买");
+        
+        const confirmResult = await fetch('/api/trades/confirm_purchase', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-Wallet-Address': walletAddress,
+                'X-Eth-Address': walletAddress
+            },
+            body: JSON.stringify({
+                trade_id: trade_id,
+                tx_hash: transferData.tx_hash
+            })
+        });
+        
+        // 检查确认结果
+        if (!confirmResult.ok) {
+            const errorData = await confirmResult.json();
+            throw new Error(errorData.error || "确认购买失败");
+        }
+        
+        const confirmData = await confirmResult.json();
+        console.log("确认购买结果:", confirmData);
+        
+        if (!confirmData.success) {
+            throw new Error(confirmData.error || "确认购买处理失败");
+        }
+        
+        // 3. 处理成功
+        console.log("购买流程完成");
+        
+        // 隐藏模态框
+        const bsModal = bootstrap.Modal.getInstance(modalElement);
+        if (bsModal) {
+            bsModal.hide();
+        }
+        
+        // 显示成功消息
+        showSuccess('购买成功！交易已提交');
         
         // 刷新页面数据
-        if (window.refreshAssetInfoNow) {
-            window.refreshAssetInfoNow();
-        } else {
-            // 移除自动刷新页面的功能，改为显示成功消息
-            console.log('购买成功，但没有找到refreshAssetInfoNow函数');
-            if (typeof showSuccess === 'function') {
-                showSuccess('购买成功！请手动刷新页面查看最新数据');
+        if (typeof refreshAssetInfoNow === 'function') {
+            try {
+                await refreshAssetInfoNow();
+            } catch (error) {
+                console.error("刷新资产信息失败:", error);
             }
         }
-
-    } catch (error) {
-        console.error('购买确认失败:', error);
-        // 在模态框内显示错误
-        if (modalErrorDiv) {
-            modalErrorDiv.textContent = error.message || '确认过程中发生意外错误';
-            modalErrorDiv.style.display = 'block';
-        } else {
-            showError(error.message || '确认过程中发生意外错误');
+        
+        // 恢复按钮状态
+        if (confirmBtn) {
+            const spinner = confirmBtn.querySelector('.spinner-border');
+            if (spinner) spinner.style.display = 'none';
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = '确认购买';
         }
-    } finally {
-        hideLoadingState();
-        if (confirmBtn) resetButton(confirmBtn);
+        
+        return confirmData;
+        
+    } catch (error) {
+        console.error("确认购买过程中出错:", error);
+        
+        // 显示错误消息
+        showError(error.message || "购买过程中出现错误");
+        
+        // 在模态框中显示错误
+        if (modalErrorDiv) {
+            modalErrorDiv.textContent = error.message || "购买过程中出现错误";
+            modalErrorDiv.style.display = "block";
+        }
+        
+        // 恢复按钮状态
+        if (confirmBtn) {
+            const spinner = confirmBtn.querySelector('.spinner-border');
+            if (spinner) spinner.style.display = 'none';
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = '确认购买';
+        }
+        
+        throw error;
     }
-}
+};
 
 // 确保在DOM加载完成后连接钱包
 document.addEventListener('DOMContentLoaded', function() {
