@@ -2411,8 +2411,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <form id="purchase-form">
                             <div class="mb-3">
                             <label for="purchase-amount" class="form-label">{{ _('Purchase Amount') }}</label>
-                            <input type="number" class="form-control" id="purchase-amount" min="1" max="{{ remaining_supply }}" value="100" step="1">
-                            <div class="form-text">{{ _('Enter the number of tokens you want to purchase') }}</div>
+                            <input type="number" class="form-control" id="purchase-amount" min="1" max="{{ remaining_supply }}" value="100" step="1" inputmode="numeric" pattern="\d*" oninput="this.value=this.value.replace(/\D/g,'')">
+                            <div class="form-text">{{ _('Enter the number of tokens you want to purchase') }} ({{ _('Must be a whole number') }})</div>
                             </div>
                         
                         <div class="mb-4">
@@ -2811,6 +2811,59 @@ async function connectWallet() {
 </script>
 
 <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 购买金额输入框验证
+        const purchaseAmountInput = document.getElementById('purchase-amount');
+        if (purchaseAmountInput) {
+            purchaseAmountInput.addEventListener('input', function(e) {
+                // 移除非数字字符
+                this.value = this.value.replace(/\D/g, '');
+                
+                // 确保不为空
+                if (!this.value) {
+                    this.value = '1';
+                }
+                
+                // 确保不小于1
+                if (parseInt(this.value) < 1) {
+                    this.value = '1';
+                }
+                
+                // 确保不超过最大值
+                const maxValue = parseInt(this.getAttribute('max') || '999999999');
+                if (parseInt(this.value) > maxValue) {
+                    this.value = maxValue.toString();
+                }
+                
+                // 更新总价
+                updateTotalPrice();
+            });
+        }
+        
+        // 函数：更新总价
+        function updateTotalPrice() {
+            const amountInput = document.getElementById('purchase-amount');
+            const totalPriceInput = document.getElementById('totalPrice');
+            const buyButton = document.getElementById('buy-button');
+            
+            if (amountInput && totalPriceInput && buyButton) {
+                const amount = parseInt(amountInput.value) || 0;
+                const pricePerToken = parseFloat(buyButton.getAttribute('data-token-price')) || 0;
+                const totalPrice = (amount * pricePerToken).toFixed(2);
+                
+                totalPriceInput.value = totalPrice;
+            }
+        }
+        
+        // 初始更新总价
+        updateTotalPrice();
+        
+        // 为购买按钮添加事件监听器
+        const buyButton = document.getElementById('buy-button');
+        if (buyButton) {
+            buyButton.addEventListener('click', handleBuy);
+        }
+    });
 </script>
 
 {% block scripts %}
