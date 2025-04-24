@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 def verify_db_tables():
     """验证数据库表是否存在"""
     try:
-        app = create_app(os.getenv('FLASK_ENV', 'production'))  # 默认使用生产环境
-        with app.app_context():
+        temp_app = create_app(os.getenv('FLASK_ENV', 'production'))  # 默认使用生产环境
+        with temp_app.app_context():
             # 检查所有模型的表是否存在
             inspector = db.inspect(db.engine)
             existing_tables = inspector.get_table_names()
@@ -49,13 +49,13 @@ def init_db():
         if not os.environ.get('DATABASE_URL'):
             raise ValueError("DATABASE_URL 环境变量未设置")
             
-        app = create_app(os.getenv('FLASK_ENV', 'production'))  # 默认使用生产环境
-        with app.app_context():
+        temp_app = create_app(os.getenv('FLASK_ENV', 'production'))  # 默认使用生产环境
+        with temp_app.app_context():
             # 检查数据库连接
             try:
                 db.engine.connect()
                 logger.info("数据库连接成功")
-                logger.info(f"当前数据库 URL: {app.config['SQLALCHEMY_DATABASE_URI']}")
+                logger.info(f"当前数据库 URL: {temp_app.config['SQLALCHEMY_DATABASE_URI']}")
             except Exception as e:
                 logger.error(f"数据库连接失败: {e}")
                 raise
@@ -74,7 +74,7 @@ def init_db():
         raise
 
 # 创建全局应用实例
-app = create_app(os.getenv('FLASK_ENV', 'production'))
+flask_app = create_app(os.getenv('FLASK_ENV', 'production'))
 
 if __name__ == '__main__':
     logger.info("启动应用...")
@@ -96,8 +96,8 @@ if __name__ == '__main__':
         logger.error("所有数据库初始化尝试都失败了")
     
     # 生产环境配置
-    app.config['DEBUG'] = False
-    app.config['PROPAGATE_EXCEPTIONS'] = True
+    flask_app.config['DEBUG'] = False
+    flask_app.config['PROPAGATE_EXCEPTIONS'] = True
     
     port = int(os.environ.get('PORT', 9000))
     host = '0.0.0.0'  # 允许外部访问
@@ -108,7 +108,7 @@ if __name__ == '__main__':
     print(f"局域网:  http://<本机IP>:{port}")
     
     # 使用waitress作为生产服务器，增加配置选项
-    serve(app, 
+    serve(flask_app, 
           host=host, 
           port=port, 
           threads=8,  # 增加线程数
