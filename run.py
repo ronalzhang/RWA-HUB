@@ -73,6 +73,9 @@ def init_db():
         logger.error(f"初始化数据库时出错: {e}")
         raise
 
+# 创建全局应用实例
+app = create_app(os.getenv('FLASK_ENV', 'production'))
+
 if __name__ == '__main__':
     logger.info("启动应用...")
     logger.info(f"环境: {os.environ.get('FLASK_ENV', 'production')}")
@@ -91,8 +94,6 @@ if __name__ == '__main__':
     
     if not success:
         logger.error("所有数据库初始化尝试都失败了")
-        
-    app = create_app(os.getenv('FLASK_ENV', 'production'))
     
     # 生产环境配置
     app.config['DEBUG'] = False
