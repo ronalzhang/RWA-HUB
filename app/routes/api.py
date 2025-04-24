@@ -9,7 +9,7 @@ from app.models.user import User, is_same_wallet_address
 from app.models.shortlink import ShortLink
 from sqlalchemy import desc, func
 from app.extensions import db, limiter
-from app.utils.decorators import token_required, eth_address_required, api_eth_address_required, task_background, admin_required
+from app.utils.decorators import token_required, eth_address_required, api_eth_address_required, task_background, admin_required, wallet_address_required
 from .admin import is_admin, get_admin_info
 import os
 import json
@@ -2525,7 +2525,7 @@ def execute_transfer():
         # 检查钱包连接状态
         if not g.eth_address:
             current_app.logger.error("未检测到钱包地址，请求头信息: " + str(request.headers))
-            return jsonify({'success': False, 'error': '请先连接钱包'}), 401
+            return jsonify({'success': False, 'error': '未提供钱包地址'}), 401
             
         # 获取请求数据
         data = request.get_json()
@@ -2540,7 +2540,7 @@ def execute_transfer():
         required_fields = ['token_symbol', 'to_address', 'amount', 'from_address']
         missing_fields = [field for field in required_fields if field not in data]
         if missing_fields:
-            current_app.logger.error(f"缺少必要字段: {missing_fields}")
+            current_app.logger.error(f"缺少必要字段: {missing_fields}, 完整数据: {data}")
             return jsonify({'success': False, 'error': f'缺少必要字段: {", ".join(missing_fields)}'}), 400
                 
         token_symbol = data.get('token_symbol')
@@ -2549,23 +2549,34 @@ def execute_transfer():
         # 数字格式处理
         try:
             amount_str = data.get('amount')
-            current_app.logger.info(f"处理金额数据: {amount_str}, 类型: {type(amount_str)}")
+            current_app.logger.info(f"处理金额数据: {amount_str}, 类型: {type(amount_str).__name__}, 值: {amount_str}")
             
             # 尝试转换为浮点数，支持多种格式
             if isinstance(amount_str, str):
                 # 清理字符串，移除任何可能影响解析的字符
                 clean_amount_str = amount_str.strip().replace(',', '.')
-                amount = float(clean_amount_str)
+                try:
+                    amount = float(clean_amount_str)
+                    current_app.logger.info(f"字符串金额'{clean_amount_str}'转换为浮点数: {amount}")
+                except ValueError as ve:
+                    current_app.logger.error(f"无法将字符串'{clean_amount_str}'转换为浮点数: {str(ve)}")
+                    return jsonify({'success': False, 'error': f'金额格式错误: {amount_str}'}), 400
             else:
-                amount = float(amount_str)
+                try:
+                    amount = float(amount_str)
+                    current_app.logger.info(f"非字符串金额{amount_str}转换为浮点数: {amount}")
+                except (ValueError, TypeError) as e:
+                    current_app.logger.error(f"无法将非字符串值{amount_str}转换为浮点数: {str(e)}")
+                    return jsonify({'success': False, 'error': f'金额格式错误: {amount_str}'}), 400
             
             # 我们不再严格要求整数值，而是允许小数
             # USDC支持小数点后6位
-            current_app.logger.info(f"金额转换结果: {amount}, 类型: {type(amount)}")
+            current_app.logger.info(f"金额转换结果: {amount}, 类型: {type(amount).__name__}")
             
             # 确保金额大于0
             if amount <= 0:
-                raise ValueError(f"金额必须大于0，当前值: {amount}")
+                current_app.logger.error(f"金额必须大于0，当前值: {amount}")
+                return jsonify({'success': False, 'error': f'金额必须大于0，当前值: {amount}'}), 400
                 
         except Exception as e:
             current_app.logger.error(f"金额转换失败: {str(e)}, 原始值: {data.get('amount')}")
@@ -2588,17 +2599,23 @@ def execute_transfer():
         # 将amount转换为整数传递给服务函数
         try:
             amount_int = int(amount)
-        except ValueError:
-            current_app.logger.error(f"无法将金额转换为整数: {amount}")
-            return jsonify({'success': False, 'error': f'内部错误：金额格式无效'}), 500
+            current_app.logger.info(f"转换金额为整数: {amount} -> {amount_int}")
+        except ValueError as ve:
+            current_app.logger.error(f"无法将金额{amount}转换为整数: {str(ve)}")
+            return jsonify({'success': False, 'error': f'内部错误：金额格式无效，无法转换为整数: {amount}'}), 400
 
         # 执行转账交易
-        transfer_result = execute_transfer_transaction(
-            token_symbol=token_symbol,
-            from_address=from_address,
-            to_address=to_address,
-            amount=amount_int # 传递整数金额
-        )
+        try:
+            transfer_result = execute_transfer_transaction(
+                token_symbol=token_symbol,
+                from_address=from_address,
+                to_address=to_address,
+                amount=amount_int # 传递整数金额
+            )
+            current_app.logger.info(f"执行转账服务函数返回: {transfer_result}")
+        except Exception as tx_error:
+            current_app.logger.error(f"执行转账服务函数失败: {str(tx_error)}")
+            return jsonify({'success': False, 'error': f'执行转账失败: {str(tx_error)}'}), 500
         
         # 检查服务函数的返回结果
         if isinstance(transfer_result, dict) and not transfer_result.get('success', True):
@@ -3601,3 +3618,169 @@ def get_user_wallet_balance():
         # 仅记录严重错误，减少exc_info使用
         current_app.logger.error(f'获取钱包余额失败: {str(e)}')
         return jsonify({'success': False, 'error': f'获取钱包余额失败: {str(e)}'}), 500
+
+@api_bp.route('/solana/execute_transfer', methods=['POST'])
+@wallet_address_required
+def execute_transfer():
+    """执行Solana代币转账
+    ---
+    tags:
+      - 区块链
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            token_symbol:
+              type: string
+              description: 代币符号
+              example: "USDC"
+            to_address:
+              type: string
+              description: 接收方地址
+              example: "HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd"
+            amount:
+              type: string
+              description: 转账金额
+              example: "1"
+            from_address:
+              type: string
+              description: 发送方地址
+              example: "8aFaBGKqFPYWc5fPPbJTWQT5EbMKCr7T5uYJJYm5xTUr"
+    responses:
+      200:
+        description: 成功响应
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+            signature:
+              type: string
+              description: 交易签名
+      400:
+        description: 无效请求
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              default: false
+            error:
+              type: string
+      500:
+        description: 服务器错误
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              default: false
+            error:
+              type: string
+    """
+    wallet_address = g.wallet_address
+    
+    if not wallet_address:
+        logging.error("未检测到钱包地址")
+        return jsonify({
+            "success": False,
+            "error": "未提供钱包地址"
+        }), 400
+    
+    try:
+        # 1. 获取请求数据
+        data = request.json
+        if not data:
+            logging.error("请求数据为空")
+            return jsonify({
+                "success": False,
+                "error": "请求数据为空"
+            }), 400
+        
+        # 2. 记录请求数据用于调试
+        logging.info(f"Solana转账请求数据: {data}")
+        
+        # 3. 提取必要字段
+        token_symbol = data.get('token_symbol')
+        to_address = data.get('to_address')
+        amount = data.get('amount')
+        from_address = data.get('from_address')
+        
+        # 4. 验证必要字段
+        missing_fields = []
+        if not token_symbol: missing_fields.append('token_symbol')
+        if not to_address: missing_fields.append('to_address')
+        if not amount: missing_fields.append('amount')
+        if not from_address: missing_fields.append('from_address')
+        
+        if missing_fields:
+            error_msg = f"缺少必要字段: {', '.join(missing_fields)}"
+            logging.error(error_msg)
+            return jsonify({
+                "success": False,
+                "error": error_msg
+            }), 400
+        
+        # 5. 验证金额格式
+        try:
+            # 尝试将金额转换为浮点数
+            amount_float = float(amount)
+            logging.info(f"金额已转换为浮点数: {amount_float}")
+        except (ValueError, TypeError) as e:
+            error_msg = f"无效的金额格式: {str(e)}"
+            logging.error(error_msg)
+            return jsonify({
+                "success": False,
+                "error": error_msg
+            }), 400
+        
+        # 6. 验证from_address和当前钱包地址的一致性
+        if from_address != wallet_address:
+            # 记录不匹配但允许继续
+            logging.warning(f"发送地址不匹配: 传入的from_address={from_address}, 当前钱包地址={wallet_address}")
+        
+        # 7. 调用区块链服务执行转账
+        from app.blockchain.solana_service import execute_transfer_transaction
+        result = execute_transfer_transaction(
+            token_symbol=token_symbol,
+            from_address=from_address,
+            to_address=to_address,
+            amount=amount_float
+        )
+        
+        # 8. 处理执行结果
+        if isinstance(result, dict) and "success" in result:
+            if not result["success"]:
+                logging.error(f"转账执行失败: {result.get('error', '未知错误')}")
+                return jsonify(result), 500
+            
+            # 提取签名并返回成功结果
+            signature = result.get("signature")
+            return jsonify({
+                "success": True,
+                "signature": signature
+            })
+        elif isinstance(result, str):  
+            # 兼容旧的返回格式（字符串形式的签名）
+            return jsonify({
+                "success": True,
+                "signature": result
+            })
+        else:
+            logging.error(f"转账执行返回了意外的结果格式: {result}")
+            return jsonify({
+                "success": False,
+                "error": "服务器返回了意外的结果格式"
+            }), 500
+            
+    except Exception as e:
+        import traceback
+        logging.error(f"处理请求失败: {str(e)}")
+        logging.error(traceback.format_exc())
+        return jsonify({
+            "success": False,
+            "error": f"处理请求失败: {str(e)}"
+        }), 500
