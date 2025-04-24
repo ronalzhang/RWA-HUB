@@ -2496,11 +2496,12 @@ async connectPhantom(isReconnect = false) {
             
             // 调用后端API执行真实的链上转账
             console.log('调用后端API执行转账...');
-            const transferResponse = await fetch('/api/solana/execute_transfer', {
+            const transferResponse = await fetch('/api/solana/execute_transfer_v2', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-Eth-Address': fromAddress,
+                        'X-Wallet-Address': fromAddress,
                         'X-Wallet-Type': 'phantom'
                     },
                     body: JSON.stringify({
