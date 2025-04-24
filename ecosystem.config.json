@@ -2,7 +2,7 @@
   "apps": [
     {
       "name": "rwa-hub",
-      "script": "wsgi.py",
+      "script": "app_wsgi.py",
       "interpreter": "venv/bin/python",
       "env": {
         "FLASK_ENV": "production",
