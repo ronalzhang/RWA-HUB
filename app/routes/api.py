@@ -3402,7 +3402,7 @@ def confirm_payment_from_post():
         return jsonify({'success': False, 'error': f'确认支付失败: {str(e)}'}), 500
 
 # 新增：执行购买接口
-@api_bp.route('/trades/execute_purchase', methods=['POST'])
+@api_bp.route('/trades/execute_purchase', methods=['POST'], endpoint='execute_purchase_v2')
 @eth_address_required
 def execute_purchase():
     """接收前端传来的钱包交易信息，完成资产购买确认"""
