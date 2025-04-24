@@ -3,7 +3,7 @@ import os
 from app import create_app, db
 from sqlalchemy.exc import OperationalError
 from flask_migrate import upgrade
-from waitress import serve as waitress_serve
+from waitress import serve
 
 # 配置详细的日志格式
 logging.basicConfig(
@@ -107,7 +107,7 @@ if __name__ == '__main__':
     print(f"局域网:  http://<本机IP>:{port}")
     
     # 使用waitress作为生产服务器，增加配置选项
-    waitress_serve(app, 
+    serve(app, 
           host=host, 
           port=port, 
           threads=8,  # 增加线程数
