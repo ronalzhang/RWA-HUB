@@ -3804,3 +3804,133 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 });
+
+/**
+ * 刷新当前页面上的资产信息
+ * 在购买成功后调用，更新剩余数量等信息
+ */
+function refreshAssetInfo() {
+    console.log("刷新资产信息...");
+    
+    // 获取当前资产ID
+    const assetId = document.getElementById('asset-id')?.value || 
+                   document.querySelector('[data-asset-id]')?.getAttribute('data-asset-id');
+    
+    if (!assetId) {
+        console.error("无法获取资产ID，无法刷新资产信息");
+        return;
+    }
+    
+    // 使用加载动画
+    const assetInfoSection = document.querySelector('.asset-details') || document.querySelector('.asset-info');
+    if (assetInfoSection) {
+        assetInfoSection.classList.add('loading');
+    }
+    
+    // 调用API获取最新的资产信息
+    fetch(`/api/assets/${assetId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`获取资产信息失败: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.error || "获取资产信息失败");
+            }
+            
+            console.log("获取到最新资产信息:", data);
+            updateAssetInfoDisplay(data.asset);
+        })
+        .catch(error => {
+            console.error("刷新资产信息出错:", error);
+            // 如果API调用失败，则直接刷新页面
+            setTimeout(() => {
+                location.reload();
+            },
+            1500);
+        })
+        .finally(() => {
+            // 移除加载动画
+            if (assetInfoSection) {
+                assetInfoSection.classList.remove('loading');
+            }
+        });
+}
+
+/**
+ * 更新页面上的资产信息显示
+ * @param {Object} asset - 资产数据对象
+ */
+function updateAssetInfoDisplay(asset) {
+    // 更新剩余数量
+    const remainingSupplyElem = document.querySelector('.remaining-supply') || 
+                               document.getElementById('remaining-supply');
+    if (remainingSupplyElem && asset.remaining_supply !== undefined) {
+        remainingSupplyElem.textContent = asset.remaining_supply;
+    }
+    
+    // 更新总供应量
+    const totalSupplyElem = document.querySelector('.total-supply') || 
+                           document.getElementById('total-supply');
+    if (totalSupplyElem && asset.total_supply !== undefined) {
+        totalSupplyElem.textContent = asset.total_supply;
+    }
+    
+    // 更新价格
+    const priceElem = document.querySelector('.asset-price') || 
+                     document.getElementById('asset-price');
+    if (priceElem && asset.price !== undefined) {
+        priceElem.textContent = asset.price;
+    }
+    
+    // 更新资产状态
+    const statusElem = document.querySelector('.asset-status') || 
+                      document.getElementById('asset-status');
+    if (statusElem && asset.status !== undefined) {
+        statusElem.textContent = asset.status;
+        
+        // 可选：根据状态更新UI样式
+        if (asset.status === 'active' || asset.status === 'approved') {
+            statusElem.classList.remove('status-inactive');
+            statusElem.classList.add('status-active');
+        } else {
+            statusElem.classList.remove('status-active');
+            statusElem.classList.add('status-inactive');
+        }
+    }
+    
+    // 更新"购买"按钮状态
+    const buyButton = document.querySelector('.buy-button') || 
+                     document.getElementById('buy-button');
+    
+    if (buyButton) {
+        // 如果剩余供应量为0或状态不是active/approved，禁用购买按钮
+        if ((asset.remaining_supply !== undefined && asset.remaining_supply <= 0) || 
+            (asset.status !== 'active' && asset.status !== 'approved')) {
+            buyButton.disabled = true;
+            buyButton.classList.add('disabled');
+        } else {
+            buyButton.disabled = false;
+            buyButton.classList.remove('disabled');
+        }
+    }
+    
+    // 显示持有信息（如果有）
+    if (asset.user_holdings && asset.user_holdings > 0) {
+        const holdingsElem = document.querySelector('.user-holdings') || 
+                           document.getElementById('user-holdings');
+        if (holdingsElem) {
+            holdingsElem.textContent = asset.user_holdings;
+            
+            // 显示持有信息区域
+            const holdingsSection = document.querySelector('.holdings-section');
+            if (holdingsSection) {
+                holdingsSection.style.display = 'block';
+            }
+        }
+    }
+    
+    console.log("资产信息显示已更新");
+}
