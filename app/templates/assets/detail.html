@@ -1211,17 +1211,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 设置交易表单
             function setupTradeForm() {
+                // 获取必要的DOM元素
                 const amountInput = document.getElementById('purchase-amount');
                 const totalPriceDisplay = document.getElementById('totalPrice');
                 const buyButton = document.getElementById('buy-button');
+                
+                // 日志记录，帮助调试
+                console.log('setupTradeForm 元素状态:', {
+                    amountInput: !!amountInput,
+                    totalPriceDisplay: !!totalPriceDisplay,
+                    buyButton: !!buyButton
+                });
                 
                 // 获取分红按钮
                 const dividendBtn = document.getElementById('dividendManagementBtn');
                 const dividendBtnMobile = document.getElementById('dividendManagementBtnMobile');
                 const dividendBtnMedium = document.getElementById('dividendManagementBtnMedium');
                 
-                if (!amountInput || !totalPriceDisplay || !buyButton) {
-                    console.error('{{ _("Cannot find trade form elements") }}');
+                if (!amountInput || !totalPriceDisplay) {
+                    console.warn('{{ _("Cannot find some trade form elements, but will continue") }}');
+                }
+                
+                if (!buyButton) {
+                    console.error('{{ _("Cannot find buy button, purchase functionality will not work") }}');
                     return;
                 }
                 
@@ -1229,25 +1241,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 function updateBuyButtonState() {
                     console.log('{{ _("Updating buy button status, current wallet status") }}:', window.walletState);
                     
-                    // 获取购买按钮
-                    const buyBtn = document.getElementById('buy-button');
+                    // 获取购买按钮 - 已经有了buyButton变量，不需要重新获取
                     const isConnected = window.walletState && (window.walletState.isConnected || window.walletState.connected);
 
                     // 更新购买按钮
-                    if (buyBtn) {
-                                if (isConnected) {
-                            buyBtn.disabled = false;
-                            buyBtn.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>{{ _("Buy") }}';
-                            buyBtn.removeAttribute('title');
-                                } else {
-                            buyBtn.disabled = true;
-                            buyBtn.innerHTML = '<i class="fas fa-wallet me-2"></i>{{ _("Connect Wallet First") }}';
-                            buyBtn.title = '{{ _("Please connect wallet first") }}';
+                    if (buyButton) {
+                        if (isConnected) {
+                            buyButton.disabled = false;
+                            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>{{ _("Buy") }}';
+                            buyButton.removeAttribute('title');
+                        } else {
+                            buyButton.disabled = true;
+                            buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>{{ _("Connect Wallet First") }}';
+                            buyButton.title = '{{ _("Please connect wallet first") }}';
                         }
                     }
                     
                     // 调用检查分红按钮可见性逻辑
-                    checkDividendManagementAccess(); 
+                    if (typeof checkDividendManagementAccess === 'function') {
+                        checkDividendManagementAccess();
+                    }
                 }
                 
                 // 初始状态检查
@@ -1279,19 +1292,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 添加购买按钮点击事件
                 if (buyButton) {
                     // 先移除可能存在的旧事件监听
-                    buyButton.removeEventListener('click', handleBuy);
-                    // 添加新的事件监听
-                    buyButton.addEventListener('click', handleBuy);
+                    const newBuyButton = buyButton.cloneNode(true);
+                    if (buyButton.parentNode) {
+                        buyButton.parentNode.replaceChild(newBuyButton, buyButton);
+                    }
+                    
+                    // 在新按钮上添加事件监听
+                    newBuyButton.addEventListener('click', handleBuy);
                     console.log('购买按钮成功绑定点击事件');
                 }
                 
                 // 设置输入金额改变时的处理
                 if (amountInput) {
-                    amountInput.addEventListener('input', function() {
+                    const newAmountInput = amountInput.cloneNode(true);
+                    if (amountInput.parentNode) {
+                        amountInput.parentNode.replaceChild(newAmountInput, amountInput);
+                    }
+                    
+                    newAmountInput.addEventListener('input', function() {
                         // 获取购买数量
                         const amount = parseFloat(this.value) || 0;
                         // 获取代币价格
-                        const tokenPrice = parseFloat("{{ asset.token_price }}");
+                        const tokenPrice = parseFloat("{{ asset.price_per_token }}");
                         
                         // 计算总价
                         const totalPrice = amount * tokenPrice;
@@ -1303,7 +1325,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     
                     // 触发一次初始化
-                    amountInput.dispatchEvent(new Event('input'));
+                    newAmountInput.dispatchEvent(new Event('input'));
                 }
                 
                 // 确保总价在页面初始化时正确显示
@@ -1580,21 +1602,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('显示加载状态');
                 }
                 
-                const buyButton = document.getElementById('buyButton');
-                const originalButtonText = buyButton.innerHTML;
+                const buyButton = document.getElementById('buy-button'); // 修正ID
+                const originalButtonText = buyButton ? buyButton.innerHTML : '';
                 
                 // 设置按钮为加载中状态
-                buyButton.disabled = true;
-                buyButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> {{ _("Processing...") }}';
+                if (buyButton) {
+                    buyButton.disabled = true;
+                    buyButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> {{ _("Processing...") }}';
+                }
                 
-                // 获取表单数据
-                const buyForm = document.getElementById('buyForm');
-                const formData = new FormData(buyForm);
-                const amount = formData.get('amount');
-                const tokenId = formData.get('token_id');
-                const assetId = formData.get('asset_id');
-                const price = formData.get('price');
-                const currency = formData.get('currency');
+                // 获取表单数据 - 使用购买数量输入框的值
+                const amountInput = document.getElementById('purchase-amount');
+                if (!amountInput) {
+                    console.error('找不到购买数量输入框');
+                    if (typeof hideLoadingState === 'function') hideLoadingState();
+                    return;
+                }
+                
+                const amount = amountInput.value;
+                const assetId = "{{ asset.id }}"; // 从模板变量获取资产ID
+                const price = "{{ asset.price_per_token }}"; // 从模板变量获取价格
+                const currency = "USDC"; // 默认货币
                 
                 // 格式化数字 - 确保没有逗号
                 const cleanAmount = amount.toString().replace(/,/g, '');
@@ -1602,7 +1630,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 格式化数字后的日志
                 console.log('购买信息:', {
-                    tokenId,
                     assetId,
                     amount: cleanAmount,
                     formattedAmount: parseFloat(cleanAmount).toFixed(6),
@@ -1611,13 +1638,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     currency
                 });
                 
-                // 将清理后的数字设置回表单
-                const cleanFormData = new FormData();
-                cleanFormData.append('token_id', tokenId);
-                cleanFormData.append('asset_id', assetId);
-                cleanFormData.append('amount', parseFloat(cleanAmount).toFixed(6));
-                cleanFormData.append('price', parseFloat(cleanPrice).toFixed(6));
-                cleanFormData.append('currency', currency);
+                // 创建FormData对象用于API请求
+                const formData = new FormData();
+                formData.append('asset_id', assetId);
+                formData.append('amount', parseFloat(cleanAmount).toFixed(0)); // 确保是整数
+                formData.append('price', parseFloat(cleanPrice).toFixed(6));
+                formData.append('currency', currency);
                 
                 try {
                     // 检查钱包连接状态
@@ -1629,7 +1655,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         // 准备购买请求
                         fetch('/api/trades/prepare_purchase', {
                             method: 'POST',
-                            body: cleanFormData,
+                            body: formData,
                             headers: {
                                 'X-Requested-With': 'XMLHttpRequest'
                             }
@@ -1689,23 +1715,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 检查是否有待处理的购买数据
                 if (!window.pendingPurchase) {
                     console.error("没有待处理的购买数据");
-                                    return; 
-                                }
+                    return; 
+                }
 
                 // 显示加载状态
-                showLoadingState("确认购买中...");
+                if (typeof showLoadingState === 'function') {
+                    showLoadingState("确认购买中...");
+                }
 
                 try {
                     // 准备调用全局confirmPurchase函数所需数据
                     const purchaseData = {
-                        asset_id: assetId,
+                        asset_id: "{{ asset.id }}", // 使用模板变量
                         amount: window.pendingPurchase.amount,
                         total_cost: window.pendingPurchase.total_cost,
                         recipient_address: window.pendingPurchase.recipient_address || "{{ asset.creator_address }}"
                     };
 
                     // 获取模态框和确认按钮元素
-                        const modalElement = document.getElementById('buyModal');
+                    const modalElement = document.getElementById('buyModal');
                     const confirmBtn = document.getElementById('confirmPurchaseBtn');
 
                     // 调用wallet.js中定义的全局confirmPurchase函数
@@ -1716,8 +1744,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 } catch (error) {
                     console.error("支付确认错误:", error);
-                    showToast('支付确认失败: ' + error.message, 'error');
-                    hideLoadingState();
+                    if (typeof showToast === 'function') {
+                        showToast('支付确认失败: ' + error.message, 'error');
+                    }
+                    if (typeof hideLoadingState === 'function') {
+                        hideLoadingState();
+                    }
                 }
             }
 
