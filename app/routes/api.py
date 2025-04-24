@@ -3619,11 +3619,11 @@ def get_user_wallet_balance():
         current_app.logger.error(f'获取钱包余额失败: {str(e)}')
         return jsonify({'success': False, 'error': f'获取钱包余额失败: {str(e)}'}), 500
 
-@api_bp.route('/solana/execute_transfer', methods=['POST'])
+@api_bp.route('/solana/execute_transfer_v2', methods=['POST'])
 @wallet_address_required
-def execute_transfer():
+def execute_transfer_v2():
     """
-    执行Solana代币转账
+    执行Solana代币转账 (V2版本)
     
     请求体参数:
         token_symbol: 代币符号
