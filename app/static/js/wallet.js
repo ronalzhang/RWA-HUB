@@ -3621,7 +3621,7 @@ async function confirmPurchase(purchaseData, modalElement, confirmBtn) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Wallet-Address': walletState.address, // 确保添加钱包地址头部
+                'X-Wallet-Address': walletState.address,
                 'X-Eth-Address': walletState.address // 为兼容性保留
             },
             body: JSON.stringify({
