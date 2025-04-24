@@ -3762,7 +3762,11 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
         if (window.refreshAssetInfoNow) {
             window.refreshAssetInfoNow();
         } else {
-            setTimeout(() => window.location.reload(), 2000); // 2秒后简单刷新
+            // 移除自动刷新页面的功能，改为显示成功消息
+            console.log('购买成功，但没有找到refreshAssetInfoNow函数');
+            if (typeof showSuccess === 'function') {
+                showSuccess('购买成功！请手动刷新页面查看最新数据');
+            }
         }
 
     } catch (error) {
@@ -3845,11 +3849,11 @@ function refreshAssetInfo() {
         })
         .catch(error => {
             console.error("刷新资产信息出错:", error);
-            // 如果API调用失败，则直接刷新页面
-            setTimeout(() => {
-                location.reload();
-            },
-            1500);
+            // 移除自动刷新页面的逻辑，防止无限刷新循环
+            // 而是显示错误信息
+            if (typeof showError === 'function') {
+                showError("无法刷新资产信息，请稍后再试");
+            }
         })
         .finally(() => {
             // 移除加载动画
