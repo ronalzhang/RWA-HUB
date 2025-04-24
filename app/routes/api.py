@@ -3891,7 +3891,7 @@ def execute_transfer_v2():
             'error': f'处理请求失败: {str(e)}'
         }), 500
 
-@api_bp.route('/execute_transfer', methods=['POST'])
+@api_bp.route('/execute_transfer', methods=['POST'], endpoint='execute_transfer_v3')
 def execute_transfer():
     """
     执行Solana转账并监控确认状态
