@@ -40,6 +40,50 @@ const walletState = {
             // 设置移动设备检测
             this._isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
+            // 检查是否从钱包App返回 - 这需要在恢复存储的钱包信息之前进行
+            if (this._isMobile) {
+                console.log('检测到移动设备，检查是否从钱包App返回');
+                
+                // 检查各种可能的钱包类型
+                const walletTypes = ['phantom', 'metamask', 'ethereum', 'solflare'];
+                
+                for (const type of walletTypes) {
+                    if (this.checkIfReturningFromWalletApp(type)) {
+                        console.log(`检测到从${type}钱包App返回，将尝试恢复连接`);
+                        
+                        // 先清除之前的连接信息，确保重新连接
+                        this.clearState();
+                        
+                        // 等待DOM完全加载
+                        await this.waitForDocumentReady();
+                        
+                        // 尝试连接钱包
+                        console.log(`尝试连接${type}钱包...`);
+                        let connected = false;
+                        
+                        try {
+                            if (type === 'phantom' || type === 'solana') {
+                                connected = await this.connectPhantom();
+                            } else if (type === 'ethereum' || type === 'metamask') {
+                                connected = await this.connectEthereum();
+                            }
+                            
+                            if (connected) {
+                                console.log(`从钱包App返回后成功连接${type}钱包`);
+                                // 更新UI和触发事件
+                                this.updateUI();
+                                this.triggerWalletStateChanged();
+                                break; // 连接成功，退出循环
+                            } else {
+                                console.log(`从钱包App返回后连接${type}钱包失败`);
+                            }
+                        } catch (err) {
+                            console.error('从钱包App返回后连接钱包失败:', err);
+                        }
+                    }
+                }
+            }
+
             // 尝试从localStorage和sessionStorage中读取钱包信息，优先使用localStorage
             const storedWalletType = localStorage.getItem('walletType') || sessionStorage.getItem('walletType');
             const storedWalletAddress = localStorage.getItem('walletAddress') || sessionStorage.getItem('walletAddress');
@@ -160,6 +204,19 @@ const walletState = {
     },
     
     /**
+     * 等待文档完全加载
+     */
+    waitForDocumentReady() {
+        return new Promise(resolve => {
+            if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                resolve();
+            } else {
+                document.addEventListener('DOMContentLoaded', () => resolve());
+            }
+        });
+    },
+    
+    /**
      * 处理localStorage变化，同步钱包状态
      */
     async handleStorageChange() {
@@ -254,6 +311,36 @@ const walletState = {
         try {
             console.log('检查钱包连接状态...');
             
+            // 首先检查是否从钱包App返回
+            if (this.isMobile()) {
+                // 检查各种可能的钱包类型
+                const walletTypes = ['phantom', 'metamask', 'ethereum', 'solflare'];
+                
+                for (const type of walletTypes) {
+                    if (this.checkIfReturningFromWalletApp(type)) {
+                        console.log(`[页面可见性变化] 检测到从${type}钱包App返回，将尝试连接`);
+                        
+                        // 尝试连接钱包
+                        let connected = false;
+                        try {
+                            if (type === 'phantom' || type === 'solana') {
+                                connected = await this.connectPhantom();
+                            } else if (type === 'ethereum' || type === 'metamask') {
+                                connected = await this.connectEthereum();
+                            }
+                            
+                            if (connected) {
+                                console.log(`[页面可见性变化] 成功连接${type}钱包`);
+                                return; // 连接成功，结束函数
+                            }
+                        } catch (error) {
+                            console.error('[页面可见性变化] 连接钱包失败:', error);
+                        }
+                    }
+                }
+            }
+            
+            // 常规的钱包连接状态检查
             if (!this.connected || !this.address || !this.walletType) {
                 console.log('钱包未连接，无需检查');
                 return;
@@ -382,22 +469,41 @@ const walletState = {
                     let deepLink = '';
                     
                     if (walletType.toLowerCase() === 'phantom') {
-                        // 构建Phantom钱包链接
+                        // 构建Phantom钱包链接 - 使用更可靠的Universal Link格式
                         const currentUrl = encodeURIComponent(window.location.href);
+                        // 使用新的深度链接格式
                         deepLink = `https://phantom.app/ul/browse/${currentUrl}`;
+                        
+                        // 保存当前钱包连接尝试状态到LocalStorage以便返回后检查
+                        localStorage.setItem('pendingWalletType', walletType);
+                        localStorage.setItem('pendingWalletConnection', 'true');
+                        localStorage.setItem('pendingWalletTimestamp', Date.now().toString());
+                        localStorage.setItem('lastConnectionAttemptUrl', window.location.href);
+                        
+                        // 创建并发送一个自定义事件，通知页面即将跳转到钱包
+                        document.dispatchEvent(new CustomEvent('walletAppRedirect', {
+                            detail: {
+                                walletType: walletType,
+                                timestamp: Date.now()
+                            }
+                        }));
+                        
+                        console.log('跳转到Phantom钱包App:', deepLink);
+                        // 跳转到钱包App
+                        window.location.href = deepLink;
+                        return true; // 返回true表示已尝试连接
                     } else if (walletType.toLowerCase() === 'metamask') {
                         // 构建MetaMask钱包链接
                         const currentUrl = encodeURIComponent(window.location.href);
                         deepLink = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
-                    }
-                    
-                    if (deepLink) {
-                        console.log('跳转到钱包App:', deepLink);
-                        // 存储尝试连接的钱包类型，以便返回时检查
+                        
+                        // 保存当前钱包连接尝试状态
                         localStorage.setItem('pendingWalletType', walletType);
                         localStorage.setItem('pendingWalletConnection', 'true');
                         localStorage.setItem('pendingWalletTimestamp', Date.now().toString());
+                        localStorage.setItem('lastConnectionAttemptUrl', window.location.href);
                         
+                        console.log('跳转到MetaMask钱包App:', deepLink);
                         // 跳转到钱包App
                         window.location.href = deepLink;
                         return true; // 返回true表示已尝试连接
@@ -2108,33 +2214,196 @@ async connectPhantom(isReconnect = false) {
     console.log('尝试连接Phantom钱包' + (isReconnect ? ' (重连)' : ''));
     
     try {
+        // 检查是否是从钱包App返回
+        const returningFromWallet = this.checkIfReturningFromWalletApp('phantom');
+        if (returningFromWallet && !isReconnect) {
+            console.log('检测到从Phantom钱包App返回，尝试恢复连接状态');
+            
+            // 移动设备上，如果浏览器不支持直接连接，返回的时候可能没有自动连接
+            // 我们需要尝试通过状态恢复连接，或给出适当提示
+            if (this.isMobile() && (!window.solana || !window.solana.isPhantom)) {
+                console.warn('从Phantom钱包返回，但浏览器不支持钱包连接');
+                showError('钱包连接未完成，请尝试使用Phantom App内置浏览器访问');
+                return false;
+            }
+        }
+        
         // 检查Phantom钱包是否安装
         if (!window.solana || !window.solana.isPhantom) {
             console.error('Phantom钱包未安装');
-            if (!isReconnect) {
-                showError('请安装Phantom钱包');
+            
+            // 在移动设备上，我们已经尝试过重定向到钱包App
+            if (this.isMobile() && returningFromWallet) {
+                showError('钱包连接未完成，请确保在Phantom App中授权连接');
+            } else if (!isReconnect) {
+                if (this.isMobile()) {
+                    showError('请在Phantom App中打开本页面，或使用桌面浏览器');
+                } else {
+                    showError('请安装Phantom钱包浏览器扩展');
+                }
             }
             return false;
         }
         
-        // 请求连接到钱包
-        const response = await window.solana.connect();
+        console.log('Phantom钱包状态:', {
+            'isPhantom': window.solana.isPhantom,
+            'isConnected': window.solana.isConnected,
+            'publicKey': window.solana.publicKey ? window.solana.publicKey.toString() : null
+        });
         
-        if (!response || !response.publicKey) {
-            console.error('无法获取Phantom钱包公钥');
-            if (!isReconnect) {
-                showError('连接Phantom钱包失败: 无法获取公钥');
-            }
-            return false;
+        // 如果已经连接，可以直接使用现有连接
+        if (window.solana.isConnected && window.solana.publicKey) {
+            console.log('Phantom钱包已经连接，使用现有连接');
+            return this.afterSuccessfulConnection(window.solana.publicKey.toString(), 'phantom', window.solana);
         }
         
-        // 连接成功，使用afterSuccessfulConnection方法处理
-        return this.afterSuccessfulConnection(response.publicKey.toString(), 'phantom', window.solana);
+        // 请求连接到钱包，设置超时
+        let connectionTimeout;
+        try {
+            const timeoutPromise = new Promise((_, reject) => {
+                connectionTimeout = setTimeout(() => {
+                    reject(new Error('连接Phantom钱包超时'));
+                }, 20000); // 20秒超时
+            });
+            
+            console.log('正在请求Phantom钱包连接...');
+            const response = await Promise.race([
+                window.solana.connect({ onlyIfTrusted: false }),
+                timeoutPromise
+            ]);
+            
+            clearTimeout(connectionTimeout);
+            
+            console.log('Phantom连接响应:', response);
+            
+            if (!response || !response.publicKey) {
+                console.error('无法获取Phantom钱包公钥');
+                if (!isReconnect) {
+                    showError('连接Phantom钱包失败: 无法获取公钥');
+                }
+                return false;
+            }
+            
+            console.log('成功获取Phantom公钥:', response.publicKey.toString());
+            
+            // 确保设置钱包已连接状态
+            window.solana.isConnected = true;
+            
+            // 设置事件监听器
+            this.setupPhantomListeners();
+            
+            // 连接成功，使用afterSuccessfulConnection方法处理
+            return this.afterSuccessfulConnection(response.publicKey.toString(), 'phantom', window.solana);
+        } catch (connectError) {
+            clearTimeout(connectionTimeout);
+            console.error('连接Phantom钱包时出错:', connectError);
+            
+            // 如果是用户拒绝连接，给出特定提示
+            if (connectError.code === 4001) {
+                if (!isReconnect) {
+                    showError('用户拒绝了钱包连接请求');
+                }
+                return false;
+            }
+            
+            // 如果是移动设备并且从钱包App返回，给出更明确的提示
+            if (this.isMobile() && returningFromWallet) {
+                showError('请确保在Phantom App中授权连接');
+                return false;
+            }
+            
+            // 尝试再次连接，但使用另一种方式
+            try {
+                console.log('尝试备用连接方法...');
+                // 先尝试仅受信任的连接，这在某些情况下更容易成功
+                const retryResponse = await window.solana.connect({ onlyIfTrusted: true }).catch(() => null);
+                
+                if (retryResponse && retryResponse.publicKey) {
+                    console.log('使用onlyIfTrusted方式连接成功');
+                    return this.afterSuccessfulConnection(retryResponse.publicKey.toString(), 'phantom', window.solana);
+                }
+                
+                // 如果上面方式失败，再使用常规方式
+                const fallbackResponse = await window.solana.connect({ onlyIfTrusted: false });
+                
+                if (!fallbackResponse || !fallbackResponse.publicKey) {
+                    throw new Error('备用连接方法失败');
+                }
+                
+                console.log('备用连接方法成功，公钥:', fallbackResponse.publicKey.toString());
+                return this.afterSuccessfulConnection(fallbackResponse.publicKey.toString(), 'phantom', window.solana);
+            } catch (retryError) {
+                console.error('备用连接方法也失败:', retryError);
+                if (!isReconnect) {
+                    if (this.isMobile()) {
+                        showError('无法连接到Phantom钱包，请确保已允许连接授权');
+                    } else {
+                        showError('无法连接到Phantom钱包，请确保已安装并授权');
+                    }
+                }
+                return false;
+            }
+        }
     } catch (error) {
         console.error('连接Phantom钱包时出错:', error);
+        console.error('错误详情:', {
+            name: error.name,
+            message: error.message,
+            code: error.code,
+            stack: error.stack
+        });
+        
         if (!isReconnect) {
             showError('连接Phantom钱包失败: ' + (error.message || '未知错误'));
         }
+        return false;
+    }
+},
+
+/**
+ * 检查是否从钱包App返回
+ * @param {string} walletType - 钱包类型
+ * @returns {boolean} 是否从钱包App返回
+ */
+checkIfReturningFromWalletApp(walletType) {
+    try {
+        // 检查localStorage中的标记
+        const pendingWalletType = localStorage.getItem('pendingWalletType');
+        const pendingWalletConnection = localStorage.getItem('pendingWalletConnection');
+        const pendingWalletTimestamp = localStorage.getItem('pendingWalletTimestamp');
+        const lastConnectionUrl = localStorage.getItem('lastConnectionAttemptUrl');
+        
+        // 检查是否与当前情况匹配
+        const isReturning = pendingWalletType === walletType &&
+                           pendingWalletConnection === 'true' &&
+                           pendingWalletTimestamp &&
+                           lastConnectionUrl === window.location.href;
+        
+        if (isReturning) {
+            console.log(`检测到从${walletType}钱包App返回`);
+            
+            // 检查时间戳是否在合理范围内（5分钟内）
+            const timestamp = parseInt(pendingWalletTimestamp, 10);
+            const now = Date.now();
+            const timeDiff = now - timestamp;
+            
+            if (timeDiff > 5 * 60 * 1000) {
+                console.log('返回时间超过5分钟，可能不是从钱包App直接返回');
+                return false;
+            }
+            
+            // 清除这些标记，避免重复处理
+            localStorage.removeItem('pendingWalletType');
+            localStorage.removeItem('pendingWalletConnection');
+            localStorage.removeItem('pendingWalletTimestamp');
+            localStorage.removeItem('lastConnectionAttemptUrl');
+            
+            return true;
+        }
+        
+        return false;
+    } catch (error) {
+        console.error('检查钱包App返回状态出错:', error);
         return false;
     }
 },
@@ -2446,7 +2715,7 @@ async connectPhantom(isReconnect = false) {
     },
     
     /**
-     * 通过Solana钱包转账代币
+     * 使用Solana钱包发送代币
      * @param {string} tokenSymbol 代币符号
      * @param {string} to 接收地址
      * @param {number} amount 转账金额
@@ -2462,10 +2731,34 @@ async connectPhantom(isReconnect = false) {
                 throw new Error('Phantom钱包未安装或不可用');
             }
             
-            if (!window.solana.isConnected) {
-                console.log('尝试连接Phantom钱包...');
-                await window.solana.connect();
-                console.log('Phantom钱包连接成功');
+            let fromAddress = '';
+            
+            // 检查钱包连接状态并获取地址
+            if (!window.solana.isConnected || !window.solana.publicKey) {
+                console.log('Phantom钱包未连接，尝试连接...');
+                try {
+                    // 尝试连接钱包
+                    await window.solana.connect();
+                    console.log('Phantom钱包连接成功');
+                    
+                    if (!window.solana.publicKey) {
+                        throw new Error('连接成功但无法获取公钥');
+                    }
+                    
+                    fromAddress = window.solana.publicKey.toString();
+                } catch (connError) {
+                    console.error('连接Phantom钱包失败:', connError);
+                    throw new Error('无法连接到钱包: ' + (connError.message || '未知错误'));
+                }
+            } else {
+                // 钱包已连接，直接获取地址
+                fromAddress = window.solana.publicKey.toString();
+                console.log('Phantom钱包已连接，地址:', fromAddress);
+            }
+            
+            // 检查是否成功获取发送地址
+            if (!fromAddress) {
+                throw new Error('无法获取钱包地址');
             }
             
             // 检查接收地址是否有效
@@ -2481,15 +2774,14 @@ async connectPhantom(isReconnect = false) {
             }
             
             console.log(`准备转账 ${amount} ${tokenSymbol} 到 ${to}`);
-            
-            // 获取当前用户的公钥
-            const fromAddress = window.solana.publicKey.toString();
             console.log(`从地址: ${fromAddress}`);
             
             // 记录Phantom钱包版本和环境信息
             console.log('Phantom信息:', {
                 isPhantom: window.solana.isPhantom,
                 version: window.solana.version || '未知',
+                isConnected: window.solana.isConnected,
+                publicKey: fromAddress,
                 isMobile: /Mobi|Android/i.test(navigator.userAgent),
                 userAgent: navigator.userAgent
             });
@@ -2508,16 +2800,23 @@ async connectPhantom(isReconnect = false) {
                         token_symbol: tokenSymbol,
                         to_address: to,
                         amount: parseFloat(amount).toString(), // 使用parseFloat保留小数
-                        from_address: fromAddress
+                        from_address: fromAddress,
+                        wallet_address: fromAddress // 额外添加钱包地址字段，增加兼容性
                     })
                 });
                 
             console.log('转账请求状态码:', transferResponse.status);
             
             if (!transferResponse.ok) {
-                const errorText = await transferResponse.text();
+                let errorText = '';
+                try {
+                    const errorJson = await transferResponse.json();
+                    errorText = errorJson.error || '未知错误';
+                } catch {
+                    errorText = await transferResponse.text();
+                }
                 console.error('转账请求失败:', transferResponse.status, errorText);
-                throw new Error('发送转账请求失败: HTTP ' + transferResponse.status);
+                throw new Error('发送转账请求失败: ' + errorText);
             }
             
             const transferResult = await transferResponse.json();
@@ -2533,9 +2832,9 @@ async connectPhantom(isReconnect = false) {
             // 显示交易状态和签名
             this._showTransactionStatus(transferResult.signature, tokenSymbol, amount, to);
                 
-                // 返回成功结果
-                return {
-                    success: true,
+            // 返回成功结果
+            return {
+                success: true,
                 txHash: transferResult.signature,
                 status: transferResult.tx_status || 'processing'
             };
@@ -4198,3 +4497,72 @@ function confirmPurchase() {
     $("#confirmPurchaseBtn").prop("disabled", false).html('确认购买');
     $("#cancelPurchaseBtn").prop("disabled", false);
   }
+
+// 页面加载时自动检测从钱包应用返回的情况
+(function detectWalletAppReturn() {
+    // 检查是否有钱包应用相关的参数
+    try {
+        const pendingWalletType = localStorage.getItem('pendingWalletType');
+        const pendingWalletConnection = localStorage.getItem('pendingWalletConnection');
+        const pendingWalletTimestamp = localStorage.getItem('pendingWalletTimestamp');
+        
+        if (pendingWalletType && pendingWalletConnection === 'true') {
+            console.log('页面加载时检测到可能从钱包应用返回', {
+                type: pendingWalletType,
+                timestamp: pendingWalletTimestamp
+            });
+            
+            // 检查时间戳是否在合理范围内（5分钟内）
+            const timestamp = parseInt(pendingWalletTimestamp, 10);
+            const now = Date.now();
+            const timeDiff = now - timestamp;
+            
+            if (timeDiff <= 5 * 60 * 1000) {
+                console.log('时间戳在有效范围内，可能是从钱包应用返回');
+                
+                // 添加页面可见性变化监听，以便在页面变为可见时尝试连接钱包
+                const visibilityHandler = function() {
+                    if (document.visibilityState === 'visible') {
+                        console.log('页面变为可见，尝试检查钱包连接状态');
+                        // 如果钱包对象已初始化，则调用检查方法
+                        if (window.wallet && typeof window.wallet.checkWalletConnection === 'function') {
+                            window.wallet.checkWalletConnection();
+                        }
+                        // 移除事件监听器，避免重复处理
+                        document.removeEventListener('visibilitychange', visibilityHandler);
+                    }
+                };
+                
+                // 添加事件监听器
+                document.addEventListener('visibilitychange', visibilityHandler);
+                
+                // 添加一次性触发器，页面完全加载后自动检查
+                if (document.readyState === 'complete') {
+                    setTimeout(() => {
+                        if (window.wallet && typeof window.wallet.checkWalletConnection === 'function') {
+                            console.log('页面已加载完成，直接检查钱包连接状态');
+                            window.wallet.checkWalletConnection();
+                        }
+                    }, 500);
+                } else {
+                    window.addEventListener('load', () => {
+                        setTimeout(() => {
+                            if (window.wallet && typeof window.wallet.checkWalletConnection === 'function') {
+                                console.log('页面加载事件触发，检查钱包连接状态');
+                                window.wallet.checkWalletConnection();
+                            }
+                        }, 500);
+                    });
+                }
+            } else {
+                console.log('时间戳已过期，清除钱包连接尝试状态');
+                localStorage.removeItem('pendingWalletType');
+                localStorage.removeItem('pendingWalletConnection');
+                localStorage.removeItem('pendingWalletTimestamp');
+                localStorage.removeItem('lastConnectionAttemptUrl');
+            }
+        }
+    } catch (error) {
+        console.error('检查钱包应用返回状态出错:', error);
+    }
+})();
