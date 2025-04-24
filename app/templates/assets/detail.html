@@ -1611,6 +1611,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     buyButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> {{ _("Processing...") }}';
                 }
                 
+                // 首先检查钱包连接状态
+                if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
+                    console.error('钱包未连接或地址不可用');
+                    if (buyButton) {
+                        buyButton.disabled = false;
+                        buyButton.innerHTML = originalButtonText;
+                    }
+                    if (typeof hideLoadingState === 'function') hideLoadingState();
+                    if (typeof showToast === 'function') {
+                        showToast('{{ _("Please connect your wallet first") }}', 'error');
+                    } else {
+                        alert('{{ _("Please connect your wallet first") }}');
+                    }
+                    
+                    // 尝试触发钱包连接
+                    if (typeof connectWallet === 'function') {
+                        try {
+                            await connectWallet();
+                        } catch (err) {
+                            console.error('钱包连接失败:', err);
+                        }
+                    }
+                    return;
+                }
+                
+                // 记录钱包地址，用于调试
+                console.log('当前钱包地址:', window.walletState.address);
+                
                 // 获取表单数据 - 使用购买数量输入框的值
                 const amountInput = document.getElementById('purchase-amount');
                 if (!amountInput) {
@@ -1635,7 +1663,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     formattedAmount: parseFloat(cleanAmount).toFixed(6),
                     price: cleanPrice,
                     formattedPrice: parseFloat(cleanPrice).toFixed(6),
-                    currency
+                    currency,
+                    walletAddress: window.walletState.address
                 });
                 
                 // 创建FormData对象用于API请求
@@ -1644,20 +1673,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 formData.append('amount', parseFloat(cleanAmount).toFixed(0)); // 确保是整数
                 formData.append('price', parseFloat(cleanPrice).toFixed(6));
                 formData.append('currency', currency);
+                formData.append('wallet_address', window.walletState.address); // 添加钱包地址
                 
                 try {
-                    // 检查钱包连接状态
-                    if (!window.walletState || !window.walletState.isConnected) {
-                        throw new Error('{{ _("Please connect your wallet first") }}');
-                    }
-
                     return new Promise((resolve, reject) => {
                         // 准备购买请求
                         fetch('/api/trades/prepare_purchase', {
                             method: 'POST',
                             body: formData,
                             headers: {
-                                'X-Requested-With': 'XMLHttpRequest'
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-Wallet-Address': window.walletState.address, // 添加钱包地址头
+                                'X-Eth-Address': window.walletState.address // 兼容性处理
                             }
                         })
                         .then(response => {
@@ -1717,6 +1744,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error("没有待处理的购买数据");
                     return; 
                 }
+                
+                // 检查钱包连接状态
+                if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
+                    console.error('钱包未连接或地址不可用');
+                    if (typeof showToast === 'function') {
+                        showToast('{{ _("Please connect your wallet first") }}', 'error');
+                    } else {
+                        alert('{{ _("Please connect your wallet first") }}');
+                    }
+                    return;
+                }
 
                 // 显示加载状态
                 if (typeof showLoadingState === 'function') {
@@ -1729,8 +1767,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         asset_id: "{{ asset.id }}", // 使用模板变量
                         amount: window.pendingPurchase.amount,
                         total_cost: window.pendingPurchase.total_cost,
-                        recipient_address: window.pendingPurchase.recipient_address || "{{ asset.creator_address }}"
+                        recipient_address: window.pendingPurchase.recipient_address || "{{ asset.creator_address }}",
+                        wallet_address: window.walletState.address // 明确提供钱包地址
                     };
+
+                    // 记录数据，用于调试
+                    console.log('准备确认购买，数据:', purchaseData);
 
                     // 获取模态框和确认按钮元素
                     const modalElement = document.getElementById('buyModal');
