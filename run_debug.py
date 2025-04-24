@@ -97,7 +97,7 @@ if __name__ == '__main__':
     app.config['DEBUG'] = False
     app.config['PROPAGATE_EXCEPTIONS'] = True
     
-    port = int(os.environ.get('PORT', 9000))
+    port = 9001
     host = '0.0.0.0'  # 允许外部访问
     
     print("启动服务器...")

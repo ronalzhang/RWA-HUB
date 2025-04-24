@@ -1,10 +1,11 @@
 from functools import wraps
-from flask import request, jsonify, g, current_app
+from flask import request, jsonify, g
 import jwt
 from app.models.user import User
+from flask import current_app
 
 def token_required(f):
-    """验证JWT Token的装饰器"""
+    """验证JWT令牌的装饰器"""
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
@@ -81,4 +82,4 @@ def wallet_address_required(f):
         current_app.logger.info(f"找到钱包地址: {wallet_address}")
         
         return f(*args, **kwargs)
-    return decorated
+    return decorated 

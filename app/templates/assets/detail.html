@@ -1246,13 +1246,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     // 更新购买按钮
                     if (buyButton) {
-                        if (isConnected) {
-                            buyButton.disabled = false;
-                            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>{{ _("Buy") }}';
+                                if (isConnected) {
+                        buyButton.disabled = false;
+                        buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>{{ _("Buy") }}';
                             buyButton.removeAttribute('title');
-                        } else {
-                            buyButton.disabled = true;
-                            buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>{{ _("Connect Wallet First") }}';
+                    } else {
+                        buyButton.disabled = true;
+                        buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>{{ _("Connect Wallet First") }}';
                             buyButton.title = '{{ _("Please connect wallet first") }}';
                         }
                     }
@@ -1742,9 +1742,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 检查是否有待处理的购买数据
                 if (!window.pendingPurchase) {
                     console.error("没有待处理的购买数据");
-                    return; 
-                }
-                
+                                    return; 
+                                }
+
                 // 检查钱包连接状态
                 if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
                     console.error('钱包未连接或地址不可用');
@@ -1775,7 +1775,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('准备确认购买，数据:', purchaseData);
 
                     // 获取模态框和确认按钮元素
-                    const modalElement = document.getElementById('buyModal');
+                        const modalElement = document.getElementById('buyModal');
                     const confirmBtn = document.getElementById('confirmPurchaseBtn');
 
                     // 调用wallet.js中定义的全局confirmPurchase函数
@@ -1790,7 +1790,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         showToast('支付确认失败: ' + error.message, 'error');
                     }
                     if (typeof hideLoadingState === 'function') {
-                        hideLoadingState();
+                    hideLoadingState();
                     }
                 }
             }
@@ -2811,7 +2811,7 @@ async function connectWallet() {
 </script>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function() {
         // 购买金额输入框验证
         const purchaseAmountInput = document.getElementById('purchase-amount');
         if (purchaseAmountInput) {
