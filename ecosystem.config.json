@@ -2,7 +2,7 @@
   "apps": [
     {
       "name": "rwa-hub",
-      "script": "application.py",
+      "script": "wsgi.py",
       "interpreter": "venv/bin/python",
       "env": {
         "DATABASE_URL": "postgresql://rwa_hub_user:${DB_PASSWORD}@${DB_HOST}/rwa_hub",
