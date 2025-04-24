@@ -9,136 +9,160 @@ from app.extensions import db
 import traceback
 import logging
 from threading import Thread
+from datetime import datetime, timedelta
+import time
 
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
-        if 'Authorization' in request.headers:
-            token = request.headers['Authorization'].replace('Bearer ', '')
+        auth_header = request.headers.get('Authorization')
+        
+        if auth_header:
+            parts = auth_header.split()
+            if len(parts) == 2 and parts[0].lower() == 'bearer':
+                token = parts[1]
         
         if not token:
-            return jsonify({'error': '缺少token'}), 401
-        
+            return jsonify({'message': '缺少访问令牌', 'authenticated': False}), 401
+            
         try:
-            data = jwt.decode(token, 'your-secret-key', algorithms=['HS256'])
-            g.current_user = User.query.get(data['id'])
-        except:
-            return jsonify({'error': 'token无效或已过期'}), 401
+            payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+            g.current_user = payload
+        except jwt.ExpiredSignatureError:
+            return jsonify({'message': '令牌已过期', 'authenticated': False}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'message': '无效令牌', 'authenticated': False}), 401
             
         return f(*args, **kwargs)
     return decorated
 
 def eth_address_required(f):
-    """要求用户已经连接钱包"""
     @wraps(f)
-    def decorated_function(*args, **kwargs):
+    def decorated(*args, **kwargs):
         eth_address = None
-
-        # 检查头部参数
-        if 'X-Eth-Address' in request.headers:
-            eth_address = request.headers.get('X-Eth-Address')
-            if eth_address:
-                g.eth_address = eth_address
-                current_app.logger.info(f"从请求头获取钱包地址: {eth_address}")
         
-        # 检查Wallet-Address头部
-        if not eth_address and 'X-Wallet-Address' in request.headers:
-            eth_address = request.headers.get('X-Wallet-Address')
-            if eth_address:
-                g.eth_address = eth_address
-                current_app.logger.info(f"从X-Wallet-Address请求头获取钱包地址: {eth_address}")
+        # 先检查X-Wallet-Address和X-Eth-Address头部
+        eth_address = request.headers.get('X-Wallet-Address') or request.headers.get('X-Eth-Address')
         
-        # 检查cookie
+        # 如果头部中没有，检查Cookie
         if not eth_address:
             eth_address = request.cookies.get('eth_address')
-            if eth_address:
-                g.eth_address = eth_address
-                current_app.logger.info(f"从cookie获取钱包地址: {eth_address}")
-        
-        # 检查session
+            
+        # 如果Cookie中没有，检查URL参数
+        if not eth_address:
+            eth_address = request.args.get('eth_address')
+            
+        # 如果URL参数中没有，检查会话
         if not eth_address and 'eth_address' in session:
             eth_address = session['eth_address']
-            if eth_address:
-                g.eth_address = eth_address
-                current_app.logger.info(f"从session获取钱包地址: {eth_address}")
-                
-        # 如果都没有找到地址，返回错误
+
+        # 如果没有找到Ethereum地址，返回401
         if not eth_address:
-            current_app.logger.warning("请求未提供钱包地址")
-            # 为后台API响应有效的数据格式
-            if request.path.startswith('/api/admin'):
-                empty_data = {
-                    'total_users': 0,
-                    'new_users_today': 0,
-                    'new_users_week': 0,
-                    'total_assets': 0,
-                    'total_asset_value': 0,
-                    'total_trades': 0,
-                    'total_trade_volume': 0
-                }
-                # 针对不同的API路径返回不同的数据格式
-                if 'user-stats' in request.path:
-                    return jsonify({
-                        'trend': [],
-                        'regions': []
-                    })
-                elif 'asset-type-stats' in request.path:
-                    return jsonify({
-                        'distribution': []
-                    })
-                else:
-                    return jsonify(empty_data)
-            else:
-                return jsonify({'error': '未提供钱包地址', 'code': 403}), 403
+            logging.warning("无法找到钱包地址，访问请求被拒绝")
+            return jsonify({'success': False, 'error': '未提供钱包地址', 'authenticated': False}), 401
+        
+        # 检查地址格式
+        if not eth_address.startswith('0x') and len(eth_address) < 30:
+            logging.warning(f"无效的钱包地址格式: {eth_address}")
+            return jsonify({'success': False, 'error': '无效的钱包地址格式', 'authenticated': False}), 401
             
+        # 在g对象中存储Ethereum地址以便视图函数访问
+        g.eth_address = eth_address
+        g.wallet_address = eth_address  # 为兼容性添加wallet_address
+        
         return f(*args, **kwargs)
-    return decorated_function
+    return decorated
+
+def wallet_address_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        wallet_address = None
+        
+        # 首先检查X-Wallet-Address和X-Eth-Address头部
+        wallet_address = request.headers.get('X-Wallet-Address') or request.headers.get('X-Eth-Address')
+        
+        # 如果头部中没有，检查Cookie
+        if not wallet_address:
+            wallet_address = request.cookies.get('wallet_address') or request.cookies.get('eth_address')
+            
+        # 如果Cookie中没有，检查URL参数
+        if not wallet_address:
+            wallet_address = request.args.get('wallet_address') or request.args.get('eth_address')
+            
+        # 如果URL参数中没有，检查会话
+        if not wallet_address and ('wallet_address' in session or 'eth_address' in session):
+            wallet_address = session.get('wallet_address') or session.get('eth_address')
+
+        # 如果没有找到钱包地址，记录并继续
+        if not wallet_address:
+            logging.warning("无法找到钱包地址")
+            g.wallet_address = None
+            return f(*args, **kwargs)
+        
+        # 在g对象中存储钱包地址以便视图函数访问
+        g.wallet_address = wallet_address
+        g.eth_address = wallet_address  # 为兼容性添加eth_address
+        
+        return f(*args, **kwargs)
+    return decorated
 
 def api_eth_address_required(f):
-    """API路由要求提供以太坊地址的装饰器，返回JSON响应"""
     @wraps(f)
-    def decorated_function(*args, **kwargs):
-        eth_address = request.headers.get('X-Eth-Address') or \
-                     request.args.get('eth_address') or \
-                     request.json.get('wallet_address') if request.json else None
+    def decorated(*args, **kwargs):
+        eth_address = None
         
-        current_app.logger.info(f"钱包地址来源:")
-        current_app.logger.info(f"- Header: {request.headers.get('X-Eth-Address')}")
-        current_app.logger.info(f"- Args: {request.args.get('eth_address')}")
-        current_app.logger.info(f"- JSON: {request.json.get('wallet_address') if request.json else None}")
-                     
-        if not eth_address:
-            current_app.logger.warning(f"未提供钱包地址")
-            return jsonify({'error': '请先连接钱包', 'code': 'WALLET_REQUIRED'}), 401
+        # 先检查X-Wallet-Address和X-Eth-Address头部
+        eth_address = request.headers.get('X-Wallet-Address') or request.headers.get('X-Eth-Address')
             
-        # 区分ETH和SOL地址处理
-        g.eth_address = eth_address.lower() if eth_address.startswith('0x') else eth_address
-        current_app.logger.info(f"最终使用地址: {g.eth_address}")
+        # 如果没有找到Ethereum地址，返回401
+        if not eth_address:
+            return jsonify({'success': False, 'error': '未提供钱包地址', 'authenticated': False}), 401
+            
+        # 在g对象中存储Ethereum地址以便视图函数访问
+        g.eth_address = eth_address
+        g.wallet_address = eth_address  # 为兼容性添加wallet_address
+        
         return f(*args, **kwargs)
-    return decorated_function
+    return decorated
 
 def admin_required(f):
-    """要求管理员权限的装饰器"""
+    """管理员权限检查装饰器"""
     @wraps(f)
-    def decorated_function(*args, **kwargs):
-        eth_address = request.headers.get('X-Eth-Address') or \
-                     request.args.get('eth_address') or \
-                     session.get('admin_eth_address')
-                     
+    def decorated(*args, **kwargs):
+        eth_address = None
+        
+        # 先检查头部
+        eth_address = request.headers.get('X-Wallet-Address') or request.headers.get('X-Eth-Address')
+        
+        # 如果头部中没有，检查Cookie
         if not eth_address:
-            flash('请先连接钱包', 'error')
-            return redirect(url_for('main.index'))
+            eth_address = request.cookies.get('eth_address')
             
-        admin_info = get_admin_permissions(eth_address.lower())
-        if not admin_info:
-            flash('您没有管理员权限', 'error')
-            return redirect(url_for('main.index'))
+        # 如果Cookie中没有，检查URL参数
+        if not eth_address:
+            eth_address = request.args.get('eth_address')
             
-        g.eth_address = eth_address.lower()
-        g.admin_info = admin_info
+        # 如果URL参数中没有，检查会话
+        if not eth_address and 'eth_address' in session:
+            eth_address = session['eth_address']
+
+        # 如果没有找到Ethereum地址，返回401
+        if not eth_address:
+            return jsonify({'success': False, 'error': '未提供钱包地址', 'authenticated': False}), 401
+        
+        # 检查是否为管理员
+        from app.routes.admin import is_admin
+        if not is_admin(eth_address):
+            logging.warning(f"非管理员尝试访问管理功能: {eth_address}")
+            return jsonify({'success': False, 'error': '无权访问，需要管理员权限', 'authenticated': True, 'authorized': False}), 403
+            
+        # 在g对象中存储Ethereum地址以便视图函数访问
+        g.eth_address = eth_address
+        g.wallet_address = eth_address  # 为兼容性添加wallet_address
+        
         return f(*args, **kwargs)
-    return decorated_function
+    return decorated
 
 def api_admin_required(f):
     """API版本的管理员权限装饰器，失败时返回JSON错误而不是重定向"""
@@ -265,18 +289,31 @@ def log_activity(activity_type):
     return decorator 
 
 def task_background(f):
-    """后台任务装饰器，用于创建后台线程执行任务"""
+    """后台任务装饰器，确保任务在后台执行，并记录执行状态"""
     @wraps(f)
     def decorated(*args, **kwargs):
-        # 获取当前应用上下文
-        app = current_app._get_current_object()
-        
-        def task_wrapper():
-            with app.app_context():
-                return f(*args, **kwargs)
-        
-        thread = Thread(target=task_wrapper)
-        thread.daemon = True
-        thread.start()
-        return thread
+        start_time = time.time()
+        try:
+            # 记录任务开始
+            task_name = f.__name__
+            logging.info(f"开始执行后台任务 {task_name}")
+            
+            # 执行实际任务
+            result = f(*args, **kwargs)
+            
+            # 记录成功完成
+            end_time = time.time()
+            duration = end_time - start_time
+            logging.info(f"后台任务 {task_name} 成功完成，耗时 {duration:.2f} 秒")
+            
+            return result
+        except Exception as e:
+            # 记录异常
+            end_time = time.time()
+            duration = end_time - start_time
+            logging.error(f"后台任务 {f.__name__} 执行失败，耗时 {duration:.2f} 秒，错误: {str(e)}")
+            
+            # 重新抛出异常以便上层处理
+            raise
+    
     return decorated 
