@@ -3127,14 +3127,31 @@ def prepare_purchase():
                 
             # 转换为字符串，然后转数字，最后取整
             amount_str = str(amount_data).strip()
+            
+            # 验证amount是否为有效数字
+            if not amount_str.replace('.', '', 1).isdigit():
+                current_app.logger.error(f"无效的金额格式: {amount_str}")
+                return jsonify({'success': False, 'error': '无效的金额格式'}), 400
+                
             amount_num = float(amount_str)
             
             if amount_num <= 0:
                 current_app.logger.error(f"金额必须大于0: {amount_num}")
                 return jsonify({'success': False, 'error': '数量必须大于0'}), 400
                 
-            # 取整
+            # 判断是否为整数
+            if amount_num != int(amount_num):
+                current_app.logger.error(f"金额必须为整数: {amount_num}")
+                return jsonify({'success': False, 'error': '数量必须为整数'}), 400
+                
+            # 取整并确保最小为1
             amount = max(1, int(amount_num))
+            
+            # 检查金额是否大于等于1
+            if amount < 1:
+                current_app.logger.error(f"金额必须大于等于1: {amount}")
+                return jsonify({'success': False, 'error': '数量必须至少为1'}), 400
+                
             current_app.logger.info(f"金额处理完成: {amount_data} -> {amount}")
             
         except Exception as e:
