@@ -1,13 +1,13 @@
 from app import create_app
 import logging
-from app.config import Config
+import os
 
 # 配置日志
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-app = create_app()
-app.config.from_object(Config)
+# 创建应用实例（使用环境变量或默认为development）
+app = create_app(os.getenv('FLASK_ENV', 'development'))
 
 if __name__ == "__main__":
     logger.info("Starting application...")
