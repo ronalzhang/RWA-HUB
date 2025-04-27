@@ -354,106 +354,68 @@ document.addEventListener('DOMContentLoaded', function() {
             // 初始化 Solana 连接
             let solanaConnection;
 
-            // 页面加载完成后初始化
-            document.addEventListener('DOMContentLoaded', async function() {
-                try {
-                    console.log('页面已加载，初始化资产详情页...');
-                    
-                    // 初始化资产配置 - 确保类型正确
-                    ASSET_CONFIG.id = parseInt("{{ asset.id }}");
-                    ASSET_CONFIG.tokenSymbol = "{{ asset.token_symbol }}";
-                    ASSET_CONFIG.tokenSupply = parseFloat("{{ asset.token_supply }}");
-                    ASSET_CONFIG.remainingSupply = parseFloat("{{ remaining_supply }}");
-                    ASSET_CONFIG.pricePerToken = parseFloat("{{ asset.price_per_token }}");
-                    ASSET_CONFIG.status = parseInt("{{ asset.status }}");
-                    ASSET_CONFIG.platformFeeAddress = "{{ platform_fee_address }}";
-                    ASSET_CONFIG.platformFeeRate = parseFloat("{{ PLATFORM_FEE_RATE }}");
-                    
-                    // 初始化刷新按钮
-                    initRefreshButton();
-                    
-                    // 设置交易表单
-                    setupTradeForm();
-                    
-                    // 设置资产信息刷新
-                    setupAssetInfoRefresh();
-                    
-                    // 立即刷新资产信息
-                    refreshAssetInfo();
-                    
-                    // 直接检查分红管理权限（不使用延时）
-                    checkDividendManagementAccess();
-                    
-                    // 更新钱包资产列表
-                    if (typeof loadUserAssets === 'function') {
-                        loadUserAssets();
-                    }
-                    
-                    // 加载累计分红信息
-                    await loadTotalDividends();
-                    
-                    // 加载交易历史
-                    loadTradeHistory();
-                    
-                    // 添加钱包状态变化事件监听器
-                    window.addEventListener('walletConnected', function(event) {
-                        // 更新购买按钮状态
-                        const buyButton = document.getElementById('buy-button');
-                        if (buyButton) {
-                            buyButton.disabled = false;
-                            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>{{ _("Buy") }}';
-                        }
-                        
-                        // 重新检查分红管理权限
-                        checkDividendManagementAccess();
-                        
-                        // 更新钱包余额
-                        if (typeof window.updateWalletBalance === 'function') {
-                            window.updateWalletBalance();
-                        }
-                        
-                        // 重新加载交易历史
-                        loadTradeHistory();
-                    });
-                    
-                    // 添加管理员状态变化事件监听
-                    window.addEventListener('adminStatusChanged', function() {
-                        // 重新检查分红管理权限
-                        checkDividendManagementAccess();
-                    });
-                    
-                    // 添加状态变化事件监听
-                    window.addEventListener('walletStateChanged', function(event) {
-                        // 如果是管理员状态变化，重新检查分红权限
-                        if (event.detail && event.detail.isAdmin !== undefined) {
-                            checkDividendManagementAccess();
-                        }
-                    });
-                    
-                    // 断开连接事件监听
-                    window.addEventListener('walletDisconnected', function() {
-                        // 隐藏所有分红按钮
-                        const dividendBtns = [
-                            document.getElementById('dividendManagementBtn'),
-                            document.getElementById('dividendManagementBtnMobile'),
-                            document.getElementById('dividendManagementBtnMedium')
-                        ];
-                        
-                        dividendBtns.forEach(btn => {
-                            if (btn) btn.style.display = 'none';
-                        });
-                        
-                        // 更新页面状态
-                        loadTradeHistory();
-                        if (typeof window.updateWalletBalance === 'function') {
-                            window.updateWalletBalance();
-                        }
-                    });
-                    
-                    console.log('页面初始化完成');
-                } catch (error) {
-                    console.error('初始化页面时出错:', error);
+            // 页面初始化
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('页面初始化值:', {
+                    assetId: '{{ asset.id }}',
+                    totalSupply: '{{ asset.token_supply }}',
+                    remainingSupply: '{{ asset.remaining_supply }}'
+                });
+                
+                // 确保全局钱包状态变量存在
+                if (!window.walletState) {
+                    window.walletState = {
+                        connected: false,
+                        isConnected: false,
+                        address: null
+                    };
                 }
+                
+                // 同步window.walletState和window.wallet中的数据
+                function syncWalletState() {
+                    if (window.wallet) {
+                        // 从wallet对象同步状态
+                        const connected = window.wallet.connected || !!window.wallet.getAddress();
+                        const address = window.wallet.getAddress();
+                        
+                        if (!window.walletState) {
+                            window.walletState = {};
+                        }
+                        
+                        window.walletState.connected = connected;
+                        window.walletState.isConnected = connected;
+                        window.walletState.address = address;
+                        
+                        // 更新购买按钮状态
+                        if (typeof updateBuyButtonState === 'function') {
+                            updateBuyButtonState();
+                        }
+                    }
+                }
+                
+                // 初次同步
+                syncWalletState();
+                
+                // 每秒检查钱包状态，确保状态同步
+                const walletStateInterval = setInterval(syncWalletState, 2000);
+                
+                // 页面卸载时清除定时器
+                window.addEventListener('beforeunload', function() {
+                    clearInterval(walletStateInterval);
+                });
+                
+                // 设置交易表单
+                setupTradeForm();
+                
+                // 设置资产信息刷新
+                setupAssetInfoRefresh();
+                
+                // 调用加载分红历史函数（如果存在）
+                if (typeof loadDividendHistory === 'function') {
+                    loadDividendHistory();
+                }
+                
+                console.log('页面初始化完成');
             });
             
             /**
@@ -1242,17 +1204,44 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('{{ _("Updating buy button status, current wallet status") }}:', window.walletState);
                     
                     // 获取购买按钮 - 已经有了buyButton变量，不需要重新获取
-                    const isConnected = window.walletState && (window.walletState.isConnected || window.walletState.connected);
+                    // 更全面地检查钱包连接状态，增加多种检查方式
+                    let isConnected = false;
+                    
+                    // 方法1: 检查window.walletState
+                    if (window.walletState && (window.walletState.isConnected || window.walletState.connected)) {
+                        isConnected = true;
+                    }
+                    
+                    // 方法2: 检查window.wallet对象
+                    if (!isConnected && window.wallet && (
+                        window.wallet.connected ||
+                        window.wallet.getAddress() ||
+                        window.wallet.getConnectionStatus())
+                    ) {
+                        isConnected = true;
+                    }
+                    
+                    // 方法3: 检查全局地址变量
+                    if (!isConnected && (window.connectedWalletAddress || window.ethereumAddress || window.solanaAddress)) {
+                        isConnected = true;
+                    }
+                    
+                    // 记录日志
+                    console.log('钱包连接状态检查结果:', isConnected, {
+                        'walletState': window.walletState ? '存在' : '不存在',
+                        'connectedStatus': window.walletState ? (window.walletState.connected || window.walletState.isConnected) : '未知',
+                        'globalAddress': window.connectedWalletAddress || window.ethereumAddress || window.solanaAddress || '无'
+                    });
 
                     // 更新购买按钮
                     if (buyButton) {
-                                if (isConnected) {
-                        buyButton.disabled = false;
-                        buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>{{ _("Buy") }}';
+                        if (isConnected) {
+                            buyButton.disabled = false;
+                            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>{{ _("Buy") }}';
                             buyButton.removeAttribute('title');
-                    } else {
-                        buyButton.disabled = true;
-                        buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>{{ _("Connect Wallet First") }}';
+                        } else {
+                            buyButton.disabled = true;
+                            buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>{{ _("Connect Wallet First") }}';
                             buyButton.title = '{{ _("Please connect wallet first") }}';
                         }
                     }
@@ -1272,6 +1261,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     updateBuyButtonState();
                 }, 1000);
                 
+                // 再增加一次额外延迟检查，确保在页面完全加载后检查状态
+                setTimeout(function() {
+                    console.log('最终钱包状态检查，确保购买按钮正确更新');
+                    updateBuyButtonState();
+                }, 3000);
+                
                 // 添加事件监听器
                 window.addEventListener('walletConnected', function(event) {
                     console.log('{{ _("Received wallet connection event, updating buy button") }}');
@@ -1286,6 +1281,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 添加状态变化事件监听
                 window.addEventListener('walletStateChanged', function(event) {
                     console.log('{{ _("Wallet status changed, updating buy button") }}', event.detail);
+                    updateBuyButtonState();
+                });
+                
+                // 添加余额更新事件监听器
+                window.addEventListener('balanceUpdated', function(event) {
+                    console.log('{{ _("Wallet balance updated, checking button status") }}');
                     updateBuyButtonState();
                 });
                 

@@ -1237,850 +1237,171 @@ def get_user_assets_query():
         # 记录当前请求的钱包地址，用于调试
         current_app.logger.info(f'通过查询参数获取资产 - 地址: {address}, 类型: {wallet_type}')
         
-        # 返回空数组，让系统从区块链获取真实数据
-        current_app.logger.info('返回空数组，系统将从区块链获取真实数据')
-        return jsonify([]), 200
-        
-    except Exception as e:
-        current_app.logger.error(f'获取用户资产失败: {str(e)}', exc_info=True)
-        return jsonify([]), 200
-
-# 添加短链接相关API
-@api_bp.route('/shortlink/create', methods=['POST'])
-@eth_address_required
-def create_shortlink():
-    """创建短链接"""
-    data = request.json
-    if not data or 'url' not in data:
-        return jsonify({'success': False, 'error': '缺少URL参数'}), 400
-    
-    original_url = data['url']
-    
-    # 获取创建者地址
-    creator_address = request.headers.get('X-Eth-Address')
-    
-    # 可选参数
-    expires_days = data.get('expires_days')
-    
-    # 创建短链接
-    try:
-        short_link = ShortLink.create_short_link(
-            original_url=original_url,
-            creator_address=creator_address,
-            expires_days=expires_days
-        )
-        
-        # 构建完整的短链接URL
-        base_url = request.host_url.rstrip('/')
-        short_url = f"{base_url}/s/{short_link.code}"
-        
-        return jsonify({
-            'success': True,
-            'code': short_link.code,
-            'short_url': short_url,
-            'original_url': short_link.original_url,
-            'expires_at': short_link.expires_at.isoformat() if short_link.expires_at else None
-        })
-    except Exception as e:
-        current_app.logger.error(f"创建短链接失败: {str(e)}")
-        return jsonify({'success': False, 'error': f'创建短链接失败: {str(e)}'}), 500
-
-@api_bp.route('/shortlink/<code>', methods=['GET'])
-def get_shortlink(code):
-    """获取短链接信息"""
-    short_link = ShortLink.query.filter_by(code=code).first()
-    
-    if not short_link:
-        return jsonify({'success': False, 'error': '短链接不存在'}), 404
-    
-    if short_link.is_expired():
-        return jsonify({'success': False, 'error': '短链接已过期'}), 410
-    
-    return jsonify({
-        'success': True,
-        'code': short_link.code,
-        'original_url': short_link.original_url,
-        'created_at': short_link.created_at.isoformat(),
-        'expires_at': short_link.expires_at.isoformat() if short_link.expires_at else None,
-        'click_count': short_link.click_count
-    })
-
-@api_bp.route('/share-messages/random', methods=['GET'])
-def get_random_share_message():
-    """获取随机分享文案"""
-    try:
-        import os
-        import json
-        import random
-        from flask import current_app
-        
-        # 确定文件路径
-        file_path = os.path.join(current_app.root_path, 'static', 'data', 'share_messages.json')
-        
-        # 默认文案
-        default_messages = [
-            "📈 分享赚佣金！邀请好友投资，您可获得高达30%的推广佣金！链接由您独享，佣金终身受益，朋友越多，收益越丰厚！",
-            "🤝 好东西就要和朋友分享！发送您的专属链接，让更多朋友加入这个投资社区，一起交流，共同成长，还能获得持续佣金回报！",
-            "🔥 发现好机会就要分享！邀请好友一起投资这个优质资产，共同见证财富增长！您的专属链接，助力朋友也能抓住这个机会！"
-        ]
-        
-        # 如果文件存在，从文件读取文案
-        if os.path.exists(file_path):
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    messages = json.load(f)
-                    if messages and isinstance(messages, list) and len(messages) > 0:
-                        # 随机选择一条文案
-                        message = random.choice(messages)
-                        return jsonify({
-                            'success': True,
-                            'message': message
-                        }), 200
-            except Exception as e:
-                current_app.logger.error(f'读取分享文案文件失败: {str(e)}')
-        
-        # 如果文件不存在或读取失败，使用默认文案
-        message = random.choice(default_messages)
-        return jsonify({
-            'success': True,
-            'message': message
-        }), 200
-        
-    except Exception as e:
-        current_app.logger.error(f'获取随机分享文案失败: {str(e)}')
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'message': "发现好机会就要分享！邀请好友一起投资这个优质资产！" # 兜底文案
-        }), 200  # 返回200而不是500，让前端能正常处理
-
-@api_bp.route('/upload-images', methods=['POST'])
-def upload_images_api():
-    """上传图片API，支持多图片上传"""
-    try:
-        from flask import request, current_app, jsonify
-        import os
-        from werkzeug.utils import secure_filename
-        import time
-        
-        current_app.logger.info("接收到图片上传请求")
-        current_app.logger.info(f"请求表单数据: {list(request.form.keys())}")
-        current_app.logger.info(f"请求文件数据: {list(request.files.keys())}")
-        
-        # 检查请求中是否包含文件
-        file_count = len(request.files)
-        if file_count == 0:
-            current_app.logger.error("请求中没有包含任何文件")
-            return jsonify({
-                'success': False,
-                'message': '请求中没有包含任何文件'
-            }), 400
-            
-        current_app.logger.info(f"接收到 {file_count} 个文件")
-        
-        # 允许任何文件键名，不仅仅是file0
-        files_to_process = []
-        for key in request.files:
-            file = request.files[key]
-            if file and file.filename:
-                files_to_process.append(file)
-                current_app.logger.info(f"准备处理文件: {file.filename}, 类型: {file.content_type}")
-        
-        if not files_to_process:
-            current_app.logger.error("没有有效的文件可以处理")
-            return jsonify({
-                'success': False,
-                'message': '没有有效的文件可以处理'
-            }), 400
-            
-        # 获取token_symbol，用于创建正确的目录结构
-        token_symbol = request.form.get('token_symbol', '')
-        current_app.logger.info(f"上传图片的token_symbol: {token_symbol}")
-        
-        # 尝试两种可能的上传路径
-        app_uploads_path = os.path.join(current_app.root_path, 'uploads')
-        static_uploads_path = os.path.join(current_app.static_folder, 'uploads')
-        
-        current_app.logger.info(f"检查可能的上传路径:")
-        current_app.logger.info(f"1. app uploads: {app_uploads_path}")
-        current_app.logger.info(f"2. static uploads: {static_uploads_path}")
-        
-        # 确定实际使用的上传基础路径
-        base_uploads_path = static_uploads_path if os.path.exists(static_uploads_path) else app_uploads_path
-        current_app.logger.info(f"选择的上传基础路径: {base_uploads_path}")
-        
-        # 确定存储路径
-        if token_symbol:
-            # 使用新的目录结构: /uploads/projects/{token_symbol}/images/
-            upload_folder = os.path.join(
-                base_uploads_path, 
-                'projects',
-                token_symbol,
-                'images'
-            )
-        else:
-            # 使用临时目录
-            current_app.logger.warning("未提供token_symbol，使用临时目录")
-            upload_folder = os.path.join(base_uploads_path, 'temp', 'images')
-            
-        # 检查并创建所有父目录
-        try:
-            # 确保上传基础目录存在
-            if not os.path.exists(base_uploads_path):
-                current_app.logger.warning(f"上传基础目录不存在，尝试创建: {base_uploads_path}")
-                os.makedirs(base_uploads_path, exist_ok=True)
-                
-            # 确保projects目录存在
-            projects_dir = os.path.join(base_uploads_path, 'projects')
-            if not os.path.exists(projects_dir):
-                current_app.logger.warning(f"projects目录不存在，尝试创建: {projects_dir}")
-                os.makedirs(projects_dir, exist_ok=True)
-            
-            # 如果使用临时目录，确保它存在
-            if not token_symbol:
-                temp_dir = os.path.join(base_uploads_path, 'temp')
-                if not os.path.exists(temp_dir):
-                    current_app.logger.warning(f"temp目录不存在，尝试创建: {temp_dir}")
-                    os.makedirs(temp_dir, exist_ok=True)
-                    
-                temp_images_dir = os.path.join(temp_dir, 'images')
-                if not os.path.exists(temp_images_dir):
-                    current_app.logger.warning(f"temp/images目录不存在，尝试创建: {temp_images_dir}")
-                    os.makedirs(temp_images_dir, exist_ok=True)
-            
-            # 确保最终的上传目录存在
-            current_app.logger.info(f"尝试创建上传目录: {upload_folder}")
-            os.makedirs(upload_folder, exist_ok=True)
-            current_app.logger.info(f"上传目录创建或确认成功: {upload_folder}")
-            
-            # 检查目录权限
-            if not os.access(upload_folder, os.W_OK):
-                current_app.logger.error(f"上传目录没有写入权限: {upload_folder}")
-                try:
-                    # 尝试修改权限
-                    import stat
-                    os.chmod(upload_folder, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)  # 777权限
-                    current_app.logger.info(f"已尝试修改目录权限: {upload_folder}")
-                    
-                    if not os.access(upload_folder, os.W_OK):
-                        current_app.logger.error(f"修改权限后，仍然没有写入权限: {upload_folder}")
-                        return jsonify({
-                            'success': False,
-                            'message': f'服务器目录权限错误，无法写入: {upload_folder}'
-                        }), 500
-                except Exception as perm_err:
-                    current_app.logger.error(f"修改目录权限失败: {str(perm_err)}")
-                    return jsonify({
-                        'success': False,
-                        'message': f'服务器目录权限错误，无法修复: {str(perm_err)}'
-                    }), 500
-        except PermissionError as pe:
-            current_app.logger.error(f"创建目录权限错误: {str(pe)}")
-            return jsonify({
-                'success': False,
-                'message': f'服务器权限错误: {str(pe)}'
-            }), 500
-        except Exception as e:
-            current_app.logger.error(f"创建目录失败: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': f'创建目录失败: {str(e)}'
-            }), 500
-        
-        # 处理所有上传的图片
-        image_paths = []
-        timestamp = int(time.time())
-        
-        for file in files_to_process:
-            if file and allowed_file(file.filename):
-                try:
-                    filename = secure_filename(file.filename)
-                    # 添加时间戳防止文件名冲突
-                    filename = f"{timestamp}_{filename}"
-                    file_path = os.path.join(upload_folder, filename)
-                    
-                    current_app.logger.info(f"准备保存文件: {file_path}")
-                    file.save(file_path)
-                    
-                    # 检查文件是否实际创建
-                    if os.path.exists(file_path):
-                        current_app.logger.info(f"文件保存成功: {file_path}, 大小: {os.path.getsize(file_path)} 字节")
-                    else:
-                        current_app.logger.error(f"文件保存失败，路径不存在: {file_path}")
-                        return jsonify({
-                            'success': False,
-                            'message': f'文件无法保存到服务器: {file_path}'
-                        }), 500
-                    
-                    # 构建相对路径，用于前端显示
-                    # 确保使用与前端一致的URL格式
-                    if token_symbol:
-                        # 使用项目路径
-                        relative_path = f"/static/uploads/projects/{token_symbol}/images/{filename}"
-                    else:
-                        relative_path = f"/static/uploads/temp/images/{filename}"
-                        
-                    image_paths.append(relative_path)
-                    current_app.logger.info(f"图片URL路径: {relative_path}")
-                except Exception as save_err:
-                    current_app.logger.error(f"保存文件时出错: {str(save_err)}")
-                    import traceback
-                    current_app.logger.error(traceback.format_exc())
-                    return jsonify({
-                        'success': False,
-                        'message': f'保存文件错误: {str(save_err)}'
-                    }), 500
-            else:
-                current_app.logger.warning(f"文件 {file.filename} 类型不允许，跳过")
-                
-        if len(image_paths) == 0:
-            current_app.logger.warning("所有文件处理完毕，但没有成功保存任何图片")
-            return jsonify({
-                'success': False,
-                'message': '没有成功保存任何图片，请检查文件类型是否被支持'
-            }), 400
-            
-        current_app.logger.info(f"成功上传 {len(image_paths)} 张图片: {image_paths}")
-        return jsonify({
-            'success': True,
-            'message': f'成功上传 {len(image_paths)} 张图片',
-            'image_paths': image_paths
-        })
-        
-    except Exception as e:
-        import traceback
-        current_app.logger.error(f"上传图片失败: {str(e)}")
-        current_app.logger.error(traceback.format_exc())
-        return jsonify({
-            'success': False,
-            'message': f'上传图片失败: {str(e)}'
-        }), 500
-
-@api_bp.route('/assets/<int:asset_id>/payment', methods=['POST'])
-@eth_address_required
-def process_asset_payment(asset_id):
-    """处理资产支付"""
-    try:
-        # 检查钱包连接状态
-        if not g.eth_address:
-            return jsonify({'error': '请先连接钱包'}), 401
-            
-        # 获取资产信息
-        asset = Asset.query.get_or_404(asset_id)
-        
-        # 验证请求者是资产创建者
-        if asset.creator_address != g.eth_address:
-            current_app.logger.warning(f"非资产创建者尝试处理支付: {g.eth_address}, 资产ID: {asset_id}")
-            return jsonify({'error': '只有资产创建者可以处理支付'}), 403
-            
-        # 获取支付数据
-        payment_data = request.json
-        if not payment_data:
-            return jsonify({'error': '无效的支付数据'}), 400
-            
-        current_app.logger.info(f"处理资产支付: {asset_id}, 数据: {payment_data}")
-        
-        # 验证支付数据
-        required_fields = ['amount', 'status', 'transaction_id']
-        for field in required_fields:
-            if field not in payment_data:
-                return jsonify({'error': f'缺少支付字段: {field}'}), 400
-                
-        # 检查支付状态
-        if payment_data.get('status') != 'confirmed':
-            return jsonify({'error': '支付未确认'}), 400
-            
-        # 检查支付金额
-        min_amount = float(os.environ.get('MIN_PAYMENT_AMOUNT', 100))
-        amount = float(payment_data.get('amount', 0))
-        if amount < min_amount:
-            return jsonify({'error': f'支付金额不足，最小金额: {min_amount} USDC'}), 400
-            
-        # 记录支付信息
-        asset.payment_details = json.dumps(payment_data)
-        asset.payment_confirmed = True
-        asset.payment_confirmed_at = datetime.utcnow()
-        
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': '支付处理成功'
-        })
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"处理资产支付失败: {str(e)}")
-        return jsonify({'error': f'处理支付失败: {str(e)}'}), 500
-
-@api_bp.route('/assets/<int:asset_id>/deploy', methods=['POST'])
-@eth_address_required
-def deploy_asset_to_blockchain(asset_id):
-    """部署资产到区块链"""
-    try:
-        # 导入资产服务
-        from app.blockchain import AssetService
-        
-        # 检查钱包连接状态
-        if not g.eth_address:
-            return jsonify({'error': '请先连接钱包'}), 401
-            
-        # 获取资产信息
-        asset = Asset.query.get_or_404(asset_id)
-        
-        # 验证请求者是资产创建者
-        if asset.creator_address != g.eth_address:
-            current_app.logger.warning(f"非资产创建者尝试上链: {g.eth_address}, 资产ID: {asset_id}")
-            return jsonify({'error': '只有资产创建者可以部署资产'}), 403
-            
-        # 检查资产是否已经上链
-        if asset.token_address:
-            current_app.logger.info(f"资产已经上链: {asset_id}, 代币地址: {asset.token_address}")
-            return jsonify({
-                'success': True,
-                'already_deployed': True,
-                'token_address': asset.token_address,
-                'message': '资产已经上链'
-            })
-            
-        # 检查支付状态
-        if not asset.payment_confirmed:
-            current_app.logger.warning(f"尝试上链未支付的资产: {asset_id}")
-            return jsonify({'error': '资产未完成支付，无法上链'}), 400
-            
-        current_app.logger.info(f"开始将资产部署到区块链: {asset_id}")
-        
-        # 创建资产服务实例
-        asset_service = AssetService()
-        
-        # 部署资产
-        deploy_result = asset_service.deploy_asset_to_blockchain(asset_id)
-        
-        if not deploy_result.get('success', False):
-            return jsonify({
-                'success': False,
-                'error': deploy_result.get('error', '部署失败')
-            }), 500
-            
-        return jsonify({
-            'success': True,
-            'token_address': deploy_result.get('token_address'),
-            'details': deploy_result.get('details', {}),
-            'message': '资产成功上链'
-        })
-    except Exception as e:
-        current_app.logger.error(f"部署资产到区块链失败: {str(e)}")
-        return jsonify({'error': f'部署资产失败: {str(e)}'}), 500
-
-@api_bp.route('/service/wallet/status')
-@eth_address_required
-def check_service_wallet_status():
-    """检查服务钱包状态"""
-    try:
-        from app.blockchain import AssetService
-        
-        # 获取钱包状态
-        status = AssetService.get_service_wallet_status()
-        
-        # 检查是否需要设置提示
-        if not status.get('success', False) and status.get('needs_setup', False):
-            # 添加帮助信息
-            status['setup_help'] = {
-                'instructions': '请确保在.env文件中正确配置了SOLANA_SERVICE_WALLET_MNEMONIC或SOLANA_SERVICE_WALLET_PRIVATE_KEY',
-                'example_env': 'SOLANA_NETWORK_URL=https://api.mainnet-beta.solana.com\nSOLANA_SERVICE_WALLET_MNEMONIC=word1 word2 ... word12',
-                'found_env_vars': status.get('env_vars_found', [])
-            }
-        
-        return jsonify(status)
-    except Exception as e:
-        current_app.logger.error(f"检查服务钱包状态失败: {str(e)}")
-        return jsonify({
-            'success': False, 
-            'error': f'检查钱包状态失败: {str(e)}',
-            'setup_help': {
-                'instructions': '发生异常。请确保正确安装了所有依赖: mnemonic、bip32utils、base58',
-                'command': 'pip install mnemonic==0.20 bip32utils==0.3.post4 base58==2.1.1'
-            }
-        }), 500
-
-@api_bp.route('/generate-token-symbol', methods=['POST'])
-def generate_token_symbol_api():
-    """生成代币代码"""
-    try:
+        # 添加查询资产的逻辑
         from app.models.asset import Asset
+        from app.models.holding import Holding
+        from app.models.user import User
+        from app.models.trade import Trade, TradeStatus
+        from sqlalchemy import or_
         
-        # 记录请求开始
-        current_app.logger.info("开始处理生成代币符号请求")
-        
-        # 验证请求数据
+        # 查询用户
+        user = None
         try:
-            data = request.get_json()
+            # 尝试查找用户 - 兼容不同地址大小写
+            if address.startswith('0x'):  # 以太坊地址
+                # 查询用户 - 同时匹配原始大小写和小写地址
+                user = User.query.filter(
+                    or_(
+                        User.eth_address == address,
+                        User.eth_address == address.lower()
+                    )
+                ).first()
+            else:  # Solana地址
+                user = User.query.filter_by(sol_address=address).first()
         except Exception as e:
-            current_app.logger.error(f"解析请求JSON数据失败: {str(e)}")
-            return jsonify({'success': False, 'error': '无效的请求格式'}), 400
+            current_app.logger.error(f'查询用户失败: {str(e)}')
             
-        if not data:
-            current_app.logger.error("生成代币符号失败: 无效的请求数据")
-            return jsonify({'success': False, 'error': '无效的请求数据'}), 400
+        # 如果找不到用户，尝试使用交易记录方式查询
+        if not user:
+            current_app.logger.info(f'未找到用户: {address}，尝试使用交易记录查询')
             
-        asset_type = data.get('type')
-        current_app.logger.info(f"正在为资产类型 {asset_type} 生成代币符号")
-        
-        if not asset_type:
-            current_app.logger.error("生成代币符号失败: 缺少资产类型参数")
-            return jsonify({'success': False, 'error': '缺少资产类型'}), 400
-        
-        # 确保资产类型是字符串格式
-        try:
-            asset_type = str(asset_type)
-            current_app.logger.info(f"转换后的资产类型: {asset_type}")
-        except Exception as e:
-            current_app.logger.error(f"转换资产类型为字符串失败: {str(e)}")
-            return jsonify({'success': False, 'error': f'资产类型格式错误: {str(e)}'}), 400
-            
-        # 生成随机数
-        try:
-            random_num = f"{random.randint(0, 9999):04d}"
-            token_symbol = f"RH-{asset_type}{random_num}"
-            current_app.logger.info(f"第一次尝试生成的代币符号: {token_symbol}")
-        except Exception as e:
-            current_app.logger.error(f"生成随机代币符号失败: {str(e)}")
-            # 使用时间戳作为备用方案
-            import time
-            token_symbol = f"RH-{asset_type}{int(time.time()) % 10000}"
-            current_app.logger.info(f"备用方案：使用时间戳生成的代币符号: {token_symbol}")
-        
-        # 检查是否已存在
-        try:
-            existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
-        except Exception as e:
-            current_app.logger.error(f"查询数据库检查代币符号是否存在时出错: {str(e)}")
-            # 使用更独特的标识符
-            import time
-            token_symbol = f"RH-{asset_type}{int(time.time() * 1000) % 10000}"
-            current_app.logger.info(f"查询失败后使用毫秒时间戳生成的代币符号: {token_symbol}")
-            return jsonify({'success': True, 'token_symbol': token_symbol})
-            
-        if existing_asset:
-            current_app.logger.info(f"代币符号 {token_symbol} 已存在，尝试第二次生成")
-            
-            # 如果已存在，再尝试生成一次
             try:
-                random_num = f"{random.randint(0, 9999):04d}"
-                token_symbol = f"RH-{asset_type}{random_num}"
-                current_app.logger.info(f"第二次尝试生成的代币符号: {token_symbol}")
-            except Exception as e:
-                current_app.logger.error(f"第二次生成随机代币符号失败: {str(e)}")
-                # 使用时间戳作为备用方案
-                import time
-                token_symbol = f"RH-{asset_type}{int(time.time()) % 10000}"
-                current_app.logger.info(f"第二次备用方案：使用时间戳生成的代币符号: {token_symbol}")
-            
-            # 再次检查
-            try:
-                existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
-            except Exception as e:
-                current_app.logger.error(f"第二次查询数据库检查代币符号是否存在时出错: {str(e)}")
-                # 使用更独特的标识符
-                import time
-                token_symbol = f"RH-{asset_type}{int(time.time() * 1000) % 10000}"
-                current_app.logger.info(f"第二次查询失败后使用毫秒时间戳生成的代币符号: {token_symbol}")
-                return jsonify({'success': True, 'token_symbol': token_symbol})
+                # 根据地址类型处理
+                if address.startswith('0x'):
+                    # ETH地址，查询原始大小写地址和小写地址
+                    completed_trades = Trade.query.filter(
+                        Trade.trader_address.in_([address, address.lower()]),
+                        Trade.status == TradeStatus.COMPLETED.value
+                    ).all()
+                else:
+                    # SOL地址或其他类型，查询原始地址（区分大小写）
+                    completed_trades = Trade.query.filter_by(
+                        trader_address=address,
+                        status=TradeStatus.COMPLETED.value
+                    ).all()
                 
-            if existing_asset:
-                current_app.logger.info(f"代币符号 {token_symbol} 依然存在，使用时间戳生成")
-                
-                # 如果依然存在，使用时间戳
-                try:
-                    import time
-                    timestamp = int(time.time())
-                    token_symbol = f"RH-{asset_type}{timestamp % 10000}"
-                    current_app.logger.info(f"使用时间戳生成的代币符号: {token_symbol}")
-                except Exception as e:
-                    current_app.logger.error(f"使用时间戳生成代币符号失败: {str(e)}")
-                    # 使用更加独特的标识符
-                    import time, uuid
-                    unique_id = str(uuid.uuid4())[:4]
-                    token_symbol = f"RH-{asset_type}{unique_id}"
-                    current_app.logger.info(f"使用UUID生成的代币符号: {token_symbol}")
-                
-                # 最后检查一次
-                try:
-                    existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
-                except Exception as e:
-                    current_app.logger.error(f"最终查询数据库检查代币符号是否存在时出错: {str(e)}")
-                    # 放弃检查，直接返回最新生成的符号
-                    return jsonify({'success': True, 'token_symbol': token_symbol})
+                # 按资产ID分组
+                assets_holdings = {}
+                for trade in completed_trades:
+                    asset_id = trade.asset_id
                     
-                if existing_asset:
-                    current_app.logger.error(f"无法生成唯一的代币符号，所有尝试都已存在")
-                    # 最终备用方案：使用UUID生成完全唯一的标识符
-                    import uuid
-                    unique_id = str(uuid.uuid4())[:6]
-                    token_symbol = f"RH-{asset_type}{unique_id}"
-                    current_app.logger.info(f"最终备用方案：使用UUID生成的代币符号: {token_symbol}")
-        
-        current_app.logger.info(f"成功生成代币符号: {token_symbol}")
-        return jsonify({'success': True, 'token_symbol': token_symbol})
-    except Exception as e:
-        import traceback
-        error_traceback = traceback.format_exc()
-        current_app.logger.error(f"生成代币符号失败: {str(e)}\n{error_traceback}")
-        
-        # 发生未知错误时，仍然尝试生成一个符号而不是返回500错误
-        try:
-            import time, uuid
-            asset_type = request.get_json().get('type', '00') if request.get_json() else '00'
-            unique_id = f"{int(time.time() % 10000)}-{str(uuid.uuid4())[:4]}"
-            emergency_token_symbol = f"RH-{asset_type}{unique_id}"
-            current_app.logger.info(f"紧急情况下生成的代币符号: {emergency_token_symbol}")
-            return jsonify({'success': True, 'token_symbol': emergency_token_symbol})
-        except Exception as fallback_error:
-            current_app.logger.error(f"最后的紧急备用生成也失败了: {str(fallback_error)}")
-            return jsonify({'success': False, 'error': f'生成代币符号失败，请重试'}), 500
-
-@api_bp.route('/assets/<int:asset_id>/distribute_dividend', methods=['POST'])
-@eth_address_required
-def distribute_dividend(asset_id):
-    """分发资产分红，但排除发行者持有的代币"""
-    try:
-        # 验证请求数据
-        data = request.get_json()
-        if not data or 'amount' not in data:
-            return jsonify({'success': False, 'error': '请提供分红金额'}), 400
-            
-        amount = float(data.get('amount', 0))
-        if amount <= 0:
-            return jsonify({'success': False, 'error': '分红金额必须大于0'}), 400
-            
-        # 获取发起请求的钱包地址
-        user_address = g.eth_address
-        
-        # 获取资产信息
-        asset = Asset.query.get(asset_id)
-        if not asset:
-            return jsonify({'success': False, 'error': '资产不存在'}), 404
-            
-        # 检查分红权限（只有管理员或资产所有者可以分红）
-        is_admin_user = is_admin(user_address)
-        is_asset_owner = is_same_wallet_address(asset.creator_address, user_address)
-        
-        if not (is_admin_user or is_asset_owner):
-            return jsonify({'success': False, 'error': '您没有权限为此资产分发分红'}), 403
-        
-        # 获取代币持有人信息（此处通常会从区块链上查询）
-        # 这里假设有一个从区块链获取持有人信息的函数
-        try:
-            # 实现从区块链获取持有人信息的逻辑
-            # 例如: holders = solana_client.get_token_holders(asset.token_address)
-            
-            # 由于没有具体实现，这里模拟一个示例数据
-            # 在实际实现中，这部分应替换为真实的查询逻辑
-            holders = [
-                {'address': 'wallet1', 'balance': 100},
-                {'address': 'wallet2', 'balance': 200},
-                {'address': 'wallet3', 'balance': 300},
-                {'address': asset.creator_address, 'balance': asset.remaining_supply},  # 发行者持有的剩余代币
-            ]
-            
-            # 计算总流通代币数量（排除发行者持有的代币）
-            total_circulating_supply = 0
-            filtered_holders = []
-            
-            for holder in holders:
-                # 如果持有人不是发行者，则计入流通代币
-                if not is_same_wallet_address(holder['address'], asset.creator_address):
-                    total_circulating_supply += holder['balance']
-                    filtered_holders.append(holder)
-            
-            # 如果没有流通代币，则返回错误
-            if total_circulating_supply == 0:
-                return jsonify({'success': False, 'error': '没有流通代币，无法分红'}), 400
+                    if asset_id not in assets_holdings:
+                        assets_holdings[asset_id] = {
+                            'asset_id': asset_id,
+                            'holding_amount': 0,
+                            'total_value': 0,
+                            'trades': []
+                        }
+                    
+                    # 根据交易类型增加或减少持有量
+                    if trade.type == 'buy':
+                        assets_holdings[asset_id]['holding_amount'] += trade.amount
+                        assets_holdings[asset_id]['total_value'] += float(trade.total or (trade.amount * trade.price))
+                    elif trade.type == 'sell':
+                        assets_holdings[asset_id]['holding_amount'] -= trade.amount
+                        assets_holdings[asset_id]['total_value'] -= float(trade.total or (trade.amount * trade.price))
+                    
+                    assets_holdings[asset_id]['trades'].append(trade)
                 
-            # 计算每个代币的分红金额
-            dividend_per_token = amount / total_circulating_supply
-            
-            # 为每个持有人（除发行者外）计算分红金额
-            dividend_distributions = []
-            for holder in filtered_holders:
-                holder_amount = holder['balance'] * dividend_per_token
-                dividend_distributions.append({
-                    'address': holder['address'],
-                    'amount': holder_amount,
-                    'token_count': holder['balance']
-                })
-                
-            # 创建分红记录
-            dividend_record = DividendRecord(
-                asset_id=asset.id,
-                amount=amount,
-                token_price=asset.token_price,
-                distributor_address=user_address,
-                holders_count=len(filtered_holders),
-                transaction_hash="记录已创建，等待上链确认",  # 实际中这会在上链后更新
-                details=json.dumps({
-                    'distributions': dividend_distributions,
-                    'dividend_per_token': dividend_per_token,
-                    'total_circulating_supply': total_circulating_supply
-                })
-            )
-            
-            db.session.add(dividend_record)
-            db.session.commit()
-            
-            # 这里应该有调用区块链接口实际执行分红的逻辑
-            # 例如: solana_client.distribute_dividend(asset.token_address, dividend_distributions)
-            
-            # 记录平台分红手续费（如果有）
-            fee_percentage = 1.0  # 假设手续费是1%
-            fee_amount = amount * (fee_percentage / 100)
-            record_income(IncomeType.DIVIDEND, fee_amount, f"资产{asset.token_symbol}分红手续费")
-            
-            return jsonify({
-                'success': True,
-                'message': f'成功分发{amount}单位的分红至{len(filtered_holders)}个地址',
-                'dividend_record_id': dividend_record.id,
-                'details': {
-                    'total_amount': amount,
-                    'dividend_per_token': dividend_per_token,
-                    'holders_count': len(filtered_holders),
-                    'total_circulating_supply': total_circulating_supply,
-                    'excluded_supply': asset.remaining_supply
-                }
-            })
-            
-        except Exception as e:
-            current_app.logger.error(f"获取代币持有人信息失败: {str(e)}")
-            return jsonify({'success': False, 'error': f'获取代币持有人信息失败: {str(e)}'}), 500
-            
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"分发分红失败: {str(e)}")
-        return jsonify({'success': False, 'error': f'分发分红失败: {str(e)}'}), 500
-
-# 添加通过token_symbol访问的端点
-@api_bp.route('/assets/symbol/<string:token_symbol>/distribute_dividend', methods=['POST'])
-@eth_address_required
-def distribute_dividend_by_symbol(token_symbol):
-    """通过代币符号分发资产分红（重定向到ID版本）"""
-    asset = Asset.query.filter_by(token_symbol=token_symbol).first()
-    if not asset:
-        return jsonify({'success': False, 'error': '资产不存在'}), 404
-        
-    return distribute_dividend(asset.id)
-
-# 保留原有的用户资产API（使用请求头/认证中间件）
-@api_bp.route('/user/assets/auth')
-@eth_address_required
-def get_user_assets():
-    """获取用户持有的资产数据（使用eth_address_required中间件）"""
-    try:
-        # 获取用户地址
-        user_address = g.eth_address
-        
-        # 记录当前请求的钱包地址，用于调试
-        current_app.logger.info(f'正在为钱包地址获取资产: {user_address} (通过认证)')
-        
-        # 根据地址类型处理
-        if user_address.startswith('0x'):
-            # ETH地址，查询原始大小写地址和小写地址
-            completed_trades = Trade.query.filter(
-                Trade.trader_address.in_([user_address, user_address.lower()]),
-                Trade.status == TradeStatus.COMPLETED.value
-            ).all()
-        else:
-            # SOL地址或其他类型，查询原始地址（区分大小写）
-            try:
-                completed_trades = Trade.query.filter_by(
-                    trader_address=user_address,
-                    status=TradeStatus.COMPLETED.value
-                ).all()
-            except Exception as db_error:
-                current_app.logger.error(f'数据库查询失败: {str(db_error)}', exc_info=True)
-                # 返回空数组而不是抛出错误
-                return jsonify([]), 200
-        
-        # 按资产ID分组
-        assets_holdings = {}
-        for trade in completed_trades:
-            asset_id = trade.asset_id
-            
-            if asset_id not in assets_holdings:
-                assets_holdings[asset_id] = {
-                    'asset_id': asset_id,
-                    'holding_amount': 0,
-                    'total_value': 0,
-                    'trades': []
-                }
-            
-            # 根据交易类型增加或减少持有量
-            if trade.type == 'buy':
-                assets_holdings[asset_id]['holding_amount'] += trade.amount
-                assets_holdings[asset_id]['total_value'] += float(trade.total or (trade.amount * trade.price))
-            elif trade.type == 'sell':
-                assets_holdings[asset_id]['holding_amount'] -= trade.amount
-                assets_holdings[asset_id]['total_value'] -= float(trade.total or (trade.amount * trade.price))
-            
-            assets_holdings[asset_id]['trades'].append(trade)
-        
-        # 获取资产详情并组装返回数据
-        user_assets = []
-        for asset_id, holding_data in assets_holdings.items():
-            # 只返回持有量大于0的资产
-            if holding_data['holding_amount'] <= 0:
-                continue
-                
-            try:
-                asset = Asset.query.get(asset_id)
-                if not asset:
-                    continue
-                
-                # 处理图片URL
-                image_url = None
-                if asset.images:
+                # 获取资产详情并组装返回数据
+                user_assets = []
+                for asset_id, holding_data in assets_holdings.items():
+                    # 只返回持有量大于0的资产
+                    if holding_data['holding_amount'] <= 0:
+                        continue
+                        
                     try:
-                        # 解析JSON字符串
-                        if isinstance(asset.images, str):
-                            images = json.loads(asset.images)
-                            if images and len(images) > 0:
-                                image_url = images[0]
-                        # 已经是列表的情况
-                        elif isinstance(asset.images, list) and len(asset.images) > 0:
-                            image_url = asset.images[0]
-                    except Exception as e:
-                        current_app.logger.error(f'解析图片URL失败: {e}')
-                        # 如果解析失败，尝试直接使用
-                        if isinstance(asset.images, str) and asset.images.startswith('/'):
-                            image_url = asset.images
-                    
-                # 计算平均成本和当前价值
-                avg_cost = holding_data['total_value'] / holding_data['holding_amount'] if holding_data['holding_amount'] > 0 else 0
-                current_value = holding_data['holding_amount'] * float(asset.token_price)
+                        asset = Asset.query.get(asset_id)
+                        if not asset:
+                            continue
+                        
+                        # 处理图片URL
+                        image_url = None
+                        if asset.images:
+                            try:
+                                # 解析JSON字符串
+                                if isinstance(asset.images, str):
+                                    images = json.loads(asset.images)
+                                    if images and len(images) > 0:
+                                        image_url = images[0]
+                                # 已经是列表的情况
+                                elif isinstance(asset.images, list) and len(asset.images) > 0:
+                                    image_url = asset.images[0]
+                            except Exception as e:
+                                current_app.logger.error(f'解析图片URL失败: {e}')
+                                # 如果解析失败，尝试直接使用
+                                if isinstance(asset.images, str) and asset.images.startswith('/'):
+                                    image_url = asset.images
+                            
+                        # 计算平均成本和当前价值
+                        avg_cost = holding_data['total_value'] / holding_data['holding_amount'] if holding_data['holding_amount'] > 0 else 0
+                        current_value = holding_data['holding_amount'] * float(asset.token_price)
+                        
+                        user_assets.append({
+                            'asset_id': asset_id,
+                            'name': asset.name,
+                            'image_url': image_url,
+                            'token_symbol': asset.token_symbol,
+                            'holding_amount': holding_data['holding_amount'],
+                            'total_supply': asset.token_supply,
+                            'holding_percentage': (holding_data['holding_amount'] / asset.token_supply) * 100 if asset.token_supply > 0 else 0,
+                            'avg_cost': round(avg_cost, 6),
+                            'current_price': float(asset.token_price),
+                            'total_value': current_value,
+                            'profit_loss': current_value - holding_data['total_value'],
+                            'profit_loss_percentage': ((current_value / holding_data['total_value']) - 1) * 100 if holding_data['total_value'] > 0 else 0
+                        })
+                    except Exception as asset_error:
+                        current_app.logger.error(f'处理资产 {asset_id} 时发生错误: {str(asset_error)}', exc_info=True)
+                        continue
                 
-                user_assets.append({
-                    'asset_id': asset_id,
-                    'name': asset.name,
-                    'image_url': image_url,
-                    'token_symbol': asset.token_symbol,
-                    'holding_amount': holding_data['holding_amount'],
-                    'total_supply': asset.token_supply,
-                    'holding_percentage': (holding_data['holding_amount'] / asset.token_supply) * 100 if asset.token_supply > 0 else 0,
-                    'avg_cost': round(avg_cost, 6),
-                    'current_price': float(asset.token_price),
-                    'total_value': current_value,
-                    'profit_loss': current_value - holding_data['total_value'],
-                    'profit_loss_percentage': ((current_value / holding_data['total_value']) - 1) * 100 if holding_data['total_value'] > 0 else 0
-                })
-            except Exception as asset_error:
-                current_app.logger.error(f'处理资产 {asset_id} 时发生错误: {str(asset_error)}', exc_info=True)
+                # 按持有价值降序排序
+                user_assets.sort(key=lambda x: x['total_value'], reverse=True)
+                
+                current_app.logger.info(f'通过交易记录找到了 {len(user_assets)} 个资产')
+                return jsonify(user_assets), 200
+            except Exception as trade_error:
+                current_app.logger.error(f'通过交易记录查询失败: {str(trade_error)}', exc_info=True)
+                return jsonify([]), 200
+            
+        current_app.logger.info(f'找到用户 ID: {user.id}，查询其资产')
+        
+        # 查询用户持有的资产
+        holdings = Holding.query.filter_by(user_id=user.id).all()
+        
+        # 如果没有持有资产，返回空数组
+        if not holdings:
+            current_app.logger.info(f'用户 {user.id} 没有持有资产，返回空数组')
+            return jsonify([]), 200
+            
+        # 准备返回的资产数据
+        result = []
+        
+        for holding in holdings:
+            # 查询资产详情
+            asset = Asset.query.get(holding.asset_id)
+            if not asset:
                 continue
+                
+            # 构建资产数据
+            asset_data = {
+                'asset_id': asset.id,
+                'name': asset.name,
+                'symbol': asset.symbol,
+                'quantity': holding.quantity,
+                'price': asset.current_price,
+                'token_symbol': asset.token_symbol,
+                'total_supply': asset.token_supply,
+                'current_price': float(asset.token_price),
+                'total_value': holding.quantity * float(asset.token_price)
+            }
+            result.append(asset_data)
+            
+        current_app.logger.info(f'返回用户 {user.id} 的 {len(result)} 个资产')
+        return jsonify(result), 200
         
-        # 按持有价值降序排序
-        user_assets.sort(key=lambda x: x['total_value'], reverse=True)
-        
-        return jsonify(user_assets), 200
     except Exception as e:
         current_app.logger.error(f'获取用户资产失败: {str(e)}', exc_info=True)
-        # 返回空数组和200状态码，而不是500错误
         return jsonify([]), 200
 
 @api_bp.route('/payments/register_pending', methods=['POST'])
