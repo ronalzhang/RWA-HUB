@@ -17,7 +17,7 @@ def list_assets():
     try:
         current_app.logger.info("请求资产列表")
         return jsonify([]), 200
-    except Exception as e:
+            except Exception as e:
         current_app.logger.error(f"获取资产列表失败: {str(e)}")
         return jsonify([]), 200
 
@@ -63,103 +63,103 @@ def get_user_assets_query():
             current_app.logger.info(f'未找到用户: {address}，尝试使用交易记录查询')
         
             try:
-                # 根据地址类型处理
+        # 根据地址类型处理
                 if wallet_type.lower() == 'ethereum':
-                    # ETH地址，查询原始大小写地址和小写地址
-                    completed_trades = Trade.query.filter(
+            # ETH地址，查询原始大小写地址和小写地址
+            completed_trades = Trade.query.filter(
                         Trade.trader_address.in_([address, address.lower()]),
-                        Trade.status == TradeStatus.COMPLETED.value
-                    ).all()
-                else:
-                    # SOL地址或其他类型，查询原始地址（区分大小写）
-                    completed_trades = Trade.query.filter_by(
+                Trade.status == TradeStatus.COMPLETED.value
+            ).all()
+        else:
+            # SOL地址或其他类型，查询原始地址（区分大小写）
+                completed_trades = Trade.query.filter_by(
                         trader_address=address,
-                        status=TradeStatus.COMPLETED.value
-                    ).all()
+                    status=TradeStatus.COMPLETED.value
+                ).all()
+        
+        # 按资产ID分组
+        assets_holdings = {}
+        for trade in completed_trades:
+            asset_id = trade.asset_id
+            
+            if asset_id not in assets_holdings:
+                assets_holdings[asset_id] = {
+                    'asset_id': asset_id,
+                    'holding_amount': 0,
+                    'total_value': 0,
+                    'trades': []
+                }
+            
+            # 根据交易类型增加或减少持有量
+            if trade.type == 'buy':
+                assets_holdings[asset_id]['holding_amount'] += trade.amount
+                assets_holdings[asset_id]['total_value'] += float(trade.total or (trade.amount * trade.price))
+            elif trade.type == 'sell':
+                assets_holdings[asset_id]['holding_amount'] -= trade.amount
+                assets_holdings[asset_id]['total_value'] -= float(trade.total or (trade.amount * trade.price))
+            
+            assets_holdings[asset_id]['trades'].append(trade)
+        
+        # 获取资产详情并组装返回数据
+        user_assets = []
+        for asset_id, holding_data in assets_holdings.items():
+            # 只返回持有量大于0的资产
+            if holding_data['holding_amount'] <= 0:
+                continue
                 
-                # 按资产ID分组
-                assets_holdings = {}
-                for trade in completed_trades:
-                    asset_id = trade.asset_id
-                    
-                    if asset_id not in assets_holdings:
-                        assets_holdings[asset_id] = {
-                            'asset_id': asset_id,
-                            'holding_amount': 0,
-                            'total_value': 0,
-                            'trades': []
-                        }
-                    
-                    # 根据交易类型增加或减少持有量
-                    if trade.type == 'buy':
-                        assets_holdings[asset_id]['holding_amount'] += trade.amount
-                        assets_holdings[asset_id]['total_value'] += float(trade.total or (trade.amount * trade.price))
-                    elif trade.type == 'sell':
-                        assets_holdings[asset_id]['holding_amount'] -= trade.amount
-                        assets_holdings[asset_id]['total_value'] -= float(trade.total or (trade.amount * trade.price))
-                    
-                    assets_holdings[asset_id]['trades'].append(trade)
+            try:
+                asset = Asset.query.get(asset_id)
+                if not asset:
+                    continue
                 
-                # 获取资产详情并组装返回数据
-                user_assets = []
-                for asset_id, holding_data in assets_holdings.items():
-                    # 只返回持有量大于0的资产
-                    if holding_data['holding_amount'] <= 0:
-                        continue
-                        
-                    try:
-                        asset = Asset.query.get(asset_id)
-                        if not asset:
-                            continue
-                        
-                        # 处理图片URL
-                        image_url = None
+                # 处理图片URL
+                image_url = None
                         if hasattr(asset, 'images') and asset.images:
-                            try:
-                                # 解析JSON字符串
-                                if isinstance(asset.images, str):
-                                    images = json.loads(asset.images)
-                                    if images and len(images) > 0:
-                                        image_url = images[0]
-                                # 已经是列表的情况
-                                elif isinstance(asset.images, list) and len(asset.images) > 0:
-                                    image_url = asset.images[0]
-                            except Exception as e:
-                                current_app.logger.error(f'解析图片URL失败: {e}')
-                                # 如果解析失败，尝试直接使用
-                                if isinstance(asset.images, str) and asset.images.startswith('/'):
-                                    image_url = asset.images
-                            
-                        # 计算平均成本和当前价值
-                        avg_cost = holding_data['total_value'] / holding_data['holding_amount'] if holding_data['holding_amount'] > 0 else 0
-                        current_value = holding_data['holding_amount'] * float(asset.token_price)
-                        
-                        user_assets.append({
-                            'asset_id': asset_id,
-                            'name': asset.name,
-                            'image_url': image_url,
-                            'token_symbol': asset.token_symbol,
-                            'holding_amount': holding_data['holding_amount'],
-                            'total_supply': asset.token_supply,
-                            'holding_percentage': (holding_data['holding_amount'] / asset.token_supply) * 100 if asset.token_supply > 0 else 0,
-                            'avg_cost': round(avg_cost, 6),
-                            'current_price': float(asset.token_price),
-                            'total_value': current_value,
-                            'profit_loss': current_value - holding_data['total_value'],
-                            'profit_loss_percentage': ((current_value / holding_data['total_value']) - 1) * 100 if holding_data['total_value'] > 0 else 0
-                        })
-                    except Exception as asset_error:
-                        current_app.logger.error(f'处理资产 {asset_id} 时发生错误: {str(asset_error)}', exc_info=True)
-                        continue
+                    try:
+                        # 解析JSON字符串
+                        if isinstance(asset.images, str):
+                            images = json.loads(asset.images)
+                            if images and len(images) > 0:
+                                image_url = images[0]
+                        # 已经是列表的情况
+                        elif isinstance(asset.images, list) and len(asset.images) > 0:
+                            image_url = asset.images[0]
+                    except Exception as e:
+                        current_app.logger.error(f'解析图片URL失败: {e}')
+                        # 如果解析失败，尝试直接使用
+                        if isinstance(asset.images, str) and asset.images.startswith('/'):
+                            image_url = asset.images
+                    
+                # 计算平均成本和当前价值
+                avg_cost = holding_data['total_value'] / holding_data['holding_amount'] if holding_data['holding_amount'] > 0 else 0
+                current_value = holding_data['holding_amount'] * float(asset.token_price)
                 
-                # 按持有价值降序排序
-                user_assets.sort(key=lambda x: x['total_value'], reverse=True)
-                
+                user_assets.append({
+                    'asset_id': asset_id,
+                    'name': asset.name,
+                    'image_url': image_url,
+                    'token_symbol': asset.token_symbol,
+                    'holding_amount': holding_data['holding_amount'],
+                    'total_supply': asset.token_supply,
+                    'holding_percentage': (holding_data['holding_amount'] / asset.token_supply) * 100 if asset.token_supply > 0 else 0,
+                    'avg_cost': round(avg_cost, 6),
+                    'current_price': float(asset.token_price),
+                    'total_value': current_value,
+                    'profit_loss': current_value - holding_data['total_value'],
+                    'profit_loss_percentage': ((current_value / holding_data['total_value']) - 1) * 100 if holding_data['total_value'] > 0 else 0
+                })
+            except Exception as asset_error:
+                current_app.logger.error(f'处理资产 {asset_id} 时发生错误: {str(asset_error)}', exc_info=True)
+                continue
+        
+        # 按持有价值降序排序
+        user_assets.sort(key=lambda x: x['total_value'], reverse=True)
+        
                 current_app.logger.info(f'通过交易记录找到了 {len(user_assets)} 个资产')
-                return jsonify(user_assets), 200
+        return jsonify(user_assets), 200
             except Exception as trade_error:
                 current_app.logger.error(f'通过交易记录查询失败: {str(trade_error)}', exc_info=True)
-                return jsonify([]), 200
+        return jsonify([]), 200
 
         current_app.logger.info(f'找到用户 ID: {user.id}，查询其资产')
         
@@ -177,7 +177,7 @@ def get_user_assets_query():
         for holding in holdings:
             # 查询资产详情
             asset = Asset.query.get(holding.asset_id)
-            if not asset:
+        if not asset:
                 continue
                 
             # 构建资产数据
@@ -193,7 +193,7 @@ def get_user_assets_query():
                     # 已经是列表的情况
                     elif isinstance(asset.images, list) and len(asset.images) > 0:
                         image_url = asset.images[0]
-                except Exception as e:
+        except Exception as e:
                     current_app.logger.error(f'解析图片URL失败: {e}')
                     # 如果解析失败，尝试直接使用
                     if isinstance(asset.images, str) and asset.images.startswith('/'):
@@ -249,7 +249,7 @@ def get_user_assets(address):
                 ).first()
             else:  # Solana地址
                 user = User.query.filter_by(sol_address=address).first()
-        except Exception as e:
+    except Exception as e:
             current_app.logger.error(f'查询用户失败: {str(e)}')
             
         # 如果找不到用户，尝试使用交易记录方式查询
@@ -264,7 +264,7 @@ def get_user_assets(address):
                         Trade.trader_address.in_([address, address.lower()]),
                         Trade.status == TradeStatus.COMPLETED.value
                     ).all()
-                else:
+            else:
                     # SOL地址或其他类型，查询原始地址（区分大小写）
                     completed_trades = Trade.query.filter_by(
                         trader_address=address,
@@ -302,8 +302,8 @@ def get_user_assets(address):
                         continue
                         
                     try:
-                        asset = Asset.query.get(asset_id)
-                        if not asset:
+        asset = Asset.query.get(asset_id)
+        if not asset:
                             continue
                         
                         # 处理图片URL
@@ -318,7 +318,7 @@ def get_user_assets(address):
                                 # 已经是列表的情况
                                 elif isinstance(asset.images, list) and len(asset.images) > 0:
                                     image_url = asset.images[0]
-                            except Exception as e:
+        except Exception as e:
                                 current_app.logger.error(f'解析图片URL失败: {e}')
                                 # 如果解析失败，尝试直接使用
                                 if isinstance(asset.images, str) and asset.images.startswith('/'):
@@ -371,7 +371,7 @@ def get_user_assets(address):
         for holding in holdings:
             # 查询资产详情
             asset = Asset.query.get(holding.asset_id)
-            if not asset:
+        if not asset:
                 continue
                 
             # 构建资产数据
@@ -387,7 +387,7 @@ def get_user_assets(address):
                     # 已经是列表的情况
                     elif isinstance(asset.images, list) and len(asset.images) > 0:
                         image_url = asset.images[0]
-                except Exception as e:
+    except Exception as e:
                     current_app.logger.error(f'解析图片URL失败: {e}')
                     # 如果解析失败，尝试直接使用
                     if isinstance(asset.images, str) and asset.images.startswith('/'):
