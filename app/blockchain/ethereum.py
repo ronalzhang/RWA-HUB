@@ -11,15 +11,18 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 # 环境配置
-ETH_RPC_URL = Config.ETH_RPC_URL or "https://rpc.ankr.com/eth"
+ETH_RPC_URL = Config.ETH_RPC_URL or "https://ethereum.publicnode.com"  # 使用免费的公共节点
 USDC_CONTRACT = Config.ETH_USDC_CONTRACT or "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
 
 # 初始化Web3
 try:
     web3 = Web3(Web3.HTTPProvider(ETH_RPC_URL))
-    logger.info(f"已连接到以太坊网络: {ETH_RPC_URL}，链ID: {web3.eth.chain_id}")
+    # 测试连接
+    chain_id = web3.eth.chain_id
+    logger.info(f"已连接到以太坊网络: {ETH_RPC_URL}，链ID: {chain_id}")
 except Exception as e:
     logger.error(f"连接以太坊网络失败: {str(e)}")
+    logger.warning("将使用模拟模式进行以太坊操作")
     web3 = None
 
 # 模拟函数，实际项目中应使用web3.py与以太坊交互

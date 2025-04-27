@@ -1,9 +1,9 @@
 import logging
 import os
+from waitress import serve
 from app import create_app, db
 from sqlalchemy.exc import OperationalError
 from flask_migrate import upgrade
-from waitress import serve
 
 # 配置详细的日志格式
 logging.basicConfig(
