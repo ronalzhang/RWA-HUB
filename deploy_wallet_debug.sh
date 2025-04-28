@@ -6,8 +6,8 @@
 SERVER="47.236.39.134"
 SSH_KEY="vincent.pem"
 REMOTE_USER="root"
-STATIC_DIR="/var/www/html/app/static/js"
-TEMPLATES_DIR="/var/www/html/app/templates"
+STATIC_DIR="/var/www/RWA-HUB/app/static/js"
+TEMPLATES_DIR="/var/www/RWA-HUB/app/templates"
 LOCAL_JS="app/static/js/wallet_debug.js"
 
 # 显示脚本信息
