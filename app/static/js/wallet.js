@@ -192,6 +192,12 @@ const walletState = {
                 }
             });
             
+            // 确保钱包状态与本地存储一致
+            this.checkWalletConsistency();
+            
+            // 设置定期检查
+            setInterval(() => this.checkWalletConsistency(), 5000);
+            
             // 完成初始化
             this.initialized = true;
             console.log('钱包初始化完成');
@@ -200,6 +206,88 @@ const walletState = {
         } catch (error) {
             console.error('初始化钱包出错:', error);
             return false;
+        }
+    },
+    
+    // 确保钱包状态与本地存储一致
+    checkWalletConsistency() {
+        try {
+            // 检查本地存储
+            const storedAddress = localStorage.getItem('walletAddress');
+            const storedType = localStorage.getItem('walletType');
+            
+            if (storedAddress && storedType) {
+                // 本地存储有钱包信息，但状态对象显示未连接
+                if (!this.connected || !this.address) {
+                    console.log('检测到状态不一致：本地存储有钱包信息但状态显示未连接');
+                    this.connected = true;
+                    this.address = storedAddress;
+                    this.walletType = storedType;
+                    
+                    // 更新UI
+                    this.updateUI();
+                }
+            } else {
+                // 本地存储没有钱包信息，但状态对象显示已连接
+                if (this.connected && this.address) {
+                    console.log('检测到状态不一致：状态显示已连接但本地存储无钱包信息');
+                    this.connected = false;
+                    this.address = null;
+                    this.walletType = null;
+                    this.balance = null;
+                    
+                    // 更新UI
+                    this.updateUI();
+                }
+            }
+            
+            // 为全局一致性保留数据
+            if (this.connected && this.address && this.walletType) {
+                if (!localStorage.getItem('walletAddress') || !localStorage.getItem('walletType')) {
+                    localStorage.setItem('walletAddress', this.address);
+                    localStorage.setItem('walletType', this.walletType);
+                }
+            }
+        } catch (err) {
+            console.error('钱包状态一致性检查失败:', err);
+        }
+    },
+    
+    // 为资产详情页提供的购买按钮状态更新函数
+    updateDetailPageButtonState() {
+        console.log('购买按钮状态更新函数被调用');
+        
+        // 先确保钱包状态一致
+        this.checkWalletConsistency();
+        
+        // 获取购买按钮
+        const buyButton = document.getElementById('buy-button');
+        if (!buyButton) {
+            console.warn('找不到购买按钮元素，无法更新状态');
+            return;
+        }
+        
+        // 检查钱包是否已连接
+        const isConnected = this.connected && this.address;
+        
+        // 更新购买按钮状态
+        if (isConnected) {
+            buyButton.disabled = false;
+            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>购买';
+            buyButton.removeAttribute('title');
+        } else {
+            buyButton.disabled = true;
+            buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
+            buyButton.title = '请先连接钱包';
+        }
+        
+        // 如果存在分红按钮检查函数，也一并调用
+        if (typeof window.checkDividendManagementAccess === 'function') {
+            try {
+                window.checkDividendManagementAccess();
+            } catch (error) {
+                console.error('分红按钮检查失败:', error);
+            }
         }
     },
     
@@ -4566,3 +4654,27 @@ function confirmPurchase() {
         console.error('检查钱包应用返回状态出错:', error);
     }
 })();
+
+// 在DOM加载完成后初始化钱包
+document.addEventListener('DOMContentLoaded', () => {
+    // 初始化钱包
+    walletState.init();
+    
+    // 暴露全局函数供资产详情页使用
+    window.updateBuyButtonStateGlobal = function() {
+        return walletState.updateDetailPageButtonState();
+    };
+    
+    // 暴露全局函数用于检查钱包状态一致性
+    window.checkWalletConsistency = function() {
+        return walletState.checkWalletConsistency();
+    };
+    
+    // 每10秒定期检查钱包状态一致性
+    setInterval(() => {
+        walletState.checkWalletConsistency();
+    }, 10000);
+    
+    console.log('钱包全局函数初始化完成');
+});
+
