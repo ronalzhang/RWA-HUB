@@ -1226,77 +1226,33 @@
     
     <!-- 公共JavaScript文件 -->
     <script src="{{ url_for('static', filename='js/wallet.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/wallet_fix.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/wallet_debug.js') }}"></script>
     
-    <!-- 钱包连接修复脚本 -->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('钱包修复脚本已加载');
+        // 等待钱包脚本加载完成后执行修复
+        document.addEventListener('walletScriptLoaded', function repairWalletState() {
+            console.log('正在修复钱包状态...');
             
-            // 检查并修复钱包连接状态
-            function repairWalletState() {
-                try {
-                    // 确保walletState对象存在
-                    if (typeof walletState === 'undefined') {
-                        console.warn('钱包状态对象不存在，创建新实例');
-                        window.walletState = {
-                            connected: false,
-                            address: '',
-                            balance: 0,
-                            network: '',
-                            wallet_type: '',
-                            checking: false,
-                            listeners: []
-                        };
-                    }
-                    
-                    // 修复无效的状态值
-                    if (walletState.connected && (!walletState.address || walletState.address === '')) {
-                        console.warn('检测到无效钱包状态: connected=true但address为空');
-                        walletState.connected = false;
-                    }
-                    
-                    // 如果localStorage中有钱包信息但当前未连接，尝试恢复连接
-                    const savedWalletType = localStorage.getItem('walletType');
-                    const savedWalletAddress = localStorage.getItem('walletAddress');
-                    
-                    if (savedWalletType && savedWalletAddress && !walletState.connected) {
-                        console.log('尝试恢复钱包连接:', savedWalletType, savedWalletAddress);
-                        
-                        // 设置临时状态，表示钱包需要重新连接
-                        walletState.wallet_type = savedWalletType;
-                        walletState.address = savedWalletAddress;
-                        
-                        // 在页面加载完成后延迟执行连接恢复
-                        setTimeout(() => {
-                            try {
-                                if (typeof connectWallet === 'function') {
-                                    console.log('尝试重新连接钱包');
-                                    connectWallet(savedWalletType);
-                                }
-                            } catch (err) {
-                                console.error('钱包重连失败:', err);
-                            }
-                        }, 1500);
-                    }
-                    
-                    // 添加额外的事件监听以确保状态同步
-                    window.addEventListener('focus', function() {
-                        // 当页面重新获得焦点时检查钱包连接状态
-                        if (walletState.connected && typeof checkWalletConnection === 'function') {
-                            setTimeout(checkWalletConnection, 200);
+            if (window.walletState) {
+                // 修复钱包状态更新方法
+                const originalUpdateWalletStatus = window.walletState.updateWalletStatus;
+                window.walletState.updateWalletStatus = function() {
+                    const result = originalUpdateWalletStatus.apply(this, arguments);
+                    // 尝试调用统一的购买按钮更新方法
+                    if (typeof window.updateBuyButtonState === 'function') {
+                        try {
+                            window.updateBuyButtonState();
+                        } catch (e) {
+                            console.error('自动更新购买按钮失败:', e);
                         }
-                    });
-                    
-                } catch (err) {
-                    console.error('钱包修复脚本执行出错:', err);
-                }
+                    }
+                    return result;
+                };
+                console.log('钱包状态修复完成');
+            } else {
+                console.warn('找不到钱包状态对象，无法修复');
             }
-            
-            // 执行修复
-            repairWalletState();
-            
-            // 监听wallet.js加载完成事件
-            document.addEventListener('walletScriptLoaded', repairWalletState);
         });
     </script>
     
