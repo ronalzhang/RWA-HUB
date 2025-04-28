@@ -1,6 +1,6 @@
 /**
  * wallet_fix.js - 钱包连接修复脚本
- * 版本: 1.1.0
+ * 版本: 1.1.1
  * 作用: 修复钱包连接状态同步和UI更新问题
  */
 
@@ -278,6 +278,138 @@
     return window.walletState;
   }
   
+  // 修复移动端钱包连接问题
+  function fixMobileWalletConnection() {
+    if (!window.wallet || typeof window.wallet.isMobile !== 'function' || !window.wallet.isMobile()) {
+      return; // 不是移动设备，不需要修复
+    }
+
+    log('初始化移动端钱包连接修复');
+
+    // 增强从钱包APP返回后的连接处理
+    window.addEventListener('visibilitychange', async function() {
+      if (document.visibilityState === 'visible') {
+        log('页面变为可见，检查是否从钱包APP返回');
+        
+        // 检查是否有待处理的钱包连接
+        const pendingWalletType = localStorage.getItem('pendingWalletType');
+        const pendingWalletConnection = localStorage.getItem('pendingWalletConnection');
+        const pendingWalletTimestamp = localStorage.getItem('pendingWalletTimestamp');
+        
+        if (pendingWalletType && pendingWalletConnection === 'true') {
+          const timestamp = parseInt(pendingWalletTimestamp, 10);
+          const now = Date.now();
+          const timeDiff = now - timestamp;
+          
+          if (timeDiff <= 5 * 60 * 1000) { // 5分钟内有效
+            log(`检测到从${pendingWalletType}钱包APP返回，尝试主动连接`);
+            
+            // 延迟一点时间执行，确保钱包APP有足够时间初始化
+            setTimeout(async () => {
+              try {
+                // 检查特定钱包类型
+                if (pendingWalletType.toLowerCase() === 'phantom') {
+                  // 检查Phantom钱包是否已在页面初始化
+                  if (window.solana && window.solana.isPhantom) {
+                    log('Phantom钱包已初始化，尝试连接');
+                    
+                    try {
+                      // 尝试连接已授权的钱包（更轻量级的调用）
+                      const response = await window.solana.connect({ onlyIfTrusted: true }).catch(() => null);
+                      
+                      if (response && response.publicKey) {
+                        log('成功连接到已授权的Phantom钱包', response.publicKey.toString());
+                        
+                        // 如果wallet对象存在，更新钱包状态
+                        if (window.wallet && typeof window.wallet.afterSuccessfulConnection === 'function') {
+                          window.wallet.afterSuccessfulConnection(
+                            response.publicKey.toString(), 
+                            'phantom', 
+                            window.solana
+                          );
+                        }
+                      } else {
+                        // 如果onlyIfTrusted失败，尝试常规连接
+                        log('尝试标准Phantom连接');
+                        const fullResponse = await window.solana.connect();
+                        
+                        if (fullResponse && fullResponse.publicKey) {
+                          log('成功连接到Phantom钱包', fullResponse.publicKey.toString());
+                          
+                          if (window.wallet && typeof window.wallet.afterSuccessfulConnection === 'function') {
+                            window.wallet.afterSuccessfulConnection(
+                              fullResponse.publicKey.toString(), 
+                              'phantom', 
+                              window.solana
+                            );
+                          }
+                        }
+                      }
+                    } catch (error) {
+                      log('从APP返回后连接Phantom钱包失败', error);
+                    }
+                  } else {
+                    log('Phantom钱包对象未找到，无法完成连接');
+                  }
+                }
+                // 可以添加其他钱包类型的处理...
+              } finally {
+                // 清除钱包连接尝试状态
+                localStorage.removeItem('pendingWalletType');
+                localStorage.removeItem('pendingWalletConnection');
+                localStorage.removeItem('pendingWalletTimestamp');
+              }
+            }, 1000);
+          } else {
+            // 时间戳过期，清除状态
+            localStorage.removeItem('pendingWalletType');
+            localStorage.removeItem('pendingWalletConnection');
+            localStorage.removeItem('pendingWalletTimestamp');
+          }
+        }
+      }
+    });
+    
+    // 拦截和增强原始钱包连接方法
+    if (window.wallet && typeof window.wallet.connect === 'function') {
+      const originalConnect = window.wallet.connect;
+      
+      window.wallet.connect = async function(walletType) {
+        // 如果不是移动设备或者已经在钱包浏览器中，使用原始方法
+        if (!window.wallet.isMobile() || 
+            (walletType === 'phantom' && window.solana) || 
+            ((walletType === 'metamask' || walletType === 'ethereum') && window.ethereum)) {
+          return originalConnect.apply(this, arguments);
+        }
+        
+        log(`增强的移动端钱包连接: ${walletType}`);
+        
+        // 对Phantom钱包的特殊处理
+        if (walletType.toLowerCase() === 'phantom') {
+          // 构建更可靠的Universal Link
+          const currentUrl = encodeURIComponent(window.location.href);
+          // 使用最新的Phantom深度链接格式
+          const deepLink = `https://phantom.app/ul/browse/${currentUrl}`;
+          
+          // 保存连接尝试状态
+          localStorage.setItem('pendingWalletType', walletType);
+          localStorage.setItem('pendingWalletConnection', 'true');
+          localStorage.setItem('pendingWalletTimestamp', Date.now().toString());
+          localStorage.setItem('lastConnectionAttemptUrl', window.location.href);
+          
+          log('跳转到Phantom钱包APP', deepLink);
+          window.location.href = deepLink;
+          return true;
+        }
+        
+        // 其他钱包类型使用原始方法
+        return originalConnect.apply(this, arguments);
+      };
+      
+      log('已增强原始钱包连接方法');
+    }
+  }
+  
   // 修复购买按钮状态
   function fixBuyButtons() {
     const buyButtons = document.querySelectorAll('.buy-btn, .buy-button, [data-action="buy"]');
@@ -529,6 +661,9 @@
     
     // 修复API请求
     fixApiRequests();
+    
+    // 修复移动端钱包连接问题
+    fixMobileWalletConnection();
     
     log('钱包修复模块初始化完成');
   }
