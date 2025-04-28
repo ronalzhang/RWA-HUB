@@ -12,7 +12,7 @@ echo -e "${YELLOW}开始部署钱包修复脚本...${NC}"
 SERVER="47.236.39.134"
 SSH_KEY="vincent.pem"
 REMOTE_USER="root"
-PROJECT_DIR="/www/wwwroot/RWA-HUB_4.0" # 服务器上的项目目录
+PROJECT_DIR="/root/RWA-HUB" # 服务器上的项目目录
 STATIC_JS_DIR="${PROJECT_DIR}/app/static/js"
 TEMPLATES_DIR="${PROJECT_DIR}/app/templates"
 
@@ -69,12 +69,12 @@ fi
 
 # 4. 重启应用服务
 echo -e "${YELLOW}重启应用服务...${NC}"
-ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "supervisorctl restart rwahub"
+ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "cd ${PROJECT_DIR} && pm2 restart rwahub"
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}警告: 重启应用服务失败，可能需要手动重启${NC}"
     echo -e "${YELLOW}尝试使用其他方式重启...${NC}"
-    ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "cd ${PROJECT_DIR} && ./.restart.sh"
+    ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "cd ${PROJECT_DIR} && pm2 restart all"
 fi
 
 # 5. 验证修复是否生效
