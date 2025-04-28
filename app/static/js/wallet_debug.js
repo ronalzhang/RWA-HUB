@@ -9,218 +9,269 @@
   if (window.walletDebugInitialized) return;
   window.walletDebugInitialized = true;
   
-  // 调试开关
-  const DEBUG = true;
-  
-  // 日志级别
-  const LOG_LEVELS = {
-    INFO: { label: 'INFO', color: '#0066cc' },
-    WARN: { label: 'WARN', color: '#cc9900' },
-    ERROR: { label: 'ERROR', color: '#cc0000' },
-    DEBUG: { label: 'DEBUG', color: '#666666' }
+  // 配置
+  const config = {
+    // 调试级别：0=关闭, 1=错误, 2=警告, 3=信息, 4=调试
+    logLevel: 1, // 只保留错误日志
+    
+    // 是否记录钱包状态变化
+    trackWalletState: true,
+    
+    // 是否记录购买按钮状态
+    trackBuyButton: false, // 关闭购买按钮状态追踪
+    
+    // 是否拦截API请求
+    interceptApiRequests: true,
+    
+    // 最大历史记录条数
+    maxHistory: 50
   };
   
-  // 全局变量保存
-  let walletStateHistory = [];
-  let buyButtonStateHistory = [];
-  let errorLog = [];
+  // 历史记录
+  const walletStateHistory = [];
+  const buyButtonStateHistory = [];
+  const apiRequestHistory = [];
   
-  // 日志函数
+  // 调试工具
+  const walletDebug = {
+    error: function(message, data) {
+      log('ERROR', message, data);
+    },
+    
+    warn: function(message, data) {
+      log('WARN', message, data);
+    },
+    
+    log: function(message, data) {
+      log('INFO', message, data);
+    },
+    
+    debug: function(message, data) {
+      log('DEBUG', message, data);
+    },
+    
+    getWalletStateHistory: function() {
+      return walletStateHistory;
+    },
+    
+    getBuyButtonStateHistory: function() {
+      return buyButtonStateHistory;
+    },
+    
+    getApiRequestHistory: function() {
+      return apiRequestHistory;
+    },
+    
+    clear: function() {
+      walletStateHistory.length = 0;
+      buyButtonStateHistory.length = 0;
+      apiRequestHistory.length = 0;
+      console.clear();
+    }
+  };
+  
+  // 记录日志
   function log(level, message, data) {
-    if (!DEBUG) return;
-    
-    const timestamp = new Date().toISOString();
-    const logEntry = {
-      timestamp: timestamp,
-      level: level.label,
-      message: message,
-      data: data || null
-    };
-    
-    console.log(
-      `%c[钱包调试] ${level.label} ${timestamp}:%c ${message}`, 
-      `color: ${level.color}; font-weight: bold;`, 
-      'color: inherit;', 
-      data || ''
-    );
-    
-    // 特定日志处理
-    if (level === LOG_LEVELS.ERROR) {
-      errorLog.push(logEntry);
+    // 检查日志级别
+    const levelMap = { 'ERROR': 1, 'WARN': 2, 'INFO': 3, 'DEBUG': 4 };
+    if (!levelMap[level] || levelMap[level] > config.logLevel) {
+      return;
     }
     
-    return logEntry;
+    // 格式化消息
+    const timestamp = new Date().toISOString();
+    const formattedMessage = `[钱包调试] ${level} ${timestamp}: ${message}`;
+    
+    // 输出到控制台
+    if (data) {
+      console.log(formattedMessage, data);
+    } else {
+      console.log(formattedMessage);
+    }
+    
+    // 限制历史记录长度
+    if (walletStateHistory.length > config.maxHistory) {
+      walletStateHistory.shift();
+    }
+    
+    if (buyButtonStateHistory.length > config.maxHistory) {
+      buyButtonStateHistory.shift();
+    }
+    
+    if (apiRequestHistory.length > config.maxHistory) {
+      apiRequestHistory.shift();
+    }
   }
   
-  // 导出日志工具到全局
-  window.walletDebug = {
-    log: (message, data) => log(LOG_LEVELS.INFO, message, data),
-    warn: (message, data) => log(LOG_LEVELS.WARN, message, data),
-    error: (message, data) => log(LOG_LEVELS.ERROR, message, data),
-    debug: (message, data) => log(LOG_LEVELS.DEBUG, message, data),
-    getErrorLog: () => [...errorLog],
-    getWalletStateHistory: () => [...walletStateHistory],
-    getBuyButtonStateHistory: () => [...buyButtonStateHistory],
-    clearLogs: () => {
-      walletStateHistory = [];
-      buyButtonStateHistory = [];
-      errorLog = [];
-      log(LOG_LEVELS.INFO, '日志已清除');
-    }
-  };
-  
-  // 初始化时记录当前页面URL和钱包状态
-  walletDebug.log('调试脚本已加载', { 
-    url: window.location.href,
-    pathname: window.location.pathname,
-    referrer: document.referrer,
-    userAgent: navigator.userAgent
-  });
-  
-  // 监控walletState变化
+  // 监控钱包状态
   function monitorWalletState() {
-    let lastWalletState = null;
-    
-    // 检查初始钱包状态
+    // 初始状态
     if (window.walletState) {
-      const initialState = { 
-        isConnected: window.walletState.isConnected,
-        address: window.walletState.address,
-        walletType: window.walletState.walletType,
+      const initialState = { ...window.walletState };
+      walletStateHistory.push({
         timestamp: new Date().toISOString(),
+        state: initialState,
         source: '初始状态'
-      };
-      walletStateHistory.push(initialState);
+      });
+      
       walletDebug.log('初始钱包状态', initialState);
-      lastWalletState = initialState;
-    } else {
-      walletDebug.warn('window.walletState未初始化');
     }
     
-    // 创建代理以监控walletState变化
-    const monitorObject = window.walletState || {};
+    // 创建全局发布者
+    let originalWalletState = window.walletState ? { ...window.walletState } : null;
     
-    if (!window.walletState) {
-      window.walletState = {};
-      walletDebug.warn('创建了临时walletState对象');
-    }
-    
-    // 监听localStorage变化
-    window.addEventListener('storage', function(e) {
-      if (e.key === 'walletState') {
-        try {
-          const newState = JSON.parse(e.newValue);
-          walletDebug.log('localStorage中的walletState已更新', newState);
-          checkWalletStateChange(newState, 'localStorage事件');
-        } catch (err) {
-          walletDebug.error('解析localStorage中的walletState失败', err);
+    // 定义全局的setter函数
+    function setupWalletStateProxy() {
+      if (window.walletState) {
+        if (!window._walletStateProxySet) {
+          try {
+            // 使用Proxy监控对象变化
+            const walletStateHandler = {
+              set(target, property, value) {
+                target[property] = value;
+                
+                // 记录变化
+                if (JSON.stringify(target) !== JSON.stringify(originalWalletState)) {
+                  checkWalletStateChange(target, 'walletState属性变化:' + property);
+                  originalWalletState = { ...target };
+                }
+                
+                return true;
+              }
+            };
+            
+            // 应用Proxy
+            window.walletState = new Proxy(window.walletState, walletStateHandler);
+            window._walletStateProxySet = true;
+            
+            walletDebug.debug('已设置钱包状态代理');
+          } catch (e) {
+            walletDebug.error('设置钱包状态代理失败', e);
+          }
         }
+      } else {
+        // 如果walletState不存在，创建一个空对象并监控
+        window.walletState = new Proxy({
+          isConnected: false,
+          address: '',
+          walletType: '',
+          timestamp: new Date().toISOString(),
+          source: '创建空walletState'
+        }, {
+          set(target, property, value) {
+            target[property] = value;
+            
+            // 记录变化
+            if (JSON.stringify(target) !== JSON.stringify(originalWalletState)) {
+              checkWalletStateChange(target, 'walletState创建并变化:' + property);
+              originalWalletState = { ...target };
+            }
+            
+            return true;
+          }
+        });
+        
+        window._walletStateProxySet = true;
+        walletDebug.log('为缺失的walletState创建了代理对象');
       }
-    });
+    }
+    
+    // 检查钱包状态变化
+    function checkWalletStateChange(newState, source) {
+      if (!originalWalletState) {
+        originalWalletState = newState;
+        return;
+      }
+      
+      // 避免记录重复状态
+      if (JSON.stringify(newState) === JSON.stringify(originalWalletState)) {
+        return;
+      }
+      
+      // 记录状态变化
+      walletStateHistory.push({
+        timestamp: new Date().toISOString(),
+        before: originalWalletState ? { ...originalWalletState } : null,
+        after: newState ? { ...newState } : null,
+        source: source || '未知来源'
+      });
+      
+      walletDebug.debug('钱包状态已变化', {
+        before: originalWalletState,
+        after: newState,
+        source: source
+      });
+      
+      // 更新原始状态
+      originalWalletState = { ...newState };
+    }
+    
+    // 设置状态代理
+    setupWalletStateProxy();
     
     // 定期检查钱包状态
-    setInterval(function() {
-      if (window.walletState) {
-        const currentState = { 
-          isConnected: window.walletState.isConnected,
-          address: window.walletState.address,
-          walletType: window.walletState.walletType,
-          timestamp: new Date().toISOString(),
-          source: '定时检查'
-        };
-        
-        // 检查是否有变化
-        if (lastWalletState && 
-            (lastWalletState.isConnected !== currentState.isConnected || 
-             lastWalletState.address !== currentState.address ||
-             lastWalletState.walletType !== currentState.walletType)) {
-          walletStateHistory.push(currentState);
-          walletDebug.log('钱包状态已变化', {
-            from: lastWalletState,
-            to: currentState
-          });
-          lastWalletState = currentState;
-        }
+    setInterval(() => {
+      if (window.walletState && !window._walletStateProxySet) {
+        setupWalletStateProxy();
       }
-    }, 3000);
-    
-    // 辅助函数：检查钱包状态变化
-    function checkWalletStateChange(newState, source) {
-      if (!newState) return;
-      
-      const currentState = { 
-        isConnected: newState.isConnected,
-        address: newState.address,
-        walletType: newState.walletType,
-        timestamp: new Date().toISOString(),
-        source: source
-      };
-      
-      if (lastWalletState && 
-          (lastWalletState.isConnected !== currentState.isConnected || 
-           lastWalletState.address !== currentState.address ||
-           lastWalletState.walletType !== currentState.walletType)) {
-        walletStateHistory.push(currentState);
-        walletDebug.log('钱包状态已变化', {
-          from: lastWalletState,
-          to: currentState
-        });
-        lastWalletState = currentState;
-      }
-    }
+    }, 1000);
   }
   
   // 监控购买按钮状态
   function monitorBuyButton() {
     // 在DOM加载完成后执行
     function checkBuyButtons() {
-      // 扩展选择器，确保能找到所有可能的购买按钮
-      const buyButtons = document.querySelectorAll('.buy-btn, .buy-button, [data-action="buy"], #buyButton, button:contains("Buy"), a:contains("Buy"), .btn-buy, .purchase-button');
-      
-      if (buyButtons.length > 0) {
-        walletDebug.log(`找到${buyButtons.length}个购买按钮`);
+      try {
+        // 使用标准CSS选择器
+        const buyButtons = document.querySelectorAll('.buy-btn, .buy-button, [data-action="buy"], #buyButton, .btn-buy, .purchase-button');
         
-        buyButtons.forEach((btn, index) => {
-          const buttonState = {
-            index: index,
-            id: btn.id || '无ID',
-            text: btn.textContent.trim(),
-            isDisabled: btn.disabled,
-            classes: Array.from(btn.classList),
-            timestamp: new Date().toISOString()
-          };
+        if (buyButtons.length > 0) {
+          walletDebug.debug(`找到${buyButtons.length}个购买按钮`);
           
-          buyButtonStateHistory.push(buttonState);
-          walletDebug.debug(`购买按钮 #${index} 状态`, buttonState);
-          
-          // 监视按钮变化
-          const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-              if (mutation.type === 'attributes' || mutation.type === 'childList') {
-                const newState = {
-                  index: index,
-                  id: btn.id || '无ID',
-                  text: btn.textContent.trim(),
-                  isDisabled: btn.disabled,
-                  classes: Array.from(btn.classList),
-                  mutation: mutation.type,
-                  timestamp: new Date().toISOString()
-                };
-                
-                buyButtonStateHistory.push(newState);
-                walletDebug.debug(`购买按钮 #${index} 状态变化`, newState);
-              }
+          buyButtons.forEach((btn, index) => {
+            const buttonState = {
+              index: index,
+              id: btn.id || '无ID',
+              text: btn.textContent.trim(),
+              isDisabled: btn.disabled,
+              classes: Array.from(btn.classList),
+              timestamp: new Date().toISOString()
+            };
+            
+            buyButtonStateHistory.push(buttonState);
+            walletDebug.debug(`购买按钮 #${index} 状态`, buttonState);
+            
+            // 监视按钮变化
+            const observer = new MutationObserver((mutations) => {
+              mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' || mutation.type === 'childList') {
+                  const newState = {
+                    index: index,
+                    id: btn.id || '无ID',
+                    text: btn.textContent.trim(),
+                    isDisabled: btn.disabled,
+                    classes: Array.from(btn.classList),
+                    mutation: mutation.type,
+                    timestamp: new Date().toISOString()
+                  };
+                  
+                  buyButtonStateHistory.push(newState);
+                  walletDebug.debug(`购买按钮 #${index} 状态变化`, newState);
+                }
+              });
+            });
+            
+            observer.observe(btn, { 
+              attributes: true, 
+              childList: true, 
+              subtree: true 
             });
           });
-          
-          observer.observe(btn, { 
-            attributes: true, 
-            childList: true, 
-            subtree: true 
-          });
-        });
-      } else {
-        walletDebug.warn('未找到购买按钮');
+        } else {
+          walletDebug.debug('未找到购买按钮');
+        }
+      } catch (e) {
+        walletDebug.error('检查购买按钮时出错', e);
       }
     }
     
@@ -296,7 +347,7 @@
           
           // 只记录API请求
           if (this._walletDebugData.url.includes('/api/')) {
-            walletDebug.log('API请求完成', {
+            walletDebug.debug('API请求完成', {
               ...this._walletDebugData,
               status: status,
               duration: duration + 'ms',
@@ -367,18 +418,27 @@
             clonedResponse.text().then(text => {
               let responseData = text;
               try {
-                if (text) {
-                  responseData = JSON.parse(text);
-                }
+                responseData = JSON.parse(text);
               } catch (e) {
-                // 如果解析失败，保持原始文本
+                // 保持文本格式
               }
               
-              walletDebug.log('Fetch API请求完成', {
+              walletDebug.debug('Fetch API请求完成', {
                 url: url,
                 method: method,
                 status: status,
                 duration: duration + 'ms',
+                response: responseData
+              });
+              
+              // 记录到历史
+              apiRequestHistory.push({
+                timestamp: new Date().toISOString(),
+                url: url,
+                method: method,
+                status: status,
+                duration: duration,
+                request: requestData,
                 response: responseData
               });
               
@@ -400,13 +460,23 @@
         .catch(error => {
           const duration = new Date().getTime() - startTime;
           
-          // 只记录API请求
           if (url.includes('/api/')) {
-            walletDebug.error('Fetch API请求错误', {
+            walletDebug.error('Fetch API请求异常', {
               url: url,
               method: method,
               duration: duration + 'ms',
-              error: error.toString()
+              error: error
+            });
+            
+            // 记录到历史
+            apiRequestHistory.push({
+              timestamp: new Date().toISOString(),
+              url: url,
+              method: method,
+              status: 'ERROR',
+              duration: duration,
+              request: requestData,
+              error: error.message
             });
           }
           
@@ -415,39 +485,46 @@
     };
   }
   
-  // 在控制台添加调试命令
+  // 添加控制台命令
   function addConsoleCommands() {
-    window.showWalletDebug = function() {
-      console.log('%c===== 钱包调试信息 =====', 'font-weight: bold; font-size: 14px;');
-      console.log('钱包状态历史:', walletStateHistory);
-      console.log('购买按钮状态历史:', buyButtonStateHistory);
-      console.log('错误日志:', errorLog);
-      
-      if (window.walletState) {
-        console.log('当前钱包状态:', {
-          isConnected: window.walletState.isConnected,
-          address: window.walletState.address,
-          walletType: window.walletState.walletType
-        });
-      } else {
-        console.log('当前钱包状态: 未初始化');
-      }
-      
-      return '调试信息已在控制台显示';
-    };
+    window.walletDebug = walletDebug;
+    
+    // 添加控制台命令
+    walletDebug.debug('已添加以下控制台命令:');
+    walletDebug.debug('window.walletDebug.getWalletStateHistory() - 获取钱包状态历史');
+    walletDebug.debug('window.walletDebug.getBuyButtonStateHistory() - 获取购买按钮状态历史');
+    walletDebug.debug('window.walletDebug.getApiRequestHistory() - 获取API请求历史');
+    walletDebug.debug('window.walletDebug.clear() - 清除历史记录和控制台');
   }
   
-  // 初始化所有监控
+  // 初始化
   function init() {
     walletDebug.log('初始化钱包调试模块');
-    monitorWalletState();
-    monitorBuyButton();
+    
+    // 监控钱包状态
+    if (config.trackWalletState) {
+      monitorWalletState();
+    }
+    
+    // 监控购买按钮
+    if (config.trackBuyButton) {
+      monitorBuyButton();
+    }
+    
+    // 监控错误
     monitorErrors();
-    monitorApiRequests();
+    
+    // 监控API请求
+    if (config.interceptApiRequests) {
+      monitorApiRequests();
+    }
+    
+    // 添加控制台命令
     addConsoleCommands();
+    
     walletDebug.log('钱包调试模块初始化完成');
   }
   
-  // 启动调试
+  // 执行初始化
   init();
 })(); 
