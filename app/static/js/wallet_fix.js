@@ -22,7 +22,7 @@
         'loading': 'Loading...'
       },
       'zh': {
-        'buy': '购买',
+        'buy': 'Buy',
         'connect_wallet': '连接钱包',
         'insufficient_balance': '余额不足',
         'loading': '加载中...'
@@ -344,13 +344,15 @@
         button.disabled = true;
         button.setAttribute('data-wallet-status', 'insufficient');
       } else {
-        button.textContent = i18n.buy;
+        // 始终使用英文"Buy"，确保统一
+        button.textContent = 'Buy';
         button.disabled = false;
         button.setAttribute('data-wallet-status', 'ready');
       }
     } else {
       // 默认状态 - 钱包已连接
-      button.textContent = i18n.buy;
+      // 始终使用英文"Buy"，确保统一
+      button.textContent = 'Buy';
       button.disabled = false;
       button.setAttribute('data-wallet-status', 'ready');
     }
@@ -453,13 +455,64 @@
     // 确保钱包状态
     ensureWalletState();
     
+    // 定义全局函数来统一更新所有购买按钮
+    window.updateAllBuyButtons = function() {
+      log('全局更新所有购买按钮为英文"Buy"');
+      
+      // 使用宽泛的选择器查找可能的购买按钮
+      const allPossibleBuyButtons = document.querySelectorAll(
+        '.buy-btn, .buy-button, [data-action="buy"], #buyButton, button:contains("Buy"), ' +
+        'a:contains("Buy"), .btn-buy, .purchase-button, [class*="buy"], .buy'
+      );
+      
+      log(`找到 ${allPossibleBuyButtons.length} 个可能的购买按钮`);
+      
+      allPossibleBuyButtons.forEach((btn, idx) => {
+        // 检查按钮是否包含"购买"文本，如果是，替换为"Buy"
+        const btnText = btn.textContent.trim();
+        if (btnText === '购买') {
+          btn.textContent = 'Buy';
+          log(`已将按钮 #${idx} 从"购买"更新为"Buy"`);
+        }
+        
+        // 对于已经标记的购买按钮，确保它们显示"Buy"
+        if (btn.getAttribute('data-wallet-status') === 'ready' || btn.classList.contains('buy-btn')) {
+          if (btnText !== 'Buy') {
+            btn.textContent = 'Buy';
+            log(`已将按钮 #${idx} 从"${btnText}"更新为"Buy"`);
+          }
+        }
+      });
+      
+      // 特别处理详情页的主购买按钮
+      if (window.location.pathname.includes('/assets/')) {
+        const detailBuyBtn = document.querySelector('#buyButton, .detail-buy-button, [data-asset-action="buy"]');
+        if (detailBuyBtn && detailBuyBtn.textContent.trim() !== 'Buy') {
+          detailBuyBtn.textContent = 'Buy';
+          log('已更新详情页主购买按钮为"Buy"');
+        }
+      }
+    };
+    
     // 初始修复
     onDomReady(function() {
       // 修复购买按钮
       fixBuyButtons();
       
+      // 立即运行全局更新函数
+      if (window.updateAllBuyButtons) {
+        window.updateAllBuyButtons();
+      }
+      
       // 定期检查购买按钮（可能有动态加载的）
-      setInterval(fixBuyButtons, CONFIG.buttonCheckInterval);
+      setInterval(function() {
+        fixBuyButtons();
+        
+        // 每次检查时也运行全局更新
+        if (window.updateAllBuyButtons) {
+          window.updateAllBuyButtons();
+        }
+      }, CONFIG.buttonCheckInterval);
     });
     
     // 监控钱包状态

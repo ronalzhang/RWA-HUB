@@ -174,7 +174,8 @@
   function monitorBuyButton() {
     // 在DOM加载完成后执行
     function checkBuyButtons() {
-      const buyButtons = document.querySelectorAll('.buy-btn');
+      // 扩展选择器，确保能找到所有可能的购买按钮
+      const buyButtons = document.querySelectorAll('.buy-btn, .buy-button, [data-action="buy"], #buyButton, button:contains("Buy"), a:contains("Buy"), .btn-buy, .purchase-button');
       
       if (buyButtons.length > 0) {
         walletDebug.log(`找到${buyButtons.length}个购买按钮`);
