@@ -11,19 +11,15 @@
   
   // 配置
   const CONFIG = {
-    debug: true,
+    debug: false, // 关闭调试减少日志
     buttonText: 'Buy',
     checkInterval: 200,  // 更频繁检查以捕获快速变化
     selectorPatterns: [
-      // 通用选择器
+      // 通用选择器 - 移除了不支持的选择器
       '.buy-btn',
       '.buy-button',
       '[data-action="buy"]',
       '#buyButton',
-      'button:contains("Buy")',
-      'button:contains("购买")',
-      'a:contains("Buy")',
-      'a:contains("购买")',
       '.btn-buy',
       '.purchase-button',
       '[class*="buy"]',
@@ -45,49 +41,54 @@
   
   // 主函数：强制按钮显示为英文
   function forceEnglishButtons() {
-    // 合并所有选择器
-    const selector = CONFIG.selectorPatterns.join(', ');
-    
-    // 查找所有可能的购买按钮
-    const buttons = document.querySelectorAll(selector);
-    log(`找到 ${buttons.length} 个潜在购买按钮`);
-    
-    // 处理每个按钮
-    let modifiedCount = 0;
-    buttons.forEach((btn, idx) => {
-      // 检查按钮内容
-      const btnText = btn.textContent.trim();
+    try {
+      // 合并所有选择器
+      const selector = CONFIG.selectorPatterns.join(', ');
       
-      // 如果文本包含"购买"，替换为"Buy"
-      if (btnText === '购买' || btnText.includes('购买')) {
-        const originalText = btnText;
+      // 查找所有可能的购买按钮
+      const buttons = document.querySelectorAll(selector);
+      log(`找到 ${buttons.length} 个潜在购买按钮`);
+      
+      // 处理每个按钮
+      let modifiedCount = 0;
+      buttons.forEach((btn, idx) => {
+        // 检查按钮内容
+        const btnText = btn.textContent.trim();
         
-        // 防止覆盖带有图标和其他内容的按钮
-        if (btn.innerHTML.includes('<i class="') || btn.innerHTML.includes('<span')) {
-          // 保留HTML结构，仅替换文本节点
-          replaceTextNodesOnly(btn, '购买', 'Buy');
-        } else {
-          btn.textContent = CONFIG.buttonText;
+        // 如果文本包含"购买"，替换为"Buy"
+        if (btnText === '购买' || btnText.includes('购买')) {
+          const originalText = btnText;
+          
+          // 防止覆盖带有图标和其他内容的按钮
+          if (btn.innerHTML.includes('<i class="') || btn.innerHTML.includes('<span')) {
+            // 保留HTML结构，仅替换文本节点
+            replaceTextNodesOnly(btn, '购买', 'Buy');
+          } else {
+            btn.textContent = CONFIG.buttonText;
+          }
+          
+          log(`已将按钮 #${idx} 从"${originalText}"更新为"${CONFIG.buttonText}"`);
+          modifiedCount++;
+          
+          // 标记按钮，防止其他脚本改回来
+          btn.setAttribute('data-text-locked', 'true');
+          
+          // 覆盖内部函数：拦截任何setText类似的操作
+          interceptButtonTextChanges(btn);
         }
         
-        log(`已将按钮 #${idx} 从"${originalText}"更新为"${CONFIG.buttonText}"`);
-        modifiedCount++;
-        
-        // 标记按钮，防止其他脚本改回来
-        btn.setAttribute('data-text-locked', 'true');
-        
-        // 覆盖内部函数：拦截任何setText类似的操作
-        interceptButtonTextChanges(btn);
-      }
+        // 如果按钮已通过data-wallet-status标记为就绪状态，也确保显示"Buy"
+        if (btn.getAttribute('data-wallet-status') === 'ready') {
+          btn.textContent = CONFIG.buttonText;
+        }
+      });
       
-      // 如果按钮已通过data-wallet-status标记为就绪状态，也确保显示"Buy"
-      if (btn.getAttribute('data-wallet-status') === 'ready') {
-        btn.textContent = CONFIG.buttonText;
-      }
-    });
-    
-    log(`共修改了 ${modifiedCount} 个按钮的文本`);
-    return modifiedCount;
+      log(`共修改了 ${modifiedCount} 个按钮的文本`);
+      return modifiedCount;
+    } catch (e) {
+      console.error('购买按钮修复错误:', e);
+      return 0;
+    }
   }
   
   // 替换所有文本节点，保留HTML结构
@@ -250,11 +251,11 @@
     }
   }
   
-  // 初始化后立即修复按钮，然后定期检查
+  // 初始化函数
   function init() {
     log('初始化购买按钮修复模块');
     
-    // 页面加载完成后执行
+    // 等待DOM加载完成
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', onReady);
     } else {
@@ -262,22 +263,29 @@
     }
     
     function onReady() {
-      // 立即修复现有按钮
+      // 立即执行一次
       forceEnglishButtons();
       
-      // 覆盖全局更新函数
+      // 开始观察DOM变化
+      const observer = observeDOM();
+      
+      // 覆盖全局函数
       overrideGlobalUpdateFunctions();
       
-      // 定期检查按钮
-      setInterval(forceEnglishButtons, CONFIG.checkInterval);
+      // 定时强制更新
+      const intervalId = setInterval(forceEnglishButtons, CONFIG.checkInterval);
       
-      // 监听DOM变化
-      const observer = observeDOM();
+      // 保存清理函数
+      window.cleanupBuyButtonFix = function() {
+        clearInterval(intervalId);
+        observer.disconnect();
+        log('已清理购买按钮修复模块');
+      };
       
       log('购买按钮修复模块初始化完成');
     }
   }
   
-  // 启动修复
+  // 执行初始化
   init();
 })(); 
