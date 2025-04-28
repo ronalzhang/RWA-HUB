@@ -1,6 +1,6 @@
 /**
  * wallet_fix.js - 钱包连接修复脚本
- * 版本: 1.1.1
+ * 版本: 1.1.2
  * 作用: 修复钱包连接状态同步和UI更新问题
  */
 
@@ -11,7 +11,7 @@
   
   // 配置和常量
   const CONFIG = {
-    debug: true,
+    debug: false, // 关闭调试日志
     buttonCheckInterval: 1000,
     walletCheckInterval: 2000,
     i18n: {
@@ -565,8 +565,35 @@
             input = newUrl;
           }
         }
+        
+        // 创建请求拦截处理函数
+        return originalFetch.call(this, input, init).catch(error => {
+          // 非关键API调用的错误静默处理
+          if (url.includes('/api/assets/') && url.includes('/dividend_stats') || 
+              url.includes('/api/dividend/total/')) {
+            // 对于分红相关的API调用错误，返回空对象而不是抛出错误
+            console.debug(`非关键API调用失败: ${url}`);
+            return new Response(JSON.stringify({success: false, error: "资源不存在"}), {
+              status: 200,
+              headers: {'Content-Type': 'application/json'}
+            });
+          }
+          
+          // 资产信息API错误处理
+          if (url.includes('/api/assets/') && !url.includes('/dividend')) {
+            console.debug(`资产API调用失败: ${url}`);
+            return new Response(JSON.stringify({success: false, error: "资产信息不存在"}), {
+              status: 200,
+              headers: {'Content-Type': 'application/json'}
+            });
+          }
+          
+          // 其他错误继续抛出
+          throw error;
+        });
       }
       
+      // 对于其他API调用，使用原始fetch
       return originalFetch.call(this, input, init);
     };
   }
@@ -589,7 +616,11 @@
     
     // 定义全局函数来统一更新所有购买按钮
     window.updateAllBuyButtons = function() {
-      console.log('[钱包修复] 全局更新所有购买按钮为英文"Buy"');
+      // 减少不必要的日志输出
+      if (CONFIG.debug) {
+        console.log('[钱包修复] 全局更新所有购买按钮为英文"Buy"');
+      }
+      
       try {
         // 使用标准有效的选择器
         const validSelectors = [
@@ -658,6 +689,17 @@
     
     // 监控钱包状态
     monitorWalletState();
+    
+    // 减少控制台错误和警告
+    window.addEventListener('error', function(event) {
+      // 忽略资源加载错误和部分API请求错误
+      if (event.filename && (
+          event.filename.includes('/api/assets/') || 
+          event.filename.includes('/api/dividend/'))) {
+        event.preventDefault();
+        return false;
+      }
+    }, true);
     
     // 修复API请求
     fixApiRequests();

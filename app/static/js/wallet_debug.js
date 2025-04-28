@@ -1,6 +1,6 @@
 /**
  * wallet_debug.js - 钱包调试脚本
- * 版本: 1.0.0
+ * 版本: 1.0.1
  * 作用: 监控并记录钱包状态变化和页面交互，辅助排查问题
  */
 
@@ -12,19 +12,19 @@
   // 配置
   const config = {
     // 调试级别：0=关闭, 1=错误, 2=警告, 3=信息, 4=调试
-    logLevel: 1, // 只保留错误日志
+    logLevel: 0, // 关闭所有日志
     
     // 是否记录钱包状态变化
-    trackWalletState: true,
+    trackWalletState: false,
     
     // 是否记录购买按钮状态
     trackBuyButton: false, // 关闭购买按钮状态追踪
     
     // 是否拦截API请求
-    interceptApiRequests: true,
+    interceptApiRequests: false,
     
     // 最大历史记录条数
-    maxHistory: 50
+    maxHistory: 20
   };
   
   // 历史记录
@@ -76,6 +76,18 @@
     const levelMap = { 'ERROR': 1, 'WARN': 2, 'INFO': 3, 'DEBUG': 4 };
     if (!levelMap[level] || levelMap[level] > config.logLevel) {
       return;
+    }
+    
+    // 忽略非关键错误
+    if (level === 'ERROR' && message === '控制台错误') {
+      const errorText = data && data[1] ? data[1].message || '' : '';
+      if (errorText.includes('404') || 
+          errorText.includes('资产信息') || 
+          errorText.includes('获取资产信息') || 
+          errorText.includes('dividend') || 
+          errorText.includes('分红')) {
+        return; // 忽略非关键错误
+      }
     }
     
     // 格式化消息
@@ -286,8 +298,31 @@
     setInterval(checkBuyButtons, 5000);
   }
   
-  // 捕获全局错误
+  // 监控错误
   function monitorErrors() {
+    // 拦截控制台错误
+    const originalConsoleError = console.error;
+    console.error = function() {
+      // 检查错误信息
+      const errorMessage = arguments[0] || '';
+      // 忽略资产信息和分红相关的错误
+      if (typeof errorMessage === 'string' && (
+          errorMessage.includes('资产信息') || 
+          errorMessage.includes('刷新资产信息') || 
+          errorMessage.includes('dividend') || 
+          errorMessage.includes('分红'))) {
+        // 降级为调试信息，而不是错误
+        if (config.logLevel >= 4) { // 只在调试级别时输出
+          console.debug.apply(console, arguments);
+        }
+        return;
+      }
+      
+      // 处理真正的错误
+      walletDebug.error('控制台错误', Array.from(arguments));
+      originalConsoleError.apply(console, arguments);
+    };
+    
     // 捕获未处理的Promise错误
     window.addEventListener('unhandledrejection', function(event) {
       walletDebug.error('未处理的Promise错误', {
@@ -306,17 +341,12 @@
         error: event.error
       });
     });
-    
-    // 捕获控制台错误
-    const originalConsoleError = console.error;
-    console.error = function() {
-      walletDebug.error('控制台错误', Array.from(arguments));
-      originalConsoleError.apply(console, arguments);
-    };
   }
   
   // 监控API请求
   function monitorApiRequests() {
+    if (!config.interceptApiRequests) return; // 如果禁用了API请求拦截，直接返回
+    
     // 拦截XMLHttpRequest
     const originalXhrOpen = XMLHttpRequest.prototype.open;
     const originalXhrSend = XMLHttpRequest.prototype.send;
@@ -499,6 +529,8 @@
   
   // 初始化
   function init() {
+    if (config.logLevel === 0) return; // 如果日志级别为0，直接跳过初始化
+    
     walletDebug.log('初始化钱包调试模块');
     
     // 监控钱包状态
@@ -525,6 +557,15 @@
     walletDebug.log('钱包调试模块初始化完成');
   }
   
-  // 执行初始化
+  // 环境检测，只在开发环境启用调试
+  if (window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.includes('test') ||
+      window.location.hostname.includes('dev')) {
+    // 开发环境保留错误级别日志
+    config.logLevel = 1;
+  }
+  
+  // 初始化调试
   init();
 })(); 
