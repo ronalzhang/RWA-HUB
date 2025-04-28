@@ -53,7 +53,7 @@ echo ""
 
 # 6. 检查PM2日志
 echo -e "${BLUE}【PM2日志】${NC}"
-ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "pm2 logs --lines 20 rwahub"
+ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "pm2 logs --lines 20 rwa-hub"
 
 echo ""
 

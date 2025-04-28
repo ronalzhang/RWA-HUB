@@ -136,7 +136,7 @@ setInterval(updateBuyButtonState, 5000);
 ## 常见问题与解决方案
 
 ### Q: 修复脚本部署后网站无法加载
-A: 检查应用服务是否正常运行，可执行`check_server.sh`脚本查看详细状态。如果服务未运行，可通过SSH登录服务器，手动启动应用：`cd /root/RWA-HUB && pm2 start rwahub`。
+A: 检查应用服务是否正常运行，可执行`check_server.sh`脚本查看详细状态。如果服务未运行，可通过SSH登录服务器，手动启动应用：`cd /root/RWA-HUB && pm2 start rwa-hub`。
 
 ### Q: 购买按钮状态仍然不更新
 A: 检查浏览器控制台是否有JavaScript错误。可能是脚本加载顺序问题，确保`wallet_fix.js`在`wallet.js`之后加载。
