@@ -17,16 +17,23 @@
 
 1. 确保有服务器SSH访问权限和密钥文件(vincent.pem)
 2. 使用部署脚本上传修复文件：`./deploy_fix.sh`
+   (脚本已更新以支持/root/RWA-HUB目录和PM2进程管理)
 3. 验证修复是否生效：`./check_server.sh`
 4. 进行手动测试，确保功能正常
 
 ## 文件说明
 
 - wallet_fix.js: 主要修复脚本
-- deploy_fix.sh: 部署脚本
-- check_server.sh: 服务器状态检查脚本
+- deploy_fix.sh: 部署脚本 (已更新服务器路径和PM2支持)
+- check_server.sh: 服务器状态检查脚本 (增加PM2状态检查)
 - run_fixed.py: 修复版启动脚本
 - README_钱包修复.md: 详细文档
+
+## 服务器环境
+
+- 应用目录: /root/RWA-HUB
+- 进程管理: PM2 (使用 rwahub 服务名)
+- 端口: 5000
 
 如有任何问题或需要帮助，请随时联系我。
 

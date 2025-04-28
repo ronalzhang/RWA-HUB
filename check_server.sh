@@ -11,7 +11,7 @@ NC='\033[0m' # 无颜色
 SERVER="47.236.39.134"
 SSH_KEY="vincent.pem"
 REMOTE_USER="root"
-PROJECT_DIR="/www/wwwroot/RWA-HUB_4.0"
+PROJECT_DIR="/root/RWA-HUB"
 
 echo -e "${YELLOW}========== RWA-HUB 服务器状态检查 ==========${NC}"
 
@@ -21,13 +21,19 @@ ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "uptime && free -h && df -h | grep -v
 
 echo ""
 
-# 2. 检查应用进程状态
-echo -e "${BLUE}【应用进程】${NC}"
-ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "ps aux | grep -E 'python|flask|uwsgi|waitress|gunicorn' | grep -v grep"
+# 2. 检查PM2应用进程状态
+echo -e "${BLUE}【PM2应用状态】${NC}"
+ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "pm2 list"
 
 echo ""
 
-# 3. 检查网站响应状态
+# 3. 检查Python进程
+echo -e "${BLUE}【Python进程】${NC}"
+ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "ps aux | grep -E 'python|flask|waitress|gunicorn' | grep -v grep"
+
+echo ""
+
+# 4. 检查网站响应状态
 echo -e "${BLUE}【网站响应】${NC}"
 echo -e "检查主页响应..."
 RESPONSE=$(ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "curl -s -o /dev/null -w '%{http_code}' localhost:5000/")
@@ -39,13 +45,19 @@ fi
 
 echo ""
 
-# 4. 检查日志文件中的错误
+# 5. 检查日志文件中的错误
 echo -e "${BLUE}【最近错误日志】${NC}"
 ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "tail -n 50 ${PROJECT_DIR}/app.log | grep -i error"
 
 echo ""
 
-# 5. 检查钱包修复脚本是否存在
+# 6. 检查PM2日志
+echo -e "${BLUE}【PM2日志】${NC}"
+ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "pm2 logs --lines 20 rwahub"
+
+echo ""
+
+# 7. 检查钱包修复脚本是否存在
 echo -e "${BLUE}【钱包修复脚本】${NC}"
 SCRIPT_EXISTS=$(ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "if [ -f ${PROJECT_DIR}/app/static/js/wallet_fix.js ]; then echo 'yes'; else echo 'no'; fi")
 
@@ -69,19 +81,19 @@ fi
 
 echo ""
 
-# 6. 检查服务器启动和运行时间
+# 8. 检查服务器启动和运行时间
 echo -e "${BLUE}【服务器运行时间】${NC}"
 ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "uptime -p"
 
 echo ""
 
-# 7. 检查网络连接
+# 9. 检查网络连接
 echo -e "${BLUE}【活跃网络连接】${NC}"
 ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "netstat -tulpn | grep -E ':(80|443|5000)' | grep -v grep"
 
 echo ""
 
-# 8. 检查修复前后的页面响应速度
+# 10. 检查修复前后的页面响应速度
 echo -e "${BLUE}【页面响应时间】${NC}"
 ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "curl -s -w '总响应时间: %{time_total}秒\n' -o /dev/null localhost:5000/"
 
