@@ -331,7 +331,10 @@
                       } else {
                         // 如果onlyIfTrusted失败，尝试常规连接
                         log('尝试标准Phantom连接');
-                        const fullResponse = await window.solana.connect();
+                        const fullResponse = await window.solana.connect().catch(e => {
+                          log('标准连接出错', e);
+                          return null;
+                        });
                         
                         if (fullResponse && fullResponse.publicKey) {
                           log('成功连接到Phantom钱包', fullResponse.publicKey.toString());
@@ -343,6 +346,25 @@
                               window.solana
                             );
                           }
+                        } else {
+                          // 可能是Phantom App还没完全初始化，再等一会重试
+                          setTimeout(() => {
+                            log('再次尝试连接Phantom钱包');
+                            window.solana.connect().then(lastTry => {
+                              if (lastTry && lastTry.publicKey) {
+                                log('最后尝试成功连接到Phantom', lastTry.publicKey.toString());
+                                if (window.wallet && typeof window.wallet.afterSuccessfulConnection === 'function') {
+                                  window.wallet.afterSuccessfulConnection(
+                                    lastTry.publicKey.toString(), 
+                                    'phantom', 
+                                    window.solana
+                                  );
+                                }
+                              }
+                            }).catch(finalError => {
+                              log('最终连接尝试失败', finalError);
+                            });
+                          }, 1500);
                         }
                       }
                     } catch (error) {
@@ -386,10 +408,25 @@
         
         // 对Phantom钱包的特殊处理
         if (walletType.toLowerCase() === 'phantom') {
-          // 构建更可靠的Universal Link
+          // 检测iOS设备
+          const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+          
+          // 构建更可靠的Universal Link或Deep Link
           const currentUrl = encodeURIComponent(window.location.href);
-          // 使用最新的Phantom深度链接格式
-          const deepLink = `https://phantom.app/ul/browse/${currentUrl}`;
+          let deepLink;
+          
+          if (isIOS) {
+            // iOS设备使用Universal Link
+            deepLink = `https://phantom.app/ul/browse/${currentUrl}`;
+            log('使用iOS的Universal Link:', deepLink);
+          } else {
+            // Android设备使用特定的协议链接
+            deepLink = `phantom://browse/${currentUrl}`;
+            // 备用链接，如果上面的不工作
+            const backupLink = `https://phantom.app/ul/browse/${currentUrl}`;
+            log('使用Android的Deep Link:', deepLink);
+            log('备用链接:', backupLink);
+          }
           
           // 保存连接尝试状态
           localStorage.setItem('pendingWalletType', walletType);
@@ -398,7 +435,15 @@
           localStorage.setItem('lastConnectionAttemptUrl', window.location.href);
           
           log('跳转到Phantom钱包APP', deepLink);
-          window.location.href = deepLink;
+          
+          // 对于iOS，需要一个小延迟来确保localStorage写入完成
+          if (isIOS) {
+            setTimeout(() => {
+              window.location.href = deepLink;
+            }, 100);
+          } else {
+            window.location.href = deepLink;
+          }
           return true;
         }
         
