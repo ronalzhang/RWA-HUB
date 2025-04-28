@@ -69,7 +69,7 @@ fi
 
 # 4. 重启应用服务
 echo -e "${YELLOW}重启应用服务...${NC}"
-ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "cd ${PROJECT_DIR} && pm2 restart rwahub"
+ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "cd ${PROJECT_DIR} && pm2 restart rwa-hub"
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}警告: 重启应用服务失败，可能需要手动重启${NC}"
