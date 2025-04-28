@@ -1,7 +1,6 @@
 /**
- * dividend_fix.js - 分红数据显示修复脚本
- * 版本: 1.0.0
- * 作用: 修复分红数据显示，特别是"Total Distributed"显示为Loading...的问题
+ * dividend_fix.js - 分红显示修复脚本
+ * 版本: 1.0.1
  */
 
 (function() {
@@ -11,12 +10,9 @@
   
   // 配置
   const CONFIG = {
-    debug: false, // 关闭调试日志
-    defaultTotal: '0.00',
-    retryAttempts: 1, // 减少重试次数
-    retryDelay: 5000, // 增加重试延迟
-    apiCacheTime: 60000, // API缓存时间，1分钟内不重复请求
-    apiRequestedTime: 0 // 上次请求时间
+    debug: false,
+    apiRetryInterval: 3000,
+    apiMaxRetries: 2
   };
   
   // 日志函数
@@ -24,191 +20,242 @@
     if (!CONFIG.debug) return;
     console.log(`[分红修复] ${message}`, data || '');
   }
-  
-  // 主函数：修复分红数据显示
-  function fixDividendDisplay() {
-    log('开始修复分红数据显示');
-    
-    // 查找分红数据显示元素
-    const totalDividendsElement = document.getElementById('totalDividendsDistributed');
-    if (!totalDividendsElement) {
-      log('未找到分红数据显示元素，可能不在资产详情页');
-      return;
-    }
-    
-    // 检查当前内容是否为Loading...
-    const currentContent = totalDividendsElement.textContent.trim();
-    if (currentContent && !currentContent.includes('Loading')) {
-      log('分红数据已显示，无需修复', currentContent);
-      return;
-    }
-    
-    // 检查是否需要遵守API缓存时间
-    const now = Date.now();
-    if (now - CONFIG.apiRequestedTime < CONFIG.apiCacheTime) {
-      log('API请求过于频繁，遵守缓存时间');
-      return;
-    }
-    
-    // 更新最后请求时间
-    CONFIG.apiRequestedTime = now;
-    
-    // 获取资产ID或符号
-    const assetId = getAssetId();
-    if (!assetId) {
-      log('无法获取资产ID，无法加载分红数据');
-      showDefaultTotal(totalDividendsElement);
-      return;
-    }
-    
-    // 加载分红数据
-    loadDividendData(assetId, totalDividendsElement);
+
+  // 日志错误函数
+  function logError(message, data) {
+    if (!CONFIG.debug) return;
+    console.error(`[分红修复] ${message}`, data || '');
   }
   
-  // 获取资产ID
-  function getAssetId() {
-    // 尝试从URL获取
-    const pathParts = window.location.pathname.split('/');
-    let assetId = pathParts[pathParts.length - 1];
+  // 处理API错误的函数
+  function handleApiError(error, endpoint) {
+    // 降级为调试级别日志，不要输出为错误
+    console.debug(`[分红API] 调用${endpoint}失败, 使用默认值`, error);
+    return {success: false};
+  }
+  
+  // 尝试多个API端点，直到一个成功
+  async function tryApiSequentially(apis, transformFn) {
+    let result = null;
+    let errors = [];
     
-    // 如果在URL中找不到，尝试从页面数据中获取
-    if (!assetId || assetId === '') {
-      assetId = document.querySelector('[data-asset-id]')?.dataset.assetId || 
-               window.ASSET_CONFIG?.assetId ||
-               window.assetData?.token_symbol;
+    for (let i = 0; i < apis.length; i++) {
+      try {
+        const endpoint = apis[i];
+        log(`尝试API端点 (${i+1}/${apis.length}): ${endpoint}`);
+        
+        // 使用带超时的fetch
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('请求超时')), 5000)
+        );
+        
+        const response = await Promise.race([
+          fetch(endpoint),
+          timeoutPromise
+        ]);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP错误 ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // 如果有数据转换函数，则应用它
+        result = transformFn ? transformFn(data) : data;
+        
+        // 成功获取数据后结束
+        log(`API调用成功: ${endpoint}`);
+        return result;
+      } catch (error) {
+        // 收集错误信息，但继续尝试下一个API
+        errors.push({api: apis[i], error: error.message});
+        
+        // 不要输出为错误，而是降级为调试日志
+        console.debug(`[分红API] 尝试API失败: ${apis[i]}`, error);
+      }
     }
     
-    log('获取到资产ID', assetId);
-    return assetId;
+    // 所有API都失败后，尝试几次后不再重试
+    if (errors.length > 0 && CONFIG.apiMaxRetries > 0) {
+      log(`所有API尝试失败，${CONFIG.apiMaxRetries}秒后重试..`, errors);
+      
+      // 减少重试计数
+      CONFIG.apiMaxRetries--;
+      
+      return new Promise(resolve => {
+        setTimeout(() => {
+          resolve(tryApiSequentially(apis, transformFn));
+        }, CONFIG.apiRetryInterval);
+      });
+    }
+    
+    // 所有尝试都失败，返回默认结果
+    return {success: false, errors};
   }
   
   // 加载分红数据
-  function loadDividendData(assetId, element, attempt = 0) {
-    log(`尝试加载分红数据 (${attempt+1}/${CONFIG.retryAttempts+1})`, assetId);
-    
-    // 确保显示加载状态，只在第一次尝试时
-    if (attempt === 0) {
-      element.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>正在加载...';
+  async function loadDividendData(assetId) {
+    if (!assetId) {
+      console.debug('[分红修复] 缺少资产ID，无法加载分红数据');
+      return null;
     }
     
-    // 只尝试最可能成功的API路径，减少404请求
-    const apiPaths = [
-      `/api/assets/${assetId}/dividend_stats`, // 主要尝试的API
-      `/api/dividend/total/${assetId}`         // 备选API
-    ];
-    
-    // 依次尝试不同API路径
-    tryApiSequentially(apiPaths, element, attempt);
+    try {
+      // 构建多个可能的API端点路径
+      const apis = [
+        `/api/assets/${assetId}/dividend_stats`,
+        `/api/dividend/total/${assetId}`
+      ];
+      
+      // 尝试顺序调用API，直到成功
+      const data = await tryApiSequentially(apis, response => {
+        // 任何返回数据都视为有效，将处理结果规范化
+        return {
+          success: true,
+          total_dividends: response.total_dividends || response.total || 0,
+          last_dividend: response.last_dividend || response.latest || null,
+          next_dividend: response.next_dividend || response.upcoming || null
+        };
+      }).catch(error => {
+        // 仅输出调试日志，不要显示为错误
+        console.debug("[分红API] 数据加载失败", error);
+        return {success: false};
+      });
+      
+      return data;
+    } catch (error) {
+      console.debug("[分红API] 未能加载分红数据", error);
+      return {success: false};
+    }
   }
   
-  // 依次尝试不同的API
-  function tryApiSequentially(apiPaths, element, attempt) {
-    if (apiPaths.length === 0) {
-      // 所有API都失败，使用模拟数据
-      if (attempt < CONFIG.retryAttempts) {
-        setTimeout(() => {
-          loadDividendData(getAssetId(), element, attempt + 1);
-        }, CONFIG.retryDelay);
-      } else {
-        log('所有API路径尝试失败，使用默认显示');
-        useMockData(element);
-      }
+  // 更新页面上的分红显示
+  function updateDividendDisplay(assetId, data) {
+    if (!data || !data.success) {
+      // 如果没有数据，使用默认显示
+      const dividendElements = document.querySelectorAll('.dividend-amount, .dividend-info');
+      dividendElements.forEach(el => {
+        // 隐藏分红信息而不是显示错误
+        el.style.display = 'none';
+      });
       return;
     }
     
-    const currentPath = apiPaths.shift();
-    log('尝试API路径', currentPath);
+    // 更新总分红金额
+    const totalDividendElements = document.querySelectorAll('.total-dividend, .total-dividends');
+    totalDividendElements.forEach(el => {
+      el.textContent = formatCurrency(data.total_dividends || 0);
+      el.setAttribute('data-amount', data.total_dividends || 0);
+    });
     
-    fetch(currentPath)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`API请求失败: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(data => {
-        log('获取到分红数据', data);
-        updateTotalDisplay(element, data);
-      })
-      .catch(error => {
-        log(`API ${currentPath} 请求失败`, error);
-        // 尝试下一个API路径
-        tryApiSequentially(apiPaths, element, attempt);
+    // 更新最近分红信息
+    if (data.last_dividend) {
+      const lastDividendElements = document.querySelectorAll('.last-dividend, .latest-dividend');
+      lastDividendElements.forEach(el => {
+        const amount = data.last_dividend.amount || 0;
+        const date = data.last_dividend.date || '';
+        
+        el.textContent = `${formatCurrency(amount)} (${formatDate(date)})`;
+        el.setAttribute('data-amount', amount);
+        el.setAttribute('data-date', date);
       });
+    }
+    
+    // 更新下次分红信息
+    if (data.next_dividend) {
+      const nextDividendElements = document.querySelectorAll('.next-dividend, .upcoming-dividend');
+      nextDividendElements.forEach(el => {
+        const amount = data.next_dividend.amount || 0;
+        const date = data.next_dividend.date || '';
+        
+        el.textContent = `${formatCurrency(amount)} (${formatDate(date)})`;
+        el.setAttribute('data-amount', amount);
+        el.setAttribute('data-date', date);
+      });
+    }
+    
+    // 显示所有分红相关元素
+    document.querySelectorAll('.dividend-section, .dividend-info, .dividend-container').forEach(el => {
+      el.style.display = '';
+    });
   }
   
-  // 更新分红总额显示
-  function updateTotalDisplay(element, data) {
-    let amount = '0.00';
+  // 格式化货币
+  function formatCurrency(value) {
+    if (!value) return '$0.00';
     
-    // 尝试不同的数据格式
-    if (data && typeof data === 'object') {
-      if (data.total_amount !== undefined) {
-        amount = formatAmount(data.total_amount);
-      } else if (data.totalAmount !== undefined) {
-        amount = formatAmount(data.totalAmount);
-      } else if (data.amount !== undefined) {
-        amount = formatAmount(data.amount);
+    const num = parseFloat(value);
+    if (isNaN(num)) return '$0.00';
+    
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(num);
+  }
+  
+  // 格式化日期
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '';
+      
+      return date.toLocaleDateString();
+    } catch (e) {
+      return '';
+    }
+  }
+  
+  // 主函数：修复分红显示
+  function fixDividendDisplay() {
+    // 获取当前资产ID
+    let assetId = null;
+    
+    // 尝试从URL中获取
+    const urlMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
+    if (urlMatch && urlMatch[1]) {
+      assetId = urlMatch[1];
+    }
+    
+    // 尝试从页面元素获取
+    if (!assetId) {
+      const assetIdElement = document.querySelector('[data-asset-id]');
+      if (assetIdElement) {
+        assetId = assetIdElement.getAttribute('data-asset-id');
       }
     }
     
-    // 更新显示
-    element.textContent = `${amount} USDC`;
-    log('更新分红总额显示', `${amount} USDC`);
-  }
-  
-  // 使用模拟数据
-  function useMockData(element) {
-    // 在API调用失败的情况下，使用模拟数据
-    const mockData = {
-      total_amount: 0
-    };
-    updateTotalDisplay(element, mockData);
-  }
-  
-  // 显示默认总额
-  function showDefaultTotal(element) {
-    element.textContent = `${CONFIG.defaultTotal} USDC`;
-    log('显示默认分红总额', CONFIG.defaultTotal);
-  }
-  
-  // 格式化金额
-  function formatAmount(amount) {
-    // 处理不同的数据类型
-    if (amount === null || amount === undefined) return '0.00';
-    
-    try {
-      // 将输入转换为数字
-      const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-      
-      // 格式化为两位小数
-      return numAmount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    } catch (e) {
-      log('格式化金额出错', e);
-      return '0.00';
+    // 如果找不到资产ID，返回
+    if (!assetId) {
+      return;
     }
+    
+    // 加载分红数据并更新显示
+    loadDividendData(assetId).then(data => {
+      updateDividendDisplay(assetId, data);
+    }).catch(error => {
+      // 不要作为错误输出
+      console.debug('[分红修复] 处理分红数据时出错', error);
+    });
   }
   
-  // 定时检查分红数据显示
-  function setupPeriodicCheck() {
-    // 页面加载完成后立即检查一次
+  // 在DOM加载完成后执行
+  function onDomReady(callback) {
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', fixDividendDisplay);
+      document.addEventListener('DOMContentLoaded', callback);
     } else {
-      fixDividendDisplay();
+      callback();
     }
-    
-    // 减少检查频率，每30秒检查一次
-    setInterval(fixDividendDisplay, 30000);
   }
   
   // 初始化
-  function init() {
-    log('初始化分红修复模块');
-    setupPeriodicCheck();
-    log('分红修复模块初始化完成');
-  }
+  onDomReady(fixDividendDisplay);
   
-  // 启动修复
-  init();
+  // 暴露公共API
+  window.dividendFix = {
+    refreshDividendInfo: fixDividendDisplay
+  };
 })(); 
