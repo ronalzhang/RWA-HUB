@@ -13,10 +13,10 @@ NC='\033[0m' # 恢复默认颜色
 # 配置信息
 SERVER="root@47.236.39.134"
 PEM_FILE="vincent.pem"
-FLASK_APP_DIR="/home/vincent/RWA-HUB_4.0/app"
+FLASK_APP_DIR="/root/RWA-HUB/app"
 STATIC_DIR="${FLASK_APP_DIR}/static/js"
 TEMPLATES_DIR="${FLASK_APP_DIR}/templates"
-BACKUP_DIR="/home/vincent/backups/$(date +%Y%m%d_%H%M%S)"
+BACKUP_DIR="/root/backups/$(date +%Y%m%d_%H%M%S)"
 
 # 本地文件路径
 DIVIDEND_FIX_JS="app/static/js/dividend_fix.js"
@@ -79,7 +79,7 @@ function backup_remote_files() {
 function pull_from_git() {
   info "在服务器上从Git仓库拉取最新代码..."
   
-  ssh -i $PEM_FILE $SERVER "cd /home/vincent/RWA-HUB_4.0 && git pull origin main"
+  ssh -i $PEM_FILE $SERVER "cd /root/RWA-HUB && git pull origin main"
   
   success "Git代码拉取完成"
 }
@@ -124,28 +124,19 @@ function verify_deployment() {
 
 # 重启应用
 function restart_app() {
-  info "重启Flask应用..."
-  ssh -i $PEM_FILE $SERVER "cd /home/vincent/RWA-HUB_4.0 && supervisorctl restart flask_app || systemctl restart flask_app || pkill -f 'python.*run.py' || true"
+  info "重启应用..."
+  ssh -i $PEM_FILE $SERVER "cd /root/RWA-HUB && pm2 restart rwa-hub"
   
   # 给应用一些启动时间
   sleep 5
   
   # 检查应用是否成功启动
-  local is_running=$(ssh -i $PEM_FILE $SERVER "ps aux | grep -v grep | grep -c 'python.*run.py' || echo 0")
+  local is_running=$(ssh -i $PEM_FILE $SERVER "pm2 list | grep -c 'rwa-hub' || echo 0")
   
   if [ "$is_running" -ge "1" ]; then
-    success "Flask应用已成功重启"
+    success "应用已成功重启"
   else
-    warning "未检测到Flask应用进程，尝试手动启动..."
-    ssh -i $PEM_FILE $SERVER "cd /home/vincent/RWA-HUB_4.0 && nohup python3 run.py > flask_app.log 2>&1 &"
-    sleep 3
-    
-    is_running=$(ssh -i $PEM_FILE $SERVER "ps aux | grep -v grep | grep -c 'python.*run.py' || echo 0")
-    if [ "$is_running" -ge "1" ]; then
-      success "Flask应用已手动启动"
-    else
-      error "无法启动Flask应用，请手动检查"
-    fi
+    error "重启应用失败，请手动检查"
   fi
 }
 

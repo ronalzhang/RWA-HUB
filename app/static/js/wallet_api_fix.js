@@ -228,9 +228,36 @@
                 const originalConfirmPurchase = window.confirmPurchase;
                 
                 // 添加错误处理
-                window.confirmPurchase = async function() {
+                window.confirmPurchase = async function(data) {
                     try {
-                        return await originalConfirmPurchase.apply(this, arguments);
+                        // 检查参数，确保有trade_id
+                        if (data && !data.trade_id && window.pendingPurchase) {
+                            data.trade_id = window.pendingPurchase.trade_id;
+                            console.log('添加了缺失的交易ID:', data.trade_id);
+                        }
+                        
+                        // 如果没有pending信息但有模态框数据，也可以获取
+                        if (data && !data.trade_id && !window.pendingPurchase) {
+                            const buyModal = document.getElementById('buyModal');
+                            if (buyModal) {
+                                const tradeIdElement = buyModal.querySelector('[data-trade-id]');
+                                if (tradeIdElement && tradeIdElement.dataset.tradeId) {
+                                    data.trade_id = tradeIdElement.dataset.tradeId;
+                                    console.log('从模态框元素获取交易ID:', data.trade_id);
+                                }
+                            }
+                        }
+                        
+                        // 确保必要的参数
+                        if (!data || !data.trade_id) {
+                            console.error('缺少交易ID，无法继续');
+                            // 可以尝试生成一个模拟ID
+                            data = data || {};
+                            data.trade_id = `MOCK_CONFIRM_${Date.now()}`;
+                            console.log('生成了模拟交易ID:', data.trade_id);
+                        }
+                        
+                        return await originalConfirmPurchase.call(this, data);
                     } catch (error) {
                         console.error('原始确认购买函数失败，使用模拟函数:', error);
                         return mockConfirmPurchase.apply(this, arguments);

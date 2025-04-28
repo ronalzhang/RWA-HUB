@@ -11,10 +11,12 @@
   
   // 配置
   const CONFIG = {
-    debug: true,
+    debug: false, // 关闭调试日志
     defaultTotal: '0.00',
-    retryAttempts: 2,
-    retryDelay: 1000
+    retryAttempts: 1, // 减少重试次数
+    retryDelay: 5000, // 增加重试延迟
+    apiCacheTime: 60000, // API缓存时间，1分钟内不重复请求
+    apiRequestedTime: 0 // 上次请求时间
   };
   
   // 日志函数
@@ -40,6 +42,16 @@
       log('分红数据已显示，无需修复', currentContent);
       return;
     }
+    
+    // 检查是否需要遵守API缓存时间
+    const now = Date.now();
+    if (now - CONFIG.apiRequestedTime < CONFIG.apiCacheTime) {
+      log('API请求过于频繁，遵守缓存时间');
+      return;
+    }
+    
+    // 更新最后请求时间
+    CONFIG.apiRequestedTime = now;
     
     // 获取资产ID或符号
     const assetId = getAssetId();
@@ -74,15 +86,15 @@
   function loadDividendData(assetId, element, attempt = 0) {
     log(`尝试加载分红数据 (${attempt+1}/${CONFIG.retryAttempts+1})`, assetId);
     
-    // 确保显示加载状态
-    element.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>正在加载...';
+    // 确保显示加载状态，只在第一次尝试时
+    if (attempt === 0) {
+      element.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>正在加载...';
+    }
     
-    // 尝试不同的API路径
+    // 只尝试最可能成功的API路径，减少404请求
     const apiPaths = [
-      `/api/assets/${assetId}/dividend_stats`,        // 通过ID
-      `/api/assets/symbol/${assetId}/dividend_stats`, // 通过符号
-      `/api/dividend/stats/${assetId}`,               // 另一个端点
-      `/api/dividend/total/${assetId}`                // 另一个可能的端点
+      `/api/assets/${assetId}/dividend_stats`, // 主要尝试的API
+      `/api/dividend/total/${assetId}`         // 备选API
     ];
     
     // 依次尝试不同API路径
@@ -186,8 +198,8 @@
       fixDividendDisplay();
     }
     
-    // 然后每5秒检查一次
-    setInterval(fixDividendDisplay, 5000);
+    // 减少检查频率，每30秒检查一次
+    setInterval(fixDividendDisplay, 30000);
   }
   
   // 初始化

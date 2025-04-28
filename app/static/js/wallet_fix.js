@@ -457,40 +457,49 @@
     
     // 定义全局函数来统一更新所有购买按钮
     window.updateAllBuyButtons = function() {
-      log('全局更新所有购买按钮为英文"Buy"');
-      
-      // 使用宽泛的选择器查找可能的购买按钮
-      const allPossibleBuyButtons = document.querySelectorAll(
-        '.buy-btn, .buy-button, [data-action="buy"], #buyButton, button:contains("Buy"), ' +
-        'a:contains("Buy"), .btn-buy, .purchase-button, [class*="buy"], .buy'
-      );
-      
-      log(`找到 ${allPossibleBuyButtons.length} 个可能的购买按钮`);
-      
-      allPossibleBuyButtons.forEach((btn, idx) => {
-        // 检查按钮是否包含"购买"文本，如果是，替换为"Buy"
-        const btnText = btn.textContent.trim();
-        if (btnText === '购买') {
-          btn.textContent = 'Buy';
-          log(`已将按钮 #${idx} 从"购买"更新为"Buy"`);
-        }
+      console.log('[钱包修复] 全局更新所有购买按钮为英文"Buy"');
+      try {
+        // 使用标准有效的选择器
+        const validSelectors = [
+          '.buy-btn', 
+          '.buy-button', 
+          '[data-action="buy"]', 
+          '#buyButton', 
+          '.btn-buy', 
+          '.purchase-button', 
+          '[class*="buy"]', 
+          '.buy',
+          '#buy-button',
+          '.detail-buy-button',
+          '[data-asset-action="buy"]',
+          '.asset-buy-button'
+        ];
         
-        // 对于已经标记的购买按钮，确保它们显示"Buy"
-        if (btn.getAttribute('data-wallet-status') === 'ready' || btn.classList.contains('buy-btn')) {
-          if (btnText !== 'Buy') {
-            btn.textContent = 'Buy';
-            log(`已将按钮 #${idx} 从"${btnText}"更新为"Buy"`);
+        // 分段查询确保安全
+        let allButtons = [];
+        validSelectors.forEach(selector => {
+          try {
+            const buttons = document.querySelectorAll(selector);
+            buttons.forEach(btn => allButtons.push(btn));
+          } catch (err) {
+            // 忽略单个选择器错误
           }
-        }
-      });
-      
-      // 特别处理详情页的主购买按钮
-      if (window.location.pathname.includes('/assets/')) {
-        const detailBuyBtn = document.querySelector('#buyButton, .detail-buy-button, [data-asset-action="buy"]');
-        if (detailBuyBtn && detailBuyBtn.textContent.trim() !== 'Buy') {
-          detailBuyBtn.textContent = 'Buy';
-          log('已更新详情页主购买按钮为"Buy"');
-        }
+        });
+        
+        // 去重
+        allButtons = [...new Set(allButtons)];
+        
+        // 修改文本
+        allButtons.forEach(btn => {
+          if (btn.textContent.trim() === '购买') {
+            btn.textContent = 'Buy';
+          }
+        });
+        
+        return true;
+      } catch (e) {
+        console.error('更新购买按钮出错:', e);
+        return false;
       }
     };
     
