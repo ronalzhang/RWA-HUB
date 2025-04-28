@@ -1224,12 +1224,10 @@
         })();
     </script>
     
-    <!-- 钱包脚本 -->
-    <script src="{{ url_for('static', filename='js/wallet_unified.js') }}"></script>
-    
     <!-- 钱包主脚本 -->
     <script src="{{ url_for('static', filename='js/wallet.js') }}"></script>
     <script src="{{ url_for('static', filename='js/wallet_fix.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dividend_fix.js') }}"></script>
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -1253,6 +1251,7 @@
     
     <!-- 钱包调试和修复脚本 -->
     <script src="{{ url_for('static', filename='js/wallet_debug.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/buy_button_fix.js') }}"></script>
     <script src="{{ url_for('static', filename='js/wallet_api_fix.js') }}"></script>
     <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
     
