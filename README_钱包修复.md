@@ -47,10 +47,10 @@ chmod 400 vincent.pem
 ```
 
 部署脚本会自动执行以下操作：
-- 将`wallet_fix.js`上传至服务器的静态资源目录
+- 将`wallet_fix.js`上传至服务器的静态资源目录 (`/root/RWA-HUB/app/static/js/`)
 - 修改`base.html`文件，添加对修复脚本的引用
 - 设置正确的文件权限
-- 重启应用服务
+- 使用PM2重启应用服务
 
 ### 3. 验证修复效果
 
@@ -61,7 +61,7 @@ chmod 400 vincent.pem
 ./check_server.sh
 ```
 
-该脚本会检查服务器状态、应用进程、网站响应、脚本加载情况等，确保修复已经成功部署。
+该脚本会检查服务器状态、应用进程、PM2状态、网站响应、脚本加载情况等，确保修复已经成功部署。
 
 ### 4. 手动测试
 
@@ -136,7 +136,7 @@ setInterval(updateBuyButtonState, 5000);
 ## 常见问题与解决方案
 
 ### Q: 修复脚本部署后网站无法加载
-A: 检查应用服务是否正常运行，可执行`check_server.sh`脚本查看详细状态。如果服务未运行，可通过SSH登录服务器，手动启动应用。
+A: 检查应用服务是否正常运行，可执行`check_server.sh`脚本查看详细状态。如果服务未运行，可通过SSH登录服务器，手动启动应用：`cd /root/RWA-HUB && pm2 start rwahub`。
 
 ### Q: 购买按钮状态仍然不更新
 A: 检查浏览器控制台是否有JavaScript错误。可能是脚本加载顺序问题，确保`wallet_fix.js`在`wallet.js`之后加载。
