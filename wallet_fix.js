@@ -53,12 +53,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // 更新按钮状态
             if (isConnected) {
                 buyButton.disabled = false;
-                buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>购买';
+                buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
                 buyButton.removeAttribute('title');
             } else {
                 buyButton.disabled = true;
-                buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
-                buyButton.title = '请先连接钱包';
+                buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>Connect Wallet';
+                buyButton.title = 'Please connect your wallet first';
             }
             
             // 如果存在分红按钮检查函数，也一并调用
