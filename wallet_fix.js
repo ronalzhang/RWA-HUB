@@ -264,25 +264,46 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // 统一的钱包状态变化处理函数
-        function handleWalletStateChange(event) {
-            console.log('统一钱包状态变化处理函数被调用:', event.type);
-            
-            // 立即更新购买按钮状态
-            updateBuyButtonState();
-            
-            // 如果是连接事件，刷新页面资产
-            if (event.type === 'walletConnected' || event.type === 'walletStateChanged') {
-                // 刷新页面资产数据
-                if (typeof window.refreshAssetInfoNow === 'function') {
-                    window.refreshAssetInfoNow();
-                }
-            }
-        }
-        
         // 保存原始函数以便恢复
         const originalUpdateBuyButtonState = window.updateBuyButtonState;
         const originalHandleBuy = window.handleBuy;
+        
+        // 直接修改walletState对象的方法
+        if (window.walletState && typeof window.walletState.updateDetailPageButtonState === 'function') {
+            // 保存原始方法引用
+            const originalUpdateDetailPageButtonState = window.walletState.updateDetailPageButtonState;
+            
+            // 覆盖原始方法
+            window.walletState.updateDetailPageButtonState = function() {
+                console.log('已覆盖的购买按钮状态更新函数被调用');
+                
+                // 先确保钱包状态一致
+                this.checkWalletConsistency && this.checkWalletConsistency();
+                
+                // 获取购买按钮
+                const buyButton = document.getElementById('buy-button');
+                if (!buyButton) {
+                    console.warn('找不到购买按钮元素，无法更新状态');
+                    return;
+                }
+                
+                // 检查钱包是否已连接
+                const isConnected = this.connected && this.address;
+                
+                // 更新购买按钮状态 - 使用英文
+                if (isConnected) {
+                    buyButton.disabled = false;
+                    buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
+                    buyButton.removeAttribute('title');
+                } else {
+                    buyButton.disabled = true;
+                    buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>Connect Wallet';
+                    buyButton.title = 'Please connect your wallet first';
+                }
+                
+                return this;
+            };
+        }
         
         // 替换全局函数
         window.updateBuyButtonState = updateBuyButtonState;
@@ -298,7 +319,12 @@ document.addEventListener('DOMContentLoaded', function() {
         ];
         
         walletEvents.forEach(function(eventName) {
-            window.addEventListener(eventName, handleWalletStateChange);
+            window.addEventListener(eventName, function handleWalletStateChange(event) {
+                console.log('钱包状态变化处理函数被调用:', event.type);
+                
+                // 立即更新购买按钮状态
+                updateBuyButtonState();
+            });
             console.log(`已注册${eventName}事件监听器`);
         });
         
