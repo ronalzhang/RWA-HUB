@@ -415,3 +415,74 @@ def get_user_assets(address):
     except Exception as e:
         current_app.logger.error(f'获取用户资产失败: {str(e)}', exc_info=True)
         return jsonify([]), 200
+
+@api_bp.route('/trades', methods=['GET'])
+def get_trade_history():
+    """获取资产交易历史"""
+    try:
+        # 获取查询参数
+        asset_id = request.args.get('asset_id', type=int)
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 5, type=int)
+        
+        # 验证参数
+        if not asset_id:
+            return jsonify({
+                'success': False,
+                'error': '缺少资产ID参数'
+            }), 400
+            
+        # 限制每页数量，避免过大查询
+        if per_page > 100:
+            per_page = 100
+            
+        # 查询交易记录
+        from app.models.trade import Trade, TradeStatus
+        
+        # 筛选条件：指定资产ID和已完成状态
+        trades_query = Trade.query.filter_by(
+            asset_id=asset_id
+        ).order_by(Trade.created_at.desc())
+        
+        # 计算总记录数和总页数
+        total_count = trades_query.count()
+        total_pages = (total_count + per_page - 1) // per_page if total_count > 0 else 1
+        
+        # 分页
+        trades = trades_query.offset((page - 1) * per_page).limit(per_page).all()
+        
+        # 格式化交易记录
+        trade_list = []
+        for trade in trades:
+            trade_list.append({
+                'id': trade.id,
+                'created_at': trade.created_at.isoformat(),
+                'trader_address': trade.trader_address,
+                'type': trade.type,
+                'amount': trade.amount,
+                'price': float(trade.price) if trade.price else 0,
+                'total': float(trade.total) if trade.total else None,
+                'status': trade.status,
+                'tx_hash': trade.tx_hash
+            })
+            
+        # 构建分页信息
+        pagination = {
+            'total': total_count,
+            'pages': total_pages,
+            'page': page,
+            'per_page': per_page
+        }
+            
+        # 返回结果
+        return jsonify({
+            'trades': trade_list,
+            'pagination': pagination
+        }), 200
+            
+    except Exception as e:
+        current_app.logger.error(f"获取交易历史失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"获取交易历史失败: {str(e)}"
+        }), 500
