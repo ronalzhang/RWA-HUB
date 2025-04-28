@@ -1,100 +1,227 @@
 #!/bin/bash
 
-# 定义颜色
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
+# 错误时停止脚本
+set -e
+
+# 颜色定义
 RED='\033[0;31m'
-NC='\033[0m' # 无颜色
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # 恢复默认颜色
 
-echo -e "${YELLOW}开始部署钱包修复脚本...${NC}"
+# 配置信息
+SERVER="root@47.236.39.134"
+PEM_FILE="vincent.pem"
+FLASK_APP_DIR="/home/vincent/RWA-HUB_4.0/app"
+STATIC_DIR="${FLASK_APP_DIR}/static/js"
+ROUTES_DIR="${FLASK_APP_DIR}/routes"
+TEMPLATES_DIR="${FLASK_APP_DIR}/templates"
+BACKUP_DIR="/home/vincent/backups/$(date +%Y%m%d_%H%M%S)"
 
-# 服务器信息
-SERVER="47.236.39.134"
-SSH_KEY="vincent.pem"
-REMOTE_USER="root"
-PROJECT_DIR="/root/RWA-HUB" # 服务器上的项目目录
-STATIC_JS_DIR="${PROJECT_DIR}/app/static/js"
-TEMPLATES_DIR="${PROJECT_DIR}/app/templates"
+# 本地文件路径
+WALLET_FIX_JS="app/static/js/wallet_fix.js"
+WALLET_DEBUG_JS="app/static/js/wallet_debug.js"
+FIXED_RUN_PY="fixed_run.py"
+API_FIXED="app/routes/api.py.fixed"
 
-# 本地文件
-LOCAL_WALLET_FIX="wallet_fix.js"
+# 输出函数
+function info() {
+  echo -e "${BLUE}[信息]${NC} $1"
+}
+
+function success() {
+  echo -e "${GREEN}[成功]${NC} $1"
+}
+
+function warning() {
+  echo -e "${YELLOW}[警告]${NC} $1"
+}
+
+function error() {
+  echo -e "${RED}[错误]${NC} $1"
+  exit 1
+}
 
 # 检查本地文件是否存在
-if [ ! -f "${LOCAL_WALLET_FIX}" ]; then
-    echo -e "${RED}错误: 本地钱包修复脚本 ${LOCAL_WALLET_FIX} 不存在${NC}"
-    exit 1
-fi
+function check_local_files() {
+  info "检查本地修复文件..."
+  
+  local missing_files=()
+  
+  if [ ! -f "$WALLET_FIX_JS" ]; then
+    missing_files+=("$WALLET_FIX_JS")
+  fi
+  
+  if [ ! -f "$WALLET_DEBUG_JS" ]; then
+    missing_files+=("$WALLET_DEBUG_JS")
+  fi
+  
+  if [ ! -f "$FIXED_RUN_PY" ]; then
+    missing_files+=("$FIXED_RUN_PY")
+  fi
+  
+  if [ ! -f "$API_FIXED" ]; then
+    missing_files+=("$API_FIXED")
+  fi
+  
+  if [ ${#missing_files[@]} -ne 0 ]; then
+    error "以下文件缺失:\n$(printf "  - %s\n" "${missing_files[@]}")"
+  fi
+  
+  success "所有修复文件已就绪"
+}
 
-echo -e "${GREEN}钱包修复脚本已找到，准备上传...${NC}"
+# 备份远程文件
+function backup_remote_files() {
+  info "创建服务器备份目录: $BACKUP_DIR"
+  ssh -i $PEM_FILE $SERVER "mkdir -p $BACKUP_DIR"
+  
+  info "备份服务器文件..."
+  ssh -i $PEM_FILE $SERVER "mkdir -p $BACKUP_DIR/static/js $BACKUP_DIR/routes $BACKUP_DIR/templates"
+  
+  # 备份JavaScript文件
+  ssh -i $PEM_FILE $SERVER "cp $STATIC_DIR/wallet.js $BACKUP_DIR/static/js/ 2>/dev/null || true"
+  ssh -i $PEM_FILE $SERVER "cp $STATIC_DIR/wallet_fix.js $BACKUP_DIR/static/js/ 2>/dev/null || true"
+  
+  # 备份Python文件
+  ssh -i $PEM_FILE $SERVER "cp /home/vincent/RWA-HUB_4.0/run.py $BACKUP_DIR/ 2>/dev/null || true"
+  
+  # 备份Routes文件
+  ssh -i $PEM_FILE $SERVER "cp $ROUTES_DIR/api.py $BACKUP_DIR/routes/ 2>/dev/null || true"
+  
+  # 备份模板文件
+  ssh -i $PEM_FILE $SERVER "cp $TEMPLATES_DIR/base.html $BACKUP_DIR/templates/ 2>/dev/null || true"
+  
+  success "服务器文件备份完成: $BACKUP_DIR"
+}
 
-# 1. 上传钱包修复脚本到服务器的静态JS目录
-echo -e "${YELLOW}上传钱包修复脚本到服务器...${NC}"
-scp -i ${SSH_KEY} ${LOCAL_WALLET_FIX} ${REMOTE_USER}@${SERVER}:${STATIC_JS_DIR}/
+# 上传修复文件
+function upload_fix_files() {
+  info "上传修复文件到服务器..."
+  
+  # 上传JavaScript修复文件
+  scp -i $PEM_FILE $WALLET_FIX_JS $SERVER:$STATIC_DIR/
+  scp -i $PEM_FILE $WALLET_DEBUG_JS $SERVER:$STATIC_DIR/
+  
+  # 上传Python修复文件
+  scp -i $PEM_FILE $FIXED_RUN_PY $SERVER:/home/vincent/RWA-HUB_4.0/
+  
+  # 上传API修复文件
+  scp -i $PEM_FILE $API_FIXED $SERVER:$ROUTES_DIR/
+  
+  success "所有修复文件已上传"
+}
 
-if [ $? -ne 0 ]; then
-    echo -e "${RED}错误: 上传钱包修复脚本失败${NC}"
-    exit 1
-fi
+# 确保HTML模板引用了修复脚本
+function ensure_js_references() {
+  info "检查并更新base.html中的JavaScript引用..."
+  
+  # 检查wallet_fix.js引用
+  local fix_js_count=$(ssh -i $PEM_FILE $SERVER "grep -c 'wallet_fix.js' $TEMPLATES_DIR/base.html 2>/dev/null || echo 0")
+  
+  if [ "$fix_js_count" -eq "0" ]; then
+    info "添加wallet_fix.js引用到base.html..."
+    ssh -i $PEM_FILE $SERVER "sed -i '/wallet\.js/a \    <script src=\"{{ url_for(\"static\", filename=\"js/wallet_fix.js\") }}\"></script>' $TEMPLATES_DIR/base.html"
+  else
+    info "已检测到wallet_fix.js引用"
+  fi
+  
+  # 检查wallet_debug.js引用
+  local debug_js_count=$(ssh -i $PEM_FILE $SERVER "grep -c 'wallet_debug.js' $TEMPLATES_DIR/base.html 2>/dev/null || echo 0")
+  
+  if [ "$debug_js_count" -eq "0" ]; then
+    info "添加wallet_debug.js引用到base.html..."
+    ssh -i $PEM_FILE $SERVER "sed -i '/wallet_fix\.js/a \    <script src=\"{{ url_for(\"static\", filename=\"js/wallet_debug.js\") }}\"></script>' $TEMPLATES_DIR/base.html"
+  else
+    info "已检测到wallet_debug.js引用"
+  fi
+  
+  success "base.html中的JavaScript引用已更新"
+}
 
-echo -e "${GREEN}钱包修复脚本已成功上传到 ${STATIC_JS_DIR}/${LOCAL_WALLET_FIX}${NC}"
+# 重启应用
+function restart_app() {
+  info "应用API修复..."
+  ssh -i $PEM_FILE $SERVER "cp $ROUTES_DIR/api.py.fixed $ROUTES_DIR/api.py"
+  
+  info "应用运行脚本修复..."
+  ssh -i $PEM_FILE $SERVER "cp /home/vincent/RWA-HUB_4.0/fixed_run.py /home/vincent/RWA-HUB_4.0/run.py"
+  
+  info "重启Flask应用..."
+  ssh -i $PEM_FILE $SERVER "cd /home/vincent/RWA-HUB_4.0 && supervisorctl restart flask_app || systemctl restart flask_app || pkill -f 'python.*run.py' || true"
+  
+  # 给应用一些启动时间
+  sleep 5
+  
+  # 检查应用是否成功启动
+  local is_running=$(ssh -i $PEM_FILE $SERVER "ps aux | grep -v grep | grep -c 'python.*run.py' || echo 0")
+  
+  if [ "$is_running" -ge "1" ]; then
+    success "Flask应用已成功重启"
+  else
+    warning "未检测到Flask应用进程，尝试手动启动..."
+    ssh -i $PEM_FILE $SERVER "cd /home/vincent/RWA-HUB_4.0 && nohup python3 run.py > flask_app.log 2>&1 &"
+    sleep 3
+    
+    is_running=$(ssh -i $PEM_FILE $SERVER "ps aux | grep -v grep | grep -c 'python.*run.py' || echo 0")
+    if [ "$is_running" -ge "1" ]; then
+      success "Flask应用已手动启动"
+    else
+      error "无法启动Flask应用，请手动检查"
+    fi
+  fi
+}
 
-# 2. 修改base.html文件，添加钱包修复脚本引用
-echo -e "${YELLOW}修改base.html文件，添加钱包修复脚本引用...${NC}"
+# 验证部署
+function verify_deployment() {
+  info "验证部署..."
+  
+  # 检查JS文件是否存在
+  local js_files_exist=$(ssh -i $PEM_FILE $SERVER "[ -f $STATIC_DIR/wallet_fix.js ] && [ -f $STATIC_DIR/wallet_debug.js ] && echo 'true' || echo 'false'")
+  
+  if [ "$js_files_exist" != "true" ]; then
+    error "JavaScript修复文件未正确部署"
+  fi
+  
+  # 检查API文件是否已修复
+  local api_fixed=$(ssh -i $PEM_FILE $SERVER "grep -c 'Fixed version' $ROUTES_DIR/api.py 2>/dev/null || echo 0")
+  
+  if [ "$api_fixed" -eq "0" ]; then
+    warning "未检测到API修复标记，可能未正确应用API修复"
+  fi
+  
+  # 检查应用是否响应
+  local http_status=$(ssh -i $PEM_FILE $SERVER "curl -s -o /dev/null -w '%{http_code}' http://localhost:5000/")
+  
+  if [ "$http_status" == "200" ]; then
+    success "应用HTTP响应正常(状态码: 200)"
+  else
+    warning "应用HTTP响应异常(状态码: $http_status)"
+  fi
+  
+  success "部署验证完成"
+}
 
-# 创建备份
-ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "cp ${TEMPLATES_DIR}/base.html ${TEMPLATES_DIR}/base.html.bak_$(date +%Y%m%d_%H%M%S)"
+# 主函数
+function main() {
+  echo "=================================="
+  echo "  Flask应用修复部署工具 v1.0.0"  
+  echo "=================================="
+  
+  # 执行部署步骤
+  check_local_files
+  backup_remote_files
+  upload_fix_files
+  ensure_js_references
+  restart_app
+  verify_deployment
+  
+  echo ""
+  echo "=================================="
+  echo -e "${GREEN}  部署完成!${NC}"
+  echo "=================================="
+}
 
-if [ $? -ne 0 ]; then
-    echo -e "${RED}错误: 创建base.html备份失败${NC}"
-    exit 1
-fi
-
-# 添加脚本引用到wallet.js之后
-ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "sed -i '/static.*wallet.js/a \    <script src=\"{{ url_for(\"static\", filename=\"js/wallet_fix.js\") }}\"></script>' ${TEMPLATES_DIR}/base.html"
-
-if [ $? -ne 0 ]; then
-    echo -e "${RED}错误: 修改base.html添加脚本引用失败${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}base.html已成功修改，添加了钱包修复脚本引用${NC}"
-
-# 3. 检查并修复文件权限
-echo -e "${YELLOW}检查并修复文件权限...${NC}"
-ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "chmod 644 ${STATIC_JS_DIR}/${LOCAL_WALLET_FIX}"
-
-if [ $? -ne 0 ]; then
-    echo -e "${RED}警告: 修复文件权限失败，可能需要手动设置${NC}"
-fi
-
-# 4. 重启应用服务
-echo -e "${YELLOW}重启应用服务...${NC}"
-ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "cd ${PROJECT_DIR} && pm2 restart rwa-hub"
-
-if [ $? -ne 0 ]; then
-    echo -e "${RED}警告: 重启应用服务失败，可能需要手动重启${NC}"
-    echo -e "${YELLOW}尝试使用其他方式重启...${NC}"
-    ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "cd ${PROJECT_DIR} && pm2 restart all"
-fi
-
-# 5. 验证修复是否生效
-echo -e "${YELLOW}验证修复是否生效...${NC}"
-echo -e "${GREEN}请等待应用重启完成（约10-20秒）...${NC}"
-sleep 15
-
-echo -e "${YELLOW}检查应用是否正常运行...${NC}"
-ssh -i ${SSH_KEY} ${REMOTE_USER}@${SERVER} "curl -s -o /dev/null -w '%{http_code}' localhost:5000/"
-
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}应用已成功重启并响应HTTP请求${NC}"
-else
-    echo -e "${RED}警告: 应用可能未正常启动，请手动检查${NC}"
-fi
-
-echo -e "${GREEN}===========================================${NC}"
-echo -e "${GREEN}修复脚本部署完成！${NC}"
-echo -e "${GREEN}请测试以下功能:${NC}"
-echo -e "${GREEN}1. 钱包连接状态检测${NC}"
-echo -e "${GREEN}2. 购买按钮状态更新${NC}"
-echo -e "${GREEN}3. 购买流程${NC}"
-echo -e "${GREEN}===========================================${NC}" 
+# 执行主函数
+main 
