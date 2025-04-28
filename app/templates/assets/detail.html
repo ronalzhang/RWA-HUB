@@ -364,11 +364,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 确保全局钱包状态变量存在
                 if (!window.walletState) {
+                    console.log('警告: window.walletState未初始化，创建临时对象');
                     window.walletState = {
                         connected: false,
                         isConnected: false,
-                        address: null
+                        address: null,
+                        _isTemporary: true  // 添加标记表示这是临时对象
                     };
+                } else {
+                    console.log('使用已初始化的window.walletState对象');
                 }
                 
                 // 同步window.walletState和window.wallet中的数据
@@ -414,6 +418,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (typeof loadDividendHistory === 'function') {
                     loadDividendHistory();
                 }
+                
+                // 添加延迟检查，确保wallet.js完全加载
+                setTimeout(function() {
+                    console.log('执行钱包功能检查和修复');
+                    
+                    // 检查全局钱包状态
+                    if (window.walletState && window.walletState._isTemporary) {
+                        console.warn('检测到临时钱包状态对象，尝试恢复正确状态');
+                        // 尝试重新初始化wallet.js
+                        if (typeof window.walletState.init === 'function') {
+                            window.walletState.init().catch(e => console.error('钱包重新初始化失败:', e));
+                        }
+                    }
+                    
+                    // 确保updateBuyButtonState函数存在
+                    if (typeof window.updateBuyButtonState !== 'function' && typeof updateBuyButtonState === 'function') {
+                        console.log('将本地updateBuyButtonState函数复制到全局作用域');
+                        window.updateBuyButtonState = updateBuyButtonState;
+                    }
+                    
+                    // 强制更新购买按钮状态
+                    if (typeof updateBuyButtonState === 'function') {
+                        console.log('强制更新购买按钮状态');
+                        updateBuyButtonState();
+                    }
+                }, 1500);
                 
                 console.log('页面初始化完成');
             });
@@ -1203,25 +1233,47 @@ document.addEventListener('DOMContentLoaded', function() {
                 function updateBuyButtonState() {
                     console.log('{{ _("Updating buy button status, current wallet status") }}:', window.walletState);
                     
+                    // 尝试使用统一的按钮状态更新函数
+                    if (window.updateBuyButtonStateGlobal && typeof window.updateBuyButtonStateGlobal === 'function') {
+                        // 如果全局函数可用，则使用它
+                        console.log('使用全局统一的updateBuyButtonState函数');
+                        return window.updateBuyButtonStateGlobal();
+                    }
+                    
                     // 获取购买按钮 - 已经有了buyButton变量，不需要重新获取
                     // 更全面地检查钱包连接状态，增加多种检查方式
                     let isConnected = false;
                     
-                    // 方法1: 检查window.walletState
+                    // 方法1: 检查window.walletState (主要方法)
                     if (window.walletState && (window.walletState.isConnected || window.walletState.connected)) {
                         isConnected = true;
                     }
                     
-                    // 方法2: 检查window.wallet对象
+                    // 方法2: 检查本地存储 (备用方法)
+                    if (!isConnected) {
+                        const storedAddress = localStorage.getItem('walletAddress');
+                        const storedType = localStorage.getItem('walletType');
+                        if (storedAddress && storedType) {
+                            isConnected = true;
+                            // 同步到walletState对象
+                            if (window.walletState) {
+                                window.walletState.connected = true;
+                                window.walletState.address = storedAddress;
+                                window.walletState.type = storedType;
+                            }
+                        }
+                    }
+                    
+                    // 方法3: 检查window.wallet对象
                     if (!isConnected && window.wallet && (
                         window.wallet.connected ||
-                        window.wallet.getAddress() ||
-                        window.wallet.getConnectionStatus())
+                        window.wallet.getAddress && window.wallet.getAddress() ||
+                        window.wallet.getConnectionStatus && window.wallet.getConnectionStatus())
                     ) {
                         isConnected = true;
                     }
                     
-                    // 方法3: 检查全局地址变量
+                    // 方法4: 检查全局地址变量
                     if (!isConnected && (window.connectedWalletAddress || window.ethereumAddress || window.solanaAddress)) {
                         isConnected = true;
                     }
@@ -1230,6 +1282,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('钱包连接状态检查结果:', isConnected, {
                         'walletState': window.walletState ? '存在' : '不存在',
                         'connectedStatus': window.walletState ? (window.walletState.connected || window.walletState.isConnected) : '未知',
+                        'localStorageAddress': localStorage.getItem('walletAddress') || '无',
                         'globalAddress': window.connectedWalletAddress || window.ethereumAddress || window.solanaAddress || '无'
                     });
 
@@ -1264,8 +1317,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 再增加一次额外延迟检查，确保在页面完全加载后检查状态
                 setTimeout(function() {
                     console.log('最终钱包状态检查，确保购买按钮正确更新');
-                    updateBuyButtonState();
-                }, 3000);
+                    
+                    // 查找可能的购买按钮元素
+                    if (!buyButton) {
+                        console.log('尝试再次查找购买按钮元素');
+                        const possibleButtons = [
+                            document.getElementById('buy-button'),
+                            document.querySelector('.buy-button'),
+                            document.querySelector('button[data-action="buy"]'),
+                            document.querySelector('button.btn-primary:not([id])')
+                        ];
+                        
+                        for (const btn of possibleButtons) {
+                            if (btn) {
+                                console.log('找到购买按钮:', btn);
+                                buyButton = btn;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // 如果找到了全局统一更新函数，优先使用
+                    if (window.updateBuyButtonStateGlobal && typeof window.updateBuyButtonStateGlobal === 'function') {
+                        console.log('使用全局统一更新函数更新按钮状态');
+                        window.updateBuyButtonStateGlobal();
+                    } else {
+                        // 否则使用本地函数
+                        updateBuyButtonState();
+                    }
+                }, 5000);
                 
                 // 添加事件监听器
                 window.addEventListener('walletConnected', function(event) {
@@ -1299,7 +1379,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // 在新按钮上添加事件监听
-                    newBuyButton.addEventListener('click', handleBuy);
+                    newBuyButton.addEventListener('click', localHandleBuy);
                     console.log('购买按钮成功绑定点击事件');
                 }
                 
@@ -1593,148 +1673,30 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
             // 处理购买按钮点击
-            async function handleBuy(e) {
+            async function localHandleBuy(e) {
                 e.preventDefault();
                 
-                // 显示加载状态
-                if (typeof window.showLoadingState === 'function') {
-                    window.showLoadingState('正在处理购买请求...');
-                } else {
-                    console.log('显示加载状态');
-                }
+                console.log('本地购买函数被调用，转调全局handleBuy');
                 
-                const buyButton = document.getElementById('buy-button'); // 修正ID
-                const originalButtonText = buyButton ? buyButton.innerHTML : '';
-                
-                // 设置按钮为加载中状态
-                if (buyButton) {
-                    buyButton.disabled = true;
-                    buyButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> {{ _("Processing...") }}';
-                }
-                
-                // 首先检查钱包连接状态
-                if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
-                    console.error('钱包未连接或地址不可用');
-                    if (buyButton) {
-                        buyButton.disabled = false;
-                        buyButton.innerHTML = originalButtonText;
-                    }
-                    if (typeof hideLoadingState === 'function') hideLoadingState();
-                    if (typeof showToast === 'function') {
-                        showToast('{{ _("Please connect your wallet first") }}', 'error');
-                    } else {
-                        alert('{{ _("Please connect your wallet first") }}');
-                    }
-                    
-                    // 尝试触发钱包连接
-                    if (typeof connectWallet === 'function') {
-                        try {
-                            await connectWallet();
-                        } catch (err) {
-                            console.error('钱包连接失败:', err);
-                        }
-                    }
-                    return;
-                }
-                
-                // 记录钱包地址，用于调试
-                console.log('当前钱包地址:', window.walletState.address);
-                
-                // 获取表单数据 - 使用购买数量输入框的值
+                // 获取必要参数
+                const buyButton = document.getElementById('buy-button');
                 const amountInput = document.getElementById('purchase-amount');
-                if (!amountInput) {
-                    console.error('找不到购买数量输入框');
-                    if (typeof hideLoadingState === 'function') hideLoadingState();
-                    return;
-                }
+                const assetId = "{{ asset.id }}";
+                const price = parseFloat("{{ asset.token_price }}");
                 
-                const amount = amountInput.value;
-                const assetId = "{{ asset.id }}"; // 从模板变量获取资产ID
-                const price = "{{ asset.price_per_token }}"; // 从模板变量获取价格
-                const currency = "USDC"; // 默认货币
-                
-                // 格式化数字 - 确保没有逗号
-                const cleanAmount = amount.toString().replace(/,/g, '');
-                const cleanPrice = price.toString().replace(/,/g, '');
-                
-                // 格式化数字后的日志
-                console.log('购买信息:', {
-                    assetId,
-                    amount: cleanAmount,
-                    formattedAmount: parseFloat(cleanAmount).toFixed(6),
-                    price: cleanPrice,
-                    formattedPrice: parseFloat(cleanPrice).toFixed(6),
-                    currency,
-                    walletAddress: window.walletState.address
-                });
-                
-                // 创建FormData对象用于API请求
-                const formData = new FormData();
-                formData.append('asset_id', assetId);
-                formData.append('amount', parseFloat(cleanAmount).toFixed(0)); // 确保是整数
-                formData.append('price', parseFloat(cleanPrice).toFixed(6));
-                formData.append('currency', currency);
-                formData.append('wallet_address', window.walletState.address); // 添加钱包地址
-                
-                try {
-                    return new Promise((resolve, reject) => {
-                        // 准备购买请求
-                        fetch('/api/trades/prepare_purchase', {
-                            method: 'POST',
-                            body: formData,
-                            headers: {
-                                'X-Requested-With': 'XMLHttpRequest',
-                                'X-Wallet-Address': window.walletState.address, // 添加钱包地址头
-                                'X-Eth-Address': window.walletState.address // 兼容性处理
-                            }
-                        })
-                        .then(response => {
-                            if (!response.ok) {
-                                return response.json().then(data => {
-                                    throw new Error(data.error || '{{ _("Server error") }}');
-                                });
-                            }
-                            return response.json();
-                        })
-                        .then(data => {
-                            if (!data.success) {
-                                throw new Error(data.error || '{{ _("Failed to prepare purchase") }}');
-                            }
-                            
-                            console.log('购买准备成功:', data);
-                            
-                            // 显示确认购买模态框
-                            const buyModal = new bootstrap.Modal(document.getElementById('buyModal'));
-                            document.getElementById('confirm-amount').value = cleanAmount;
-                            document.getElementById('confirm-total').value = data.total_amount + ' USDC';
-                            
-                            // 存储交易ID和其他必要数据，用于确认时调用
-                            window.pendingPurchase = {
-                                trade_id: data.trade_id,
-                                total: data.total_amount,
-                                amount: cleanAmount,
-                                total_cost: data.total_amount,
-                                seller: data.seller_address,
-                                recipient_address: data.seller_address,
-                                platform_fee_basis_points: data.platform_fee_basis_points,
-                                contract_address: data.purchase_contract_address
-                            };
-                            
-                            buyModal.show();
-                            resolve(data);
-                        })
-                        .catch(error => {
-                            console.error('购买准备失败:', error);
-                                hideLoadingState();
-                            showError(error.message || '{{ _("Failed to prepare purchase") }}');
-                            reject(error);
-                        });
-                    });
-                } catch (error) {
-                    console.error('购买处理错误:', error);
-                                hideLoadingState();
-                    showError(error.message || '{{ _("An error occurred during purchase") }}');
-                    throw error;
+                // 调用wallet.js中的全局handleBuy函数
+                if (typeof window.handleBuy === 'function') {
+                    try {
+                        await window.handleBuy(assetId, amountInput, buyButton, price);
+                    } catch (error) {
+                        console.error('调用全局handleBuy函数失败:', error);
+                        showError('处理购买请求时发生错误，请稍后重试');
+                        hideLoadingState();
+                    }
+                } else {
+                    console.error('全局handleBuy函数不可用');
+                    alert('购买功能暂时不可用，请刷新页面后重试');
+                    hideLoadingState();
                 }
             }
 
@@ -2862,7 +2824,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 为购买按钮添加事件监听器
         const buyButton = document.getElementById('buy-button');
         if (buyButton) {
-            buyButton.addEventListener('click', handleBuy);
+            buyButton.addEventListener('click', localHandleBuy);
         }
     });
 </script>
