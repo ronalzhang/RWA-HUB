@@ -10,13 +10,13 @@
     // 文本资源
     const TEXTS = {
         'zh': {
-            processing: '正在处理购买请求...',
-            walletNotConnected: '请先连接钱包',
-            missingAmountInput: '找不到购买数量输入框',
-            invalidAmount: '请输入有效的购买数量',
-            serverError: '服务器错误',
-            prepareFailed: '准备购买失败',
-            purchaseError: '购买处理出错'
+            processing: 'Processing...',
+            walletNotConnected: 'Please connect your wallet first',
+            missingAmountInput: 'Purchase amount input not found',
+            invalidAmount: 'Please enter a valid purchase amount',
+            serverError: 'Server error',
+            prepareFailed: 'Failed to prepare purchase',
+            purchaseError: 'Error processing purchase'
         },
         'en': {
             processing: 'Processing purchase request...',

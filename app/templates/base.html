@@ -1224,11 +1224,37 @@
         })();
     </script>
     
-    <!-- 公共JavaScript文件 -->
+    <!-- 钱包脚本 -->
+    <script src="{{ url_for('static', filename='js/wallet_unified.js') }}"></script>
+    
+    <!-- 钱包主脚本 -->
     <script src="{{ url_for('static', filename='js/wallet.js') }}"></script>
     <script src="{{ url_for('static', filename='js/wallet_fix.js') }}"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始加载完成后立即更新所有购买按钮
+            setTimeout(function() {
+                if (typeof window.updateBuyButtonState === 'function') {
+                    window.updateBuyButtonState(null, 'Buy');
+                    console.log('初始购买按钮状态已更新为英文"Buy"');
+                }
+            }, 100);
+            
+            // 监听钱包脚本加载完成事件
+            document.addEventListener('walletJsLoaded', function() {
+                console.log('钱包脚本加载完成，更新购买按钮状态');
+                if (typeof window.updateBuyButtonState === 'function') {
+                    window.updateBuyButtonState(null, 'Buy');
+                }
+            });
+        });
+    </script>
+    
+    <!-- 钱包调试和修复脚本 -->
     <script src="{{ url_for('static', filename='js/wallet_debug.js') }}"></script>
     <script src="{{ url_for('static', filename='js/wallet_api_fix.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
     
     <script>
         // 等待钱包脚本加载完成后执行修复
