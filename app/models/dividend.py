@@ -1,5 +1,6 @@
 from datetime import datetime
 from app.extensions import db
+from sqlalchemy import func
 
 class DividendRecord(db.Model):
     """分红记录"""
@@ -48,9 +49,9 @@ class DividendRecord(db.Model):
     
     @classmethod
     def get_total_amount_by_asset(cls, asset_id):
-        """获取资产的总分红金额"""
-        records = cls.query.filter_by(asset_id=asset_id).all()
-        return sum(record.amount for record in records)
+        """获取资产的总分红金额 (优化：使用数据库聚合)"""
+        total = db.session.query(func.sum(cls.amount)).filter_by(asset_id=asset_id).scalar()
+        return total or 0.0 # 如果没有记录或总和为None，返回0.0
     
     def to_dict(self):
         """转换为字典"""
