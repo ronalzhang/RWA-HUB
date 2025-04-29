@@ -15,7 +15,8 @@ const walletState = {
     connecting: false,         // 是否正在连接中
     chainId: null,             // 当前连接的链ID
     assets: [],                // 当前钱包拥有的资产
-    stateChangeCallbacks: [],  // 状态变更回调函数数组
+    // -- 修改：注释掉回调数组和相关方法，统一使用浏览器事件 --
+    // stateChangeCallbacks: [],  // 状态变更回调函数数组 
     web3: null,                // Web3实例（以太坊钱包）
     provider: null,            // 钱包提供商实例
     pendingWalletAppOpen: false, // 是否正在等待打开钱包App（移动端）
@@ -143,11 +144,13 @@ const walletState = {
                             // 已经在connect方法内更新了UI，无需重复
                             
                             // 通知状态变化
-                            this.notifyStateChange({
-                                type: 'reconnect', 
-                                address: this.address,
-                                walletType: this.walletType
-                            });
+                            // -- 修改：使用 triggerWalletStateChanged 替代 notifyStateChange --
+                            // this.notifyStateChange({
+                            //     type: 'reconnect', 
+                            //     address: this.address,
+                            //     walletType: this.walletType
+                            // });
+                            this.triggerWalletStateChanged(); // 触发事件
                         } else {
                             console.log('钱包重连失败，但保持界面状态');
                             // 确保UI显示钱包信息，即使重连失败
@@ -521,177 +524,40 @@ const walletState = {
      * @returns {Promise<boolean>} 连接是否成功
      */
     async connect(walletType) {
+        console.log(`尝试连接钱包: ${walletType}`);
+        this.connecting = true;
+        this.updateUI();
+        
+        let success = false;
         try {
-            console.log(`尝试连接钱包类型: ${walletType}`);
-            
-            if (!walletType) {
-                console.error('未指定钱包类型');
-                showError('请选择要连接的钱包类型');
-                    return false;
-                }
-            
-            // 如果当前已经连接了同类型的钱包，先断开连接
-            if (this.connected && this.walletType === walletType) {
-                await this.disconnect();
-            }
-            
-            // 在移动设备上进行特殊处理
-            if (this.isMobile()) {
-                console.log('检测到移动设备，特殊处理钱包连接');
-                
-                // 检查是否在dApp浏览器中
-                let inDAppBrowser = false;
-                
-                if (walletType.toLowerCase() === 'phantom' || walletType.toLowerCase() === 'solflare') {
-                    // 检查Solana对象是否存在
-                    inDAppBrowser = window.solana !== undefined;
-                } else if (walletType.toLowerCase() === 'ethereum' || walletType.toLowerCase() === 'metamask') {
-                    // 检查ethereum对象是否存在
-                    inDAppBrowser = window.ethereum !== undefined;
-                }
-                
-                if (!inDAppBrowser) {
-                    console.log('未在dApp浏览器中，尝试直接跳转到钱包App');
-                    
-                    // 根据钱包类型构建移动端深度链接
-                    let deepLink = '';
-                    
-                    if (walletType.toLowerCase() === 'phantom') {
-                        // 构建Phantom钱包链接 - 使用更可靠的Universal Link格式
-                        const currentUrl = encodeURIComponent(window.location.href);
-                        // 使用新的深度链接格式
-                        deepLink = `https://phantom.app/ul/browse/${currentUrl}`;
-                        
-                        // 保存当前钱包连接尝试状态到LocalStorage以便返回后检查
-                        localStorage.setItem('pendingWalletType', walletType);
-                        localStorage.setItem('pendingWalletConnection', 'true');
-                        localStorage.setItem('pendingWalletTimestamp', Date.now().toString());
-                        localStorage.setItem('lastConnectionAttemptUrl', window.location.href);
-                        
-                        // 创建并发送一个自定义事件，通知页面即将跳转到钱包
-                        document.dispatchEvent(new CustomEvent('walletAppRedirect', {
-                            detail: {
-                                walletType: walletType,
-                                timestamp: Date.now()
-                            }
-                        }));
-                        
-                        console.log('跳转到Phantom钱包App:', deepLink);
-                        // 跳转到钱包App
-                        window.location.href = deepLink;
-                        return true; // 返回true表示已尝试连接
-                    } else if (walletType.toLowerCase() === 'metamask') {
-                        // 构建MetaMask钱包链接
-                        const currentUrl = encodeURIComponent(window.location.href);
-                        deepLink = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
-                        
-                        // 保存当前钱包连接尝试状态
-                        localStorage.setItem('pendingWalletType', walletType);
-                        localStorage.setItem('pendingWalletConnection', 'true');
-                        localStorage.setItem('pendingWalletTimestamp', Date.now().toString());
-                        localStorage.setItem('lastConnectionAttemptUrl', window.location.href);
-                        
-                        console.log('跳转到MetaMask钱包App:', deepLink);
-                        // 跳转到钱包App
-                        window.location.href = deepLink;
-                        return true; // 返回true表示已尝试连接
-                    }
-                }
-            }
-            
-            // 记录要连接的钱包类型
-            const requestedWalletType = walletType;
-            let success = false;
-            
-            // 根据钱包类型调用不同的连接方法
-            switch (requestedWalletType.toLowerCase()) {
-                    case 'ethereum':
-                case 'metamask':
-                    success = await this.connectEthereum();
-                        break;
-                    case 'phantom':
-                    success = await this.connectPhantom();
-                        break;
-                case 'solflare':
-                    success = await this.connectSolflare();
-                    break;
-                case 'coinbase':
-                    success = await this.connectCoinbase();
-                    break;
-                case 'slope':
-                    success = await this.connectSlope();
-                    break;
-                case 'glow':
-                    success = await this.connectGlow();
-                    break;
-                    default:
-                    console.error(`不支持的钱包类型: ${requestedWalletType}`);
-                    showError(`不支持的钱包类型: ${requestedWalletType}`);
-                    return false;
-                }
-            
-            // 如果连接成功
-            if (success) {
-                console.log(`${requestedWalletType}钱包连接成功`);
-            
-                // 关闭钱包选择器
-                this.closeWalletSelector();
-            
-            // 更新UI
-                this.updateUI();
-                
-                // 获取余额和资产
-                try {
-                    await this.getWalletBalance();
-                    await this.getUserAssets(this.address);
-                await this.checkIsAdmin();
-                } catch (error) {
-                    console.warn('获取钱包信息时出错:', error);
-                }
-                
-                // 通知状态变化
-                this.notifyStateChange({
-                    type: 'connect',
-                    address: this.address,
-                    walletType: this.walletType
-                });
-                
-                // 广播自定义事件
-                document.dispatchEvent(new CustomEvent('walletConnected', {
-                    detail: {
-                        walletType: this.walletType,
-                        address: this.address
-                    }
-                }));
-            
-                    return true;
+            if (walletType === 'ethereum') {
+                success = await this.connectEthereum();
+            } else if (walletType === 'phantom' || walletType === 'solana') {
+                success = await this.connectPhantom();
             } else {
-                console.log(`${requestedWalletType}钱包连接失败`);
-                
-                // 确保清除部分连接状态
-                this.connected = false;
-                this.walletType = null;
-                this.address = null;
-                
-                // 更新UI
-                this.updateUI();
-                
-                return false;
+                throw new Error(`不支持的钱包类型: ${walletType}`);
+            }
+            
+            if (success) {
+                console.log(`${walletType} 钱包连接成功`);
+                // -- 修改：连接成功后触发事件 --
+                this.triggerWalletStateChanged();
+            } else {
+                console.log(`${walletType} 钱包连接失败或被用户取消`);
+                // 确保状态回滚
+                if (!this.connected) { // 只有在确实没连上的情况下才清除
+                    this.clearState();
+                }
             }
         } catch (error) {
-            console.error('连接钱包时出错:', error);
-            showError('连接钱包时出错: ' + (error.message || '未知错误'));
-            
-            // 确保清除部分连接状态
-            this.connected = false;
-            this.walletType = null;
-            this.address = null;
-            
-            // 更新UI
+            console.error(`连接 ${walletType} 钱包失败:`, error);
+            this.clearState(); // 出错时彻底清除状态
+            showError(`连接失败: ${error.message}`);
+        } finally {
+            this.connecting = false;
             this.updateUI();
-            
-                            return false;
         }
+        return success;
     },
     
     /**
@@ -858,64 +724,40 @@ const walletState = {
      * @param {boolean} reload - 是否重新加载页面
      */
     async disconnect(reload = true) {
-        try {
-            console.log('断开钱包连接');
-            
-            // 如果没有连接钱包，不执行任何操作
-            if (!this.connected || !this.walletType) {
-                console.log('钱包未连接，无需断开');
-                return;
-            }
-            
-            // 根据钱包类型执行不同的断开操作
-            if (this.walletType === 'ethereum' && window.ethereum) {
-                console.log('断开以太坊钱包连接');
-                // 以太坊钱包没有专门的断开连接方法，只需清除状态
-                
-                // 尝试移除事件监听器
-                window.ethereum.removeAllListeners?.();
-            } else if ((this.walletType === 'phantom' || this.walletType === 'solana') && window.solana) {
-                console.log('断开Phantom钱包连接');
-                try {
-                    // 断开Phantom钱包连接
-                    await window.solana.disconnect();
-                } catch (err) {
-                    console.error('断开Phantom钱包时出错:', err);
-                }
-                
-                // 尝试移除事件监听器
-                window.solana.removeAllListeners?.();
-            }
-            
-            // 清除钱包状态
-            this.clearState();
-            
-            // 清除存储中的钱包信息，但不触发页面刷新或重载
-            this.clearStoredWalletData();
-            
-            // 触发断开连接事件，通知其他组件
-            this.notifyStateChange({ type: 'disconnect' });
-            
-            // 更新UI
-            this.updateUI();
-            
-            if (reload) {
-                console.log('断开连接后重新加载页面');
-                // 重新加载页面以确保状态完全重置
-                setTimeout(() => {
-                    window.location.reload();
-                }, 100);
-        } else {
-                console.log('断开连接，但不重新加载页面');
-                showSuccess('已断开钱包连接');
-            }
-        } catch (error) {
-            console.error('断开钱包连接时出错:', error);
-            showError('断开钱包连接时出错: ' + (error.message || '未知错误'));
-            
-            // 即使出错，也清除状态
-            this.clearState();
-            this.updateUI();
+        console.log('断开钱包连接...');
+        
+        // 清除状态和存储
+        this.clearState();
+        this.clearStoredWalletData();
+        
+        // 移除监听器
+        if (this.provider && this.provider.removeListener) {
+            this.provider.removeListener('accountsChanged', this.handleAccountsChanged);
+            this.provider.removeListener('chainChanged', this.handleChainChanged);
+            this.provider.removeListener('disconnect', this.handleDisconnect);
+        }
+        if (window.solana && window.solana.removeListener) {
+             window.solana.removeListener('disconnect', this.handlePhantomDisconnect);
+             window.solana.removeListener('accountChanged', this.handlePhantomAccountChanged);
+        }
+        
+        this.provider = null;
+        this.web3 = null;
+        
+        // 更新UI
+        this.updateUI();
+        
+        // -- 修改：断开连接后触发事件 --
+        this.triggerWalletStateChanged();
+        
+        // 通知状态变更
+        // -- 修改：移除 notifyStateChange 调用 --
+        // this.notifyStateChange({ type: 'disconnect' });
+        
+        // 可选：刷新页面以确保完全重置
+        if (reload) {
+            console.log('刷新页面以完成断开连接');
+            window.location.reload();
         }
     },
     
