@@ -805,7 +805,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
                         // 格式化日期
                         const date = new Date(trade.created_at);
+                        // -- 修改：包含年份 --
                         const formattedDate = date.toLocaleString('zh-CN', {
+                            year: 'numeric', // 添加年份
                             month: 'numeric',
                             day: 'numeric',
                             hour: '2-digit',
@@ -831,8 +833,15 @@ document.addEventListener('DOMContentLoaded', function() {
                             statusText = '{{ _("Failed") }}';
                             statusClass = 'text-danger';
                         } else if (trade.status === 'pending_payment') {
-                            statusText = '{{ _("Waiting Payment") }}';
-                            statusClass = 'text-info';
+                            // -- 修改：增加过期状态判断 --
+                            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+                            if (date < twentyFourHoursAgo) {
+                                statusText = '{{ _("Expired") }}';
+                                statusClass = 'text-muted'; // 使用灰色表示过期
+                            } else {
+                                statusText = '{{ _("Waiting Payment") }}';
+                                statusClass = 'text-info';
+                            }
                         } else if (trade.status === 'pending_confirmation') {
                             statusText = '{{ _("Confirming") }}';
                             statusClass = 'text-warning';
@@ -948,9 +957,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     data.trades.forEach(trade => {
                         // 格式化日期
                         const date = new Date(trade.created_at);
-                        const formattedDate = date.toLocaleString('en-US', {
-                            month: 'short',
-                        day: '2-digit',
+                        // -- 修改：包含年份 (在 loadMoreTrades 函数中也应用修改) --
+                        const formattedDate = date.toLocaleString('zh-CN', {
+                            year: 'numeric', // 添加年份
+                            month: 'numeric',
+                        day: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit'
                         });
@@ -974,8 +985,15 @@ document.addEventListener('DOMContentLoaded', function() {
                             statusText = '{{ _("Failed") }}';
                         statusClass = 'text-danger';
                     } else if (trade.status === 'pending_payment') {
-                        statusText = '{{ _("Waiting Payment") }}';
-                        statusClass = 'text-info';
+                        // -- 修改：增加过期状态判断 (在 loadMoreTrades 函数中也应用修改) --
+                        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+                        if (date < twentyFourHoursAgo) {
+                            statusText = '{{ _("Expired") }}';
+                            statusClass = 'text-muted';
+                        } else {
+                            statusText = '{{ _("Waiting Payment") }}';
+                            statusClass = 'text-info';
+                        }
                     } else if (trade.status === 'pending_confirmation') {
                         statusText = '{{ _("Confirming") }}';
                         statusClass = 'text-warning';
@@ -995,7 +1013,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <td>${amount}</td>
                             <td>${total} USDC</td>
                             <td class="${statusClass}">${statusText}</td>
-                            <td style="max-width:25%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${txHashDisplay}</td>
+                            <td style="max-width:20%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${txHashDisplay}</td>
                         `;
                         tbody.appendChild(tr);
                     });
@@ -1467,7 +1485,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const timeoutId = setTimeout(() => {
                     didTimeout = true;
                     console.warn('{{ _("Loading total dividends timed out") }}');
-                    totalDividendsElement.innerHTML = '<span class="text-warning">{{ _("Timeout") }}</span>';
+                    // -- 修改：使用更明确的超时文本 --
+                    totalDividendsElement.innerHTML = '<span class="text-warning">{{ _("加载超时") }}</span>';
                 }, timeout);
                 
                 try {
@@ -1518,7 +1537,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 如果没有超时，则显示错误信息
                     if (!didTimeout) {
                     console.error('{{ _("Failed to load total dividend information") }}:', error);
-                        totalDividendsElement.innerHTML = '<span class="text-danger">{{ _("Failed to load") }}</span>';
+                        // -- 修改：使用更明确的错误文本 --
+                        totalDividendsElement.innerHTML = '<span class="text-danger">{{ _("加载失败") }}</span>';
                     }
                 }
             }
