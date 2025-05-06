@@ -147,6 +147,15 @@ def create_app(config_name='development'):
     with app.app_context():
         import app.tasks
     
+    # -- 修改：使用正确的配置键 RATELIMIT_STORAGE_URI --
+    db_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
+    if db_uri:
+        # app.config['RATELIMIT_STORAGE_URL'] = db_uri # 错误键名
+        app.config['RATELIMIT_STORAGE_URI'] = db_uri # 正确键名
+        app.logger.info(f"设置 Flask-Limiter 存储 URI: {db_uri}")
+    else:
+        app.logger.warning("未找到数据库 URI，Flask-Limiter 将使用内存存储")
+    
     return app
 
 # 在初始化时添加分销佣金设置
