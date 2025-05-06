@@ -712,19 +712,19 @@
     // 检查当前是否在资产详情页
     const isAssetDetailPage = window.location.pathname.includes('/assets/') || 
                             document.querySelector('.asset-detail-page') ||
-                            document.getElementById('asset-detail-container');
+                            document.getElementById('asset-detail-container') ||
+                            document.getElementById('buy-button');
     
     // 如果在资产详情页，不修改已设置好的按钮文本
-    if (isAssetDetailPage && button.textContent.includes('Buy') || button.textContent.includes('购买')) {
+    if (isAssetDetailPage && (button.id === 'buy-button' || 
+                             button.textContent.includes('Buy') || 
+                             button.textContent.includes('购买') ||
+                             button.innerHTML.includes('fa-shopping-cart'))) {
       // 仅更新禁用状态，不更改文本
       if (!walletState || !walletState.isWalletConnected()) {
         // 未连接钱包
         button.disabled = true;
         button.setAttribute('data-wallet-status', 'disconnected');
-      } else if (walletState.balance === null) {
-        // 连接了钱包但余额未知
-        button.disabled = true;
-        button.setAttribute('data-wallet-status', 'loading');
       } else {
         // 连接了钱包并有余额
         button.disabled = false;
@@ -1000,6 +1000,17 @@
       }
       
       try {
+        // 检查是否在资产详情页，如果是则不强制更改按钮文本
+        const isAssetDetailPage = window.location.pathname.includes('/assets/') || 
+                                 document.querySelector('.asset-detail-page') ||
+                                 document.getElementById('asset-detail-container') ||
+                                 document.getElementById('buy-button');
+                                 
+        if (isAssetDetailPage) {
+          log('检测到资产详情页，跳过强制修改按钮文本');
+          return true;
+        }
+        
         // 使用标准有效的选择器
         const validSelectors = [
           '.buy-btn', 
@@ -1010,7 +1021,6 @@
           '.purchase-button', 
           '[class*="buy"]', 
           '.buy',
-          '#buy-button',
           '.detail-buy-button',
           '[data-asset-action="buy"]',
           '.asset-buy-button'
