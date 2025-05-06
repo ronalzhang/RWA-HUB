@@ -75,7 +75,14 @@ def init_extensions(app):
     babel.init_app(app)
     
     # 初始化请求限制器
-    limiter.init_app(app)
+    storage_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
+    if storage_uri:
+        limiter.init_app(app, storage_uri=storage_uri)
+        app.logger.info(f"Flask-Limiter 使用数据库存储: {storage_uri}")
+    else:
+        # 如果没有数据库URI，则使用默认（内存），并保留警告
+        limiter.init_app(app)
+        app.logger.warning("未配置SQLALCHEMY_DATABASE_URI，Flask-Limiter 将使用内存存储")
     
     # 初始化调度器（不需要init_app）
     try:
