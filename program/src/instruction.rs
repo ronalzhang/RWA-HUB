@@ -5,30 +5,39 @@ use anchor_spl::token::{Token, TokenAccount};
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub enum RwaHubInstruction {
-    /// 初始化资产
+    /// 初始化资产，并创建PDA金库存放代币
     /// 
     /// Accounts expected:
-    /// 0. `[signer]` 创建者
-    /// 1. `[writable]` 资产账户
-    /// 2. `[writable]` 代币铸造账户
-    /// 3. `[]` 系统程序
-    /// 4. `[]` 代币程序
+    /// 0. `[signer]` 资产创建者，支付所有费用
+    /// 1. `[writable]` 资产数据账户
+    /// 2. `[writable]` 资产代币铸造厂账户
+    /// 3. `[writable]` 资产金库ATA (PDA的ATA)
+    /// 4. `[]` 系统程序
+    /// 5. `[]` 代币程序
+    /// 6. `[]` 关联代币账户程序
+    /// 7. `[]` Rent Sysvar
     InitializeAsset {
         name: String,
         symbol: String,
         total_supply: u64,
         decimals: u8,
+        price: u64,   // 【新增】确保价格在初始化时传入
     },
 
-    /// 购买资产代币
+    /// 购买资产代币（支持平台手续费3.5%）
     /// 
     /// Accounts expected:
-    /// 0. `[signer]` 买家
-    /// 1. `[writable]` 买家代币账户
-    /// 2. `[writable]` 卖家代币账户
-    /// 3. `[writable]` 买家USDC账户
-    /// 4. `[writable]` 卖家USDC账户
-    /// 5. `[]` 代币程序
+    /// 0. `[signer]` 买家钱包
+    /// 1. `[writable]` 买家资产代币ATA
+    /// 2. `[writable]` 资产金库代币ATA
+    /// 3. `[writable]` 买家USDC代币ATA
+    /// 4. `[writable]` 资产数据账户
+    /// 5. `[]` 平台主钱包公钥
+    /// 6. `[]` USDC铸造厂地址
+    /// 7. `[]` 代币程序
+    /// 8. `[]` 关联代币账户程序
+    /// 9. `[]` 系统程序
+    /// 10. `[]` Rent Sysvar
     Buy {
         amount: u64,
     },
