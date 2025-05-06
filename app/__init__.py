@@ -20,6 +20,14 @@ def create_app(config_name='development'):
     app.config.from_object(config[config_name])
     config[config_name].init_app(app)
     
+    # -- 修改：根据数据库配置设置速率限制存储URL --
+    db_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
+    if db_uri:
+        app.config['RATELIMIT_STORAGE_URL'] = db_uri
+        app.logger.info(f"设置 Flask-Limiter 存储 URL: {db_uri}")
+    else:
+        app.logger.warning("未找到数据库 URI，Flask-Limiter 将使用内存存储")
+    
     # 配置静态文件
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # 禁用静态文件缓存
     app.static_folder = 'static'  # 设置静态文件夹
