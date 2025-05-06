@@ -14,6 +14,7 @@
     debug: false, // 关闭调试日志
     buttonCheckInterval: 1000,
     walletCheckInterval: 2000,
+    edgeWalletCheckInterval: 5000, // Edge浏览器使用更长的间隔
     i18n: {
       'en': {
         'buy': 'Buy',
@@ -32,6 +33,12 @@
   
   // 当前语言环境
   const currentLang = document.documentElement.lang || 'en';
+  
+  // 检测是否为Edge浏览器
+  const isEdgeBrowser = () => {
+    return navigator.userAgent.indexOf("Edg/") > -1 || 
+           navigator.userAgent.indexOf("Edge/") > -1;
+  };
   
   // 日志函数
   function log(message, data) {
@@ -539,8 +546,24 @@
   function monitorWalletState() {
     let lastWalletStatus = null;
     let isFirstCheck = true;  // 添加首次检查标记
+    let lastUpdateTime = 0;   // 添加上次更新时间戳
+    const isEdge = isEdgeBrowser();
+    
+    // 根据浏览器类型选择检查间隔
+    const checkInterval = isEdge ? CONFIG.edgeWalletCheckInterval : CONFIG.walletCheckInterval;
+    
+    if (isEdge) {
+      log('检测到Edge浏览器，使用更长的钱包状态检查间隔');
+    }
     
     setInterval(function() {
+      // 对于Edge浏览器，添加时间限制
+      const now = Date.now();
+      if (isEdge && now - lastUpdateTime < 3000) {
+        // Edge浏览器中，如果距离上次更新少于3秒，则跳过此次检查
+        return;
+      }
+      
       // 确保钱包状态对象存在
       const walletState = ensureWalletState();
       
@@ -559,18 +582,35 @@
         return;
       }
       
-      // 检查是否有变化（只有在非首次检查且有实际变化时）
-      const hasChanged = lastWalletStatus && (
-        lastWalletStatus.isConnected !== currentStatus.isConnected ||
-        lastWalletStatus.address !== currentStatus.address ||
-        lastWalletStatus.walletType !== currentStatus.walletType
-      );
+      // 在Edge浏览器中使用更严格的比较
+      let hasChanged = false;
+      
+      if (isEdge) {
+        // Edge浏览器中，只有当状态真正发生重大变化时才更新
+        hasChanged = lastWalletStatus && (
+          (lastWalletStatus.isConnected !== currentStatus.isConnected) || // 连接状态改变
+          (lastWalletStatus.address !== currentStatus.address) || // 地址改变
+          (lastWalletStatus.walletType !== currentStatus.walletType && 
+           currentStatus.walletType !== null && 
+           currentStatus.walletType !== "") // 钱包类型有效且发生改变
+        );
+      } else {
+        // 其他浏览器使用标准比较
+        hasChanged = lastWalletStatus && (
+          lastWalletStatus.isConnected !== currentStatus.isConnected ||
+          lastWalletStatus.address !== currentStatus.address ||
+          lastWalletStatus.walletType !== currentStatus.walletType
+        );
+      }
       
       if (hasChanged) {
         log('钱包状态已变化', {
           before: lastWalletStatus,
           after: currentStatus
         });
+        
+        // 记录更新时间
+        lastUpdateTime = now;
         
         // 更新所有购买按钮
         document.querySelectorAll('.buy-btn, .buy-button, [data-action="buy"]').forEach(updateBuyButton);
@@ -589,7 +629,31 @@
         // 更新上次状态
         lastWalletStatus = {...currentStatus};
       }
-    }, CONFIG.walletCheckInterval);
+    }, checkInterval);
+    
+    // 特别处理Edge浏览器的visibilitychange事件
+    if (isEdge) {
+      // 尝试拦截document.visibilitychange事件在Edge上的频繁触发
+      const originalAddEventListener = document.addEventListener;
+      document.addEventListener = function(type, listener, options) {
+        if (type === 'visibilitychange') {
+          // 创建防抖动包装函数
+          let timeout;
+          const debouncedListener = function(event) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+              listener.call(this, event);
+            }, 1000); // 1秒延迟
+          };
+          
+          // 使用防抖动包装函数替代原始监听器
+          return originalAddEventListener.call(this, type, debouncedListener, options);
+        }
+        
+        // 对于其他类型的事件，保持原样
+        return originalAddEventListener.call(this, type, listener, options);
+      };
+    }
   }
   
   // 修复网络请求错误
@@ -749,6 +813,12 @@
       }
     };
     
+    // 专门针对Edge浏览器修复wallet.js中的visibilitychange事件处理
+    if (isEdgeBrowser()) {
+      log('应用Edge浏览器专用修复');
+      fixEdgeVisibilityChange();
+    }
+    
     // 初始修复
     onDomReady(function() {
       // 修复购买按钮
@@ -791,6 +861,76 @@
     fixMobileWalletConnection();
     
     log('钱包修复模块初始化完成');
+  }
+  
+  // 针对Edge浏览器修复visibilitychange事件处理
+  function fixEdgeVisibilityChange() {
+    // 检测是否已有document.visibilitychange事件监听器
+    const originalAddEventListener = document.addEventListener;
+    let visibilityChangeHandlers = [];
+    let isVisibilityHandlerFixed = false;
+    let lastVisibilityCheck = 0;
+    
+    // 替换document.addEventListener，捕获visibilitychange处理函数
+    document.addEventListener = function(type, listener, options) {
+      if (type === 'visibilitychange') {
+        log('捕获到visibilitychange事件监听');
+        
+        // 保存原始处理函数
+        visibilityChangeHandlers.push(listener);
+        
+        // 创建防抖动包装函数
+        const debouncedListener = function(event) {
+          const now = Date.now();
+          // 忽略5秒内的重复调用
+          if (now - lastVisibilityCheck < 5000) {
+            log('忽略5秒内的重复visibilitychange事件');
+            return;
+          }
+          
+          lastVisibilityCheck = now;
+          
+          // 只有在页面真正可见时才调用原始处理函数
+          if (document.visibilityState === 'visible') {
+            log('处理visibilitychange事件（页面可见）');
+            setTimeout(() => {
+              try {
+                listener.call(this, event);
+              } catch (err) {
+                console.error('visibilitychange处理失败:', err);
+              }
+            }, 1000);
+          }
+        };
+        
+        // 使用防抖动包装函数替代原始监听器
+        return originalAddEventListener.call(this, type, debouncedListener, options);
+      }
+      
+      // 对于其他类型的事件，保持原样
+      return originalAddEventListener.call(this, type, listener, options);
+    };
+    
+    // 修复wallet.js中的checkWalletConnection方法
+    if (window.walletState && typeof window.walletState.checkWalletConnection === 'function') {
+      const originalCheckWalletConnection = window.walletState.checkWalletConnection;
+      let lastCheck = 0;
+      
+      window.walletState.checkWalletConnection = function() {
+        const now = Date.now();
+        if (now - lastCheck < 5000) {
+          log('忽略5秒内的重复钱包状态检查');
+          return Promise.resolve(false);
+        }
+        
+        lastCheck = now;
+        return originalCheckWalletConnection.apply(this, arguments);
+      };
+      
+      log('已修复wallet.js中的checkWalletConnection方法');
+    }
+    
+    log('Edge浏览器visibilitychange事件修复完成');
   }
   
   // 启动修复
