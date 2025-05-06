@@ -54,9 +54,14 @@ def get_user_assets_query():
                     )
                 ).first()
             else:  # Solana地址或其他类型
-                user = User.query.filter_by(sol_address=address).first()
+                # -- 修改：移除对 sol_address 的查询，因为 User 模型没有此字段 --
+                # user = User.query.filter_by(sol_address=address).first()
+                # 如果不是 ETH 地址，我们无法直接通过 User 模型查找，后续将通过交易记录查找
+                user = None 
         except Exception as e:
             current_app.logger.error(f'查询用户失败: {str(e)}')
+            # -- 修改：查询失败时也设置 user = None，进入交易记录查找 --
+            user = None 
             
         # 如果找不到用户，尝试使用交易记录方式查询
         if not user:
@@ -248,7 +253,7 @@ def get_user_assets(address):
                     )
                 ).first()
             else:  # Solana地址
-                user = User.query.filter_by(sol_address=address).first()
+                user = None
         except Exception as e:
             current_app.logger.error(f'查询用户失败: {str(e)}')
             
