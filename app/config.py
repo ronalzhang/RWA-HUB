@@ -95,8 +95,8 @@ class ProductionConfig(Config):
     DEBUG = False
     
     # !! 关键改动：直接指定生产环境使用本地数据库 !!
-    SQLALCHEMY_DATABASE_URI = 'postgresql://rwa_hub_user:password@localhost/rwa_hub'
-    print(f"生产环境强制使用本地数据库: {SQLALCHEMY_DATABASE_URI}")
+    SQLALCHEMY_DATABASE_URI = 'postgresql://rwa_hub_user:password@localhost/rwa_hub?sslmode=disable'
+    print(f"生产环境强制使用本地数据库 (SSL disabled): {SQLALCHEMY_DATABASE_URI}")
     
     @staticmethod
     def init_app(app):
