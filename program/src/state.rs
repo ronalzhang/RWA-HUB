@@ -17,6 +17,7 @@ pub struct Asset {
     pub mint: Pubkey,
     pub price: u64,        // USDC价格，6位小数
     pub remaining_supply: u64,
+    pub vault_bump: u8,    // PDA金库的bump种子
 }
 
 impl Sealed for Asset {}
@@ -28,7 +29,7 @@ impl IsInitialized for Asset {
 }
 
 impl Pack for Asset {
-    const LEN: usize = 165; // 计算所有字段的总长度
+    const LEN: usize = 166; // 原165 + 1(vault_bump)
 
     fn pack_into_slice(&self, dst: &mut [u8]) {
         let data = self.try_to_vec().unwrap();
