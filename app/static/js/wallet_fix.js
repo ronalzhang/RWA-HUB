@@ -538,6 +538,7 @@
   // 监控钱包状态
   function monitorWalletState() {
     let lastWalletStatus = null;
+    let isFirstCheck = true;  // 添加首次检查标记
     
     setInterval(function() {
       // 确保钱包状态对象存在
@@ -550,11 +551,20 @@
         walletType: walletState.walletType
       };
       
-      // 检查是否有变化
-      const hasChanged = !lastWalletStatus || 
+      // 首次检查只存储状态，不触发事件
+      if (isFirstCheck) {
+        lastWalletStatus = {...currentStatus};
+        isFirstCheck = false;
+        log('钱包状态初始化', currentStatus);
+        return;
+      }
+      
+      // 检查是否有变化（只有在非首次检查且有实际变化时）
+      const hasChanged = lastWalletStatus && (
         lastWalletStatus.isConnected !== currentStatus.isConnected ||
         lastWalletStatus.address !== currentStatus.address ||
-        lastWalletStatus.walletType !== currentStatus.walletType;
+        lastWalletStatus.walletType !== currentStatus.walletType
+      );
       
       if (hasChanged) {
         log('钱包状态已变化', {
