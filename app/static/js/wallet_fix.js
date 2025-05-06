@@ -47,6 +47,206 @@
     }
   }
   
+  // 完全禁用页面自动刷新行为（仅限Edge浏览器）
+  function disableEdgePageRefresh() {
+    if (!isEdgeBrowser()) return; // 仅适用于Edge浏览器
+    
+    try {
+      // 1. 保存原始的history方法
+      const originalPushState = history.pushState;
+      const originalReplaceState = history.replaceState;
+      
+      // 重写history方法，防止页面调用history.go/back等方法
+      history.pushState = function() {
+        log('Edge浏览器: 拦截history.pushState调用');
+        const url = arguments[2];
+        if (url && url !== window.location.href) {
+          log('Edge浏览器: 允许正常跳转', url);
+          return originalPushState.apply(this, arguments);
+        }
+        // 拦截可能导致刷新的调用
+        return undefined;
+      };
+      
+      history.replaceState = function() {
+        log('Edge浏览器: 拦截history.replaceState调用');
+        const url = arguments[2];
+        if (url && url !== window.location.href) {
+          log('Edge浏览器: 允许正常跳转', url);
+          return originalReplaceState.apply(this, arguments);
+        }
+        // 拦截可能导致刷新的调用
+        return undefined;
+      };
+      
+      // 2. 阻止页面刷新尝试
+      window.onbeforeunload = function(e) {
+        const target = e.target.activeElement;
+        // 仅阻止非用户意图的刷新
+        if (!target || !['A', 'BUTTON', 'INPUT'].includes(target.tagName)) {
+          log('Edge浏览器: 阻止非用户意图的页面刷新');
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      };
+      
+      // 3. 阻止location.reload()调用
+      const originalWindowReload = window.location.reload;
+      window.location.reload = function() {
+        log('Edge浏览器: 拦截location.reload()调用');
+        // 完全阻止自动刷新
+        return undefined;
+      };
+      
+      log('Edge浏览器: 页面自动刷新保护已启用');
+    } catch (err) {
+      console.error('启用Edge刷新保护失败:', err);
+    }
+  }
+  
+  // 为Edge浏览器彻底禁用visibilitychange事件
+  function disableEdgeVisibilityChange() {
+    if (!isEdgeBrowser()) return; // 仅适用于Edge浏览器
+    
+    try {
+      log('Edge浏览器: 正在禁用visibilitychange事件');
+      
+      // 1. 保存原始的addEventListener和removeEventListener方法
+      const originalAddEventListener = document.addEventListener;
+      const originalRemoveEventListener = document.removeEventListener;
+      
+      // 2. 重写addEventListener方法，彻底阻止visibilitychange事件注册
+      document.addEventListener = function(type, listener, options) {
+        if (type === 'visibilitychange') {
+          log('Edge浏览器: 阻止添加visibilitychange事件监听器');
+          // 完全阻止注册，不保留监听器引用
+          return undefined;
+        }
+        
+        // 其他事件正常添加
+        return originalAddEventListener.call(this, type, listener, options);
+      };
+      
+      // 3. 重写removeEventListener方法
+      document.removeEventListener = function(type, listener, options) {
+        if (type === 'visibilitychange') {
+          log('Edge浏览器: 移除visibilitychange事件监听器(已禁用)');
+          return undefined;
+        }
+        
+        // 其他事件正常移除
+        return originalRemoveEventListener.call(this, type, listener, options);
+      };
+      
+      // 4. 尝试定义一个不可修改的visibilityState属性
+      try {
+        // 首先删除现有属性
+        delete document.visibilityState;
+        
+        // 然后定义一个新的不可修改的属性
+        Object.defineProperty(document, 'visibilityState', {
+          configurable: false,
+          enumerable: true,
+          get: function() {
+            return 'visible'; // 始终返回可见状态，避免触发页面刷新
+          }
+        });
+        
+        // 劫持document.hidden属性
+        Object.defineProperty(document, 'hidden', {
+          configurable: false,
+          enumerable: true,
+          get: function() {
+            return false; // 始终返回非隐藏状态
+          }
+        });
+      } catch (propErr) {
+        log('Edge浏览器: 无法重新定义visibilityState属性，尝试使用替代方法', propErr);
+        
+        // 替代方法: 拦截Document.prototype.visibilityState的getter
+        const originalVisibilityStateGetter = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState');
+        if (originalVisibilityStateGetter && originalVisibilityStateGetter.get) {
+          Object.defineProperty(Document.prototype, 'visibilityState', {
+            get: function() {
+              return 'visible'; // 始终返回可见状态
+            }
+          });
+        }
+      }
+      
+      // 5. 劫持document对象的dispatchEvent方法，防止手动触发visibilitychange事件
+      const originalDispatchEvent = document.dispatchEvent;
+      document.dispatchEvent = function(event) {
+        if (event.type === 'visibilitychange') {
+          log('Edge浏览器: 阻止手动触发visibilitychange事件');
+          return true; // 假装事件已成功触发
+        }
+        return originalDispatchEvent.call(this, event);
+      };
+      
+      log('Edge浏览器: visibilitychange事件已完全禁用');
+    } catch (err) {
+      console.error('禁用Edge浏览器visibilitychange事件失败:', err);
+    }
+  }
+  
+  // 强力修复Edge浏览器问题
+  function applyEdgeBrowserFixes() {
+    if (!isEdgeBrowser()) return;
+    
+    log('检测到Edge浏览器，应用全面修复方案');
+    
+    // 1. 禁用visibilitychange事件
+    disableEdgeVisibilityChange();
+    
+    // 2. 禁用页面自动刷新行为
+    disableEdgePageRefresh();
+    
+    // 3. 修复wallet.js中的问题代码
+    if (window.walletState) {
+      // 覆盖checkWalletConnection方法
+      if (typeof window.walletState.checkWalletConnection === 'function') {
+        const originalCheckWalletConnection = window.walletState.checkWalletConnection;
+        let lastCheck = 0;
+        
+        window.walletState.checkWalletConnection = function() {
+          const now = Date.now();
+          // 限制检查频率，至少10秒一次
+          if (now - lastCheck < 10000) {
+            log('Edge浏览器: 忽略频繁的钱包检查请求');
+            return Promise.resolve(false);
+          }
+          
+          lastCheck = now;
+          return originalCheckWalletConnection.apply(this, arguments)
+            .catch(err => {
+              log('Edge浏览器: 静默处理钱包检查错误', err);
+              return false;
+            });
+        };
+        
+        log('Edge浏览器: 已增强钱包状态检查方法');
+      }
+      
+      // 禁用可能导致页面刷新的方法
+      const methodsToDisable = ['handleStorageChange', 'checkWalletConsistency'];
+      
+      methodsToDisable.forEach(methodName => {
+        if (typeof window.walletState[methodName] === 'function') {
+          const originalMethod = window.walletState[methodName];
+          window.walletState[methodName] = function() {
+            log(`Edge浏览器: 禁用可能导致刷新的方法 ${methodName}`);
+            return false; // 返回假值防止进一步处理
+          };
+          log(`Edge浏览器: 已禁用 ${methodName} 方法`);
+        }
+      });
+    }
+    
+    log('Edge浏览器: 全面修复方案已应用');
+  }
+  
   // 检查并修复钱包状态
   function ensureWalletState() {
     if (!window.walletState) {
@@ -759,6 +959,11 @@
   function init() {
     log('初始化钱包修复模块');
     
+    // 首先应用Edge浏览器修复
+    if (isEdgeBrowser()) {
+      applyEdgeBrowserFixes();
+    }
+    
     // 确保钱包状态
     ensureWalletState();
     
@@ -814,12 +1019,6 @@
       }
     };
     
-    // 专门针对Edge浏览器修复wallet.js中的visibilitychange事件处理
-    if (isEdgeBrowser()) {
-      log('应用Edge浏览器专用修复');
-      fixEdgeVisibilityChange();
-    }
-    
     // 初始修复
     onDomReady(function() {
       // 修复购买按钮
@@ -863,151 +1062,4 @@
     
     log('钱包修复模块初始化完成');
   }
-  
-  // 针对Edge浏览器修复visibilitychange事件处理
-  function fixEdgeVisibilityChange() {
-    // 检测是否已有document.visibilitychange事件监听器
-    const originalAddEventListener = document.addEventListener;
-    let visibilityChangeHandlers = [];
-    let isVisibilityHandlerFixed = false;
-    let lastVisibilityCheck = 0;
-    
-    // 替换document.addEventListener，捕获visibilitychange处理函数
-    document.addEventListener = function(type, listener, options) {
-      if (type === 'visibilitychange') {
-        log('捕获到visibilitychange事件监听');
-        
-        // 保存原始处理函数
-        visibilityChangeHandlers.push(listener);
-        
-        // 创建防抖动包装函数
-        const debouncedListener = function(event) {
-          const now = Date.now();
-          // 忽略5秒内的重复调用
-          if (now - lastVisibilityCheck < 5000) {
-            log('忽略5秒内的重复visibilitychange事件');
-            return;
-          }
-          
-          lastVisibilityCheck = now;
-          
-          // 只有在页面真正可见时才调用原始处理函数
-          if (document.visibilityState === 'visible') {
-            log('处理visibilitychange事件（页面可见）');
-            setTimeout(() => {
-              try {
-                listener.call(this, event);
-              } catch (err) {
-                console.error('visibilitychange处理失败:', err);
-              }
-            }, 1000);
-          }
-        };
-        
-        // 使用防抖动包装函数替代原始监听器
-        return originalAddEventListener.call(this, type, debouncedListener, options);
-      }
-      
-      // 对于其他类型的事件，保持原样
-      return originalAddEventListener.call(this, type, listener, options);
-    };
-    
-    // 修复wallet.js中的checkWalletConnection方法
-    if (window.walletState && typeof window.walletState.checkWalletConnection === 'function') {
-      const originalCheckWalletConnection = window.walletState.checkWalletConnection;
-      let lastCheck = 0;
-      
-      window.walletState.checkWalletConnection = function() {
-        const now = Date.now();
-        if (now - lastCheck < 5000) {
-          log('忽略5秒内的重复钱包状态检查');
-          return Promise.resolve(false);
-        }
-        
-        lastCheck = now;
-        return originalCheckWalletConnection.apply(this, arguments);
-      };
-      
-      log('已修复wallet.js中的checkWalletConnection方法');
-    }
-    
-    log('Edge浏览器visibilitychange事件修复完成');
-  }
-  
-  // 修复Edge浏览器中的visibilitychange事件导致的无限刷新问题
-  function fixEdgeVisibilityIssue() {
-    if (!isEdgeBrowser()) return; // 仅处理Edge浏览器
-    
-    log('检测到Edge浏览器，应用特殊修复');
-    
-    // 移除document上所有的visibilitychange事件监听器(这是导致问题的根源)
-    const originalAddEventListener = document.addEventListener;
-    const originalRemoveEventListener = document.removeEventListener;
-    
-    // 保存已添加的非visibilitychange事件监听器
-    const eventListeners = {};
-    
-    // 覆盖addEventListener方法，不注册visibilitychange事件
-    document.addEventListener = function(type, listener, options) {
-      if (type === 'visibilitychange') {
-        log('Edge浏览器: 阻止添加visibilitychange事件监听器');
-        // 不添加到DOM，但记录下来以保持引用
-        if (!eventListeners[type]) eventListeners[type] = [];
-        eventListeners[type].push({listener, options});
-        return;
-      }
-      
-      // 其他事件正常添加
-      return originalAddEventListener.call(this, type, listener, options);
-    };
-    
-    // 覆盖removeEventListener方法
-    document.removeEventListener = function(type, listener, options) {
-      if (type === 'visibilitychange') {
-        log('Edge浏览器: 处理移除visibilitychange事件监听器');
-        // 从我们保存的列表中移除
-        if (eventListeners[type]) {
-          const index = eventListeners[type].findIndex(e => e.listener === listener);
-          if (index !== -1) {
-            eventListeners[type].splice(index, 1);
-          }
-        }
-        return;
-      }
-      
-      // 其他事件正常移除
-      return originalRemoveEventListener.call(this, type, listener, options);
-    };
-    
-    // 尝试修复已经添加的事件监听器
-    try {
-      log('Edge浏览器: 尝试移除已添加的visibilitychange事件监听器');
-      
-      // 创建一个新的模拟事件，但永远不会触发真正的刷新
-      const mockVisibilityEvent = new Event('visibilitychange');
-      Object.defineProperty(document, 'visibilityState', {
-        get: function() {
-          return 'hidden'; // 始终返回hidden，避免触发wallet.js中的检查条件
-        }
-      });
-    } catch (err) {
-      log('Edge浏览器修复尝试失败', err);
-    }
-  }
-  
-  // 初始化时应用Edge浏览器修复
-  const applyEdgeFixes = () => {
-    // 等待DOM完全加载
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', fixEdgeVisibilityIssue);
-    } else {
-      fixEdgeVisibilityIssue();
-    }
-  };
-  
-  // 即刻调用Edge修复
-  applyEdgeFixes();
-  
-  // 启动修复
-  init();
 })(); 
