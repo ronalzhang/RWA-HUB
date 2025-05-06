@@ -31,7 +31,7 @@ cors = CORS()
 babel = Babel()
 
 # 初始化请求限制器
-limiter = Limiter()
+limiter = Limiter(key_func=get_remote_address)
 
 # 初始化调度器
 scheduler = BackgroundScheduler()
@@ -75,7 +75,7 @@ def init_extensions(app):
     babel.init_app(app)
     
     # 初始化请求限制器
-    limiter.init_app(app, key_func=get_remote_address)
+    limiter.init_app(app)
     app.logger.info("Flask-Limiter 初始化完成")
     
     # 初始化调度器（不需要init_app）
