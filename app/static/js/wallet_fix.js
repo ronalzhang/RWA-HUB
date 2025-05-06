@@ -709,6 +709,31 @@
     const walletState = window.walletState;
     const i18n = CONFIG.i18n[currentLang] || CONFIG.i18n.en;
     
+    // 检查当前是否在资产详情页
+    const isAssetDetailPage = window.location.pathname.includes('/assets/') || 
+                            document.querySelector('.asset-detail-page') ||
+                            document.getElementById('asset-detail-container');
+    
+    // 如果在资产详情页，不修改已设置好的按钮文本
+    if (isAssetDetailPage && button.textContent.includes('Buy') || button.textContent.includes('购买')) {
+      // 仅更新禁用状态，不更改文本
+      if (!walletState || !walletState.isWalletConnected()) {
+        // 未连接钱包
+        button.disabled = true;
+        button.setAttribute('data-wallet-status', 'disconnected');
+      } else if (walletState.balance === null) {
+        // 连接了钱包但余额未知
+        button.disabled = true;
+        button.setAttribute('data-wallet-status', 'loading');
+      } else {
+        // 连接了钱包并有余额
+        button.disabled = false;
+        button.setAttribute('data-wallet-status', 'ready');
+      }
+      return; // 不更改详情页上的按钮文本
+    }
+    
+    // 非详情页的正常处理
     if (!walletState || !walletState.isWalletConnected()) {
       // 未连接钱包
       button.textContent = i18n.connect_wallet;
