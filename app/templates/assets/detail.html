@@ -839,8 +839,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 statusText = '{{ _("Expired") }}';
                                 statusClass = 'text-muted'; // 使用灰色表示过期
                             } else {
-                                statusText = '{{ _("Waiting Payment") }}';
-                                statusClass = 'text-info';
+                            statusText = '{{ _("Waiting Payment") }}';
+                            statusClass = 'text-info';
                             }
                         } else if (trade.status === 'pending_confirmation') {
                             statusText = '{{ _("Confirming") }}';
@@ -991,8 +991,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             statusText = '{{ _("Expired") }}';
                             statusClass = 'text-muted';
                         } else {
-                            statusText = '{{ _("Waiting Payment") }}';
-                            statusClass = 'text-info';
+                        statusText = '{{ _("Waiting Payment") }}';
+                        statusClass = 'text-info';
                         }
                     } else if (trade.status === 'pending_confirmation') {
                         statusText = '{{ _("Confirming") }}';
@@ -1696,8 +1696,25 @@ document.addEventListener('DOMContentLoaded', function() {
             async function localHandleBuy(e) {
                 e.preventDefault();
                 
-                console.log('本地购买函数被调用，转调全局handleBuy');
+                console.log('本地购买函数被调用');
                 
+                // 首先，非常严格地检查钱包连接状态
+                if (!window.walletState || !window.walletState.isWalletConnected || !window.walletState.isWalletConnected()) {
+                    console.warn('钱包未连接或状态函数不可用，触发钱包选择器');
+                    // 尝试调用全局的钱包选择器函数
+                    if (typeof window.showWalletSelector === 'function') {
+                        window.showWalletSelector();
+                    } else if (typeof window.openWalletSelector === 'function') {
+                        window.openWalletSelector();
+                    } else {
+                        // 作为备用，直接提示
+                        alert('{{ _("Please connect your wallet first") }}');
+                    }
+                    return; // 阻止后续操作
+                }
+                
+                console.log('钱包已连接，继续购买流程');
+
                 // 获取必要参数
                 const buyButton = document.getElementById('buy-button');
                 const amountInput = document.getElementById('purchase-amount');
@@ -1705,18 +1722,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 const price = parseFloat("{{ asset.token_price }}");
                 
                 // 调用wallet.js中的全局handleBuy函数
+                // 这个全局handleBuy应该负责显示购买确认模态框等后续步骤
                 if (typeof window.handleBuy === 'function') {
                     try {
+                        // 调用全局handleBuy，它应该处理模态框的显示和后续的确认购买逻辑
                         await window.handleBuy(assetId, amountInput, buyButton, price);
                     } catch (error) {
                         console.error('调用全局handleBuy函数失败:', error);
                         showError('处理购买请求时发生错误，请稍后重试');
-                        hideLoadingState();
+                        if (typeof hideLoadingState === 'function') hideLoadingState();
                     }
                 } else {
                     console.error('全局handleBuy函数不可用');
                     alert('购买功能暂时不可用，请刷新页面后重试');
-                    hideLoadingState();
+                    if (typeof hideLoadingState === 'function') hideLoadingState();
                 }
             }
 
@@ -1725,16 +1744,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 检查是否有待处理的购买数据
                 if (!window.pendingPurchase) {
                     console.error("没有待处理的购买数据");
-                                    return; 
-                                }
+                    return; 
+                }
 
-                // 检查钱包连接状态
-                if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
-                    console.error('钱包未连接或地址不可用');
+                // 再次确认钱包连接状态，以防万一
+                if (!window.walletState || !window.walletState.isWalletConnected || !window.walletState.isWalletConnected()) {
+                    console.error('钱包未连接或地址不可用，在确认购买时');
                     if (typeof showToast === 'function') {
                         showToast('{{ _("Please connect your wallet first") }}', 'error');
                     } else {
                         alert('{{ _("Please connect your wallet first") }}');
+                    }
+                     if (typeof hideLoadingState === 'function') hideLoadingState();
+                    // 关闭模态框
+                    const modalElement = document.getElementById('buyModal');
+                    if (modalElement) {
+                        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                        if (modalInstance) {
+                            modalInstance.hide();
+                        }
                     }
                     return;
                 }
