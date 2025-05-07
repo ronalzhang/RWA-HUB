@@ -356,8 +356,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 页面初始化
             document.addEventListener('DOMContentLoaded', function() {
+                // 创建更健壮的资产ID处理机制
+                let assetId = '{{ asset.id }}';
+                const assetSymbol = '{{ asset.token_symbol }}';
+                
+                // 如果存在资产符号且以RH-开头，优先使用它
+                if (assetSymbol && assetSymbol.startsWith('RH-')) {
+                    assetId = assetSymbol;
+                    console.log('使用资产符号作为ID:', assetId);
+                }
+                
+                // 全局资产配置
+                window.ASSET_CONFIG = {
+                    id: assetId,
+                    numericalId: '{{ asset.id }}',
+                    tokenSymbol: assetSymbol || assetId,
+                    totalSupply: '{{ asset.token_supply }}',
+                    remainingSupply: '{{ asset.remaining_supply }}',
+                    apiPrefix: assetSymbol && assetSymbol.startsWith('RH-') ? '/api/assets/symbol/' : '/api/assets/'
+                };
+                
                 console.log('页面初始化值:', {
-                    assetId: '{{ asset.id }}',
+                    assetId: assetId,
                     totalSupply: '{{ asset.token_supply }}',
                     remainingSupply: '{{ asset.remaining_supply }}'
                 });
@@ -1173,13 +1193,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
                 document.head.appendChild(style);
                 
-                // 确保lastKnownData存在
+                // 使用全局ASSET_CONFIG设置lastKnownData
                 if (!window.lastKnownData) {
                     window.lastKnownData = {
-                        remainingSupply: parseInt("{{ remaining_supply|default(asset.token_supply) }}"),
-                        tokenSupply: parseInt("{{ asset.token_supply }}"),
+                        assetId: window.ASSET_CONFIG ? window.ASSET_CONFIG.id : '{{ asset.id }}',
+                        tokenSymbol: window.ASSET_CONFIG ? window.ASSET_CONFIG.tokenSymbol : '{{ asset.token_symbol }}',
+                        remainingSupply: parseInt(window.ASSET_CONFIG ? window.ASSET_CONFIG.remainingSupply : "{{ remaining_supply|default(asset.token_supply) }}"),
+                        tokenSupply: parseInt(window.ASSET_CONFIG ? window.ASSET_CONFIG.totalSupply : "{{ asset.token_supply }}"),
                         tokenPrice: parseFloat("{{ asset.token_price }}")
                     };
+                    console.log('初始化lastKnownData:', window.lastKnownData);
                 }
                 
                 // 初始调用一次刷新函数，但不设置重复刷新
