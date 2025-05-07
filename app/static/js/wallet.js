@@ -528,12 +528,12 @@ const walletState = {
         this.connecting = true;
         this.updateUI();
         
-        let success = false;
+            let success = false;
         try {
             if (walletType === 'ethereum') {
-                success = await this.connectEthereum();
+                    success = await this.connectEthereum();
             } else if (walletType === 'phantom' || walletType === 'solana') {
-                success = await this.connectPhantom();
+                    success = await this.connectPhantom();
             } else {
                 throw new Error(`不支持的钱包类型: ${walletType}`);
             }
@@ -725,7 +725,7 @@ const walletState = {
      */
     async disconnect(reload = true) {
         console.log('断开钱包连接...');
-        
+            
         // 清除状态和存储
         this.clearState();
         this.clearStoredWalletData();
@@ -743,10 +743,10 @@ const walletState = {
         
         this.provider = null;
         this.web3 = null;
-        
-        // 更新UI
-        this.updateUI();
-        
+            
+            // 更新UI
+            this.updateUI();
+            
         // -- 修改：断开连接后触发事件 --
         this.triggerWalletStateChanged();
         
@@ -755,9 +755,9 @@ const walletState = {
         // this.notifyStateChange({ type: 'disconnect' });
         
         // 可选：刷新页面以确保完全重置
-        if (reload) {
+            if (reload) {
             console.log('刷新页面以完成断开连接');
-            window.location.reload();
+                    window.location.reload();
         }
     },
     
@@ -3915,9 +3915,37 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
     
     const modalErrorDiv = modalElement?.querySelector('#buyModalError');
     
-    // 验证钱包连接和钱包地址
-    if (!walletState.isConnected || !walletState.address) {
-        console.error("钱包未连接或地址不可用");
+    // 增强型钱包连接状态检查
+    let isConnected = false;
+    let walletAddress = '';
+    
+    // 方法1: 检查全局walletState对象
+    if (window.walletState && (window.walletState.isConnected || window.walletState.connected) && window.walletState.address) {
+        isConnected = true;
+        walletAddress = window.walletState.address;
+        console.log("从全局walletState检测到钱包连接:", walletAddress);
+    }
+    
+    // 方法2: 检查传入的钱包地址
+    if (!isConnected && purchaseData && purchaseData.wallet_address) {
+        isConnected = true;
+        walletAddress = purchaseData.wallet_address;
+        console.log("从传入参数检测到钱包地址:", walletAddress);
+    }
+    
+    // 方法3: 检查localStorage
+    if (!isConnected) {
+        const storedAddress = localStorage.getItem('walletAddress');
+        if (storedAddress) {
+            isConnected = true;
+            walletAddress = storedAddress;
+            console.log("从localStorage检测到钱包连接:", walletAddress);
+        }
+    }
+    
+    // 如果仍然未检测到连接，显示错误
+    if (!isConnected || !walletAddress) {
+        console.error("所有方法均未检测到钱包连接");
         showError("请先连接钱包");
         if (modalErrorDiv) {
             modalErrorDiv.textContent = "请先连接钱包";
@@ -3926,13 +3954,7 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
         return;
     }
     
-    // 验证传入的钱包地址（如果有）与当前连接的钱包地址是否一致
-    if (purchaseData.wallet_address && purchaseData.wallet_address !== walletState.address) {
-        console.warn(`传入的钱包地址(${purchaseData.wallet_address})与当前连接的钱包地址(${walletState.address})不一致，将使用当前连接的钱包地址`);
-    }
-    
-    // 确保一定使用当前连接的钱包地址
-    const walletAddress = walletState.address;
+    // 使用检测到的钱包地址
     console.log("使用钱包地址:", walletAddress);
     
     try {
