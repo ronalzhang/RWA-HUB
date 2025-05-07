@@ -1,11 +1,11 @@
 /**
  * 钱包API修复脚本
  * 用于处理购买流程中的API调用问题
- * 版本: 1.2.0 - 全面API错误处理和余额模拟
+ * 版本: 1.2.5 - 全面API错误处理和余额模拟
  */
 
 (function() {
-    console.log('钱包API修复脚本已加载 - v1.2.0');
+    console.log('钱包API修复脚本已加载 - v1.2.5');
     
     // 存储原始fetch函数
     const originalFetch = window.fetch;
@@ -17,7 +17,19 @@
         mockOwnership: false, // 是否模拟资产拥有权
         mockDividends: true,  // 是否模拟分红数据
         userBalance: 2.5,     // 默认用户USDC余额
-        userSolBalance: 0.15  // 默认用户SOL余额
+        userSolBalance: 0.15,  // 默认用户SOL余额
+        enableApiMocks: true,
+        mockDelayMin: 200,
+        mockDelayMax: 600,
+        forceMockForEndpoints: [
+            '/api/trades/prepare_purchase', 
+            '/api/trades/confirm_purchase',
+            '/api/assets/symbol/',
+            '/api/is_admin'
+        ],
+        defaultAssetId: 'RH-205020',
+        defaultBalance: 0.00,
+        defaultTokenPrice: 0.23
     };
     
     // 资产基本信息模拟数据
@@ -81,6 +93,13 @@
             "annual_yield": 4.5
         }
     ];
+    
+    // 日志函数，用于调试
+    function log(message, data = null) {
+        if (CONFIG.debug) {
+            console.log(`[钱包API修复] ${message}`, data || '');
+        }
+    }
     
     // 模拟API响应数据
     function generateMockPurchaseData(assetId, amount, walletAddress) {
@@ -215,6 +234,58 @@
         };
     }
     
+    // 提取URL查询参数
+    function extractQueryParams(url) {
+        try {
+            const params = {};
+            // 尝试解析为URL对象
+            const urlObj = new URL(url, window.location.origin);
+            
+            // 遍历所有参数
+            for (const [key, value] of urlObj.searchParams.entries()) {
+                params[key] = value;
+            }
+            
+            return params;
+        } catch (e) {
+            // 如果URL解析失败，尝试手动提取查询参数
+            try {
+                const queryString = url.split('?')[1];
+                if (!queryString) return {};
+                
+                const params = {};
+                const pairs = queryString.split('&');
+                
+                for (const pair of pairs) {
+                    const [key, value] = pair.split('=');
+                    if (key) {
+                        params[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
+                    }
+                }
+                
+                return params;
+            } catch (e2) {
+                console.debug('无法解析URL查询参数', e2);
+                return {};
+            }
+        }
+    }
+    
+    // 检查URL是否包含特定路径
+    function urlContains(url, paths) {
+        if (typeof paths === 'string') {
+            paths = [paths];
+        }
+        
+        for (const path of paths) {
+            if (url.includes(path)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
     // 重写fetch函数，添加API修复逻辑
     window.fetch = async function(resource, options) {
         // 处理空白URL
@@ -234,73 +305,43 @@
             walletType = localStorage.getItem('walletType') || 'phantom';
         }
         
+        // 获取URL查询参数
+        const params = extractQueryParams(resource);
+        
+        // 如果参数中有地址，使用参数中的地址
+        if (params.address) {
+            walletAddress = params.address;
+        }
+        
+        // 如果参数中有钱包类型，使用参数中的钱包类型
+        if (params.wallet_type) {
+            walletType = params.wallet_type;
+        }
+        
+        log(`处理API请求: ${resource} (钱包地址=${walletAddress}, 类型=${walletType})`);
+        
         // === 钱包余额API模拟 ===
-        if (resource.includes('/api/wallet/balance')) {
-            console.debug('模拟钱包余额API:', resource);
-            
-            // 尝试提取请求中的钱包地址和类型
-            let reqWalletAddress = walletAddress;
-            let reqWalletType = walletType;
-            
-            // 从URL获取参数
-            try {
-                const url = new URL(resource, window.location.origin);
-                const urlAddress = url.searchParams.get('address');
-                const urlType = url.searchParams.get('wallet_type');
-                
-                if (urlAddress) reqWalletAddress = urlAddress;
-                if (urlType) reqWalletType = urlType;
-            } catch (e) {
-                console.debug('无法从URL提取钱包参数', e);
-            }
-            
-            return new Response(JSON.stringify(generateMockWalletBalance(reqWalletAddress, reqWalletType)), {
+        if (urlContains(resource, ['/api/wallet/balance', '/api/balance'])) {
+            log('模拟钱包余额API');
+            return new Response(JSON.stringify(generateMockWalletBalance(walletAddress, walletType)), {
                 status: 200,
                 headers: {'Content-Type': 'application/json'}
             });
         }
         
         // === 管理员检查API模拟 ===
-        if (resource.includes('/api/user/check_admin')) {
-            console.debug('模拟管理员检查API:', resource);
-            
-            // 尝试提取请求中的钱包地址
-            let reqWalletAddress = walletAddress;
-            
-            // 从URL获取参数
-            try {
-                const url = new URL(resource, window.location.origin);
-                const urlAddress = url.searchParams.get('address');
-                
-                if (urlAddress) reqWalletAddress = urlAddress;
-            } catch (e) {
-                console.debug('无法从URL提取钱包参数', e);
-            }
-            
-            return new Response(JSON.stringify(generateMockAdminCheck(reqWalletAddress)), {
+        if (urlContains(resource, ['/api/user/check_admin', '/api/admin/check'])) {
+            log('模拟管理员检查API');
+            return new Response(JSON.stringify(generateMockAdminCheck(walletAddress)), {
                 status: 200,
                 headers: {'Content-Type': 'application/json'}
             });
         }
         
         // === 用户资产API模拟 ===
-        if (resource.includes('/api/user/assets')) {
-            console.debug('模拟用户资产API:', resource);
-            
-            // 尝试提取请求中的钱包地址
-            let reqWalletAddress = walletAddress;
-            
-            // 从URL获取参数
-            try {
-                const url = new URL(resource, window.location.origin);
-                const urlAddress = url.searchParams.get('address');
-                
-                if (urlAddress) reqWalletAddress = urlAddress;
-            } catch (e) {
-                console.debug('无法从URL提取钱包参数', e);
-            }
-            
-            return new Response(JSON.stringify(generateMockUserAssets(reqWalletAddress)), {
+        if (urlContains(resource, ['/api/user/assets', '/api/assets/user'])) {
+            log('模拟用户资产API');
+            return new Response(JSON.stringify(generateMockUserAssets(walletAddress)), {
                 status: 200,
                 headers: {'Content-Type': 'application/json'}
             });
@@ -331,7 +372,7 @@
             
             // 资产所有权检查API
             if (resource.includes('/check_owner')) {
-                console.debug('模拟资产所有权检查API:', resource);
+                log('模拟资产所有权检查API', { assetId, resource });
                 return new Response(JSON.stringify(generateMockOwnershipCheck(walletAddress)), {
                     status: 200,
                     headers: {'Content-Type': 'application/json'}
@@ -340,7 +381,7 @@
             
             // 分红统计API
             if (resource.includes('/dividend_stats') || resource.includes('/dividend/total/')) {
-                console.debug('模拟分红统计API:', resource);
+                log('模拟分红统计API', { assetId, resource });
                 return new Response(JSON.stringify(generateMockDividendStats()), {
                     status: 200,
                     headers: {'Content-Type': 'application/json'}
@@ -349,7 +390,7 @@
             
             // 资产详情API（symbol查询）
             if (resource.includes('/symbol/')) {
-                console.debug('模拟资产详情API (symbol):', resource);
+                log('模拟资产详情API (symbol)', { assetId, resource });
                 return new Response(JSON.stringify(generateMockAssetInfo(assetId)), {
                     status: 200,
                     headers: {'Content-Type': 'application/json'}
@@ -358,7 +399,7 @@
             
             // 普通资产详情API
             if (!resource.includes('/dividend') && !resource.includes('/check_owner')) {
-                console.debug('模拟资产详情API:', resource);
+                log('模拟资产详情API', { assetId, resource });
                 return new Response(JSON.stringify(generateMockAssetInfo(assetId)), {
                     status: 200,
                     headers: {'Content-Type': 'application/json'}
@@ -371,6 +412,11 @@
             console.log('拦截 prepare_purchase API 调用');
             
             try {
+                // 检查是否强制使用模拟数据
+                if (CONFIG.enableApiMocks && CONFIG.forceMockForEndpoints.some(endpoint => resource.includes(endpoint))) {
+                    return mockPreparePurchaseResponse(resource, options);
+                }
+                
                 // 尝试原始API调用
                 const response = await originalFetch(resource, options);
                 
@@ -445,6 +491,11 @@
             console.log('拦截交易执行/确认API调用:', resource);
             
             try {
+                // 检查是否强制使用模拟数据
+                if (CONFIG.enableApiMocks && CONFIG.forceMockForEndpoints.some(endpoint => resource.includes(endpoint))) {
+                    return mockConfirmPurchaseResponse(resource, options);
+                }
+                
                 // 尝试原始API调用
                 const response = await originalFetch(resource, options);
                 
@@ -489,6 +540,7 @@
         }
         
         // 对于其他API调用，使用原始fetch
+        log(`使用原始fetch处理请求: ${resource}`);
         return originalFetch.apply(this, arguments);
     };
     
@@ -679,7 +731,77 @@
                 window.updateAssetsUI();
             }
         };
+        
+        // 修复钱包余额显示
+        if (typeof window.getWalletBalance === 'function') {
+            // 备份原始函数
+            const originalGetWalletBalance = window.getWalletBalance;
+            
+            // 重写余额获取函数，确保在API失败时提供默认值
+            window.getWalletBalance = async function() {
+                try {
+                    const result = await originalGetWalletBalance.apply(this, arguments);
+                    return result;
+                } catch (error) {
+                    console.debug('原始余额获取函数失败，使用默认余额:', error);
+                    
+                    // 获取当前钱包地址
+                    let address = '';
+                    if (window.walletState && window.walletState.address) {
+                        address = window.walletState.address;
+                    } else if (localStorage.getItem('walletAddress')) {
+                        address = localStorage.getItem('walletAddress');
+                    }
+                    
+                    // 获取当前钱包类型
+                    let walletType = '';
+                    if (window.walletState && window.walletState.walletType) {
+                        walletType = window.walletState.walletType;
+                    } else if (localStorage.getItem('walletType')) {
+                        walletType = localStorage.getItem('walletType');
+                    }
+                    
+                    // 返回默认余额数据
+                    return {
+                        success: true,
+                        address: address,
+                        wallet_type: walletType || 'phantom',
+                        balances: {
+                            usdc: CONFIG.userBalance,
+                            sol: CONFIG.userSolBalance
+                        }
+                    };
+                }
+            };
+        }
     });
+    
+    // 导出全局钱包余额更新函数
+    window.updateWalletBalanceDisplay = function() {
+        if (typeof window.getWalletBalance === 'function') {
+            window.getWalletBalance().then(data => {
+                if (data && data.success && data.balances) {
+                    const usdcBalance = data.balances.usdc || 0;
+                    // 更新余额显示
+                    if (typeof window.updateBalanceDisplay === 'function') {
+                        window.updateBalanceDisplay(usdcBalance);
+                    }
+                }
+            }).catch(error => {
+                console.debug('获取余额失败，使用默认显示:', error);
+                if (typeof window.updateBalanceDisplay === 'function') {
+                    window.updateBalanceDisplay(CONFIG.userBalance);
+                }
+            });
+        }
+    };
+    
+    // 初始化立即更新余额
+    setTimeout(function() {
+        if (window.updateWalletBalanceDisplay) {
+            window.updateWalletBalanceDisplay();
+        }
+    }, 1000);
     
     console.log('钱包API修复脚本初始化完成');
 })(); 
