@@ -1,11 +1,11 @@
 /**
  * 统一购买处理脚本
  * 支持多语言界面
- * 版本：1.1.0 - 增强钱包检测与错误处理，提升与钱包API的兼容性
+ * 版本：1.1.5 - 增强钱包检测与API错误处理，提升API兼容性
  */
 
 (function() {
-    console.log('加载购买处理脚本 v1.1.0');
+    console.log('加载购买处理脚本 v1.1.5');
     
     // 文本资源
     const TEXTS = {
@@ -55,7 +55,6 @@
         debug: true,
         retryCount: 3,
         retryDelay: 1000,
-        defaultAssetId: 'RH-205020',
         platformFeeRate: 0.035 // 3.5%平台费率
     };
     
@@ -68,7 +67,7 @@
     
     // 资产ID格式标准化
     function normalizeAssetId(assetId) {
-        if (!assetId) return CONFIG.defaultAssetId;
+        if (!assetId) return '';
         
         // 如果是纯数字格式的ID，转换为RH-格式
         if (/^\d+$/.test(assetId)) {
@@ -220,7 +219,7 @@
         }, 3000);
     }
     
-    // 准备购买API调用
+    // 准备购买API调用 - 多端点尝试
     async function preparePurchase(assetId, amount, walletAddress) {
         log('准备购买API调用', { assetId, amount, walletAddress });
         
@@ -241,6 +240,8 @@
             '/api/purchase/prepare',
             '/api/trade/prepare'
         ];
+        
+        let lastError = null;
         
         // 尝试多个URLs
         for (let i = 0; i < urls.length; i++) {
@@ -263,45 +264,26 @@
                     return data;
                 }
                 
-                log(`端点 ${url} 返回错误代码: ${response.status}`);
+                const errorText = await response.text().catch(() => '');
+                lastError = new Error(`端点 ${url} 返回错误代码: ${response.status} ${errorText}`);
+                log(lastError.message);
             } catch (error) {
+                lastError = error;
                 log(`端点 ${url} 调用失败`, error);
             }
         }
         
-        // 所有端点都失败，返回模拟数据
-        log('所有API端点调用失败，返回模拟数据');
-        
-        // 创建足够真实的模拟数据
-        const mockData = {
-            success: true,
-            trade_id: `MOCK-${Date.now()}`,
-            amount: parseInt(amount),
-            price_per_token: 0.23, // 默认价格
-            total: parseFloat(amount) * 0.23,
-            status: 'pending',
-            wallet_address: walletAddress,
-            asset_id: normalizedAssetId,
-            transaction_hash: null,
-            created_at: new Date().toISOString()
-        };
-        
-        return mockData;
+        // 如果所有端点都失败，抛出最后一个错误
+        throw lastError || new Error('所有API端点调用失败');
     }
     
-    // 确认购买API调用
+    // 确认购买API调用 - 多端点尝试
     async function confirmPurchase(tradeId, walletAddress) {
         log('确认购买API调用', { tradeId, walletAddress });
         
         // 检查tradeId参数
         if (!tradeId) {
-            log('交易ID为空，返回模拟数据');
-            return {
-                success: true,
-                trade_id: `MOCK-${Date.now()}`,
-                status: 'completed',
-                message: '交易模拟完成'
-            };
+            throw new Error('交易ID不存在，无法完成购买');
         }
         
         // 构建请求数据
@@ -317,6 +299,8 @@
             '/api/purchase/confirm',
             '/api/transactions/confirm'
         ];
+        
+        let lastError = null;
         
         // 尝试多个URLs
         for (let i = 0; i < urls.length; i++) {
@@ -339,21 +323,17 @@
                     return data;
                 }
                 
-                log(`确认端点 ${url} 返回错误代码: ${response.status}`);
+                const errorText = await response.text().catch(() => '');
+                lastError = new Error(`确认端点 ${url} 返回错误代码: ${response.status} ${errorText}`);
+                log(lastError.message);
             } catch (error) {
+                lastError = error;
                 log(`确认端点 ${url} 调用失败`, error);
             }
         }
         
-        // 所有端点都失败，返回模拟数据
-        log('所有确认API端点调用失败，返回模拟数据');
-        
-        return {
-            success: true,
-            trade_id: tradeId || `MOCK-${Date.now()}`,
-            status: 'completed',
-            message: '交易模拟完成'
-        };
+        // 如果所有端点都失败，抛出最后一个错误
+        throw lastError || new Error('所有确认API端点调用失败');
     }
     
     // 核心购买逻辑
@@ -362,24 +342,24 @@
         
         // 禁用购买按钮，防止重复点击
         buyButton.disabled = true;
-        buyButton.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>处理中...`;
+        buyButton.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${getText('processing')}`;
         
         try {
             // 获取购买数量
             const amount = amountInput.value ? parseInt(amountInput.value) : 0;
             if (!amount || amount <= 0) {
-                throw new Error('请输入有效的购买数量');
+                throw new Error(getText('invalidAmount'));
             }
             
             // 检查钱包连接 - 使用提供的walletInfo或检查连接状态
             let walletConnection = walletInfo;
-            if (!walletConnection || !walletConnection.walletAddress) {
+            if (!walletConnection || !walletConnection.address) {
                 walletConnection = await checkWalletConnection();
             }
             
             // 如果钱包未连接，抛出错误
             if (!walletConnection.connected || !walletConnection.address) {
-                throw new Error('请先连接钱包');
+                throw new Error(getText('walletNotConnected'));
             }
             
             // 1. 调用准备购买API
@@ -387,7 +367,7 @@
             const prepareResponse = await preparePurchase(assetId, amount, walletConnection.address);
             
             if (!prepareResponse.success) {
-                throw new Error(prepareResponse.error || '准备购买失败');
+                throw new Error(prepareResponse.error || getText('prepareFailed'));
             }
             
             // 保存交易ID
@@ -414,26 +394,27 @@
             const totalCost = subtotal;
             
             // 设置模态框内容
-            if (modalAssetName) modalAssetName.textContent = assetId;
+            if (modalAssetName) modalAssetName.textContent = prepareResponse.asset_name || assetId;
             if (modalAmount) modalAmount.textContent = amount;
-            if (modalPricePerToken) modalPricePerToken.textContent = pricePerToken.toFixed(2);
-            if (modalSubtotal) modalSubtotal.textContent = subtotal.toFixed(2);
-            if (modalFee) modalFee.textContent = platformFee.toFixed(2);
-            if (modalTotalCost) modalTotalCost.textContent = totalCost.toFixed(2);
+            if (modalPricePerToken) modalPricePerToken.textContent = (prepareResponse.token_price || pricePerToken).toFixed(2);
+            if (modalSubtotal) modalSubtotal.textContent = (prepareResponse.subtotal || subtotal).toFixed(2);
+            if (modalFee) modalFee.textContent = (prepareResponse.platform_fee || platformFee).toFixed(2);
+            if (modalTotalCost) modalTotalCost.textContent = (prepareResponse.total_amount || totalCost).toFixed(2);
             
             // 设置接收地址
-            const platformAddress = document.querySelector('meta[name="platform-fee-address"]')?.content || 
+            const platformAddress = prepareResponse.recipient_address || 
+                                   document.querySelector('meta[name="platform-fee-address"]')?.content || 
                                    'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd';
             if (modalRecipientAddress) modalRecipientAddress.textContent = platformAddress;
             
             // 保存待处理交易信息到全局变量
             window.pendingPurchase = {
+                trade_id: tradeId,
                 asset_id: assetId,
                 amount: amount,
-                total_cost: totalCost.toFixed(2),
+                total_cost: (prepareResponse.total_amount || totalCost).toFixed(2),
                 recipient_address: platformAddress,
-                wallet_address: walletConnection.address,
-                trade_id: tradeId
+                wallet_address: walletConnection.address
             };
             
             // 显示模态框
@@ -451,15 +432,15 @@
             // 显示错误信息
             const buyError = document.getElementById('buy-error');
             if (buyError) {
-                buyError.textContent = error.message || '购买处理失败';
+                buyError.textContent = error.message || getText('purchaseError');
                 buyError.style.display = 'block';
             } else {
-                showMessage(error.message || '购买处理失败', 'danger');
+                showMessage(error.message || getText('purchaseError'), 'danger');
             }
         } finally {
             // 恢复购买按钮
             buyButton.disabled = false;
-            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>购买';
+            buyButton.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>${getText('buy') || '购买'}`;
         }
     }
     
@@ -472,7 +453,7 @@
             const confirmBtn = document.getElementById('confirmPurchaseBtn');
             if (confirmBtn) {
                 confirmBtn.disabled = true;
-                confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>处理中...';
+                confirmBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${getText('processing')}`;
             }
             
             // 如果没有交易ID，抛出错误
@@ -498,7 +479,7 @@
             }
             
             // 显示成功消息
-            showMessage('购买成功！', 'success');
+            showMessage(getText('purchaseSuccess'), 'success');
             
             // 刷新资产信息
             if (typeof window.refreshAssetInfoNow === 'function') {
@@ -524,10 +505,10 @@
             // 显示错误信息
             const modalError = document.getElementById('buyModalError');
             if (modalError) {
-                modalError.textContent = error.message || '购买确认失败';
+                modalError.textContent = error.message || getText('purchaseError');
                 modalError.style.display = 'block';
             } else {
-                showMessage(error.message || '购买确认失败', 'danger');
+                showMessage(error.message || getText('purchaseError'), 'danger');
             }
             
             return false;
@@ -536,7 +517,7 @@
             const confirmBtn = document.getElementById('confirmPurchaseBtn');
             if (confirmBtn) {
                 confirmBtn.disabled = false;
-                confirmBtn.innerHTML = '确认购买';
+                confirmBtn.innerHTML = getText('confirm') || '确认购买';
             }
         }
     }

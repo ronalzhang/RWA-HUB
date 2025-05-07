@@ -1,807 +1,469 @@
 /**
- * 钱包API修复脚本
- * 用于处理购买流程中的API调用问题
- * 版本: 1.2.5 - 全面API错误处理和余额模拟
+ * RWA-HUB 钱包API修复脚本
+ * 解决API 404错误和资产ID不一致问题
+ * 版本: 1.3.0
  */
 
 (function() {
-    console.log('钱包API修复脚本已加载 - v1.2.5');
+    console.log('钱包API修复脚本已加载 - v1.3.0');
+    
+    // 调试设置
+    const CONFIG = {
+        debug: true,
+        enableApiMocks: false, // 关闭模拟数据
+        defaultAssetId: 'RH-205020',
+        retryCount: 3,
+        retryDelay: 500
+    };
+    
+    // 调试日志
+    function log(message, data = null) {
+        if (CONFIG.debug) {
+            if (data !== null) {
+                console.log(`[钱包API修复] ${message}`, data);
+            } else {
+                console.log(`[钱包API修复] ${message}`);
+            }
+        }
+    }
     
     // 存储原始fetch函数
     const originalFetch = window.fetch;
     
-    // 全局配置
-    const CONFIG = {
-        debug: true,
-        assetID: 'RH-205020', // 默认资产ID
-        mockOwnership: false, // 是否模拟资产拥有权
-        mockDividends: true,  // 是否模拟分红数据
-        userBalance: 2.5,     // 默认用户USDC余额
-        userSolBalance: 0.15,  // 默认用户SOL余额
-        enableApiMocks: true,
-        mockDelayMin: 200,
-        mockDelayMax: 600,
-        forceMockForEndpoints: [
-            '/api/trades/prepare_purchase', 
-            '/api/trades/confirm_purchase',
-            '/api/assets/symbol/',
-            '/api/is_admin'
-        ],
-        defaultAssetId: 'RH-205020',
-        defaultBalance: 0.00,
-        defaultTokenPrice: 0.23
-    };
-    
-    // 资产基本信息模拟数据
-    const ASSET_INFO = {
-        "id": CONFIG.assetID,
-        "name": "Chinook Regional Hospital",
-        "symbol": CONFIG.assetID,
-        "description": "加拿大医疗资产通证，年化收益率4.5%，每季度分红",
-        "asset_type": "medical_property",
-        "location": "加拿大阿尔伯塔省",
-        "token_price": 0.23,
-        "total_supply": 100000000,
-        "remaining_supply": 99988520,
-        "image_url": "/static/img/assets/hospital1.jpg",
-        "website": "https://www.albertahealthservices.ca/",
-        "category": "医疗资产",
-        "listed_date": "2023-05-01",
-        "annual_yield": 4.5,
-        "dividend_cycle": "quarterly",
-        "last_price_update": "2023-11-01"
-    };
-    
-    // 分红数据模拟
-    const DIVIDEND_INFO = {
-        "success": true,
-        "total_dividends": 450000,
-        "last_dividend": {
-            "amount": 120000,
-            "date": "2023-09-30",
-            "status": "completed"
-        },
-        "next_dividend": {
-            "amount": 125000,
-            "date": "2023-12-31",
-            "status": "scheduled"
-        }
-    };
-    
-    // 钱包余额模拟数据
-    const BALANCE_INFO = {
-        "success": true,
-        "balances": {
-            "usdc": CONFIG.userBalance,
-            "sol": CONFIG.userSolBalance
-        },
-        "address": "",
-        "wallet_type": ""
-    };
-    
-    // 用户资产模拟数据
-    const USER_ASSETS = [
-        {
-            "asset_id": CONFIG.assetID,
-            "token_symbol": CONFIG.assetID,
-            "token_name": "Chinook Regional Hospital",
-            "token_amount": 5000,
-            "purchase_date": "2023-10-15",
-            "token_price": 0.23,
-            "total_value": 1150,
-            "image_url": "/static/img/assets/hospital1.jpg",
-            "annual_yield": 4.5
-        }
-    ];
-    
-    // 日志函数，用于调试
-    function log(message, data = null) {
-        if (CONFIG.debug) {
-            console.log(`[钱包API修复] ${message}`, data || '');
-        }
-    }
-    
-    // 模拟API响应数据
-    function generateMockPurchaseData(assetId, amount, walletAddress) {
-        // 获取当前资产信息
-        let assetName = ASSET_INFO.name;
-        try {
-            const pageTitle = document.querySelector('h1, h2, .asset-title')?.textContent;
-            if (pageTitle && pageTitle.trim().length > 0) {
-                assetName = pageTitle.trim();
-            }
-        } catch (e) {
-            console.debug('无法从页面获取资产名称', e);
+    // 标准化资产ID
+    function normalizeAssetId(assetId) {
+        if (!assetId) return CONFIG.defaultAssetId;
+        
+        // 如果是纯数字，添加RH-前缀
+        if (/^\d+$/.test(assetId)) {
+            return `RH-${assetId}`;
         }
         
-        // 获取价格
-        let tokenPrice = ASSET_INFO.token_price;
-        try {
-            const priceElement = document.querySelector('[data-token-price]');
-            if (priceElement) {
-                const price = parseFloat(priceElement.getAttribute('data-token-price'));
-                if (!isNaN(price)) {
-                    tokenPrice = price;
-                }
-            }
-        } catch (e) {
-            console.debug('无法从页面获取价格', e);
+        // 如果已经是RH-格式，保持不变
+        if (assetId.startsWith('RH-')) {
+            return assetId;
         }
         
-        // 计算金额
-        const cleanAmount = parseInt(amount) || 1;
-        const subtotal = cleanAmount * tokenPrice;
-        const platformFee = subtotal * 0.02; // 2% 平台费
-        const totalAmount = (subtotal + platformFee).toFixed(2);
+        // 尝试提取数字部分
+        const match = assetId.match(/(\d+)/);
+        if (match && match[1]) {
+            return `RH-${match[1]}`;
+        }
         
-        console.log('生成模拟购买数据:', {
-            assetId,
-            assetName,
-            amount: cleanAmount,
-            price: tokenPrice,
-            subtotal,
-            platformFee,
-            totalAmount
-        });
+        return assetId;
+    }
+    
+    // 改进的fetch函数 - 支持多端点尝试和错误处理
+    async function fetchWithRetry(url, options = {}, retries = CONFIG.retryCount) {
+        let lastError;
         
-        return {
-            success: true,
-            trade_id: `MOCK-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            asset_id: assetId || CONFIG.assetID,
-            asset_name: assetName,
-            amount: cleanAmount,
-            token_price: tokenPrice,
-            subtotal: subtotal.toFixed(2),
-            platform_fee: platformFee.toFixed(2),
-            platform_fee_basis_points: 200, // 2%
-            total_amount: totalAmount,
-            wallet_address: walletAddress,
-            seller_address: '8xpT...A7dQ', // 模拟卖家地址
-            recipient_address: '8xpT...A7dQ', // 模拟接收地址
-            purchase_contract_address: null
-        };
-    }
-    
-    // 生成资产详情模拟数据
-    function generateMockAssetInfo(assetId) {
-        // 克隆基本信息，避免修改原始对象
-        const assetInfo = {...ASSET_INFO};
+        // 标准化URL
+        const normalizedUrl = normalizeApiUrl(url);
         
-        // 更新ID
-        assetInfo.id = assetId || CONFIG.assetID;
-        assetInfo.symbol = assetId || CONFIG.assetID;
-        
-        return assetInfo;
-    }
-    
-    // 生成分红统计模拟数据
-    function generateMockDividendStats() {
-        return {...DIVIDEND_INFO};
-    }
-    
-    // 生成资产所有权检查模拟数据
-    function generateMockOwnershipCheck(walletAddress) {
-        return {
-            success: true,
-            is_owner: CONFIG.mockOwnership,
-            wallet_address: walletAddress,
-            asset_id: CONFIG.assetID,
-            ownership_percentage: CONFIG.mockOwnership ? 2.5 : 0,
-            token_amount: CONFIG.mockOwnership ? 2500000 : 0
-        };
-    }
-    
-    // 生成模拟交易执行结果
-    function generateMockTransferResult(data) {
-        return {
-            success: true,
-            transaction_hash: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`,
-            trade_id: data?.trade_id || `MOCK-TX-${Date.now()}`,
-            status: "completed",
-            message: "交易已成功处理"
-        };
-    }
-    
-    // 生成钱包余额模拟数据
-    function generateMockWalletBalance(walletAddress, walletType) {
-        const balanceData = {...BALANCE_INFO};
-        balanceData.address = walletAddress;
-        balanceData.wallet_type = walletType;
-        
-        return balanceData;
-    }
-    
-    // 生成管理员检查结果
-    function generateMockAdminCheck(walletAddress) {
-        return {
-            success: true,
-            is_admin: false, // 默认非管理员
-            wallet_address: walletAddress
-        };
-    }
-    
-    // 生成用户资产数据
-    function generateMockUserAssets(walletAddress) {
-        const assets = [...USER_ASSETS];
-        
-        // 添加钱包地址
-        return {
-            success: true,
-            assets: assets,
-            wallet_address: walletAddress,
-            total_assets: assets.length,
-            total_value: assets.reduce((sum, asset) => sum + asset.total_value, 0)
-        };
-    }
-    
-    // 提取URL查询参数
-    function extractQueryParams(url) {
-        try {
-            const params = {};
-            // 尝试解析为URL对象
-            const urlObj = new URL(url, window.location.origin);
-            
-            // 遍历所有参数
-            for (const [key, value] of urlObj.searchParams.entries()) {
-                params[key] = value;
-            }
-            
-            return params;
-        } catch (e) {
-            // 如果URL解析失败，尝试手动提取查询参数
+        // 尝试多次请求
+        for (let i = 0; i < retries; i++) {
             try {
-                const queryString = url.split('?')[1];
-                if (!queryString) return {};
-                
-                const params = {};
-                const pairs = queryString.split('&');
-                
-                for (const pair of pairs) {
-                    const [key, value] = pair.split('=');
-                    if (key) {
-                        params[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
-                    }
+                if (i > 0) {
+                    log(`重试API请求 (${i}/${retries}): ${normalizedUrl}`);
+                    // 增加延迟，避免过多请求
+                    await new Promise(resolve => setTimeout(resolve, CONFIG.retryDelay));
                 }
                 
-                return params;
-            } catch (e2) {
-                console.debug('无法解析URL查询参数', e2);
-                return {};
-            }
-        }
-    }
-    
-    // 检查URL是否包含特定路径
-    function urlContains(url, paths) {
-        if (typeof paths === 'string') {
-            paths = [paths];
-        }
-        
-        for (const path of paths) {
-            if (url.includes(path)) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-    
-    // 重写fetch函数，添加API修复逻辑
-    window.fetch = async function(resource, options) {
-        // 处理空白URL
-        if (!resource) {
-            console.error('API调用URL为空');
-            return originalFetch.apply(this, arguments);
-        }
-        
-        // 获取钱包地址
-        let walletAddress = '';
-        let walletType = '';
-        if (window.walletState && window.walletState.address) {
-            walletAddress = window.walletState.address;
-            walletType = window.walletState.walletType || 'phantom';
-        } else if (localStorage.getItem('walletAddress')) {
-            walletAddress = localStorage.getItem('walletAddress');
-            walletType = localStorage.getItem('walletType') || 'phantom';
-        }
-        
-        // 获取URL查询参数
-        const params = extractQueryParams(resource);
-        
-        // 如果参数中有地址，使用参数中的地址
-        if (params.address) {
-            walletAddress = params.address;
-        }
-        
-        // 如果参数中有钱包类型，使用参数中的钱包类型
-        if (params.wallet_type) {
-            walletType = params.wallet_type;
-        }
-        
-        log(`处理API请求: ${resource} (钱包地址=${walletAddress}, 类型=${walletType})`);
-        
-        // === 钱包余额API模拟 ===
-        if (urlContains(resource, ['/api/wallet/balance', '/api/balance'])) {
-            log('模拟钱包余额API');
-            return new Response(JSON.stringify(generateMockWalletBalance(walletAddress, walletType)), {
-                status: 200,
-                headers: {'Content-Type': 'application/json'}
-            });
-        }
-        
-        // === 管理员检查API模拟 ===
-        if (urlContains(resource, ['/api/user/check_admin', '/api/admin/check'])) {
-            log('模拟管理员检查API');
-            return new Response(JSON.stringify(generateMockAdminCheck(walletAddress)), {
-                status: 200,
-                headers: {'Content-Type': 'application/json'}
-            });
-        }
-        
-        // === 用户资产API模拟 ===
-        if (urlContains(resource, ['/api/user/assets', '/api/assets/user'])) {
-            log('模拟用户资产API');
-            return new Response(JSON.stringify(generateMockUserAssets(walletAddress)), {
-                status: 200,
-                headers: {'Content-Type': 'application/json'}
-            });
-        }
-        
-        // === 资产详情API模拟 ===
-        if (resource.includes('/api/assets/')) {
-            // 获取资产ID
-            let assetId = CONFIG.assetID;
-            try {
-                // 从URL提取资产ID
-                const urlParts = resource.split('/');
-                const assetIndex = urlParts.indexOf('assets') + 1;
-                if (assetIndex > 0 && urlParts.length > assetIndex) {
-                    // 移除查询参数
-                    let extractedId = urlParts[assetIndex].split('?')[0];
-                    // 移除端点名称
-                    if (extractedId.includes('symbol')) {
-                        extractedId = urlParts[assetIndex + 1].split('?')[0];
-                    }
-                    if (extractedId) {
-                        assetId = extractedId;
-                    }
-                }
-            } catch (e) {
-                console.debug('无法从URL提取资产ID', e);
-            }
-            
-            // 资产所有权检查API
-            if (resource.includes('/check_owner')) {
-                log('模拟资产所有权检查API', { assetId, resource });
-                return new Response(JSON.stringify(generateMockOwnershipCheck(walletAddress)), {
-                    status: 200,
-                    headers: {'Content-Type': 'application/json'}
-                });
-            }
-            
-            // 分红统计API
-            if (resource.includes('/dividend_stats') || resource.includes('/dividend/total/')) {
-                log('模拟分红统计API', { assetId, resource });
-                return new Response(JSON.stringify(generateMockDividendStats()), {
-                    status: 200,
-                    headers: {'Content-Type': 'application/json'}
-                });
-            }
-            
-            // 资产详情API（symbol查询）
-            if (resource.includes('/symbol/')) {
-                log('模拟资产详情API (symbol)', { assetId, resource });
-                return new Response(JSON.stringify(generateMockAssetInfo(assetId)), {
-                    status: 200,
-                    headers: {'Content-Type': 'application/json'}
-                });
-            }
-            
-            // 普通资产详情API
-            if (!resource.includes('/dividend') && !resource.includes('/check_owner')) {
-                log('模拟资产详情API', { assetId, resource });
-                return new Response(JSON.stringify(generateMockAssetInfo(assetId)), {
-                    status: 200,
-                    headers: {'Content-Type': 'application/json'}
-                });
-            }
-        }
-        
-        // === 交易准备API模拟 ===
-        if (resource.includes('/api/trades/prepare_purchase')) {
-            console.log('拦截 prepare_purchase API 调用');
-            
-            try {
-                // 检查是否强制使用模拟数据
-                if (CONFIG.enableApiMocks && CONFIG.forceMockForEndpoints.some(endpoint => resource.includes(endpoint))) {
-                    return mockPreparePurchaseResponse(resource, options);
-                }
+                const response = await originalFetch(normalizedUrl, options);
                 
-                // 尝试原始API调用
-                const response = await originalFetch(resource, options);
-                
-                // 如果API调用成功，直接返回原始响应
+                // 如果请求成功
                 if (response.ok) {
-                    console.log('原始API调用成功');
                     return response;
                 }
                 
-                console.log('原始API调用失败，使用模拟数据:', response.status);
-                
-                // 解析请求体获取参数
-                let requestData = {};
-                if (options && options.body) {
-                    try {
-                        requestData = JSON.parse(options.body);
-                    } catch (e) {
-                        console.error('解析请求体失败:', e);
-                    }
-                }
-                
-                // 生成模拟响应数据
-                const mockData = generateMockPurchaseData(
-                    requestData.asset_id,
-                    requestData.amount,
-                    requestData.wallet_address || walletAddress
-                );
-                
-                // 创建模拟响应
-                return new Response(JSON.stringify(mockData), {
-                    status: 200,
-                    headers: {'Content-Type': 'application/json'}
-                });
+                lastError = new Error(`API请求失败: ${response.status} ${response.statusText}`);
+                log(`API请求失败 (${i+1}/${retries}): ${normalizedUrl} - ${response.status}`);
             } catch (error) {
-                console.error('API调用完全失败，使用模拟数据:', error);
-                
-                // 尝试从URL参数或选项中获取数据
-                let assetId = '';
-                let amount = 1;
-                
-                if (options && options.body) {
-                    try {
-                        const data = JSON.parse(options.body);
-                        assetId = data.asset_id;
-                        amount = data.amount;
-                    } catch (e) {
-                        console.error('解析请求体失败:', e);
-                    }
-                }
-                
-                if (!assetId) {
-                    // 尝试从当前URL获取资产ID
-                    const urlMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
-                    if (urlMatch && urlMatch[1]) {
-                        assetId = urlMatch[1];
-                    }
-                }
-                
-                // 生成模拟响应数据
-                const mockData = generateMockPurchaseData(assetId, amount, walletAddress);
-                
-                // 创建模拟响应
-                return new Response(JSON.stringify(mockData), {
-                    status: 200,
-                    headers: {'Content-Type': 'application/json'}
-                });
+                lastError = error;
+                log(`API请求异常 (${i+1}/${retries}): ${normalizedUrl}`, error);
             }
         }
         
-        // === 交易执行API模拟 ===
-        if (resource.includes('/api/execute_transfer') || resource.includes('/api/trades/confirm_purchase')) {
-            console.log('拦截交易执行/确认API调用:', resource);
-            
-            try {
-                // 检查是否强制使用模拟数据
-                if (CONFIG.enableApiMocks && CONFIG.forceMockForEndpoints.some(endpoint => resource.includes(endpoint))) {
-                    return mockConfirmPurchaseResponse(resource, options);
-                }
-                
-                // 尝试原始API调用
-                const response = await originalFetch(resource, options);
-                
-                // 如果API调用成功，直接返回原始响应
-                if (response.ok) {
-                    console.log('原始交易执行API调用成功');
-                    return response;
-                }
-                
-                console.log('原始交易执行API调用失败，使用模拟数据:', response.status);
-                
-                // 解析请求体获取参数
-                let requestData = {};
-                if (options && options.body) {
-                    try {
-                        requestData = JSON.parse(options.body);
-                    } catch (e) {
-                        console.error('解析请求体失败:', e);
-                    }
-                }
-                
-                // 生成模拟响应数据
-                const mockData = generateMockTransferResult(requestData);
-                
-                // 创建模拟响应
-                return new Response(JSON.stringify(mockData), {
-                    status: 200,
-                    headers: {'Content-Type': 'application/json'}
-                });
-            } catch (error) {
-                console.error('交易执行API调用完全失败，使用模拟数据:', error);
-                
-                // 生成模拟响应数据
-                const mockData = generateMockTransferResult({});
-                
-                // 创建模拟响应
-                return new Response(JSON.stringify(mockData), {
-                    status: 200,
-                    headers: {'Content-Type': 'application/json'}
-                });
-            }
-        }
-        
-        // 对于其他API调用，使用原始fetch
-        log(`使用原始fetch处理请求: ${resource}`);
-        return originalFetch.apply(this, arguments);
-    };
+        // 如果所有尝试都失败，抛出最后一个错误
+        throw lastError || new Error(`无法完成API请求: ${normalizedUrl}`);
+    }
     
-    // 模拟确认购买操作
-    async function mockConfirmPurchase(purchaseData, modalElement, confirmBtn) {
-        console.log('执行模拟确认购买:', purchaseData);
-        
-        if (!purchaseData || !purchaseData.trade_id) {
-            console.error('无效的购买数据');
-            throw new Error('无效的购买数据');
+    // 标准化API URL
+    function normalizeApiUrl(url) {
+        // 如果URL已经包含域名，不做修改
+        if (url.startsWith('http')) {
+            return url;
         }
         
-        // 显示加载状态
-        if (confirmBtn) {
-            const originalText = confirmBtn.innerHTML;
-            confirmBtn.disabled = true;
-            confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 处理中...';
-            
-            // 恢复函数
-            const resetButton = () => {
-                confirmBtn.disabled = false;
-                confirmBtn.innerHTML = originalText;
-            };
-            
+        // 处理资产API路径
+        if (url.includes('/api/assets/')) {
+            // 检查URL中是否包含资产ID
+            const assetIdMatch = url.match(/\/api\/assets\/([^\/\?]+)/);
+            if (assetIdMatch && assetIdMatch[1]) {
+                const originalId = assetIdMatch[1];
+                const normalizedId = normalizeAssetId(originalId);
+                
+                // 只在需要时替换资产ID
+                if (originalId !== normalizedId) {
+                    return url.replace(originalId, normalizedId);
+                }
+            }
+        }
+        
+        return url;
+    }
+    
+    // 尝试多个可能的URL端点
+    async function fetchWithMultipleUrls(urls, options = {}) {
+        if (!Array.isArray(urls) || urls.length === 0) {
+            throw new Error('没有提供有效的URL数组');
+        }
+        
+        let lastError;
+        
+        // 尝试每个URL
+        for (let i = 0; i < urls.length; i++) {
             try {
-                // 模拟交易处理时间
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-                // 关闭模态框
-                if (modalElement && window.bootstrap) {
-                    const bsModal = bootstrap.Modal.getInstance(modalElement);
-                    if (bsModal) {
-                        bsModal.hide();
-                    } else {
-                        modalElement.style.display = 'none';
-                    }
-                } else if (modalElement) {
-                    // 尝试使用jQuery关闭
-                    try {
-                        if (window.jQuery) {
-                            window.jQuery(modalElement).modal('hide');
-                        } else {
-                            modalElement.style.display = 'none';
-                        }
-                    } catch (e) {
-                        console.debug('无法关闭模态框:', e);
-                        // 直接隐藏
-                        modalElement.style.display = 'none';
-                    }
-                }
-                
-                // 显示成功消息
-                if (typeof window.showSuccess === 'function') {
-                    window.showSuccess('购买请求已提交！请耐心等待交易确认。');
-                } else {
-                    alert('购买请求已提交！请耐心等待交易确认。');
-                }
-                
-                // 如果有刷新函数，刷新资产数据
-                if (typeof window.refreshAssetInfoNow === 'function') {
-                    setTimeout(() => window.refreshAssetInfoNow(), 1000);
-                }
-                
-                // 修改区块链UI显示
-                const confirmInfo = {
-                    success: true,
-                    transaction_hash: `tx_${Date.now()}`,
-                    trade_id: purchaseData.trade_id,
-                    message: "交易已成功提交到区块链"
-                };
-                
-                // 更新用户资产
-                setTimeout(() => {
-                    if (typeof window.updateAssetsUIGlobal === 'function') {
-                        window.updateAssetsUIGlobal();
-                    }
-                }, 2000);
-                
-                return confirmInfo;
+                log(`尝试API端点 ${i+1}/${urls.length}: ${urls[i]}`);
+                const response = await fetchWithRetry(urls[i], options);
+                return response;
             } catch (error) {
-                console.error('模拟购买失败:', error);
-                
-                // 显示错误消息
-                if (typeof window.showError === 'function') {
-                    window.showError('处理购买请求时出错');
-                } else {
-                    alert('处理购买请求时出错');
+                lastError = error;
+                log(`端点失败 ${i+1}/${urls.length}: ${urls[i]}`, error);
+            }
+        }
+        
+        // 所有URL都失败
+        throw lastError || new Error('所有API端点请求失败');
+    }
+    
+    // 钱包API - 多端点尝试获取钱包余额
+    async function getWalletBalance(address) {
+        if (!address) {
+            throw new Error('获取余额需要钱包地址');
+        }
+        
+        // 多个可能的API端点
+        const urls = [
+            `/api/get_wallet_balance?address=${address}`,
+            `/api/balance?address=${address}`,
+            `/api/wallet/balance?address=${address}`,
+            `/api/user/balance?address=${address}`
+        ];
+        
+        try {
+            const response = await fetchWithMultipleUrls(urls);
+            const data = await response.json();
+            
+            // 正常返回API结果
+            return data;
+        } catch (error) {
+            log('获取钱包余额失败', error);
+            throw new Error('无法获取钱包余额: ' + error.message);
+        }
+    }
+    
+    // 检查用户是否是管理员
+    async function checkIsAdmin(address) {
+        if (!address) {
+            return { is_admin: false };
+        }
+        
+        // 多个可能的API端点
+        const urls = [
+            `/api/is_admin?address=${address}`,
+            `/api/check_admin?address=${address}`,
+            `/api/user/admin_status?address=${address}`,
+            `/api/admin/check?address=${address}`
+        ];
+        
+        try {
+            const response = await fetchWithMultipleUrls(urls);
+            const data = await response.json();
+            
+            // 返回API结果
+            return data;
+        } catch (error) {
+            log('检查管理员权限失败', error);
+            // 在API失败时默认为非管理员，这是安全做法
+            return { is_admin: false };
+        }
+    }
+    
+    // 重写fetch以支持重试和标准化URL
+    window.fetch = async function(input, init) {
+        let url = input;
+        
+        // 提取URL（如果input是Request对象）
+        if (input instanceof Request) {
+            url = input.url;
+            if (!init) init = {};
+        }
+        
+        // 检查是否是API调用
+        if (typeof url === 'string' && url.includes('/api/')) {
+            try {
+                if (url.includes('/api/trades/prepare_purchase') || 
+                    url.includes('/api/trades/confirm_purchase')) {
+                    // 这些端点需要使用原始fetch并手动处理多端点尝试
+                    return originalFetch(input, init);
                 }
                 
+                // 对API请求应用重试逻辑
+                return await fetchWithRetry(url, init);
+            } catch (error) {
+                // 只对标准错误类型进行处理
                 throw error;
-            } finally {
-                // 重置按钮状态
-                resetButton();
             }
         }
-    }
+        
+        // 对于非API请求，使用原始fetch
+        return originalFetch(input, init);
+    };
     
-    // 替换转账函数
-    function mockTransferToken(to, amount, tokenSymbol, successCallback, errorCallback) {
-        console.log(`模拟转账: ${amount} ${tokenSymbol} 到 ${to}`);
+    // 改进资产详情API函数
+    function enhanceAssetDetailApi() {
+        // 查找原始函数
+        const originalRefreshAssetInfo = window.refreshAssetInfo;
         
-        // 检查余额是否足够
-        const hasEnoughBalance = CONFIG.userBalance >= parseFloat(amount);
-        
-        // 延迟执行，模拟交易处理时间
-        setTimeout(() => {
-            if (hasEnoughBalance) {
-                const mockSignature = `mock_tx_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-                console.log(`模拟转账成功，交易签名: ${mockSignature}`);
-                if (typeof successCallback === 'function') {
-                    successCallback(mockSignature);
-                }
-            } else {
-                console.error('余额不足，转账失败');
-                if (typeof errorCallback === 'function') {
-                    errorCallback('余额不足，无法完成交易');
-                }
-            }
-        }, 1500);
-    }
-    
-    // 当DOM加载完成后，执行
-    document.addEventListener('DOMContentLoaded', function() {
-        // 全局替换转账函数
-        if (typeof window.transferToken !== 'function' || typeof window.transferSolanaToken !== 'function') {
-            console.log('替换转账函数为模拟函数');
-            window.transferToken = mockTransferToken;
-            window.transferSolanaToken = mockTransferToken;
-        }
-        
-        // 监听确认购买按钮
-        const confirmBtn = document.getElementById('confirmPurchaseBtn');
-        if (confirmBtn) {
-            console.log('找到确认购买按钮，添加事件处理');
-            
-            // 替换确认购买函数（如果原始函数不可用）
-            if (typeof window.confirmPurchase !== 'function') {
-                console.log('未找到全局confirmPurchase函数，使用模拟函数');
-                window.confirmPurchase = mockConfirmPurchase;
-            } else {
-                console.log('使用现有confirmPurchase函数，添加错误处理');
+        if (typeof originalRefreshAssetInfo === 'function') {
+            window.refreshAssetInfo = async function() {
+                log('执行增强的资产详情刷新');
                 
-                // 保存原始函数
-                const originalConfirmPurchase = window.confirmPurchase;
-                
-                // 添加错误处理
-                window.confirmPurchase = async function(data) {
-                    try {
-                        // 检查参数，确保有trade_id
-                        if (data && !data.trade_id && window.pendingPurchase) {
-                            data.trade_id = window.pendingPurchase.trade_id;
-                            console.log('添加了缺失的交易ID:', data.trade_id);
+                try {
+                    // 获取资产ID
+                    let assetId = null;
+                    
+                    // 尝试多个可能的来源获取资产ID
+                    // 1. 从全局ASSET_CONFIG
+                    if (window.ASSET_CONFIG && window.ASSET_CONFIG.assetId) {
+                        assetId = window.ASSET_CONFIG.assetId;
+                        log('从ASSET_CONFIG获取资产ID:', assetId);
+                    } 
+                    // 2. 从URL参数
+                    else if (window.location.pathname.includes('/assets/')) {
+                        const pathMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
+                        if (pathMatch && pathMatch[1]) {
+                            assetId = pathMatch[1];
+                            log('从URL路径获取资产ID:', assetId);
                         }
-                        
-                        // 如果没有pending信息但有模态框数据，也可以获取
-                        if (data && !data.trade_id && !window.pendingPurchase) {
-                            const buyModal = document.getElementById('buyModal');
-                            if (buyModal) {
-                                const tradeIdElement = buyModal.querySelector('[data-trade-id]');
-                                if (tradeIdElement && tradeIdElement.dataset.tradeId) {
-                                    data.trade_id = tradeIdElement.dataset.tradeId;
-                                    console.log('从模态框元素获取交易ID:', data.trade_id);
-                                }
-                            }
-                        }
-                        
-                        // 确保必要的参数
-                        if (!data || !data.trade_id) {
-                            console.error('缺少交易ID，无法继续');
-                            // 可以尝试生成一个模拟ID
-                            data = data || {};
-                            data.trade_id = `MOCK_CONFIRM_${Date.now()}`;
-                            console.log('生成了模拟交易ID:', data.trade_id);
-                        }
-                        
-                        return await originalConfirmPurchase.call(this, data);
-                    } catch (error) {
-                        console.error('原始确认购买函数失败，使用模拟函数:', error);
-                        return mockConfirmPurchase.apply(this, arguments);
                     }
-                };
+                    // 3. 从DOM元素
+                    else {
+                        const assetElement = document.querySelector('[data-asset-id]');
+                        if (assetElement) {
+                            assetId = assetElement.getAttribute('data-asset-id');
+                            log('从DOM元素获取资产ID:', assetId);
+                        }
+                    }
+                    
+                    // 如果找不到资产ID，调用原始函数
+                    if (!assetId) {
+                        log('找不到资产ID，使用原始刷新函数');
+                        return originalRefreshAssetInfo();
+                    }
+                    
+                    // 标准化资产ID
+                    const normalizedId = normalizeAssetId(assetId);
+                    
+                    // 多个可能的API端点
+                    const urls = [
+                        `/api/assets/symbol/${normalizedId}?_=${Date.now()}`,
+                        `/api/assets/${normalizedId}?_=${Date.now()}`,
+                        `/api/asset_details/${normalizedId}?_=${Date.now()}`,
+                        `/api/assets/detail/${normalizedId}?_=${Date.now()}`
+                    ];
+                    
+                    // 尝试请求可能的API端点
+                    const response = await fetchWithMultipleUrls(urls);
+                    const asset = await response.json();
+                    
+                    // 检查API响应
+                    if (!asset || !asset.token_symbol) {
+                        throw new Error('API返回的资产数据无效');
+                    }
+                    
+                    // 更新UI元素
+                    const updatedElements = updateAssetDetailsUI(asset);
+                    log('资产详情API调用成功，已更新UI元素', updatedElements);
+                    
+                    // 保存最后获取的数据
+                    window.lastAssetData = asset;
+                    
+                    return asset;
+                } catch (error) {
+                    log('增强资产详情API调用失败', error);
+                    
+                    // 如果有上次数据，使用它
+                    if (window.lastAssetData) {
+                        log('使用上次缓存的资产数据');
+                        updateAssetDetailsUI(window.lastAssetData);
+                        return window.lastAssetData;
+                    }
+                    
+                    // 如果仍然失败，调用原始函数
+                    log('调用原始刷新函数作为后备机制');
+                    return originalRefreshAssetInfo();
+                }
+            };
+            
+            log('资产详情API函数已增强');
+        }
+    }
+    
+    // 更新资产详情UI元素
+    function updateAssetDetailsUI(asset) {
+        const updatedElements = [];
+        
+        try {
+            // 更新资产名称
+            const nameElements = document.querySelectorAll('.asset-name, #asset-name, [data-field="asset-name"]');
+            nameElements.forEach(el => {
+                el.textContent = asset.name || asset.token_symbol;
+                updatedElements.push('asset-name');
+            });
+            
+            // 更新资产符号
+            const symbolElements = document.querySelectorAll('.asset-symbol, #asset-symbol, [data-field="asset-symbol"]');
+            symbolElements.forEach(el => {
+                el.textContent = asset.token_symbol;
+                updatedElements.push('asset-symbol');
+            });
+            
+            // 更新资产价格
+            const priceElements = document.querySelectorAll('.asset-price, #asset-price, [data-field="asset-price"]');
+            if (asset.token_price) {
+                priceElements.forEach(el => {
+                    el.textContent = `$${parseFloat(asset.token_price).toFixed(2)}`;
+                    updatedElements.push('asset-price');
+                });
             }
+            
+            // 更新资产总供应量
+            const supplyElements = document.querySelectorAll('.asset-supply, #asset-supply, [data-field="asset-supply"]');
+            if (asset.token_supply) {
+                supplyElements.forEach(el => {
+                    el.textContent = parseInt(asset.token_supply).toLocaleString();
+                    updatedElements.push('asset-supply');
+                });
+            }
+            
+            // 更新资产剩余供应量
+            const remainingElements = document.querySelectorAll('.asset-remaining, #asset-remaining, [data-field="asset-remaining"]');
+            if (asset.remaining_supply) {
+                remainingElements.forEach(el => {
+                    el.textContent = parseInt(asset.remaining_supply).toLocaleString();
+                    updatedElements.push('asset-remaining');
+                });
+            }
+            
+            // 更新购买按钮的数据属性
+            const buyButtons = document.querySelectorAll('#buy-button, .buy-button, [data-action="buy"]');
+            buyButtons.forEach(btn => {
+                btn.setAttribute('data-asset-id', asset.id || asset.token_symbol);
+                if (asset.token_price) {
+                    btn.setAttribute('data-token-price', asset.token_price);
+                }
+                updatedElements.push('buy-button');
+            });
+            
+            // 更新描述
+            const descElements = document.querySelectorAll('.asset-description, #asset-description, [data-field="asset-description"]');
+            if (asset.description) {
+                descElements.forEach(el => {
+                    el.textContent = asset.description;
+                    updatedElements.push('asset-description');
+                });
+            }
+        } catch (error) {
+            log('更新资产详情UI时出错', error);
         }
         
-        // 导出全局更新函数
-        window.updateAssetsUIGlobal = function() {
-            if (typeof window.updateAssetsUI === 'function') {
-                window.updateAssetsUI();
+        return updatedElements;
+    }
+    
+    // 增强钱包连接检查
+    function enhanceWalletConnectCheck() {
+        // 保存原始函数
+        if (typeof window.isWalletConnected === 'function') {
+            const originalCheck = window.isWalletConnected;
+            
+            // 增强函数
+            window.isWalletConnected = function() {
+                try {
+                    // 首先尝试原始方法
+                    const originalResult = originalCheck();
+                    
+                    // 如果原始方法确认已连接，直接返回
+                    if (originalResult === true) {
+                        return true;
+                    }
+                    
+                    // 多重检查
+                    // 1. 检查localStorage
+                    const storedAddress = localStorage.getItem('walletAddress');
+                    if (storedAddress) {
+                        return true;
+                    }
+                    
+                    // 2. 检查walletState对象
+                    if (window.walletState) {
+                        if (window.walletState.isConnected || 
+                            window.walletState.connected ||
+                            window.walletState.address) {
+                            return true;
+                        }
+                    }
+                    
+                    // 返回原始结果
+                    return originalResult;
+                } catch (error) {
+                    log('增强钱包连接检查出错', error);
+                    return false; // 安全默认值
+                }
+            };
+            
+            log('钱包连接检查函数已增强');
+        }
+    }
+    
+    // 增强全局钱包API
+    function enhanceGlobalWalletApi() {
+        // 增强或创建全局getWalletBalance函数
+        window.getWalletBalance = async function(address) {
+            try {
+                return await getWalletBalance(address);
+            } catch (error) {
+                log('获取钱包余额失败', error);
+                return { balance: 0 };
             }
         };
         
-        // 修复钱包余额显示
-        if (typeof window.getWalletBalance === 'function') {
-            // 备份原始函数
-            const originalGetWalletBalance = window.getWalletBalance;
-            
-            // 重写余额获取函数，确保在API失败时提供默认值
-            window.getWalletBalance = async function() {
-                try {
-                    const result = await originalGetWalletBalance.apply(this, arguments);
-                    return result;
-                } catch (error) {
-                    console.debug('原始余额获取函数失败，使用默认余额:', error);
-                    
-                    // 获取当前钱包地址
-                    let address = '';
-                    if (window.walletState && window.walletState.address) {
-                        address = window.walletState.address;
-                    } else if (localStorage.getItem('walletAddress')) {
-                        address = localStorage.getItem('walletAddress');
-                    }
-                    
-                    // 获取当前钱包类型
-                    let walletType = '';
-                    if (window.walletState && window.walletState.walletType) {
-                        walletType = window.walletState.walletType;
-                    } else if (localStorage.getItem('walletType')) {
-                        walletType = localStorage.getItem('walletType');
-                    }
-                    
-                    // 返回默认余额数据
-                    return {
-                        success: true,
-                        address: address,
-                        wallet_type: walletType || 'phantom',
-                        balances: {
-                            usdc: CONFIG.userBalance,
-                            sol: CONFIG.userSolBalance
-                        }
-                    };
-                }
-            };
-        }
-    });
+        // 增强或创建全局checkIsAdmin函数
+        window.checkIsAdmin = async function(address) {
+            try {
+                return await checkIsAdmin(address);
+            } catch (error) {
+                log('检查管理员权限失败', error);
+                return { is_admin: false };
+            }
+        };
+        
+        log('全局钱包API函数已增强');
+    }
     
-    // 导出全局钱包余额更新函数
-    window.updateWalletBalanceDisplay = function() {
-        if (typeof window.getWalletBalance === 'function') {
-            window.getWalletBalance().then(data => {
-                if (data && data.success && data.balances) {
-                    const usdcBalance = data.balances.usdc || 0;
-                    // 更新余额显示
-                    if (typeof window.updateBalanceDisplay === 'function') {
-                        window.updateBalanceDisplay(usdcBalance);
-                    }
-                }
-            }).catch(error => {
-                console.debug('获取余额失败，使用默认显示:', error);
-                if (typeof window.updateBalanceDisplay === 'function') {
-                    window.updateBalanceDisplay(CONFIG.userBalance);
-                }
-            });
-        }
-    };
+    // 初始化
+    function init() {
+        enhanceAssetDetailApi();
+        enhanceWalletConnectCheck();
+        enhanceGlobalWalletApi();
+        log('钱包API修复脚本初始化完成');
+    }
     
-    // 初始化立即更新余额
-    setTimeout(function() {
-        if (window.updateWalletBalanceDisplay) {
-            window.updateWalletBalanceDisplay();
-        }
-    }, 1000);
-    
-    console.log('钱包API修复脚本初始化完成');
+    // 在DOM加载完成后初始化
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })(); 
