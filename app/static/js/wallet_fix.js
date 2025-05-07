@@ -256,10 +256,8 @@
         address: null,
         walletType: null,
         balance: null,
-        // 确保 isWalletConnected 总是存在
-        isWalletConnected: function() {
-          return this.isConnected && !!this.address;
-        },
+        
+        // 基本方法实现
         connect: async function(walletType) {
           log(`尝试连接钱包类型: ${walletType}`);
           try {
@@ -288,15 +286,13 @@
                 log('Solana钱包连接错误', err);
               }
             }
-            // 如果未能连接，确保状态正确
-            this.isConnected = false;
             return false;
           } catch (err) {
             log('钱包连接错误', err);
-            this.isConnected = false;
             return false;
           }
         },
+        
         disconnect: function() {
           this.isConnected = false;
           this.address = null;
@@ -305,10 +301,13 @@
           this.saveState();
           this.dispatchEvent('disconnected');
         },
+        
         saveState: function() {
           try {
             localStorage.setItem('walletAddress', this.address || '');
             localStorage.setItem('walletType', this.walletType || '');
+            
+            // 兼容新旧存储方式
             const stateToSave = {
               isConnected: this.isConnected,
               address: this.address,
@@ -319,26 +318,35 @@
             log('保存钱包状态失败', e);
           }
         },
+        
         loadState: function() {
           try {
-            const savedStateStr = localStorage.getItem('walletState');
-            if (savedStateStr) {
-              const savedState = JSON.parse(savedStateStr);
-              this.isConnected = !!savedState.isConnected;
-              this.address = savedState.address || null;
-              this.walletType = savedState.walletType || null;
-              // 如果成功从 walletState 加载，直接返回
-              if(this.isConnected) return;
+            // 尝试从localStorage加载状态
+            const address = localStorage.getItem('walletAddress');
+            const walletType = localStorage.getItem('walletType');
+            
+            // 检查新版本存储
+            const savedState = localStorage.getItem('walletState');
+            if (savedState) {
+              try {
+                const parsedState = JSON.parse(savedState);
+                if (parsedState && typeof parsedState === 'object') {
+                  this.isConnected = !!parsedState.isConnected;
+                  this.address = parsedState.address || null;
+                  this.walletType = parsedState.walletType || null;
+                  return;
+                }
+              } catch (e) {
+                log('解析walletState失败', e);
+              }
             }
-            // 兼容旧的存储方式，如果新的 walletState 未能成功恢复连接状态
-            const oldAddress = localStorage.getItem('walletAddress');
-            const oldWalletType = localStorage.getItem('walletType');
-            if (oldAddress && oldWalletType) {
-              this.address = oldAddress;
-              this.walletType = oldWalletType;
-              this.isConnected = true; // 假设旧方式存储即为已连接
+            
+            // 回退到旧版本存储
+            if (address && walletType) {
+              this.address = address;
+              this.walletType = walletType;
+              this.isConnected = true;
             } else {
-              // 如果两种方式都失败，确保是断开状态
               this.isConnected = false;
               this.address = null;
               this.walletType = null;
@@ -350,48 +358,131 @@
             this.walletType = null;
           }
         },
+        
         dispatchEvent: function(eventName, detail) {
           const event = new CustomEvent('wallet' + eventName.charAt(0).toUpperCase() + eventName.slice(1), {
             detail: detail || {
               address: this.address,
-              walletType: this.walletType,
-              isConnected: this.isConnected // 确保事件也携带连接状态
+              walletType: this.walletType
             },
             bubbles: true
           });
           document.dispatchEvent(event);
         },
+        
         getAddress: function() {
           return this.address;
         },
+        
         getWalletType: function() {
           return this.walletType;
-        }
-        // isWalletConnected 已在对象创建时定义
-      };
-      window.walletState.loadState(); // 新创建对象后立即加载状态
-      log('window.walletState 已创建并初始化加载状态。', window.walletState);
-    } else {
-      // 如果 window.walletState 已存在，仍要确保 isWalletConnected 方法存在
-      if (typeof window.walletState.isWalletConnected !== 'function') {
-        log('为已存在的 window.walletState 添加缺失的 isWalletConnected 方法');
-        window.walletState.isWalletConnected = function() {
+        },
+        
+        isWalletConnected: function() {
           return this.isConnected && !!this.address;
-        };
+        }
+      };
+      
+      // 初始载入状态
+      window.walletState.loadState();
+      
+      // 添加以太坊事件监听
+      if (window.ethereum) {
+        window.ethereum.on('accountsChanged', function(accounts) {
+          if (accounts.length === 0) {
+            window.walletState.disconnect();
+          } else if (window.walletState.walletType === 'metamask') {
+            window.walletState.address = accounts[0];
+            window.walletState.isConnected = true;
+            window.walletState.saveState();
+            window.walletState.dispatchEvent('changed');
+          }
+        });
       }
-      // 确保其他核心方法也存在，如果不存在则赋予一个安全的默认实现
-      const coreMethods = ['connect', 'disconnect', 'saveState', 'loadState', 'dispatchEvent', 'getAddress', 'getWalletType'];
-      coreMethods.forEach(methodName => {
-        if (typeof window.walletState[methodName] !== 'function') {
-          log(`为已存在的 window.walletState 添加缺失的核心方法: ${methodName}`);
-          window.walletState[methodName] = function(...args) {
-            log(`调用了 ${methodName} 的存根实现`, args);
-            if (methodName === 'connect') return Promise.resolve(false);
-            return undefined;
+      
+      // 添加Solana事件监听
+      if (window.solana) {
+        window.solana.on('disconnect', function() {
+          if (window.walletState.walletType === 'solana') {
+            window.walletState.disconnect();
+          }
+        });
+      }
+    } else {
+      // 确保所有必要的方法存在
+      const requiredMethods = ['connect', 'disconnect', 'getAddress', 'isWalletConnected'];
+      
+      requiredMethods.forEach(method => {
+        if (typeof window.walletState[method] !== 'function') {
+          log(`为缺失的方法创建空实现: ${method}`);
+          
+          // 创建空方法
+          window.walletState[method] = function() {
+            log(`调用了未实现的方法: ${method}`);
+            return method === 'isWalletConnected' ? false : null;
           };
         }
       });
+      
+      // 确保保存和加载方法存在
+      if (typeof window.walletState.saveState !== 'function') {
+        window.walletState.saveState = function() {
+          try {
+            localStorage.setItem('walletAddress', this.address || '');
+            localStorage.setItem('walletType', this.walletType || '');
+            
+            const stateToSave = {
+              isConnected: this.isConnected,
+              address: this.address,
+              walletType: this.walletType
+            };
+            localStorage.setItem('walletState', JSON.stringify(stateToSave));
+          } catch (e) {
+            log('保存钱包状态失败', e);
+          }
+        };
+      }
+      
+      if (typeof window.walletState.loadState !== 'function') {
+        window.walletState.loadState = function() {
+          try {
+            const address = localStorage.getItem('walletAddress');
+            const walletType = localStorage.getItem('walletType');
+            
+            const savedState = localStorage.getItem('walletState');
+            if (savedState) {
+              try {
+                const parsedState = JSON.parse(savedState);
+                if (parsedState && typeof parsedState === 'object') {
+                  this.isConnected = !!parsedState.isConnected;
+                  this.address = parsedState.address || null;
+                  this.walletType = parsedState.walletType || null;
+                  return;
+                }
+              } catch (e) {
+                log('解析walletState失败', e);
+              }
+            }
+            
+            if (address && walletType) {
+              this.address = address;
+              this.walletType = walletType;
+              this.isConnected = true;
+            } else {
+              this.isConnected = false;
+              this.address = null;
+              this.walletType = null;
+            }
+          } catch (e) {
+            log('加载钱包状态失败', e);
+          }
+        };
+        
+        // 立即加载状态
+        window.walletState.loadState();
+      }
     }
+    
     return window.walletState;
   }
   
@@ -611,66 +702,8 @@
     });
   }
   
-  // 更新按钮状态
-  function updateBuyButton(button) {
-    if (!button) return;
-
-    // 检查是否为资产详情页的特定购买按钮
-    const isDetailPageBuyButton = button.id === 'buy-button' && 
-                                (window.location.pathname.includes('/assets/') || 
-                                 document.querySelector('.asset-detail-page'));
-
-    if (isDetailPageBuyButton) {
-      // 如果是资产详情页的购买按钮 (id='buy-button')，则此函数不修改其文本内容，
-      // 只根据钱包状态更新其启用/禁用状态。
-      // 文本内容由 detail.html 页面的逻辑控制。
-      const walletState = window.walletState;
-      if (!walletState || !walletState.isWalletConnected()) {
-        button.disabled = true;
-      } else {
-        button.disabled = false;
-      }
-      // 标记此按钮已被特殊处理，其他通用逻辑可以跳过
-      button._isDetailPageBuyButton = true; 
-      return; 
-    }
-    
-    // 对于其他非详情页主购买按钮，或者详情页上其他符合条件的按钮，执行通用逻辑
-    const walletState = window.walletState;
-    const i18n = CONFIG.i18n[currentLang] || CONFIG.i18n.en;
-
-    if (!walletState || !walletState.isWalletConnected()) {
-      button.textContent = i18n.connect_wallet;
-      button.disabled = false;
-      button.setAttribute('data-wallet-status', 'disconnected');
-    } else if (walletState.balance === null && !button._isDetailPageBuyButton) { // 详情页主按钮不应显示loading
-      button.textContent = i18n.loading;
-      button.disabled = true;
-      button.setAttribute('data-wallet-status', 'loading');
-    } else if (typeof button.getAttribute('data-min-balance') === 'string' && !button._isDetailPageBuyButton) {
-      const minBalance = parseFloat(button.getAttribute('data-min-balance'));
-      const currentBalance = parseFloat(walletState.balance);
-      if (!isNaN(minBalance) && !isNaN(currentBalance) && currentBalance < minBalance) {
-        button.textContent = i18n.insufficient_balance;
-        button.disabled = true;
-        button.setAttribute('data-wallet-status', 'insufficient');
-      } else {
-        button.textContent = 'Buy';
-        button.disabled = false;
-        button.setAttribute('data-wallet-status', 'ready');
-      }
-    } else if (!button._isDetailPageBuyButton) { // 确保不是详情页主按钮才设置默认Buy文本
-      button.textContent = 'Buy';
-      button.disabled = false;
-      button.setAttribute('data-wallet-status', 'ready');
-    }
-  }
-  
   // 监控钱包状态
   function monitorWalletState() {
-    // 在监控开始时，也尝试确保 walletState 和其核心方法是健全的
-    ensureWalletState(); 
-
     let lastWalletStatus = null;
     let isFirstCheck = true;  // 添加首次检查标记
     let lastUpdateTime = 0;   // 添加上次更新时间戳
@@ -683,11 +716,20 @@
       log('检测到Edge浏览器，使用更长的钱包状态检查间隔');
     }
     
-    setInterval(function() {
-      // 对于Edge浏览器，添加时间限制
+    // 初始化时立即记录当前状态，但不触发事件
+    const initialWalletState = ensureWalletState();
+    lastWalletStatus = {
+      isConnected: initialWalletState.isConnected,
+      address: initialWalletState.address,
+      walletType: initialWalletState.walletType
+    };
+    log('初始钱包状态已记录', lastWalletStatus);
+    
+    const intervalId = setInterval(function() {
+      // 对于Edge浏览器，添加更严格的时间限制
       const now = Date.now();
-      if (isEdge && now - lastUpdateTime < 3000) {
-        // Edge浏览器中，如果距离上次更新少于3秒，则跳过此次检查
+      if (isEdge && now - lastUpdateTime < 5000) {
+        // Edge浏览器中，如果距离上次更新少于5秒，则跳过此次检查
         return;
       }
       
@@ -705,7 +747,7 @@
       if (isFirstCheck) {
         lastWalletStatus = {...currentStatus};
         isFirstCheck = false;
-        log('钱包状态初始化', currentStatus);
+        log('首次钱包状态检查完成，不触发事件', currentStatus);
         return;
       }
       
@@ -714,19 +756,21 @@
       
       if (isEdge) {
         // Edge浏览器中，只有当状态真正发生重大变化时才更新
-        hasChanged = lastWalletStatus && (
+        hasChanged = (
           (lastWalletStatus.isConnected !== currentStatus.isConnected) || // 连接状态改变
-          (lastWalletStatus.address !== currentStatus.address) || // 地址改变
+          (lastWalletStatus.address !== currentStatus.address && currentStatus.address !== null) || // 地址改变且有效
           (lastWalletStatus.walletType !== currentStatus.walletType && 
            currentStatus.walletType !== null && 
            currentStatus.walletType !== "") // 钱包类型有效且发生改变
         );
       } else {
-        // 其他浏览器使用标准比较
-        hasChanged = lastWalletStatus && (
+        // 其他浏览器使用标准比较，但避免无意义的null -> null或空字符串变化
+        hasChanged = (
           lastWalletStatus.isConnected !== currentStatus.isConnected ||
-          lastWalletStatus.address !== currentStatus.address ||
-          lastWalletStatus.walletType !== currentStatus.walletType
+          (lastWalletStatus.address !== currentStatus.address && 
+           (currentStatus.address !== null && currentStatus.address !== "")) ||
+          (lastWalletStatus.walletType !== currentStatus.walletType && 
+           (currentStatus.walletType !== null && currentStatus.walletType !== ""))
         );
       }
       
@@ -740,7 +784,7 @@
         lastUpdateTime = now;
         
         // 更新所有购买按钮
-        document.querySelectorAll('.buy-btn, .buy-button, [data-action="buy"]').forEach(updateBuyButton);
+        document.querySelectorAll('.buy-btn, .buy-button, [data-action="buy"], #buy-button').forEach(updateBuyButton);
         
         // 触发自定义事件
         const eventName = currentStatus.isConnected ? 'walletConnected' : 'walletDisconnected';
@@ -753,6 +797,18 @@
         });
         document.dispatchEvent(event);
         
+        // 触发通用的钱包状态变化事件
+        const stateChangeEvent = new CustomEvent('walletStateChanged', {
+          detail: {
+            isConnected: currentStatus.isConnected,
+            address: currentStatus.address,
+            walletType: currentStatus.walletType,
+            previousState: {...lastWalletStatus}
+          },
+          bubbles: true
+        });
+        document.dispatchEvent(stateChangeEvent);
+        
         // 更新上次状态
         lastWalletStatus = {...currentStatus};
       }
@@ -760,26 +816,80 @@
     
     // 特别处理Edge浏览器的visibilitychange事件
     if (isEdge) {
-      // 尝试拦截document.visibilitychange事件在Edge上的频繁触发
-      const originalAddEventListener = document.addEventListener;
-      document.addEventListener = function(type, listener, options) {
-        if (type === 'visibilitychange') {
-          // 创建防抖动包装函数
-          let timeout;
-          const debouncedListener = function(event) {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => {
-              listener.call(this, event);
-            }, 1000); // 1秒延迟
-          };
-          
-          // 使用防抖动包装函数替代原始监听器
-          return originalAddEventListener.call(this, type, debouncedListener, options);
-        }
-        
-        // 对于其他类型的事件，保持原样
-        return originalAddEventListener.call(this, type, listener, options);
-      };
+      // 完全禁用visibilitychange事件，防止Edge浏览器的异常行为
+      disableEdgeVisibilityChange();
+    }
+    
+    // 返回间隔ID，便于需要时清除
+    return intervalId;
+  }
+  
+  // 更新按钮状态
+  function updateBuyButton(button) {
+    if (!button) return;
+
+    // 检查是否为资产详情页的特定购买按钮
+    const isAssetDetailPage = window.location.pathname.includes('/assets/') || 
+                              document.querySelector('.asset-detail-page');
+    const isDetailPageBuyButton = button.id === 'buy-button' && isAssetDetailPage;
+
+    if (isDetailPageBuyButton) {
+      // 如果是资产详情页的购买按钮 (id='buy-button')，则此函数不修改其文本内容，
+      // 只根据钱包状态更新其启用/禁用状态
+      log('检测到资产详情页购买按钮，仅更新启用状态');
+      const walletState = window.walletState;
+      if (!walletState || !walletState.isWalletConnected || 
+          (typeof walletState.isWalletConnected === 'function' && !walletState.isWalletConnected())) {
+        button.disabled = true;
+        // 不修改文本内容，那是由detail.html负责
+      } else {
+        button.disabled = false;
+        // 不修改文本内容，那是由detail.html负责
+      }
+      
+      // 标记此按钮已被特殊处理，其他通用逻辑可以跳过
+      button._isDetailPageBuyButton = true; 
+      return; 
+    }
+    
+    // 对于其他非详情页主购买按钮，或者详情页上其他符合条件的按钮，执行通用逻辑
+    const walletState = window.walletState;
+    const i18n = CONFIG.i18n[currentLang] || CONFIG.i18n.en;
+
+    // 检查钱包状态，确保isWalletConnected同时作为属性和方法都能处理
+    let isConnected = false;
+    if (walletState) {
+      if (typeof walletState.isWalletConnected === 'function') {
+        isConnected = walletState.isWalletConnected();
+      } else {
+        isConnected = walletState.isConnected === true && !!walletState.address;
+      }
+    }
+
+    if (!walletState || !isConnected) {
+      button.textContent = i18n.connect_wallet;
+      button.disabled = false;
+      button.setAttribute('data-wallet-status', 'disconnected');
+    } else if (walletState.balance === null && !button._isDetailPageBuyButton) {
+      button.textContent = i18n.loading;
+      button.disabled = true;
+      button.setAttribute('data-wallet-status', 'loading');
+    } else if (typeof button.getAttribute('data-min-balance') === 'string' && !button._isDetailPageBuyButton) {
+      const minBalance = parseFloat(button.getAttribute('data-min-balance'));
+      const currentBalance = parseFloat(walletState.balance);
+      if (!isNaN(minBalance) && !isNaN(currentBalance) && currentBalance < minBalance) {
+        button.textContent = i18n.insufficient_balance;
+        button.disabled = true;
+        button.setAttribute('data-wallet-status', 'insufficient');
+      } else {
+        button.textContent = i18n.buy;
+        button.disabled = false;
+        button.setAttribute('data-wallet-status', 'ready');
+      }
+    } else if (!button._isDetailPageBuyButton) {
+      button.textContent = i18n.buy;
+      button.disabled = false;
+      button.setAttribute('data-wallet-status', 'ready');
     }
   }
   
