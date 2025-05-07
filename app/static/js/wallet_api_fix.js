@@ -665,10 +665,23 @@
             // 更新购买按钮的数据属性
             const buyButtons = document.querySelectorAll('#buy-button, .buy-button, [data-action="buy"]');
             buyButtons.forEach(btn => {
+                // 只设置数据属性，不修改按钮文本
                 btn.setAttribute('data-asset-id', asset.id || asset.token_symbol);
                 if (asset.token_price) {
                     btn.setAttribute('data-token-price', asset.token_price);
                 }
+                
+                // 确保按钮文本不是金额
+                const btnText = btn.textContent.trim();
+                if (btnText.match(/^\d+(\.\d+)?$/) || btnText === asset.token_price) {
+                    // 如果按钮文本是数字或等于资产价格，将其恢复为"Buy"
+                    const currentLang = document.documentElement.lang || 'en';
+                    btn.textContent = currentLang.startsWith('zh') ? '购买' : 'Buy';
+                    
+                    // 可选：添加购物车图标
+                    btn.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>${btn.textContent}`;
+                }
+                
                 updatedElements.push('buy-button');
             });
             

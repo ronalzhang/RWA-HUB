@@ -1300,7 +1300,7 @@
         allButtons = [...new Set(allButtons)];
         
         allButtons.forEach(btn => {
-          // 对于非详情页主购买按钮，如果文本是'购买'，则改为'Buy'
+          // 不修改按钮的原始文本，除非为空或是"购买"需转为"Buy"
           if (btn.textContent.trim() === '购买') {
             btn.textContent = 'Buy';
           }

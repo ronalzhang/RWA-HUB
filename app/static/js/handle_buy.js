@@ -392,7 +392,11 @@
         
         // 保存原文本
         if (isLoading && !button.hasAttribute('data-original-text')) {
-            button.setAttribute('data-original-text', button.textContent.trim());
+            const originalText = button.textContent.trim();
+            // 确保保存的是"Buy"或其本地化版本，不是金额
+            const buyTexts = ['Buy', 'buy', '购买', '买入'];
+            const textToSave = buyTexts.includes(originalText) ? originalText : 'Buy';
+            button.setAttribute('data-original-text', textToSave);
         }
         
         // 设置按钮状态
@@ -408,6 +412,14 @@
             // 恢复原文本
             if (button.hasAttribute('data-original-text')) {
                 button.textContent = button.getAttribute('data-original-text');
+                // 可选：为文本添加图标
+                if (button.innerHTML.indexOf('fa-') === -1) {
+                    button.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>${button.textContent}`;
+                }
+            } else {
+                // 如果没有原始文本，设置回默认的"Buy"
+                button.textContent = 'Buy';
+                button.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>Buy`;
             }
             
             // 移除加载动画类
@@ -818,8 +830,29 @@
             
             // 为每个按钮绑定点击事件
             allButtons.forEach(button => {
+                // 保存原始文本，确保是"Buy"或本地化版本
+                const originalText = button.textContent.trim();
+                const buyTexts = ['Buy', 'buy', '购买', '买入'];
+                if (!button.hasAttribute('data-original-text')) {
+                    const textToSave = buyTexts.includes(originalText) ? originalText : 'Buy';
+                    button.setAttribute('data-original-text', textToSave);
+                }
+                
                 // 移除现有事件监听器，避免重复绑定
                 const newButton = button.cloneNode(true);
+                if (originalText && buyTexts.includes(originalText)) {
+                    newButton.textContent = originalText;
+                } else if (button.hasAttribute('data-original-text')) {
+                    newButton.textContent = button.getAttribute('data-original-text');
+                } else {
+                    newButton.textContent = 'Buy';
+                }
+                
+                // 确保按钮文本是正确的
+                if (newButton.textContent.match(/^\d+(\.\d+)?$/)) {
+                    newButton.textContent = 'Buy';
+                }
+                
                 button.parentNode.replaceChild(newButton, button);
                 
                 // 绑定新的事件监听器
