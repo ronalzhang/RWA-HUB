@@ -1698,18 +1698,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 console.log('[detail.html] localHandleBuy: 点击事件触发');
                 
-                // 步骤1: 检查 window.walletState 对象是否存在
+                // 步骤1: 检查 window.walletState 对象是否存在，并尝试调用 ensureWalletState 修复
                 if (typeof window.walletState === 'undefined' || window.walletState === null) {
-                    console.warn('[detail.html] localHandleBuy: window.walletState 对象未定义或为null。');
-                    alert('{{ _("Wallet service is initializing. Please try again in a moment.") }}');
-                    return;
+                    console.warn('[detail.html] localHandleBuy: window.walletState 对象未定义或为null。尝试ensureWalletState修复。');
+                    if (typeof ensureWalletState === 'function') {
+                        try { ensureWalletState(); } catch (ex) { console.error('ensureWalletState 调用失败', ex); }
+                    }
+                    // 再次检查
+                    if (typeof window.walletState === 'undefined' || window.walletState === null) {
+                         alert('{{ _("Wallet service is initializing. Please try again in a moment.") }}');
+                         return;
+                    }
                 }
 
-                // 步骤2: 检查 isWalletConnected 是否为函数
+                // 步骤2: 检查 isWalletConnected 是否为函数，并尝试调用 ensureWalletState 修复
                 if (typeof window.walletState.isWalletConnected !== 'function') {
-                    console.warn('[detail.html] localHandleBuy: window.walletState.isWalletConnected 不是一个函数。');
-                    alert('{{ _("Wallet connection check is not available. Please refresh and try again.") }}');
-                    return;
+                    console.warn('[detail.html] localHandleBuy: window.walletState.isWalletConnected 不是一个函数。尝试ensureWalletState修复。');
+                    if (typeof ensureWalletState === 'function') {
+                        try { ensureWalletState(); } catch (ex) { console.error('ensureWalletState 调用失败', ex); }
+                    }
+                     // 再次检查
+                    if (typeof window.walletState.isWalletConnected !== 'function') {
+                        alert('{{ _("Wallet connection check is not available. Please refresh and try again.") }}');
+                        return;
+                    }
                 }
 
                 // 步骤3: 调用 isWalletConnected 并获取状态
