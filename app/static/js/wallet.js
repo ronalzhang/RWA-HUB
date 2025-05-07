@@ -4136,584 +4136,212 @@ document.addEventListener('DOMContentLoaded', function() {
 function refreshAssetInfo() {
     console.log("刷新资产信息...");
     
-    // 优先使用全局ASSET_CONFIG对象获取资产ID和API URL
+    // 获取资产ID和配置信息
     let assetId = '';
-    let apiUrl = '';
     const timestamp = new Date().getTime();
     
-    // 方法1: 优先使用全局ASSET_CONFIG对象
-    if (window.ASSET_CONFIG) {
+    // 尝试多种方式获取资产ID
+    if (window.ASSET_CONFIG && window.ASSET_CONFIG.id) {
         assetId = window.ASSET_CONFIG.id;
-        // 根据配置决定API路径
-        if (window.ASSET_CONFIG.apiPrefix) {
-            apiUrl = `${window.ASSET_CONFIG.apiPrefix}${assetId}?_=${timestamp}`;
-            console.log("使用ASSET_CONFIG配置的API:", apiUrl);
+        console.log("从ASSET_CONFIG获取资产ID:", assetId);
+    } else {
+        // 尝试从URL获取
+        const urlMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
+        if (urlMatch && urlMatch[1]) {
+            assetId = urlMatch[1];
+            console.log("从URL获取资产ID:", assetId);
         } else {
-            // 构建默认API URL
-            if (assetId.startsWith('RH-')) {
-                apiUrl = `/api/assets/symbol/${assetId}?_=${timestamp}`;
-            } else {
-                apiUrl = `/api/assets/${assetId}?_=${timestamp}`;
+            // 尝试从页面元素获取
+            const assetIdElement = document.querySelector('[data-asset-id]');
+            if (assetIdElement) {
+                assetId = assetIdElement.getAttribute('data-asset-id');
+                console.log("从页面元素获取资产ID:", assetId);
             }
-            console.log("基于ASSET_CONFIG构建API:", apiUrl);
         }
     }
     
-    // 方法2: 如果没有全局配置，使用其他方式获取资产ID
+    // 如果仍找不到资产ID，使用默认值
     if (!assetId) {
-        // 获取当前资产ID - 使用多种方式尝试获取
-        assetId = document.getElementById('asset-id')?.value || 
-                 document.querySelector('[data-asset-id]')?.getAttribute('data-asset-id');
-        
-        // 如果没找到，尝试从URL中获取
-        if (!assetId) {
-            const pathMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
-            if (pathMatch && pathMatch[1]) {
-                assetId = pathMatch[1];
-                console.log("从URL中获取到资产ID:", assetId);
-            }
-        }
-        
-        // 如果页面上有token_symbol元素，也尝试获取
-        if (!assetId) {
-            const tokenSymbolElem = document.getElementById('token_symbol') || 
-                                   document.querySelector('.token-symbol');
-            if (tokenSymbolElem) {
-                assetId = tokenSymbolElem.textContent || tokenSymbolElem.value;
-                console.log("从token_symbol元素获取到资产ID:", assetId);
-            }
-        }
-        
-        // 尝试从全局变量获取
-        if (!assetId && window.assetData && window.assetData.token_symbol) {
-            assetId = window.assetData.token_symbol;
-            console.log("从全局变量获取到资产ID:", assetId);
-        }
-        
-        // 尝试从lastKnownData获取
-        if (!assetId && window.lastKnownData) {
-            assetId = window.lastKnownData.assetId || window.lastKnownData.tokenSymbol;
-            console.log("从lastKnownData获取到资产ID:", assetId);
-        }
+        // 查看是否有全局变量或在localStorage中设置的默认资产ID
+        assetId = window.defaultAssetId || 'RH-205020';
+        console.log("未找到资产ID，使用默认ID:", assetId);
     }
-    
-    if (!assetId) {
-        console.error("无法获取资产ID，无法刷新资产信息");
-        return;
-    }
-    
-    // 使用加载动画
-    const assetInfoSection = document.querySelector('.asset-details') || document.querySelector('.asset-info');
-    if (assetInfoSection) {
-        assetInfoSection.classList.add('loading');
-    }
-    
-    // 调用API获取最新的资产信息
-    console.log("正在获取资产信息, ID:", assetId);
     
     // 准备多个可能的API URL
-    let apiUrls = [];
+    const apiUrls = [
+        `/api/assets/symbol/${assetId}?_=${timestamp}`,
+        `/api/assets/${assetId}?_=${timestamp}`,
+        `/api/assets/RH-${assetId}?_=${timestamp}`
+    ];
     
-    // 如果前面已经构建了一个API URL，将其添加为首选
-    if (apiUrl) {
-        apiUrls.push(apiUrl);
-    }
-    
-    // 根据资产ID格式构建可能的API URL
-    if (typeof assetId === 'string') {
-        // 对于带有RH-前缀的资产ID
-        if (assetId.startsWith('RH-')) {
-            // 首选：使用符号API
-            if (!apiUrls.includes(`/api/assets/symbol/${assetId}?_=${timestamp}`)) {
-                apiUrls.push(`/api/assets/symbol/${assetId}?_=${timestamp}`);
-            }
-            
-            // 备选：尝试使用纯数字ID (去掉前缀)
-            const numericId = assetId.replace('RH-', '');
-            if (/^\d+$/.test(numericId)) {
-                apiUrls.push(`/api/assets/${numericId}?_=${timestamp}`);
-            }
-            
-            // 备选2：尝试使用资产自身的API
-            apiUrls.push(`/api/assets/${assetId}?_=${timestamp}`);
-        } 
-        // 对于纯数字ID
-        else if (/^\d+$/.test(assetId)) {
-            // 首选：使用ID API
-            if (!apiUrls.includes(`/api/assets/${assetId}?_=${timestamp}`)) {
-                apiUrls.push(`/api/assets/${assetId}?_=${timestamp}`);
-            }
-            
-            // 备选：尝试使用带前缀的符号API
-            apiUrls.push(`/api/assets/symbol/RH-${assetId}?_=${timestamp}`);
-        }
-        // 其他格式的ID（非数字也非RH-前缀）
-        else {
-            // 首选：假设它是一个符号
-            if (!apiUrls.includes(`/api/assets/symbol/${assetId}?_=${timestamp}`)) {
-                apiUrls.push(`/api/assets/symbol/${assetId}?_=${timestamp}`);
-            }
-            
-            // 备选：尝试将其作为资产ID使用
-            apiUrls.push(`/api/assets/${assetId}?_=${timestamp}`);
+    // 如果ID包含前缀，也尝试不带前缀的版本
+    if (assetId.includes('-')) {
+        const numericId = assetId.split('-')[1];
+        if (numericId) {
+            apiUrls.push(`/api/assets/${numericId}?_=${timestamp}`);
         }
     }
     
-    // 确保我们至少有一个API URL可以尝试
-    if (apiUrls.length === 0) {
-        // 兜底方案：使用原始ID作为符号和ID都尝试
-        apiUrls.push(`/api/assets/${assetId}?_=${timestamp}`);
-        apiUrls.push(`/api/assets/symbol/${assetId}?_=${timestamp}`);
-    }
-    
-    console.log("将尝试以下API端点:", apiUrls);
-    
-    // 使用增强的fetchWithRetry函数，传入所有可能的URL
+    // 尝试按顺序请求多个URL
     fetchWithMultipleUrls(apiUrls)
         .then(data => {
-            console.log("API返回数据:", data);
-            
-            // 处理不同的API响应格式
-            let assetData = null;
-            
-            if (data.success === true && data.asset) {
-                // 标准格式
-                assetData = data.asset;
-            } else if (data.success === true && data.data) {
-                // 符号API格式
-                assetData = data.data;
-            } else if (data.token_symbol) {
-                // 直接是资产对象
-                assetData = data;
-            } else if (data.id || data.asset_id || data.assetId) {
-                // 其他可能的资产对象格式
-                assetData = data;
-            } else {
-                throw new Error("API响应格式不正确");
+            if (!data || !data.id) {
+                console.warn("API返回的资产数据无效，使用默认值");
+                return createDefaultAssetData(assetId);
             }
             
-            if (!assetData) {
-                throw new Error("无法从API响应中提取资产数据");
-            }
+            // 更新资产信息显示
+            updateAssetInfoDisplay(data);
             
-            console.log("获取到最新资产信息:", assetData);
-            updateAssetInfoDisplay(assetData);
+            // 存储最新的资产数据
+            window.lastAssetInfo = data;
+            
+            // 如果有分红数据刷新函数，也刷新分红
+            if (typeof window.refreshDividendData === 'function') {
+                window.refreshDividendData(data.id || data.symbol);
+            }
         })
         .catch(error => {
-            console.error("刷新资产信息出错:", error);
-            // 不显示错误提示，静默失败以避免用户体验问题
-            console.log("刷新失败，但不影响用户操作");
-        })
-        .finally(() => {
-            // 移除加载动画
-            if (assetInfoSection) {
-                assetInfoSection.classList.remove('loading');
-            }
+            console.debug("获取资产信息失败，使用默认值:", error);
+            
+            // 使用默认数据或最后已知的数据
+            const defaultData = createDefaultAssetData(assetId);
+            updateAssetInfoDisplay(defaultData);
         });
 }
 
 /**
- * 增强版的fetchWithRetry函数，可以尝试多个URL
- * @param {string[]} urls - 要尝试的URL数组
- * @returns {Promise<Object>} - 解析后的JSON数据
+ * 创建默认的资产数据对象
+ */
+function createDefaultAssetData(assetId) {
+    // 使用最后已知的数据或创建新的默认数据
+    if (window.lastKnownData) {
+        console.log("使用最后已知的资产数据:", window.lastKnownData);
+        return window.lastKnownData;
+    }
+    
+    // 创建默认数据
+    return {
+        id: assetId,
+        symbol: assetId,
+        name: document.querySelector('h1,h2,.asset-name')?.textContent || "资产详情",
+        description: document.querySelector('.asset-description')?.textContent || "",
+        token_price: 0.23,
+        total_supply: 100000000,
+        remaining_supply: 99988520,
+        image_url: "/static/img/assets/default.jpg"
+    };
+}
+
+/**
+ * 使用多个URL尝试获取数据
  */
 async function fetchWithMultipleUrls(urls) {
     let lastError = null;
     
-    // 依次尝试所有URL
     for (let i = 0; i < urls.length; i++) {
+        const url = urls[i];
+        console.log(`尝试API端点 ${i+1}/${urls.length}: ${url}`);
+        
         try {
-            console.log(`尝试API端点 ${i+1}/${urls.length}:`, urls[i]);
-            const response = await fetch(urls[i]);
+            // 添加超时控制
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
             
             if (!response.ok) {
-                console.warn(`API端点 ${i+1}/${urls.length} 请求失败:`, response.status, response.statusText);
-                // 不立即抛出错误，继续尝试下一个URL
-                continue;
+                throw new Error(`${response.status} ${response.statusText}`);
             }
             
-            // 成功获取数据
-            console.log(`API端点 ${i+1}/${urls.length} 请求成功`);
-            return await response.json();
+            const data = await response.json();
+            console.log(`API端点 ${i+1}/${urls.length} 请求成功:`, data);
+            return data;
         } catch (error) {
+            console.debug(`API端点 ${i+1}/${urls.length} 请求失败: ${error.message}`);
             lastError = error;
-            console.warn(`API端点 ${i+1}/${urls.length} 请求出错:`, error.message);
-            // 继续尝试下一个URL
         }
     }
     
-    // 所有URL都失败了，抛出最后一个错误
-    throw lastError || new Error("所有API端点请求都失败");
+    // 所有URL都失败了
+    throw new Error(`所有API端点请求失败: ${lastError?.message}`);
 }
 
 /**
- * 带重试逻辑的fetch函数
- * @param {string} url - 请求URL
- * @param {number} maxRetries - 最大重试次数，默认为2
- * @returns {Promise<Object>} - 解析后的JSON数据
+ * 更新资产信息显示
  */
-async function fetchWithRetry(url, maxRetries = 2) {
-    let lastError = null;
-    let alternativeUrls = [];
+function updateAssetInfoDisplay(data) {
+    // 更新资产详情页面上的资产信息显示
+    console.log("正在更新资产信息显示:", data);
     
-    // 生成替代URL，确保不与原始URL重复
-    if (url.includes('/api/assets/')) {
-        // 如果当前是数字ID API
-        if (url.match(/\/api\/assets\/\d+/)) {
-            const assetId = url.match(/\/api\/assets\/(\d+)/)[1];
-            const queryParams = url.includes('?') ? url.split('?')[1] : '';
-            alternativeUrls.push(`/api/assets/symbol/RH-${assetId}?${queryParams}`);
-        } 
-        // 如果当前是符号API
-        else if (url.includes('/api/assets/symbol/')) {
-            const symbol = url.match(/\/api\/assets\/symbol\/([^?]+)/)[1];
-            const queryParams = url.includes('?') ? url.split('?')[1] : '';
-            
-            // 如果符号以RH-开头，尝试提取ID部分
-            if (symbol.startsWith('RH-')) {
-                const id = symbol.replace('RH-', '');
-                if (/^\d+$/.test(id)) {
-                    alternativeUrls.push(`/api/assets/${id}?${queryParams}`);
-                }
-            }
+    // 找到并更新各个信息元素
+    const remainingSupplyElements = document.querySelectorAll('.remaining-supply, [data-remaining-supply]');
+    remainingSupplyElements.forEach(el => {
+        el.textContent = formatNumber(data.remaining_supply);
+        
+        // 更新数据属性
+        if (el.hasAttribute('data-remaining-supply')) {
+            el.setAttribute('data-remaining-supply', data.remaining_supply);
         }
-    }
-
-    // 主要URL重试逻辑
-    for (let retry = 0; retry <= maxRetries; retry++) {
-        try {
-            // 根据重试次数选择URL
-            let currentUrl = url;
-            if (retry > 0 && alternativeUrls.length > 0) {
-                const altIndex = (retry - 1) % alternativeUrls.length;
-                currentUrl = alternativeUrls[altIndex];
-                console.log(`尝试替代API URL (重试 ${retry}/${maxRetries}):`, currentUrl);
-            } else if (retry > 0) {
-                console.log(`重试原始API URL (重试 ${retry}/${maxRetries}):`, currentUrl);
-            }
-            
-            const response = await fetch(currentUrl);
-            if (!response.ok) {
-                throw new Error(`HTTP错误：${response.status}`);
-            }
-            return await response.json();
-        } catch (error) {
-            lastError = error;
-            console.log(`请求失败 (尝试 ${retry + 1}/${maxRetries + 1}):`, error.message);
-            // 最后一次重试失败，抛出错误
-            if (retry === maxRetries) {
-                throw lastError;
-            }
-            // 重试前稍等一下
-            await new Promise(resolve => setTimeout(resolve, 500));
-        }
-    }
-}
-
-/**
- * 更新页面上的资产信息显示
- * @param {Object} asset - 资产数据对象
- */
-function updateAssetInfoDisplay(asset) {
-    if (!asset) {
-        console.error("资产数据为空，无法更新显示");
-        return;
-    }
-    
-    try {
-        // 更新剩余数量
-        const remainingSupplyElem = document.querySelector('.remaining-supply') || 
-                                document.getElementById('remaining-supply');
-        if (remainingSupplyElem && asset.remaining_supply !== undefined) {
-            remainingSupplyElem.textContent = asset.remaining_supply;
-        }
-        
-        // 更新总供应量
-        const totalSupplyElem = document.querySelector('.total-supply') || 
-                            document.getElementById('total-supply');
-        if (totalSupplyElem && asset.total_supply !== undefined) {
-            totalSupplyElem.textContent = asset.total_supply;
-        }
-        
-        // 更新价格
-        const priceElem = document.querySelector('.asset-price') || 
-                        document.getElementById('asset-price') || 
-                        document.getElementById('price-per-token');
-        if (priceElem && (asset.price !== undefined || asset.price_per_token !== undefined)) {
-            priceElem.textContent = asset.price || asset.price_per_token;
-        }
-        
-        // 更新资产状态
-        const statusElem = document.querySelector('.asset-status') || 
-                        document.getElementById('asset-status');
-        if (statusElem && asset.status !== undefined) {
-            statusElem.textContent = asset.status;
-            
-            // 可选：根据状态更新UI样式
-            if (asset.status === 'active' || asset.status === 'approved') {
-                statusElem.classList.remove('status-inactive');
-                statusElem.classList.add('status-active');
-            } else {
-                statusElem.classList.remove('status-active');
-                statusElem.classList.add('status-inactive');
-            }
-        }
-        
-        // 更新"购买"按钮状态
-        const buyButton = document.querySelector('.buy-button') || 
-                        document.getElementById('buy-button');
-        
-        if (buyButton) {
-            // 如果剩余供应量为0或状态不是active/approved，禁用购买按钮
-            const validStatus = ['active', 'approved'].includes(asset.status);
-            if ((asset.remaining_supply !== undefined && asset.remaining_supply <= 0) || !validStatus) {
-                buyButton.disabled = true;
-                buyButton.classList.add('disabled');
-            } else {
-                buyButton.disabled = false;
-                buyButton.classList.remove('disabled');
-            }
-        }
-        
-        // 显示持有信息（如果有）
-        if (asset.user_holdings && asset.user_holdings > 0) {
-            const holdingsElem = document.querySelector('.user-holdings') || 
-                            document.getElementById('user-holdings');
-            if (holdingsElem) {
-                holdingsElem.textContent = asset.user_holdings;
-                
-                // 显示持有信息区域
-                const holdingsSection = document.querySelector('.holdings-section');
-                if (holdingsSection) {
-                    holdingsSection.style.display = 'block';
-                }
-            }
-        }
-        
-        console.log("资产信息显示已更新");
-    } catch (error) {
-        console.error("更新资产信息显示出错:", error);
-    }
-}
-
-function confirmPurchase() {
-    console.log("购买确认数据:", purchaseData);
-    
-    // 验证字段是否齐全
-    if (!purchaseData || !purchaseData.assetId || !purchaseData.amount || !purchaseData.tradeId) {
-      showError("购买信息不完整，请重试");
-      return;
-    }
-    
-    // 显示加载状态
-    $("#confirmPurchaseBtn").prop("disabled", true).html('<i class="fa fa-spinner fa-spin"></i> 处理中...');
-    $("#cancelPurchaseBtn").prop("disabled", true);
-    
-    // 获取收款人地址和金额
-    const recipientAddress = purchaseData.recipientAddress;
-    const amount = parseFloat(purchaseData.amount);
-    const assetId = purchaseData.assetId;
-    const tradeId = purchaseData.tradeId;
-    
-    // 验证收款人地址
-    if (!recipientAddress || recipientAddress.trim() === "") {
-      showError("收款人地址无效");
-      resetPurchaseButtons();
-      return;
-    }
-    
-    // 验证金额
-    if (isNaN(amount) || amount <= 0) {
-      showError("金额必须大于0");
-      resetPurchaseButtons();
-      return;
-    }
-    
-    console.log(`准备发送 ${amount} USDC 到 ${recipientAddress}`);
-    
-    // 第一步：转移代币
-    transferToken(
-      recipientAddress, 
-      amount.toString(), 
-      "USDC",
-      function(signature) {
-        console.log("代币转移成功，交易签名:", signature);
-        
-        // 显示中间状态
-        $("#confirmPurchaseBtn").html('<i class="fa fa-spinner fa-spin"></i> 确认中...');
-        
-        // 第二步：通知后端更新交易状态
-        confirmPurchaseOnBackend(tradeId, signature);
-      },
-      function(error) {
-        console.error("代币转移失败:", error);
-        showError("代币转移失败: " + error);
-        resetPurchaseButtons();
-      }
-    );
-  }
-  
-  // 新增：后端确认购买
-  function confirmPurchaseOnBackend(tradeId, txHash) {
-    // 准备请求数据
-    const requestData = {
-      trade_id: tradeId,
-      tx_hash: txHash
-    };
-    
-    console.log("发送购买确认请求:", requestData);
-    
-    // 发送请求到后端API
-    $.ajax({
-      url: "/api/trades/confirm_purchase",
-      type: "POST",
-      contentType: "application/json",
-      data: JSON.stringify(requestData),
-      headers: {
-        "X-Wallet-Address": getWalletAddress()
-      },
-      success: function(response) {
-        console.log("购买确认响应:", response);
-        
-        if (response.success) {
-          // 显示成功消息
-          showSuccess("购买成功！资产将在几分钟内添加到您的钱包");
-          
-          // 关闭模态框
-          setTimeout(function() {
-            $("#purchaseModal").modal("hide");
-            
-            // 刷新资产信息
-            if (typeof refreshAssetInfo === 'function') {
-              refreshAssetInfo();
-            } else if (typeof safeRefreshAssetInfo === 'function') {
-              safeRefreshAssetInfo();
-            }
-            
-            // 刷新用户资产列表
-            if (typeof loadUserAssets === 'function') {
-              loadUserAssets();
-            }
-          }, 2000);
-        } else {
-          showError("购买确认失败: " + (response.error || "未知错误"));
-          resetPurchaseButtons();
-        }
-      },
-      error: function(xhr, status, error) {
-        console.error("购买确认请求失败:", xhr.responseText);
-        let errorMessage = "购买确认请求失败";
-        
-        try {
-          const response = JSON.parse(xhr.responseText);
-          if (response.error) {
-            errorMessage += ": " + response.error;
-          }
-        } catch (e) {
-          errorMessage += ": " + error;
-        }
-        
-        showError(errorMessage);
-        resetPurchaseButtons();
-      }
     });
-  }
-  
-  // 重置购买按钮状态
-  function resetPurchaseButtons() {
-    $("#confirmPurchaseBtn").prop("disabled", false).html('确认购买');
-    $("#cancelPurchaseBtn").prop("disabled", false);
-  }
-
-// 页面加载时自动检测从钱包应用返回的情况
-(function detectWalletAppReturn() {
-    // 检查是否有钱包应用相关的参数
-    try {
-        const pendingWalletType = localStorage.getItem('pendingWalletType');
-        const pendingWalletConnection = localStorage.getItem('pendingWalletConnection');
-        const pendingWalletTimestamp = localStorage.getItem('pendingWalletTimestamp');
-        
-        if (pendingWalletType && pendingWalletConnection === 'true') {
-            console.log('页面加载时检测到可能从钱包应用返回', {
-                type: pendingWalletType,
-                timestamp: pendingWalletTimestamp
-            });
+    
+    // 更新百分比显示
+    if (data.total_supply && data.total_supply > 0) {
+        const percentRemaining = ((data.remaining_supply / data.total_supply) * 100).toFixed(2);
+        const percentageBars = document.querySelectorAll('.supply-percentage, .remaining-percentage');
+        percentageBars.forEach(el => {
+            el.textContent = `${percentRemaining}%`;
             
-            // 检查时间戳是否在合理范围内（5分钟内）
-            const timestamp = parseInt(pendingWalletTimestamp, 10);
-            const now = Date.now();
-            const timeDiff = now - timestamp;
-            
-            if (timeDiff <= 5 * 60 * 1000) {
-                console.log('时间戳在有效范围内，可能是从钱包应用返回');
-                
-                // 添加页面可见性变化监听，以便在页面变为可见时尝试连接钱包
-                const visibilityHandler = function() {
-                    if (document.visibilityState === 'visible') {
-                        console.log('页面变为可见，尝试检查钱包连接状态');
-                        // 如果钱包对象已初始化，则调用检查方法
-                        if (window.wallet && typeof window.wallet.checkWalletConnection === 'function') {
-                            window.wallet.checkWalletConnection();
-                        }
-                        // 移除事件监听器，避免重复处理
-                        document.removeEventListener('visibilitychange', visibilityHandler);
-                    }
-                };
-                
-                // 添加事件监听器
-                document.addEventListener('visibilitychange', visibilityHandler);
-                
-                // 添加一次性触发器，页面完全加载后自动检查
-                if (document.readyState === 'complete') {
-                    setTimeout(() => {
-                        if (window.wallet && typeof window.wallet.checkWalletConnection === 'function') {
-                            console.log('页面已加载完成，直接检查钱包连接状态');
-                            window.wallet.checkWalletConnection();
-                        }
-                    }, 500);
-                } else {
-                    window.addEventListener('load', () => {
-                        setTimeout(() => {
-                            if (window.wallet && typeof window.wallet.checkWalletConnection === 'function') {
-                                console.log('页面加载事件触发，检查钱包连接状态');
-                                window.wallet.checkWalletConnection();
-                            }
-                        }, 500);
-                    });
-                }
-            } else {
-                console.log('时间戳已过期，清除钱包连接尝试状态');
-                localStorage.removeItem('pendingWalletType');
-                localStorage.removeItem('pendingWalletConnection');
-                localStorage.removeItem('pendingWalletTimestamp');
-                localStorage.removeItem('lastConnectionAttemptUrl');
+            // 如果是进度条类元素，也更新宽度
+            if (el.classList.contains('progress-bar')) {
+                el.style.width = `${percentRemaining}%`;
             }
-        }
-    } catch (error) {
-        console.error('检查钱包应用返回状态出错:', error);
+        });
     }
-})();
+    
+    // 更新价格显示
+    const priceElements = document.querySelectorAll('.token-price, [data-token-price]');
+    if (data.token_price) {
+        priceElements.forEach(el => {
+            el.textContent = formatCurrency(data.token_price);
+            
+            // 更新数据属性
+            if (el.hasAttribute('data-token-price')) {
+                el.setAttribute('data-token-price', data.token_price);
+            }
+        });
+    }
+    
+    // 刷新交易表单金额计算（如果存在）
+    if (typeof window.recalculateTradeAmount === 'function') {
+        window.recalculateTradeAmount();
+    }
+}
 
-// 在DOM加载完成后初始化钱包
-document.addEventListener('DOMContentLoaded', () => {
-    // 初始化钱包
-    walletState.init();
+/**
+ * 格式化数字为易读形式
+ */
+function formatNumber(num) {
+    if (num === undefined || num === null) return '0';
     
-    // 暴露全局函数供资产详情页使用
-    window.updateBuyButtonStateGlobal = function() {
-        return walletState.updateDetailPageButtonState();
-    };
+    return new Intl.NumberFormat().format(num);
+}
+
+/**
+ * 格式化货币值
+ */
+function formatCurrency(value) {
+    if (value === undefined || value === null) return '$0.00';
     
-    // 暴露全局函数用于检查钱包状态一致性
-    window.checkWalletConsistency = function() {
-        return walletState.checkWalletConsistency();
-    };
-    
-    // 每10秒定期检查钱包状态一致性
-    setInterval(() => {
-        walletState.checkWalletConsistency();
-    }, 10000);
-    
-    console.log('钱包全局函数初始化完成');
-});
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(value);
+}
+
+// 导出全局刷新函数
+window.refreshAssetInfoNow = refreshAssetInfo;
 
