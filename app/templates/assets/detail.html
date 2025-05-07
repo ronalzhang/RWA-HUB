@@ -1698,65 +1698,113 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 console.log('[detail.html] localHandleBuy: 点击事件触发');
                 
-                // 使用全局钱包API的最强健方法检查钱包连接
+                // 高强度多源钱包连接检测
                 let isConnected = false;
                 let walletAddress = '';
                 let walletType = '';
                 
-                // 方法1: 检查全局walletState (最可靠的方法)
-                if (window.walletState) {
+                // 方法1: 首选检查 - localStorage直接检查(速度最快)
+                walletAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address') || '';
+                walletType = localStorage.getItem('walletType') || 'phantom';
+                
+                if (walletAddress) {
+                    isConnected = true;
+                    console.log('[detail.html] localHandleBuy: 从localStorage直接检测到钱包连接', {address: walletAddress, walletType});
+                }
+                
+                // 方法2: 检查全局walletState (最可靠的方法)
+                if (!isConnected && window.walletState) {
                     if (typeof window.walletState.isWalletConnected === 'function') {
                         try {
                             isConnected = window.walletState.isWalletConnected();
-                            walletAddress = window.walletState.address || '';
-                            walletType = window.walletState.walletType || '';
+                            if (isConnected) {
+                                walletAddress = window.walletState.address || '';
+                                walletType = window.walletState.walletType || '';
+                                console.log('[detail.html] localHandleBuy: 从walletState.isWalletConnected检测到钱包连接', {address: walletAddress, walletType});
+                            }
                         } catch (error) {
                             console.error('[detail.html] localHandleBuy: 调用isWalletConnected函数错误', error);
                         }
-                    } else if (window.walletState.isConnected && window.walletState.address) {
+                    } else if (window.walletState.isConnected || window.walletState.connected) {
                         isConnected = true;
-                        walletAddress = window.walletState.address;
+                        walletAddress = window.walletState.address || '';
                         walletType = window.walletState.walletType || '';
+                        console.log('[detail.html] localHandleBuy: 从walletState属性检测到钱包连接', {address: walletAddress, walletType});
                     }
                 }
                 
-                // 方法2: 备用检查 - localStorage
-                if (!isConnected) {
-                    walletAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address') || '';
-                    walletType = localStorage.getItem('walletType') || 'phantom';
-                    
-                    if (walletAddress) {
-                        isConnected = true;
-                        console.log('[detail.html] localHandleBuy: 从localStorage检测到钱包连接', {address: walletAddress, walletType});
+                // 方法3: 检查window.walletPublicKey (兼容旧版本)
+                if (!isConnected && window.walletPublicKey) {
+                    try {
+                        const pubkeyStr = typeof window.walletPublicKey === 'string' 
+                            ? window.walletPublicKey 
+                            : (typeof window.walletPublicKey.toString === 'function' 
+                                ? window.walletPublicKey.toString() 
+                                : '');
+                        
+                        if (pubkeyStr && pubkeyStr.length > 30) {
+                            isConnected = true;
+                            walletAddress = pubkeyStr;
+                            walletType = 'phantom';
+                            console.log('[detail.html] localHandleBuy: 从walletPublicKey检测到钱包连接', {address: walletAddress});
+                        }
+                    } catch (error) {
+                        console.error('[detail.html] localHandleBuy: 解析walletPublicKey错误', error);
                     }
                 }
+                
+                // 记录连接状态
+                console.log('[detail.html] localHandleBuy: 钱包连接状态检查结果:', { 
+                    isConnected, 
+                    walletAddress: walletAddress ? `${walletAddress.substring(0,6)}...${walletAddress.substring(walletAddress.length-4)}` : 'none',
+                    walletType
+                });
                 
                 // 如果钱包未连接，显示错误并触发钱包连接
-                if (!isConnected) {
+                if (!isConnected || !walletAddress) {
                     console.log('[detail.html] localHandleBuy: 钱包未连接，尝试触发连接');
                     
-                    // 显示错误消息
+                    // 清除任何可能的错误显示
                     const buyError = document.getElementById('buy-error');
                     if (buyError) {
-                        buyError.textContent = 'Please connect your wallet first';
                         buyError.style.display = 'block';
+                        buyError.textContent = '请先连接钱包';
                     }
                     
-                    // 触发钱包连接
-                    if (typeof connectWallet === 'function') {
-                        try {
-                            await connectWallet();
-                        } catch (error) {
-                            console.error('[detail.html] localHandleBuy: 连接钱包失败', error);
+                    // 尝试打开钱包连接菜单，顺序排列多种可能的方法
+                    try {
+                        // 优先使用全局openWalletSelector函数
+                        if (typeof window.openWalletSelector === 'function') {
+                            window.openWalletSelector();
+                            console.log('[detail.html] localHandleBuy: 已调用window.openWalletSelector()');
+                            return;
                         }
-                    } else if (typeof window.toggleWalletMenu === 'function') {
-                        window.toggleWalletMenu();
+                        // 备选：使用toggleWalletMenu函数
+                        else if (typeof window.toggleWalletMenu === 'function') {
+                            window.toggleWalletMenu();
+                            console.log('[detail.html] localHandleBuy: 已调用window.toggleWalletMenu()');
+                            return;
+                        }
+                        // 最后：使用本地connectWallet函数
+                        else if (typeof connectWallet === 'function') {
+                            await connectWallet();
+                            console.log('[detail.html] localHandleBuy: 已调用connectWallet()');
+                            return;
+                        }
+                        
+                        // 如果以上方法都不可用，显示一个更明确的错误
+                        throw new Error('找不到钱包连接方法');
+                    } catch (error) {
+                        console.error('[detail.html] localHandleBuy: 连接钱包失败', error);
+                        if (buyError) {
+                            buyError.textContent = '钱包连接失败，请手动连接钱包后重试';
+                        }
                     }
-                    
                     return;
                 }
                 
-                console.log('[detail.html] localHandleBuy: 钱包已连接，继续购买流程');
+                // 钱包已连接，继续购买流程
+                console.log('[detail.html] localHandleBuy: 钱包已连接，地址:', walletAddress.substring(0,6) + '...' + walletAddress.substring(walletAddress.length-4));
                 
                 // 获取必要的表单元素
                 const assetId = document.getElementById('buy-button').getAttribute('data-asset-id');
@@ -1764,11 +1812,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 const buyButton = document.getElementById('buy-button');
                 const tokenPrice = parseFloat(buyButton.getAttribute('data-token-price') || '0');
                 
-                // 如果存在全局handleBuy函数，优先使用全局函数
-                if (typeof window.handleBuy === 'function') {
-                    window.handleBuy(assetId, amountInput, buyButton, tokenPrice);
-                } else {
-                    console.error('[detail.html] localHandleBuy: 全局handleBuy函数不可用');
+                // 清除任何之前的错误
+                const buyError = document.getElementById('buy-error');
+                if (buyError) {
+                    buyError.style.display = 'none';
+                }
+                
+                try {
+                    // 如果存在全局handleBuy函数，优先使用全局函数
+                    if (typeof window.handleBuy === 'function') {
+                        console.log('[detail.html] localHandleBuy: 调用全局handleBuy函数');
+                        // 添加明确的钱包参数
+                        window.handleBuy(assetId, amountInput, buyButton, tokenPrice, {
+                            walletConnected: isConnected,
+                            walletAddress: walletAddress,
+                            walletType: walletType
+                        });
+                    } else {
+                        // 全局函数不可用，显示错误
+                        console.error('[detail.html] localHandleBuy: 全局handleBuy函数不可用');
+                        if (buyError) {
+                            buyError.textContent = '购买功能暂时不可用，请刷新页面重试';
+                            buyError.style.display = 'block';
+                        }
+                    }
+                } catch (error) {
+                    console.error('[detail.html] localHandleBuy: 调用handleBuy失败', error);
+                    if (buyError) {
+                        buyError.textContent = error.message || '购买处理失败，请重试';
+                        buyError.style.display = 'block';
+                    }
                 }
             }
 
@@ -1781,13 +1854,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 let walletAddress = '';
                 let walletType = '';
                 
-                // 1. 检查全局钱包状态对象 (最优先方法)
-                if (window.walletState) {
+                // 1. 首选检查 - localStorage直接检查(速度最快)
+                const storedAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
+                const storedType = localStorage.getItem('walletType') || 'phantom';
+                
+                if (storedAddress) {
+                    walletConnected = true;
+                    walletAddress = storedAddress;
+                    walletType = storedType;
+                    console.log('[detail.html] confirmPurchase: 从localStorage检测到钱包连接', {walletAddress, walletType});
+                }
+                
+                // 2. 检查全局walletState对象 (最可靠的方法)
+                if (!walletConnected && window.walletState) {
                     if (typeof window.walletState.isWalletConnected === 'function') {
                         try {
                             walletConnected = window.walletState.isWalletConnected();
-                            walletAddress = window.walletState.address || '';
-                            walletType = window.walletState.walletType || '';
+                            if (walletConnected) {
+                                walletAddress = window.walletState.address || '';
+                                walletType = window.walletState.walletType || '';
+                                console.log('[detail.html] confirmPurchase: 从walletState.isWalletConnected检测到钱包连接', 
+                                    {walletAddress, walletType});
+                            }
                         } catch (err) {
                             console.warn('[detail.html] confirmPurchase: 调用全局isWalletConnected方法失败', err);
                         }
@@ -1795,21 +1883,35 @@ document.addEventListener('DOMContentLoaded', function() {
                         walletConnected = true;
                         walletAddress = window.walletState.address;
                         walletType = window.walletState.walletType || '';
+                        console.log('[detail.html] confirmPurchase: 从walletState属性检测到钱包连接', {walletAddress, walletType});
                     }
                 }
                 
-                // 2. 检查localStorage (备用方法)
-                if (!walletConnected) {
-                    const storedAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
-                    const storedType = localStorage.getItem('walletType') || 'phantom';
-                    
-                    if (storedAddress) {
-                        walletConnected = true;
-                        walletAddress = storedAddress;
-                        walletType = storedType;
-                        console.log('[detail.html] confirmPurchase: 从localStorage检测到钱包连接', {walletAddress, walletType});
+                // 3. 检查window.walletPublicKey (兼容旧版本)
+                if (!walletConnected && window.walletPublicKey) {
+                    try {
+                        const pubkeyStr = typeof window.walletPublicKey === 'string' 
+                            ? window.walletPublicKey 
+                            : (typeof window.walletPublicKey.toString === 'function' 
+                                ? window.walletPublicKey.toString() 
+                                : '');
+                        
+                        if (pubkeyStr && pubkeyStr.length > 30) {
+                            walletConnected = true;
+                            walletAddress = pubkeyStr;
+                            walletType = 'phantom';
+                            console.log('[detail.html] confirmPurchase: 从walletPublicKey检测到钱包连接', {walletAddress});
+                        }
+                    } catch (error) {
+                        console.error('[detail.html] confirmPurchase: 解析walletPublicKey错误', error);
                     }
                 }
+                
+                // 记录最终状态
+                console.log('[detail.html] confirmPurchase: 钱包连接状态检查结果:', {
+                    connected: walletConnected,
+                    address: walletAddress ? `${walletAddress.substring(0,6)}...${walletAddress.substring(walletAddress.length-4)}` : 'none'
+                });
                 
                 // 如果钱包仍未连接，显示错误
                 if (!walletConnected || !walletAddress) {
@@ -1817,8 +1919,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 显示错误消息
                     const modalError = document.getElementById('buyModalError');
                     if (modalError) {
-                        modalError.textContent = 'Please connect your wallet first';
+                        modalError.textContent = '请先连接钱包';
                         modalError.style.display = 'block';
+                    }
+                    
+                    // 尝试触发钱包连接器
+                    try {
+                        if (typeof window.openWalletSelector === 'function') {
+                            setTimeout(() => {
+                                window.openWalletSelector();
+                                // 隐藏模态框
+                                const buyModal = document.getElementById('buyModal');
+                                const bsModal = bootstrap.Modal.getInstance(buyModal);
+                                if (bsModal) bsModal.hide();
+                            }, 1500);
+                        }
+                    } catch (error) {
+                        console.error('[detail.html] confirmPurchase: 打开钱包选择器失败', error);
                     }
                     return;
                 }
@@ -1852,9 +1969,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 显示加载状态
                 if (confirmBtn) {
+                    confirmBtn.innerText = '处理中...';
+                    confirmBtn.disabled = true;
                     const spinner = confirmBtn.querySelector('.spinner-border');
                     if (spinner) spinner.style.display = 'inline-block';
-                    confirmBtn.disabled = true;
                 }
                 
                 try {
@@ -1872,15 +1990,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 显示错误消息
                     const modalError = document.getElementById('buyModalError');
                     if (modalError) {
-                        modalError.textContent = error.message || 'Failed to confirm purchase';
+                        modalError.textContent = error.message || '购买确认失败';
                         modalError.style.display = 'block';
                     }
                 } finally {
                     // 恢复按钮状态
                     if (confirmBtn) {
+                        confirmBtn.innerText = '确认购买';
+                        confirmBtn.disabled = false;
                         const spinner = confirmBtn.querySelector('.spinner-border');
                         if (spinner) spinner.style.display = 'none';
-                        confirmBtn.disabled = false;
                     }
                 }
             }
