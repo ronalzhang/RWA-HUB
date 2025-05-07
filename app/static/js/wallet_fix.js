@@ -705,63 +705,52 @@
   // 更新按钮状态
   function updateBuyButton(button) {
     if (!button) return;
-    
-    const walletState = window.walletState;
-    const i18n = CONFIG.i18n[currentLang] || CONFIG.i18n.en;
-    
-    // 检查当前是否在资产详情页
-    const isAssetDetailPage = window.location.pathname.includes('/assets/') || 
-                            document.querySelector('.asset-detail-page') ||
-                            document.getElementById('asset-detail-container') ||
-                            document.getElementById('buy-button');
-    
-    // 如果在资产详情页，不修改已设置好的按钮文本
-    if (isAssetDetailPage && (button.id === 'buy-button' || 
-                             button.textContent.includes('Buy') || 
-                             button.textContent.includes('购买') ||
-                             button.innerHTML.includes('fa-shopping-cart'))) {
-      // 仅更新禁用状态，不更改文本
+
+    // 检查是否为资产详情页的特定购买按钮
+    const isDetailPageBuyButton = button.id === 'buy-button' && 
+                                (window.location.pathname.includes('/assets/') || 
+                                 document.querySelector('.asset-detail-page'));
+
+    if (isDetailPageBuyButton) {
+      // 如果是资产详情页的购买按钮 (id='buy-button')，则此函数不修改其文本内容，
+      // 只根据钱包状态更新其启用/禁用状态。
+      // 文本内容由 detail.html 页面的逻辑控制。
+      const walletState = window.walletState;
       if (!walletState || !walletState.isWalletConnected()) {
-        // 未连接钱包
         button.disabled = true;
-        button.setAttribute('data-wallet-status', 'disconnected');
       } else {
-        // 连接了钱包并有余额
         button.disabled = false;
-        button.setAttribute('data-wallet-status', 'ready');
       }
-      return; // 不更改详情页上的按钮文本
+      // 标记此按钮已被特殊处理，其他通用逻辑可以跳过
+      button._isDetailPageBuyButton = true; 
+      return; 
     }
     
-    // 非详情页的正常处理
+    // 对于其他非详情页主购买按钮，或者详情页上其他符合条件的按钮，执行通用逻辑
+    const walletState = window.walletState;
+    const i18n = CONFIG.i18n[currentLang] || CONFIG.i18n.en;
+
     if (!walletState || !walletState.isWalletConnected()) {
-      // 未连接钱包
       button.textContent = i18n.connect_wallet;
       button.disabled = false;
       button.setAttribute('data-wallet-status', 'disconnected');
-    } else if (walletState.balance === null) {
-      // 连接了钱包但余额未知
+    } else if (walletState.balance === null && !button._isDetailPageBuyButton) { // 详情页主按钮不应显示loading
       button.textContent = i18n.loading;
       button.disabled = true;
       button.setAttribute('data-wallet-status', 'loading');
-    } else if (typeof button.getAttribute('data-min-balance') === 'string') {
-      // 检查最小余额要求
+    } else if (typeof button.getAttribute('data-min-balance') === 'string' && !button._isDetailPageBuyButton) {
       const minBalance = parseFloat(button.getAttribute('data-min-balance'));
       const currentBalance = parseFloat(walletState.balance);
-      
       if (!isNaN(minBalance) && !isNaN(currentBalance) && currentBalance < minBalance) {
         button.textContent = i18n.insufficient_balance;
         button.disabled = true;
         button.setAttribute('data-wallet-status', 'insufficient');
       } else {
-        // 始终使用英文"Buy"，确保统一
         button.textContent = 'Buy';
         button.disabled = false;
         button.setAttribute('data-wallet-status', 'ready');
       }
-    } else {
-      // 默认状态 - 钱包已连接
-      // 始终使用英文"Buy"，确保统一
+    } else if (!button._isDetailPageBuyButton) { // 确保不是详情页主按钮才设置默认Buy文本
       button.textContent = 'Buy';
       button.disabled = false;
       button.setAttribute('data-wallet-status', 'ready');
@@ -994,59 +983,48 @@
     
     // 定义全局函数来统一更新所有购买按钮
     window.updateAllBuyButtons = function() {
-      // 减少不必要的日志输出
       if (CONFIG.debug) {
-        console.log('[钱包修复] 全局更新所有购买按钮为英文"Buy"');
+        console.log('[钱包修复] 全局更新所有购买按钮');
       }
-      
       try {
-        // 检查是否在资产详情页，如果是则不强制更改按钮文本
         const isAssetDetailPage = window.location.pathname.includes('/assets/') || 
                                  document.querySelector('.asset-detail-page') ||
                                  document.getElementById('asset-detail-container') ||
                                  document.getElementById('buy-button');
-                                 
-        if (isAssetDetailPage) {
-          log('检测到资产详情页，跳过强制修改按钮文本');
-          return true;
-        }
-        
-        // 使用标准有效的选择器
+
         const validSelectors = [
-          '.buy-btn', 
-          '.buy-button', 
-          '[data-action="buy"]', 
-          '#buyButton', 
-          '.btn-buy', 
-          '.purchase-button', 
-          '[class*="buy"]', 
-          '.buy',
-          '.detail-buy-button',
-          '[data-asset-action="buy"]',
-          '.asset-buy-button'
+          '.buy-btn', '.buy-button', '[data-action="buy"]',
+          '#buyButton', '.btn-buy', '.purchase-button',
+          '[class*="buy"]', '.buy',
+          '.detail-buy-button', '[data-asset-action="buy"]', '.asset-buy-button'
         ];
         
-        // 分段查询确保安全
         let allButtons = [];
         validSelectors.forEach(selector => {
           try {
             const buttons = document.querySelectorAll(selector);
-            buttons.forEach(btn => allButtons.push(btn));
-          } catch (err) {
-            // 忽略单个选择器错误
-          }
+            buttons.forEach(btn => {
+              // 如果是详情页的特定购买按钮 (id='buy-button')，则不添加到这里进行文本修改
+              if (isAssetDetailPage && btn.id === 'buy-button') {
+                return; 
+              }
+              allButtons.push(btn);
+            });
+          } catch (err) {}
         });
         
-        // 去重
         allButtons = [...new Set(allButtons)];
         
-        // 修改文本
         allButtons.forEach(btn => {
+          // 对于非详情页主购买按钮，如果文本是'购买'，则改为'Buy'
           if (btn.textContent.trim() === '购买') {
             btn.textContent = 'Buy';
           }
+          // 同时调用 updateBuyButton 来正确设置其状态（如果它不是详情页主按钮）
+          if (!isAssetDetailPage || btn.id !== 'buy-button') {
+             updateBuyButton(btn);
+          }
         });
-        
         return true;
       } catch (e) {
         console.error('更新购买按钮出错:', e);
