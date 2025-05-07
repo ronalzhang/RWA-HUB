@@ -55,7 +55,13 @@
         // 检查按钮内容
         const btnText = btn.textContent.trim();
         
-        // 如果文本包含"购买"，替换为"Buy"
+        // 跳过数字文本内容，避免将价格或金额替换为"Buy"
+        if (/^\d+(\.\d+)?$/.test(btnText)) {
+          log(`按钮 #${idx} 文本为数字 "${btnText}"，跳过处理`);
+          return;
+        }
+        
+        // 仅当文本是中文"购买"时才替换为英文"Buy"
         if (btnText === '购买' || btnText.includes('购买')) {
           const originalText = btnText;
           
@@ -78,7 +84,8 @@
         }
         
         // 如果按钮已通过data-wallet-status标记为就绪状态，也确保显示"Buy"
-        if (btn.getAttribute('data-wallet-status') === 'ready') {
+        // 但仅当当前文本不是数字时
+        if (btn.getAttribute('data-wallet-status') === 'ready' && !/^\d+(\.\d+)?$/.test(btnText)) {
           btn.textContent = CONFIG.buttonText;
         }
       });
@@ -130,7 +137,8 @@
           originalInnerHTML.set.call(this, value);
           
           // 如果设置的内容包含"购买"，则替换为"Buy"
-          if (value.includes('购买')) {
+          // 但跳过包含数字的内容
+          if (value.includes('购买') && !/^\d+(\.\d+)?$/.test(value)) {
             setTimeout(() => {
               replaceTextNodesOnly(this, '购买', 'Buy');
             }, 0);
@@ -149,8 +157,12 @@
         },
         set: function(value) {
           // 如果尝试设置"购买"，则改为设置"Buy"
+          // 但保护数字内容
           if (value === '购买') {
             value = 'Buy';
+          } else if (/^\d+(\.\d+)?$/.test(value)) {
+            // 如果是纯数字，不做处理
+            log('保护数字内容:', value);
           }
           return originalTextContent.set.call(this, value);
         },
@@ -272,7 +284,9 @@
       // 覆盖全局函数
       overrideGlobalUpdateFunctions();
       
-      // 定时强制更新
+      // 定时强制更新，但降低频率以避免过度干扰
+      // 将检查间隔从200毫秒增加到2000毫秒(2秒)
+      CONFIG.checkInterval = 2000;
       const intervalId = setInterval(forceEnglishButtons, CONFIG.checkInterval);
       
       // 保存清理函数
