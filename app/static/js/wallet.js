@@ -4181,15 +4181,45 @@ function refreshAssetInfo() {
     
     // 添加时间戳防止缓存
     const timestamp = new Date().getTime();
-    let apiUrl = `/api/assets/${assetId}?_=${timestamp}`;
+    let apiUrl = '';
     
-    // 尝试格式检测，对于RH-前缀的资产ID使用symbol API
-    if (assetId.startsWith('RH-')) {
-        apiUrl = `/api/assets/symbol/${assetId}?_=${timestamp}`;
-        console.log("使用资产符号API:", apiUrl);
+    // 增强型资产ID格式检测
+    if (typeof assetId === 'string') {
+        // 对于RH-前缀的资产ID，使用symbol API
+        if (assetId.startsWith('RH-')) {
+            apiUrl = `/api/assets/symbol/${assetId}?_=${timestamp}`;
+            console.log("使用资产符号API:", apiUrl);
+        } 
+        // 尝试检查是否为数字ID
+        else if (/^\d+$/.test(assetId)) {
+            apiUrl = `/api/assets/${assetId}?_=${timestamp}`;
+            console.log("使用数字ID API:", apiUrl);
+        }
+        // 其他格式的ID，也尝试使用symbol API
+        else {
+            apiUrl = `/api/assets/symbol/${assetId}?_=${timestamp}`;
+            console.log("使用默认符号API:", apiUrl);
+        }
+    } else {
+        // 兜底处理
+        apiUrl = `/api/assets/${assetId}?_=${timestamp}`;
+        console.log("使用默认ID API:", apiUrl);
     }
     
     fetch(apiUrl)
+        .then(response => {
+            if (!response.ok) {
+                // 如果第一个尝试失败，尝试另一个API端点格式
+                if (apiUrl.includes('/api/assets/symbol/')) {
+                    console.log("符号API失败，尝试ID API...");
+                    return fetch(`/api/assets/${assetId}?_=${timestamp}`);
+                } else {
+                    console.log("ID API失败，尝试符号API...");
+                    return fetch(`/api/assets/symbol/${assetId}?_=${timestamp}`);
+                }
+            }
+            return response;
+        })
         .then(response => {
             if (!response.ok) {
                 throw new Error(`获取资产信息失败: ${response.status}`);
@@ -4210,6 +4240,9 @@ function refreshAssetInfo() {
                 assetData = data.data;
             } else if (data.token_symbol) {
                 // 直接是资产对象
+                assetData = data;
+            } else if (data.id || data.asset_id || data.assetId) {
+                // 其他可能的资产对象格式
                 assetData = data;
             } else {
                 throw new Error("API响应格式不正确");
