@@ -4211,34 +4211,65 @@ function refreshAssetInfo() {
     // 调用API获取最新的资产信息
     console.log("正在获取资产信息, ID:", assetId);
     
-    // 如果前面没有构建API URL，现在构建
-    if (!apiUrl) {
-        // 增强型资产ID格式检测
-        if (typeof assetId === 'string') {
-            // 对于RH-前缀的资产ID，使用symbol API
-            if (assetId.startsWith('RH-')) {
-                apiUrl = `/api/assets/symbol/${assetId}?_=${timestamp}`;
-                console.log("使用资产符号API:", apiUrl);
-            } 
-            // 尝试检查是否为数字ID
-            else if (/^\d+$/.test(assetId)) {
-                apiUrl = `/api/assets/${assetId}?_=${timestamp}`;
-                console.log("使用数字ID API:", apiUrl);
+    // 准备多个可能的API URL
+    let apiUrls = [];
+    
+    // 如果前面已经构建了一个API URL，将其添加为首选
+    if (apiUrl) {
+        apiUrls.push(apiUrl);
+    }
+    
+    // 根据资产ID格式构建可能的API URL
+    if (typeof assetId === 'string') {
+        // 对于带有RH-前缀的资产ID
+        if (assetId.startsWith('RH-')) {
+            // 首选：使用符号API
+            if (!apiUrls.includes(`/api/assets/symbol/${assetId}?_=${timestamp}`)) {
+                apiUrls.push(`/api/assets/symbol/${assetId}?_=${timestamp}`);
             }
-            // 其他格式的ID，也尝试使用symbol API
-            else {
-                apiUrl = `/api/assets/symbol/${assetId}?_=${timestamp}`;
-                console.log("使用默认符号API:", apiUrl);
+            
+            // 备选：尝试使用纯数字ID (去掉前缀)
+            const numericId = assetId.replace('RH-', '');
+            if (/^\d+$/.test(numericId)) {
+                apiUrls.push(`/api/assets/${numericId}?_=${timestamp}`);
             }
-        } else {
-            // 兜底处理
-            apiUrl = `/api/assets/${assetId}?_=${timestamp}`;
-            console.log("使用默认ID API:", apiUrl);
+            
+            // 备选2：尝试使用资产自身的API
+            apiUrls.push(`/api/assets/${assetId}?_=${timestamp}`);
+        } 
+        // 对于纯数字ID
+        else if (/^\d+$/.test(assetId)) {
+            // 首选：使用ID API
+            if (!apiUrls.includes(`/api/assets/${assetId}?_=${timestamp}`)) {
+                apiUrls.push(`/api/assets/${assetId}?_=${timestamp}`);
+            }
+            
+            // 备选：尝试使用带前缀的符号API
+            apiUrls.push(`/api/assets/symbol/RH-${assetId}?_=${timestamp}`);
+        }
+        // 其他格式的ID（非数字也非RH-前缀）
+        else {
+            // 首选：假设它是一个符号
+            if (!apiUrls.includes(`/api/assets/symbol/${assetId}?_=${timestamp}`)) {
+                apiUrls.push(`/api/assets/symbol/${assetId}?_=${timestamp}`);
+            }
+            
+            // 备选：尝试将其作为资产ID使用
+            apiUrls.push(`/api/assets/${assetId}?_=${timestamp}`);
         }
     }
     
-    // 执行API请求，增加失败重试逻辑
-    fetchWithRetry(apiUrl)
+    // 确保我们至少有一个API URL可以尝试
+    if (apiUrls.length === 0) {
+        // 兜底方案：使用原始ID作为符号和ID都尝试
+        apiUrls.push(`/api/assets/${assetId}?_=${timestamp}`);
+        apiUrls.push(`/api/assets/symbol/${assetId}?_=${timestamp}`);
+    }
+    
+    console.log("将尝试以下API端点:", apiUrls);
+    
+    // 使用增强的fetchWithRetry函数，传入所有可能的URL
+    fetchWithMultipleUrls(apiUrls)
         .then(data => {
             console.log("API返回数据:", data);
             
@@ -4279,6 +4310,40 @@ function refreshAssetInfo() {
                 assetInfoSection.classList.remove('loading');
             }
         });
+}
+
+/**
+ * 增强版的fetchWithRetry函数，可以尝试多个URL
+ * @param {string[]} urls - 要尝试的URL数组
+ * @returns {Promise<Object>} - 解析后的JSON数据
+ */
+async function fetchWithMultipleUrls(urls) {
+    let lastError = null;
+    
+    // 依次尝试所有URL
+    for (let i = 0; i < urls.length; i++) {
+        try {
+            console.log(`尝试API端点 ${i+1}/${urls.length}:`, urls[i]);
+            const response = await fetch(urls[i]);
+            
+            if (!response.ok) {
+                console.warn(`API端点 ${i+1}/${urls.length} 请求失败:`, response.status, response.statusText);
+                // 不立即抛出错误，继续尝试下一个URL
+                continue;
+            }
+            
+            // 成功获取数据
+            console.log(`API端点 ${i+1}/${urls.length} 请求成功`);
+            return await response.json();
+        } catch (error) {
+            lastError = error;
+            console.warn(`API端点 ${i+1}/${urls.length} 请求出错:`, error.message);
+            // 继续尝试下一个URL
+        }
+    }
+    
+    // 所有URL都失败了，抛出最后一个错误
+    throw lastError || new Error("所有API端点请求都失败");
 }
 
 /**

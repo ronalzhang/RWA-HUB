@@ -751,6 +751,31 @@
         return;
       }
       
+      // 添加深度比较，防止对象引用变化但内容相同导致的假状态变化
+      function deepEqual(obj1, obj2) {
+        // 处理简单类型
+        if (obj1 === obj2) return true;
+        
+        // 处理null或undefined
+        if (obj1 == null || obj2 == null) return obj1 === obj2;
+        
+        // 处理不同类型
+        if (typeof obj1 !== typeof obj2) return false;
+        
+        // 处理对象类型
+        if (typeof obj1 === 'object') {
+          const keys1 = Object.keys(obj1);
+          const keys2 = Object.keys(obj2);
+          
+          if (keys1.length !== keys2.length) return false;
+          
+          return keys1.every(key => deepEqual(obj1[key], obj2[key]));
+        }
+        
+        // 其他情况（基本类型）
+        return obj1 === obj2;
+      }
+      
       // 在Edge浏览器中使用更严格的比较
       let hasChanged = false;
       
@@ -758,7 +783,9 @@
         // Edge浏览器中，只有当状态真正发生重大变化时才更新
         hasChanged = (
           (lastWalletStatus.isConnected !== currentStatus.isConnected) || // 连接状态改变
-          (lastWalletStatus.address !== currentStatus.address && currentStatus.address !== null) || // 地址改变且有效
+          (lastWalletStatus.address !== currentStatus.address && 
+           currentStatus.address !== null && 
+           currentStatus.address !== "") || // 地址改变且有效
           (lastWalletStatus.walletType !== currentStatus.walletType && 
            currentStatus.walletType !== null && 
            currentStatus.walletType !== "") // 钱包类型有效且发生改变
@@ -774,6 +801,22 @@
         );
       }
       
+      // 如果钱包已连接但地址相同，不触发不必要的更新
+      if (hasChanged && lastWalletStatus.isConnected && currentStatus.isConnected &&
+          lastWalletStatus.address === currentStatus.address) {
+        // 如果只是walletType变化但两者都有效，则不触发完整更新
+        if (lastWalletStatus.walletType && currentStatus.walletType && 
+            lastWalletStatus.walletType !== currentStatus.walletType) {
+          log('钱包类型变化但地址相同，跳过完整更新', {
+            oldType: lastWalletStatus.walletType,
+            newType: currentStatus.walletType
+          });
+          // 更新类型但不触发完整更新流程
+          lastWalletStatus.walletType = currentStatus.walletType;
+          hasChanged = false;
+        }
+      }
+      
       if (hasChanged) {
         log('钱包状态已变化', {
           before: lastWalletStatus,
@@ -786,16 +829,30 @@
         // 更新所有购买按钮
         document.querySelectorAll('.buy-btn, .buy-button, [data-action="buy"], #buy-button').forEach(updateBuyButton);
         
-        // 触发自定义事件
-        const eventName = currentStatus.isConnected ? 'walletConnected' : 'walletDisconnected';
-        const event = new CustomEvent(eventName, {
-          detail: {
-            address: currentStatus.address,
-            walletType: currentStatus.walletType
-          },
-          bubbles: true
-        });
-        document.dispatchEvent(event);
+        // 避免不必要的断连再连接循环
+        if (lastWalletStatus.isConnected === false && currentStatus.isConnected === true) {
+          // 仅在钱包从断开到连接时触发walletConnected事件
+          const event = new CustomEvent('walletConnected', {
+            detail: {
+              address: currentStatus.address,
+              walletType: currentStatus.walletType
+            },
+            bubbles: true
+          });
+          document.dispatchEvent(event);
+          log('已触发钱包连接事件', currentStatus);
+        } else if (lastWalletStatus.isConnected === true && currentStatus.isConnected === false) {
+          // 仅在钱包从连接到断开时触发walletDisconnected事件
+          const event = new CustomEvent('walletDisconnected', {
+            detail: {
+              previousAddress: lastWalletStatus.address,
+              previousWalletType: lastWalletStatus.walletType
+            },
+            bubbles: true
+          });
+          document.dispatchEvent(event);
+          log('已触发钱包断开事件', {previousState: lastWalletStatus});
+        }
         
         // 触发通用的钱包状态变化事件
         const stateChangeEvent = new CustomEvent('walletStateChanged', {
@@ -818,6 +875,36 @@
     if (isEdge) {
       // 完全禁用visibilitychange事件，防止Edge浏览器的异常行为
       disableEdgeVisibilityChange();
+      
+      // 为Edge浏览器注册一个更安全的仅一次性visibilitychange处理
+      const safeVisibilityHandler = function() {
+        log('Edge浏览器: 安全的visibilitychange事件处理');
+        // 移除自身，确保只执行一次
+        document.removeEventListener('visibilitychange', safeVisibilityHandler);
+        
+        // 只在页面变为可见时尝试恢复会话
+        if (document.visibilityState === 'visible') {
+          setTimeout(function() {
+            log('Edge浏览器: 页面变为可见，安全地检查钱包状态');
+            // 安全地触发一次钱包状态检查
+            const walletState = ensureWalletState();
+            if (walletState && typeof walletState.checkWalletConnection === 'function') {
+              try {
+                walletState.checkWalletConnection().catch(() => {});
+              } catch (e) {
+                // 忽略所有错误
+              }
+            }
+          }, 1000);
+        }
+      };
+      
+      // 尝试添加这个安全的处理器
+      try {
+        document.addEventListener('visibilitychange', safeVisibilityHandler, { once: true });
+      } catch (e) {
+        log('Edge浏览器: 无法添加安全的visibilitychange处理器', e);
+      }
     }
     
     // 返回间隔ID，便于需要时清除
@@ -831,65 +918,66 @@
     // 检查是否为资产详情页的特定购买按钮
     const isAssetDetailPage = window.location.pathname.includes('/assets/') || 
                               document.querySelector('.asset-detail-page');
-    const isDetailPageBuyButton = button.id === 'buy-button' && isAssetDetailPage;
+    
+    // 更精确地检测detail.html页面中的购买按钮
+    const isDetailPageBuyButton = (
+      (button.id === 'buy-button' && isAssetDetailPage) || // ID匹配且在资产页面
+      (button.hasAttribute('data-asset-id') && button.hasAttribute('data-token-price')) || // 具有特定数据属性
+      (isAssetDetailPage && button.closest('.trade-card')) // 在资产页内的交易卡片中
+    );
 
     if (isDetailPageBuyButton) {
-      // 如果是资产详情页的购买按钮 (id='buy-button')，则此函数不修改其文本内容，
-      // 只根据钱包状态更新其启用/禁用状态
-      log('检测到资产详情页购买按钮，仅更新启用状态');
-      const walletState = window.walletState;
-      if (!walletState || !walletState.isWalletConnected || 
-          (typeof walletState.isWalletConnected === 'function' && !walletState.isWalletConnected())) {
-        button.disabled = true;
-        // 不修改文本内容，那是由detail.html负责
-      } else {
-        button.disabled = false;
-        // 不修改文本内容，那是由detail.html负责
-      }
-      
-      // 标记此按钮已被特殊处理，其他通用逻辑可以跳过
-      button._isDetailPageBuyButton = true; 
-      return; 
+      // 在资产详情页，由detail.html自己处理按钮文本
+      log('检测到资产详情页购买按钮，由页面自身处理');
+      return;
     }
     
-    // 对于其他非详情页主购买按钮，或者详情页上其他符合条件的按钮，执行通用逻辑
-    const walletState = window.walletState;
-    const i18n = CONFIG.i18n[currentLang] || CONFIG.i18n.en;
-
-    // 检查钱包状态，确保isWalletConnected同时作为属性和方法都能处理
-    let isConnected = false;
-    if (walletState) {
-      if (typeof walletState.isWalletConnected === 'function') {
-        isConnected = walletState.isWalletConnected();
+    // 非资产详情页的按钮，由wallet_fix.js处理
+    try {
+      const walletState = window.walletState;
+      const isConnected = walletState && (
+        (typeof walletState.isWalletConnected === 'function' && walletState.isWalletConnected()) ||
+        walletState.isConnected || 
+        walletState.connected
+      );
+      
+      if (!isConnected) {
+        // 钱包未连接状态
+        button.disabled = false; // 允许点击，触发钱包连接流程
+        
+        // 支持多语言
+        const lang = document.documentElement.lang || navigator.language || 'en';
+        const connectText = (lang.startsWith('zh') ? 
+                           CONFIG.i18n.zh.connect_wallet : 
+                           CONFIG.i18n.en.connect_wallet);
+        
+        // 保留按钮原始内容
+        if (!button._originalText) {
+          button._originalText = button.textContent.trim();
+        }
+        
+        // 设置连接钱包文本
+        button.textContent = connectText;
+        button.innerHTML = `<i class="fas fa-wallet me-2"></i>${connectText}`;
       } else {
-        isConnected = walletState.isConnected === true && !!walletState.address;
-      }
-    }
-
-    if (!walletState || !isConnected) {
-      button.textContent = i18n.connect_wallet;
-      button.disabled = false;
-      button.setAttribute('data-wallet-status', 'disconnected');
-    } else if (walletState.balance === null && !button._isDetailPageBuyButton) {
-      button.textContent = i18n.loading;
-      button.disabled = true;
-      button.setAttribute('data-wallet-status', 'loading');
-    } else if (typeof button.getAttribute('data-min-balance') === 'string' && !button._isDetailPageBuyButton) {
-      const minBalance = parseFloat(button.getAttribute('data-min-balance'));
-      const currentBalance = parseFloat(walletState.balance);
-      if (!isNaN(minBalance) && !isNaN(currentBalance) && currentBalance < minBalance) {
-        button.textContent = i18n.insufficient_balance;
-        button.disabled = true;
-        button.setAttribute('data-wallet-status', 'insufficient');
-      } else {
-        button.textContent = i18n.buy;
+        // 钱包已连接
         button.disabled = false;
-        button.setAttribute('data-wallet-status', 'ready');
+        
+        // 恢复原始文本
+        if (button._originalText) {
+          button.textContent = button._originalText;
+        } else {
+          // 如果没有原始文本记录，使用默认文本
+          const lang = document.documentElement.lang || navigator.language || 'en';
+          const buyText = (lang.startsWith('zh') ? 
+                         CONFIG.i18n.zh.buy : 
+                         CONFIG.i18n.en.buy);
+          button.textContent = buyText;
+          button.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>${buyText}`;
+        }
       }
-    } else if (!button._isDetailPageBuyButton) {
-      button.textContent = i18n.buy;
-      button.disabled = false;
-      button.setAttribute('data-wallet-status', 'ready');
+    } catch (error) {
+      log('更新按钮状态时出错', error);
     }
   }
   
