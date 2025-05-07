@@ -256,8 +256,10 @@
         address: null,
         walletType: null,
         balance: null,
-        
-        // 基本方法实现
+        // 确保 isWalletConnected 总是存在
+        isWalletConnected: function() {
+          return this.isConnected && !!this.address;
+        },
         connect: async function(walletType) {
           log(`尝试连接钱包类型: ${walletType}`);
           try {
@@ -286,13 +288,15 @@
                 log('Solana钱包连接错误', err);
               }
             }
+            // 如果未能连接，确保状态正确
+            this.isConnected = false;
             return false;
           } catch (err) {
             log('钱包连接错误', err);
+            this.isConnected = false;
             return false;
           }
         },
-        
         disconnect: function() {
           this.isConnected = false;
           this.address = null;
@@ -301,13 +305,10 @@
           this.saveState();
           this.dispatchEvent('disconnected');
         },
-        
         saveState: function() {
           try {
             localStorage.setItem('walletAddress', this.address || '');
             localStorage.setItem('walletType', this.walletType || '');
-            
-            // 兼容新旧存储方式
             const stateToSave = {
               isConnected: this.isConnected,
               address: this.address,
@@ -318,35 +319,26 @@
             log('保存钱包状态失败', e);
           }
         },
-        
         loadState: function() {
           try {
-            // 尝试从localStorage加载状态
-            const address = localStorage.getItem('walletAddress');
-            const walletType = localStorage.getItem('walletType');
-            
-            // 检查新版本存储
-            const savedState = localStorage.getItem('walletState');
-            if (savedState) {
-              try {
-                const parsedState = JSON.parse(savedState);
-                if (parsedState && typeof parsedState === 'object') {
-                  this.isConnected = !!parsedState.isConnected;
-                  this.address = parsedState.address || null;
-                  this.walletType = parsedState.walletType || null;
-                  return;
-                }
-              } catch (e) {
-                log('解析walletState失败', e);
-              }
+            const savedStateStr = localStorage.getItem('walletState');
+            if (savedStateStr) {
+              const savedState = JSON.parse(savedStateStr);
+              this.isConnected = !!savedState.isConnected;
+              this.address = savedState.address || null;
+              this.walletType = savedState.walletType || null;
+              // 如果成功从 walletState 加载，直接返回
+              if(this.isConnected) return;
             }
-            
-            // 回退到旧版本存储
-            if (address && walletType) {
-              this.address = address;
-              this.walletType = walletType;
-              this.isConnected = true;
+            // 兼容旧的存储方式，如果新的 walletState 未能成功恢复连接状态
+            const oldAddress = localStorage.getItem('walletAddress');
+            const oldWalletType = localStorage.getItem('walletType');
+            if (oldAddress && oldWalletType) {
+              this.address = oldAddress;
+              this.walletType = oldWalletType;
+              this.isConnected = true; // 假设旧方式存储即为已连接
             } else {
+              // 如果两种方式都失败，确保是断开状态
               this.isConnected = false;
               this.address = null;
               this.walletType = null;
@@ -358,131 +350,48 @@
             this.walletType = null;
           }
         },
-        
         dispatchEvent: function(eventName, detail) {
           const event = new CustomEvent('wallet' + eventName.charAt(0).toUpperCase() + eventName.slice(1), {
             detail: detail || {
               address: this.address,
-              walletType: this.walletType
+              walletType: this.walletType,
+              isConnected: this.isConnected // 确保事件也携带连接状态
             },
             bubbles: true
           });
           document.dispatchEvent(event);
         },
-        
         getAddress: function() {
           return this.address;
         },
-        
         getWalletType: function() {
           return this.walletType;
-        },
-        
-        isWalletConnected: function() {
-          return this.isConnected && !!this.address;
         }
+        // isWalletConnected 已在对象创建时定义
       };
-      
-      // 初始载入状态
-      window.walletState.loadState();
-      
-      // 添加以太坊事件监听
-      if (window.ethereum) {
-        window.ethereum.on('accountsChanged', function(accounts) {
-          if (accounts.length === 0) {
-            window.walletState.disconnect();
-          } else if (window.walletState.walletType === 'metamask') {
-            window.walletState.address = accounts[0];
-            window.walletState.isConnected = true;
-            window.walletState.saveState();
-            window.walletState.dispatchEvent('changed');
-          }
-        });
-      }
-      
-      // 添加Solana事件监听
-      if (window.solana) {
-        window.solana.on('disconnect', function() {
-          if (window.walletState.walletType === 'solana') {
-            window.walletState.disconnect();
-          }
-        });
-      }
+      window.walletState.loadState(); // 新创建对象后立即加载状态
+      log('window.walletState 已创建并初始化加载状态。', window.walletState);
     } else {
-      // 确保所有必要的方法存在
-      const requiredMethods = ['connect', 'disconnect', 'getAddress', 'isWalletConnected'];
-      
-      requiredMethods.forEach(method => {
-        if (typeof window.walletState[method] !== 'function') {
-          log(`为缺失的方法创建空实现: ${method}`);
-          
-          // 创建空方法
-          window.walletState[method] = function() {
-            log(`调用了未实现的方法: ${method}`);
-            return method === 'isWalletConnected' ? false : null;
+      // 如果 window.walletState 已存在，仍要确保 isWalletConnected 方法存在
+      if (typeof window.walletState.isWalletConnected !== 'function') {
+        log('为已存在的 window.walletState 添加缺失的 isWalletConnected 方法');
+        window.walletState.isWalletConnected = function() {
+          return this.isConnected && !!this.address;
+        };
+      }
+      // 确保其他核心方法也存在，如果不存在则赋予一个安全的默认实现
+      const coreMethods = ['connect', 'disconnect', 'saveState', 'loadState', 'dispatchEvent', 'getAddress', 'getWalletType'];
+      coreMethods.forEach(methodName => {
+        if (typeof window.walletState[methodName] !== 'function') {
+          log(`为已存在的 window.walletState 添加缺失的核心方法: ${methodName}`);
+          window.walletState[methodName] = function(...args) {
+            log(`调用了 ${methodName} 的存根实现`, args);
+            if (methodName === 'connect') return Promise.resolve(false);
+            return undefined;
           };
         }
       });
-      
-      // 确保保存和加载方法存在
-      if (typeof window.walletState.saveState !== 'function') {
-        window.walletState.saveState = function() {
-          try {
-            localStorage.setItem('walletAddress', this.address || '');
-            localStorage.setItem('walletType', this.walletType || '');
-            
-            const stateToSave = {
-              isConnected: this.isConnected,
-              address: this.address,
-              walletType: this.walletType
-            };
-            localStorage.setItem('walletState', JSON.stringify(stateToSave));
-          } catch (e) {
-            log('保存钱包状态失败', e);
-          }
-        };
-      }
-      
-      if (typeof window.walletState.loadState !== 'function') {
-        window.walletState.loadState = function() {
-          try {
-            const address = localStorage.getItem('walletAddress');
-            const walletType = localStorage.getItem('walletType');
-            
-            const savedState = localStorage.getItem('walletState');
-            if (savedState) {
-              try {
-                const parsedState = JSON.parse(savedState);
-                if (parsedState && typeof parsedState === 'object') {
-                  this.isConnected = !!parsedState.isConnected;
-                  this.address = parsedState.address || null;
-                  this.walletType = parsedState.walletType || null;
-                  return;
-                }
-              } catch (e) {
-                log('解析walletState失败', e);
-              }
-            }
-            
-            if (address && walletType) {
-              this.address = address;
-              this.walletType = walletType;
-              this.isConnected = true;
-            } else {
-              this.isConnected = false;
-              this.address = null;
-              this.walletType = null;
-            }
-          } catch (e) {
-            log('加载钱包状态失败', e);
-          }
-        };
-        
-        // 立即加载状态
-        window.walletState.loadState();
-      }
     }
-    
     return window.walletState;
   }
   
