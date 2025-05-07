@@ -4136,33 +4136,65 @@ document.addEventListener('DOMContentLoaded', function() {
 function refreshAssetInfo() {
     console.log("刷新资产信息...");
     
-    // 获取当前资产ID - 使用多种方式尝试获取
-    let assetId = document.getElementById('asset-id')?.value || 
+    // 优先使用全局ASSET_CONFIG对象获取资产ID和API URL
+    let assetId = '';
+    let apiUrl = '';
+    const timestamp = new Date().getTime();
+    
+    // 方法1: 优先使用全局ASSET_CONFIG对象
+    if (window.ASSET_CONFIG) {
+        assetId = window.ASSET_CONFIG.id;
+        // 根据配置决定API路径
+        if (window.ASSET_CONFIG.apiPrefix) {
+            apiUrl = `${window.ASSET_CONFIG.apiPrefix}${assetId}?_=${timestamp}`;
+            console.log("使用ASSET_CONFIG配置的API:", apiUrl);
+        } else {
+            // 构建默认API URL
+            if (assetId.startsWith('RH-')) {
+                apiUrl = `/api/assets/symbol/${assetId}?_=${timestamp}`;
+            } else {
+                apiUrl = `/api/assets/${assetId}?_=${timestamp}`;
+            }
+            console.log("基于ASSET_CONFIG构建API:", apiUrl);
+        }
+    }
+    
+    // 方法2: 如果没有全局配置，使用其他方式获取资产ID
+    if (!assetId) {
+        // 获取当前资产ID - 使用多种方式尝试获取
+        assetId = document.getElementById('asset-id')?.value || 
                  document.querySelector('[data-asset-id]')?.getAttribute('data-asset-id');
-    
-    // 如果没找到，尝试从URL中获取
-    if (!assetId) {
-        const pathMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
-        if (pathMatch && pathMatch[1]) {
-            assetId = pathMatch[1];
-            console.log("从URL中获取到资产ID:", assetId);
+        
+        // 如果没找到，尝试从URL中获取
+        if (!assetId) {
+            const pathMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
+            if (pathMatch && pathMatch[1]) {
+                assetId = pathMatch[1];
+                console.log("从URL中获取到资产ID:", assetId);
+            }
         }
-    }
-    
-    // 如果页面上有token_symbol元素，也尝试获取
-    if (!assetId) {
-        const tokenSymbolElem = document.getElementById('token_symbol') || 
-                               document.querySelector('.token-symbol');
-        if (tokenSymbolElem) {
-            assetId = tokenSymbolElem.textContent || tokenSymbolElem.value;
-            console.log("从token_symbol元素获取到资产ID:", assetId);
+        
+        // 如果页面上有token_symbol元素，也尝试获取
+        if (!assetId) {
+            const tokenSymbolElem = document.getElementById('token_symbol') || 
+                                   document.querySelector('.token-symbol');
+            if (tokenSymbolElem) {
+                assetId = tokenSymbolElem.textContent || tokenSymbolElem.value;
+                console.log("从token_symbol元素获取到资产ID:", assetId);
+            }
         }
-    }
-    
-    // 尝试从全局变量获取
-    if (!assetId && window.assetData && window.assetData.token_symbol) {
-        assetId = window.assetData.token_symbol;
-        console.log("从全局变量获取到资产ID:", assetId);
+        
+        // 尝试从全局变量获取
+        if (!assetId && window.assetData && window.assetData.token_symbol) {
+            assetId = window.assetData.token_symbol;
+            console.log("从全局变量获取到资产ID:", assetId);
+        }
+        
+        // 尝试从lastKnownData获取
+        if (!assetId && window.lastKnownData) {
+            assetId = window.lastKnownData.assetId || window.lastKnownData.tokenSymbol;
+            console.log("从lastKnownData获取到资产ID:", assetId);
+        }
     }
     
     if (!assetId) {
@@ -4179,53 +4211,34 @@ function refreshAssetInfo() {
     // 调用API获取最新的资产信息
     console.log("正在获取资产信息, ID:", assetId);
     
-    // 添加时间戳防止缓存
-    const timestamp = new Date().getTime();
-    let apiUrl = '';
-    
-    // 增强型资产ID格式检测
-    if (typeof assetId === 'string') {
-        // 对于RH-前缀的资产ID，使用symbol API
-        if (assetId.startsWith('RH-')) {
-            apiUrl = `/api/assets/symbol/${assetId}?_=${timestamp}`;
-            console.log("使用资产符号API:", apiUrl);
-        } 
-        // 尝试检查是否为数字ID
-        else if (/^\d+$/.test(assetId)) {
+    // 如果前面没有构建API URL，现在构建
+    if (!apiUrl) {
+        // 增强型资产ID格式检测
+        if (typeof assetId === 'string') {
+            // 对于RH-前缀的资产ID，使用symbol API
+            if (assetId.startsWith('RH-')) {
+                apiUrl = `/api/assets/symbol/${assetId}?_=${timestamp}`;
+                console.log("使用资产符号API:", apiUrl);
+            } 
+            // 尝试检查是否为数字ID
+            else if (/^\d+$/.test(assetId)) {
+                apiUrl = `/api/assets/${assetId}?_=${timestamp}`;
+                console.log("使用数字ID API:", apiUrl);
+            }
+            // 其他格式的ID，也尝试使用symbol API
+            else {
+                apiUrl = `/api/assets/symbol/${assetId}?_=${timestamp}`;
+                console.log("使用默认符号API:", apiUrl);
+            }
+        } else {
+            // 兜底处理
             apiUrl = `/api/assets/${assetId}?_=${timestamp}`;
-            console.log("使用数字ID API:", apiUrl);
+            console.log("使用默认ID API:", apiUrl);
         }
-        // 其他格式的ID，也尝试使用symbol API
-        else {
-            apiUrl = `/api/assets/symbol/${assetId}?_=${timestamp}`;
-            console.log("使用默认符号API:", apiUrl);
-        }
-    } else {
-        // 兜底处理
-        apiUrl = `/api/assets/${assetId}?_=${timestamp}`;
-        console.log("使用默认ID API:", apiUrl);
     }
     
-    fetch(apiUrl)
-        .then(response => {
-            if (!response.ok) {
-                // 如果第一个尝试失败，尝试另一个API端点格式
-                if (apiUrl.includes('/api/assets/symbol/')) {
-                    console.log("符号API失败，尝试ID API...");
-                    return fetch(`/api/assets/${assetId}?_=${timestamp}`);
-                } else {
-                    console.log("ID API失败，尝试符号API...");
-                    return fetch(`/api/assets/symbol/${assetId}?_=${timestamp}`);
-                }
-            }
-            return response;
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`获取资产信息失败: ${response.status}`);
-            }
-            return response.json();
-        })
+    // 执行API请求，增加失败重试逻辑
+    fetchWithRetry(apiUrl)
         .then(data => {
             console.log("API返回数据:", data);
             
@@ -4266,6 +4279,70 @@ function refreshAssetInfo() {
                 assetInfoSection.classList.remove('loading');
             }
         });
+}
+
+/**
+ * 带重试逻辑的fetch函数
+ * @param {string} url - 请求URL
+ * @param {number} maxRetries - 最大重试次数，默认为2
+ * @returns {Promise<Object>} - 解析后的JSON数据
+ */
+async function fetchWithRetry(url, maxRetries = 2) {
+    let lastError = null;
+    let alternativeUrls = [];
+    
+    // 生成替代URL，确保不与原始URL重复
+    if (url.includes('/api/assets/')) {
+        // 如果当前是数字ID API
+        if (url.match(/\/api\/assets\/\d+/)) {
+            const assetId = url.match(/\/api\/assets\/(\d+)/)[1];
+            const queryParams = url.includes('?') ? url.split('?')[1] : '';
+            alternativeUrls.push(`/api/assets/symbol/RH-${assetId}?${queryParams}`);
+        } 
+        // 如果当前是符号API
+        else if (url.includes('/api/assets/symbol/')) {
+            const symbol = url.match(/\/api\/assets\/symbol\/([^?]+)/)[1];
+            const queryParams = url.includes('?') ? url.split('?')[1] : '';
+            
+            // 如果符号以RH-开头，尝试提取ID部分
+            if (symbol.startsWith('RH-')) {
+                const id = symbol.replace('RH-', '');
+                if (/^\d+$/.test(id)) {
+                    alternativeUrls.push(`/api/assets/${id}?${queryParams}`);
+                }
+            }
+        }
+    }
+
+    // 主要URL重试逻辑
+    for (let retry = 0; retry <= maxRetries; retry++) {
+        try {
+            // 根据重试次数选择URL
+            let currentUrl = url;
+            if (retry > 0 && alternativeUrls.length > 0) {
+                const altIndex = (retry - 1) % alternativeUrls.length;
+                currentUrl = alternativeUrls[altIndex];
+                console.log(`尝试替代API URL (重试 ${retry}/${maxRetries}):`, currentUrl);
+            } else if (retry > 0) {
+                console.log(`重试原始API URL (重试 ${retry}/${maxRetries}):`, currentUrl);
+            }
+            
+            const response = await fetch(currentUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP错误：${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            lastError = error;
+            console.log(`请求失败 (尝试 ${retry + 1}/${maxRetries + 1}):`, error.message);
+            // 最后一次重试失败，抛出错误
+            if (retry === maxRetries) {
+                throw lastError;
+            }
+            // 重试前稍等一下
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+    }
 }
 
 /**
