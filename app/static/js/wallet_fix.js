@@ -668,6 +668,9 @@
   
   // 监控钱包状态
   function monitorWalletState() {
+    // 在监控开始时，也尝试确保 walletState 和其核心方法是健全的
+    ensureWalletState(); 
+
     let lastWalletStatus = null;
     let isFirstCheck = true;  // 添加首次检查标记
     let lastUpdateTime = 0;   // 添加上次更新时间戳
