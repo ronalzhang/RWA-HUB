@@ -458,11 +458,11 @@
         }
         
         // 准备请求数据
-        const requestData = {
+            const requestData = {
             asset_id: normalizedAssetId,
             amount: amount,
-            wallet_address: walletAddress
-        };
+                wallet_address: walletAddress
+            };
         
         // 添加钱包类型（如果可用）
         if (window.walletState && window.walletState.walletType) {
@@ -527,7 +527,7 @@
         } catch (error) {
             log('准备购买请求失败', error);
             
-            // 返回失败响应，不再模拟成功
+            // 返回失败响应，明确告知用户API请求失败
             return {
                 success: false,
                 error: `${getText('prepareFailed')}: ${error.message || '无法连接到服务器'}`,
@@ -618,7 +618,7 @@
         } catch (error) {
             log('确认购买请求失败', error);
             
-            // 返回失败响应，不再模拟成功
+            // 返回失败响应，明确告知用户API请求失败
             return {
                 success: false,
                 error: `${getText('purchaseError')}: ${error.message || '无法连接到服务器'}`,

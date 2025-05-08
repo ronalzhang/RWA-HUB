@@ -276,8 +276,11 @@
         
         // 所有URL都失败，抛出错误 - 但静默处理，避免控制台错误
         if (CONFIG.suppressErrors) {
-            // 创建空响应而不是抛出错误
+            // 创建空响应而不是抛出错误，明确标记为错误
             return new Response(JSON.stringify({
+                success: false,
+                error: "资产数据获取失败，请稍后再试",
+                isApiError: true,
                 id: extractAssetIdFromUrl(urls[0]) || "",
                 token_symbol: "",
                 name: "",
@@ -309,8 +312,8 @@
                 const pathMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
                 if (pathMatch && pathMatch[1]) {
                     assetId = pathMatch[1];
+                    }
                 }
-            }
             // 3. 从DOM元素
             else {
                 const assetElement = document.querySelector('[data-asset-id]');
@@ -343,8 +346,8 @@
             // 检查API响应
             if (!asset || (!asset.token_symbol && !asset.name)) {
                 throw new Error('API返回的资产数据无效');
-            }
-            
+                }
+                
             // 更新UI元素
             updateAssetDetailsUI(asset);
             
@@ -387,9 +390,9 @@
         } catch (error) {
             // 返回默认余额
             return { balance: 0 };
+            }
         }
-    }
-    
+        
     // 检查用户是否是管理员
     async function checkIsAdmin(address) {
         if (!address) {
@@ -418,97 +421,120 @@
     
     // 更新资产详情UI元素
     function updateAssetDetailsUI(asset) {
-        if (!asset) return [];
-        
-        const updatedElements = [];
-        
         try {
-            // 更新资产名称
-            const nameElements = document.querySelectorAll('.asset-name, #asset-name, [data-field="asset-name"]');
+            // 如果API返回的是错误标记，确保处理正确
+            if (asset.isApiError) {
+                // 记录错误
+                log('API错误: 资产数据获取失败', asset.error || '未知错误');
+                
+                // 确保购买按钮显示正确
+                ensureCorrectBuyButtonText();
+                
+                // 不继续更新UI
+                return;
+            }
+            
+            // 提取关键资产数据
+            const tokenSymbol = asset.token_symbol || '';
+            const name = asset.name || '';
+            const tokenPrice = asset.token_price !== null ? asset.token_price : null;
+            const tokenSupply = asset.token_supply || 0;
+            const remainingSupply = asset.remaining_supply !== undefined ? asset.remaining_supply : tokenSupply;
+            
+            // 1. 更新标题/名称
+            const nameElements = document.querySelectorAll('.asset-name, .asset-title, [data-asset="name"]');
             nameElements.forEach(el => {
-                if (asset.name) {
-                    el.textContent = asset.name;
-                    updatedElements.push('asset-name');
+                if (el && name) {
+                    el.textContent = name;
                 }
             });
             
-            // 更新资产符号
-            const symbolElements = document.querySelectorAll('.asset-symbol, #asset-symbol, [data-field="asset-symbol"]');
+            // 2. 更新代币符号
+            const symbolElements = document.querySelectorAll('.asset-symbol, [data-asset="symbol"]');
             symbolElements.forEach(el => {
-                if (asset.token_symbol) {
-                    el.textContent = asset.token_symbol;
-                    updatedElements.push('asset-symbol');
+                if (el && tokenSymbol) {
+                    el.textContent = tokenSymbol;
                 }
             });
             
-            // 更新资产价格
-            const priceElements = document.querySelectorAll('.asset-price, #asset-price, [data-field="asset-price"]');
-            if (asset.token_price) {
-                priceElements.forEach(el => {
-                    el.textContent = `$${parseFloat(asset.token_price).toFixed(2)}`;
-                    updatedElements.push('asset-price');
-                });
-            }
-            
-            // 更新资产总供应量
-            const supplyElements = document.querySelectorAll('.asset-supply, #asset-supply, [data-field="asset-supply"]');
-            if (asset.token_supply) {
-                supplyElements.forEach(el => {
-                    el.textContent = parseInt(asset.token_supply).toLocaleString();
-                    updatedElements.push('asset-supply');
-                });
-            }
-            
-            // 更新资产剩余供应量
-            const remainingElements = document.querySelectorAll('.asset-remaining, #asset-remaining, [data-field="asset-remaining"]');
-            if (asset.remaining_supply) {
-                remainingElements.forEach(el => {
-                    el.textContent = parseInt(asset.remaining_supply).toLocaleString();
-                    updatedElements.push('asset-remaining');
-                });
-            }
-            
-            // 更新购买按钮的数据属性
-            const buyButtons = document.querySelectorAll('#buy-button, .buy-button, [data-action="buy"]');
-            buyButtons.forEach(btn => {
-                // 只设置数据属性，不修改按钮文本
-                if (asset.id) {
-                    btn.setAttribute('data-asset-id', asset.id);
-                } else if (asset.token_symbol) {
-                    btn.setAttribute('data-asset-id', asset.token_symbol);
+            // 3. 更新价格 (保留价格为null的情况)
+            const priceElements = document.querySelectorAll('.asset-price, .token-price, [data-asset="price"]');
+            priceElements.forEach(el => {
+                if (el && tokenPrice !== null) {
+                    // 针对不同展示方式处理
+                    if (el.tagName === 'INPUT') {
+                        el.value = tokenPrice;
+                    } else {
+                        el.textContent = Number(tokenPrice).toFixed(2);
+                    }
                 }
-                
-                if (asset.token_price) {
-                    btn.setAttribute('data-token-price', asset.token_price);
-                }
-                
-                // 确保按钮文本不是金额
-                const btnText = btn.textContent.trim();
-                if (btnText.match(/^\d+(\.\d+)?$/) || (asset.token_price && btnText === asset.token_price.toString())) {
-                    // 如果按钮文本是数字或等于资产价格，将其恢复为"Buy"
-                    const currentLang = document.documentElement.lang || 'en';
-                    btn.textContent = currentLang.startsWith('zh') ? '购买' : 'Buy';
-                    
-                    // 可选：添加购物车图标
-                    btn.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>${btn.textContent}`;
-                }
-                
-                updatedElements.push('buy-button');
             });
             
-            // 更新描述
-            const descElements = document.querySelectorAll('.asset-description, #asset-description, [data-field="asset-description"]');
-            if (asset.description) {
-                descElements.forEach(el => {
-                    el.textContent = asset.description;
-                    updatedElements.push('asset-description');
-                });
+            // 4. 更新总供应量
+            const supplyElements = document.querySelectorAll('.token-supply, .asset-supply, [data-asset="supply"]');
+            supplyElements.forEach(el => {
+                if (el && tokenSupply) {
+                    if (el.tagName === 'INPUT') {
+                        el.value = tokenSupply;
+                    } else {
+                        el.textContent = tokenSupply.toLocaleString();
+                    }
+                }
+            });
+            
+            // 5. 更新剩余供应量
+            const remainingElements = document.querySelectorAll('.remaining-supply, [data-asset="remaining"]');
+            remainingElements.forEach(el => {
+                if (el && remainingSupply !== undefined) {
+                    if (el.tagName === 'INPUT') {
+                        el.value = remainingSupply;
+                    } else {
+                        el.textContent = remainingSupply.toLocaleString();
+                    }
+                }
+            });
+            
+            // 6. 更新交易表单中的数据
+            const tradeForm = document.querySelector('#trade-form, .trade-form, form[data-purpose="trade"]');
+            if (tradeForm) {
+                // 设置隐藏的资产ID
+                const assetIdInput = tradeForm.querySelector('input[name="asset_id"]');
+                if (assetIdInput && asset.id) {
+                    assetIdInput.value = asset.id;
+                }
+                
+                // 设置价格显示
+                const priceDisplay = tradeForm.querySelector('.price-display, [data-display="price"]');
+                if (priceDisplay && tokenPrice !== null) {
+                    priceDisplay.textContent = `$${Number(tokenPrice).toFixed(2)}`;
+                }
             }
+            
+            // 确保购买按钮显示正确
+            ensureCorrectBuyButtonText();
+            
+            // 保存最新数据到lastKnownData
+            if (typeof window.lastKnownData === 'undefined') {
+                window.lastKnownData = {};
+            }
+            
+            window.lastKnownData = {
+                assetId: asset.id,
+                tokenSymbol: tokenSymbol,
+                remainingSupply: remainingSupply,
+                tokenSupply: tokenSupply,
+                tokenPrice: tokenPrice
+            };
+            
+            // 触发资产数据已更新事件
+            const event = new CustomEvent('assetDataUpdated', { detail: asset });
+            window.dispatchEvent(event);
+            
         } catch (error) {
-            // 生产环境中不记录错误
+            log('更新资产详情UI时出错', error);
+            // 确保购买按钮显示正确，即使出错
+            ensureCorrectBuyButtonText();
         }
-        
-        return updatedElements;
     }
     
     // 增强钱包连接检查
@@ -533,8 +559,8 @@
                     const storedAddress = localStorage.getItem('walletAddress');
                     if (storedAddress) {
                         return true;
-                    }
-                    
+                }
+                
                     // 2. 检查walletState对象
                     if (window.walletState) {
                         if (window.walletState.isConnected || 
@@ -578,7 +604,7 @@
                 return { balance: 0 };
             }
         };
-        
+                
         // 增强或创建全局checkIsAdmin函数
         window.checkIsAdmin = async function(address) {
             try {
@@ -630,55 +656,33 @@
         // 搜索所有购买按钮
         const buyButtons = document.querySelectorAll('#buy-button, .detail-buy-button, [data-asset-action="buy"], .buy-button, [data-action="buy"]');
         
+        if (buyButtons.length === 0) {
+            return; // 没有找到购买按钮
+        }
+        
+        // 设置所有按钮的文本为"Buy"
         buyButtons.forEach(button => {
-            // 防止按钮显示为价格
-            if (/^\s*\d+(\.\d+)?\s*$/.test(button.textContent) || 
-                button.textContent === '0.23' || 
-                button.textContent === '0' || 
-                button.textContent === '0.00') {
+            // 检查按钮当前文本是否为价格数字或其它非Buy文本
+            const currentText = button.textContent.trim();
+            const isNumeric = /^\d+(\.\d+)?$/.test(currentText);
+            
+            // 如果当前显示的是数字或空文本，替换为"Buy"
+            if (isNumeric || !currentText || currentText.length === 0) {
+                // 保存原有属性
+                const classes = button.className;
+                const attrs = {};
+                Array.from(button.attributes).forEach(attr => {
+                    attrs[attr.name] = attr.value;
+                });
                 
-                // 使用当前语言显示"Buy"
-                const currentLang = document.documentElement.lang || 'en';
-                const buyText = currentLang.startsWith('zh') ? '购买' : 'Buy';
-                button.textContent = buyText;
+                // 设置正确的按钮文本
+                button.textContent = "Buy";
                 
-                // 添加购物车图标
-                button.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>${buyText}`;
-                
-                // 记录日志，仅开发环境
-                if (!CONFIG.suppressErrors) {
-                    console.log('修正购买按钮文本: ', button);
+                // 如果需要添加图标
+                if (button.innerHTML.indexOf('fa-') === -1) {
+                    button.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>Buy`;
                 }
             }
-            
-            // 监听购买按钮的文本变化
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.type === 'characterData' || mutation.type === 'childList') {
-                        const newText = button.textContent.trim();
-                        if (/^\s*\d+(\.\d+)?\s*$/.test(newText) || 
-                            newText === '0.23' || 
-                            newText === '0' || 
-                            newText === '0.00') {
-                            
-                            // 使用当前语言显示"Buy"
-                            const currentLang = document.documentElement.lang || 'en';
-                            const buyText = currentLang.startsWith('zh') ? '购买' : 'Buy';
-                            button.textContent = buyText;
-                            
-                            // 添加购物车图标
-                            button.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>${buyText}`;
-                        }
-                    }
-                });
-            });
-            
-            // 开始观察按钮
-            observer.observe(button, {
-                characterData: true,
-                childList: true,
-                subtree: true
-            });
         });
     }
     
@@ -692,8 +696,8 @@
             // 处理特殊情况: 外部请求
             if (url.includes('external.api') || url.startsWith('http')) {
                 return originalFetch(url, options);
-            }
-            
+                        }
+                        
             // 判断是否为API请求
             if (url.includes('/api/')) {
                 try {
@@ -706,7 +710,7 @@
                     
                     // 使用增强的fetch函数
                     return fetchWithRetry(normalizedUrl, options);
-                } catch (error) {
+                    } catch (error) {
                     // 生产环境中处理错误
                     if (CONFIG.suppressErrors) {
                         // 创建空响应而不是抛出错误
