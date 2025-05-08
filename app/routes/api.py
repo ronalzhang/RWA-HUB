@@ -491,3 +491,300 @@ def get_trade_history():
             'success': False,
             'error': f"获取交易历史失败: {str(e)}"
         }), 500
+
+@api_bp.route('/assets/symbol/<string:symbol>', methods=['GET'])
+def get_asset_by_symbol(symbol):
+    """通过代币符号获取资产详情"""
+    try:
+        current_app.logger.info(f"请求通过符号获取资产: {symbol}")
+        from app.models.asset import Asset
+        
+        # 查询资产
+        asset = Asset.query.filter_by(token_symbol=symbol).first()
+        
+        # 如果找不到资产，返回404
+        if not asset:
+            current_app.logger.warning(f"找不到符号为 {symbol} 的资产")
+            return jsonify({
+                'success': False,
+                'error': f'找不到符号为 {symbol} 的资产'
+            }), 404
+        
+        # 将资产转换为字典并返回
+        asset_data = asset.to_dict()
+        
+        # 添加图片URL处理
+        if hasattr(asset, 'images') and asset.images:
+            asset_data['images'] = asset.images
+            
+            # 为前端设置主图片
+            if asset.images and len(asset.images) > 0:
+                asset_data['image_url'] = asset.images[0]
+        
+        # 构建基本响应
+        response = {
+            'success': True,
+            'id': asset.id,
+            'token_symbol': asset.token_symbol,
+            'name': asset.name,
+            'token_price': float(asset.token_price),
+            'token_supply': asset.token_supply,
+            'remaining_supply': asset.remaining_supply,
+        }
+        
+        # 添加额外资产数据
+        response.update(asset_data)
+        
+        current_app.logger.info(f"成功返回资产 {symbol} 的详情")
+        return jsonify(response), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"通过符号获取资产失败: {symbol}, 错误: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"获取资产失败: {str(e)}"
+        }), 500
+
+@api_bp.route('/trades/prepare_purchase', methods=['POST'])
+def prepare_purchase():
+    """准备购买交易"""
+    try:
+        # 获取请求数据
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '无效的请求数据'
+            }), 400
+        
+        # 验证必要字段
+        asset_id = data.get('asset_id')
+        amount = data.get('amount')
+        wallet_address = data.get('wallet_address')
+        
+        if not asset_id:
+            return jsonify({
+                'success': False,
+                'error': '缺少资产ID'
+            }), 400
+            
+        if not amount:
+            return jsonify({
+                'success': False,
+                'error': '缺少购买数量'
+            }), 400
+            
+        if not wallet_address:
+            return jsonify({
+                'success': False,
+                'error': '缺少钱包地址'
+            }), 400
+        
+        # 处理资产ID，支持RH-XXXXXX格式
+        from app.models.asset import Asset
+        
+        asset = None
+        try:
+            # 如果资产ID是数字，直接查询
+            if isinstance(asset_id, int) or (isinstance(asset_id, str) and asset_id.isdigit()):
+                asset = Asset.query.get(int(asset_id))
+            # 如果资产ID是符号格式，通过符号查询
+            elif isinstance(asset_id, str) and asset_id.startswith('RH-'):
+                asset = Asset.query.filter_by(token_symbol=asset_id).first()
+        except Exception as e:
+            current_app.logger.error(f"查询资产失败: {str(e)}", exc_info=True)
+            
+        # 如果找不到资产，返回错误
+        if not asset:
+            return jsonify({
+                'success': False,
+                'error': f'找不到资产: {asset_id}'
+            }), 404
+            
+        # 将数量转换为整数
+        try:
+            amount = int(float(amount))
+            if amount <= 0:
+                return jsonify({
+                    'success': False,
+                    'error': '购买数量必须大于0'
+                }), 400
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': '无效的购买数量'
+            }), 400
+            
+        # 检查资产是否有足够的剩余供应量
+        if asset.remaining_supply is not None and amount > asset.remaining_supply:
+            return jsonify({
+                'success': False,
+                'error': f'购买数量超过可用供应量: {asset.remaining_supply}'
+            }), 400
+            
+        # 计算总价格
+        price = float(asset.token_price)
+        total = price * amount
+        
+        # 生成交易ID
+        import uuid
+        trade_id = str(uuid.uuid4())
+        
+        # 准备响应数据
+        response = {
+            'success': True,
+            'trade_id': trade_id,
+            'asset_id': asset.id,
+            'token_symbol': asset.token_symbol,
+            'amount': amount,
+            'price': price,
+            'total': total,
+            'wallet_address': wallet_address
+        }
+        
+        # 在会话中存储待确认的交易数据，有效期10分钟
+        from datetime import datetime, timedelta
+        session_key = f'purchase_tx_{trade_id}'
+        
+        session[session_key] = {
+            'trade_id': trade_id,
+            'asset_id': asset.id,
+            'amount': amount,
+            'price': price,
+            'total': total,
+            'wallet_address': wallet_address,
+            'expires_at': (datetime.utcnow() + timedelta(minutes=10)).timestamp()
+        }
+        
+        current_app.logger.info(f"准备购买成功: 资产 {asset.token_symbol}, 交易ID {trade_id}")
+        return jsonify(response), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"准备购买失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"准备购买失败: {str(e)}"
+        }), 500
+
+@api_bp.route('/trades/confirm_purchase', methods=['POST'])
+def confirm_purchase():
+    """确认购买交易"""
+    try:
+        # 获取请求数据
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '无效的请求数据'
+            }), 400
+            
+        # 验证必要字段
+        trade_id = data.get('trade_id')
+        
+        if not trade_id:
+            return jsonify({
+                'success': False,
+                'error': '缺少交易ID'
+            }), 400
+            
+        # 从会话中获取交易数据
+        session_key = f'purchase_tx_{trade_id}'
+        tx_data = session.get(session_key)
+        
+        if not tx_data:
+            return jsonify({
+                'success': False,
+                'error': '找不到交易数据或交易已过期'
+            }), 404
+            
+        # 检查交易是否已过期
+        from datetime import datetime
+        if datetime.utcnow().timestamp() > tx_data.get('expires_at', 0):
+            # 删除过期交易数据
+            session.pop(session_key, None)
+            return jsonify({
+                'success': False,
+                'error': '交易已过期'
+            }), 400
+            
+        # 创建新交易记录
+        from app.models.trade import Trade, TradeType, TradeStatus
+        from app.models.asset import Asset
+        import json
+        
+        # 获取交易相关数据
+        asset_id = tx_data['asset_id']
+        amount = tx_data['amount']
+        price = tx_data['price']
+        total = tx_data['total']
+        wallet_address = tx_data['wallet_address']
+        
+        # 查询资产
+        asset = Asset.query.get(asset_id)
+        if not asset:
+            return jsonify({
+                'success': False,
+                'error': f'找不到资产: {asset_id}'
+            }), 404
+            
+        # 检查资产是否有足够的剩余供应量
+        if asset.remaining_supply is not None and amount > asset.remaining_supply:
+            return jsonify({
+                'success': False,
+                'error': f'购买数量超过可用供应量: {asset.remaining_supply}'
+            }), 400
+            
+        # 创建交易记录
+        new_trade = Trade(
+            asset_id=asset_id,
+            type=TradeType.BUY.value,
+            amount=amount,
+            price=price,
+            total=total,
+            trader_address=wallet_address,
+            status=TradeStatus.COMPLETED.value,  # 直接设为已完成
+            payment_details=json.dumps({
+                'method': 'api',
+                'trade_id': trade_id,
+                'timestamp': datetime.utcnow().isoformat()
+            })
+        )
+        
+        # 更新资产剩余供应量
+        if asset.remaining_supply is not None:
+            asset.remaining_supply = max(0, asset.remaining_supply - amount)
+            
+        # 保存到数据库
+        db.session.add(new_trade)
+        db.session.commit()
+        
+        # 清除会话中的交易数据
+        session.pop(session_key, None)
+        
+        # 准备响应数据
+        response = {
+            'success': True,
+            'trade_id': trade_id,
+            'status': 'completed',
+            'message': '购买成功！资产将在几分钟内添加到您的钱包',
+            'transaction': {
+                'id': new_trade.id,
+                'asset_id': asset_id,
+                'token_symbol': asset.token_symbol,
+                'amount': amount,
+                'price': price,
+                'total': total,
+                'status': new_trade.status,
+                'created_at': new_trade.created_at.isoformat()
+            }
+        }
+        
+        current_app.logger.info(f"确认购买成功: 交易ID {trade_id}, 资产 {asset.token_symbol}")
+        return jsonify(response), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"确认购买失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"确认购买失败: {str(e)}"
+        }), 500
