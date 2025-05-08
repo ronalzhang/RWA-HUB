@@ -281,7 +281,7 @@
                 id: extractAssetIdFromUrl(urls[0]) || "",
                 token_symbol: "",
                 name: "",
-                token_price: 0,
+                token_price: null,
                 token_supply: 0,
                 remaining_supply: 0
             }), {
