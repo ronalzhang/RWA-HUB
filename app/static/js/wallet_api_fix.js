@@ -1,17 +1,15 @@
 /**
  * RWA-HUB 钱包API修复脚本
  * 解决API 404错误和资产ID不一致问题
- * 版本: 1.3.2 - 完全禁用生产环境中的模拟数据
+ * 版本: 1.4.0 - 生产环境纯净版，完全移除所有模拟数据
  */
 
 (function() {
-    console.log('钱包API修复脚本已加载 - v1.3.2');
+    console.log('钱包API修复脚本已加载 - v1.4.0 (生产模式)');
     
-    // 调试设置
+    // 生产环境配置
     const CONFIG = {
-        debug: true,
-        enableApiMocks: false, // 关闭模拟数据
-        defaultAssetId: 'RH-205020',
+        debug: false, // 关闭调试日志
         retryCount: 3,
         retryDelay: 500,
         // 缓存设置
@@ -20,22 +18,7 @@
         // 限流设置
         enableRateLimit: true,
         apiTimeWindow: 30000, // 30秒时间窗口
-        maxRequestsPerWindow: 5, // 每个端点在时间窗口内最多请求5次
-        // 默认数据 - 仅在开发模式下使用
-        defaultData: {
-            assets: {
-                "RH-205020": {
-                    id: 'RH-205020',
-                    token_symbol: 'RH-205020',
-                    name: 'Real Estate Token',
-                    token_price: 0,
-                    token_supply: 0,
-                    remaining_supply: 0
-                }
-            },
-            balance: 0,
-            admin: false
-        }
+        maxRequestsPerWindow: 5 // 每个端点在时间窗口内最多请求5次
     };
     
     // 请求缓存
@@ -60,7 +43,7 @@
     
     // 标准化资产ID
     function normalizeAssetId(assetId) {
-        if (!assetId) return CONFIG.defaultAssetId;
+        if (!assetId) return '';
         
         // 如果是纯数字，添加RH-前缀
         if (/^\d+$/.test(assetId)) {
@@ -120,7 +103,6 @@
         
         // 检查是否超出请求限制
         if (limiter.count >= CONFIG.maxRequestsPerWindow) {
-            log(`API端点 ${endpoint} 已达到请求限制，将被限流`);
             return true;
         }
         
@@ -145,7 +127,6 @@
             return null;
         }
         
-        log(`使用缓存响应: ${url}`);
         return cached.response.clone();
     }
     
@@ -157,135 +138,9 @@
             response: response.clone(),
             timestamp: Date.now()
         });
-        
-        log(`响应已缓存: ${url}`);
     }
     
-    // 生成默认资产数据响应 - 仅在模拟数据启用时使用
-    function createDefaultAssetResponse(assetId) {
-        // 返回一个空对象作为资产数据，避免展示误导性的模拟数据
-        const defaultAsset = CONFIG.defaultData.assets[assetId] || {
-            id: assetId,
-            token_symbol: assetId,
-            name: `获取数据失败`,
-            token_price: 0,
-            token_supply: 0,
-            remaining_supply: 0
-        };
-        
-        return new Response(JSON.stringify(defaultAsset), {
-            status: 200,
-            headers: {'Content-Type': 'application/json'}
-        });
-    }
-    
-    // 生成默认余额响应
-    function createDefaultBalanceResponse() {
-        return new Response(JSON.stringify({
-            balance: CONFIG.defaultData.balance
-        }), {
-            status: 200,
-            headers: {'Content-Type': 'application/json'}
-        });
-    }
-    
-    // 生成默认管理员状态响应
-    function createDefaultAdminResponse() {
-        return new Response(JSON.stringify({
-            is_admin: CONFIG.defaultData.admin
-        }), {
-            status: 200,
-            headers: {'Content-Type': 'application/json'}
-        });
-    }
-    
-    // 生成默认分红数据响应
-    function createDefaultDividendResponse() {
-        return new Response(JSON.stringify({
-            success: true,
-            total_dividends: 0,
-            last_dividend: null,
-            next_dividend: null,
-            message: "暂无分红数据"
-        }), {
-            status: 200,
-            headers: {'Content-Type': 'application/json'}
-        });
-    }
-    
-    // 处理API响应
-    function handleApiResponse(url, response) {
-        // 只缓存成功的响应
-        if (response.ok) {
-            addToCache(url, response);
-        }
-        
-        return response;
-    }
-    
-    // 处理API错误
-    function handleApiError(url, error) {
-        log(`API请求失败: ${url}`, error);
-        
-        // 如果模拟数据被禁用（生产环境），则返回真实错误
-        if (!CONFIG.enableApiMocks) {
-            log('模拟数据已禁用，返回真实API错误');
-            // 创建包含真实错误信息的响应
-            return new Response(JSON.stringify({
-                success: false,
-                error: error.message || "API请求失败",
-                errorType: "API_ERROR",
-                apiUrl: url
-            }), {
-                status: 404,  // 返回正确的错误状态码
-                headers: {'Content-Type': 'application/json'}
-            });
-        }
-        
-        // 以下代码仅在开发环境中模拟数据时使用
-        log('使用模拟数据响应API错误');
-        
-        // 根据URL类型返回不同的默认响应
-        if (url.includes('/api/assets/') || url.includes('/api/asset_details/')) {
-            const assetId = extractAssetIdFromUrl(url) || CONFIG.defaultAssetId;
-            return createDefaultAssetResponse(assetId);
-        }
-        
-        if (url.includes('/api/wallet/balance') || url.includes('/api/balance')) {
-            return createDefaultBalanceResponse();
-        }
-        
-        if (url.includes('/api/is_admin') || url.includes('/api/check_admin')) {
-            return createDefaultAdminResponse();
-        }
-        
-        if (url.includes('/dividend') || url.includes('/dividend_stats')) {
-            return createDefaultDividendResponse();
-        }
-        
-        // 对于购买相关API，返回成功模拟
-        if (url.includes('/prepare_purchase') || url.includes('/confirm_purchase')) {
-            return new Response(JSON.stringify({
-                success: true,
-                trade_id: `MOCK-${Date.now()}`,
-                message: "API不可用，使用模拟交易"
-            }), {
-                status: 200,
-                headers: {'Content-Type': 'application/json'}
-            });
-        }
-        
-        // 默认返回通用错误响应
-        return new Response(JSON.stringify({
-            success: false,
-            error: "API服务暂时不可用"
-        }), {
-            status: 404, // 返回正确的404状态码
-            headers: {'Content-Type': 'application/json'}
-        });
-    }
-    
-    // 改进的fetch函数 - 支持多端点尝试和错误处理
+    // 改进的fetch函数 - 支持重试但不返回模拟数据
     async function fetchWithRetry(url, options = {}, retries = CONFIG.retryCount) {
         // 检查缓存
         const cachedResponse = getFromCache(url);
@@ -293,24 +148,7 @@
         
         // 检查限流
         if (shouldRateLimit(url)) {
-            log(`API请求被限流: ${url}`);
-            
-            // 如果模拟数据被禁用（生产环境），抛出真实错误
-            if (!CONFIG.enableApiMocks) {
-                throw new Error(`API请求限流: ${url}`);
-            }
-            
-            // 以下代码仅在开发环境中模拟数据时使用
-            if (url.includes('/api/assets/') || url.includes('/api/asset_details/')) {
-                const assetId = extractAssetIdFromUrl(url) || CONFIG.defaultAssetId;
-                return createDefaultAssetResponse(assetId);
-            } else if (url.includes('/api/wallet/balance') || url.includes('/api/balance')) {
-                return createDefaultBalanceResponse();
-            } else if (url.includes('/api/is_admin') || url.includes('/api/check_admin')) {
-                return createDefaultAdminResponse();
-            } else if (url.includes('/dividend') || url.includes('/dividend_stats')) {
-                return createDefaultDividendResponse();
-            }
+            throw new Error(`API请求限流: ${url}`);
         }
         
         let lastError;
@@ -319,7 +157,6 @@
         for (let i = 0; i < retries; i++) {
             try {
                 if (i > 0) {
-                    log(`重试API请求 (${i}/${retries}): ${url}`);
                     // 增加延迟，避免过多请求
                     await new Promise(resolve => setTimeout(resolve, CONFIG.retryDelay));
                 }
@@ -333,26 +170,18 @@
                 }
                 
                 lastError = new Error(`${response.status} ${response.statusText}`);
-                log(`API请求失败 (${i+1}/${retries}): ${url} - ${response.status}`);
                 
-                // 在生产环境中，如果是404错误，不使用模拟数据
-                if (response.status === 404 && !CONFIG.enableApiMocks) {
+                // 对于404错误，直接返回错误
+                if (response.status === 404) {
                     throw new Error(`404 Not Found: ${url}`);
-                }
-                
-                // 在开发环境中，如果是404错误，直接返回默认响应，避免无意义的重试
-                if (response.status === 404 && CONFIG.enableApiMocks) {
-                    log(`检测到404错误，直接返回默认数据: ${url}`);
-                    break;
                 }
             } catch (error) {
                 lastError = error;
-                log(`API请求异常 (${i+1}/${retries}): ${url}`, error);
             }
         }
         
-        // 如果所有尝试都失败，返回默认数据或抛出错误
-        return handleApiError(url, lastError);
+        // 如果所有尝试都失败，抛出错误
+        throw lastError || new Error('API请求失败');
     }
     
     // 标准化API URL
@@ -391,7 +220,6 @@
             for (const url of urls) {
                 const cachedResponse = getFromCache(url);
                 if (cachedResponse) {
-                    log(`使用缓存响应: ${url}`);
                     return cachedResponse;
                 }
             }
@@ -404,56 +232,25 @@
             try {
                 // 检查是否应该限流
                 if (shouldRateLimit(urls[i])) {
-                    log(`API请求被限流: ${urls[i]}`);
                     continue;
                 }
                 
-                log(`尝试API端点 ${i+1}/${urls.length}: ${urls[i]}`);
                 const response = await fetchWithRetry(urls[i], options);
                 
                 // 成功获取响应
                 return response;
             } catch (error) {
                 lastError = error;
-                log(`端点失败 ${i+1}/${urls.length}: ${urls[i]}`, error);
             }
         }
         
-        // 如果模拟数据被禁用（生产环境），抛出真实错误
-        if (!CONFIG.enableApiMocks) {
-            throw lastError || new Error('所有API端点请求失败');
-        }
-        
-        // 以下代码仅在开发环境中模拟数据时使用
-        // 提取资产ID (如果适用)
-        let assetId = null;
-        for (const url of urls) {
-            const extractedId = extractAssetIdFromUrl(url);
-            if (extractedId) {
-                assetId = extractedId;
-                break;
-            }
-        }
-        
-        // 所有URL都失败，返回合适的默认响应
-        if (urls[0].includes('/api/assets/') || urls[0].includes('/api/asset_details/')) {
-            return createDefaultAssetResponse(assetId || CONFIG.defaultAssetId);
-        } else if (urls[0].includes('/api/wallet/balance') || urls[0].includes('/api/balance')) {
-            return createDefaultBalanceResponse();
-        } else if (urls[0].includes('/api/is_admin') || urls[0].includes('/api/check_admin')) {
-            return createDefaultAdminResponse();
-        } else if (urls[0].includes('/dividend') || urls[0].includes('/dividend_stats')) {
-            return createDefaultDividendResponse();
-        }
-        
-        // 如果无法确定类型，抛出错误
+        // 所有URL都失败，抛出错误
         throw lastError || new Error('所有API端点请求失败');
     }
     
     // 钱包API - 多端点尝试获取钱包余额
     async function getWalletBalance(address) {
         if (!address) {
-            log('获取余额需要钱包地址');
             return { balance: 0 };
         }
         
@@ -472,7 +269,6 @@
             // 返回API结果
             return data;
         } catch (error) {
-            log('获取钱包余额失败', error);
             // 返回默认余额
             return { balance: 0 };
         }
@@ -481,7 +277,6 @@
     // 检查用户是否是管理员
     async function checkIsAdmin(address) {
         if (!address) {
-            log('检查管理员权限需要钱包地址');
             return { is_admin: false };
         }
         
@@ -500,174 +295,34 @@
             // 返回API结果
             return data;
         } catch (error) {
-            log('检查管理员权限失败', error);
             // 在API失败时默认为非管理员，这是安全做法
             return { is_admin: false };
         }
     }
     
-    // 重写fetch以支持重试和标准化URL
-    window.fetch = async function(input, init) {
-        let url = input;
-        
-        // 提取URL（如果input是Request对象）
-        if (input instanceof Request) {
-            url = input.url;
-            if (!init) init = {};
-        }
-        
-        // 检查是否是API调用
-        if (typeof url === 'string' && url.includes('/api/')) {
-            try {
-                // 标准化URL
-                const normalizedUrl = normalizeApiUrl(url);
-                
-                // 检查缓存
-                const cachedResponse = getFromCache(normalizedUrl);
-                if (cachedResponse) return cachedResponse;
-                
-                // 检查是否应该限流
-                if (shouldRateLimit(normalizedUrl)) {
-                    log(`API请求被限流: ${normalizedUrl}`);
-                    return handleApiError(normalizedUrl, new Error('请求被限流'));
-                }
-                
-                // 执行请求
-                const response = await originalFetch(normalizedUrl, init);
-                
-                // 如果请求成功，添加到缓存
-                if (response.ok) {
-                    addToCache(normalizedUrl, response);
-                    return response;
-                }
-                
-                // 处理404错误
-                if (response.status === 404) {
-                    log(`检测到404错误，返回默认数据: ${normalizedUrl}`);
-                    return handleApiError(normalizedUrl, new Error('404 Not Found'));
-                }
-                
-                return response;
-            } catch (error) {
-                // 处理错误
-                log(`API请求失败: ${url}`, error);
-                return handleApiError(url, error);
-            }
-        }
-        
-        // 对于非API请求，使用原始fetch
-        return originalFetch(input, init);
-    };
-    
-    // 改进资产详情API函数
-    function enhanceAssetDetailApi() {
-        // 查找原始函数
-        const originalRefreshAssetInfo = window.refreshAssetInfo;
-        
-        if (typeof originalRefreshAssetInfo === 'function') {
-            window.refreshAssetInfo = async function() {
-                log('执行增强的资产详情刷新');
-                
-                try {
-                    // 获取资产ID
-                    let assetId = null;
-                    
-                    // 尝试多个可能的来源获取资产ID
-                    // 1. 从全局ASSET_CONFIG
-                    if (window.ASSET_CONFIG && window.ASSET_CONFIG.assetId) {
-                        assetId = window.ASSET_CONFIG.assetId;
-                        log('从ASSET_CONFIG获取资产ID:', assetId);
-                    } 
-                    // 2. 从URL参数
-                    else if (window.location.pathname.includes('/assets/')) {
-                        const pathMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
-                        if (pathMatch && pathMatch[1]) {
-                            assetId = pathMatch[1];
-                            log('从URL路径获取资产ID:', assetId);
-                        }
-                    }
-                    // 3. 从DOM元素
-                    else {
-                        const assetElement = document.querySelector('[data-asset-id]');
-                        if (assetElement) {
-                            assetId = assetElement.getAttribute('data-asset-id');
-                            log('从DOM元素获取资产ID:', assetId);
-                        }
-                    }
-                    
-                    // 如果找不到资产ID，调用原始函数
-                    if (!assetId) {
-                        log('找不到资产ID，使用原始刷新函数');
-                        return originalRefreshAssetInfo();
-                    }
-                    
-                    // 标准化资产ID
-                    const normalizedId = normalizeAssetId(assetId);
-                    
-                    // 多个可能的API端点
-                    const urls = [
-                        `/api/assets/symbol/${normalizedId}?_=${Date.now()}`,
-                        `/api/assets/${normalizedId}?_=${Date.now()}`,
-                        `/api/asset_details/${normalizedId}?_=${Date.now()}`,
-                        `/api/assets/detail/${normalizedId}?_=${Date.now()}`
-                    ];
-                    
-                    // 尝试请求可能的API端点
-                    const response = await fetchWithMultipleUrls(urls);
-                    const asset = await response.json();
-                    
-                    // 检查API响应
-                    if (!asset || !asset.token_symbol) {
-                        throw new Error('API返回的资产数据无效');
-                    }
-                    
-                    // 更新UI元素
-                    const updatedElements = updateAssetDetailsUI(asset);
-                    log('资产详情API调用成功，已更新UI元素', updatedElements);
-                    
-                    // 保存最后获取的数据
-                    window.lastAssetData = asset;
-                    
-                    return asset;
-                } catch (error) {
-                    log('增强资产详情API调用失败', error);
-                    
-                    // 如果有上次数据，使用它
-                    if (window.lastAssetData) {
-                        log('使用上次缓存的资产数据');
-                        updateAssetDetailsUI(window.lastAssetData);
-                        return window.lastAssetData;
-                    }
-                    
-                    // 使用默认数据
-                    const defaultAsset = CONFIG.defaultData.assets[CONFIG.defaultAssetId];
-                    log('使用默认资产数据', defaultAsset);
-                    updateAssetDetailsUI(defaultAsset);
-                    return defaultAsset;
-                }
-            };
-            
-            log('资产详情API函数已增强');
-        }
-    }
-    
     // 更新资产详情UI元素
     function updateAssetDetailsUI(asset) {
+        if (!asset) return [];
+        
         const updatedElements = [];
         
         try {
             // 更新资产名称
             const nameElements = document.querySelectorAll('.asset-name, #asset-name, [data-field="asset-name"]');
             nameElements.forEach(el => {
-                el.textContent = asset.name || asset.token_symbol;
-                updatedElements.push('asset-name');
+                if (asset.name) {
+                    el.textContent = asset.name;
+                    updatedElements.push('asset-name');
+                }
             });
             
             // 更新资产符号
             const symbolElements = document.querySelectorAll('.asset-symbol, #asset-symbol, [data-field="asset-symbol"]');
             symbolElements.forEach(el => {
-                el.textContent = asset.token_symbol;
-                updatedElements.push('asset-symbol');
+                if (asset.token_symbol) {
+                    el.textContent = asset.token_symbol;
+                    updatedElements.push('asset-symbol');
+                }
             });
             
             // 更新资产价格
@@ -701,14 +356,19 @@
             const buyButtons = document.querySelectorAll('#buy-button, .buy-button, [data-action="buy"]');
             buyButtons.forEach(btn => {
                 // 只设置数据属性，不修改按钮文本
-                btn.setAttribute('data-asset-id', asset.id || asset.token_symbol);
+                if (asset.id) {
+                    btn.setAttribute('data-asset-id', asset.id);
+                } else if (asset.token_symbol) {
+                    btn.setAttribute('data-asset-id', asset.token_symbol);
+                }
+                
                 if (asset.token_price) {
                     btn.setAttribute('data-token-price', asset.token_price);
                 }
                 
                 // 确保按钮文本不是金额
                 const btnText = btn.textContent.trim();
-                if (btnText.match(/^\d+(\.\d+)?$/) || btnText === asset.token_price) {
+                if (btnText.match(/^\d+(\.\d+)?$/) || (asset.token_price && btnText === asset.token_price.toString())) {
                     // 如果按钮文本是数字或等于资产价格，将其恢复为"Buy"
                     const currentLang = document.documentElement.lang || 'en';
                     btn.textContent = currentLang.startsWith('zh') ? '购买' : 'Buy';
@@ -729,7 +389,7 @@
                 });
             }
         } catch (error) {
-            log('更新资产详情UI时出错', error);
+            // 生产环境中不记录错误
         }
         
         return updatedElements;
@@ -771,12 +431,9 @@
                     // 返回原始结果
                     return originalResult;
                 } catch (error) {
-                    log('增强钱包连接检查出错', error);
                     return false; // 安全默认值
                 }
             };
-            
-            log('钱包连接检查函数已增强');
         }
     }
     
@@ -790,7 +447,6 @@
                 const cachedBalance = sessionStorage.getItem(cacheKey);
                 
                 if (cachedBalance && Date.now() - parseInt(sessionStorage.getItem(`${cacheKey}-time`) || 0) < 60000) {
-                    log('使用缓存的钱包余额');
                     return { balance: parseFloat(cachedBalance) };
                 }
                 
@@ -803,7 +459,6 @@
                 
                 return result;
             } catch (error) {
-                log('获取钱包余额失败', error);
                 return { balance: 0 };
             }
         };
@@ -816,7 +471,6 @@
                 const cachedAdmin = sessionStorage.getItem(cacheKey);
                 
                 if (cachedAdmin && Date.now() - parseInt(sessionStorage.getItem(`${cacheKey}-time`) || 0) < 300000) {
-                    log('使用缓存的管理员状态');
                     return { is_admin: cachedAdmin === 'true' };
                 }
                 
@@ -829,12 +483,9 @@
                 
                 return result;
             } catch (error) {
-                log('检查管理员权限失败', error);
                 return { is_admin: false };
             }
         };
-        
-        log('全局钱包API函数已增强');
     }
     
     // 清理过期缓存
@@ -847,7 +498,6 @@
         for (const [url, entry] of apiCache.entries()) {
             if (now - entry.timestamp > CONFIG.cacheExpiry) {
                 apiCache.delete(url);
-                log(`已清理过期缓存: ${url}`);
             }
         }
         
@@ -859,33 +509,150 @@
         }
     }
     
-    // 定期清理缓存
-    setInterval(cleanupExpiredCache, 60000); // 每分钟清理一次
-    
-    // 初始化
-    function init() {
-        log('初始化钱包API修复模块');
+    // 确保购买按钮显示正确的文本
+    function ensureCorrectBuyButtonText() {
+        // 搜索所有购买按钮
+        const buyButtons = document.querySelectorAll('#buy-button, .detail-buy-button, [data-asset-action="buy"]');
         
-        // 清除现有缓存 - 防止缓存了模拟数据
+        buyButtons.forEach(button => {
+            // 防止按钮显示为价格
+            if (/^\s*\d+(\.\d+)?\s*$/.test(button.textContent) || button.textContent === '0.23') {
+                button.textContent = 'Buy';
+                
+                // 添加购物车图标
+                button.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>${button.textContent}`;
+            }
+            
+            // 监听购买按钮的文本变化
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'characterData' || mutation.type === 'childList') {
+                        const newText = button.textContent.trim();
+                        if (/^\s*\d+(\.\d+)?\s*$/.test(newText) || newText === '0.23') {
+                            button.textContent = 'Buy';
+                            
+                            // 添加购物车图标
+                            button.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>Buy`;
+                        }
+                    }
+                });
+            });
+            
+            // 开始观察按钮
+            observer.observe(button, {
+                characterData: true,
+                childList: true,
+                subtree: true
+            });
+        });
+    }
+    
+    // 增强资产详情API函数
+    function enhanceAssetDetailApi() {
+        // 查找原始函数
+        const originalRefreshAssetInfo = window.refreshAssetInfo;
+        
+        if (typeof originalRefreshAssetInfo === 'function') {
+            window.refreshAssetInfo = async function() {
+                try {
+                    // 获取资产ID
+                    let assetId = null;
+                    
+                    // 尝试多个可能的来源获取资产ID
+                    // 1. 从全局ASSET_CONFIG
+                    if (window.ASSET_CONFIG && window.ASSET_CONFIG.assetId) {
+                        assetId = window.ASSET_CONFIG.assetId;
+                    } 
+                    // 2. 从URL参数
+                    else if (window.location.pathname.includes('/assets/')) {
+                        const pathMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
+                        if (pathMatch && pathMatch[1]) {
+                            assetId = pathMatch[1];
+                        }
+                    }
+                    // 3. 从DOM元素
+                    else {
+                        const assetElement = document.querySelector('[data-asset-id]');
+                        if (assetElement) {
+                            assetId = assetElement.getAttribute('data-asset-id');
+                        }
+                    }
+                    
+                    // 如果找不到资产ID，调用原始函数
+                    if (!assetId) {
+                        return originalRefreshAssetInfo();
+                    }
+                    
+                    // 标准化资产ID
+                    const normalizedId = normalizeAssetId(assetId);
+                    
+                    // 修正：使用正确的API路径
+                    // 优先使用assets直接路径，而不是symbol子路径
+                    const urls = [
+                        `/api/assets/${normalizedId}?_=${Date.now()}`,
+                        `/api/asset_details/${normalizedId}?_=${Date.now()}`,
+                        `/api/assets/detail/${normalizedId}?_=${Date.now()}`,
+                        `/api/assets/symbol/${normalizedId}?_=${Date.now()}`
+                    ];
+                    
+                    // 尝试请求可能的API端点
+                    const response = await fetchWithMultipleUrls(urls);
+                    const asset = await response.json();
+                    
+                    // 检查API响应
+                    if (!asset || (!asset.token_symbol && !asset.name)) {
+                        throw new Error('API返回的资产数据无效');
+                    }
+                    
+                    // 更新UI元素
+                    updateAssetDetailsUI(asset);
+                    
+                    // 保存最后获取的数据
+                    window.lastAssetData = asset;
+                    
+                    return asset;
+                } catch (error) {
+                    // 如果有上次数据，使用它
+                    if (window.lastAssetData) {
+                        updateAssetDetailsUI(window.lastAssetData);
+                        return window.lastAssetData;
+                    }
+                    
+                    // 如果所有尝试都失败，调用原始函数
+                    return originalRefreshAssetInfo();
+                }
+            };
+        }
+    }
+    
+    // 初始化函数
+    function init() {
+        // 清除现有缓存
         apiCache.clear();
         
         // 覆盖全局fetch函数
         window.fetch = function(url, options = {}) {
-            // 处理特殊情况: 禁止第三方外部请求重定向
-            if (url.includes('external.api')) {
+            // 处理特殊情况: 外部请求
+            if (url.includes('external.api') || url.startsWith('http')) {
                 return originalFetch(url, options);
             }
             
             // 判断是否为API请求
             if (url.includes('/api/')) {
-                // 标准化API URL
-                const normalizedUrl = normalizeApiUrl(url);
-                if (normalizedUrl !== url) {
-                    log(`API URL已标准化: ${url} → ${normalizedUrl}`);
+                try {
+                    // 标准化API URL
+                    const normalizedUrl = normalizeApiUrl(url);
+                    
+                    // 检查缓存
+                    const cachedResponse = getFromCache(normalizedUrl);
+                    if (cachedResponse) return cachedResponse;
+                    
+                    // 使用增强的fetch函数
+                    return fetchWithRetry(normalizedUrl, options);
+                } catch (error) {
+                    // 生产环境中直接抛出错误
+                    throw error;
                 }
-                
-                // 使用增强的fetch函数
-                return fetchWithRetry(normalizedUrl, options);
             }
             
             // 非API请求使用原始fetch
@@ -908,42 +675,6 @@
         document.addEventListener('DOMContentLoaded', function() {
             // 确保购买按钮上显示正确的文本
             ensureCorrectBuyButtonText();
-        });
-        
-        log('钱包API修复模块初始化完成');
-    }
-    
-    // 确保购买按钮显示正确的文本
-    function ensureCorrectBuyButtonText() {
-        // 搜索所有购买按钮
-        const buyButtons = document.querySelectorAll('#buy-button, .detail-buy-button, [data-asset-action="buy"]');
-        
-        buyButtons.forEach(button => {
-            // 防止按钮显示为价格
-            if (/^\s*\d+(\.\d+)?\s*$/.test(button.textContent) || button.textContent === '0.23') {
-                log('修复购买按钮文本', button.id || button.className);
-                button.textContent = 'Buy';
-            }
-            
-            // 监听购买按钮的文本变化
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.type === 'characterData' || mutation.type === 'childList') {
-                        const newText = button.textContent.trim();
-                        if (/^\s*\d+(\.\d+)?\s*$/.test(newText) || newText === '0.23') {
-                            log('购买按钮文本被错误设置为数字，修复为Buy');
-                            button.textContent = 'Buy';
-                        }
-                    }
-                });
-            });
-            
-            // 开始观察按钮
-            observer.observe(button, {
-                characterData: true,
-                childList: true,
-                subtree: true
-            });
         });
     }
     
