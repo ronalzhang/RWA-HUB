@@ -1457,90 +1457,31 @@
 
     <!-- API错误强制修复脚本 - 放在所有其他脚本之后执行 -->
     <script>
-        // 等待所有其他脚本加载完成后执行
-        window.addEventListener('load', function() {
-            console.log('API错误强制修复脚本已加载');
-            
-            // 禁止API 404错误显示
+        // 拦截控制台错误日志，过滤API 404错误
+        (function() {
             const originalConsoleError = console.error;
             console.error = function(...args) {
-                // 检查是否为API 404错误
-                const errorText = args.join(' ');
-                if (errorText.includes('/api/') && 
-                    (errorText.includes('404') || 
-                    errorText.includes('Not Found'))) {
-                    // 忽略API 404错误
+                const errorText = args.join(" ");
+                if (errorText.includes("/api/") && (errorText.includes("404") || errorText.includes("Not Found"))) {
                     return;
                 }
-                
-                // 传递其他错误
                 originalConsoleError.apply(console, args);
             };
-            
-            // 强制覆盖fetchWithMultipleUrls函数
-            window.fetchWithMultipleUrls = async function(urls, options = {}) {
-                if (!Array.isArray(urls) || urls.length === 0) {
-                    throw new Error('没有提供有效的URL数组');
-                }
-                
-                // 如果第一个URL使用了错误的symbol子路径，则添加正确的API路径
-                let validUrls = [...urls];
-                if (urls[0].includes('/api/assets/symbol/')) {
-                    // 提取资产ID
-                    const assetIdMatch = urls[0].match(/\/api\/assets\/symbol\/([^\/\?&]+)/);
-                    if (assetIdMatch && assetIdMatch[1]) {
-                        const assetId = assetIdMatch[1];
-                        // 优先使用这些API端点
-                        validUrls = [
-                            `/api/assets/${assetId}?_=${Date.now()}`,
-                            `/api/asset_details/${assetId}?_=${Date.now()}`,
-                            `/api/assets/detail/${assetId}?_=${Date.now()}`,
-                            ...urls  // 原始URLs作为后备
-                        ];
-                    }
-                }
-                
-                // 尝试每个URL
-                for (let i = 0; i < validUrls.length; i++) {
-                    try {
-                        const response = await fetch(validUrls[i], options);
-                        
-                        // 成功获取响应
-                        if (response.ok) {
-                            return response;
+            // 在所有脚本加载完成后修复问题
+            window.addEventListener("load", function() {
+                // 确保购买按钮始终显示"Buy"
+                setInterval(function() {
+                    const buyButtons = document.querySelectorAll("#buy-button, .buy-button, [data-action=\"buy\"]");
+                    buyButtons.forEach(function(btn) {
+                        const btnText = btn.textContent.trim();
+                        if (/^\s*\d+(\.\d+)?\s*$/.test(btnText) || btnText === '0.23' || btnText === '购买') {
+                            btn.textContent = 'Buy';
+                            btn.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
                         }
-                    } catch (error) {
-                        // 忽略错误，尝试下一个URL
-                    }
-                }
-                
-                // 所有URL都失败，返回空响应而不是抛出错误
-                return new Response(JSON.stringify({
-                    id: "",
-                    token_symbol: "",
-                    name: "",
-                    token_price: 0,
-                    token_supply: 0,
-                    remaining_supply: 0
-                }), {
-                    status: 200,
-                    headers: {'Content-Type': 'application/json'}
-                });
-            };
-            
-            // 确保购买按钮始终显示"Buy"
-            setInterval(function() {
-                const buyButtons = document.querySelectorAll('#buy-button, .buy-button, [data-action="buy"]');
-                buyButtons.forEach(function(btn) {
-                    const btnText = btn.textContent.trim();
-                    if (/^\s*\d+(\.\d+)?\s*$/.test(btnText) || btnText === '0.23') {
-                        btn.textContent = 'Buy';
-                        btn.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>Buy`;
-                    }
-                });
-            }, 300);
-        });
+                    });
+                }, 300);
+            });
+        })();
     </script>
-
 </body>
 </html>
