@@ -281,7 +281,7 @@
                 id: extractAssetIdFromUrl(urls[0]) || "",
                 token_symbol: "",
                 name: "",
-                token_price: null,
+                token_price: null,  // 确保为null而不是0
                 token_supply: 0,
                 remaining_supply: 0
             }), {
@@ -628,15 +628,27 @@
     // 确保购买按钮显示正确的文本
     function ensureCorrectBuyButtonText() {
         // 搜索所有购买按钮
-        const buyButtons = document.querySelectorAll('#buy-button, .detail-buy-button, [data-asset-action="buy"]');
+        const buyButtons = document.querySelectorAll('#buy-button, .detail-buy-button, [data-asset-action="buy"], .buy-button, [data-action="buy"]');
         
         buyButtons.forEach(button => {
             // 防止按钮显示为价格
-            if (/^\s*\d+(\.\d+)?\s*$/.test(button.textContent) || button.textContent === '0.23') {
-                button.textContent = 'Buy';
+            if (/^\s*\d+(\.\d+)?\s*$/.test(button.textContent) || 
+                button.textContent === '0.23' || 
+                button.textContent === '0' || 
+                button.textContent === '0.00') {
+                
+                // 使用当前语言显示"Buy"
+                const currentLang = document.documentElement.lang || 'en';
+                const buyText = currentLang.startsWith('zh') ? '购买' : 'Buy';
+                button.textContent = buyText;
                 
                 // 添加购物车图标
-                button.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>${button.textContent}`;
+                button.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>${buyText}`;
+                
+                // 记录日志，仅开发环境
+                if (!CONFIG.suppressErrors) {
+                    console.log('修正购买按钮文本: ', button);
+                }
             }
             
             // 监听购买按钮的文本变化
@@ -644,11 +656,18 @@
                 mutations.forEach((mutation) => {
                     if (mutation.type === 'characterData' || mutation.type === 'childList') {
                         const newText = button.textContent.trim();
-                        if (/^\s*\d+(\.\d+)?\s*$/.test(newText) || newText === '0.23') {
-                            button.textContent = 'Buy';
+                        if (/^\s*\d+(\.\d+)?\s*$/.test(newText) || 
+                            newText === '0.23' || 
+                            newText === '0' || 
+                            newText === '0.00') {
+                            
+                            // 使用当前语言显示"Buy"
+                            const currentLang = document.documentElement.lang || 'en';
+                            const buyText = currentLang.startsWith('zh') ? '购买' : 'Buy';
+                            button.textContent = buyText;
                             
                             // 添加购物车图标
-                            button.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>Buy`;
+                            button.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>${buyText}`;
                         }
                     }
                 });
@@ -693,7 +712,8 @@
                         // 创建空响应而不是抛出错误
                         return new Response(JSON.stringify({
                             success: false,
-                            error: error.message
+                            error: error.message,
+                            token_price: null  // 确保为null而不是0
                         }), {
                             status: 200,
                             headers: {'Content-Type': 'application/json'}
@@ -723,8 +743,13 @@
             ensureCorrectBuyButtonText();
         });
         
-        // 确保立即执行一次
+        // 立即执行一次
         setTimeout(ensureCorrectBuyButtonText, 500);
+        
+        // 多次检查购买按钮文本，确保它不被覆盖
+        setTimeout(ensureCorrectBuyButtonText, 1000);
+        setTimeout(ensureCorrectBuyButtonText, 2000);
+        setTimeout(ensureCorrectBuyButtonText, 5000);
     }
     
     // 执行初始化
