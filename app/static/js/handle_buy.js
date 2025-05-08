@@ -527,15 +527,11 @@
         } catch (error) {
             log('准备购买请求失败', error);
             
-            // 模拟成功响应以允许流程继续
+            // 返回失败响应，不再模拟成功
             return {
-                success: true,
-                trade_id: `MOCK-${Date.now()}`,
-                amount: parseFloat(amount),
-                price: 0.23,
-                total: parseFloat(amount) * 0.23,
-                status: "prepared",
-                note: "API不可用，使用本地模拟数据"
+                success: false,
+                error: `${getText('prepareFailed')}: ${error.message || '无法连接到服务器'}`,
+                isApiError: true
             };
         }
     }
@@ -622,13 +618,11 @@
         } catch (error) {
             log('确认购买请求失败', error);
             
-            // 模拟成功响应以保证用户体验
-            state.confirmedPurchases.add(tradeId);
-            
+            // 返回失败响应，不再模拟成功
             return {
-                success: true,
-                status: 'completed',
-                message: getText('purchaseCompleted')
+                success: false,
+                error: `${getText('purchaseError')}: ${error.message || '无法连接到服务器'}`,
+                isApiError: true
             };
         }
     }
@@ -711,11 +705,23 @@
             log('准备购买请求:', { assetId, amount });
             const prepareResult = await preparePurchase(assetId, amount);
             
+            // 处理准备购买响应
             if (!prepareResult.success) {
-                log('准备购买失败:', prepareResult);
-                createAlert(prepareResult.error || getText('prepareFailed'), 'error');
+                // 显示错误消息
+                if (prepareResult.error) {
+                    createAlert(prepareResult.error, 'error');
+                } else {
+                    createAlert(getText('prepareFailed'), 'error');
+                }
+                
+                // 如果是API错误，清楚地告诉用户
+                if (prepareResult.isApiError) {
+                    createAlert('服务器API不可用，购买功能暂时无法使用。请联系管理员。', 'error');
+                }
+                
                 updateButtonState(button, false);
                 state.purchaseInProgress = false;
+                
                 return;
             }
             
@@ -755,9 +761,24 @@
                     log('确认购买:', prepareResult);
                     const confirmResult = await confirmPurchase(prepareResult);
                     
+                    // 处理确认购买响应
                     if (!confirmResult.success) {
-                        log('确认购买失败:', confirmResult);
-                        createAlert(confirmResult.error || getText('purchaseError'), 'error');
+                        // 显示错误消息
+                        const errorMessage = confirmResult.error || getText('purchaseError');
+                        createAlert(errorMessage, 'error');
+                        
+                        // 关闭模态框
+                        hideModal();
+                        
+                        // 更新状态
+                        updateButtonState(button, false);
+                        state.purchaseInProgress = false;
+                        
+                        // 如果是API错误，清楚地告诉用户
+                        if (confirmResult.isApiError) {
+                            createAlert('服务器API不可用，购买无法完成。请联系管理员。', 'error');
+                        }
+                        
                         return;
                     }
                     
