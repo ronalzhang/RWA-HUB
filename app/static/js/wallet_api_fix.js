@@ -1,11 +1,11 @@
 /**
  * RWA-HUB 钱包API修复脚本
  * 解决API 404错误和资产ID不一致问题
- * 版本: 1.3.1 - 增加API请求缓存和限流功能
+ * 版本: 1.3.2 - 完全禁用生产环境中的模拟数据
  */
 
 (function() {
-    console.log('钱包API修复脚本已加载 - v1.3.1');
+    console.log('钱包API修复脚本已加载 - v1.3.2');
     
     // 调试设置
     const CONFIG = {
@@ -21,16 +21,16 @@
         enableRateLimit: true,
         apiTimeWindow: 30000, // 30秒时间窗口
         maxRequestsPerWindow: 5, // 每个端点在时间窗口内最多请求5次
-        // 默认数据
+        // 默认数据 - 仅在开发模式下使用
         defaultData: {
             assets: {
                 "RH-205020": {
                     id: 'RH-205020',
                     token_symbol: 'RH-205020',
                     name: 'Real Estate Token',
-                    token_price: 0.23,
-                    token_supply: 100000000,
-                    remaining_supply: 100000000
+                    token_price: 0,
+                    token_supply: 0,
+                    remaining_supply: 0
                 }
             },
             balance: 0,
@@ -161,15 +161,16 @@
         log(`响应已缓存: ${url}`);
     }
     
-    // 生成默认资产数据响应
+    // 生成默认资产数据响应 - 仅在模拟数据启用时使用
     function createDefaultAssetResponse(assetId) {
+        // 返回一个空对象作为资产数据，避免展示误导性的模拟数据
         const defaultAsset = CONFIG.defaultData.assets[assetId] || {
             id: assetId,
             token_symbol: assetId,
-            name: `Token ${assetId}`,
-            token_price: 0.23,
-            token_supply: 100000000,
-            remaining_supply: 100000000
+            name: `获取数据失败`,
+            token_price: 0,
+            token_supply: 0,
+            remaining_supply: 0
         };
         
         return new Response(JSON.stringify(defaultAsset), {
@@ -226,6 +227,24 @@
     function handleApiError(url, error) {
         log(`API请求失败: ${url}`, error);
         
+        // 如果模拟数据被禁用（生产环境），则返回真实错误
+        if (!CONFIG.enableApiMocks) {
+            log('模拟数据已禁用，返回真实API错误');
+            // 创建包含真实错误信息的响应
+            return new Response(JSON.stringify({
+                success: false,
+                error: error.message || "API请求失败",
+                errorType: "API_ERROR",
+                apiUrl: url
+            }), {
+                status: 404,  // 返回正确的错误状态码
+                headers: {'Content-Type': 'application/json'}
+            });
+        }
+        
+        // 以下代码仅在开发环境中模拟数据时使用
+        log('使用模拟数据响应API错误');
+        
         // 根据URL类型返回不同的默认响应
         if (url.includes('/api/assets/') || url.includes('/api/asset_details/')) {
             const assetId = extractAssetIdFromUrl(url) || CONFIG.defaultAssetId;
@@ -261,7 +280,7 @@
             success: false,
             error: "API服务暂时不可用"
         }), {
-            status: 200,
+            status: 404, // 返回正确的404状态码
             headers: {'Content-Type': 'application/json'}
         });
     }
@@ -276,7 +295,12 @@
         if (shouldRateLimit(url)) {
             log(`API请求被限流: ${url}`);
             
-            // 根据URL类型返回不同的默认响应
+            // 如果模拟数据被禁用（生产环境），抛出真实错误
+            if (!CONFIG.enableApiMocks) {
+                throw new Error(`API请求限流: ${url}`);
+            }
+            
+            // 以下代码仅在开发环境中模拟数据时使用
             if (url.includes('/api/assets/') || url.includes('/api/asset_details/')) {
                 const assetId = extractAssetIdFromUrl(url) || CONFIG.defaultAssetId;
                 return createDefaultAssetResponse(assetId);
@@ -308,11 +332,16 @@
                     return response;
                 }
                 
-                lastError = new Error(`API请求失败: ${response.status} ${response.statusText}`);
+                lastError = new Error(`${response.status} ${response.statusText}`);
                 log(`API请求失败 (${i+1}/${retries}): ${url} - ${response.status}`);
                 
-                // 如果是404错误，直接返回默认响应，避免无意义的重试
-                if (response.status === 404) {
+                // 在生产环境中，如果是404错误，不使用模拟数据
+                if (response.status === 404 && !CONFIG.enableApiMocks) {
+                    throw new Error(`404 Not Found: ${url}`);
+                }
+                
+                // 在开发环境中，如果是404错误，直接返回默认响应，避免无意义的重试
+                if (response.status === 404 && CONFIG.enableApiMocks) {
                     log(`检测到404错误，直接返回默认数据: ${url}`);
                     break;
                 }
@@ -322,7 +351,7 @@
             }
         }
         
-        // 如果所有尝试都失败，返回默认数据
+        // 如果所有尝试都失败，返回默认数据或抛出错误
         return handleApiError(url, lastError);
     }
     
@@ -390,6 +419,12 @@
             }
         }
         
+        // 如果模拟数据被禁用（生产环境），抛出真实错误
+        if (!CONFIG.enableApiMocks) {
+            throw lastError || new Error('所有API端点请求失败');
+        }
+        
+        // 以下代码仅在开发环境中模拟数据时使用
         // 提取资产ID (如果适用)
         let assetId = null;
         for (const url of urls) {
@@ -829,17 +864,89 @@
     
     // 初始化
     function init() {
+        log('初始化钱包API修复模块');
+        
+        // 清除现有缓存 - 防止缓存了模拟数据
+        apiCache.clear();
+        
+        // 覆盖全局fetch函数
+        window.fetch = function(url, options = {}) {
+            // 处理特殊情况: 禁止第三方外部请求重定向
+            if (url.includes('external.api')) {
+                return originalFetch(url, options);
+            }
+            
+            // 判断是否为API请求
+            if (url.includes('/api/')) {
+                // 标准化API URL
+                const normalizedUrl = normalizeApiUrl(url);
+                if (normalizedUrl !== url) {
+                    log(`API URL已标准化: ${url} → ${normalizedUrl}`);
+                }
+                
+                // 使用增强的fetch函数
+                return fetchWithRetry(normalizedUrl, options);
+            }
+            
+            // 非API请求使用原始fetch
+            return originalFetch(url, options);
+        };
+        
+        // 增强资产详情API
         enhanceAssetDetailApi();
+        
+        // 增强钱包连接检查
         enhanceWalletConnectCheck();
+        
+        // 增强全局钱包API
         enhanceGlobalWalletApi();
-        cleanupExpiredCache();
-        log('钱包API修复脚本初始化完成');
+        
+        // 定期清理过期缓存
+        setInterval(cleanupExpiredCache, 300000); // 每5分钟清理一次
+        
+        // 连接到购买按钮
+        document.addEventListener('DOMContentLoaded', function() {
+            // 确保购买按钮上显示正确的文本
+            ensureCorrectBuyButtonText();
+        });
+        
+        log('钱包API修复模块初始化完成');
     }
     
-    // 在DOM加载完成后初始化
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
+    // 确保购买按钮显示正确的文本
+    function ensureCorrectBuyButtonText() {
+        // 搜索所有购买按钮
+        const buyButtons = document.querySelectorAll('#buy-button, .detail-buy-button, [data-asset-action="buy"]');
+        
+        buyButtons.forEach(button => {
+            // 防止按钮显示为价格
+            if (/^\s*\d+(\.\d+)?\s*$/.test(button.textContent) || button.textContent === '0.23') {
+                log('修复购买按钮文本', button.id || button.className);
+                button.textContent = 'Buy';
+            }
+            
+            // 监听购买按钮的文本变化
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'characterData' || mutation.type === 'childList') {
+                        const newText = button.textContent.trim();
+                        if (/^\s*\d+(\.\d+)?\s*$/.test(newText) || newText === '0.23') {
+                            log('购买按钮文本被错误设置为数字，修复为Buy');
+                            button.textContent = 'Buy';
+                        }
+                    }
+                });
+            });
+            
+            // 开始观察按钮
+            observer.observe(button, {
+                characterData: true,
+                childList: true,
+                subtree: true
+            });
+        });
     }
+    
+    // 执行初始化
+    init();
 })(); 
