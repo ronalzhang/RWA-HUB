@@ -837,7 +837,7 @@ def confirm_purchase():
             'error': f"确认购买失败: {str(e)}"
         }), 500
 
-@api_bp.route('/api/dividend/stats/<string:asset_id>')
+@api_bp.route('/dividend/stats/<string:asset_id>')
 def get_dividend_stats_api(asset_id):
     """获取资产的分红统计信息（兼容前端API）"""
     try:
@@ -905,12 +905,12 @@ def get_dividend_stats_api(asset_id):
             'asset_id': asset_id
         }), 200
 
-@api_bp.route('/api/assets/<string:asset_id>/dividend')
+@api_bp.route('/assets/<string:asset_id>/dividend')
 def get_asset_dividend_api(asset_id):
     """资产分红数据API的别名路由（兼容前端其他API路径）"""
     return get_dividend_stats_api(asset_id)
 
-@api_bp.route('/api/dividend/total/<string:asset_id>')
+@api_bp.route('/dividend/total/<string:asset_id>')
 def get_dividend_total_api(asset_id):
     """资产分红总额API的别名路由（兼容前端其他API路径）"""
     return get_dividend_stats_api(asset_id)
