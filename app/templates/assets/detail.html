@@ -42,94 +42,104 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="{{ url_for('proxy.cached_vendor', filename='solana-spl-token.js') }}"></script>
 <!-- 初始化Solana库 -->
 <script>
-    // 创建全局对象
-    window.splToken = {};
-    window.solanaWeb3 = {};
-    
-    // 初始化函数
-    async function initSolanaLibs() {
+    // 创建全局对象 - 仅在未定义时初始化，避免重复
+    if (!window.solanaLibInitialized) {
+        window.solanaLibInitialized = true;
+        window.splToken = window.splToken || {};
+        window.solanaWeb3 = window.solanaWeb3 || {};
+        
         console.log('初始化Solana库...');
         
-        try {
-            // 检查Solana Web3.js
-            if (typeof SolanaWeb3 === 'undefined') {
-                throw new Error('Solana Web3.js未加载');
-            }
-            
-            // 复制Solana Web3.js到全局对象
-            for (const key in SolanaWeb3) {
-                window.solanaWeb3[key] = SolanaWeb3[key];
-            }
-            console.log('Solana Web3.js初始化成功');
-            
-            // 检查SPL Token
-            if (typeof SolanaToken === 'undefined') {
-                throw new Error('SPL Token库未加载');
-            }
-            
-            // 复制SPL Token到全局对象
-            for (const key in SolanaToken) {
-                window.splToken[key] = SolanaToken[key];
-            }
-            console.log('SPL Token库初始化成功');
-            
-            // 确保solanaWeb3.SPL存在
-            window.solanaWeb3.SPL = window.splToken;
-            
-            return true;
-        } catch (error) {
-            console.error('Solana库初始化失败:', error);
-            
-            // 如果初始化失败，创建基本对象
-            if (window.solanaWeb3 && window.solanaWeb3.PublicKey) {
-                window.splToken = {
-                    TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
-                    ASSOCIATED_TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
-                    createTransferInstruction: function(fromPubkey, toPubkey, ownerPubkey, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
-                        const keys = [
-                            { pubkey: fromPubkey, isSigner: false, isWritable: true },
-                            { pubkey: toPubkey, isSigner: false, isWritable: true },
-                            { pubkey: ownerPubkey, isSigner: multiSigners.length === 0, isWritable: false }
-                        ];
-                        multiSigners.forEach(signer => {
-                            keys.push({ pubkey: signer.publicKey, isSigner: true, isWritable: false });
-                        });
-                        return new window.solanaWeb3.TransactionInstruction({
-                            keys,
-                            programId,
-                            data: new Uint8Array([3, ...new Array(8).fill(0)]) // 3是transfer指令的代码
-                        });
-                    }
-                };
-                console.log('使用基本SPL Token对象');
+        // 标记用于调试
+        window.spl_token_initialized = false;
+        
+        // 初始化函数
+        window.initSolanaLibs = async function() {
+            try {
+                // 避免重复初始化
+                if (window.solanaWeb3.Connection && window.splToken.TOKEN_PROGRAM_ID) {
+                    console.log('Solana库已初始化，跳过重复初始化');
+                    return true;
+                }
+                
+                // 检查Solana Web3.js
+                if (typeof SolanaWeb3 === 'undefined') {
+                    throw new Error('Solana Web3.js未加载');
+                }
+                
+                // 复制Solana Web3.js到全局对象
+                for (const key in SolanaWeb3) {
+                    window.solanaWeb3[key] = SolanaWeb3[key];
+                }
+                console.log('Solana Web3.js初始化成功');
+                
+                // 检查SPL Token
+                if (typeof SolanaToken === 'undefined') {
+                    throw new Error('SPL Token库未加载');
+                }
+                
+                // 复制SPL Token到全局对象
+                for (const key in SolanaToken) {
+                    window.splToken[key] = SolanaToken[key];
+                }
+                console.log('SPL Token库初始化成功');
+                
+                // 确保solanaWeb3.SPL存在
+                window.solanaWeb3.SPL = window.splToken;
+                window.spl_token_initialized = true;
+                
                 return true;
+            } catch (error) {
+                console.error('Solana库初始化失败:', error);
+                
+                // 如果初始化失败，创建基本对象
+                if (window.solanaWeb3 && window.solanaWeb3.PublicKey) {
+                    window.splToken = {
+                        TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+                        ASSOCIATED_TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
+                        createTransferInstruction: function(fromPubkey, toPubkey, ownerPubkey, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
+                            const keys = [
+                                { pubkey: fromPubkey, isSigner: false, isWritable: true },
+                                { pubkey: toPubkey, isSigner: false, isWritable: true },
+                                { pubkey: ownerPubkey, isSigner: multiSigners.length === 0, isWritable: false }
+                            ];
+                            multiSigners.forEach(signer => {
+                                keys.push({ pubkey: signer.publicKey, isSigner: true, isWritable: false });
+                            });
+                            return new window.solanaWeb3.TransactionInstruction({
+                                keys,
+                                programId,
+                                data: new Uint8Array([3, ...new Array(8).fill(0)]) // 3是transfer指令的代码
+                            });
+                        }
+                    };
+                    window.solanaWeb3.SPL = window.splToken;
+                    window.spl_token_initialized = true;
+                    console.log('使用基本SPL Token对象');
+                    return true;
+                }
+                
+                throw error;
             }
-            
-            throw error;
-        }
+        };
+    } else {
+        console.log('Solana库初始化函数已存在，跳过重新定义');
     }
     
-    // 在页面加载时初始化
+    // 在页面加载时初始化 - 添加防重复初始化逻辑
+    let solanaInitialized = false;
     document.addEventListener('DOMContentLoaded', async function() {
-        console.log('DOMContentLoaded 事件触发');
+        if (solanaInitialized) return;
+        solanaInitialized = true;
+        
+        console.log('DOMContentLoaded 事件触发，初始化Solana库');
         try {
             // 尝试初始化Solana库
-            await initSolanaLibs();
+            await window.initSolanaLibs();
             console.log('Solana库初始化完成');
-            
-            // 在这里可以安全地执行依赖Solana库的代码
-            // 例如，更新UI元素，绑定事件监听器等
-            // 确保这些操作也在try块内部，或者在initSolanaLibs成功后执行
-            
         } catch (error) {
             console.error('Solana库初始化过程中发生错误:', error);
-            // 在这里可以向用户显示错误信息，或者禁用依赖Solana库的功能
-            // 例如: document.getElementById('buyButton').disabled = true;
-            //         document.getElementById('solanaErrorMsg').textContent = 'Solana功能加载失败，请稍后重试。';
         }
-        
-        // 其他不依赖Solana库的DOM操作可以放在这里
-        console.log('DOMContentLoaded 事件处理完成');
     });
 </script>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -529,8 +539,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const functionStartTime = Date.now();
                 console.log(`[${functionStartTime}] checkDividendManagementAccess: 开始执行`);
                     
-                    // 获取所有分红按钮
-                    const dividendBtns = [
+                // 获取所有分红按钮
+                const dividendBtns = [
                     document.getElementById('dividendManagementBtn'),
                     document.getElementById('dividendManagementBtnMobile'),
                     document.getElementById('dividendManagementBtnMedium')
@@ -539,44 +549,60 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log(`[${functionStartTime}] checkDividendManagementAccess: 找到 ${dividendBtns.length} 个分红按钮`);
 
                 // **核心逻辑：默认强制隐藏**
-                    dividendBtns.forEach(btn => {
-                            btn.style.display = 'none';
+                dividendBtns.forEach(btn => {
+                    btn.style.display = 'none';
                 });
                 console.log(`[${functionStartTime}] checkDividendManagementAccess: 已强制隐藏所有按钮`);
                 
                 // 检查钱包连接状态
-                const isConnected = window.walletState && (window.walletState.isConnected || window.walletState.connected) && window.walletState.address;
-                console.log(`[${functionStartTime}] checkDividendManagementAccess: 钱包连接状态: ${isConnected}`);
+                const connectedAddress = localStorage.getItem('walletAddress') || 
+                                        (window.walletState && window.walletState.address) || 
+                                        '';
+                console.log(`[${functionStartTime}] checkDividendManagementAccess: 钱包连接状态: ${connectedAddress}`);
                 
-                if (!isConnected) {
+                if (!connectedAddress) {
                     console.log(`[${functionStartTime}] checkDividendManagementAccess: 钱包未连接，结束执行`);
                     return; 
                 }
                 
                 // 钱包已连接，检查权限
-                const connectedAddress = window.walletState.address;
-                    const isWalletAdmin = window.walletState.isAdmin === true;
-                    const isOwnerFrontend = "{{ is_owner|lower }}" === "true";
-                    const isAdminFrontend = "{{ is_admin_user|lower }}" === "true";
+                const isWalletAdmin = window.walletState && window.walletState.isAdmin === true;
+                const isOwnerFrontend = "{{ is_owner|lower }}" === "true";
+                const isAdminFrontend = "{{ is_admin_user|lower }}" === "true";
                 const currentAddress = '{{ current_user_address|default("", true) }}'; // 后端渲染时的地址
                 
-                    let hasPermission = false;
+                let hasPermission = false;
                 let permissionSource = '无';
                     
                 console.log(`[${functionStartTime}] checkDividendManagementAccess: 权限检查输入: isWalletAdmin=${isWalletAdmin}, isOwnerFrontend=${isOwnerFrontend}, isAdminFrontend=${isAdminFrontend}, currentAddress=${currentAddress}, connectedAddress=${connectedAddress}`);
                 
-                    if (isWalletAdmin) {
+                if (isWalletAdmin) {
                     permissionSource = '钱包状态';
-                        hasPermission = true;
+                    hasPermission = true;
                 } else if (currentAddress.toLowerCase() === connectedAddress.toLowerCase() && (isOwnerFrontend || isAdminFrontend)) {
                     permissionSource = '后端渲染';
-                        hasPermission = true;
+                    hasPermission = true;
                 } else {
                     // 尝试API检查 (即使地址匹配也检查，作为备用或强制实时验证)
                     permissionSource = 'API检查中';
-                    console.log(`[${functionStartTime}] checkDividendManagementAccess: 调用API检查权限: ${connectedAddress}`);
+                    
+                    // 安全地获取资产ID
+                    let assetId = '';
+                    if (window.ASSET_CONFIG && window.ASSET_CONFIG.id) {
+                        assetId = window.ASSET_CONFIG.id;
+                    } else {
+                        // 备用方式获取资产ID
+                        const pathMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
+                        if (pathMatch && pathMatch[1]) {
+                            assetId = pathMatch[1];
+                        } else {
+                            assetId = '{{ asset.id }}' || '{{ asset.token_symbol }}';
+                        }
+                    }
+                    
+                    console.log(`[${functionStartTime}] checkDividendManagementAccess: 调用API检查权限: ${connectedAddress}，资产ID: ${assetId}`);
                     try {
-                        const response = await fetch(`/api/assets/${ASSET_CONFIG.id}/check_owner`, {
+                        const response = await fetch(`/api/assets/${assetId}/check_owner`, {
                             headers: { 'X-Eth-Address': connectedAddress },
                             cache: 'no-cache' // 避免缓存
                         });
@@ -602,20 +628,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 // **核心逻辑：仅在有权限时显示**
                 if (hasPermission) {
                     console.log(`[${functionStartTime}] checkDividendManagementAccess: 权限通过，准备显示按钮`);
-                    const dividendUrl = `/assets/${ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${connectedAddress}`;
-                        dividendBtns.forEach(btn => {
-                                btn.href = dividendUrl;
+                    
+                    // 安全获取资产符号用于构建URL
+                    let tokenSymbol = '';
+                    if (window.ASSET_CONFIG && window.ASSET_CONFIG.tokenSymbol) {
+                        tokenSymbol = window.ASSET_CONFIG.tokenSymbol;
+                    } else {
+                        tokenSymbol = '{{ asset.token_symbol }}';
+                    }
+                    
+                    const dividendUrl = `/assets/${tokenSymbol}/dividend?eth_address=${connectedAddress}`;
+                    dividendBtns.forEach(btn => {
+                        btn.href = dividendUrl;
                         btn.classList.remove('disabled'); 
                         btn.style.pointerEvents = 'auto';
                         btn.removeAttribute('title');
-                                if (btn.id === 'dividendManagementBtn') {
-                                    btn.style.display = 'inline-flex';
+                        if (btn.id === 'dividendManagementBtn') {
+                            btn.style.display = 'inline-flex';
                         } else {
-                                    btn.style.display = 'block';
-                                }
+                            btn.style.display = 'block';
+                        }
                         console.log(`[${functionStartTime}] checkDividendManagementAccess: 已显示按钮 ${btn.id}`);
-                        });
-                    } else {
+                    });
+                } else {
                     console.log(`[${functionStartTime}] checkDividendManagementAccess: 权限未通过，保持按钮隐藏`);
                     // 再次确认隐藏（理论上不需要，因为开头已隐藏）
                     dividendBtns.forEach(btn => { btn.style.display = 'none'; });
@@ -3138,15 +3173,33 @@ document.addEventListener('DOMContentLoaded', function() {
 <script>
     // 确保SPL Token库正确加载
     window.initSplTokenLib = async function() {
-        console.log('执行SPL Token库初始化');
+        console.log('执行SPL Token库初始化检查');
         
-        // 检查全局对象
-        if (window.splToken) {
-            console.log('SPL Token库已加载');
+        // 如果全局初始化已完成，直接使用
+        if (window.solanaLibInitialized && window.spl_token_initialized) {
+            console.log('检测到全局Solana库已初始化，使用现有实例');
             return true;
+        }
+        
+        // 如果全局初始化函数存在，优先使用
+        if (typeof window.initSolanaLibs === 'function') {
+            console.log('使用全局Solana初始化函数');
+            try {
+                await window.initSolanaLibs();
+                return true;
+            } catch (error) {
+                console.error('通过全局初始化函数加载SPL Token失败:', error);
+                // 继续尝试备用方法
+            }
         }
 
         try {
+            // 如果全局对象已存在，直接使用
+            if (window.splToken && window.splToken.TOKEN_PROGRAM_ID) {
+                console.log('SPL Token库已存在，无需重新加载');
+                return true;
+            }
+
             // 如果全局对象不存在，尝试从window.SolanaToken获取
             if (window.SolanaToken) {
                 window.splToken = window.SolanaToken;
@@ -3154,43 +3207,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 return true;
             }
 
-            // 如果还是不存在，尝试从备用CDN加载
-            const backupUrls = [
-                'https://unpkg.com/@solana/spl-token@0.3.8/dist/index.iife.js',
-                'https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.8/dist/index.iife.js',
-                'https://cdn.skypack.dev/@solana/spl-token@0.3.8'
-            ];
-
-            for (const url of backupUrls) {
-                try {
-                    await new Promise((resolve, reject) => {
-                        const script = document.createElement('script');
-                        script.src = url;
-                        script.onload = () => {
-                            if (window.SolanaToken) {
-                                window.splToken = window.SolanaToken;
-                                resolve();
-                            } else {
-                                reject(new Error('SolanaToken未定义'));
-                            }
-                        };
-                        script.onerror = () => reject(new Error(`加载失败: ${url}`));
-                        document.head.appendChild(script);
-                    });
-                    console.log(`成功从 ${url} 加载SPL Token库`);
-                    return true;
-                } catch (error) {
-                    console.warn(`从 ${url} 加载失败:`, error);
-                    continue;
-                }
-            }
-
-            // 如果所有CDN都失败，创建基本对象
-            if (window.solanaWeb3 && window.solanaWeb3.PublicKey) {
-                window.splToken = {
-                    TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
-                    ASSOCIATED_TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
-                    createTransferInstruction: function(fromPubkey, toPubkey, ownerPubkey, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
+            console.log('使用备用方法初始化SPL Token库');
+            
+            // 确保基础对象存在
+            window.splToken = window.splToken || {};
+            window.solanaWeb3 = window.solanaWeb3 || {};
+            
+            // 如果已有PublicKey对象，创建简化的SPL Token接口
+            if (window.solanaWeb3.PublicKey) {
+                window.splToken.TOKEN_PROGRAM_ID = window.splToken.TOKEN_PROGRAM_ID || 
+                    new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+                window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID = window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID || 
+                    new window.solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+                
+                // 确保存在基本接口
+                window.splToken.createTransferInstruction = window.splToken.createTransferInstruction || 
+                    function(fromPubkey, toPubkey, ownerPubkey, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
                         const keys = [
                             { pubkey: fromPubkey, isSigner: false, isWritable: true },
                             { pubkey: toPubkey, isSigner: false, isWritable: true },
@@ -3204,28 +3236,35 @@ document.addEventListener('DOMContentLoaded', function() {
                             programId,
                             data: new Uint8Array([3, ...new Array(8).fill(0)]) // 3是transfer指令的代码
                         });
-                    }
-                };
-                console.log('使用基本SPL Token对象');
+                    };
+                
+                // 确保SPL对象存在
+                window.solanaWeb3.SPL = window.splToken;
+                console.log('使用简化的SPL Token接口');
                 return true;
             }
 
-            throw new Error('无法初始化SPL Token库');
+            console.warn('无法初始化SPL Token库，缺少基础依赖');
+            return false;
         } catch (error) {
             console.error('SPL Token库初始化失败:', error);
-            throw error;
+            return false;
         }
     };
 
-    // 在页面加载时初始化
-    document.addEventListener('DOMContentLoaded', async function() {
-        try {
-            await window.initSplTokenLib();
-            console.log('SPL Token库初始化成功');
-        } catch (error) {
-            console.error('SPL Token库初始化失败:', error);
-        }
-    });
+    // 仅在DOM加载后执行一次初始化检查
+    if (!window.splTokenInitChecked) {
+        window.splTokenInitChecked = true;
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                if (await window.initSplTokenLib()) {
+                    console.log('SPL Token库初始化成功 (页面底部检查)');
+                }
+            } catch (error) {
+                console.error('SPL Token库初始化检查失败:', error);
+            }
+        });
+    }
 </script>
 
 <script type="module">

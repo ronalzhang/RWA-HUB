@@ -69,7 +69,8 @@
                 '/api/trades/confirm_purchase',
                 '/api/v1/trades/confirm_purchase'
             ]
-        }
+        },
+        initialized: false
     };
     
     // 获取当前语言
@@ -475,10 +476,12 @@
             // 使用全局函数更新按钮
             if (typeof window.updateBuyButtonState === 'function') {
                 window.updateBuyButtonState(button, defaultText, true);
+            } else if (typeof window.updateBuyButtonStateGlobal === 'function') {
+                window.updateBuyButtonStateGlobal(button, defaultText, true);
             } else {
                 // 后备方案
                 const spinner = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>`;
-                button.innerHTML = spinner + defaultText;
+                button.innerHTML = `${spinner}${defaultText}`;
             }
         } else {
             // 恢复按钮状态
@@ -486,7 +489,9 @@
             
             // 使用全局函数恢复按钮文本
             if (typeof window.updateBuyButtonState === 'function') {
-                window.updateBuyButtonState(button, originalText, true);
+                window.updateBuyButtonState(button, originalText);
+            } else if (typeof window.updateBuyButtonStateGlobal === 'function') {
+                window.updateBuyButtonStateGlobal(button, originalText);
             } else {
                 // 后备方案
                 button.textContent = originalText;
@@ -948,6 +953,11 @@
     
     // 初始化
     function init() {
+        if (state.initialized) {
+            log('模块已初始化，跳过');
+            return;
+        }
+        
         log('初始化购买处理模块');
         
         // 设置购买按钮
