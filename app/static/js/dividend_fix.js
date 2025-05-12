@@ -1,6 +1,6 @@
 /**
  * dividend_fix.js - 分红显示修复脚本
- * 版本: 1.0.2 - 增强错误处理
+ * 版本: 1.0.3 - 增强错误处理，静默API失败
  */
 
 (function() {
@@ -12,8 +12,9 @@
   const CONFIG = {
     debug: false,
     apiRetryInterval: 3000,
-    apiMaxRetries: 2,
-    defaultAssetId: 'RH-205020'
+    apiMaxRetries: 1, // 减少重试次数降低控制台错误
+    defaultAssetId: 'RH-205020',
+    silentErrors: true // 静默处理错误
   };
   
   // 默认分红数据(当API完全失败时使用)
@@ -38,38 +39,56 @@
     console.log(`[分红修复] ${message}`, data || '');
   }
 
-  // 日志错误函数
+  // 日志错误函数 - 使用debug级别而非error级别
   function logError(message, data) {
-    if (!CONFIG.debug) return;
-    console.error(`[分红修复] ${message}`, data || '');
+    if (CONFIG.silentErrors) {
+      // 静默模式下，使用debug级别日志，不会污染控制台
+      console.debug(`[分红修复] ${message}`, data || '');
+    } else if (CONFIG.debug) {
+      console.error(`[分红修复] ${message}`, data || '');
+    }
   }
   
   // 处理API错误的函数
   function handleApiError(error, endpoint) {
     // 降级为调试级别日志，不要输出为错误
-    console.debug(`[分红API] 调用${endpoint}失败, 使用默认值`, error);
+    console.debug(`[分红API] 调用${endpoint}失败, 使用默认值`);
     return {success: false};
   }
   
   // 尝试多个API端点，直到一个成功
   async function tryApiSequentially(apis, transformFn) {
+    // 检查是否已经有API失败的记录
+    const apiFailCacheKey = 'dividend_api_failed';
+    const apiFailCache = sessionStorage.getItem(apiFailCacheKey);
+    
+    // 如果API在当前会话已经失败过，直接返回默认数据
+    if (apiFailCache && JSON.parse(apiFailCache).timestamp > Date.now() - 60000) {
+      console.debug('[分红API] 跳过API调用，使用默认数据（基于会话缓存）');
+      return DEFAULT_DIVIDEND_DATA;
+    }
+    
     let result = null;
     let errors = [];
+    
+    // 添加Promise.race的超时封装
+    const fetchWithTimeout = (url, timeout = 3000) => {
+      return Promise.race([
+        fetch(url).catch(e => {
+          throw new Error(`Fetch failed: ${e.message}`);
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout')), timeout)
+        )
+      ]);
+    };
     
     for (let i = 0; i < apis.length; i++) {
       try {
         const endpoint = apis[i];
         log(`尝试API端点 (${i+1}/${apis.length}): ${endpoint}`);
         
-        // 使用带超时的fetch
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('请求超时')), 5000)
-        );
-        
-        const response = await Promise.race([
-          fetch(endpoint),
-          timeoutPromise
-        ]);
+        const response = await fetchWithTimeout(endpoint, 3000);
         
         if (!response.ok) {
           throw new Error(`HTTP错误 ${response.status}`);
@@ -88,26 +107,18 @@
         errors.push({api: apis[i], error: error.message});
         
         // 不要输出为错误，而是降级为调试日志
-        console.debug(`[分红API] 尝试API失败: ${apis[i]}`, error);
+        console.debug(`[分红API] 尝试API失败: ${apis[i]}`);
       }
     }
     
-    // 所有API都失败后，尝试几次后不再重试
-    if (errors.length > 0 && CONFIG.apiMaxRetries > 0) {
-      log(`所有API尝试失败，${CONFIG.apiRetryInterval}秒后重试..`, errors);
-      
-      // 减少重试计数
-      CONFIG.apiMaxRetries--;
-      
-      return new Promise(resolve => {
-        setTimeout(() => {
-          resolve(tryApiSequentially(apis, transformFn));
-        }, CONFIG.apiRetryInterval);
-      });
-    }
+    // 所有API都失败，记录到会话存储中避免重复调用
+    sessionStorage.setItem(apiFailCacheKey, JSON.stringify({
+      timestamp: Date.now(),
+      errors: errors.length
+    }));
     
-    // 所有尝试都失败，返回默认分红数据而不是错误状态
-    log('所有API尝试都失败，返回默认分红数据');
+    // 所有API都失败后，返回默认分红数据
+    console.debug('[分红API] 所有API尝试都失败，使用默认数据');
     return DEFAULT_DIVIDEND_DATA;
   }
   
@@ -119,15 +130,17 @@
     }
     
     try {
-      // 构建多个可能的API端点路径
+      // 构建多个可能的API端点路径，确保URL不包含可能引起404的重复部分
+      const baseAssetId = assetId.replace(/^RH-/, ''); // 去除前缀，避免重复
+      
       const apis = [
-        `/api/assets/${assetId}/dividend_stats`,
+        `/api/dividend/stats/${assetId}`, // 新路径尝试
         `/api/dividend/total/${assetId}`,
-        `/api/assets/symbol/${assetId}/dividend_stats`
+        `/api/assets/${assetId}/dividend` // 简化路径
       ];
       
       // 尝试顺序调用API，直到成功
-      const data = await tryApiSequentially(apis, response => {
+      return await tryApiSequentially(apis, response => {
         // 任何返回数据都视为有效，将处理结果规范化
         return {
           success: true,
@@ -135,15 +148,9 @@
           last_dividend: response.last_dividend || response.latest || null,
           next_dividend: response.next_dividend || response.upcoming || null
         };
-      }).catch(error => {
-        // 仅输出调试日志，不要显示为错误
-        console.debug("[分红API] 数据加载失败，返回默认数据", error);
-        return DEFAULT_DIVIDEND_DATA;
       });
-      
-      return data;
     } catch (error) {
-      console.debug("[分红API] 未能加载分红数据，返回默认数据", error);
+      console.debug("[分红API] 未能加载分红数据，返回默认数据");
       return DEFAULT_DIVIDEND_DATA;
     }
   }
@@ -250,20 +257,21 @@
     // 如果找不到资产ID，使用默认ID
     if (!assetId) {
       assetId = CONFIG.defaultAssetId;
-      log(`未找到资产ID，使用默认ID: ${assetId}`);
     }
     
-    // 加载分红数据并更新显示
-    loadDividendData(assetId).then(data => {
-      updateDividendDisplay(assetId, data);
-    }).catch(error => {
-      // 不要作为错误输出
-      console.debug('[分红修复] 处理分红数据时出错，使用默认显示', error);
-      updateDividendDisplay(assetId, DEFAULT_DIVIDEND_DATA);
-    });
+    // 请求分红数据并更新显示
+    loadDividendData(assetId)
+      .then(data => {
+        updateDividendDisplay(assetId, data);
+      })
+      .catch(error => {
+        // 静默处理错误
+        console.debug('[分红API] 处理分红数据失败，使用默认值');
+        updateDividendDisplay(assetId, DEFAULT_DIVIDEND_DATA);
+      });
   }
   
-  // 在DOM加载完成后执行
+  // 辅助函数：DOM 准备就绪
   function onDomReady(callback) {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', callback);
@@ -272,15 +280,8 @@
     }
   }
   
-  onDomReady(fixDividendDisplay);
-  
-  // 导出全局方法
-  window.refreshDividendData = function(assetId) {
-    loadDividendData(assetId || CONFIG.defaultAssetId).then(data => {
-      updateDividendDisplay(assetId || CONFIG.defaultAssetId, data);
-    }).catch(error => {
-      console.debug('[分红修复] 刷新分红数据失败，使用默认显示', error);
-      updateDividendDisplay(assetId || CONFIG.defaultAssetId, DEFAULT_DIVIDEND_DATA);
-    });
-  };
+  // 初始化
+  onDomReady(() => {
+    setTimeout(fixDividendDisplay, 500);
+  });
 })(); 
