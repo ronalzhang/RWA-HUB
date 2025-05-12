@@ -1,11 +1,18 @@
 /**
  * 统一购买处理脚本
  * 支持多语言界面
- * 版本：1.2.1 - 修复API调用问题和购买流程
+ * 版本：1.3.0 - 修复浏览器卡死问题，优化性能和事件处理
  */
 
 (function() {
-    console.log('加载购买处理脚本 v1.2.1');
+    // 避免重复加载和初始化
+    if (window.buyHandlerInitialized) {
+        console.debug('购买处理脚本已经初始化，跳过重复执行');
+        return;
+    }
+    window.buyHandlerInitialized = true;
+    
+    console.log('加载购买处理脚本 v1.3.0');
     
     // 文本资源
     const TEXTS = {
@@ -37,17 +44,18 @@
     
     // 配置
     const CONFIG = {
-        debug: true,
-        apiTimeoutMs: 15000,      // API请求超时时间增加到15秒
-        enableApiCache: true,     // 启用API缓存
-        cacheExpiry: 30000,       // 缓存过期时间：30秒
-        maxRetries: 3,            // 最大重试次数增加到3次
-        retryDelayMs: 1500,       // 重试延迟增加到1.5秒
+        debug: false,              // 减少调试日志输出
+        apiTimeoutMs: 10000,       // API请求超时时间降低到10秒
+        enableApiCache: true,      // 启用API缓存
+        cacheExpiry: 30000,        // 缓存过期时间：30秒
+        maxRetries: 2,             // 最大重试次数降低到2次
+        retryDelayMs: 1000,        // 重试延迟降低到1秒
         defaultAssetId: 'RH-205020',
-        lastRequestTime: 0,       // 上次请求时间
-        minRequestInterval: 3000, // 最小请求间隔减少到3秒
-        requestCount: 0,          // 请求计数器
-        maxRequestsPerMinute: 20  // 每分钟最大请求数增加到20
+        lastRequestTime: 0,        // 上次请求时间
+        minRequestInterval: 2000,  // 最小请求间隔降低到2秒
+        requestCount: 0,           // 请求计数器
+        maxRequestsPerMinute: 15,  // 每分钟最大请求数减少到15
+        safetyTimeout: 8000        // 安全超时，确保操作不会无限挂起
     };
     
     // API缓存
@@ -70,7 +78,9 @@
                 '/api/v1/trades/confirm_purchase'
             ]
         },
-        initialized: false
+        initialized: false,
+        eventHandlersAttached: false,  // 跟踪事件处理器是否已附加
+        initializationTimestamp: Date.now()  // 记录初始化时间戳
     };
     
     // 获取当前语言
@@ -92,6 +102,76 @@
             } else {
                 console.log(`[购买处理] ${message}`);
             }
+        }
+    }
+    
+    // 安全执行函数 - 防止任何操作导致页面卡死
+    function safeExecute(fn, fallbackFn, timeout = CONFIG.safetyTimeout) {
+        let hasCompleted = false;
+        let timeoutId = null;
+        
+        // 设置安全超时
+        timeoutId = setTimeout(() => {
+            if (!hasCompleted) {
+                console.debug('[购买处理] 操作超时终止', fn.name || '匿名函数');
+                hasCompleted = true;
+                
+                if (typeof fallbackFn === 'function') {
+                    try {
+                        fallbackFn();
+                    } catch (e) {
+                        console.debug('[购买处理] 降级操作执行失败', e);
+                    }
+                }
+            }
+        }, timeout);
+        
+        // 执行主函数
+        try {
+            const result = fn();
+            
+            // 处理Promise
+            if (result && typeof result.then === 'function') {
+                // 返回竞态Promise，确保不会无限等待
+                return Promise.race([
+                    result.then(value => {
+                        if (!hasCompleted) {
+                            clearTimeout(timeoutId);
+                            hasCompleted = true;
+                        }
+                        return value;
+                    }).catch(err => {
+                        if (!hasCompleted) {
+                            clearTimeout(timeoutId);
+                            hasCompleted = true;
+                        }
+                        throw err;
+                    }),
+                    new Promise((_, reject) => {
+                        // 此Promise会在超时时被处理，但我们在timeoutId中已经有逻辑了
+                    })
+                ]);
+            }
+            
+            // 同步结果
+            clearTimeout(timeoutId);
+            hasCompleted = true;
+            return result;
+        } catch (error) {
+            if (!hasCompleted) {
+                clearTimeout(timeoutId);
+                hasCompleted = true;
+                console.debug('[购买处理] 操作执行失败', error);
+                
+                if (typeof fallbackFn === 'function') {
+                    try {
+                        return fallbackFn();
+                    } catch (e) {
+                        console.debug('[购买处理] 降级操作执行失败', e);
+                    }
+                }
+            }
+            throw error;
         }
     }
     
@@ -142,7 +222,7 @@
             // 3. 检查localStorage中的钱包地址
             const storedAddress = localStorage.getItem('walletAddress');
             if (storedAddress) {
-                log('钱包状态检查：通过localStorage确认已连接，地址:' + storedAddress.substring(0,6) + '...');
+                log('钱包状态检查：通过localStorage确认已连接');
                 return true;
             }
             
@@ -154,10 +234,9 @@
             }
             
             // 默认为未连接
-            log('钱包状态检查：未连接');
             return false;
         } catch (error) {
-            log('检查钱包连接状态时出错', error);
+            console.debug('[购买处理] 检查钱包连接状态时出错', error);
             return false;
         }
     }
@@ -184,7 +263,7 @@
             
             return null;
         } catch (error) {
-            log('获取钱包地址时出错', error);
+            console.debug('[购买处理] 获取钱包地址时出错', error);
             return null;
         }
     }
@@ -202,13 +281,13 @@
         
         // 检查最小请求间隔
         if (now - CONFIG.lastRequestTime < CONFIG.minRequestInterval) {
-            log(`API请求频率过高，最后请求时间: ${new Date(CONFIG.lastRequestTime).toLocaleTimeString()}`);
+            console.debug(`[购买处理] API请求频率过高，已限制`);
             return false;
         }
         
         // 检查每分钟最大请求数
         if (CONFIG.requestCount >= CONFIG.maxRequestsPerMinute) {
-            log(`已达到每分钟最大API请求数: ${CONFIG.maxRequestsPerMinute}`);
+            console.debug(`[购买处理] 已达到每分钟最大API请求数限制`);
             return false;
         }
         
@@ -249,98 +328,120 @@
     
     // 创建提示信息
     function createAlert(message, type = 'info') {
+        const container = document.querySelector('.alert-container') || document.querySelector('.message-container');
+        
+        if (!container) {
+            // 如果没有容器，使用toast
+            showToast(message, type === 'error' ? 'danger' : type);
+            return;
+        }
+        
+        // 创建alert元素
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+        alert.setAttribute('role', 'alert');
+        
+        alert.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        
+        // 添加到容器
+        container.appendChild(alert);
+        
+        // 自动关闭
+        setTimeout(() => {
+            if (alert.parentNode) {
+                alert.classList.remove('show');
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.parentNode.removeChild(alert);
+                    }
+                }, 150);
+            }
+        }, 5000);
+    }
+    
+    // 显示Toast消息
+    function showToast(message, type = 'info') {
         try {
-            // 首先尝试使用Sweetalert2或类似库
-            if (window.Swal) {
-                window.Swal.fire({
-                    title: type === 'error' ? '错误' : '提示',
-                    text: message,
-                    icon: type,
-                    confirmButtonText: '确定'
-                });
-                return;
+            // 检查是否有Toast容器
+            let toastContainer = document.querySelector('.toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                document.body.appendChild(toastContainer);
             }
             
-            // 尝试使用Bootstrap toast
+            // 创建Toast元素
+            const toastId = `toast-${Date.now()}`;
+            const toast = document.createElement('div');
+            toast.className = `toast bg-${type} text-white`;
+            toast.id = toastId;
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+            toast.setAttribute('data-bs-delay', '5000');
+            toast.innerHTML = `
+                <div class="toast-header bg-${type} text-white">
+                    <strong class="me-auto">通知</strong>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div class="toast-body">
+                    ${message}
+                </div>
+            `;
+            
+            // 添加到容器
+            toastContainer.appendChild(toast);
+            
+            // 使用Bootstrap的Toast API显示（如果可用）
             if (window.bootstrap && window.bootstrap.Toast) {
-                // 查找或创建toast容器
-                let toastContainer = document.getElementById('toast-container');
-                if (!toastContainer) {
-                    toastContainer = document.createElement('div');
-                    toastContainer.id = 'toast-container';
-                    toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-                    document.body.appendChild(toastContainer);
-                }
-                
-                // 创建toast元素
-                const toastId = 'toast-' + Date.now();
-                const toastEl = document.createElement('div');
-                toastEl.className = `toast align-items-center text-white bg-${type === 'error' ? 'danger' : 'primary'} border-0`;
-                toastEl.id = toastId;
-                toastEl.setAttribute('role', 'alert');
-                toastEl.setAttribute('aria-live', 'assertive');
-                toastEl.setAttribute('aria-atomic', 'true');
-                
-                // 设置toast内容
-                toastEl.innerHTML = `
-                    <div class="d-flex">
-                        <div class="toast-body">
-                            ${message}
-                        </div>
-                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-                    </div>
-                `;
-                
-                // 添加到容器
-                toastContainer.appendChild(toastEl);
-                
-                // 初始化并显示toast
-                const toast = new window.bootstrap.Toast(toastEl, {
-                    autohide: true,
-                    delay: 5000
-                });
-                toast.show();
-                
-                // 设置自动移除
-                toastEl.addEventListener('hidden.bs.toast', () => {
-                    toastEl.remove();
-                });
-                
-                return;
-            }
-            
-            // 如果以上都不可用，回退到alert
-            if (type === 'error') {
-                alert('错误: ' + message);
+                const bsToast = new window.bootstrap.Toast(toast);
+                bsToast.show();
             } else {
-                alert(message);
+                // 否则手动处理
+                toast.classList.add('show');
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => {
+                        if (toast.parentNode) {
+                            toast.parentNode.removeChild(toast);
+                        }
+                    }, 300);
+                }, 5000);
             }
         } catch (error) {
-            log('显示提示信息时出错', error);
+            console.error('显示Toast消息出错:', error);
+            // 降级到alert
             alert(message);
         }
     }
     
-    // 创建较美观的模态框
+    // 创建和显示模态窗口
     function showModal(title, content, confirmCallback = null) {
         try {
-            // 查找现有模态框或创建新的
-            let modal = document.getElementById('purchase-confirmation-modal');
+            // 防止同时显示多个模态窗口
+            if (state.modalVisible) {
+                log('已有模态窗口显示中，忽略请求');
+                return;
+            }
+            
+            // 使用现有模态窗口或创建新的
+            let modal = document.getElementById('purchase-modal');
             if (!modal) {
-                // 创建模态框元素
                 modal = document.createElement('div');
                 modal.className = 'modal fade';
-                modal.id = 'purchase-confirmation-modal';
+                modal.id = 'purchase-modal';
                 modal.setAttribute('tabindex', '-1');
-                modal.setAttribute('aria-labelledby', 'modalLabel');
+                modal.setAttribute('aria-labelledby', 'purchase-modal-title');
                 modal.setAttribute('aria-hidden', 'true');
                 
-                // 设置模态框HTML结构
                 modal.innerHTML = `
-                    <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title" id="modalLabel">${title}</h5>
+                                <h5 class="modal-title" id="purchase-modal-title">${title}</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
@@ -348,732 +449,610 @@
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                                <button type="button" class="btn btn-primary" id="modal-confirm-button">确认</button>
+                                <button type="button" class="btn btn-primary" id="modal-confirm-btn">确认</button>
                             </div>
                         </div>
                     </div>
                 `;
                 
-                // 添加到文档
                 document.body.appendChild(modal);
             } else {
-                // 更新现有模态框内容
+                // 更新现有模态窗口
                 modal.querySelector('.modal-title').textContent = title;
                 modal.querySelector('.modal-body').innerHTML = content;
             }
             
-            // 初始化模态框
-            let modalInstance;
-            if (window.bootstrap && window.bootstrap.Modal) {
-                modalInstance = new window.bootstrap.Modal(modal);
-            }
-            
             // 设置确认按钮事件
-            const confirmButton = modal.querySelector('#modal-confirm-button');
-            if (confirmButton && confirmCallback) {
-                // 移除之前的事件监听器
-                const newButton = confirmButton.cloneNode(true);
-                confirmButton.parentNode.replaceChild(newButton, confirmButton);
+            const confirmBtn = modal.querySelector('#modal-confirm-btn');
+            if (confirmBtn) {
+                // 移除旧的事件监听器
+                const newConfirmBtn = confirmBtn.cloneNode(true);
+                confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
                 
                 // 添加新的事件监听器
-                newButton.addEventListener('click', async () => {
-                    // 禁用按钮并显示加载状态
-                    newButton.disabled = true;
-                    newButton.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 处理中...`;
-                    
-                    try {
-                        // 调用回调函数
-                        await confirmCallback();
-                        
-                        // 隐藏模态框
-                        if (modalInstance) {
-                            modalInstance.hide();
-                        } else {
-                            modal.style.display = 'none';
-                        }
-                    } catch (error) {
-                        log('模态框确认回调执行出错', error);
-                        
-                        // 显示错误消息
-                        const errorContainer = modal.querySelector('.modal-error');
-                        if (errorContainer) {
-                            errorContainer.textContent = error.message || '处理请求时出错';
-                            errorContainer.style.display = 'block';
-                        } else {
-                            // 如果没有错误容器，创建一个
-                            const errorDiv = document.createElement('div');
-                            errorDiv.className = 'alert alert-danger mt-3 modal-error';
-                            errorDiv.textContent = error.message || '处理请求时出错';
-                            modal.querySelector('.modal-body').appendChild(errorDiv);
-                        }
-                    } finally {
-                        // 恢复按钮状态
-                        newButton.disabled = false;
-                        newButton.textContent = '确认';
-                    }
-                });
+                if (confirmCallback) {
+                    newConfirmBtn.addEventListener('click', confirmCallback);
+                }
             }
             
-            // 显示模态框
-            if (modalInstance) {
-                modalInstance.show();
+            // 显示模态窗口
+            if (window.bootstrap && window.bootstrap.Modal) {
+                const bsModal = new window.bootstrap.Modal(modal);
+                bsModal.show();
+                
+                // 监听模态窗口关闭事件
+                modal.addEventListener('hidden.bs.modal', function () {
+                    state.modalVisible = false;
+                });
+                
+                state.modalVisible = true;
             } else {
+                // 降级显示
                 modal.style.display = 'block';
                 modal.classList.add('show');
+                document.body.classList.add('modal-open');
+                
+                // 创建背景
+                let backdrop = document.createElement('div');
+                backdrop.className = 'modal-backdrop fade show';
+                document.body.appendChild(backdrop);
+                
+                state.modalVisible = true;
+                
+                // 关闭按钮事件
+                const closeBtn = modal.querySelector('.btn-close, .btn-secondary');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', () => hideModal(modal, backdrop));
+                }
             }
-            
-            // 更新状态
-            state.modalVisible = true;
-            
         } catch (error) {
-            log('显示模态框时出错', error);
-            
-            // 回退到基本确认对话框
-            if (confirmCallback && confirm(content)) {
+            console.error('显示模态窗口失败:', error);
+            // 降级到确认对话框
+            if (confirmCallback && confirm(`${title}\n\n${content.replace(/<[^>]*>/g, '')}`)) {
                 confirmCallback();
             }
         }
     }
     
-    // 隐藏模态框
-    function hideModal() {
+    // 隐藏模态窗口
+    function hideModal(modal = null, backdrop = null) {
         try {
-            const modal = document.getElementById('purchase-confirmation-modal');
+            if (!modal) {
+                modal = document.getElementById('purchase-modal');
+            }
+            
             if (!modal) return;
             
             if (window.bootstrap && window.bootstrap.Modal) {
                 const bsModal = window.bootstrap.Modal.getInstance(modal);
-                if (bsModal) bsModal.hide();
+                if (bsModal) {
+                    bsModal.hide();
+                }
             } else {
-                // 简易隐藏
+                // 手动隐藏
                 modal.style.display = 'none';
                 modal.classList.remove('show');
+                document.body.classList.remove('modal-open');
+                
+                // 移除背景
+                if (backdrop) {
+                    backdrop.parentNode.removeChild(backdrop);
+                } else {
+                    const backdrops = document.querySelectorAll('.modal-backdrop');
+                    backdrops.forEach(el => el.parentNode.removeChild(el));
+                }
             }
             
             state.modalVisible = false;
         } catch (error) {
-            log('隐藏模态框时出错', error);
+            console.error('隐藏模态窗口失败:', error);
         }
     }
     
-    // 更新按钮状态，使用全局updateBuyButtonState函数
+    // 更新按钮状态
     function updateButtonState(button, isLoading) {
         if (!button) return;
         
-        // 默认文本
-        const defaultText = getText('processing');
-        const originalText = button.dataset.originalText || 'Buy';
+        // 检查是否存在全局的更新按钮函数
+        if (typeof window.updateBuyButtonState === 'function') {
+            const buttonText = isLoading ? getText('processing') : button.dataset.originalText || '购买';
+            window.updateBuyButtonState(button, buttonText, true);
+            return;
+        }
         
-        if (isLoading) {
-            // 保存原始文本，如果尚未保存
-            if (!button.dataset.originalText) {
+        // 备用方法：直接更新按钮
+        try {
+            // 保存原始文本
+            if (!button.dataset.originalText && !isLoading) {
                 button.dataset.originalText = button.textContent.trim();
             }
             
-            // 设置加载状态
-            button.disabled = true;
-            
-            // 使用全局函数更新按钮
-            if (typeof window.updateBuyButtonState === 'function') {
-                window.updateBuyButtonState(button, defaultText, true);
-            } else if (typeof window.updateBuyButtonStateGlobal === 'function') {
-                window.updateBuyButtonStateGlobal(button, defaultText, true);
+            // 更新按钮内容和状态
+            if (isLoading) {
+                button.disabled = true;
+                const spinnerExists = button.querySelector('.spinner-border') !== null;
+                
+                if (!spinnerExists) {
+                    button.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ${getText('processing')}`;
+                }
             } else {
-                // 后备方案
-                const spinner = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>`;
-                button.innerHTML = `${spinner}${defaultText}`;
+                button.disabled = false;
+                button.innerHTML = button.dataset.originalText || '购买';
             }
-        } else {
-            // 恢复按钮状态
-            button.disabled = false;
-            
-            // 使用全局函数恢复按钮文本
-            if (typeof window.updateBuyButtonState === 'function') {
-                window.updateBuyButtonState(button, originalText);
-            } else if (typeof window.updateBuyButtonStateGlobal === 'function') {
-                window.updateBuyButtonStateGlobal(button, originalText);
-            } else {
-                // 后备方案
-                button.textContent = originalText;
-            }
+        } catch (error) {
+            console.debug('[购买处理] 更新按钮状态失败:', error);
         }
     }
     
-    // 准备购买请求 - 修复API请求问题
+    // 准备购买请求
     async function preparePurchase(assetId, amount) {
-        // 检查API请求限制
-        if (!checkApiRateLimit()) {
-            return {
-                success: false,
-                error: '请求频率过高，请稍后再试'
-            };
-        }
-        
-        // 获取钱包地址
-        const walletAddress = getWalletAddress();
-        if (!walletAddress) {
-            return {
-                success: false,
-                error: getText('walletNotConnected')
-            };
-        }
-        
-        // 标准化资产ID
-        assetId = normalizeAssetId(assetId);
-        
-        // 准备请求数据
-        const requestData = {
-            asset_id: assetId,
-            amount: amount,
-            wallet_address: walletAddress,
-            wallet_type: localStorage.getItem('walletType') || 'unknown'
-        };
-        
-        // 缓存键
-        const cacheKey = `prepare_${assetId}_${amount}_${walletAddress}`;
-        
-        // 检查缓存
-        const cachedResult = getFromCache(cacheKey);
-        if (cachedResult) {
-            return cachedResult;
-        }
-        
-        log('准备购买请求数据:', requestData);
-        
-        // 失败重试
-        let lastError = null;
-        
-        // 尝试所有可能的API端点
-        const endpoints = state.apiEndpoints.prepare;
-        
-        for (let i = 0; i < endpoints.length; i++) {
-            try {
-                // 设置请求超时
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), CONFIG.apiTimeoutMs);
-                
-                // 发送请求
-                log(`尝试API端点 ${i+1}/${endpoints.length}: ${endpoints[i]}`);
-                const response = await fetch(endpoints[i], {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestData),
-                    signal: controller.signal
-                });
-                
-                // 清除超时
-                clearTimeout(timeoutId);
-                
-                // 检查响应状态
-                if (!response.ok) {
-                    lastError = new Error(`API返回错误状态: ${response.status}`);
-                    continue;
-                }
-                
-                // 解析响应数据
-                const result = await response.json();
-                
-                // 添加到缓存
-                addToCache(cacheKey, result);
-                
-                log('准备购买请求成功:', result);
-                return result;
-            } catch (error) {
-                lastError = error;
-                log(`准备购买API端点 ${endpoints[i]} 失败:`, error);
-            }
-        }
-        
-        // 所有端点都失败
-        log('所有准备购买API端点都失败，最后错误:', lastError);
-        throw lastError || new Error('所有准备购买API端点都失败');
-    }
-    
-    // 确认购买请求 - 修复API请求问题
-    async function confirmPurchase(purchaseData) {
-        // 检查API请求限制
-        if (!checkApiRateLimit()) {
-            return {
-                success: false,
-                error: '请求频率过高，请稍后再试'
-            };
-        }
-        
-        // 检查购买数据
-        if (!purchaseData || !purchaseData.trade_id) {
-            log('确认购买缺少必要数据:', purchaseData);
-            return {
-                success: false,
-                error: '缺少购买交易ID'
-            };
-        }
-        
-        // 准备请求数据
-        const requestData = {
-            trade_id: purchaseData.trade_id
-        };
-        
-        // 缓存键 - 确认请求不应该被缓存，但记录已确认的交易
-        const tradeId = purchaseData.trade_id;
-        
-        // 检查是否已经确认过
-        if (state.confirmedPurchases.has(tradeId)) {
-            log(`交易 ${tradeId} 已经确认过，返回成功状态`);
-            return {
-                success: true,
-                status: 'completed',
-                message: getText('purchaseCompleted')
-            };
-        }
-        
-        log('确认购买请求数据:', requestData);
-        
-        // 失败重试
-        let lastError = null;
-        
-        // 尝试所有可能的API端点
-        const endpoints = state.apiEndpoints.confirm;
-        
-        for (let i = 0; i < endpoints.length; i++) {
-            try {
-                // 设置请求超时
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), CONFIG.apiTimeoutMs);
-                
-                // 发送请求
-                log(`尝试确认API端点 ${i+1}/${endpoints.length}: ${endpoints[i]}`);
-                const response = await fetch(endpoints[i], {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestData),
-                    signal: controller.signal
-                });
-                
-                // 清除超时
-                clearTimeout(timeoutId);
-                
-                // 检查响应状态
-                if (!response.ok) {
-                    lastError = new Error(`API返回错误状态: ${response.status}`);
-                    continue;
-                }
-                
-                // 解析响应数据
-                const result = await response.json();
-                
-                // 如果成功，记录已确认的交易ID
-                if (result.success) {
-                    state.confirmedPurchases.add(tradeId);
-                }
-                
-                log('确认购买请求成功:', result);
-                return result;
-            } catch (error) {
-                lastError = error;
-                log(`确认购买API端点 ${endpoints[i]} 失败:`, error);
-            }
-        }
-        
-        // 所有端点都失败
-        log('所有确认购买API端点都失败，最后错误:', lastError);
-        throw lastError || new Error('所有确认购买API端点都失败');
-    }
-    
-    // 处理购买按钮点击
-    async function handleBuyButtonClick(event) {
-        // 防止表单提交和页面跳转
-        event.preventDefault();
-        event.stopPropagation();
-        
-        // 如果购买已在进行中，防止重复点击
-        if (state.purchaseInProgress) {
-            log('购买已在进行中，忽略重复点击');
-            return;
-        }
-        
-        try {
-            // 标记购买正在进行中
-            state.purchaseInProgress = true;
-            
-            // 获取按钮和相关元素
-            const button = event.currentTarget;
-            updateButtonState(button, true);
-            
-            // 检查钱包连接状态
-            if (!isWalletConnected()) {
-                log('钱包未连接，无法继续购买');
-                createAlert(getText('walletNotConnected'), 'error');
-                updateButtonState(button, false);
-                state.purchaseInProgress = false;
-                return;
+        // 安全执行API请求
+        return safeExecute(async () => {
+            if (!checkApiRateLimit()) {
+                throw new Error('API请求频率限制');
             }
             
-            // 获取资产ID
-            let assetId = button.getAttribute('data-asset-id');
-            if (!assetId) {
-                // 尝试从页面其他位置获取
-                assetId = document.querySelector('[data-asset-id]')?.getAttribute('data-asset-id');
-            }
-            if (!assetId) {
-                // 尝试从URL获取
-                const urlMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
-                if (urlMatch) {
-                    assetId = urlMatch[1];
-                }
-            }
+            // 检查缓存
+            const cacheKey = `prepare_${assetId}_${amount}`;
+            const cachedData = getFromCache(cacheKey);
+            if (cachedData) return cachedData;
             
-            // 最后使用默认资产ID
-            if (!assetId) {
-                assetId = CONFIG.defaultAssetId;
-                log('未找到资产ID，使用默认ID:', assetId);
-            } else {
-                log('找到资产ID:', assetId);
-            }
-            
-            // 获取购买数量
-            const amountInput = document.getElementById('purchase-amount') || 
-                               document.querySelector('input[name="amount"]') || 
-                               document.querySelector('.purchase-amount');
-            
-            if (!amountInput) {
-                log('找不到购买数量输入框');
-                createAlert(getText('missingAmountInput'), 'error');
-                updateButtonState(button, false);
-                state.purchaseInProgress = false;
-                return;
-            }
-            
-            // 解析购买数量
-            const amount = parseFloat(amountInput.value);
-            if (isNaN(amount) || amount <= 0) {
-                log('无效的购买数量:', amountInput.value);
-                createAlert(getText('invalidAmount'), 'error');
-                updateButtonState(button, false);
-                state.purchaseInProgress = false;
-                return;
-            }
-            
-            // 准备购买请求
-            log('准备购买请求:', { assetId, amount });
-            const prepareResult = await preparePurchase(assetId, amount);
-            
-            // 处理准备购买响应
-            if (!prepareResult.success) {
-                // 显示错误消息
-                if (prepareResult.error) {
-                    createAlert(prepareResult.error, 'error');
-                } else {
-                    createAlert(getText('prepareFailed'), 'error');
-                }
-                
-                // 如果是API错误，清楚地告诉用户
-                if (prepareResult.isApiError) {
-                    createAlert('服务器API不可用，购买功能暂时无法使用。请联系管理员。', 'error');
-                }
-                
-                updateButtonState(button, false);
-                state.purchaseInProgress = false;
-                
-                return;
-            }
-            
-            // 保存购买数据用于确认
-            state.purchaseData = prepareResult;
-            
-            // 创建确认弹窗内容
-            const modalContent = `
-                <div>
-                    <p>请确认以下购买信息:</p>
-                    <ul class="list-group mb-3">
-                        <li class="list-group-item d-flex justify-content-between">
-                            <span>资产:</span>
-                            <strong>${prepareResult.token_symbol || assetId}</strong>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between">
-                            <span>购买数量:</span>
-                            <strong>${prepareResult.amount || amount}</strong>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between">
-                            <span>单价:</span>
-                            <strong>${prepareResult.price} USDC</strong>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between">
-                            <span>总价:</span>
-                            <strong>${prepareResult.total} USDC</strong>
-                        </li>
-                    </ul>
-                    <div class="alert alert-info">
-                        <small>确认后，资产将添加到您的钱包: <code>${prepareResult.wallet_address}</code></small>
-                    </div>
-                    <div class="alert alert-danger mt-3 modal-error" style="display: none;"></div>
-                </div>
-            `;
-            
-            // 显示确认弹窗
-            showModal('确认购买', modalContent, async () => {
-                try {
-                    log('用户确认购买，开始确认交易...');
-                    const confirmResult = await confirmPurchase(prepareResult);
-                    
-                    // 处理确认响应
-                    if (confirmResult.success) {
-                        log('购买确认成功:', confirmResult);
-                        
-                        // 隐藏模态框
-                        hideModal();
-                        
-                        // 显示成功消息
-                        createAlert(getText('purchaseCompleted'), 'success');
-                        
-                        // 可选：刷新页面或更新UI
-                        setTimeout(() => {
-                            // 如果需要刷新页面，取消注释下一行
-                            // window.location.reload();
-                            
-                            // 或者更新UI显示
-                            updateUIAfterPurchase(assetId, amount);
-                        }, 1500);
-                    } else {
-                        // 显示错误消息
-                        const errorMessage = confirmResult.error || getText('purchaseError');
-                        createAlert(errorMessage, 'error');
-                        log('购买确认失败:', confirmResult);
-                        
-                        // 标记API错误
-                        if (confirmResult.isApiError) {
-                            createAlert('服务器API不可用，购买无法完成。请联系管理员。', 'error');
-                        }
-                    }
-                } catch (error) {
-                    log('确认购买过程中出错:', error);
-                    createAlert(getText('purchaseError'), 'error');
-                }
-                
-                // 恢复按钮状态
-                updateButtonState(button, false);
-                state.purchaseInProgress = false;
-            });
-        } catch (error) {
-            log('处理购买按钮点击时出错:', error);
-            createAlert(getText('purchaseError'), 'error');
-            updateButtonState(event.currentTarget, false);
-            state.purchaseInProgress = false;
-        }
-    }
-    
-    // 更新购买后的UI
-    function updateUIAfterPurchase(assetId, amount) {
-        // 尝试更新可用数量显示
-        const remainingElement = document.querySelector('.asset-remaining, .remaining-supply, #remainingSupply');
-        if (remainingElement) {
-            const currentRemaining = parseInt(remainingElement.textContent) || 0;
-            const newRemaining = Math.max(0, currentRemaining - amount);
-            remainingElement.textContent = newRemaining.toString();
-        }
-        
-        // 可能还需要更新其他UI元素
-    }
-    
-    // 设置购买按钮监听器
-    function setupBuyButton() {
-        try {
-            // 查找所有可能的购买按钮
-            const selectors = [
-                '#buy-button', 
-                '.buy-button', 
-                '.buy-btn', 
-                '[data-action="buy"]',
-                '.detail-buy-button',
-                '[data-asset-action="buy"]'
-            ];
-            
-            // 收集所有找到的按钮
-            const allButtons = [];
-            selectors.forEach(selector => {
-                const buttons = document.querySelectorAll(selector);
-                if (buttons.length > 0) {
-                    buttons.forEach(btn => allButtons.push(btn));
-                }
-            });
-            
-            // 如果没有找到任何按钮，尝试等待DOM加载完成后再次尝试
-            if (allButtons.length === 0) {
-                log('找不到购买按钮，将在DOM加载完成后再次尝试');
-                
-                // 等待DOM加载完成
-                if (document.readyState !== 'complete') {
-                    window.addEventListener('load', setupBuyButton);
-                } else {
-                    // DOM已加载，但仍未找到按钮，尝试在短暂延迟后再次尝试
-                    setTimeout(setupBuyButton, 1000);
-                }
-                return;
-            }
-            
-            // 为每个按钮绑定点击事件
-            allButtons.forEach(button => {
-                // 保存原始文本，确保是"Buy"或本地化版本
-                const originalText = button.textContent.trim();
-                const buyTexts = ['Buy', 'buy', '购买', '买入'];
-                if (!button.hasAttribute('data-original-text')) {
-                    const textToSave = buyTexts.includes(originalText) ? originalText : 'Buy';
-                    button.setAttribute('data-original-text', textToSave);
-                }
-                
-                // 移除现有事件监听器，避免重复绑定
-                const newButton = button.cloneNode(true);
-                if (originalText && buyTexts.includes(originalText)) {
-                    newButton.textContent = originalText;
-                } else if (button.hasAttribute('data-original-text')) {
-                    newButton.textContent = button.getAttribute('data-original-text');
-                } else {
-                    newButton.textContent = 'Buy';
-                }
-                
-                // 确保按钮文本是正确的
-                if (newButton.textContent.match(/^\d+(\.\d+)?$/)) {
-                    newButton.textContent = 'Buy';
-                }
-                
-                button.parentNode.replaceChild(newButton, button);
-                
-                // 绑定新的事件监听器
-                newButton.addEventListener('click', handleBuyButtonClick);
-            });
-            
-            log('购买按钮成功绑定点击事件');
-        } catch (error) {
-            log('设置购买按钮监听器时出错:', error);
-        }
-    }
-    
-    // 初始化
-    function init() {
-        if (state.initialized) {
-            log('模块已初始化，跳过');
-            return;
-        }
-        
-        log('初始化购买处理模块');
-        
-        // 设置购买按钮
-        setupBuyButton();
-        
-        // 监听DOM变化，处理动态添加的按钮
-        const observer = new MutationObserver(setupBuyButton);
-        observer.observe(document.body, { 
-            childList: true, 
-            subtree: true 
-        });
-        
-        // 设置全局购买处理函数
-        window.handleBuy = handleBuyButtonClick;
-        
-        log('购买处理模块初始化完成');
-    }
-    
-    // 文档加载完成后初始化
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
-    
-    // 当window.confirmPurchase函数被调用时处理
-    window.confirmPurchase = async function(purchaseData, modalElement, confirmButton) {
-        if (state.purchaseInProgress) {
-            log('已有购买请求正在处理中，请等待');
-            return;
-        }
-        
-        state.purchaseInProgress = true;
-        log('开始处理购买确认', purchaseData);
-        
-        try {
-            // 更新按钮状态
-            updateButtonState(confirmButton, true);
-            
-            // 检查钱包连接
-            if (!isWalletConnected()) {
+            // 构建请求参数
+            const walletAddress = getWalletAddress();
+            if (!walletAddress) {
                 throw new Error(getText('walletNotConnected'));
             }
             
-            // 检查购买数据
-            if (!purchaseData || !purchaseData.asset_id || !purchaseData.amount) {
-                throw new Error('购买数据无效');
+            const params = {
+                asset_id: assetId.replace('RH-', ''),  // 移除RH-前缀
+                amount: amount,
+                wallet_address: walletAddress
+            };
+            
+            log('准备购买请求:', params);
+            
+            // 尝试多个API端点
+            for (let i = 0; i < state.apiEndpoints.prepare.length; i++) {
+                const endpoint = state.apiEndpoints.prepare[i];
+                try {
+                    // 创建AbortController用于超时控制
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), CONFIG.apiTimeoutMs);
+                    
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify(params),
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误 ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // 验证响应
+                    if (!data || !data.success) {
+                        throw new Error(data.message || getText('prepareFailed'));
+                    }
+                    
+                    // 缓存成功的响应
+                    addToCache(cacheKey, data);
+                    
+                    return data;
+                } catch (error) {
+                    log(`API端点 ${endpoint} 失败:`, error.message);
+                    
+                    // 如果是最后一个API，则抛出错误
+                    if (i === state.apiEndpoints.prepare.length - 1) {
+                        throw error;
+                    }
+                    
+                    // 否则尝试下一个API
+                    continue;
+                }
             }
             
-            // 验证交易ID
-            if (!purchaseData.trade_id) {
-                log('交易ID不存在，将准备新的购买请求');
+            // 不应该到达这里
+            throw new Error(getText('serverError'));
+        }, () => {
+            console.debug('[购买处理] 准备购买请求超时');
+            throw new Error('准备购买请求超时，请稍后重试');
+        });
+    }
+    
+    // 确认购买请求
+    async function confirmPurchase(purchaseData) {
+        // 安全执行API请求
+        return safeExecute(async () => {
+            if (!checkApiRateLimit()) {
+                throw new Error('API请求频率限制');
+            }
+            
+            if (!purchaseData || !purchaseData.purchase_id) {
+                throw new Error(getText('purchaseError'));
+            }
+            
+            // 检查是否已确认过
+            if (state.confirmedPurchases.has(purchaseData.purchase_id)) {
+                log('跳过重复确认:', purchaseData.purchase_id);
+                return { success: true, already_confirmed: true };
+            }
+            
+            // 构建请求参数
+            const walletAddress = getWalletAddress();
+            if (!walletAddress) {
+                throw new Error(getText('walletNotConnected'));
+            }
+            
+            const params = {
+                purchase_id: purchaseData.purchase_id,
+                wallet_address: walletAddress,
+                signature: purchaseData.signature || '',
+                transaction_id: purchaseData.transaction_id || ''
+            };
+            
+            log('确认购买请求:', params);
+            
+            // 尝试多个API端点
+            for (let i = 0; i < state.apiEndpoints.confirm.length; i++) {
+                const endpoint = state.apiEndpoints.confirm[i];
+                try {
+                    // 创建AbortController用于超时控制
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), CONFIG.apiTimeoutMs);
+                    
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify(params),
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误 ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // 验证响应
+                    if (!data || !data.success) {
+                        throw new Error(data.message || getText('purchaseError'));
+                    }
+                    
+                    // 记录已确认的购买
+                    state.confirmedPurchases.add(purchaseData.purchase_id);
+                    
+                    return data;
+                } catch (error) {
+                    log(`API端点 ${endpoint} 失败:`, error.message);
+                    
+                    // 如果是最后一个API，则抛出错误
+                    if (i === state.apiEndpoints.confirm.length - 1) {
+                        throw error;
+                    }
+                    
+                    // 否则尝试下一个API
+                    continue;
+                }
+            }
+            
+            // 不应该到达这里
+            throw new Error(getText('serverError'));
+        }, () => {
+            console.debug('[购买处理] 确认购买请求超时');
+            throw new Error('确认购买请求超时，请稍后重试');
+        });
+    }
+    
+    // 处理购买按钮点击事件
+    async function handleBuyButtonClick(event) {
+        // 使用safeExecute避免潜在的无限循环或阻塞
+        return safeExecute(async () => {
+            // 防止短时间内重复点击
+            const now = Date.now();
+            if (state.purchaseInProgress || now - state.lastPurchaseTime < 3000) {
+                log('忽略重复点击，间隔时间过短或处理中');
+                event.preventDefault();
+                event.stopPropagation();
+                return false;
+            }
+            
+            state.purchaseInProgress = true;
+            state.lastPurchaseTime = now;
+            
+            try {
+                // 获取按钮和相关数据
+                const button = event.currentTarget;
+                updateButtonState(button, true);
+                
+                // 检查钱包连接状态
+                if (!isWalletConnected()) {
+                    // 尝试打开钱包连接模态窗口
+                    if (typeof window.connectWallet === 'function') {
+                        window.connectWallet();
+                    } else if (document.getElementById('connect-wallet-button')) {
+                        document.getElementById('connect-wallet-button').click();
+                    } else {
+                        throw new Error(getText('walletNotConnected'));
+                    }
+                    return false;
+                }
+                
+                // 获取资产ID
+                let assetId = button.getAttribute('data-asset-id');
+                if (!assetId) {
+                    const assetElement = document.querySelector('[data-asset-id]');
+                    if (assetElement) {
+                        assetId = assetElement.getAttribute('data-asset-id');
+                    }
+                }
+                
+                if (!assetId) {
+                    // 尝试从URL获取
+                    const urlMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
+                    if (urlMatch && urlMatch[1]) {
+                        assetId = urlMatch[1];
+                    }
+                }
+                
+                // 规范化资产ID
+                assetId = normalizeAssetId(assetId);
+                
+                // 获取购买数量
+                let amount = 1; // 默认为1个
+                
+                // 首先尝试从按钮属性获取
+                if (button.hasAttribute('data-amount')) {
+                    amount = parseFloat(button.getAttribute('data-amount')) || 1;
+                } else {
+                    // 尝试从输入框获取
+                    const amountInput = document.querySelector('#amount-input, #purchase-amount, input[name="amount"]');
+                    if (amountInput) {
+                        amount = parseFloat(amountInput.value) || 1;
+                    }
+                }
+                
+                // 验证输入
+                if (isNaN(amount) || amount <= 0) {
+                    throw new Error(getText('invalidAmount'));
+                }
+                
+                log(`处理购买请求: 资产=${assetId}, 数量=${amount}`);
+                
                 // 准备购买请求
-                const prepareResult = await preparePurchase(
-                    purchaseData.asset_id,
-                    purchaseData.amount
-                );
+                const prepareResult = await preparePurchase(assetId, amount);
                 
                 if (!prepareResult || !prepareResult.success) {
-                    throw new Error(prepareResult?.error || getText('prepareFailed'));
+                    throw new Error(prepareResult.message || getText('prepareFailed'));
                 }
                 
-                // 更新交易ID
-                purchaseData.trade_id = prepareResult.trade_id;
-                log('已获取交易ID', purchaseData.trade_id);
-            }
-            
-            // 确认购买
-            log('执行购买确认', purchaseData);
-            const confirmResult = await confirmPurchase(purchaseData);
-            
-            if (!confirmResult || !confirmResult.success) {
-                throw new Error(confirmResult?.error || getText('purchaseError'));
-            }
-            
-            // 购买成功
-            log('购买确认成功', confirmResult);
-            
-            // 隐藏模态框
-            if (modalElement && typeof bootstrap !== 'undefined') {
-                const bsModal = bootstrap.Modal.getInstance(modalElement);
-                if (bsModal) {
-                    bsModal.hide();
+                log('购买请求准备成功:', prepareResult);
+                state.purchaseData = prepareResult;
+                
+                // 显示确认模态窗口
+                const modalContent = `
+                    <p>确认购买以下资产:</p>
+                    <ul>
+                        <li>资产ID: ${assetId}</li>
+                        <li>数量: ${amount}</li>
+                        <li>价格: ${prepareResult.total_price || '获取中...'}</li>
+                    </ul>
+                    <p>点击确认完成购买。</p>
+                `;
+                
+                showModal('确认购买', modalContent, async () => {
+                    try {
+                        hideModal();
+                        
+                        // 确认购买
+                        const confirmResult = await confirmPurchase(prepareResult);
+                        
+                        if (!confirmResult || !confirmResult.success) {
+                            throw new Error(confirmResult.message || getText('purchaseError'));
+                        }
+                        
+                        log('购买确认成功:', confirmResult);
+                        
+                        // 显示成功消息
+                        createAlert(getText('purchaseSuccess'), 'success');
+                        
+                        // 更新UI
+                        updateUIAfterPurchase(assetId, amount);
+                        
+                    } catch (error) {
+                        console.error('确认购买时出错:', error);
+                        createAlert(error.message || getText('purchaseError'), 'error');
+                    } finally {
+                        updateButtonState(button, false);
+                        state.purchaseInProgress = false;
+                    }
+                });
+                
+            } catch (error) {
+                console.error('处理购买请求时出错:', error);
+                createAlert(error.message || getText('purchaseError'), 'error');
+                state.purchaseInProgress = false;
+                
+                // 尝试更新按钮状态
+                try {
+                    updateButtonState(event.currentTarget, false);
+                } catch (e) {
+                    console.debug('更新按钮状态失败:', e);
                 }
             }
             
-            // 显示成功消息
-            createAlert(getText('purchaseCompleted'), 'success');
-            
-            // 更新UI
-            updateUIAfterPurchase(purchaseData.asset_id, purchaseData.amount);
-            
-            // 刷新钱包资产
-            if (typeof window.refreshWalletAssets === 'function') {
-                window.refreshWalletAssets();
-            }
-            
-            return confirmResult;
-        } catch (error) {
-            log('购买确认失败', error);
-            
-            // 显示错误消息
-            const modalError = document.getElementById('buyModalError');
-            if (modalError) {
-                modalError.textContent = error.message || getText('purchaseError');
-                modalError.style.display = 'block';
-            } else {
-                // 如果找不到模态错误元素，使用弹出提示
-                createAlert(error.message || getText('purchaseError'), 'danger');
-            }
-            
-            throw error;
-        } finally {
-            // 恢复按钮状态
-            updateButtonState(confirmButton, false);
+            // 阻止默认行为
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+        }, () => {
+            // 降级处理：恢复UI状态
+            console.debug('[购买处理] 处理购买按钮点击超时');
             state.purchaseInProgress = false;
+            
+            // 尝试更新按钮状态
+            if (event && event.currentTarget) {
+                try {
+                    updateButtonState(event.currentTarget, false);
+                } catch (e) {
+                    console.debug('更新按钮状态失败:', e);
+                }
+            }
+            
+            createAlert('处理请求超时，请稍后重试', 'error');
+            return false;
+        });
+    }
+    
+    // 购买成功后更新UI
+    function updateUIAfterPurchase(assetId, amount) {
+        // 刷新余额显示
+        if (typeof window.updateWalletBalance === 'function') {
+            window.updateWalletBalance();
         }
-    };
+        
+        // 刷新资产列表
+        if (typeof window.refreshUserAssets === 'function') {
+            window.refreshUserAssets();
+        }
+    }
+    
+    // 设置购买按钮事件
+    function setupBuyButton() {
+        // 如果已经设置过事件处理器，不要重复设置
+        if (state.eventHandlersAttached) {
+            log('事件处理器已附加，跳过重复设置');
+            return;
+        }
+        
+        try {
+            // 查找所有购买按钮
+            const buyButtons = document.querySelectorAll('.buy-btn, .buy-button, [data-action="buy"], #buyButton, .btn-buy, #buy-button');
+            if (!buyButtons || buyButtons.length === 0) {
+                log('页面上没有找到购买按钮');
+                return;
+            }
+            
+            log(`找到 ${buyButtons.length} 个购买按钮`);
+            
+            // 设置事件处理器
+            buyButtons.forEach((button, index) => {
+                // 跳过无效按钮
+                if (!button || button.tagName !== 'BUTTON') return;
+                
+                // 检查是否已经设置过事件处理器
+                if (button.getAttribute('data-buy-handler-attached') === 'true') {
+                    log(`按钮 #${index} 已附加事件处理器，跳过`);
+                    return;
+                }
+                
+                // 保存原始文本
+                if (!button.dataset.originalText) {
+                    button.dataset.originalText = button.textContent.trim();
+                }
+                
+                // 移除旧的事件监听器并附加新的
+                const newButton = button.cloneNode(true);
+                button.parentNode.replaceChild(newButton, button);
+                
+                newButton.addEventListener('click', handleBuyButtonClick);
+                newButton.setAttribute('data-buy-handler-attached', 'true');
+                
+                log(`已设置按钮 #${index} 的点击事件处理器`);
+            });
+            
+            // 标记已设置事件处理器
+            state.eventHandlersAttached = true;
+            
+        } catch (error) {
+            console.error('设置购买按钮事件时出错:', error);
+        }
+    }
+    
+    // 初始化函数
+    function init() {
+        return safeExecute(() => {
+            // 防止重复初始化
+            if (state.initialized) {
+                log('购买处理已初始化，跳过重复执行');
+                return;
+            }
+            
+            log('正在初始化购买处理脚本...');
+            
+            // 初始化模块状态
+            state.initialized = true;
+            state.eventHandlersAttached = false;
+            state.initializationTimestamp = Date.now();
+            
+            // 设置购买按钮事件处理器
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    setTimeout(setupBuyButton, 500);
+                });
+            } else {
+                setTimeout(setupBuyButton, 500);
+            }
+            
+            // 添加页面变化监听器，处理动态添加的按钮
+            let lastSetupTime = 0;
+            const observer = new MutationObserver((mutations) => {
+                // 限制处理频率，避免性能问题
+                const now = Date.now();
+                if (now - lastSetupTime < 2000) return;
+                
+                // 检查是否有新的购买按钮
+                const hasBuyButtons = document.querySelector('.buy-btn, .buy-button, [data-action="buy"], #buyButton, .btn-buy, #buy-button:not([data-buy-handler-attached="true"])');
+                if (hasBuyButtons) {
+                    lastSetupTime = now;
+                    setTimeout(setupBuyButton, 200);
+                }
+            });
+            
+            // 配置并启动观察器
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: false,
+                characterData: false
+            });
+            
+            // 监听URL变化（单页应用）
+            let lastUrl = location.href;
+            const urlObserver = new MutationObserver(() => {
+                const currentUrl = location.href;
+                if (currentUrl !== lastUrl) {
+                    lastUrl = currentUrl;
+                    log('URL已变化，重新设置按钮...');
+                    state.eventHandlersAttached = false;
+                    setTimeout(setupBuyButton, 500);
+                }
+            });
+            
+            urlObserver.observe(document, { subtree: true, childList: true });
+            
+            log('购买处理脚本初始化完成');
+            
+            // 发布初始化完成事件
+            document.dispatchEvent(new CustomEvent('buyHandlerReady'));
+        }, () => {
+            console.error('[购买处理] 初始化超时');
+            state.initialized = true; // 防止重试
+        });
+    }
+    
+    // 启动初始化
+    init();
 })(); 
