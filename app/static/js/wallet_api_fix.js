@@ -1,8 +1,112 @@
 /**
  * RWA-HUB 钱包API修复脚本
  * 解决API 404错误和资产ID不一致问题
- * 版本: 1.5.0 - 生产环境强化版，覆盖原有API调用函数
+ * 版本: 1.5.1 - 生产环境强化版，覆盖原有API调用函数
  */
+
+// 为全局window对象添加购买按钮更新函数
+window.updateBuyButtonStateGlobal = function(button, text, forceUpdate = false) {
+    // 日志函数
+    const log = function(message, data) {
+        if (typeof console !== 'undefined' && console.log) {
+            if (data !== undefined) {
+                console.log(`[钱包API] ${message}`, data);
+            } else {
+                console.log(`[钱包API] ${message}`);
+            }
+        }
+    };
+    
+    // 检查当前页面是否为资产详情页
+    const isAssetDetailPage = function() {
+        return (
+            window.location.pathname.includes('/assets/') || 
+            document.querySelector('.asset-detail-page') ||
+            document.getElementById('asset-detail-container') ||
+            document.getElementById('buy-button')
+        );
+    };
+    
+    // 判断按钮是否为详情页特殊按钮
+    const isDetailPageSpecialButton = function(btn) {
+        if (!btn) return false;
+        
+        return (
+            btn.id === 'buy-button' || 
+            btn.classList.contains('detail-buy-button') ||
+            btn.hasAttribute('data-asset-id') ||
+            btn.hasAttribute('data-token-price')
+        );
+    };
+    
+    try {
+        log('更新购买按钮状态');
+        
+        // 如果传入特定按钮，只更新该按钮
+        if (button) {
+            // 判断是否为详情页的特殊按钮
+            if (isAssetDetailPage() && isDetailPageSpecialButton(button) && !forceUpdate) {
+                log('跳过详情页特殊按钮', button);
+                return;
+            }
+            
+            // 获取当前文本，防止不必要的DOM更新
+            const currentText = button.textContent.trim();
+            if (currentText !== text && (currentText === '购买' || /^\d+(\.\d+)?$/.test(currentText) || !currentText || forceUpdate)) {
+                if (button.innerHTML.indexOf('fa-') === -1) {
+                    button.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>${text || 'Buy'}`;
+                } else {
+                    // 保留现有图标，只更新文本部分
+                    const iconHtml = button.innerHTML.match(/<i[^>]*><\/i>/);
+                    if (iconHtml) {
+                        button.innerHTML = `${iconHtml[0]} ${text || 'Buy'}`;
+                    } else {
+                        button.textContent = text || 'Buy';
+                    }
+                }
+                log(`按钮文本已更新为: "${text || 'Buy'}"`, button);
+            }
+            return;
+        }
+        
+        // 否则更新所有按钮（除详情页特殊按钮外）
+        const buyButtons = document.querySelectorAll('.buy-btn, .buy-button, [data-action="buy"], #buyButton, .btn-buy');
+        let updatedCount = 0;
+        
+        buyButtons.forEach(btn => {
+            // 跳过详情页特殊按钮
+            if (isAssetDetailPage() && isDetailPageSpecialButton(btn) && !forceUpdate) {
+                log('跳过详情页特殊按钮', btn);
+                return;
+            }
+            
+            const currentText = btn.textContent.trim();
+            
+            // 设置正确的按钮文本
+            if (currentText === '购买' || /^\d+(\.\d+)?$/.test(currentText) || !currentText || forceUpdate) {
+                if (btn.innerHTML.indexOf('fa-') === -1) {
+                    btn.innerHTML = `<i class="fas fa-shopping-cart me-2"></i>${text || 'Buy'}`;
+                } else {
+                    // 保留现有图标，只更新文本部分
+                    const iconHtml = btn.innerHTML.match(/<i[^>]*><\/i>/);
+                    if (iconHtml) {
+                        btn.innerHTML = `${iconHtml[0]} ${text || 'Buy'}`;
+                    } else {
+                        btn.textContent = text || 'Buy';
+                    }
+                }
+                updatedCount++;
+            }
+        });
+        
+        log(`共更新了 ${updatedCount} 个购买按钮`);
+    } catch (error) {
+        console.error('更新购买按钮出错:', error);
+    }
+};
+
+// 兼容性别名
+window.updateBuyButtonState = window.updateBuyButtonStateGlobal;
 
 (function() {
     // 最小化日志
@@ -654,11 +758,8 @@
     // 确保购买按钮显示正确的文本
     function ensureCorrectBuyButtonText() {
         // 搜索所有购买按钮
-        const buyButtons = document.querySelectorAll('#buy-button, .detail-buy-button, [data-asset-action="buy"], .buy-button, [data-action="buy"]');
-        
-        if (buyButtons.length === 0) {
-            return; // 没有找到购买按钮
-        }
+        const buyButtons = document.querySelectorAll('.buy-btn, .buy-button, [data-action="buy"], #buyButton, .btn-buy');
+        if (!buyButtons || buyButtons.length === 0) return;
         
         // 设置所有按钮的文本为"Buy"
         buyButtons.forEach(button => {
@@ -667,7 +768,7 @@
             const isNumeric = /^\d+(\.\d+)?$/.test(currentText);
             
             // 如果当前显示的是数字或空文本，替换为"Buy"
-            if (isNumeric || !currentText || currentText.length === 0) {
+            if (isNumeric || !currentText || currentText.length === 0 || currentText === '购买') {
                 // 保存原有属性
                 const classes = button.className;
                 const attrs = {};

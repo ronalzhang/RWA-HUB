@@ -1229,6 +1229,11 @@
     <script src="{{ url_for('static', filename='js/wallet_fix.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dividend_fix.js') }}"></script>
     
+    <!-- 修复脚本 - 调整加载顺序：wallet_api_fix.js → handle_buy.js → buy_button_fix.js -->
+    <script src="{{ url_for('static', filename='js/wallet_api_fix.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/buy_button_fix.js') }}"></script>
+    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // 初始加载完成后立即更新所有购买按钮
@@ -1251,9 +1256,6 @@
     
     <!-- 钱包调试和修复脚本 -->
     <script src="{{ url_for('static', filename='js/wallet_debug.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/buy_button_fix.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/wallet_api_fix.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
     
     <script>
         // 等待钱包脚本加载完成后执行修复
@@ -1455,33 +1457,5 @@
         }
     </script>
 
-    <!-- API错误强制修复脚本 - 放在所有其他脚本之后执行 -->
-    <script>
-        // 拦截控制台错误日志，过滤API 404错误
-        (function() {
-            const originalConsoleError = console.error;
-            console.error = function(...args) {
-                const errorText = args.join(" ");
-                if (errorText.includes("/api/") && (errorText.includes("404") || errorText.includes("Not Found"))) {
-                    return;
-                }
-                originalConsoleError.apply(console, args);
-            };
-            // 在所有脚本加载完成后修复问题
-            window.addEventListener("load", function() {
-                // 确保购买按钮始终显示"Buy"
-                setInterval(function() {
-                    const buyButtons = document.querySelectorAll("#buy-button, .buy-button, [data-action=\"buy\"]");
-                    buyButtons.forEach(function(btn) {
-                        const btnText = btn.textContent.trim();
-                        if (/^\s*\d+(\.\d+)?\s*$/.test(btnText) || btnText === '0.23' || btnText === '购买') {
-                            btn.textContent = 'Buy';
-                            btn.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
-                        }
-                    });
-                }, 300);
-            });
-        })();
-    </script>
 </body>
 </html>
