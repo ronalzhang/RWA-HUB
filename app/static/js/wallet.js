@@ -1142,8 +1142,8 @@ const walletState = {
             // 添加时间戳以避免缓存
             const timestamp = new Date().getTime();
             
-            // 修改API路径从/service/wallet/status/到/api/service/wallet/status/
-            const apiUrl = `/api/service/wallet/status/${address}?_=${timestamp}`;
+            // 修正API路径没有斜杠的问题，添加walletType参数
+            const apiUrl = `/api/service/wallet/status?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
             console.log('请求余额API:', apiUrl);
             
             const response = await fetch(apiUrl);
