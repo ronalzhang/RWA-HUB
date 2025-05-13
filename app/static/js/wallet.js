@@ -1142,8 +1142,8 @@ const walletState = {
             // 添加时间戳以避免缓存
             const timestamp = new Date().getTime();
             
-            // 修改API路径从/api/wallet/balance到/service/wallet/status/
-            const apiUrl = `/service/wallet/status/${address}?_=${timestamp}`;
+            // 修改API路径从/service/wallet/status/到/api/service/wallet/status/
+            const apiUrl = `/api/service/wallet/status/${address}?_=${timestamp}`;
             console.log('请求余额API:', apiUrl);
             
             const response = await fetch(apiUrl);
@@ -1695,7 +1695,7 @@ const walletState = {
             try {
                 // 构建API请求URL，添加时间戳防止缓存
                 const timestamp = new Date().getTime();
-                const url = `/api/user/assets?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
+                const url = `/api/service/user/assets?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
                 console.log(`[getUserAssets] 调用API: ${url}`);
                 
                 const response = await fetch(url);
