@@ -1,10 +1,10 @@
 /**
  * 简化版购买处理脚本
- * 版本：1.0.0
+ * 版本：1.0.1
  */
 
-// 全局变量，用于存储timeout ID
-let buyTimeoutId = null;
+// 全局变量，用于存储timeout ID (使用window对象避免重复声明)
+window.buyTimeoutId = null;
 
 // 平台费率配置
 const PLATFORM_FEE_RATE = 0.035; // 3.5%平台费率
@@ -58,6 +58,9 @@ document.addEventListener('DOMContentLoaded', function() {
   if (amountInput) {
     amountInput.addEventListener('input', updatePriceDisplay);
   }
+  
+  // 初始化按钮状态
+  updateBuyButtonState();
 });
 
 /**
@@ -68,8 +71,8 @@ document.addEventListener('DOMContentLoaded', function() {
  */
 function handleBuy(assetId, amountInput, buyButton) {
   // 如果已有计时器运行，清除它
-  if (buyTimeoutId) {
-    clearTimeout(buyTimeoutId);
+  if (window.buyTimeoutId) {
+    clearTimeout(window.buyTimeoutId);
   }
   
   // 防止重复点击
@@ -87,7 +90,7 @@ function handleBuy(assetId, amountInput, buyButton) {
   // 检查资产ID
   if (!assetId) {
     console.error('资产ID未提供');
-    resetButton(buyButton, 'Buy');
+    resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
     return;
   }
   
@@ -104,7 +107,7 @@ function handleBuy(assetId, amountInput, buyButton) {
   
   if (!amount || amount <= 0) {
     alert('请输入有效的购买数量');
-    resetButton(buyButton, 'Buy');
+    resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
     return;
   }
   
@@ -112,7 +115,7 @@ function handleBuy(assetId, amountInput, buyButton) {
   const walletAddress = localStorage.getItem('walletAddress');
   if (!walletAddress) {
     alert('请先连接您的钱包');
-    resetButton(buyButton, 'Buy');
+    resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
     return;
   }
   
@@ -133,6 +136,7 @@ function handleBuy(assetId, amountInput, buyButton) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'X-Wallet-Address': walletAddress
     },
     body: JSON.stringify(purchaseData)
   })
@@ -166,7 +170,7 @@ function handleBuy(assetId, amountInput, buyButton) {
         .catch(error => {
           console.error('钱包签名失败', error);
           alert('交易签名失败，请重试');
-          resetButton(buyButton, 'Buy');
+          resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
           if (typeof hideLoadingState === 'function') {
             hideLoadingState();
           }
@@ -179,7 +183,7 @@ function handleBuy(assetId, amountInput, buyButton) {
   .catch(error => {
     console.error('准备购买失败', error);
     alert(`购买失败: ${error.message}`);
-    resetButton(buyButton, 'Buy');
+    resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
     if (typeof hideLoadingState === 'function') {
       hideLoadingState();
     }
@@ -207,6 +211,7 @@ function handleBuy(assetId, amountInput, buyButton) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Wallet-Address': walletAddress
       },
       body: JSON.stringify(confirmData)
     })
@@ -226,7 +231,7 @@ function handleBuy(assetId, amountInput, buyButton) {
       alert('购买成功！');
       
       // 重置按钮状态
-      resetButton(buyButton, 'Buy');
+      resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
       
       // 隐藏加载状态
       if (typeof hideLoadingState === 'function') {
@@ -234,14 +239,14 @@ function handleBuy(assetId, amountInput, buyButton) {
       }
       
       // 延迟刷新页面以显示最新状态
-      buyTimeoutId = setTimeout(() => {
+      window.buyTimeoutId = setTimeout(() => {
         window.location.reload();
       }, 2000);
     })
     .catch(error => {
       console.error('确认购买失败', error);
       alert(`购买失败: ${error.message}`);
-      resetButton(buyButton, 'Buy');
+      resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
       if (typeof hideLoadingState === 'function') {
         hideLoadingState();
       }
@@ -254,10 +259,54 @@ function handleBuy(assetId, amountInput, buyButton) {
  * @param {HTMLElement} button - 按钮元素
  * @param {string} text - 按钮文本
  */
-function resetButton(button, text = 'Buy') {
+function resetButton(button, text = '<i class="fas fa-shopping-cart me-2"></i>Buy') {
   if (button) {
     button.disabled = false;
     button.innerHTML = text;
+  }
+}
+
+/**
+ * 更新购买按钮状态
+ * 检查钱包连接状态并更新按钮
+ */
+function updateBuyButtonState() {
+  console.log('更新购买按钮状态');
+  
+  // 获取购买按钮
+  const buyButton = document.getElementById('buy-button');
+  if (!buyButton) {
+    console.warn('找不到购买按钮元素');
+    return;
+  }
+  
+  // 检查钱包状态
+  let isConnected = false;
+  
+  // 方法1: 检查walletState对象
+  if (window.walletState) {
+    if (window.walletState.connected || window.walletState.isConnected) {
+      isConnected = true;
+    }
+  }
+  
+  // 方法2: 检查localStorage中的钱包地址
+  if (!isConnected) {
+    const walletAddress = localStorage.getItem('walletAddress');
+    isConnected = !!walletAddress;
+  }
+  
+  // 更新按钮状态
+  if (isConnected) {
+    console.log('钱包已连接，启用购买按钮');
+    buyButton.disabled = false;
+    buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
+    buyButton.removeAttribute('title');
+  } else {
+    console.log('钱包未连接，禁用购买按钮');
+    buyButton.disabled = true;
+    buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
+    buyButton.title = '请先连接钱包';
   }
 }
 
@@ -314,17 +363,66 @@ function setupBuyButton() {
     }
     
     // 确保按钮文字为"Buy"
-    if (newButton.textContent !== 'Buy') {
-      newButton.textContent = 'Buy';
-    }
+    newButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
     
     newButton.addEventListener('click', handleBuyButtonClick);
   });
+  
+  // 更新按钮状态
+  updateBuyButtonState();
 }
+
+// 添加钱包状态变化监听器
+document.addEventListener('walletStateChanged', function(event) {
+  console.log('钱包状态变化，更新购买按钮状态:', event.detail);
+  updateBuyButtonState();
+});
+
+// 监听钱包连接事件
+document.addEventListener('walletConnected', function(event) {
+  console.log('钱包已连接，更新购买按钮状态:', event.detail);
+  updateBuyButtonState();
+});
+
+// 监听钱包断开连接事件
+document.addEventListener('walletDisconnected', function() {
+  console.log('钱包已断开连接，更新购买按钮状态');
+  updateBuyButtonState();
+});
 
 // 初始化
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', setupBuyButton);
+  document.addEventListener('DOMContentLoaded', function() {
+    setupBuyButton();
+    
+    // 如果walletState可用，调用其更新方法
+    if (window.walletState && typeof window.walletState.updateDetailPageButtonState === 'function') {
+      try {
+        window.walletState.updateDetailPageButtonState();
+      } catch (error) {
+        console.error('调用walletState.updateDetailPageButtonState失败:', error);
+        // 使用备用方法
+        updateBuyButtonState();
+      }
+    } else {
+      // 使用自己的方法
+      updateBuyButtonState();
+    }
+  });
 } else {
   setupBuyButton();
+  
+  // 如果walletState可用，调用其更新方法
+  if (window.walletState && typeof window.walletState.updateDetailPageButtonState === 'function') {
+    try {
+      window.walletState.updateDetailPageButtonState();
+    } catch (error) {
+      console.error('调用walletState.updateDetailPageButtonState失败:', error);
+      // 使用备用方法
+      updateBuyButtonState();
+    }
+  } else {
+    // 使用自己的方法
+    updateBuyButtonState();
+  }
 } 
