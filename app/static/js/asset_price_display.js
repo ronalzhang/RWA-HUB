@@ -1,6 +1,6 @@
 /**
  * 资产价格显示管理脚本
- * 版本: 1.0.0 - 修复购买按钮价格显示问题
+ * 版本: 1.0.1 - 修复购买按钮显示问题，仅显示Buy而非价格
  */
 
 (function() {
@@ -11,7 +11,7 @@
   }
   window.assetPriceDisplayInitialized = true;
   
-  console.log('[价格显示] 初始化价格显示脚本 v1.0.0');
+  console.log('[价格显示] 初始化价格显示脚本 v1.0.1');
   
   // 配置
   const CONFIG = {
@@ -33,73 +33,65 @@
   // 价格缓存
   const priceCache = new Map();
   
-  // 安全执行函数
-  function safeExecute(fn, fallback, timeout = 5000) {
-    let hasCompleted = false;
-    let localTimeoutId = null;
-    
-    // 设置安全超时
-    localTimeoutId = setTimeout(() => {
-      if (!hasCompleted) {
-        console.debug('[价格显示] 操作超时终止');
-        hasCompleted = true;
-        
-        if (typeof fallback === 'function') {
-          try {
-            fallback();
-          } catch (e) {
-            console.debug('[价格显示] 降级处理失败:', e);
-          }
-        }
-      }
-    }, timeout);
-    
-    // 执行主函数
-    try {
-      const result = fn();
+  // 安全执行函数，带超时
+  function safeExecute(func, onTimeout, timeoutMs = 3000) {
+    return new Promise((resolve) => {
+      let resolved = false;
+      let timeoutId;
       
-      // 处理Promise
-      if (result && typeof result.then === 'function') {
-        return Promise.race([
-          result.then(value => {
-            if (!hasCompleted) {
-              clearTimeout(localTimeoutId);
-              hasCompleted = true;
+      // 设置超时
+      if (timeoutMs > 0) {
+        timeoutId = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            if (onTimeout) {
+              resolve(onTimeout());
+            } else {
+              resolve(null);
             }
-            return value;
-          }).catch(err => {
-            if (!hasCompleted) {
-              clearTimeout(localTimeoutId);
-              hasCompleted = true;
-            }
-            throw err;
-          }),
-          new Promise((_, reject) => {
-            // 此Promise会在timeoutId触发时被拒绝
-          })
-        ]);
+          }
+        }, timeoutMs);
       }
       
-      // 同步结果
-      clearTimeout(localTimeoutId);
-      hasCompleted = true;
-      return result;
-    } catch (error) {
-      if (!hasCompleted) {
-        clearTimeout(localTimeoutId);
-        hasCompleted = true;
-        console.debug('[价格显示] 操作执行失败:', error);
+      // 执行函数
+      try {
+        const result = func();
         
-        if (typeof fallback === 'function') {
-          try {
-            return fallback();
-          } catch (e) {
-            console.debug('[价格显示] 降级处理失败:', e);
+        // 如果是Promise，等待其完成
+        if (result instanceof Promise) {
+          result
+            .then(value => {
+              if (!resolved) {
+                resolved = true;
+                clearTimeout(timeoutId);
+                resolve(value);
+              }
+            })
+            .catch(error => {
+              if (!resolved) {
+                resolved = true;
+                clearTimeout(timeoutId);
+                console.error('[价格显示] safeExecute Promise错误:', error);
+                resolve(null);
+              }
+            });
+        } else {
+          // 如果不是Promise，直接返回结果
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutId);
+            resolve(result);
           }
         }
+      } catch (error) {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeoutId);
+          console.error('[价格显示] safeExecute 执行错误:', error);
+          resolve(null);
+        }
       }
-      throw error;
-    }
+    });
   }
   
   // 日志函数
@@ -363,7 +355,7 @@
           el.setAttribute('data-price', price);
         });
         
-        // 更新购买按钮显示价格
+        // 更新购买按钮数据属性（不更改按钮文本）
         updateBuyButtonPrice(assetId, price);
       });
       
@@ -374,7 +366,7 @@
     }
   }
   
-  // 更新购买按钮价格
+  // 更新购买按钮价格数据属性（但不更改按钮文本）
   function updateBuyButtonPrice(assetId, price) {
     try {
       const buyButtons = document.querySelectorAll('.buy-btn, .buy-button, [data-action="buy"], #buyButton, .btn-buy, #buy-button');
@@ -386,31 +378,7 @@
           return;
         }
         
-        // 检查按钮内容是否包含价格占位符
-        let buttonText = button.textContent.trim();
-        
-        // 判断是否已经包含了价格
-        const hasPricePattern = /\$\s*[\d,.]+|\d+\.\d{2}|\d+$/;
-        const priceFormatted = formatPrice(price);
-        
-        // 模式1: 包含"Buy for $0.23"这样的格式
-        if (/buy\s+for\s+\$?\s*[\d,.]+/i.test(buttonText)) {
-          buttonText = buttonText.replace(/(\s+for\s+)\$?\s*[\d,.]+/i, `$1${priceFormatted}`);
-          button.textContent = buttonText;
-        }
-        // 模式2: 包含"购买 $0.23"这样的格式
-        else if (/购买\s+\$?\s*[\d,.]+/i.test(buttonText)) {
-          buttonText = buttonText.replace(/(\s+)\$?\s*[\d,.]+/i, `$1${priceFormatted}`);
-          button.textContent = buttonText;
-        }
-        // 模式3: 如果按钮只有价格，直接替换
-        else if (hasPricePattern.test(buttonText) && buttonText.length < 10) {
-          button.textContent = priceFormatted;
-        }
-        // 模式4: 如果按钮没有价格，但有"Buy"文本
-        else if (/buy|购买/i.test(buttonText) && !hasPricePattern.test(buttonText)) {
-          button.textContent = `${buttonText} ${priceFormatted}`;
-        }
+        // 注意：不再修改按钮文本，只更新数据属性
         
         // 重要：保存原始数值价格到data属性
         if (price !== null && !isNaN(parseFloat(price))) {
@@ -424,7 +392,7 @@
         }
       });
     } catch (error) {
-      console.debug('[价格显示] 更新购买按钮价格失败:', error);
+      console.debug('[价格显示] 更新购买按钮数据属性失败:', error);
     }
   }
   
@@ -477,7 +445,7 @@
       
       urlObserver.observe(document, { subtree: true, childList: true });
       
-      log('价格显示脚本初始化完成');
+      log('价格显示脚本初始化完成 (不修改按钮文本)');
       
       // 发布初始化完成事件
       document.dispatchEvent(new CustomEvent('assetPriceDisplayReady'));
