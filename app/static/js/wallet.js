@@ -814,8 +814,8 @@ const walletState = {
             const walletType = this.getWalletType();
             const timestamp = new Date().getTime();
             
-            // 修改API路径从/api/user/check_admin到/api/admin/check
-            const apiUrl = `/api/admin/check?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
+            // 修改API路径从/api/user/check_admin到/api/admin/check_admin
+            const apiUrl = `/api/admin/check_admin?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
             console.log('调用管理员检查API:', apiUrl);
             
             const response = await fetch(apiUrl);
@@ -1142,8 +1142,8 @@ const walletState = {
             // 添加时间戳以避免缓存
             const timestamp = new Date().getTime();
             
-            // 修正API路径没有斜杠的问题，添加walletType参数
-            const apiUrl = `/api/service/wallet/status?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
+            // 修正API路径
+            const apiUrl = `/api/wallet/status?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
             console.log('请求余额API:', apiUrl);
             
             const response = await fetch(apiUrl);
@@ -1695,7 +1695,7 @@ const walletState = {
             try {
                 // 构建API请求URL，添加时间戳防止缓存
                 const timestamp = new Date().getTime();
-                const url = `/api/service/user/assets?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
+                const url = `/api/user/assets?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
                 console.log(`[getUserAssets] 调用API: ${url}`);
                 
                 const response = await fetch(url);
