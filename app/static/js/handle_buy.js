@@ -4,6 +4,11 @@
  * 版本：1.3.0 - 修复浏览器卡死问题，优化性能和事件处理
  */
 
+// 定义全局变量
+let timeoutId = null;
+let preparePurchaseController = null;
+let confirmPurchaseController = null;
+
 (function() {
     // 避免重复加载和初始化
     if (window.buyHandlerInitialized) {
@@ -108,10 +113,10 @@
     // 安全执行函数 - 防止任何操作导致页面卡死
     function safeExecute(fn, fallbackFn, timeout = CONFIG.safetyTimeout) {
         let hasCompleted = false;
-        let timeoutId = null;
+        let localTimeoutId = null;
         
         // 设置安全超时
-        timeoutId = setTimeout(() => {
+        localTimeoutId = setTimeout(() => {
             if (!hasCompleted) {
                 console.debug('[购买处理] 操作超时终止', fn.name || '匿名函数');
                 hasCompleted = true;
@@ -136,13 +141,13 @@
                 return Promise.race([
                     result.then(value => {
                         if (!hasCompleted) {
-                            clearTimeout(timeoutId);
+                            clearTimeout(localTimeoutId);
                             hasCompleted = true;
                         }
                         return value;
                     }).catch(err => {
                         if (!hasCompleted) {
-                            clearTimeout(timeoutId);
+                            clearTimeout(localTimeoutId);
                             hasCompleted = true;
                         }
                         throw err;
@@ -154,12 +159,12 @@
             }
             
             // 同步结果
-            clearTimeout(timeoutId);
+            clearTimeout(localTimeoutId);
             hasCompleted = true;
             return result;
         } catch (error) {
             if (!hasCompleted) {
-                clearTimeout(timeoutId);
+                clearTimeout(localTimeoutId);
                 hasCompleted = true;
                 console.debug('[购买处理] 操作执行失败', error);
                 
@@ -586,174 +591,200 @@
     
     // 准备购买请求
     async function preparePurchase(assetId, amount) {
-        // 安全执行API请求
-        return safeExecute(async () => {
-            if (!checkApiRateLimit()) {
-                throw new Error('API请求频率限制');
-            }
-            
-            // 检查缓存
-            const cacheKey = `prepare_${assetId}_${amount}`;
-            const cachedData = getFromCache(cacheKey);
-            if (cachedData) return cachedData;
-            
-            // 构建请求参数
-            const walletAddress = getWalletAddress();
-            if (!walletAddress) {
-                throw new Error(getText('walletNotConnected'));
-            }
-            
-            const params = {
-                asset_id: assetId.replace('RH-', ''),  // 移除RH-前缀
-                amount: amount,
-                wallet_address: walletAddress
-            };
-            
-            log('准备购买请求:', params);
-            
-            // 尝试多个API端点
-            for (let i = 0; i < state.apiEndpoints.prepare.length; i++) {
-                const endpoint = state.apiEndpoints.prepare[i];
-                try {
-                    // 创建AbortController用于超时控制
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), CONFIG.apiTimeoutMs);
-                    
-                    const response = await fetch(endpoint, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        },
-                        body: JSON.stringify(params),
-                        signal: controller.signal
-                    });
-                    
-                    clearTimeout(timeoutId);
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP错误 ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    
-                    // 验证响应
-                    if (!data || !data.success) {
-                        throw new Error(data.message || getText('prepareFailed'));
-                    }
-                    
-                    // 缓存成功的响应
-                    addToCache(cacheKey, data);
-                    
-                    return data;
-                } catch (error) {
-                    log(`API端点 ${endpoint} 失败:`, error.message);
-                    
-                    // 如果是最后一个API，则抛出错误
-                    if (i === state.apiEndpoints.prepare.length - 1) {
-                        throw error;
-                    }
-                    
-                    // 否则尝试下一个API
-                    continue;
+        updateStatus('准备购买请求...', 'info');
+        log('准备购买请求:', { assetId, amount });
+        
+        // 清除之前的超时
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+        }
+        
+        // 清除之前的controller
+        if (preparePurchaseController) {
+            try {
+                preparePurchaseController.abort();
+            } catch (e) {}
+        }
+        
+        // 检查缓存
+        const cacheKey = `prepare_${assetId}_${amount}`;
+        const cachedData = getFromCache(cacheKey);
+        if (cachedData) return cachedData;
+        
+        // 构建请求参数
+        const walletAddress = getWalletAddress();
+        if (!walletAddress) {
+            throw new Error(getText('walletNotConnected'));
+        }
+        
+        const params = {
+            asset_id: assetId.replace('RH-', ''),  // 移除RH-前缀
+            amount: amount,
+            wallet_address: walletAddress
+        };
+        
+        log('准备购买请求:', params);
+        
+        // 尝试多个API端点
+        for (let i = 0; i < state.apiEndpoints.prepare.length; i++) {
+            const endpoint = state.apiEndpoints.prepare[i];
+            try {
+                // 创建AbortController用于超时控制
+                preparePurchaseController = new AbortController();
+                const signal = preparePurchaseController.signal;
+                
+                // 设置超时
+                timeoutId = setTimeout(() => preparePurchaseController.abort(), CONFIG.apiTimeoutMs);
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify(params),
+                    signal: signal
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP错误 ${response.status}`);
                 }
+                
+                const data = await response.json();
+                
+                // 验证响应
+                if (!data || !data.success) {
+                    throw new Error(data.message || getText('prepareFailed'));
+                }
+                
+                // 缓存成功的响应
+                addToCache(cacheKey, data);
+                
+                return data;
+            } catch (error) {
+                log(`API端点 ${endpoint} 失败:`, error.message);
+                
+                // 确保清除超时
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+                
+                // 如果是最后一个API，则抛出错误
+                if (i === state.apiEndpoints.prepare.length - 1) {
+                    throw error;
+                }
+                
+                // 否则尝试下一个API
+                continue;
             }
-            
-            // 不应该到达这里
-            throw new Error(getText('serverError'));
-        }, () => {
-            console.debug('[购买处理] 准备购买请求超时');
-            throw new Error('准备购买请求超时，请稍后重试');
-        });
+        }
+        
+        // 不应该到达这里
+        throw new Error(getText('serverError'));
     }
     
     // 确认购买请求
     async function confirmPurchase(purchaseData) {
-        // 安全执行API请求
-        return safeExecute(async () => {
-            if (!checkApiRateLimit()) {
-                throw new Error('API请求频率限制');
-            }
-            
-            if (!purchaseData || !purchaseData.purchase_id) {
-                throw new Error(getText('purchaseError'));
-            }
-            
-            // 检查是否已确认过
-            if (state.confirmedPurchases.has(purchaseData.purchase_id)) {
-                log('跳过重复确认:', purchaseData.purchase_id);
-                return { success: true, already_confirmed: true };
-            }
-            
-            // 构建请求参数
-            const walletAddress = getWalletAddress();
-            if (!walletAddress) {
-                throw new Error(getText('walletNotConnected'));
-            }
-            
-            const params = {
-                purchase_id: purchaseData.purchase_id,
-                wallet_address: walletAddress,
-                signature: purchaseData.signature || '',
-                transaction_id: purchaseData.transaction_id || ''
-            };
-            
-            log('确认购买请求:', params);
-            
-            // 尝试多个API端点
-            for (let i = 0; i < state.apiEndpoints.confirm.length; i++) {
-                const endpoint = state.apiEndpoints.confirm[i];
-                try {
-                    // 创建AbortController用于超时控制
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), CONFIG.apiTimeoutMs);
-                    
-                    const response = await fetch(endpoint, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        },
-                        body: JSON.stringify(params),
-                        signal: controller.signal
-                    });
-                    
-                    clearTimeout(timeoutId);
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP错误 ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    
-                    // 验证响应
-                    if (!data || !data.success) {
-                        throw new Error(data.message || getText('purchaseError'));
-                    }
-                    
-                    // 记录已确认的购买
-                    state.confirmedPurchases.add(purchaseData.purchase_id);
-                    
-                    return data;
-                } catch (error) {
-                    log(`API端点 ${endpoint} 失败:`, error.message);
-                    
-                    // 如果是最后一个API，则抛出错误
-                    if (i === state.apiEndpoints.confirm.length - 1) {
-                        throw error;
-                    }
-                    
-                    // 否则尝试下一个API
-                    continue;
+        updateStatus('确认购买中...', 'info');
+        log('确认购买请求:', purchaseData);
+        
+        // 清除之前的超时
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+        }
+        
+        // 清除之前的controller
+        if (confirmPurchaseController) {
+            try {
+                confirmPurchaseController.abort();
+            } catch (e) {}
+        }
+        
+        if (!purchaseData || !purchaseData.purchase_id) {
+            throw new Error(getText('purchaseError'));
+        }
+        
+        // 检查是否已确认过
+        if (state.confirmedPurchases.has(purchaseData.purchase_id)) {
+            log('跳过重复确认:', purchaseData.purchase_id);
+            return { success: true, already_confirmed: true };
+        }
+        
+        // 构建请求参数
+        const walletAddress = getWalletAddress();
+        if (!walletAddress) {
+            throw new Error(getText('walletNotConnected'));
+        }
+        
+        const params = {
+            purchase_id: purchaseData.purchase_id,
+            wallet_address: walletAddress,
+            signature: purchaseData.signature || '',
+            transaction_id: purchaseData.transaction_id || ''
+        };
+        
+        log('确认购买请求:', params);
+        
+        // 尝试多个API端点
+        for (let i = 0; i < state.apiEndpoints.confirm.length; i++) {
+            const endpoint = state.apiEndpoints.confirm[i];
+            try {
+                // 创建AbortController用于超时控制
+                confirmPurchaseController = new AbortController();
+                const signal = confirmPurchaseController.signal;
+                
+                // 设置超时
+                timeoutId = setTimeout(() => confirmPurchaseController.abort(), CONFIG.apiTimeoutMs);
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify(params),
+                    signal: signal
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP错误 ${response.status}`);
                 }
+                
+                const data = await response.json();
+                
+                // 验证响应
+                if (!data || !data.success) {
+                    throw new Error(data.message || getText('purchaseError'));
+                }
+                
+                // 记录已确认的购买
+                state.confirmedPurchases.add(purchaseData.purchase_id);
+                
+                return data;
+            } catch (error) {
+                log(`API端点 ${endpoint} 失败:`, error.message);
+                
+                // 确保清除超时
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+                
+                // 如果是最后一个API，则抛出错误
+                if (i === state.apiEndpoints.confirm.length - 1) {
+                    throw error;
+                }
+                
+                // 否则尝试下一个API
+                continue;
             }
-            
-            // 不应该到达这里
-            throw new Error(getText('serverError'));
-        }, () => {
-            console.debug('[购买处理] 确认购买请求超时');
-            throw new Error('确认购买请求超时，请稍后重试');
-        });
+        }
+        
+        // 不应该到达这里
+        throw new Error(getText('serverError'));
     }
     
     // 处理购买按钮点击事件
