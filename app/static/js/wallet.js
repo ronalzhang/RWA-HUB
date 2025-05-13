@@ -808,56 +808,57 @@ const walletState = {
      */
     async checkIsAdmin() {
         try {
-            // 获取钱包地址和类型
-            const address = this.getAddress();
-            const walletType = this.getWalletType();
-            
-            if (!address) {
-                console.log('检查管理员权限：钱包未连接');
-            return false;
-        }
-        
             console.log('检查钱包是否为管理员...');
             
-            // 添加时间戳防止缓存
+            const address = this.getAddress();
+            const walletType = this.getWalletType();
             const timestamp = new Date().getTime();
-            const apiUrl = `/api/user/check_admin?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
+            
+            // 修改API路径从/api/user/check_admin到/api/admin/check
+            const apiUrl = `/api/admin/check?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
             console.log('调用管理员检查API:', apiUrl);
             
-            try {
-                const response = await fetch(apiUrl);
-                
-                if (!response.ok) {
-                    console.log('管理员检查API响应不成功:', response.status, response.statusText);
-                    // 继续执行备用逻辑，不要直接抛出错误
-                } else {
-                    const data = await response.json();
-                    
-                    if (data && data.success === true) {
-                        console.log('API管理员检查结果:', data.is_admin);
-                        return data.is_admin === true;
-                    }
-                }
-            } catch (apiError) {
-                console.debug('调用管理员检查API失败:', apiError);
-                // 继续执行备用逻辑，不要抛出错误
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+              throw new Error(`${response.status} ${response.statusText}`);
             }
             
-            // 备用逻辑：如果API调用失败，使用其他方式判断
+            const data = await response.json();
+            const isAdmin = data.is_admin === true;
+            
+            console.log('服务器返回的管理员状态:', isAdmin);
+            this.isAdmin = isAdmin;
+            
+            // 更新管理员入口显示状态
+            this.updateAdminDisplay();
+            
+            // 返回管理员状态
+            return isAdmin;
+        } catch (error) {
+            console.error('管理员检查API响应不成功:', error.message);
             console.log('API管理员检查失败，使用备用逻辑');
             
-            // 备用方法1：检查预定义的管理员地址列表
-            const adminAddresses = [
-                '8z8ye8QG5xUVmLB1D41HEhWDLHNXAVZiJx1FL9HVYWiR', // 示例1
-                '5TCbnp8aUZgH9f21qXFQSm1M41esPrYFTAYJAHmPPQbY'  // 示例2
-            ];
+            // 备用逻辑：使用缓存的状态或其他方式判断
+            const cachedIsAdmin = localStorage.getItem('isAdmin') === 'true';
             
-            const isInAdminList = adminAddresses.includes(address);
-            console.log('钱包管理员状态(备用判断):', isInAdminList ? '是管理员' : '不是管理员');
+            if (this.isConnected() && this.address) {
+              // 获取管理员配置
+              const adminAddresses = [
+                // 可以在这里添加已知的管理员地址列表
+                '0x1234567890abcdef1234567890abcdef12345678'
+              ];
+              
+              // 检查当前钱包是否在管理员列表中
+              const isAdmin = adminAddresses.some(addr => 
+                addr.toLowerCase() === this.address.toLowerCase()
+              );
+              
+              console.log('钱包管理员状态(备用判断):', isAdmin ? '是管理员' : '不是管理员');
+              this.isAdmin = isAdmin;
+              this.updateAdminDisplay();
+              return isAdmin;
+            }
             
-            return isInAdminList;
-        } catch (error) {
-            console.error('检查管理员权限出错:', error);
             return false;
         }
     },
@@ -1132,84 +1133,51 @@ const walletState = {
             const walletType = this.getWalletType();
             
             if (!address) {
-                console.log('获取余额：钱包未连接');
-                return { 
-                    success: false, 
-                    reason: 'wallet_not_connected',
-                    balances: { 
-                        usdc: 0,
-                        sol: 0
-                    }
-                };
+                console.log('获取钱包余额 - 没有钱包地址');
+                return null;
             }
             
             console.log('获取钱包余额 - 地址:', address, '类型:', walletType);
             
-            // 添加时间戳避免缓存
+            // 添加时间戳以避免缓存
             const timestamp = new Date().getTime();
-            const apiUrl = `/api/wallet/balance?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
+            
+            // 修改API路径从/api/wallet/balance到/service/wallet/status/
+            const apiUrl = `/service/wallet/status/${address}?_=${timestamp}`;
             console.log('请求余额API:', apiUrl);
             
-            try {
-                const response = await fetch(apiUrl);
-                
-                if (!response.ok) {
-                    console.log('获取余额API失败:', response.status, response.statusText);
-                    // 不要直接抛出错误，使用备用方法继续
-                } else {
-                    const data = await response.json();
-                    
-                    if (data && data.success) {
-                        return data;
-                    }
-                }
-            } catch (apiError) {
-                console.debug('获取余额API请求异常:', apiError);
-                // 不要抛出错误，继续使用备用方法
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+              throw new Error(`${response.status} ${response.statusText}`);
             }
             
-            // 备用方法：使用已保存的余额或区块链直接查询
+            const data = await response.json();
+            
+            // 处理API响应格式
+            if (data.success) {
+              // 使用balance_sol或balance字段
+              const balance = data.balance_sol || data.balance || 0;
+              console.log('获取到钱包余额:', balance);
+              this.updateBalanceDisplay(balance);
+              this.triggerBalanceUpdatedEvent();
+              return balance;
+            } else {
+              console.error('获取余额API返回错误:', data.error);
+              return null;
+            }
+        } catch (error) {
+            console.error('获取余额API失败:', error.message);
             console.log('API获取余额失败，使用备用方法');
             
-            // 备用方法1：使用之前保存的余额
-            const savedBalance = localStorage.getItem('walletBalance');
-            if (savedBalance) {
-                try {
-                    const parsedBalance = JSON.parse(savedBalance);
-                    return {
-                        success: true,
-                        address: address,
-                        wallet_type: walletType,
-                        balances: parsedBalance
-                    };
-                } catch (e) {
-                    console.debug('解析保存的余额数据失败:', e);
-                }
+            // 备用方法：从本地存储获取余额
+            const cachedBalance = localStorage.getItem('walletBalance');
+            if (cachedBalance) {
+              const balance = parseFloat(cachedBalance);
+              this.updateBalanceDisplay(balance);
+              return balance;
             }
             
-            // 备用方法2：返回默认值
-            return {
-                success: true,
-                address: address,
-                wallet_type: walletType,
-                balances: {
-                    usdc: 0,
-                    sol: 0
-                }
-            };
-        } catch (error) {
-            console.error('获取钱包余额失败:', error);
-            
-            // 返回一个默认对象而不是抛出错误
-            return {
-                success: false,
-                reason: 'error',
-                error: error.message,
-                balances: {
-                    usdc: 0,
-                    sol: 0
-                }
-            };
+            return null;
         }
     },
     
