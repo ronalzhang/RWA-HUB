@@ -814,8 +814,8 @@ const walletState = {
             const walletType = this.getWalletType();
             const timestamp = new Date().getTime();
             
-            // 修改API路径从/api/user/check_admin到/api/admin/check_admin
-            const apiUrl = `/api/admin/check_admin?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
+            // 修改API路径从/api/admin/check_admin到/api/admin/check
+            const apiUrl = `/api/admin/check?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
             console.log('调用管理员检查API:', apiUrl);
             
             const response = await fetch(apiUrl);
