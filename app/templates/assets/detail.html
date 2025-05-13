@@ -3308,7 +3308,7 @@ async function checkSolanaUSDCBalance(walletAddress) {
     console.log('检查钱包USDC余额:', walletAddress);
     try {
         // 调用API获取余额
-        const response = await fetch(`/api/wallet/token_balance?address=${walletAddress}&token=USDC&_=${Date.now()}`);
+        const response = await fetch(`/api/service/wallet/token_balance?address=${walletAddress}&token=USDC&_=${Date.now()}`);
         if (!response.ok) {
             throw new Error('获取余额接口请求失败');
         }
