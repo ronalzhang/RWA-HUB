@@ -2,9 +2,7 @@ import os
 from flask import jsonify, current_app, Blueprint, request
 from app.blockchain.asset_service import AssetService
 from app.blockchain.solana import SolanaClient
-
-# 创建蓝图实例
-service_bp = Blueprint('service', __name__)
+from . import service_bp  # 从__init__.py导入正确的蓝图
 
 @service_bp.route('/wallet/status')
 def service_wallet_status():
