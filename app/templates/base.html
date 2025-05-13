@@ -1346,10 +1346,12 @@
     </script>
     
     {% block scripts %}
-    <!-- 加载核心JavaScript - 仅加载jquery和bootstrap，避免重复加载其他脚本 -->
+    <!-- 加载核心JavaScript -->
     {% if not js_loaded %}
     <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dividend.js') }}"></script>
     {% endif %}
     <!-- 页面特定脚本可以在此添加 -->
     {% endblock %}

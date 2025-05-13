@@ -6,6 +6,60 @@
 // 全局变量，用于存储timeout ID
 let buyTimeoutId = null;
 
+// 平台费率配置
+const PLATFORM_FEE_RATE = 0.035; // 3.5%平台费率
+
+/**
+ * 计算平台费用
+ * @param {number} amount - 金额
+ * @returns {number} - 平台费用
+ */
+function calculatePlatformFee(amount) {
+  return amount * PLATFORM_FEE_RATE;
+}
+
+/**
+ * 更新价格显示
+ * 替代已删除的asset_price_display.js功能
+ */
+function updatePriceDisplay() {
+  try {
+    // 获取必要元素
+    const amountInput = document.getElementById('purchase-amount');
+    const totalPriceDisplay = document.getElementById('totalPrice');
+    const buyButton = document.getElementById('buy-button');
+    
+    if (!amountInput || !totalPriceDisplay || !buyButton) {
+      console.log('价格更新：找不到必要元素');
+      return;
+    }
+    
+    // 获取价格和数量
+    const pricePerToken = parseFloat(buyButton.getAttribute('data-token-price')) || 0;
+    const amount = parseInt(amountInput.value) || 0;
+    
+    // 计算总价
+    const totalPrice = (amount * pricePerToken).toFixed(2);
+    totalPriceDisplay.value = totalPrice;
+    
+    console.log(`价格更新：${amount} × ${pricePerToken} = ${totalPrice}`);
+  } catch (error) {
+    console.error('更新价格显示失败:', error);
+  }
+}
+
+// 页面加载时更新价格
+document.addEventListener('DOMContentLoaded', function() {
+  // 初始化价格显示
+  updatePriceDisplay();
+  
+  // 监听输入变化
+  const amountInput = document.getElementById('purchase-amount');
+  if (amountInput) {
+    amountInput.addEventListener('input', updatePriceDisplay);
+  }
+});
+
 /**
  * 处理购买资产的函数
  * @param {string} assetId - 资产ID
