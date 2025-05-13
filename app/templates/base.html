@@ -1233,6 +1233,7 @@
     <script src="{{ url_for('static', filename='js/wallet_api_fix.js') }}"></script>
     <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
     <script src="{{ url_for('static', filename='js/buy_button_fix.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dividend_fix.js') }}"></script>
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -1375,7 +1376,17 @@
          */
     </script>
     
-    {% block scripts %}{% endblock %}
+    {% block scripts %}
+    <!-- 加载核心JavaScript -->
+    <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <!-- 修复脚本 -->
+    <script src="{{ url_for('static', filename='js/wallet_api_fix.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dividend_fix.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/asset_price_display.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/payment_interceptor.js') }}"></script>
+    {% endblock %}
 
     <!-- Purchase Confirmation Modal -->
     <div class="modal fade" id="buyModal" tabindex="-1" aria-labelledby="buyModalLabel" aria-hidden="true">

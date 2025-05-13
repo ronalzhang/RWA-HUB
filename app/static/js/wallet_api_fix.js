@@ -1,7 +1,7 @@
 /**
  * RWA-HUB 钱包API修复脚本
  * 解决API 404错误和资产ID不一致问题
- * 版本: 1.6.0 - 修复浏览器卡死问题，优化性能
+ * 版本: 1.6.1 - 修复timeoutId未定义错误，优化性能
  */
 
 // 防止重复初始化
@@ -10,7 +10,7 @@ if (window.walletApiFixInitialized) {
 } else {
   // 设置初始化标志
   window.walletApiFixInitialized = true;
-  console.log('[钱包API] 初始化修复脚本 v1.6.0');
+  console.log('[钱包API] 初始化修复脚本 v1.6.1');
 
   // 安全执行函数 - 防止任何操作导致页面卡死
   function safeExecute(fn, fallback, timeout = 5000) {
@@ -291,10 +291,12 @@ if (window.walletApiFixInitialized) {
       
       while (attempt < maxAttempts) {
         attempt++;
+        let timeoutId = null; // 确保在每次循环中都定义timeoutId
+        
         try {
           // 设置超时
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+          timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
           
           if (!finalOptions.signal) {
             finalOptions.signal = controller.signal;
@@ -349,7 +351,9 @@ if (window.walletApiFixInitialized) {
           }
           
         } catch (error) {
-          clearTimeout(timeoutId);
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
           lastError = error;
           
           // 如果是中止的请求，不再重试
