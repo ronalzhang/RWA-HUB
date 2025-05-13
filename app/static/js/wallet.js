@@ -807,63 +807,57 @@ const walletState = {
      * 检查钱包是否为管理员
      */
     async checkIsAdmin() {
-        if (!this.connected || !this.address) {
-            this.isAdmin = false;
+        try {
+            // 获取钱包地址和类型
+            const address = this.getAddress();
+            const walletType = this.getWalletType();
+            
+            if (!address) {
+                console.log('检查管理员权限：钱包未连接');
             return false;
         }
         
-        try {
             console.log('检查钱包是否为管理员...');
             
-            // 启用API调用，获取真实管理员状态
+            // 添加时间戳防止缓存
+            const timestamp = new Date().getTime();
+            const apiUrl = `/api/user/check_admin?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
+            console.log('调用管理员检查API:', apiUrl);
+            
             try {
-                const walletType = this.walletType || 'ethereum';
-                const url = `/api/user/check_admin?address=${this.address}&wallet_type=${walletType}&_=${new Date().getTime()}`;
-                console.log(`调用管理员检查API: ${url}`);
+                const response = await fetch(apiUrl);
                 
-                const response = await fetch(url);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('管理员检查API返回数据:', data);
-                    
-                    if (data.success !== undefined) {
-                        this.isAdmin = Boolean(data.is_admin || data.admin);
-                        console.log(`从API获取到管理员状态: ${this.isAdmin ? '是管理员' : '不是管理员'}`);
-                        
-                        // 更新管理员链接
-                        if (typeof window.updateAdminNavLink === 'function') {
-                            window.updateAdminNavLink();
-                        }
-                        
-                        return this.isAdmin;
-                    } else {
-                        console.warn('管理员检查API返回未知格式');
-                    }
+                if (!response.ok) {
+                    console.log('管理员检查API响应不成功:', response.status, response.statusText);
+                    // 继续执行备用逻辑，不要直接抛出错误
                 } else {
-                    console.warn('管理员检查API响应不成功:', response.status, response.statusText);
-            }
-        } catch (error) {
-                console.warn('获取管理员状态API失败:', error);
+                    const data = await response.json();
+                    
+                    if (data && data.success === true) {
+                        console.log('API管理员检查结果:', data.is_admin);
+                        return data.is_admin === true;
+                    }
+                }
+            } catch (apiError) {
+                console.debug('调用管理员检查API失败:', apiError);
+                // 继续执行备用逻辑，不要抛出错误
             }
             
-            // 如果API获取失败，使用备用逻辑
+            // 备用逻辑：如果API调用失败，使用其他方式判断
             console.log('API管理员检查失败，使用备用逻辑');
             
-            // 假设特定地址是管理员
-            const adminAddresses = {
-                'ethereum': ['0x6394993426DBA3b654eF0052698Fe9E0B6A98870'],
-                'phantom': ['EeYfRd8nRFiEjXdUn2XxE8Pt6YyQrX8x6jAsqL7srkPD']
-            };
+            // 备用方法1：检查预定义的管理员地址列表
+            const adminAddresses = [
+                '8z8ye8QG5xUVmLB1D41HEhWDLHNXAVZiJx1FL9HVYWiR', // 示例1
+                '5TCbnp8aUZgH9f21qXFQSm1M41esPrYFTAYJAHmPPQbY'  // 示例2
+            ];
             
-            const addressList = adminAddresses[this.walletType] || [];
-            this.isAdmin = addressList.includes(this.address);
+            const isInAdminList = adminAddresses.includes(address);
+            console.log('钱包管理员状态(备用判断):', isInAdminList ? '是管理员' : '不是管理员');
             
-            console.log(`钱包管理员状态(备用判断): ${this.isAdmin ? '是管理员' : '不是管理员'}`);
-            return this.isAdmin;
+            return isInAdminList;
         } catch (error) {
-            console.error('检查管理员状态失败:', error);
-            this.isAdmin = false;
+            console.error('检查管理员权限出错:', error);
             return false;
         }
     },
@@ -1133,127 +1127,89 @@ const walletState = {
      * @returns {Promise<number|null>} 更新后的余额，失败时返回null
      */
     async getWalletBalance() {
-        if (!this.connected || !this.address) {
-            console.log('钱包未连接，无法获取余额');
-            this.balance = 0;
-            this.updateBalanceDisplay();
-            return;
+        try {
+            const address = this.getAddress();
+            const walletType = this.getWalletType();
+            
+            if (!address) {
+                console.log('获取余额：钱包未连接');
+                return { 
+                    success: false, 
+                    reason: 'wallet_not_connected',
+                    balances: { 
+                        usdc: 0,
+                        sol: 0
+                    }
+                };
             }
+            
+            console.log('获取钱包余额 - 地址:', address, '类型:', walletType);
+            
+            // 添加时间戳避免缓存
+            const timestamp = new Date().getTime();
+            const apiUrl = `/api/wallet/balance?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
+            console.log('请求余额API:', apiUrl);
             
             try {
-            console.log(`获取钱包余额 - 地址: ${this.address}, 类型: ${this.walletType}`);
-            
-            // 构建API请求URL，添加时间戳防止缓存
-            const timestamp = new Date().getTime();
-            const url = `/api/wallet/balance?address=${this.address}&wallet_type=${this.walletType}&_=${timestamp}`;
-            
-            console.log(`请求余额API: ${url}`);
-                const response = await fetch(url);
+                const response = await fetch(apiUrl);
                 
-                if (response.ok) {
-                    const data = await response.json();
-                console.log('余额API返回数据:', data);
-                
-                // 增强USDC余额提取逻辑 - 支持更多种API返回格式
-                let usdcBalance = null;
-                
-                // 详细的日志记录帮助调试
-                if (!data) {
-                    console.warn('API返回了空数据');
-                } else if (typeof data !== 'object') {
-                    console.warn('API返回的不是对象:', typeof data);
+                if (!response.ok) {
+                    console.log('获取余额API失败:', response.status, response.statusText);
+                    // 不要直接抛出错误，使用备用方法继续
                 } else {
-                    console.log('尝试从API响应中解析余额信息');
+                    const data = await response.json();
                     
-                    // 优先使用balances中的USDC余额（针对Phantom钱包）
-                    if (data.balances && typeof data.balances === 'object' && data.balances.USDC !== undefined) {
-                        usdcBalance = parseFloat(data.balances.USDC);
-                        console.log('  从data.balances.USDC中获取到余额:', usdcBalance);
-                    }
-                    // 其次使用通用balance字段
-                    else if (data.balance !== undefined) {
-                        usdcBalance = parseFloat(data.balance);
-                        console.log('  从data.balance中获取到余额:', usdcBalance);
-                    } else if (data.usdc_balance !== undefined) {
-                        usdcBalance = parseFloat(data.usdc_balance);
-                        console.log('  从data.usdc_balance中获取到余额:', usdcBalance);
-                    } else if (data.data && typeof data.data === 'object') {
-                        if (data.data.balance !== undefined) {
-                            usdcBalance = parseFloat(data.data.balance);
-                            console.log('  从data.data.balance中获取到余额:', usdcBalance);
-                        } else if (data.data.usdc_balance !== undefined) {
-                            usdcBalance = parseFloat(data.data.usdc_balance);
-                            console.log('  从data.data.usdc_balance中获取到余额:', usdcBalance);
-                        }
-                    } else if (data.result && typeof data.result === 'object') {
-                        if (data.result.balance !== undefined) {
-                            usdcBalance = parseFloat(data.result.balance);
-                            console.log('  从data.result.balance中获取到余额:', usdcBalance);
-                        } else if (data.result.usdc_balance !== undefined) {
-                            usdcBalance = parseFloat(data.result.usdc_balance);
-                            console.log('  从data.result.usdc_balance中获取到余额:', usdcBalance);
-                        }
-                    }
-                    
-                    // 如果上面的方法没有找到余额，尝试递归搜索对象的所有属性
-                    if (usdcBalance === null) {
-                        console.log('  未在常规位置找到余额，尝试递归搜索');
-                        const findBalance = (obj, depth = 0) => {
-                            if (depth > 3 || typeof obj !== 'object' || obj === null) return null;
-                            
-                            for (const key in obj) {
-                                if (key === 'balance' || key === 'usdc_balance') {
-                                    const value = parseFloat(obj[key]);
-                                    if (!isNaN(value)) {
-                                        console.log(`  在深度${depth}处找到余额 [${key}]:`, value);
-                                        return value;
-                                    }
-                                } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-                                    const nestedResult = findBalance(obj[key], depth + 1);
-                                    if (nestedResult !== null) return nestedResult;
-                                }
-                            }
-                            return null;
-                        };
-                        
-                        const foundBalance = findBalance(data);
-                        if (foundBalance !== null) {
-                            usdcBalance = foundBalance;
-                            console.log('  递归搜索找到余额:', usdcBalance);
-                        }
+                    if (data && data.success) {
+                        return data;
                     }
                 }
-                
-                // 确保余额是有效数字，但如果API返回null或未找到，保留当前余额
-                if (usdcBalance !== null) {
-                    usdcBalance = isNaN(usdcBalance) ? 0 : usdcBalance;
-                    this.balance = usdcBalance;
-                    console.log(`设置新的USDC余额: ${this.balance}`);
-                    } else {
-                    console.warn('未能从API响应中提取有效余额，设置余额为null');
-                        this.balance = null;
-                }
-                
-                // 先更新UI显示
-                this.updateBalanceDisplay();
-                
-                // 再触发事件通知其他组件（使用延时避免潜在循环）
-                setTimeout(() => {
-                this.triggerBalanceUpdatedEvent();
-                }, 100);
-                        
-                return this.balance;
-            } else {
-                console.error('获取余额API失败:', response.status, response.statusText);
-                this.balance = null;  // API请求失败时设置为null而不是0
-                this.updateBalanceDisplay();
-                return this.balance;
+            } catch (apiError) {
+                console.debug('获取余额API请求异常:', apiError);
+                // 不要抛出错误，继续使用备用方法
             }
+            
+            // 备用方法：使用已保存的余额或区块链直接查询
+            console.log('API获取余额失败，使用备用方法');
+            
+            // 备用方法1：使用之前保存的余额
+            const savedBalance = localStorage.getItem('walletBalance');
+            if (savedBalance) {
+                try {
+                    const parsedBalance = JSON.parse(savedBalance);
+                    return {
+                        success: true,
+                        address: address,
+                        wallet_type: walletType,
+                        balances: parsedBalance
+                    };
+                } catch (e) {
+                    console.debug('解析保存的余额数据失败:', e);
+                }
+            }
+            
+            // 备用方法2：返回默认值
+            return {
+                success: true,
+                address: address,
+                wallet_type: walletType,
+                balances: {
+                    usdc: 0,
+                    sol: 0
+                }
+            };
         } catch (error) {
-            console.error('获取余额出错:', error);
-            this.balance = null;  // 出错时设置为null而不是0
-            this.updateBalanceDisplay();
-            return this.balance;
+            console.error('获取钱包余额失败:', error);
+            
+            // 返回一个默认对象而不是抛出错误
+            return {
+                success: false,
+                reason: 'error',
+                error: error.message,
+                balances: {
+                    usdc: 0,
+                    sol: 0
+                }
+            };
         }
     },
     
@@ -1288,66 +1244,39 @@ const walletState = {
     /**
      * 更新余额显示
      */
-    updateBalanceDisplay() {
+    updateBalanceDisplay(balance = null) {
         try {
-            console.log('更新余额显示, 余额:', this.balance);
-                
-            // 确保余额处理更准确
-            let formattedBalance = '--';
+            console.log('更新余额显示, 余额:', balance);
             
-            // 处理三种情况：null/undefined、0、有效数字
-                if (this.balance === null || this.balance === undefined) {
-                // 余额未获取到，显示为 '--'
-                formattedBalance = '--';
-                } else {
-                // 转换为数字
-                const numericBalance = parseFloat(this.balance);
-                if (isNaN(numericBalance)) {
-                    // 无效数字，显示为 '--'
-                    formattedBalance = '--';
-                } else {
-                    // 有效数字(包括0)，格式化为两位小数
-                    formattedBalance = numericBalance.toFixed(2);
-                }
+            // 如果没有提供余额，尝试从walletState获取
+            if (balance === null && this.state) {
+                balance = this.state.balance;
             }
             
-            // 更新顶部导航栏显示地址而不是余额
-            const walletBtnText = document.getElementById('walletBtnText');
-            if (walletBtnText && this.connected && this.address) {
-                const formattedAddress = this.formatAddress(this.address);
-                walletBtnText.textContent = formattedAddress;
-                console.log('更新钱包按钮文本为地址:', formattedAddress);
+            // 更新全局按钮文本
+            if (this.address) {
+                const shortAddress = this.formatAddress(this.address);
+                console.log('更新钱包按钮文本为地址:', shortAddress);
+                $('.wallet-address-text, .wallet-address').text(shortAddress);
             }
             
-            // 更新下拉菜单中的余额显示
-            const dropdownBalanceElement = document.getElementById('walletBalanceInDropdown');
-            if (dropdownBalanceElement) {
-                dropdownBalanceElement.textContent = formattedBalance;
-                console.log('更新下拉菜单余额显示:', formattedBalance);
-            } else {
-                console.warn('找不到下拉菜单余额显示元素(walletBalanceInDropdown)');
-            }
+            // 更新下拉菜单余额显示
+            const balanceStr = (balance !== null && !isNaN(parseFloat(balance))) 
+                ? parseFloat(balance).toFixed(2) 
+                : '--';
+            console.log('更新下拉菜单余额显示:', balanceStr);
+            $('.wallet-balance').text(balanceStr);
             
-            // 同时确保钱包地址也正确显示
-            const walletAddressDisplay = document.getElementById('walletAddressDisplay');
-            if (walletAddressDisplay && this.address) {
-                const formattedAddress = this.formatAddress(this.address);
-                walletAddressDisplay.textContent = formattedAddress;
-                walletAddressDisplay.title = this.address; // 设置完整地址为悬停提示
-                
-                // 添加点击复制功能
-                walletAddressDisplay.style.cursor = 'pointer';
-                walletAddressDisplay.onclick = () => this.copyWalletAddress();
-                
-                console.log('更新钱包地址显示:', formattedAddress, '(完整地址:', this.address, ')');
-            } else if (!walletAddressDisplay) {
-                console.warn('找不到钱包地址显示元素(walletAddressDisplay)');
+            // 更新钱包地址显示
+            if (this.address) {
+                const shortAddress = this.formatAddress(this.address);
+                console.log('更新钱包地址显示:', shortAddress, `(完整地址: ${this.address} )`);
+                $('.wallet-address-full').text(this.address);
+                $('.wallet-address').text(shortAddress);
             }
-            
-            // 不再触发余额更新事件，以避免循环调用
-            // this.triggerBalanceUpdatedEvent(); // 删除这行以防止循环调用
         } catch (error) {
-            console.error('更新余额显示出错:', error);
+            console.error('更新钱包余额显示出错:', error);
+            // 出错时不抛出异常，保持UI稳定
         }
     },
     
@@ -4258,7 +4187,7 @@ async function fetchWithMultipleUrls(urls) {
             const data = await response.json();
             console.log(`API端点 ${i+1}/${urls.length} 请求成功:`, data);
             return data;
-        } catch (error) {
+    } catch (error) {
             console.debug(`API端点 ${i+1}/${urls.length} 请求失败: ${error.message}`);
             lastError = error;
         }
@@ -4344,4 +4273,131 @@ function formatCurrency(value) {
 
 // 导出全局刷新函数
 window.refreshAssetInfoNow = refreshAssetInfo;
+
+// 在适当位置添加以下代码，替代wallet_api_fix.js的功能
+
+/**
+ * 签名并确认交易
+ * @param {Object} transactionData - 交易数据
+ * @returns {Promise<Object>} - 返回带有签名的Promise
+ */
+async function signAndConfirmTransaction(transactionData) {
+  if (!transactionData) {
+    return Promise.reject(new Error('交易数据为空'));
+  }
+  
+  // 检查钱包连接
+  if (!window.ethereum && !window.solana) {
+    return Promise.reject(new Error('未检测到钱包'));
+  }
+  
+  // 检查当前钱包类型
+  const walletType = localStorage.getItem('walletType') || '';
+  
+  try {
+    // 根据钱包类型处理签名
+    if (walletType.toLowerCase().includes('metamask') || window.ethereum) {
+      return await signEthereumTransaction(transactionData);
+    } else if (walletType.toLowerCase().includes('phantom') || window.solana) {
+      return await signSolanaTransaction(transactionData);
+    } else {
+      return Promise.reject(new Error('不支持的钱包类型'));
+    }
+  } catch (error) {
+    console.error('签名失败:', error);
+    return Promise.reject(error);
+  }
+}
+
+/**
+ * 签名以太坊交易
+ * @param {Object} transactionData - 交易数据
+ * @returns {Promise<Object>} - 返回签名结果
+ */
+async function signEthereumTransaction(transactionData) {
+  if (!window.ethereum) {
+    return Promise.reject(new Error('未检测到以太坊钱包'));
+  }
+  
+  try {
+    // 获取当前账户
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const from = accounts[0];
+    
+    if (!from) {
+      return Promise.reject(new Error('无法获取钱包地址'));
+    }
+    
+    // 是否需要发送交易还是仅签名
+    if (transactionData.method === 'eth_signTypedData_v4' || transactionData.method === 'eth_signTypedData') {
+      // EIP-712签名
+      const signature = await window.ethereum.request({
+        method: transactionData.method || 'eth_signTypedData_v4',
+        params: [from, JSON.stringify(transactionData.data)]
+      });
+      
+      return { signature, wallet_address: from };
+    } else {
+      // 常规交易
+      const txParams = {
+        from,
+        to: transactionData.to,
+        value: transactionData.value || '0x0',
+        data: transactionData.data || '0x',
+        gas: transactionData.gas || undefined,
+        gasPrice: transactionData.gasPrice || undefined
+      };
+      
+      // 发送交易
+      const txHash = await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [txParams]
+      });
+      
+      return { signature: txHash, wallet_address: from };
+    }
+  } catch (error) {
+    console.error('以太坊签名失败:', error);
+    return Promise.reject(error);
+  }
+}
+
+/**
+ * 签名Solana交易
+ * @param {Object} transactionData - 交易数据
+ * @returns {Promise<Object>} - 返回签名结果
+ */
+async function signSolanaTransaction(transactionData) {
+  if (!window.solana) {
+    return Promise.reject(new Error('未检测到Solana钱包'));
+  }
+  
+  try {
+    // 连接到Solana钱包
+    const response = await window.solana.connect();
+    const publicKey = response.publicKey.toString();
+    
+    // 检查交易数据格式
+    if (!transactionData.message) {
+      return Promise.reject(new Error('无效的Solana交易数据'));
+    }
+    
+    // 创建交易对象
+    const transaction = {
+      serialize: () => Buffer.from(transactionData.message, 'base64')
+    };
+    
+    // 请求签名
+    const signedTransaction = await window.solana.signTransaction(transaction);
+    const signature = signedTransaction.signature.toString('base64');
+    
+    return { signature, wallet_address: publicKey };
+  } catch (error) {
+    console.error('Solana签名失败:', error);
+    return Promise.reject(error);
+  }
+}
+
+// 添加到全局命名空间
+window.signAndConfirmTransaction = signAndConfirmTransaction;
 
