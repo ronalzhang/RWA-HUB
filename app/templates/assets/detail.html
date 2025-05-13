@@ -3403,8 +3403,7 @@ async function transferUSDC(fromAddress, toAddress, amount) {
 </script>
 
 {% block scripts %}
-{{ super() }}
-<!-- 仅保留以下脚本，因为它们不在base.html中 -->
-<script src="{{ url_for('static', filename='js/asset_price_display.js') }}"></script>
-<script src="{{ url_for('static', filename='js/payment_interceptor.js') }}"></script>
+<!-- 仅加载必要的脚本 -->
+{% set js_loaded = true %}
+<script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
 {% endblock %}

@@ -12,15 +12,97 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
 var/
-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# virtualenv
+venv/
+.venv/
+ENV/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Rust/Cargo
+target/
+**/*.rs.bk
+Cargo.lock
+
+# Platform specific
+platform-tools*/
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 编译产物
+*.o
+*.a
+*.dylib
+*.so
+*.dll
+*.exe
+
+# 局部配置及敏感信息
+.env
+.env.local
+*.pem
+*.key
+keypair.json
+*-keypair.json
+deployer-keypair.json
+
+# 数据库相关
+*.db
+*.db-journal
+*.sqlite3
+*.sqlite3-journal
+*.db.backup
+
+# 日志
+logs/
+*.log
+
+# 备份文件
+*.bak
+*backup*
+*.old
+*.orig
+*.tmp
+
+# 临时文件
+temp/
+tmp/
+*.tmp
+**/temp/**
+instance/
+
+# 上传文件
+app/static/uploads/
+
+# 其他二进制文件
+*.bin
+*.dat
+*.tar
+*.gz
+*.zip
+*.rar
+*.7z
+*.pdf
+*.docx
+*.xlsx
+
+# Debug文件
+*debug*
 
 # 项目文档和设计文件（不推送到仓库）
 *.md
@@ -39,10 +121,6 @@ wheels/
 # PM2配置文件
 ecosystem.config.js
 ecosystem.config.json
-
-# 备份文件
-*.bak
-app.db.backup
 
 # 虚拟环境
 venv/
