@@ -522,4 +522,120 @@ class AssetService:
         except Exception as e:
             logger.error(f"获取代币余额过程中发生错误: {str(e)}")
             logger.error(traceback.format_exc())
-            return 0.0 
+            return 0.0
+
+    @staticmethod
+    def get_user_assets(wallet_address, wallet_type='metamask'):
+        """
+        获取用户的资产列表
+        
+        Args:
+            wallet_address: 钱包地址
+            wallet_type: 钱包类型
+            
+        Returns:
+            list: 用户的资产列表
+        """
+        try:
+            logger.info(f"开始获取用户 {wallet_address} 的资产列表，钱包类型: {wallet_type}")
+            
+            # 验证输入参数
+            if not wallet_address:
+                logger.error("钱包地址为空")
+                return []
+            
+            # 针对不同钱包类型进行地址格式化
+            if wallet_type.lower() in ['phantom', 'solflare', 'solana']:
+                # Solana钱包地址保持原样
+                formatted_address = wallet_address
+            else:
+                # 以太坊钱包地址转小写
+                formatted_address = wallet_address.lower() if wallet_address.startswith('0x') else wallet_address
+            
+            logger.info(f"格式化后的钱包地址: {formatted_address}")
+            
+            # 从数据库查询用户的资产
+            from app.models import Asset, AssetOwnership, Trade
+            from app import db
+            from sqlalchemy import or_, and_
+            
+            # 先查询用户直接拥有的资产
+            owned_assets = Asset.query.filter(
+                Asset.owner_address == formatted_address,
+                Asset.status > 0  # 排除已删除资产
+            ).all()
+            
+            # 再查询用户通过交易获得的资产
+            asset_ownerships = AssetOwnership.query.filter_by(
+                owner_address=formatted_address,
+                status='active'
+            ).all()
+            
+            # 查询交易中的资产
+            trade_assets = db.session.query(Asset).join(
+                Trade, Asset.id == Trade.asset_id
+            ).filter(
+                Trade.buyer_address == formatted_address,
+                Trade.status == 'completed'
+            ).all()
+            
+            # 合并所有资产并去重
+            all_assets = []
+            asset_ids = set()
+            
+            # 添加直接拥有的资产
+            for asset in owned_assets:
+                if asset.id not in asset_ids:
+                    asset_ids.add(asset.id)
+                    all_assets.append({
+                        'id': asset.id,
+                        'name': asset.name,
+                        'token_symbol': asset.token_symbol,
+                        'token_price': asset.token_price,
+                        'token_supply': asset.token_supply,
+                        'remaining_supply': asset.remaining_supply,
+                        'image_url': asset.image_url,
+                        'asset_type': asset.asset_type,
+                        'ownership_type': 'creator'
+                    })
+            
+            # 添加通过所有权表拥有的资产
+            for ownership in asset_ownerships:
+                asset = Asset.query.get(ownership.asset_id)
+                if asset and asset.id not in asset_ids:
+                    asset_ids.add(asset.id)
+                    all_assets.append({
+                        'id': asset.id,
+                        'name': asset.name,
+                        'token_symbol': asset.token_symbol,
+                        'token_price': asset.token_price,
+                        'token_supply': asset.token_supply,
+                        'remaining_supply': asset.remaining_supply,
+                        'image_url': asset.image_url,
+                        'asset_type': asset.asset_type,
+                        'ownership_type': 'ownership',
+                        'amount': ownership.amount
+                    })
+            
+            # 添加通过交易获得的资产
+            for asset in trade_assets:
+                if asset.id not in asset_ids:
+                    asset_ids.add(asset.id)
+                    all_assets.append({
+                        'id': asset.id,
+                        'name': asset.name,
+                        'token_symbol': asset.token_symbol,
+                        'token_price': asset.token_price,
+                        'token_supply': asset.token_supply,
+                        'remaining_supply': asset.remaining_supply,
+                        'image_url': asset.image_url,
+                        'asset_type': asset.asset_type,
+                        'ownership_type': 'trade'
+                    })
+            
+            logger.info(f"找到 {len(all_assets)} 个资产")
+            return all_assets
+            
+        except Exception as e:
+            logger.exception(f"获取用户资产列表异常: {str(e)}")
+            return [] 
