@@ -1,6 +1,6 @@
 /**
  * 简化版购买处理脚本
- * 版本：1.0.1
+ * 版本：1.2.0 - 重构支付流程，增强稳定性
  */
 
 // 全局变量，用于存储timeout ID (使用window对象避免重复声明)
@@ -70,9 +70,12 @@ document.addEventListener('DOMContentLoaded', function() {
  * @param {HTMLElement} buyButton - 购买按钮元素
  */
 function handleBuy(assetId, amountInput, buyButton) {
+  console.log('购买函数被调用:', { assetId });
+  
   // 如果已有计时器运行，清除它
   if (window.buyTimeoutId) {
     clearTimeout(window.buyTimeoutId);
+    window.buyTimeoutId = null;
   }
   
   // 防止重复点击
@@ -91,6 +94,7 @@ function handleBuy(assetId, amountInput, buyButton) {
   if (!assetId) {
     console.error('资产ID未提供');
     resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
+    showError('资产ID未提供，无法完成交易');
     return;
   }
   
@@ -106,43 +110,166 @@ function handleBuy(assetId, amountInput, buyButton) {
   }
   
   if (!amount || amount <= 0) {
-    alert('请输入有效的购买数量');
+    showError('请输入有效的购买数量');
     resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
     return;
   }
   
   // 检查钱包连接状态
-  const walletAddress = localStorage.getItem('walletAddress');
-  if (!walletAddress) {
-    alert('请先连接您的钱包');
-    resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
+  const walletConnected = isWalletConnected();
+  if (!walletConnected) {
+    showError('请先连接您的钱包');
+    resetButton(buyButton, '<i class="fas fa-wallet me-2"></i>请先连接钱包');
+    buyButton.disabled = true;
     return;
   }
+  
+  // 获取钱包信息
+  const walletAddress = getWalletAddress();
+  const walletType = getWalletType();
   
   // 准备购买数据
   const purchaseData = {
     asset_id: assetId,
     amount: amount,
-    wallet_address: walletAddress
+    wallet_address: walletAddress,
+    wallet_type: walletType
   };
   
   // 显示加载状态
-  if (typeof showLoadingState === 'function') {
-    showLoadingState('正在准备购买...');
-  }
+  showLoadingState('正在准备购买...');
   
   // 发送准备购买请求
+  console.log('发送准备购买请求:', purchaseData);
   fetch('/api/trades/prepare_purchase', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Wallet-Address': walletAddress
+      'X-Wallet-Address': walletAddress,
+      'X-Wallet-Type': walletType || 'unknown'
     },
     body: JSON.stringify(purchaseData)
   })
   .then(response => {
     if (!response.ok) {
-      throw new Error(`HTTP error ${response.status}`);
+      throw new Error(`服务器错误: ${response.status}`);
+    }
+    return response.json();
+  })
+  .then(data => {
+    console.log('准备购买响应:', data);
+    
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    
+    // 获取接收地址和金额
+    const recipientAddress = data.recipient_address || data.platform_address;
+    const totalAmount = parseFloat(data.total_amount || data.amount);
+    
+    if (!recipientAddress || isNaN(totalAmount) || totalAmount <= 0) {
+      throw new Error('服务器返回的支付信息不完整');
+    }
+    
+    // 更新加载状态
+    showLoadingState('请在钱包中确认交易...');
+    
+    // 检查钱包API是否可用
+    if (!window.walletState || typeof window.walletState.transferSolanaToken !== 'function') {
+      throw new Error('钱包API不可用，无法完成支付');
+    }
+    
+    // 跟踪交易详情
+    purchaseData.recipient_address = recipientAddress;
+    purchaseData.total_amount = totalAmount;
+    purchaseData.purchase_id = data.purchase_id || data.id;
+    
+    // 执行支付
+    console.log(`使用钱包API执行USDC转账: ${totalAmount} USDC 到 ${recipientAddress}`);
+    return window.walletState.transferSolanaToken('USDC', recipientAddress, totalAmount)
+      .then(paymentResult => {
+        if (!paymentResult.success) {
+          throw new Error(paymentResult.error || '钱包转账失败');
+        }
+        
+        console.log('支付成功，交易哈希:', paymentResult.txHash);
+        
+        // 确认购买
+        return confirmPurchase(
+          purchaseData.purchase_id, 
+          paymentResult.txHash,
+          purchaseData.asset_id,
+          walletAddress,
+          amount
+        );
+      });
+  })
+  .then(result => {
+    console.log('购买完成:', result);
+    
+    // 显示成功消息
+    showSuccessMessage('购买成功！', `您已成功购买 ${amount} 个代币，交易将在链上确认后到账。`);
+    
+    // 重置按钮状态
+    resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
+    
+    // 隐藏加载状态
+    hideLoadingState();
+    
+    // 延迟刷新页面以显示最新状态
+    window.buyTimeoutId = setTimeout(() => {
+      window.location.reload();
+    }, 3000);
+  })
+  .catch(error => {
+    console.error('购买处理失败:', error);
+    
+    // 显示错误消息
+    showError(error.message || '购买失败，请稍后重试');
+    
+    // 重置按钮状态
+    resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
+    
+    // 隐藏加载状态
+    hideLoadingState();
+  });
+}
+
+/**
+ * 确认购买函数
+ * @param {string} purchaseId - 购买ID
+ * @param {string} signature - 交易签名
+ * @param {string} assetId - 资产ID
+ * @param {string} walletAddress - 钱包地址
+ * @param {number} amount - 购买数量
+ */
+function confirmPurchase(purchaseId, signature, assetId, walletAddress, amount) {
+  // 更新加载状态
+  showLoadingState('正在确认购买...');
+  
+  // 确认购买数据
+  const confirmData = { 
+    purchase_id: purchaseId,
+    signature: signature,
+    asset_id: assetId,
+    wallet_address: walletAddress,
+    amount: amount
+  };
+  
+  console.log('发送确认购买请求:', confirmData);
+  
+  // 发送确认购买请求
+  return fetch('/api/trades/confirm_purchase', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Wallet-Address': walletAddress
+    },
+    body: JSON.stringify(confirmData)
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`确认请求失败: ${response.status}`);
     }
     return response.json();
   })
@@ -151,107 +278,14 @@ function handleBuy(assetId, amountInput, buyButton) {
       throw new Error(data.error);
     }
     
-    // 处理响应
-    console.log('准备购买成功', data);
-    
-    // 如果需要进行钱包签名
-    if (data.requires_signature && typeof signAndConfirmTransaction === 'function') {
-      // 更新加载状态
-      if (typeof showLoadingState === 'function') {
-        showLoadingState('请在钱包中确认交易...');
-      }
-      
-      // 调用钱包签名函数
-      signAndConfirmTransaction(data.transaction_data)
-        .then(signatureData => {
-          // 确认购买
-          confirmPurchase(data.purchase_id, signatureData.signature);
-        })
-        .catch(error => {
-          console.error('钱包签名失败', error);
-          alert('交易签名失败，请重试');
-          resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
-          if (typeof hideLoadingState === 'function') {
-            hideLoadingState();
-          }
-        });
-    } else {
-      // 无需签名，直接确认购买
-      confirmPurchase(data.purchase_id);
-    }
-  })
-  .catch(error => {
-    console.error('准备购买失败', error);
-    alert(`购买失败: ${error.message}`);
-    resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
-    if (typeof hideLoadingState === 'function') {
-      hideLoadingState();
-    }
+    console.log('确认购买成功:', data);
+    return {
+      success: true,
+      transaction_hash: signature,
+      purchase_id: purchaseId,
+      message: '购买已确认，交易将在链上完成后到账'
+    };
   });
-  
-  /**
-   * 确认购买函数
-   * @param {string} purchaseId - 购买ID
-   * @param {string} signature - 可选的签名数据
-   */
-  function confirmPurchase(purchaseId, signature = null) {
-    // 确认购买数据
-    const confirmData = { purchase_id: purchaseId };
-    if (signature) {
-      confirmData.signature = signature;
-    }
-    
-    // 更新加载状态
-    if (typeof showLoadingState === 'function') {
-      showLoadingState('正在确认购买...');
-    }
-    
-    // 发送确认购买请求
-    fetch('/api/trades/confirm_purchase', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Wallet-Address': walletAddress
-      },
-      body: JSON.stringify(confirmData)
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error ${response.status}`);
-      }
-      return response.json();
-    })
-    .then(data => {
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      
-      // 购买成功
-      console.log('购买成功', data);
-      alert('购买成功！');
-      
-      // 重置按钮状态
-      resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
-      
-      // 隐藏加载状态
-      if (typeof hideLoadingState === 'function') {
-        hideLoadingState();
-      }
-      
-      // 延迟刷新页面以显示最新状态
-      window.buyTimeoutId = setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-    })
-    .catch(error => {
-      console.error('确认购买失败', error);
-      alert(`购买失败: ${error.message}`);
-      resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
-      if (typeof hideLoadingState === 'function') {
-        hideLoadingState();
-      }
-    });
-  }
 }
 
 /**
@@ -280,24 +314,12 @@ function updateBuyButtonState() {
     return;
   }
   
-  // 检查钱包状态
-  let isConnected = false;
-  
-  // 方法1: 检查walletState对象
-  if (window.walletState) {
-    if (window.walletState.connected || window.walletState.isConnected) {
-      isConnected = true;
-    }
-  }
-  
-  // 方法2: 检查localStorage中的钱包地址
-  if (!isConnected) {
-    const walletAddress = localStorage.getItem('walletAddress');
-    isConnected = !!walletAddress;
-  }
+  // 检查钱包连接状态
+  const walletConnected = isWalletConnected();
+  console.log('钱包状态检查:', { connected: walletConnected });
   
   // 更新按钮状态
-  if (isConnected) {
+  if (walletConnected) {
     console.log('钱包已连接，启用购买按钮');
     buyButton.disabled = false;
     buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
@@ -307,6 +329,160 @@ function updateBuyButtonState() {
     buyButton.disabled = true;
     buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
     buyButton.title = '请先连接钱包';
+  }
+}
+
+/**
+ * 检查钱包是否已连接
+ * @returns {boolean} - 钱包是否已连接
+ */
+function isWalletConnected() {
+  // 方法1: 检查walletState对象
+  if (window.walletState) {
+    if (window.walletState.connected || window.walletState.isConnected) {
+      return true;
+    }
+  }
+  
+  // 方法2: 检查localStorage中的钱包地址
+  const walletAddress = localStorage.getItem('walletAddress');
+  return !!walletAddress;
+}
+
+/**
+ * 获取钱包地址
+ * @returns {string|null} - 钱包地址
+ */
+function getWalletAddress() {
+  // 方法1: 从walletState获取
+  if (window.walletState && window.walletState.address) {
+    return window.walletState.address;
+  }
+  
+  // 方法2: 从localStorage获取
+  return localStorage.getItem('walletAddress');
+}
+
+/**
+ * 获取钱包类型
+ * @returns {string} - 钱包类型
+ */
+function getWalletType() {
+  // 方法1: 从walletState获取
+  if (window.walletState && window.walletState.walletType) {
+    return window.walletState.walletType;
+  }
+  
+  // 方法2: 从localStorage获取
+  return localStorage.getItem('walletType') || 'unknown';
+}
+
+/**
+ * 显示错误消息
+ * @param {string} message - 错误消息
+ */
+function showError(message) {
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: '错误',
+      text: message,
+      icon: 'error',
+      confirmButtonText: '确定'
+    });
+  } else {
+    alert(message);
+  }
+}
+
+/**
+ * 显示成功消息
+ * @param {string} title - 标题
+ * @param {string} message - 成功消息
+ */
+function showSuccessMessage(title, message) {
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: title,
+      text: message,
+      icon: 'success',
+      confirmButtonText: '确定'
+    });
+  } else {
+    alert(`${title}: ${message}`);
+  }
+}
+
+/**
+ * 显示加载状态
+ * @param {string} message - 加载消息
+ */
+function showLoadingState(message = '处理中...') {
+  if (typeof window.showLoadingOverlay === 'function') {
+    window.showLoadingOverlay(message);
+  } else {
+    // 创建加载遮罩层
+    let loadingOverlay = document.getElementById('buyLoadingOverlay');
+    
+    if (!loadingOverlay) {
+      loadingOverlay = document.createElement('div');
+      loadingOverlay.id = 'buyLoadingOverlay';
+      loadingOverlay.className = 'loading-overlay';
+      loadingOverlay.innerHTML = `
+        <div class="loading-spinner">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="mt-2 loading-message">${message}</p>
+        </div>
+      `;
+      
+      // 添加样式
+      const style = document.createElement('style');
+      style.textContent = `
+        .loading-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.5);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 9999;
+        }
+        .loading-spinner {
+          background-color: white;
+          padding: 20px;
+          border-radius: 5px;
+          text-align: center;
+        }
+      `;
+      document.head.appendChild(style);
+      
+      document.body.appendChild(loadingOverlay);
+    } else {
+      // 更新消息
+      const messageElement = loadingOverlay.querySelector('.loading-message');
+      if (messageElement) {
+        messageElement.textContent = message;
+      }
+      loadingOverlay.style.display = 'flex';
+    }
+  }
+}
+
+/**
+ * 隐藏加载状态
+ */
+function hideLoadingState() {
+  if (typeof window.hideLoadingOverlay === 'function') {
+    window.hideLoadingOverlay();
+  } else {
+    const loadingOverlay = document.getElementById('buyLoadingOverlay');
+    if (loadingOverlay) {
+      loadingOverlay.style.display = 'none';
+    }
   }
 }
 
@@ -329,22 +505,22 @@ function handleBuyButtonClick(event) {
     }
     
     if (!assetId) {
-      alert('无法确定资产ID');
+      showError('无法确定资产ID');
       return false;
     }
     
     // 获取购买数量
     const amountInput = document.querySelector('#purchase-amount, #amount-input, input[name="amount"]');
     if (!amountInput) {
-      alert('无法确定购买数量');
+      showError('无法确定购买数量');
       return false;
     }
     
-    // 调用全局购买函数
-    window.handleBuy(assetId, amountInput, button);
+    // 调用购买函数
+    handleBuy(assetId, amountInput, button);
   } catch (error) {
     console.error('点击处理失败:', error);
-    alert(error.message || '处理失败');
+    showError(error.message || '处理失败');
   }
   
   return false;
@@ -389,7 +565,7 @@ document.addEventListener('walletDisconnected', function() {
   console.log('钱包已断开连接，更新购买按钮状态');
   updateBuyButtonState();
 });
-
+    
 // 初始化
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function() {
