@@ -1339,25 +1339,84 @@ async function processPayment() {
             updateProgress(20, '{{ _("Requesting payment...") }}');
             
             // 从配置或API获取平台收款地址和发布费用
-            // TODO: 从后端API获取这些配置值，避免硬编码
-            const platformAddress = window.RWA_HUB_CONFIG?.platformFeeAddress || 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd'; // 后备硬编码
-            const publishingFeeText = document.getElementById('publishingFee').textContent;
-            const feeAmount = parseFloat(publishingFeeText) || window.RWA_HUB_CONFIG?.publishingFee || 1.0; // 后备硬编码
+            // 使用API动态获取这些配置值，避免硬编码
+            let platformAddress, feeAmount;
+            
+            try {
+                // 尝试从API获取最新的支付配置
+                const configResponse = await fetch('/api/config/payment_settings');
+                if (configResponse.ok) {
+                    const configData = await configResponse.json();
+                    platformAddress = configData.platform_address;
+                    feeAmount = configData.publishing_fee;
+                    console.log('从API获取支付配置成功:', configData);
+                }
+            } catch (configError) {
+                console.warn('从API获取支付配置失败，使用默认值:', configError);
+            }
+            
+            // 如果API获取失败，使用备用值
+            if (!platformAddress) {
+                platformAddress = window.RWA_HUB_CONFIG?.platformFeeAddress || 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd';
+            }
+            
+            if (!feeAmount) {
+                const publishingFeeText = document.getElementById('publishingFee').textContent;
+                feeAmount = parseFloat(publishingFeeText) || window.RWA_HUB_CONFIG?.publishingFee || 1.0;
+            }
 
             console.log(`准备支付 ${feeAmount} USDC 到平台地址: ${platformAddress}`);
+            updateProgress(25, '{{ _("Connecting to wallet...") }}');
+            
+            // 检查钱包状态
+            if (!window.walletState) {
+                throw new Error('{{ _("Wallet connection unavailable") }}');
+            }
+            
+            if (!window.walletState.connected || !window.walletState.address) {
+                throw new Error('{{ _("Please connect your wallet first") }}');
+            }
+            
+            // 检查钱包余额
+            try {
+                updateProgress(30, '{{ _("Checking wallet balance...") }}');
+                const balanceCheckResult = await window.walletState.checkTokenBalance('USDC');
+                if (balanceCheckResult && balanceCheckResult.balance !== undefined) {
+                    if (parseFloat(balanceCheckResult.balance) < feeAmount) {
+                        throw new Error(`{{ _("Insufficient USDC balance. Required: ") }}${feeAmount}, {{ _("Available: ") }}${balanceCheckResult.balance}`);
+                    }
+                    console.log(`钱包余额充足: ${balanceCheckResult.balance} USDC`);
+                }
+            } catch (balanceError) {
+                console.warn('余额检查失败，继续处理:', balanceError);
+                // 继续执行，让钱包自己处理余额不足的情况
+            }
             
             // 执行转账
             if (window.walletState && typeof window.walletState.transferToken === 'function') {
+                updateProgress(35, '{{ _("Requesting wallet approval...") }}');
                 console.log('使用钱包API执行USDC转账');
                 const result = await window.walletState.transferToken('USDC', platformAddress, feeAmount);
                 
                 if (result && result.success && result.txHash) {
                     console.log('转账初步成功:', result.txHash);
                     updateProgress(40, '{{ _("Payment submitted, creating asset...") }}');
+                    
+                    // 检查支付是否已被初步确认
+                    try {
+                        await checkInitialTransactionConfirmation(result.txHash);
+                        console.log('交易初步确认成功');
+                    } catch (confirmError) {
+                        console.warn('交易初步确认失败，但继续处理:', confirmError);
+                        // 继续创建资产，后端会再次确认
+                    }
+                    
                     hideLoadingState(); // 隐藏加载状态，让创建过程接管
                     resolve({
                         success: true,
-                        txHash: result.txHash
+                        txHash: result.txHash,
+                        amount: feeAmount,
+                        recipient: platformAddress
                     });
                 } else {
                     throw new Error('{{ _("Transfer failed") }}: ' + (result.error || '{{ _("Unknown error") }}'));
@@ -1371,6 +1430,44 @@ async function processPayment() {
             // 直接 reject 错误对象，让调用处处理
             reject(error);
         }
+    });
+}
+
+// 检查交易初步确认状态
+async function checkInitialTransactionConfirmation(txHash, maxAttempts = 3, interval = 1000) {
+    return new Promise((resolve, reject) => {
+        let attempts = 0;
+        
+        const checkStatus = async () => {
+            attempts++;
+            try {
+                const response = await fetch(`/api/transactions/status?tx_hash=${txHash}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                if (data.confirmed || data.status === 'confirmed' || data.status === 'finalized') {
+                    console.log(`交易 ${txHash} 已初步确认`);
+                    return resolve(true);
+                }
+                
+                if (attempts >= maxAttempts) {
+                    console.log(`达到最大尝试次数(${maxAttempts})，交易可能仍在处理中`);
+                    return resolve(false);
+                }
+                
+                setTimeout(checkStatus, interval);
+            } catch (error) {
+                console.warn(`检查交易状态出错(尝试 ${attempts}/${maxAttempts}):`, error);
+                if (attempts >= maxAttempts) {
+                    return reject(error);
+                }
+                setTimeout(checkStatus, interval);
+            }
+        };
+        
+        checkStatus();
     });
 }
 
@@ -1400,11 +1497,12 @@ async function processAssetCreation(formData, txHash) {
         updateProgress(70, '{{ _("Preparing asset data...") }}');
         
         // 构建请求数据，初始状态设置为 PENDING(1)
-        // 不再发送 payment_status 和 platform_address，后端会处理
+        // 确保包含支付交易信息
         const requestData = {
             ...formData,
             status: 1, // PENDING 状态
             payment_tx_hash: txHash, // 包含支付交易哈希
+            payment_confirmed: false, // 初始设置为未确认
             images: uploadedImages.map(file => file.url || ''),
             documents: uploadedDocuments.map(file => ({
                 name: file.file ? file.file.name : file.name || 'document.pdf',
@@ -1420,8 +1518,9 @@ async function processAssetCreation(formData, txHash) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Eth-Address': window.walletState.getAddress() || '',
-                'X-Wallet-Type': window.walletState.getWalletType() || ''
+                'X-Eth-Address': window.walletState?.getAddress() || '',
+                'X-Wallet-Type': window.walletState?.getWalletType() || '',
+                'X-Payment-Hash': txHash // 额外添加支付哈希在头信息中
             },
             body: JSON.stringify(requestData)
         });
@@ -1433,16 +1532,6 @@ async function processAssetCreation(formData, txHash) {
         }
         
         console.log('资产创建请求成功:', createResult);
-        
-        // -- 移除前端调用 /api/payments/register_pending --
-        // 后端 /api/assets/create 成功后应直接触发确认任务
-        /*
-        try {
-            // ... (旧的 register_pending 调用代码) ...
-        } catch (error) {
-            console.error('注册交易确认任务出错:', error);
-        }
-        */
        
         updateProgress(100, '{{ _("Asset creation request submitted!") }}');
         
@@ -1453,11 +1542,13 @@ async function processAssetCreation(formData, txHash) {
         // 立即跳转到资产详情页
         window.location.href = `/assets/${createResult.token_symbol}`;
         
+        return createResult;
     } catch (error) {
         console.error('{{ _("Asset creation error") }}:', error);
         hideLoadingState();
         showError(error.message || '{{ _("Processing error, please try again.") }}');
         disablePublishButtons(false);
+        throw error; // 重新抛出错误以便调用者处理
     }
 }
 
