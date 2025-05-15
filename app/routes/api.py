@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, g, current_app, session, url_for, flash, redirect, render_template, abort
+from flask import Blueprint, jsonify, request, g, current_app, session, url_for, flash, redirect, render_template, abort, send_file, Response
 import json
 import os
 import uuid
@@ -8,9 +8,17 @@ from decimal import Decimal
 from sqlalchemy import or_, and_, func, desc
 import traceback
 import re
+import requests
+from app.utils.utils import allowed_file, generate_filename, get_image_dimensions
+from app.models import Asset, User, Trade, AssetType
+from app.extensions import db
+from app.blockchain.solana_service import execute_transfer_transaction
 
 # 创建蓝图
 api_bp = Blueprint('api', __name__)
+
+# 日志记录器
+logger = logging.getLogger(__name__)
 
 @api_bp.route('/assets/list', methods=['GET'])
 def list_assets():
@@ -914,3 +922,64 @@ def get_asset_dividend_api(asset_id):
 def get_dividend_total_api(asset_id):
     """资产分红总额API的别名路由（兼容前端其他API路径）"""
     return get_dividend_stats_api(asset_id)
+
+@api_bp.route('/solana/execute_transfer_v2', methods=['POST'])
+def api_execute_transfer_v2():
+    """转发到service模块的execute_transfer_v2函数"""
+    try:
+        data = request.json
+        logger.info(f"API路由收到转账请求: {data}")
+        
+        # 验证必要参数 - 修复参数名称不匹配问题
+        required_fields = ['from_address', 'to_address', 'amount', 'token_symbol']
+        
+        # 前端传来的参数名称可能有所不同，进行兼容处理
+        mapped_data = {
+            'from_address': data.get('from_address') or data.get('fromAddress'),
+            'to_address': data.get('to_address') or data.get('toAddress'),
+            'amount': data.get('amount'),
+            'token_symbol': data.get('token_symbol') or data.get('token'),
+            'purpose': data.get('purpose'),
+            'metadata': data.get('metadata')
+        }
+        
+        # 检查必填字段
+        missing_fields = []
+        for field in required_fields:
+            if not mapped_data.get(field):
+                missing_fields.append(field)
+        
+        if missing_fields:
+            return jsonify({
+                'success': False,
+                'message': f'缺少必要字段: {", ".join(missing_fields)}'
+            }), 400
+        
+        # 执行转账
+        signature = execute_transfer_transaction(
+            token_symbol=mapped_data['token_symbol'],
+            from_address=mapped_data['from_address'],
+            to_address=mapped_data['to_address'],
+            amount=float(mapped_data['amount'])
+        )
+        
+        if signature:
+            return jsonify({
+                'success': True,
+                'signature': signature,
+                'message': '转账已提交到Solana网络'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '转账执行失败，未获取到签名'
+            }), 500
+            
+    except Exception as e:
+        error_msg = f"执行转账失败: {str(e)}"
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'message': error_msg
+        }), 500
