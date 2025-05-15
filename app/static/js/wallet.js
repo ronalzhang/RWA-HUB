@@ -2625,40 +2625,108 @@ checkIfReturningFromWalletApp(walletType) {
             console.log(`转账来源地址: ${from}`);
             
             // 4. USDC代币地址(Solana Mainnet)
-            const USDC_TOKEN_ADDRESS = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+            const usdcMint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
             
-            // 5. 构建转账请求参数
-            const transferParams = {
-                recipient: to,
-                amount: amount,
-                splToken: USDC_TOKEN_ADDRESS,
-                reference: null,
-                message: '资产发布费'
-            };
+            // 5. 使用API构建转账交易 - 不再使用window.solana.transfer方法
+            const buildTransferUrl = `/api/solana/build_transfer?from=${from}&to=${to}&amount=${amount}&token=${usdcMint}`;
+            console.log('请求构建转账交易:', buildTransferUrl);
             
-            console.log('发起Phantom钱包转账请求，参数:', transferParams);
+            const buildResponse = await fetch(buildTransferUrl);
+            if (!buildResponse.ok) {
+                throw new Error(`构建交易失败: ${buildResponse.status} ${buildResponse.statusText}`);
+            }
             
-            // 6. 发起转账请求
-            const {signature} = await window.solana.transfer(transferParams);
-            console.log('转账请求已提交，交易签名:', signature);
+            const buildData = await buildResponse.json();
+            if (!buildData.success || !buildData.serialized_transaction) {
+                throw new Error(buildData.error || '构建交易失败，未返回有效交易数据');
+            }
             
-            // 7. 返回成功结果
+            // 6. 解码Base64编码的序列化交易
+            const serializedTransaction = buildData.serialized_transaction;
+            console.log('从API获取的序列化交易:', serializedTransaction);
+            
+            // 7. 创建交易对象 - 确保solanaWeb3可用
+            let transaction;
+            const solanaLib = typeof solanaWeb3 !== 'undefined' ? solanaWeb3 : 
+                             (typeof window.solanaWeb3 !== 'undefined' ? window.solanaWeb3 : null);
+            
+            if (!solanaLib) {
+                throw new Error('Solana Web3库未加载，请确保页面已加载必要的依赖');
+            }
+            
+            transaction = solanaLib.Transaction.from(
+                Buffer.from(serializedTransaction, 'base64')
+            );
+            
+            // 8. 请求用户签名
+            console.log('请求用户签名交易...');
+            const signedTransaction = await window.solana.signTransaction(transaction);
+            
+            // 9. 发送已签名的交易
+            console.log('发送已签名的交易...');
+            const connection = new solanaLib.Connection(
+                'https://api.mainnet-beta.solana.com',
+                'confirmed'
+            );
+            
+            const signature = await connection.sendRawTransaction(
+                signedTransaction.serialize()
+            );
+            
+            console.log('交易已发送，签名:', signature);
+            
+            // 10. 返回成功结果
             return {
                 success: true,
                 txHash: signature,
                 error: null
             };
         } catch (error) {
-            // 记录详细错误信息
-            console.error('Solana转账失败:', error);
-            console.error('错误详情:', error);
-            
-            // 返回失败结果
-            return {
-                success: false,
-                txHash: null,
-                error: `转账失败: ${error.message || '未知错误'}`
-            };
+            // 如果上面的方法失败，尝试使用executeTransfer API
+            try {
+                console.log('直接转账方法失败，尝试使用API转账...');
+                
+                // 使用后端API执行转账
+                const apiResponse = await fetch('/api/solana/execute_transfer_v2', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        from_address: window.solana.publicKey.toString(),
+                        to_address: to,
+                        amount: amount,
+                        token_symbol: tokenSymbol
+                    })
+                });
+                
+                if (!apiResponse.ok) {
+                    throw new Error(`API转账失败: ${apiResponse.status} ${apiResponse.statusText}`);
+                }
+                
+                const apiData = await apiResponse.json();
+                if (!apiData.success) {
+                    throw new Error(apiData.error || 'API转账处理失败');
+                }
+                
+                return {
+                    success: true,
+                    txHash: apiData.tx_hash || apiData.signature,
+                    error: null
+                };
+            } catch (apiError) {
+                // 记录详细错误信息
+                console.error('Solana转账失败:', error);
+                console.error('API转账也失败:', apiError);
+                console.error('错误详情:', error);
+                
+                // 返回失败结果
+                return {
+                    success: false,
+                    txHash: null,
+                    error: `转账失败: ${error.message || '未知错误'}`
+                };
+            }
         }
     },
     

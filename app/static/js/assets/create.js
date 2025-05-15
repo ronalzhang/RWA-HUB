@@ -1467,6 +1467,23 @@ async function processPayment() {
             showLoadingState('处理支付交易...');
             updateProgress(20, '准备支付...');
             
+            // 检查并加载Solana Web3.js库
+            if (typeof solanaWeb3 === 'undefined') {
+                console.log('加载solanaWeb3库...');
+                try {
+                    await loadExternalScript('https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js');
+                    console.log('solanaWeb3库加载成功');
+                    
+                    // 确保全局变量可用
+                    if (typeof solanaWeb3 === 'undefined' && typeof solanaWeb3 !== 'undefined') {
+                        window.solanaWeb3 = solanaWeb3;
+                    }
+                } catch (loadError) {
+                    console.error('加载Solana Web3库失败:', loadError);
+                    throw new Error('无法加载必要的区块链库');
+                }
+            }
+            
             // 配置平台收款地址和费用（固定值，简化测试）
             let platformAddress = 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd';
             let feeAmount = 0.01; // 固定0.01 USDC的低费用用于测试
@@ -1482,46 +1499,56 @@ async function processPayment() {
                 }
             } catch (configError) {
                 console.warn('获取支付配置失败，使用默认值:', configError);
-                // 使用默认值继续
             }
             
-            updateProgress(40, '确认支付...');
+            console.log(`准备支付 ${feeAmount} USDC 到 ${platformAddress}`);
             
-            // 确保钱包已连接
-            if (!window.solana || !window.solana.isPhantom) {
-                throw new Error('请安装并连接Phantom钱包');
+            // 确保用户已连接钱包
+            const walletData = window.wallet.getCurrentWallet();
+            if (!walletData || !walletData.connected) {
+                console.log('钱包未连接，尝试连接钱包');
+                await checkAndConnectWallet();
             }
             
-            // 准备支付参数
-            const tokenSymbol = 'USDC';
-            const toAddress = platformAddress;
-            const amount = feeAmount;
-            
-            console.log(`准备支付 ${amount} ${tokenSymbol} 到 ${toAddress}`);
-            updateProgress(60, '发起转账...');
-            
-            // 获取表单数据
+            // 获取表单数据（用于后续创建资产）
             const formData = getAssetFormData();
+            console.log('获取的表单数据:', formData);
             
-            // 执行支付转账
-            const transferResult = await window.wallet.transferToken(tokenSymbol, toAddress, amount);
-            
-            if (!transferResult.success) {
-                console.error('支付失败:', transferResult.error);
-                throw new Error(`转账失败: ${transferResult.error}`);
+            if (!window.wallet) {
+                throw new Error('钱包接口不可用');
             }
             
-            console.log('支付成功, 交易哈希:', transferResult.txHash);
-            updateProgress(80, '支付完成，正在创建资产...');
-            
-            // 处理支付成功后的资产创建
-            await handlePaymentSuccess(transferResult.txHash, formData);
-            
-            resolve(transferResult);
+            try {
+                updateProgress(50, '处理支付...');
+                
+                // 发起转账
+                const result = await window.wallet.transferToken(
+                    'USDC',
+                    platformAddress,
+                    feeAmount
+                );
+                
+                // 检查转账结果
+                if (!result.success) {
+                    throw new Error(`转账失败: ${result.error || '未知原因'}`);
+                }
+                
+                console.log('支付成功，交易哈希:', result.txHash);
+                updateProgress(80, '支付成功，处理资产创建...');
+                
+                // 处理资产创建
+                await handlePaymentSuccess(result.txHash, formData);
+                
+                // 完成整个流程
+                resolve(result);
+            } catch (paymentError) {
+                console.error('支付失败:', paymentError);
+                throw new Error(`转账失败: ${paymentError.message || '支付处理出错'}`);
+            }
         } catch (error) {
             console.error('支付处理错误:', error);
-            updateProgress(0, '支付失败');
-            showError(`支付处理错误: ${error.message || '未知错误'}`);
+            updateProgress(0, '');
+            hideLoadingState();
             reject(error);
         }
     });
