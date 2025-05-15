@@ -55,7 +55,7 @@ def index():
                              _=_)
 
 @main_bp.route('/auth/login')
-def login():
+def main_login_view():
     """登录页面"""
     return render_template('auth/login.html', _=_)
 
