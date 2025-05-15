@@ -1026,3 +1026,111 @@ def api_execute_transfer_v2():
             'success': False, 
             'message': f"处理请求时发生异常: {str(e)}"
         }), 500
+
+@api_bp.route('/solana/build_transfer', methods=['GET'])
+def api_build_transfer():
+    """构建Solana SPL代币转账交易"""
+    try:
+        from_address = request.args.get('from')
+        to_address = request.args.get('to')
+        amount_str = request.args.get('amount')
+        token_mint = request.args.get('token')
+        
+        if not from_address or not to_address or not amount_str or not token_mint:
+            return jsonify({
+                'success': False,
+                'error': '缺少必要参数: from, to, amount, token'
+            }), 400
+        
+        try:
+            amount = float(amount_str)
+            if amount <= 0:
+                return jsonify({
+                    'success': False,
+                    'error': '金额必须大于0'
+                }), 400
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': '无效的金额格式'
+            }), 400
+        
+        # 导入Solana相关库
+        try:
+            from solana.rpc.api import Client
+            from solana.publickey import PublicKey
+            from solana.transaction import Transaction
+            from solana.system_program import TransferParams, transfer
+            import base64
+            from spl.token.instructions import get_associated_token_address, transfer as spl_transfer
+            from spl.token.constants import TOKEN_PROGRAM_ID
+        except ImportError as e:
+            logger.error(f"导入Solana库失败: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'服务器缺少必要的Solana库: {str(e)}'
+            }), 500
+        
+        # 连接到Solana网络
+        try:
+            client = Client("https://api.mainnet-beta.solana.com")
+        except Exception as e:
+            logger.error(f"连接Solana网络失败: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'连接Solana网络失败: {str(e)}'
+            }), 500
+        
+        # 创建公钥对象
+        try:
+            from_pubkey = PublicKey(from_address)
+            to_pubkey = PublicKey(to_address)
+            token_pubkey = PublicKey(token_mint)
+            
+            # 获取发送方的关联代币账户地址
+            from_token_account = get_associated_token_address(from_pubkey, token_pubkey)
+            
+            # 获取接收方的关联代币账户地址
+            to_token_account = get_associated_token_address(to_pubkey, token_pubkey)
+            
+            # 获取最新的区块哈希
+            recent_blockhash = client.get_recent_blockhash()['result']['value']['blockhash']
+            
+            # 创建交易对象
+            transaction = Transaction()
+            transaction.recent_blockhash = recent_blockhash
+            
+            # 将金额转换为lamports (USDC有6位小数)
+            amount_lamports = int(amount * 1_000_000)
+            
+            # 添加SPL Token转账指令
+            transfer_instruction = spl_transfer(
+                TOKEN_PROGRAM_ID,
+                from_token_account,
+                to_token_account,
+                from_pubkey,
+                amount_lamports
+            )
+            transaction.add(transfer_instruction)
+            
+            # 序列化交易
+            serialized_transaction = base64.b64encode(transaction.serialize()).decode('ascii')
+            
+            return jsonify({
+                'success': True,
+                'serialized_transaction': serialized_transaction,
+                'blockhash': recent_blockhash
+            })
+        except Exception as e:
+            logger.error(f"构建转账交易失败: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'构建转账交易失败: {str(e)}'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"处理构建转账请求时出错: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'处理请求时发生错误: {str(e)}'
+        }), 500
