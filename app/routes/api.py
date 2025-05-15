@@ -924,12 +924,12 @@ def get_dividend_total_api(asset_id):
 
 @api_bp.route('/solana/execute_transfer_v2', methods=['POST'])
 def api_execute_transfer_v2():
-    """转发到service模块的execute_transfer_v2函数"""
+    """使用服务器作为中转执行Solana转账交易"""
     try:
         data = request.json
         logger.info(f"API路由收到转账请求: {data}")
         
-        # 验证必要参数 - 修复参数名称不匹配问题
+        # 验证必要参数
         required_fields = ['from_address', 'to_address', 'amount', 'token_symbol']
         
         # 前端传来的参数名称可能有所不同，进行兼容处理
@@ -955,45 +955,12 @@ def api_execute_transfer_v2():
                 'message': f"缺少必要参数: {', '.join(missing_fields)}"
             }), 400
             
-        # 告知前端优先使用钱包直接转账而不是服务器执行
-        # 注释掉下面的代码以便让服务器执行转账
-        #if not os.environ.get('SOLANA_PRIVATE_KEY'):
-        #    logger.warning("服务器未配置Solana私钥，无法执行转账")
-        #    return jsonify({
-        #        'success': False,
-        #        'message': "服务器未配置Solana私钥，请使用钱包直接转账"
-        #    }), 400
-            
-        # 尝试执行转账 - 简化流程
-        try:
-            # 模拟成功结果 - 在实际环境中应该调用真实的转账函数
-            # 为了避免复杂的依赖问题，我们现在简单返回成功结果
-            # 对于资产创建场景而言，这个代币转账只是一个象征性的铸币费支付
-            # 后面可以通过交易记录系统处理真实的代币转移
-            
-            # 生成一个看起来合法的签名值
-            import hashlib
-            import time
-            signature_data = f"{mapped_data['from_address']}:{mapped_data['to_address']}:{mapped_data['amount']}:{time.time()}"
-            signature = hashlib.sha256(signature_data.encode()).hexdigest()
-            
-            logger.info(f"模拟支付成功，生成签名: {signature}")
-            
-            # 更新用户记录为已支付创建费用
-            # 这里可以添加你的数据库更新逻辑
-            
-            return jsonify({
-                'success': True,
-                'signature': signature,
-                'message': '转账已处理'
-            })
-            
-        except Exception as e:
-            logger.error(f"执行转账失败: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': f'执行转账失败: {str(e)}'
-            }), 500
+        # 通知前端需要使用钱包来执行交易，而不是由服务器代替执行
+        return jsonify({
+            'success': False,
+            'message': "请使用钱包直接执行交易，服务器不代替执行转账操作",
+            'requireWallet': True
+        }), 200
             
     except Exception as e:
         logger.error(f"API异常: {str(e)}")
@@ -1061,4 +1028,49 @@ def api_build_transfer():
         return jsonify({
             'success': False,
             'error': f'构建转账交易失败: {str(e)}'
+        }), 500
+
+@api_bp.route('/solana/relay', methods=['POST'])
+def solana_relay():
+    """Solana网络中继API - 让前端通过服务器连接Solana网络"""
+    try:
+        # 获取请求数据
+        relay_data = request.json
+        logger.info("收到Solana网络中继请求")
+        
+        if not relay_data:
+            logger.error("中继请求缺少数据")
+            return jsonify({'error': 'No data provided'}), 400
+            
+        # 设置Solana RPC节点URL
+        solana_rpc_url = os.environ.get("SOLANA_NETWORK_URL", "https://api.mainnet-beta.solana.com")
+        
+        # 转发请求到Solana网络
+        import requests
+        
+        solana_response = requests.post(
+            solana_rpc_url,
+            json=relay_data,
+            headers={
+                'Content-Type': 'application/json'
+            },
+            timeout=30  # 增加超时时间
+        )
+        
+        # 返回Solana网络响应
+        if solana_response.status_code == 200:
+            return jsonify(solana_response.json()), 200
+        else:
+            logger.error(f"Solana网络返回错误: {solana_response.status_code} - {solana_response.text}")
+            return jsonify({
+                'error': f"Solana网络返回错误: {solana_response.status_code}",
+                'details': solana_response.text
+            }), 502
+            
+    except Exception as e:
+        logger.error(f"处理Solana中继请求时出错: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'error': f"处理中继请求时出错: {str(e)}"
         }), 500
