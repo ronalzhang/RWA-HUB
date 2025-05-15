@@ -1463,86 +1463,144 @@ function showPaymentConfirmation() {
 async function processPayment() {
     return new Promise(async (resolve, reject) => {
         try {
-            console.log('开始处理支付...');
+            console.log('开始处理支付...')
             showLoadingState('处理支付交易...');
             updateProgress(20, '请求支付...');
             
-            // 确保solana web3对象可用
-            if (typeof solanaWeb3 === 'undefined') {
-                console.error('solanaWeb3库未加载');
-                // 尝试加载solanaWeb3库
-                try {
-                    await loadExternalScript('https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js');
-                    console.log('solanaWeb3库动态加载成功');
-                } catch (loadErr) {
-                    throw new Error('无法加载Solana Web3.js库，支付无法继续');
-                }
-            }
-            
             // 从配置或API获取平台收款地址和发布费用
-            let platformAddress = 'AKx2YJWMAcqVfGcHytJMLXjf5P7YQQHmYJSGzrS88wdj'; // 默认地址
-            let feeAmount = 0.01; // 默认发布费用 0.01 USDC
+            let platformAddress, feeAmount;
             
             try {
                 // 尝试从API获取最新的支付配置
                 const configResponse = await fetch('/api/config/payment_settings');
                 if (configResponse.ok) {
                     const configData = await configResponse.json();
-                    if (configData.platform_address) {
-                        platformAddress = configData.platform_address;
-                    }
-                    if (configData.publishing_fee) {
-                        feeAmount = configData.publishing_fee;
-                    }
+                    platformAddress = configData.platform_address;
+                    feeAmount = configData.publishing_fee;
                     console.log('从API获取支付配置成功:', configData);
                 }
             } catch (configError) {
                 console.warn('获取支付配置失败，使用默认值:', configError);
             }
             
-            updateProgress(30, '准备支付交易...');
-            
-            // 获取用户当前选择的钱包类型
-            const currentWallet = window.wallet.getCurrentWallet();
-            if (!currentWallet) {
-                throw new Error('请先连接钱包');
+            // 使用默认值作为后备方案
+            if (!platformAddress) {
+                platformAddress = 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd'; // 默认平台地址
             }
             
-            console.log('当前钱包:', currentWallet);
-            console.log(`准备支付 ${feeAmount} USDC 到 ${platformAddress}`);
+            if (!feeAmount) {
+                feeAmount = 0.01; // 默认发布费用为0.01 USDC，保持较低金额方便测试
+            }
             
-            updateProgress(50, '等待钱包确认...');
+            // 获取当前钱包信息 - 优先使用wallet接口，兼容walletState
+            let currentWallet = null;
+            let walletAddress = null;
+            
+            if (window.wallet && typeof window.wallet.getCurrentWallet === 'function') {
+                // 使用window.wallet接口
+                currentWallet = window.wallet.getCurrentWallet();
+                if (!currentWallet) {
+                    throw new Error('请先连接钱包');
+                }
+                walletAddress = currentWallet.address;
+            } else if (window.walletState) {
+                // 直接使用walletState
+                console.log('window.wallet接口不可用，使用walletState');
+                if (!window.walletState.connected) {
+                    throw new Error('请先连接钱包');
+                }
+                walletAddress = window.walletState.address;
+                currentWallet = {
+                    type: window.walletState.walletType,
+                    address: walletAddress,
+                    connected: true
+                };
+            } else {
+                // 尝试从localStorage获取
+                walletAddress = localStorage.getItem('walletAddress');
+                const walletType = localStorage.getItem('walletType');
+                if (!walletAddress || !walletType) {
+                    throw new Error('未连接钱包，请先连接钱包');
+                }
+                
+                currentWallet = {
+                    type: walletType,
+                    address: walletAddress,
+                    connected: true
+                };
+                console.log('从本地存储获取钱包信息:', currentWallet);
+            }
+            
+            // 验证钱包信息
+            if (!walletAddress) {
+                throw new Error('无法获取钱包地址，请重新连接钱包');
+            }
+            
+            console.log(`使用钱包地址: ${walletAddress}`);
+            
+            // 执行USDC转账
+            console.log(`准备向 ${platformAddress} 转账 ${feeAmount} USDC`);
+            updateProgress(40, '处理支付...');
+            
+            // 支付方法1: 使用window.wallet接口
+            let transferResult = null;
+            let transferError = null;
             
             try {
-                // 执行转账
-                const transferResult = await window.wallet.transferToken('USDC', platformAddress, feeAmount);
+                // 优先使用wallet.transferToken
+                if (window.wallet && typeof window.wallet.transferToken === 'function') {
+                    console.log('使用window.wallet.transferToken...');
+                    transferResult = await window.wallet.transferToken('USDC', platformAddress, feeAmount);
+                } 
+                // 备选: 使用walletState.transferToken
+                else if (window.walletState && typeof window.walletState.transferToken === 'function') {
+                    console.log('使用window.walletState.transferToken...');
+                    transferResult = await window.walletState.transferToken('USDC', platformAddress, feeAmount);
+                }
+                // 备选: 使用walletState.transferSolanaToken
+                else if (window.walletState && typeof window.walletState.transferSolanaToken === 'function') {
+                    console.log('使用window.walletState.transferSolanaToken...');
+                    transferResult = await window.walletState.transferSolanaToken('USDC', platformAddress, feeAmount);
+                }
+                // 备选: 直接使用API
+                else {
+                    throw new Error('无可用的转账方法，请检查钱包连接');
+                }
+                
                 console.log('转账结果:', transferResult);
                 
-                if (!transferResult.success) {
-                    throw new Error(`${_("Transfer failed")}: ${transferResult.error || '未知错误'}`);
+                if (!transferResult || !transferResult.success) {
+                    throw new Error(transferResult?.error || '转账失败，请检查余额或重试');
                 }
                 
-                // 存储交易哈希，后续可能需要用于验证
-                $('#tx_hash').val(transferResult.txHash);
+                // 提取交易哈希
+                const txHash = transferResult.txHash;
+                console.log('转账成功，交易哈希:', txHash);
                 
-                updateProgress(90, '支付成功，完成资产创建...');
-                resolve(transferResult.txHash);
-            } catch (transferError) {
-                console.error('支付处理错误:', transferError);
+                updateProgress(60, '支付完成，提交资产信息...');
                 
-                // 尝试备用支付方法 - 请求管理员手动处理
-                const approvePayment = confirm('标准支付方式失败。您希望请求管理员手动处理支付吗？（您将需要联系管理员并提供凭证）');
-                if (approvePayment) {
-                    $('#manual_payment').val('1');
-                    $('#tx_hash').val('manual_payment_requested');
-                    resolve('manual_payment');
-                } else {
-                    reject(transferError);
-                }
+                // 获取表单数据
+                const formData = getAssetFormData();
+                console.log('准备提交的表单数据:', formData);
+                
+                // 处理成功，提交资产创建请求
+                updateProgress(80, '创建资产...');
+                const result = await processAssetCreation(formData, txHash);
+                
+                showSuccessMessage('资产创建成功', `恭喜！您的资产 "${formData.name}" 已成功创建。`);
+                resolve(result);
+            } catch (error) {
+                console.error('支付处理错误:', error);
+                // 显示错误消息并拒绝Promise
+                showError(`{{ _("Payment processing error") }}: ${error.message}`);
+                reject(error);
             }
         } catch (error) {
             console.error('支付处理错误:', error);
+            showError(`{{ _("Payment processing error") }}`);
             reject(error);
+        } finally {
+            hideLoadingState();
         }
     });
 }
