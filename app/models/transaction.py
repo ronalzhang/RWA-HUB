@@ -1,66 +1,60 @@
-import enum
-from datetime import datetime
+"""
+交易模型 - 记录支付和转账相关信息
+"""
+
 from app.extensions import db
-from sqlalchemy import Index
+from datetime import datetime
+from enum import Enum
 
-class TransactionType(enum.Enum):
-    TRANSFER = 1           # 转账
-    PURCHASE = 2           # 购买资产
-    STAKING = 3            # 质押
-    UNSTAKING = 4          # 解除质押
-    CLAIM_REWARD = 5       # 领取奖励
-    MINT_TOKEN = 6         # 铸造代币
-    FEE = 7                # 手续费
-    REFUND = 8             # 退款
-    DIVIDEND = 9           # 分红
-    ASSET_LISTING = 10     # 资产上架
-    OTHER = 99             # 其他
+class TransactionStatus(Enum):
+    """交易状态枚举"""
+    PENDING = 'pending'
+    COMPLETED = 'completed'
+    FAILED = 'failed'
+    CANCELLED = 'cancelled'
 
-class TransactionStatus(enum.Enum):
-    PENDING = 1    # 待确认
-    CONFIRMED = 2  # 已确认
-    FAILED = 3     # 失败
-    CANCELLED = 4  # 已取消
+class TransactionType(Enum):
+    """交易类型枚举"""
+    PAYMENT = 'payment'
+    TRANSFER = 'transfer'
+    FEE = 'fee'
+    REFUND = 'refund'
+    OTHER = 'other'
 
 class Transaction(db.Model):
-    """区块链交易记录"""
+    """交易模型"""
     __tablename__ = 'transactions'
     
     id = db.Column(db.Integer, primary_key=True)
-    tx_hash = db.Column(db.String(100), unique=True, index=True)
-    tx_type = db.Column(db.Integer, nullable=False)  # TransactionType枚举值
-    status = db.Column(db.Integer, default=TransactionStatus.PENDING.value)
-    
-    # 区块链相关信息
-    blockchain = db.Column(db.String(20), nullable=False, default='solana')  # 'solana', 'ethereum'等
-    amount = db.Column(db.Float, nullable=True)
-    token_address = db.Column(db.String(64), nullable=True)
-    token_name = db.Column(db.String(50), nullable=True)
-    
-    # 交易相关方
-    from_address = db.Column(db.String(100), nullable=True, index=True)
-    to_address = db.Column(db.String(100), nullable=True, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=True)
-    
-    # 时间信息
+    from_address = db.Column(db.String(255), nullable=False, index=True)
+    to_address = db.Column(db.String(255), nullable=False, index=True)
+    amount = db.Column(db.Float, nullable=False)
+    token_symbol = db.Column(db.String(50), nullable=False)
+    signature = db.Column(db.String(255), nullable=True, unique=True)
+    status = db.Column(db.String(50), nullable=False, default=TransactionStatus.PENDING.value)
+    tx_type = db.Column(db.String(50), nullable=False, default=TransactionType.PAYMENT.value)
+    data = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    confirmed_at = db.Column(db.DateTime, nullable=True)
-    
-    # 附加信息
-    fee = db.Column(db.Float, nullable=True)
-    notes = db.Column(db.Text, nullable=True)
-    details = db.Column(db.Text, nullable=True)  # JSON格式的详细信息
-    
-    # 索引
-    __table_args__ = (
-        Index('idx_tx_user_asset', 'user_id', 'asset_id'),
-        Index('idx_tx_status_type', 'status', 'tx_type'),
-    )
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     def __repr__(self):
-        return f"<Transaction {self.id}: {self.tx_hash}>"
-    
+        return f'<Transaction {self.id}: {self.from_address} -> {self.to_address}, {self.amount} {self.token_symbol}>'
+        
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'from_address': self.from_address,
+            'to_address': self.to_address,
+            'amount': self.amount,
+            'token_symbol': self.token_symbol,
+            'signature': self.signature,
+            'status': self.status,
+            'tx_type': self.tx_type,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
     @property
     def type_name(self):
         """返回交易类型的名称"""
