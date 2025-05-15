@@ -20,3 +20,21 @@ USDC_TOKEN_ADDRESS = os.environ.get('USDC_TOKEN_ADDRESS', 'EPjFWdd5AufqSSqeM2qN1
 
 # 其他配置...
 # 如果有其他配置类，请确保添加到合适的类中或保持在全局 
+
+class Config:
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'secret-key-needs-to-be-changed'
+    
+    # 数据库配置
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///app.db'
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # 文件上传配置
+    UPLOAD_FOLDER = os.path.join(os.getcwd(), 'app', 'static', 'uploads')
+    MAX_CONTENT_LENGTH = 20 * 1024 * 1024  # 最大上传文件大小: 20MB
+    
+    # Solana配置
+    SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL') or 'https://api.mainnet-beta.solana.com'
+    SOLANA_ENDPOINT = os.environ.get('SOLANA_ENDPOINT') or 'https://api.mainnet-beta.solana.com'
+    SOLANA_PROGRAM_ID = os.environ.get('SOLANA_PROGRAM_ID') or 'RWAxxx111111111111111111111111111111111111'
+    SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT') or 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+    SOLANA_USDC_DECIMALS = 6 
