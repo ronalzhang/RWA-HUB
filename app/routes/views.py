@@ -52,7 +52,8 @@ def static_files(filename):
 
 # 认证页面路由
 @auth_bp.route('/login')
-def login():
+def auth_login_view():
+    """登录页面"""
     return render_template('auth/login.html')
 
 @auth_bp.route('/register')
