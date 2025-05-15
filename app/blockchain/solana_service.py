@@ -27,21 +27,8 @@ from app.models.trade import TradeType
 from datetime import datetime
 import base58
 
-# 尝试导入spl模块，如果不存在则使用模拟模块
-try:
-    from spl.token.constants import TOKEN_PROGRAM_ID
-except ImportError:
-    try:
-        # 尝试使用我们自己的模拟模块
-        from app.utils.spl_mock import Constants
-        TOKEN_PROGRAM_ID = Constants.TOKEN_PROGRAM_ID
-        logger = logging.getLogger(__name__)
-        logger.warning("使用模拟的spl模块")
-    except ImportError:
-        # 如果模拟模块也不可用，则使用硬编码的TOKEN_PROGRAM_ID
-        TOKEN_PROGRAM_ID = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-        logger = logging.getLogger(__name__)
-        logger.warning("未找到spl模块，使用硬编码的TOKEN_PROGRAM_ID")
+# 使用真实的TOKEN_PROGRAM_ID常量
+TOKEN_PROGRAM_ID = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
 
 # 获取日志记录器
 logger = logging.getLogger(__name__)
