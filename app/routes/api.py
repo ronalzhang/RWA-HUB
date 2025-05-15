@@ -1062,8 +1062,11 @@ def api_build_transfer():
             from solana.transaction import Transaction
             from solana.system_program import TransferParams, transfer
             import base64
-            from spl.token.instructions import get_associated_token_address, transfer as spl_transfer
-            from spl.token.constants import TOKEN_PROGRAM_ID
+            
+            # 使用内部兼容模块替代外部spl库
+            # 原始导入：from spl.token.instructions import get_associated_token_address, transfer as spl_transfer
+            from app.utils.spl.token.instructions import get_associated_token_address, transfer as spl_transfer
+            from app.utils.spl.token.constants import TOKEN_PROGRAM_ID
         except ImportError as e:
             logger.error(f"导入Solana库失败: {e}")
             return jsonify({
@@ -1094,7 +1097,27 @@ def api_build_transfer():
             to_token_account = get_associated_token_address(to_pubkey, token_pubkey)
             
             # 获取最新的区块哈希
-            recent_blockhash = client.get_recent_blockhash()['result']['value']['blockhash']
+            # 老版本: recent_blockhash = client.get_recent_blockhash()['result']['value']['blockhash']
+            # 新版本适配
+            try:
+                blockhash_resp = client.get_latest_blockhash()
+                if hasattr(blockhash_resp, 'value'):
+                    # 新版API
+                    recent_blockhash = blockhash_resp.value.blockhash
+                else:
+                    # 兼容旧版API
+                    recent_blockhash = blockhash_resp['result']['value']['blockhash']
+            except AttributeError:
+                # 尝试其他API格式
+                try:
+                    blockhash_resp = client.get_recent_blockhash()
+                    recent_blockhash = blockhash_resp['result']['value']['blockhash']
+                except Exception as e:
+                    logger.error(f"获取区块哈希失败: {e}")
+                    return jsonify({
+                        'success': False,
+                        'error': f'获取区块哈希失败: {str(e)}'
+                    }), 500
             
             # 创建交易对象
             transaction = Transaction()
