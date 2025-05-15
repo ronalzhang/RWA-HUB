@@ -695,6 +695,52 @@ def check_asset_owner(asset_id):
             'error': str(e)
         }), 500
 
+# 添加基于token_symbol的资产所有者检查API
+@assets_api_bp.route('/<string:token_symbol>/check_owner')
+@eth_address_required
+def check_asset_owner_by_symbol(token_symbol):
+    """基于token_symbol检查用户是否是资产所有者或管理员"""
+    try:
+        # 获取资产信息
+        asset = Asset.query.filter_by(token_symbol=token_symbol).first_or_404()
+        
+        # 检查权限
+        if not g.eth_address:
+            return jsonify({
+                'is_owner': False,
+                'is_admin': False,
+                'error': '未提供钱包地址'
+            }), 200
+            
+        # 检查是否是管理员或资产所有者
+        is_admin_user = is_admin(g.eth_address)
+        
+        owner_address = asset.owner_address
+        user_address = g.eth_address
+        
+        # 区分ETH和SOL地址的比较
+        if owner_address and user_address:
+            if owner_address.startswith('0x') and user_address.startswith('0x'):
+                # ETH地址比较时都转为小写
+                is_owner = user_address.lower() == owner_address.lower()
+            else:
+                # SOL地址或其他类型地址直接比较（大小写敏感）
+                is_owner = user_address == owner_address
+        else:
+            is_owner = False
+        
+        return jsonify({
+            'is_owner': is_owner,
+            'is_admin': is_admin_user
+        }), 200
+    except Exception as e:
+        current_app.logger.error(f'基于token_symbol检查资产所有权失败: {str(e)}')
+        return jsonify({
+            'is_owner': False,
+            'is_admin': False,
+            'error': str(e)
+        }), 500
+
 def allowed_file(filename, allowed_extensions):
     """检查文件类型是否允许"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
