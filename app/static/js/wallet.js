@@ -117,9 +117,23 @@ const walletState = {
                 if (storedWalletType === 'ethereum' && window.ethereum) {
                     canReconnect = true;
                     console.log('检测到以太坊钱包可用，将尝试重连');
-                } else if (storedWalletType === 'phantom' && window.solana && window.solana.isPhantom) {
-                    canReconnect = true;
-                    console.log('检测到Phantom钱包可用，将尝试重连');
+                } else if (storedWalletType === 'phantom') {
+                    // 修改逻辑：给Phantom钱包更多时间初始化
+                    if (window.solana && window.solana.isPhantom) {
+                        canReconnect = true;
+                        console.log('检测到Phantom钱包可用，将尝试重连');
+                    } else {
+                        // 新增：延迟检查Phantom钱包
+                        console.log('未立即检测到Phantom钱包，将延迟再次检查');
+                        setTimeout(() => {
+                            if (window.solana && window.solana.isPhantom) {
+                                console.log('延迟检测到Phantom钱包，现在可用');
+                                this.delayedPhantomReconnect();
+                            } else {
+                                console.log('延迟检测后仍未发现Phantom钱包，使用localStorage保持状态');
+                            }
+                        }, 2000); // 给插件2秒钟初始化时间
+                    }
                 } else if (storedWalletType === 'solana' && window.solana) {
                     canReconnect = true;
                     console.log('检测到Solana钱包可用，将尝试重连');
@@ -141,15 +155,6 @@ const walletState = {
                         
                         if (success) {
                             console.log('钱包重连成功');
-                            // 已经在connect方法内更新了UI，无需重复
-                            
-                            // 通知状态变化
-                            // -- 修改：使用 triggerWalletStateChanged 替代 notifyStateChange --
-                            // this.notifyStateChange({
-                            //     type: 'reconnect', 
-                            //     address: this.address,
-                            //     walletType: this.walletType
-                            // });
                             this.triggerWalletStateChanged(); // 触发事件
                         } else {
                             console.log('钱包重连失败，但保持界面状态');
@@ -2071,21 +2076,56 @@ async connectPhantom(isReconnect = false) {
             }
         }
         
-        // 检查Phantom钱包是否安装
+        // 增强型Phantom钱包检测 - 确保即使延迟加载也能正确检测
         if (!window.solana || !window.solana.isPhantom) {
-            console.error('Phantom钱包未安装');
+            console.log('暂未检测到Phantom钱包，尝试等待...');
             
-            // 在移动设备上，我们已经尝试过重定向到钱包App
-            if (this.isMobile() && returningFromWallet) {
-                showError('钱包连接未完成，请确保在Phantom App中授权连接');
-            } else if (!isReconnect) {
-                if (this.isMobile()) {
-                    showError('请在Phantom App中打开本页面，或使用桌面浏览器');
+            // 如果是重连操作，我们尝试等待一小段时间再检测
+            if (isReconnect || this.walletType === 'phantom') {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                if (!window.solana || !window.solana.isPhantom) {
+                    console.log('等待后仍未检测到Phantom钱包');
+                    
+                    // 如果有localStorage存储的Phantom地址，我们保持UI状态但不报错
+                    if (isReconnect && localStorage.getItem('walletAddress') && localStorage.getItem('walletType') === 'phantom') {
+                        console.log('使用localStorage存储的钱包状态');
+                        return false;
+                    }
+                    
+                    if (!isReconnect) {
+                        if (this.isMobile()) {
+                            showError('请在Phantom App中打开本页面，或使用桌面浏览器');
+                        } else {
+                            showError('请安装Phantom钱包浏览器扩展');
+                        }
+                    }
+                    return false;
                 } else {
-                    showError('请安装Phantom钱包浏览器扩展');
+                    console.log('等待后成功检测到Phantom钱包');
                 }
+            } else {
+                // 非重连模式下，检查是否有Phantom地址存储在localStorage
+                if (localStorage.getItem('walletType') === 'phantom' && localStorage.getItem('walletAddress')) {
+                    console.log('虽然未检测到Phantom钱包，但有存储的钱包地址，保持状态');
+                    this.connected = true;
+                    this.walletType = 'phantom';
+                    this.address = localStorage.getItem('walletAddress');
+                    this.updateUI();
+                    return false;
+                }
+                
+                console.error('Phantom钱包未安装或未加载');
+                
+                if (!isReconnect) {
+                    if (this.isMobile()) {
+                        showError('请在Phantom App中打开本页面，或使用桌面浏览器');
+                    } else {
+                        showError('请安装Phantom钱包浏览器扩展');
+                    }
+                }
+                return false;
             }
-            return false;
         }
         
         console.log('Phantom钱包状态:', {
@@ -3322,6 +3362,23 @@ checkIfReturningFromWalletApp(walletType) {
                 error: error.message || '未知错误'
             };
         }
+    },
+
+    // 添加一个新方法用于延迟重连到Phantom钱包
+    delayedPhantomReconnect() {
+        if (this.walletType !== 'phantom' || !this.address) return;
+        
+        console.log('执行延迟的Phantom钱包重连...');
+        this.connectPhantom(true).then(success => {
+            if (success) {
+                console.log('延迟Phantom钱包重连成功');
+                this.triggerWalletStateChanged();
+            } else {
+                console.log('延迟Phantom钱包重连失败，但保持UI状态');
+            }
+        }).catch(err => {
+            console.error('延迟Phantom钱包重连出错:', err);
+        });
     },
 }
 
