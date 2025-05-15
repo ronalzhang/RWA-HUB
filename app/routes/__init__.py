@@ -2,13 +2,11 @@ from flask import Blueprint
 
 # 创建蓝图
 main_bp = Blueprint('main', __name__)
-auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 assets_bp = Blueprint('assets', __name__, url_prefix='/assets')
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
 # API蓝图
 api_bp = Blueprint('api', __name__, url_prefix='/api')
-auth_api_bp = Blueprint('auth_api', __name__)
 assets_api_bp = Blueprint('assets_api', __name__, url_prefix='/api/assets')
 trades_api_bp = Blueprint('trades_api', __name__)
 admin_api_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
@@ -43,14 +41,10 @@ from .service import *
 # 注册蓝图函数
 def register_blueprints(app):
     """注册所有蓝图"""
-    from . import views, auth, admin, assets, api, service
+    from . import views, admin, assets, api, service
     
     # 注册主页蓝图
     app.register_blueprint(views.main_bp)
-    
-    # 注册认证蓝图
-    app.register_blueprint(auth.auth_bp, url_prefix='/auth')
-    app.register_blueprint(auth.auth_api_bp, url_prefix='/api/auth')
     
     # 注册管理后台蓝图
     app.register_blueprint(admin.admin_bp, url_prefix='/admin')
