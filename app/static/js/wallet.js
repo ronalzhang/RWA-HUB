@@ -2606,7 +2606,7 @@ checkIfReturningFromWalletApp(walletType) {
      */
     async transferSolanaToken(tokenSymbol, to, amount) {
         try {
-            console.log(`开始Solana ${tokenSymbol}转账，接收地址: ${to}, 金额: ${amount}`);
+            console.log(`开始执行真实Solana ${tokenSymbol}转账，接收地址: ${to}, 金额: ${amount}`);
             
             // 1. 检查Phantom钱包
             if (!window.solana || !window.solana.isPhantom) {
@@ -2622,59 +2622,151 @@ checkIfReturningFromWalletApp(walletType) {
             
             // 3. 获取当前钱包地址
             const fromPublicKey = window.solana.publicKey;
-            const from = fromPublicKey.toString();
-            console.log(`转账来源地址: ${from}`);
-            
-            // 4. 简化实现：直接调用后端API模拟支付
-            console.log('调用direct_transfer API...');
-            
-            // 构建请求数据
-            const requestData = {
-                from_address: from,
-                to_address: to,
-                amount: amount,
-                token_symbol: tokenSymbol,
-                purpose: '资产创建费用'
-            };
-            
-            // 调用API
-            const response = await fetch('/api/solana/direct_transfer', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestData)
-            });
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('支付API调用失败:', response.status, errorText);
-                throw new Error(`支付API调用失败: ${response.status}`);
+            if (!fromPublicKey) {
+                throw new Error('无法获取钱包公钥');
             }
             
-            const result = await response.json();
-            
-            if (!result.success) {
-                throw new Error(result.message || '支付处理失败');
+            // 4. 检查必要的库是否已加载
+            if (!window.solanaWeb3) {
+                // 动态加载Solana web3.js库
+                console.log('正在加载Solana Web3.js库...');
+                await this.loadSolanaLibraries();
             }
             
-            console.log('支付成功:', result);
+            // 5. 创建连接和公钥对象
+            const connection = new window.solanaWeb3.Connection(
+                'https://api.mainnet-beta.solana.com', 
+                'confirmed'
+            );
             
-            // 5. 返回成功结果
+            const fromPubkey = new window.solanaWeb3.PublicKey(fromPublicKey.toString());
+            const toPubkey = new window.solanaWeb3.PublicKey(to);
+            
+            // 6. 获取USDC Token Mint地址
+            const usdcMint = new window.solanaWeb3.PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // Mainnet USDC
+            
+            // 7. 获取相关的代币账户
+            const fromTokenAccount = await window.splToken.getAssociatedTokenAddress(
+                usdcMint,
+                fromPubkey
+            );
+            
+            const toTokenAccount = await window.splToken.getAssociatedTokenAddress(
+                usdcMint,
+                toPubkey
+            );
+            
+            // 8. 检查接收方的代币账户是否存在，如果不存在则创建
+            let transaction = new window.solanaWeb3.Transaction();
+            
+            // 检查接收账户是否存在
+            const toTokenAccountInfo = await connection.getAccountInfo(toTokenAccount);
+            if (!toTokenAccountInfo) {
+                console.log('接收方代币账户不存在，添加创建指令');
+                transaction.add(
+                    window.splToken.createAssociatedTokenAccountInstruction(
+                        fromPubkey,
+                        toTokenAccount,
+                        toPubkey,
+                        usdcMint
+                    )
+                );
+            }
+            
+            // 9. 准备转账金额（USDC有6位小数）
+            const lamportsAmount = Math.round(amount * 1000000); // 转换为USDC的最小单位
+            
+            // 10. 添加转账指令
+            transaction.add(
+                window.splToken.createTransferInstruction(
+                    fromTokenAccount,
+                    toTokenAccount,
+                    fromPubkey,
+                    lamportsAmount
+                )
+            );
+            
+            // 11. 获取最近的区块哈希
+            const { blockhash } = await connection.getRecentBlockhash();
+            transaction.recentBlockhash = blockhash;
+            transaction.feePayer = fromPubkey;
+            
+            // 12. 发送交易请求给钱包签名
+            console.log('请求钱包签名交易...');
+            const signed = await window.solana.signTransaction(transaction);
+            
+            // 13. 发送已签名的交易到网络
+            console.log('发送已签名交易到网络...');
+            const signature = await connection.sendRawTransaction(signed.serialize());
+            
+            // 14. 等待交易确认
+            console.log('等待交易确认，签名:', signature);
+            const confirmation = await connection.confirmTransaction(signature);
+            
+            if (confirmation.value.err) {
+                throw new Error(`交易确认出错: ${JSON.stringify(confirmation.value.err)}`);
+            }
+            
+            console.log('交易成功确认:', signature);
+            
+            // 15. 返回成功结果
             return {
                 success: true,
-                txHash: result.signature || 'simulated-tx-hash',
+                txHash: signature,
                 error: null
             };
             
         } catch (error) {
-            console.error('Solana转账失败:', error);
+            console.error('Solana链上转账失败:', error);
             return {
                 success: false,
                 txHash: null,
                 error: `转账失败: ${error.message || '未知错误'}`
             };
         }
+    },
+    
+    /**
+     * 加载Solana相关库
+     * @private
+     */
+    async loadSolanaLibraries() {
+        return new Promise((resolve, reject) => {
+            try {
+                // 检查是否已加载
+                if (window.solanaWeb3 && window.splToken) {
+                    return resolve();
+                }
+                
+                // 加载 solana/web3.js
+                const web3Script = document.createElement('script');
+                web3Script.src = 'https://cdn.jsdelivr.net/npm/@solana/web3.js@1.74.0/lib/index.iife.min.js';
+                web3Script.onload = () => {
+                    console.log('Solana Web3.js 库已加载');
+                    
+                    // 加载 SPL Token 库
+                    const splTokenScript = document.createElement('script');
+                    splTokenScript.src = 'https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.7/lib/index.iife.min.js';
+                    splTokenScript.onload = () => {
+                        console.log('SPL Token 库已加载');
+                        resolve();
+                    };
+                    splTokenScript.onerror = (e) => {
+                        console.error('加载SPL Token库失败:', e);
+                        reject(new Error('加载SPL Token库失败'));
+                    };
+                    document.head.appendChild(splTokenScript);
+                };
+                web3Script.onerror = (e) => {
+                    console.error('加载Solana Web3.js库失败:', e);
+                    reject(new Error('加载Solana Web3.js库失败'));
+                };
+                document.head.appendChild(web3Script);
+            } catch (error) {
+                console.error('加载Solana库出错:', error);
+                reject(error);
+            }
+        });
     },
     
     /**
