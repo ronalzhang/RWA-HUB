@@ -1,5 +1,5 @@
 from flask import render_template, send_from_directory, current_app, request, redirect, url_for, flash, session
-from . import main_bp, auth_bp, assets_bp
+from . import main_bp, assets_bp
 from .admin import admin_required, is_admin
 from ..models import Asset
 from ..models.asset import AssetStatus
@@ -49,16 +49,6 @@ import logging
 @main_bp.route('/static/<path:filename>')
 def static_files(filename):
     return send_from_directory(current_app.static_folder, filename)
-
-# 认证页面路由
-@auth_bp.route('/login')
-def auth_login_view():
-    """登录页面"""
-    return render_template('auth/login.html')
-
-@auth_bp.route('/register')
-def register():
-    return render_template('auth/register.html')
 
 # 资产页面路由
 @assets_bp.route('/create')

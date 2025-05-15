@@ -53,13 +53,3 @@ def index():
                              current_user_address=None,
                              AssetStatus=AssetStatus,
                              _=_)
-
-@main_bp.route('/auth/login')
-def main_login_view():
-    """登录页面"""
-    return render_template('auth/login.html', _=_)
-
-@main_bp.route('/auth/register')
-def register():
-    """注册页面"""
-    return render_template('auth/register.html', _=_)
