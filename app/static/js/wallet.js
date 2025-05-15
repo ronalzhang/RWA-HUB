@@ -2626,45 +2626,46 @@ checkIfReturningFromWalletApp(walletType) {
                 throw new Error('无法获取钱包公钥');
             }
             
-            // 4. 检查必要的库是否已加载
-            if (!window.solanaWeb3) {
-                // 动态加载Solana web3.js库
-                console.log('正在加载Solana Web3.js库...');
-                await this.loadSolanaLibraries();
-            }
+            // 4. 检查必要的库是否已加载并正确分配到全局变量
+            await this.ensureSolanaLibraries();
             
             // 5. 创建连接和公钥对象
-            const connection = new window.solanaWeb3.Connection(
+            const solanaWeb3 = window.solanaWeb3;
+            const splToken = window.splToken;
+            
+            const connection = new solanaWeb3.Connection(
                 'https://api.mainnet-beta.solana.com', 
                 'confirmed'
             );
             
-            const fromPubkey = new window.solanaWeb3.PublicKey(fromPublicKey.toString());
-            const toPubkey = new window.solanaWeb3.PublicKey(to);
+            const fromPubkey = new solanaWeb3.PublicKey(fromPublicKey.toString());
+            const toPubkey = new solanaWeb3.PublicKey(to);
             
             // 6. 获取USDC Token Mint地址
-            const usdcMint = new window.solanaWeb3.PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // Mainnet USDC
+            const usdcMint = new solanaWeb3.PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // Mainnet USDC
             
             // 7. 获取相关的代币账户
-            const fromTokenAccount = await window.splToken.getAssociatedTokenAddress(
+            console.log('获取代币账户...');
+            const fromTokenAccount = await splToken.getAssociatedTokenAddress(
                 usdcMint,
                 fromPubkey
             );
             
-            const toTokenAccount = await window.splToken.getAssociatedTokenAddress(
+            const toTokenAccount = await splToken.getAssociatedTokenAddress(
                 usdcMint,
                 toPubkey
             );
             
             // 8. 检查接收方的代币账户是否存在，如果不存在则创建
-            let transaction = new window.solanaWeb3.Transaction();
+            let transaction = new solanaWeb3.Transaction();
             
             // 检查接收账户是否存在
+            console.log('检查接收方账户...');
             const toTokenAccountInfo = await connection.getAccountInfo(toTokenAccount);
             if (!toTokenAccountInfo) {
                 console.log('接收方代币账户不存在，添加创建指令');
                 transaction.add(
-                    window.splToken.createAssociatedTokenAccountInstruction(
+                    splToken.createAssociatedTokenAccountInstruction(
                         fromPubkey,
                         toTokenAccount,
                         toPubkey,
@@ -2677,8 +2678,9 @@ checkIfReturningFromWalletApp(walletType) {
             const lamportsAmount = Math.round(amount * 1000000); // 转换为USDC的最小单位
             
             // 10. 添加转账指令
+            console.log('添加转账指令...');
             transaction.add(
-                window.splToken.createTransferInstruction(
+                splToken.createTransferInstruction(
                     fromTokenAccount,
                     toTokenAccount,
                     fromPubkey,
@@ -2687,6 +2689,7 @@ checkIfReturningFromWalletApp(walletType) {
             );
             
             // 11. 获取最近的区块哈希
+            console.log('获取区块哈希...');
             const { blockhash } = await connection.getRecentBlockhash();
             transaction.recentBlockhash = blockhash;
             transaction.feePayer = fromPubkey;
@@ -2727,43 +2730,131 @@ checkIfReturningFromWalletApp(walletType) {
     },
     
     /**
+     * 确保Solana库已经正确加载
+     */
+    async ensureSolanaLibraries() {
+        // 检查Solana Web3.js库
+        if (!window.solanaWeb3) {
+            if (window.solanaWeb3js) {
+                window.solanaWeb3 = window.solanaWeb3js;
+            } else if (window.solana && window.solana.web3) {
+                window.solanaWeb3 = window.solana.web3;
+            } else {
+                console.log('未找到已加载的Solana Web3.js库，尝试加载...');
+                await this.loadSolanaLibraries();
+            }
+        }
+        
+        // 检查SPL Token库
+        if (!window.splToken) {
+            if (window.spl && window.spl.token) {
+                window.splToken = window.spl.token;
+                console.log('已从window.spl.token初始化splToken库');
+            } else {
+                console.log('未找到已加载的SPL Token库，尝试加载...');
+                await this.loadSolanaLibraries();
+            }
+        }
+        
+        // 最终检查
+        if (!window.solanaWeb3 || !window.splToken) {
+            throw new Error('无法加载必要的Solana区块链库，请刷新页面重试');
+        }
+        
+        console.log('Solana库已准备就绪:', {
+            'solanaWeb3': !!window.solanaWeb3,
+            'splToken': !!window.splToken,
+            'hasGetAssociatedTokenAddress': !!(window.splToken && window.splToken.getAssociatedTokenAddress)
+        });
+    },
+    
+    /**
      * 加载Solana相关库
      * @private
      */
     async loadSolanaLibraries() {
         return new Promise((resolve, reject) => {
             try {
+                // 加载 solana/web3.js
+                if (!window.solanaWeb3) {
+                    const web3Script = document.createElement('script');
+                    web3Script.src = 'https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js';
+                    web3Script.onload = () => {
+                        console.log('Solana Web3.js 库已加载');
+                        
+                        // 确保全局变量正确设置
+                        if (window.solanaWeb3js) {
+                            window.solanaWeb3 = window.solanaWeb3js;
+                        } else if (window.solana && window.solana.web3) {
+                            window.solanaWeb3 = window.solana.web3;
+                        }
+                        
+                        // 加载 SPL Token 库
+                        this.loadSplTokenLibrary().then(resolve).catch(reject);
+                    };
+                    web3Script.onerror = (e) => {
+                        console.error('加载Solana Web3.js库失败:', e);
+                        reject(new Error('加载Solana Web3.js库失败'));
+                    };
+                    document.head.appendChild(web3Script);
+                } else {
+                    // Web3.js已加载，继续加载SPL Token
+                    this.loadSplTokenLibrary().then(resolve).catch(reject);
+                }
+            } catch (error) {
+                console.error('加载Solana库出错:', error);
+                reject(error);
+            }
+        });
+    },
+    
+    /**
+     * 加载SPL Token库
+     * @private
+     */
+    async loadSplTokenLibrary() {
+        return new Promise((resolve, reject) => {
+            try {
                 // 检查是否已加载
-                if (window.solanaWeb3 && window.splToken) {
+                if (window.splToken) {
                     return resolve();
                 }
                 
-                // 加载 solana/web3.js
-                const web3Script = document.createElement('script');
-                web3Script.src = 'https://cdn.jsdelivr.net/npm/@solana/web3.js@1.74.0/lib/index.iife.min.js';
-                web3Script.onload = () => {
-                    console.log('Solana Web3.js 库已加载');
+                // 检查是否可以从现有变量中获取
+                if (window.spl && window.spl.token) {
+                    window.splToken = window.spl.token;
+                    console.log('已从window.spl.token初始化splToken库');
+                    return resolve();
+                }
+                
+                // 需要加载库
+                const splTokenScript = document.createElement('script');
+                splTokenScript.src = 'https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js';
+                splTokenScript.onload = () => {
+                    console.log('SPL Token 库已加载');
                     
-                    // 加载 SPL Token 库
-                    const splTokenScript = document.createElement('script');
-                    splTokenScript.src = 'https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.7/lib/index.iife.min.js';
-                    splTokenScript.onload = () => {
-                        console.log('SPL Token 库已加载');
-                        resolve();
-                    };
-                    splTokenScript.onerror = (e) => {
-                        console.error('加载SPL Token库失败:', e);
-                        reject(new Error('加载SPL Token库失败'));
-                    };
-                    document.head.appendChild(splTokenScript);
+                    // 设置全局变量
+                    if (window.spl && window.spl.token) {
+                        window.splToken = window.spl.token;
+                        console.log('已从window.spl.token初始化splToken库');
+                    }
+                    
+                    // 检查关键方法是否存在
+                    if (!window.splToken || !window.splToken.getAssociatedTokenAddress) {
+                        console.error('SPL Token库已加载但找不到getAssociatedTokenAddress方法');
+                        reject(new Error('SPL Token库功能不完整'));
+                        return;
+                    }
+                    
+                    resolve();
                 };
-                web3Script.onerror = (e) => {
-                    console.error('加载Solana Web3.js库失败:', e);
-                    reject(new Error('加载Solana Web3.js库失败'));
+                splTokenScript.onerror = (e) => {
+                    console.error('加载SPL Token库失败:', e);
+                    reject(new Error('加载SPL Token库失败'));
                 };
-                document.head.appendChild(web3Script);
+                document.head.appendChild(splTokenScript);
             } catch (error) {
-                console.error('加载Solana库出错:', error);
+                console.error('加载SPL Token库出错:', error);
                 reject(error);
             }
         });
