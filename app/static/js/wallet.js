@@ -1716,7 +1716,7 @@ const walletState = {
             try {
                 // 构建API请求URL，添加时间戳防止缓存
                 const timestamp = new Date().getTime();
-                const url = `/api/service/user/assets?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
+                const url = `/api/user/assets?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
                 console.log(`[getUserAssets] 调用API: ${url}`);
                 
                 const response = await fetch(url);
