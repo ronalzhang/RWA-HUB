@@ -2659,59 +2659,88 @@ checkIfReturningFromWalletApp(walletType) {
             console.log(`准备转账 ${amount} ${tokenSymbol} 到 ${to}`);
             console.log(`从地址: ${fromAddress}`);
             
-            // 记录Phantom钱包版本和环境信息
-            console.log('Phantom信息:', {
-                isPhantom: window.solana.isPhantom,
-                version: window.solana.version || '未知',
-                isConnected: window.solana.isConnected,
-                publicKey: fromAddress,
-                isMobile: /Mobi|Android/i.test(navigator.userAgent),
-                userAgent: navigator.userAgent
-            });
-            
-            // 调用后端API执行真实的链上转账
-            console.log('调用后端API执行转账...');
-            const transferResponse = await fetch('/api/solana/execute_transfer_v2', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        token_symbol: tokenSymbol,
-                        to_address: to,
-                        amount: parseFloat(amount).toString(),
-                        from_address: fromAddress
-                    })
+            // 直接使用用户钱包发送SPL代币转账，不再调用后端API
+            try {
+                console.log('使用用户钱包直接发送转账...');
+                
+                // 根据代币符号获取mint地址
+                let mintAddress;
+                switch(tokenSymbol.toUpperCase()) {
+                    case 'USDC':
+                        // Solana USDC mint (Devnet)
+                        mintAddress = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';  
+                        break;
+                    default:
+                        throw new Error(`不支持的代币: ${tokenSymbol}`);
+                }
+                
+                // 使用Phantom钱包发送SPL代币交易
+                const transaction = await window.solana.request({
+                    method: 'transferToken',
+                    params: {
+                        destination: to,
+                        amount: parseFloat(amount),
+                        mint: mintAddress,
+                        decimals: 6 // USDC has 6 decimals
+                    }
                 });
                 
-            console.log('转账请求状态码:', transferResponse.status);
-            
-            if (!transferResponse.ok) {
-                let errorMsg = '未知错误';
-                try {
-                    const errorData = await transferResponse.json();
-                    errorMsg = errorData.message || errorData.error || '未知错误';
-                } catch (e) {
-                    errorMsg = await transferResponse.text() || '请求失败';
-                }
-                console.error('转账请求失败:', transferResponse.status, errorMsg);
-                throw new Error('转账请求失败: ' + errorMsg);
-            }
-            
-            const transferResult = await transferResponse.json();
-            console.log('转账响应:', transferResult);
-            
-            // 检查转账结果
-            if (transferResult.success && transferResult.signature) {
+                console.log('交易已提交, 签名:', transaction.signature);
+                
                 return {
                     success: true,
-                    txHash: transferResult.signature,
+                    txHash: transaction.signature,
                     message: '转账成功'
                 };
-            } else {
-                const errorMessage = transferResult.message || '转账失败，未返回签名';
-                console.error('转账失败:', errorMessage);
-                throw new Error(errorMessage);
+            } catch (walletError) {
+                console.error('钱包转账失败:', walletError);
+                // 尝试降级到旧版API请求
+                try {
+                    console.log('尝试使用后端API作为备选...');
+                    const transferResponse = await fetch('/api/solana/execute_transfer_v2', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            token_symbol: tokenSymbol,
+                            to_address: to,
+                            amount: parseFloat(amount).toString(),
+                            from_address: fromAddress
+                        })
+                    });
+                    
+                    console.log('转账请求状态码:', transferResponse.status);
+                    
+                    if (!transferResponse.ok) {
+                        let errorMsg = '未知错误';
+                        try {
+                            const errorData = await transferResponse.json();
+                            errorMsg = errorData.message || errorData.error || '未知错误';
+                        } catch (e) {
+                            errorMsg = await transferResponse.text() || '请求失败';
+                        }
+                        throw new Error('转账请求失败: ' + errorMsg);
+                    }
+                    
+                    const transferResult = await transferResponse.json();
+                    console.log('转账响应:', transferResult);
+                    
+                    // 检查转账结果
+                    if (transferResult.success && transferResult.signature) {
+                        return {
+                            success: true,
+                            txHash: transferResult.signature,
+                            message: '转账成功'
+                        };
+                    } else {
+                        throw new Error(transferResult.message || '转账失败，未返回签名');
+                    }
+                } catch (apiError) {
+                    console.error('API转账失败:', apiError);
+                    // 两种方法都失败，抛出最初的钱包错误
+                    throw walletError;
+                }
             }
         } catch (error) {
             console.error('Solana转账失败:', error);

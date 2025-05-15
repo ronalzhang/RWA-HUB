@@ -937,7 +937,7 @@ def api_execute_transfer_v2():
             'from_address': data.get('from_address') or data.get('fromAddress'),
             'to_address': data.get('to_address') or data.get('toAddress'),
             'amount': data.get('amount'),
-            'token_symbol': data.get('token_symbol') or data.get('token'),
+            'token_symbol': data.get('token_symbol') or data.get('tokenSymbol'),
             'purpose': data.get('purpose'),
             'metadata': data.get('metadata')
         }
@@ -957,7 +957,20 @@ def api_execute_transfer_v2():
             
         # 执行真实转账
         try:
+            from app.utils.utils import get_solana_client
+            from app.blockchain.solana_service import execute_transfer_transaction
+            
             logger.info(f"执行转账: {mapped_data}")
+            
+            # 验证是否配置了服务钱包私钥
+            solana_private_key = os.environ.get('SOLANA_PRIVATE_KEY')
+            if not solana_private_key:
+                logger.error("Solana私钥未配置，无法执行转账")
+                return jsonify({
+                    'success': False,
+                    'message': "服务器未配置转账私钥，请使用钱包直接转账"
+                }), 400
+                
             signature = execute_transfer_transaction(
                 token_symbol=mapped_data['token_symbol'],
                 from_address=mapped_data['from_address'],
@@ -970,6 +983,12 @@ def api_execute_transfer_v2():
                 'signature': signature,
                 'message': '转账成功'
             })
+        except ModuleNotFoundError as me:
+            logger.error(f"执行转账失败，缺少必要模块: {str(me)}")
+            return jsonify({
+                'success': False,
+                'message': f'执行转账失败: 服务器配置错误，缺少必要模块'
+            }), 500
         except Exception as e:
             logger.error(f"执行转账失败: {str(e)}")
             return jsonify({

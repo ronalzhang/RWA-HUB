@@ -477,10 +477,9 @@ function calculatePublishingFee() {
         totalValue = parseFloat(document.getElementById('total_value_similar').value) || 0;
     }
     
-    // 计算发布费用 - 费率为0.0001%
-    // 计算发布费用：totalValue * 0.000001 是基于资产总值的费用比例（0.0001%）
-    // 0.01 是最低收费标准（0.01 USDC），确保即使资产价值很低也至少收取这个金额
-    let fee = Math.max(totalValue * 0.000001, 0.01);
+    // 计算发布费用 - 保持0.01 USDC固定费用用于测试
+    // 在测试环境中保持最低费用，在生产环境可以调整费率
+    let fee = 0.01; // 固定费用0.01 USDC，方便测试
     publishingFeeElement.textContent = `${fee.toFixed(2)} USDC`;
 }
 
@@ -1465,8 +1464,8 @@ async function processPayment() {
     return new Promise(async (resolve, reject) => {
         try {
             console.log('开始处理支付...');
-            showLoadingState('{{ _("Processing payment transaction...") }}');
-            updateProgress(20, '{{ _("Requesting payment...") }}');
+            showLoadingState('处理支付交易...');
+            updateProgress(20, '请求支付...');
             
             // 从配置或API获取平台收款地址和发布费用
             // 使用API动态获取这些配置值，避免硬编码
@@ -1492,23 +1491,26 @@ async function processPayment() {
             
             if (!feeAmount) {
                 const publishingFeeText = document.getElementById('publishingFee').textContent;
-                feeAmount = parseFloat(publishingFeeText) || window.RWA_HUB_CONFIG?.publishingFee || 0.01; // 默认为0.01，降低测试门槛
+                // 从文本中提取数字，例如 "0.01 USDC" => 0.01
+                const feeMatch = publishingFeeText.match(/(\d+\.?\d*)/);
+                feeAmount = feeMatch ? parseFloat(feeMatch[1]) : 0.01; // 默认0.01 USDC
+                console.log(`从发布费用文本中提取: "${publishingFeeText}" => ${feeAmount}`);
             }
 
             console.log(`准备支付 ${feeAmount} USDC 到平台地址: ${platformAddress}`);
-            updateProgress(25, '{{ _("Connecting to wallet...") }}');
+            updateProgress(25, '连接钱包...');
             
             // 检查钱包状态
             if (!window.walletState) {
-                throw new Error('{{ _("Wallet connection unavailable") }}');
+                throw new Error('钱包连接不可用');
             }
             
             if (!window.walletState.connected || !window.walletState.address) {
-                throw new Error('{{ _("Please connect your wallet first") }}');
+                throw new Error('请先连接钱包');
             }
             
             // 直接执行转账，不检查余额
-            updateProgress(35, '{{ _("Requesting wallet approval...") }}');
+            updateProgress(35, '请求钱包授权...');
             console.log('使用钱包API执行USDC转账');
             
             if (window.walletState && typeof window.walletState.transferToken === 'function') {
@@ -1516,7 +1518,7 @@ async function processPayment() {
                 
                 if (result && result.success && result.txHash) {
                     console.log('转账初步成功:', result.txHash);
-                    updateProgress(40, '{{ _("Payment submitted, creating asset...") }}');
+                    updateProgress(40, '支付已提交，创建资产...');
                     
                     // 检查支付是否已被初步确认
                     try {
@@ -1535,14 +1537,14 @@ async function processPayment() {
                         recipient: platformAddress
                     });
                 } else {
-                    throw new Error('{{ _("Transfer failed") }}: ' + (result.error || '{{ _("Unknown error") }}'));
+                    throw new Error('转账失败: ' + (result.error || '未知错误'));
                 }
             } else {
-                throw new Error('{{ _("Wallet API is unavailable, cannot process transfer") }}');
+                throw new Error('钱包API不可用，无法处理转账');
             }
         } catch (error) {
             hideLoadingState();
-            console.error('{{ _("Payment processing error") }}:', error);
+            console.error('支付处理错误:', error);
             // 直接 reject 错误对象，让调用处处理
             reject(error);
         }
