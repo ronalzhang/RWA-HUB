@@ -949,36 +949,38 @@ def api_execute_transfer_v2():
                 missing_fields.append(field)
         
         if missing_fields:
+            logger.error(f"转账请求缺少必要参数: {missing_fields}")
             return jsonify({
                 'success': False,
-                'message': f'缺少必要字段: {", ".join(missing_fields)}'
+                'message': f"缺少必要参数: {', '.join(missing_fields)}"
             }), 400
-        
-        # 执行转账
-        signature = execute_transfer_transaction(
-            token_symbol=mapped_data['token_symbol'],
-            from_address=mapped_data['from_address'],
-            to_address=mapped_data['to_address'],
-            amount=float(mapped_data['amount'])
-        )
-        
-        if signature:
+            
+        # 执行真实转账
+        try:
+            logger.info(f"执行转账: {mapped_data}")
+            signature = execute_transfer_transaction(
+                token=mapped_data['token_symbol'],
+                from_address=mapped_data['from_address'],
+                to_address=mapped_data['to_address'],
+                amount=float(mapped_data['amount']),
+                metadata=mapped_data.get('metadata')
+            )
+            logger.info(f"转账成功，交易签名: {signature}")
             return jsonify({
                 'success': True,
                 'signature': signature,
-                'message': '转账已提交到Solana网络'
+                'message': '转账成功'
             })
-        else:
+        except Exception as e:
+            logger.error(f"执行转账失败: {str(e)}")
             return jsonify({
                 'success': False,
-                'message': '转账执行失败，未获取到签名'
-            }), 500
+                'message': f'执行转账失败: {str(e)}'
+            }), 400
             
     except Exception as e:
-        error_msg = f"执行转账失败: {str(e)}"
-        logger.error(error_msg)
-        logger.error(traceback.format_exc())
+        logger.error(f"API异常: {str(e)}")
         return jsonify({
-            'success': False,
-            'message': error_msg
+            'success': False, 
+            'message': f"处理请求时发生异常: {str(e)}"
         }), 500
