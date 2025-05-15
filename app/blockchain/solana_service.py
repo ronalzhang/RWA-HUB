@@ -23,8 +23,16 @@ from app.extensions import db
 from app.models import Trade, Asset
 from app.models.trade import TradeType
 from datetime import datetime
-from spl.token.constants import TOKEN_PROGRAM_ID
 import base58
+
+# 尝试导入spl模块，如果不存在则定义TOKEN_PROGRAM_ID常量
+try:
+    from spl.token.constants import TOKEN_PROGRAM_ID
+except ImportError:
+    # 如果spl模块不可用，则使用硬编码的TOKEN_PROGRAM_ID
+    TOKEN_PROGRAM_ID = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+    logger = logging.getLogger(__name__)
+    logger.warning("未找到spl模块，使用硬编码的TOKEN_PROGRAM_ID")
 
 # 获取日志记录器
 logger = logging.getLogger(__name__)
@@ -611,15 +619,26 @@ def _get_token_account(self, owner_address, token_mint):
             
             # 尝试使用原生spl库作为后备选项
             try:
-                from spl.token.instructions import get_associated_token_address as native_get_ata
-                token_account = native_get_ata(
-                    owner_pubkey,
-                    token_mint_pubkey
+                # 当spl库不可用时，使用公式计算关联代币账户地址
+                # 这是一个简化版本，适用于大多数情况
+                logger.info("尝试使用替代方法计算关联代币账户地址")
+                token_program_id = TOKEN_PROGRAM_ID
+                associated_token_program_id = PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+                
+                seeds = [
+                    owner_pubkey.to_bytes(),
+                    token_program_id.to_bytes(),
+                    token_mint_pubkey.to_bytes(),
+                ]
+                
+                program_derived_address, nonce = PublicKey.find_program_address(
+                    seeds, associated_token_program_id
                 )
-                logger.info(f"使用原生库获取到代币账户: {token_account}")
-                return token_account
+                
+                logger.info(f"使用替代方法获取到代币账户: {program_derived_address}")
+                return program_derived_address
             except Exception as native_error:
-                logger.error(f"使用原生库获取关联代币账户也失败: {str(native_error)}", exc_info=True)
+                logger.error(f"使用替代方法获取关联代币账户也失败: {str(native_error)}", exc_info=True)
             
             raise ValueError(f"无法获取关联代币账户: {str(e)}")
         
