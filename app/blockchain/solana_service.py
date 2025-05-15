@@ -25,14 +25,21 @@ from app.models.trade import TradeType
 from datetime import datetime
 import base58
 
-# 尝试导入spl模块，如果不存在则定义TOKEN_PROGRAM_ID常量
+# 尝试导入spl模块，如果不存在则使用模拟模块
 try:
     from spl.token.constants import TOKEN_PROGRAM_ID
 except ImportError:
-    # 如果spl模块不可用，则使用硬编码的TOKEN_PROGRAM_ID
-    TOKEN_PROGRAM_ID = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-    logger = logging.getLogger(__name__)
-    logger.warning("未找到spl模块，使用硬编码的TOKEN_PROGRAM_ID")
+    try:
+        # 尝试使用我们自己的模拟模块
+        from app.utils.spl_mock import Constants
+        TOKEN_PROGRAM_ID = Constants.TOKEN_PROGRAM_ID
+        logger = logging.getLogger(__name__)
+        logger.warning("使用模拟的spl模块")
+    except ImportError:
+        # 如果模拟模块也不可用，则使用硬编码的TOKEN_PROGRAM_ID
+        TOKEN_PROGRAM_ID = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+        logger = logging.getLogger(__name__)
+        logger.warning("未找到spl模块，使用硬编码的TOKEN_PROGRAM_ID")
 
 # 获取日志记录器
 logger = logging.getLogger(__name__)
@@ -617,7 +624,19 @@ def _get_token_account(self, owner_address, token_mint):
         except Exception as e:
             logger.error(f"获取关联代币账户失败: {str(e)}", exc_info=True)
             
-            # 尝试使用原生spl库作为后备选项
+            # 尝试使用模拟spl库
+            try:
+                from app.utils.spl_mock import get_associated_token_address
+                token_account = get_associated_token_address(
+                    owner_pubkey,
+                    token_mint_pubkey
+                )
+                logger.info(f"使用模拟库获取到代币账户: {token_account}")
+                return token_account
+            except Exception as mock_error:
+                logger.error(f"使用模拟库获取关联代币账户失败: {str(mock_error)}", exc_info=True)
+            
+            # 尝试使用替代方法
             try:
                 # 当spl库不可用时，使用公式计算关联代币账户地址
                 # 这是一个简化版本，适用于大多数情况
