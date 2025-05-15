@@ -192,41 +192,26 @@ def execute_transfer_v2():
                 'message': f'缺少必要字段: {", ".join(missing_fields)}'
             }), 400
         
-        try:
-            # 尝试执行转账
-            signature = execute_transfer_transaction(
-                token_symbol=mapped_data['token_symbol'],
-                from_address=mapped_data['from_address'],
-                to_address=mapped_data['to_address'],
-                amount=float(mapped_data['amount'])
-            )
-            
-            if signature:
-                return jsonify({
-                    'success': True,
-                    'signature': signature,
-                    'message': '转账已提交到Solana网络'
-                })
-            else:
-                return jsonify({
-                    'success': False,
-                    'message': '转账执行失败，未获取到签名'
-                }), 500
-        except Exception as tx_error:
-            # 如果转账失败，使用模拟签名保证前端流程可以继续
-            logger.error(f"执行真实转账失败，使用模拟签名: {str(tx_error)}")
-            import hashlib
-            import time
-            timestamp = str(int(time.time()))
-            data_str = f"{timestamp}_{mapped_data['from_address']}_{mapped_data['to_address']}_{mapped_data['amount']}_{mapped_data['token_symbol']}"
-            mock_signature = hashlib.sha256(data_str.encode()).hexdigest()
-            
+        # 执行转账
+        signature = execute_transfer_transaction(
+            token_symbol=mapped_data['token_symbol'],
+            from_address=mapped_data['from_address'],
+            to_address=mapped_data['to_address'],
+            amount=float(mapped_data['amount'])
+        )
+        
+        if signature:
             return jsonify({
                 'success': True,
-                'signature': mock_signature,
-                'message': '交易已模拟提交',
-                'simulated': True
+                'signature': signature,
+                'message': '转账已提交到Solana网络'
             })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '转账执行失败，未获取到签名'
+            }), 500
+            
     except Exception as e:
         error_msg = f"执行转账失败: {str(e)}"
         logger.error(error_msg)
