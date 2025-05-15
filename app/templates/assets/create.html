@@ -656,25 +656,42 @@
 <!-- 添加SPL Token库支持 -->
 <script src="https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js"></script>
 <script>
-    // 确保SPL Token库全局可用
-    window.splToken = window.spl?.token || {};
-    
-    // 检查并初始化SPL Token库
+    // 立即初始化SPL Token库
     document.addEventListener('DOMContentLoaded', function() {
-        // 判断SPL Token库是否正确加载
-        if (!window.splToken || !window.splToken.createTransferInstruction) {
-            console.warn('SPL Token库未正确加载，尝试重新加载');
+        try {
+            // 确保SPL Token库全局可用
+            if (window.spl && window.spl.token) {
+                window.splToken = window.spl.token;
+                console.log('SPL Token库初始化成功', window.splToken);
+            } else {
+                console.warn('SPL Token库未正确加载，尝试重新加载');
+                
+                // 动态加载SPL Token库
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.js';
+                script.onload = function() {
+                    window.splToken = window.spl?.token || {};
+                    console.log('SPL Token库已成功重新加载', window.splToken);
+                    
+                    // 检查关键方法是否存在
+                    if (window.splToken && !window.splToken.getAssociatedTokenAddress) {
+                        console.warn('SPL Token库缺少关键方法，尝试扩展...');
+                        // 添加缺失的方法（如果需要）
+                    }
+                };
+                document.head.appendChild(script);
+            }
             
-            // 动态加载SPL Token库
-            const script = document.createElement('script');
-            script.src = 'https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js';
-            script.onload = function() {
-                window.splToken = window.spl?.token || {};
-                console.log('SPL Token库已成功重新加载', window.splToken);
-            };
-            document.head.appendChild(script);
-        } else {
-            console.log('SPL Token库已正确加载', window.splToken);
+            // 预先检查钱包连接状态
+            setTimeout(function() {
+                if (window.wallet && window.wallet.connected) {
+                    console.log('钱包已连接，准备支付功能');
+                } else {
+                    console.log('钱包未连接，支付时将提示连接钱包');
+                }
+            }, 1000);
+        } catch (e) {
+            console.error('初始化SPL Token库出错:', e);
         }
     });
 </script>
