@@ -562,9 +562,9 @@ def upload_images():
         
         # 检查请求大小
         content_length = request.content_length
-        if content_length and content_length > 10 * 1024 * 1024:  # 限制为10MB
+        if content_length and content_length > 20 * 1024 * 1024:  # 限制为20MB
             current_app.logger.error(f'请求体太大: {content_length / (1024 * 1024):.2f}MB')
-            return jsonify({'success': False, 'message': f'文件大小超过限制（最大10MB）, 当前: {content_length / (1024 * 1024):.2f}MB'}), 413
+            return jsonify({'success': False, 'message': f'文件大小超过限制（最大20MB）, 当前: {content_length / (1024 * 1024):.2f}MB'}), 413
             
         # 检查是否有文件上传
         if 'file' not in request.files:
