@@ -652,31 +652,45 @@
 
 {% block scripts %}
 <!-- 先引入依赖库 -->
-<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+<script src="https://unpkg.com/@solana/web3.js@1.78.0/lib/index.iife.min.js"></script>
 <!-- 添加SPL Token库支持 -->
 <script src="https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js"></script>
 <script>
     // 立即初始化SPL Token库
     document.addEventListener('DOMContentLoaded', function() {
         try {
+            // 确保Solana Web3.js库全局可用
+            if (window.solanaWeb3js) {
+                window.solanaWeb3 = window.solanaWeb3js;
+                console.log('Solana Web3.js库已初始化为全局变量', window.solanaWeb3);
+            } else if (window.solana && window.solana.web3) {
+                window.solanaWeb3 = window.solana.web3;
+                console.log('Solana Web3.js库已从window.solana.web3初始化', window.solanaWeb3);
+            }
+            
             // 确保SPL Token库全局可用
             if (window.spl && window.spl.token) {
                 window.splToken = window.spl.token;
                 console.log('SPL Token库初始化成功', window.splToken);
+                
+                // 检查关键方法是否存在
+                if (window.splToken.getAssociatedTokenAddress) {
+                    console.log('SPL Token库的关键方法已确认可用');
+                } else {
+                    console.warn('警告：SPL Token库缺少getAssociatedTokenAddress方法');
+                }
             } else {
-                console.warn('SPL Token库未正确加载，尝试重新加载');
+                console.warn('警告：SPL Token库未正确加载');
                 
                 // 动态加载SPL Token库
                 const script = document.createElement('script');
                 script.src = 'https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.js';
                 script.onload = function() {
-                    window.splToken = window.spl?.token || {};
-                    console.log('SPL Token库已成功重新加载', window.splToken);
-                    
-                    // 检查关键方法是否存在
-                    if (window.splToken && !window.splToken.getAssociatedTokenAddress) {
-                        console.warn('SPL Token库缺少关键方法，尝试扩展...');
-                        // 添加缺失的方法（如果需要）
+                    if (window.spl && window.spl.token) {
+                        window.splToken = window.spl.token;
+                        console.log('SPL Token库已成功重新加载', window.splToken);
+                    } else {
+                        console.error('动态加载SPL Token库后仍无法获取window.spl.token');
                     }
                 };
                 document.head.appendChild(script);
@@ -691,7 +705,7 @@
                 }
             }, 1000);
         } catch (e) {
-            console.error('初始化SPL Token库出错:', e);
+            console.error('初始化Solana库出错:', e);
         }
     });
 </script>
