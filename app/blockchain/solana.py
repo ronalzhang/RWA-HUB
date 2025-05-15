@@ -62,7 +62,7 @@ class SolanaClient:
             wallet_address (str, optional): 钱包地址，仅用于只读操作. 默认为None.
         """
         self.config = load_config()
-        endpoint_url = endpoint_url or self.config.SOLANA_ENDPOINT
+        endpoint_url = endpoint_url or os.environ.get("SOLANA_NETWORK_URL", "https://api.mainnet-beta.solana.com")
         
         # 设置mock_mode标志，确保从环境变量读取
         self.mock_mode = os.environ.get('SOLANA_MOCK_MODE', 'false').lower() == 'true'

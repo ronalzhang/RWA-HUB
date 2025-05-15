@@ -379,7 +379,7 @@ class AssetService:
             }
             
     @staticmethod
-    def get_token_balance(wallet_address, token_mint_address):
+    def get_token_balance(wallet_address, token_mint_address=None):
         """
         获取特定SPL代币在钱包中的余额
         
@@ -405,7 +405,6 @@ class AssetService:
             
             # 初始化Solana客户端
             try:
-                from app.blockchain.solana import SolanaClient
                 solana_client = SolanaClient(wallet_address=wallet_address)
                 network_url = solana_client.network_url
                 logger.info(f"Solana客户端初始化成功，网络URL: {network_url}")
