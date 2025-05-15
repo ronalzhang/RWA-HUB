@@ -50,9 +50,9 @@ def register_blueprints(app):
     app.register_blueprint(admin.admin_bp, url_prefix='/admin')
     app.register_blueprint(admin.admin_api_bp, url_prefix='/api/admin')
     
-    # 注册资产蓝图
-    app.register_blueprint(assets.assets_bp, url_prefix='/assets')
-    app.register_blueprint(assets.assets_api_bp, url_prefix='/api/assets')
+    # 注册资产蓝图 - 直接使用全局变量而不是模块属性
+    app.register_blueprint(assets_bp, url_prefix='/assets')
+    app.register_blueprint(assets_api_bp, url_prefix='/api/assets')
     
     # 注册API蓝图
     app.register_blueprint(api.api_bp, url_prefix='/api')
