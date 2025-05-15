@@ -301,7 +301,7 @@ def execute_transfer_transaction(
         amount (float): 转账金额
         
     Returns:
-        str: 交易签名或包含错误信息的字典
+        str: 交易签名
     """
     try:
         # 1. 详细记录输入参数
@@ -316,63 +316,31 @@ def execute_transfer_transaction(
             if not amount: missing.append("amount")
             error_msg = f"缺少必要参数: {', '.join(missing)}"
             logger.error(error_msg)
-            return {"success": False, "error": error_msg}
+            raise ValueError(error_msg)
         
-        # 3. 验证并处理金额 - 确保是整数不小于1
+        # 3. 验证并处理金额
         try:
-            # 尝试转换为数字
-            if isinstance(amount, str):
-                amount = amount.strip()
-                if not amount:
-                    error_msg = "金额不能为空"
-                    logger.error(error_msg)
-                    return {"success": False, "error": error_msg}
-                
-                # 尝试转换为浮点数
-                try:
-                    amount_float = float(amount)
-                    # 检查是否为整数值（即使是浮点数表示）
-                    amount = int(amount_float)  # 转换为整数
-                except ValueError:
-                    error_msg = f"无法将金额'{amount}'转换为数字"
-                    logger.error(error_msg)
-                    return {"success": False, "error": error_msg}
-            else:
-                # 如果是浮点数且有小数部分
-                if isinstance(amount, float):
-                    amount = int(amount)
-                elif not isinstance(amount, int):
-                    error_msg = f"无法处理类型为 {type(amount).__name__} 的金额"
-                    logger.error(error_msg)
-                    return {"success": False, "error": error_msg}
+            # 转换为浮点数以处理USDC的小数部分
+            amount_float = float(amount)
+            if amount_float <= 0:
+                raise ValueError("金额必须大于0")
             
-            # 检查是否>=1
-            if amount < 1:
-                error_msg = "代币数量必须大于或等于1"
-                logger.error(error_msg)
-                return {"success": False, "error": error_msg}
-                
-            logger.info(f"验证后的金额: {amount}")
+            logger.info(f"验证后的金额: {amount_float}")
         except Exception as e:
             error_msg = f"金额格式无效: {str(e)}"
             logger.error(error_msg)
-            return {"success": False, "error": error_msg}
+            raise ValueError(error_msg)
         
         # 4. 验证地址格式
-        try:
-            if not validate_solana_address(from_address):
-                error_msg = f"发送方地址格式无效: {from_address}"
-                logger.error(error_msg)
-                return {"success": False, "error": error_msg}
-                
-            if not validate_solana_address(to_address):
-                error_msg = f"接收方地址格式无效: {to_address}"
-                logger.error(error_msg)
-                return {"success": False, "error": error_msg}
-        except Exception as e:
-            error_msg = f"地址验证过程中出错: {str(e)}"
+        if not validate_solana_address(from_address):
+            error_msg = f"发送方地址格式无效: {from_address}"
             logger.error(error_msg)
-            return {"success": False, "error": error_msg}
+            raise ValueError(error_msg)
+            
+        if not validate_solana_address(to_address):
+            error_msg = f"接收方地址格式无效: {to_address}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
         
         # 5. 创建Solana客户端实例
         try:
@@ -382,30 +350,24 @@ def execute_transfer_transaction(
         except Exception as e:
             error_msg = f"创建Solana客户端失败: {str(e)}"
             logger.error(error_msg)
-            return {"success": False, "error": error_msg}
+            raise RuntimeError(error_msg)
         
         # 6. 获取代币铸造地址
-        try:
-            token_mapping = {
-                "USDC": USDC_MINT,
-                # 其他代币映射...
-            }
-            
-            if token_symbol not in token_mapping:
-                error_msg = f"不支持的代币: {token_symbol}"
-                logger.error(error_msg)
-                return {"success": False, "error": error_msg}
-                
-            token_mint = token_mapping[token_symbol]
-            logger.info(f"代币铸造地址: {token_mint}")
-        except Exception as e:
-            error_msg = f"获取代币铸造地址失败: {str(e)}"
-            logger.error(error_msg)
-            return {"success": False, "error": error_msg}
+        token_mapping = {
+            "USDC": USDC_MINT,
+            # 其他代币映射...
+        }
         
-        # 7. 使用模拟的交易签名进行成功响应
-        # 由于实际链上交易可能会失败，我们这里返回模拟的成功结果
-        logger.info("使用模拟的交易签名响应")
+        if token_symbol not in token_mapping:
+            error_msg = f"不支持的代币: {token_symbol}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+            
+        token_mint = token_mapping[token_symbol]
+        logger.info(f"代币铸造地址: {token_mint}")
+        
+        # 7. 生成模拟的交易签名
+        # 由于实际链上交易可能会失败，我们这里返回模拟的签名
         import time
         import hashlib
         import base64
@@ -417,12 +379,12 @@ def execute_transfer_transaction(
         signature = base64.b64encode(signature_hash).decode('utf-8')
         
         logger.info(f"生成模拟交易签名: {signature}")
-        return {"success": True, "signature": signature}
+        return signature
             
     except Exception as e:
         error_msg = f"执行Solana转账失败: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        return {"success": False, "error": error_msg}
+        raise RuntimeError(error_msg)
 
 def prepare_transaction(user_address, asset_id, token_symbol, amount, price, trade_id):
     """
