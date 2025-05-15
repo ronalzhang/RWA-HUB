@@ -653,10 +653,11 @@
 {% block scripts %}
 <!-- 先引入依赖库 -->
 <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+<!-- 添加SPL Token库支持 -->
+<script src="https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js"></script>
 <script>
-    // 确保solanaWeb3变量可用
-    window.solanaWeb3 = solanaWeb3;
-    console.log('Solana Web3.js库已加载');
+    // 确保SPL Token库全局可用
+    window.splToken = window.spl?.token || {};
 </script>
 
 <!-- 引入钱包相关脚本 -->
