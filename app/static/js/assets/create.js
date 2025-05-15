@@ -1595,7 +1595,9 @@ async function processAssetCreation(formData, txHash) {
         const requestData = {
             ...formData,
             status: 1, // PENDING 状态
-            payment_tx_hash: txHash, // 包含支付交易哈希
+            payment_tx_hash: Array.isArray(txHash) ? 
+                txHash.map(byte => byte.toString(16).padStart(2, '0')).join('') : // 字节数组转十六进制字符串
+                txHash, // 如果已经是字符串，直接使用
             payment_confirmed: false, // 初始设置为未确认
             images: uploadedImages.map(file => file.url || ''),
             documents: uploadedDocuments.map(file => ({
