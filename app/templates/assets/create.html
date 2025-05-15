@@ -652,9 +652,9 @@
 
 {% block scripts %}
 <!-- 先引入依赖库 -->
-<script src="https://unpkg.com/@solana/web3.js@1.78.0/lib/index.iife.min.js"></script>
+<script src="{{ url_for('static', filename='js/contracts/solana-web3.iife.min.js') }}" onerror="this.onerror=null;this.src='https://unpkg.com/@solana/web3.js@1.78.0/lib/index.iife.min.js';"></script>
 <!-- 添加SPL Token库支持 -->
-<script src="https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js"></script>
+<script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}" onerror="this.onerror=null;this.src='https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js';"></script>
 <script>
     // 立即初始化SPL Token库
     document.addEventListener('DOMContentLoaded', function() {
@@ -668,10 +668,10 @@
                 console.log('Solana Web3.js库已从window.solana.web3初始化', window.solanaWeb3);
             }
             
-            // 确保SPL Token库全局可用
+            // 检查SPL Token库是否已加载
             if (window.spl && window.spl.token) {
                 window.splToken = window.spl.token;
-                console.log('SPL Token库初始化成功', window.splToken);
+                console.log('SPL Token库已初始化成功', window.splToken);
                 
                 // 检查关键方法是否存在
                 if (window.splToken.getAssociatedTokenAddress) {
@@ -680,11 +680,12 @@
                     console.warn('警告：SPL Token库缺少getAssociatedTokenAddress方法');
                 }
             } else {
-                console.warn('警告：SPL Token库未正确加载');
+                console.warn('警告：SPL Token库未正确加载，尝试重新加载');
                 
                 // 动态加载SPL Token库
-                const script = document.createElement('script');
-                script.src = 'https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.js';
+                var script = document.createElement('script');
+                script.src = "{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}";
+                
                 script.onload = function() {
                     if (window.spl && window.spl.token) {
                         window.splToken = window.spl.token;
@@ -693,6 +694,13 @@
                         console.error('动态加载SPL Token库后仍无法获取window.spl.token');
                     }
                 };
+                
+                script.onerror = function() {
+                    console.log('本地SPL Token库加载失败，尝试使用CDN');
+                    this.onerror = null;
+                    this.src = "https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js";
+                };
+                
                 document.head.appendChild(script);
             }
             
