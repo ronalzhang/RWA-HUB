@@ -1777,6 +1777,11 @@ function disablePublishButtons(disabled) {
     fixButtonStyles();
 }
 
+// 启用发布按钮
+function enablePublishButtons() {
+    disablePublishButtons(false);
+}
+
 // 修复按钮样式函数
 function fixButtonStyles() {
     const gradientButtons = document.querySelectorAll('.btn-gradient-primary');

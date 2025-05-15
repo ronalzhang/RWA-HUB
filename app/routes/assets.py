@@ -879,3 +879,114 @@ def get_asset_qrcode(asset_id):
     except Exception as e:
         current_app.logger.warning(f"生成资产二维码失败: {str(e)}")
         return jsonify({'success': False, 'message': f'生成二维码失败: {str(e)}'}), 500
+
+@assets_api_bp.route('/create', methods=['POST'])
+@eth_address_required
+def create_asset_api():
+    """创建资产API"""
+    try:
+        # 获取请求数据
+        data = request.json
+        if not data:
+            current_app.logger.error("资产创建API：请求数据为空")
+            return jsonify({
+                'success': False,
+                'error': '请求数据为空'
+            }), 400
+            
+        # 记录请求数据
+        current_app.logger.info(f"资产创建API：收到请求数据 {data}")
+        
+        # 获取创建者地址
+        creator_address = g.eth_address
+        if not creator_address:
+            current_app.logger.error("资产创建API：未提供创建者地址")
+            return jsonify({
+                'success': False,
+                'error': '未提供创建者地址'
+            }), 400
+            
+        # 验证必填字段
+        required_fields = ['name', 'asset_type', 'token_symbol', 'token_supply', 'token_price']
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        
+        if missing_fields:
+            current_app.logger.error(f"资产创建API：缺少必填字段 {missing_fields}")
+            return jsonify({
+                'success': False,
+                'error': f'缺少必填字段: {", ".join(missing_fields)}'
+            }), 400
+            
+        # 验证代币符号格式和可用性
+        token_symbol = data.get('token_symbol')
+        if not re.match(r'^RH-(10|20)\d{4}$', token_symbol):
+            current_app.logger.error(f"资产创建API：代币符号格式无效 {token_symbol}")
+            return jsonify({
+                'success': False,
+                'error': '无效的代币符号格式'
+            }), 400
+            
+        # 检查代币符号是否已存在
+        existing_asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+        if existing_asset:
+            current_app.logger.error(f"资产创建API：代币符号已存在 {token_symbol}")
+            return jsonify({
+                'success': False,
+                'error': f'代币符号 {token_symbol} 已被使用'
+            }), 400
+            
+        # 创建资产记录
+        try:
+            # 处理图片和文档
+            images = data.get('images', [])
+            documents = data.get('documents', [])
+            
+            # 创建资产实例
+            new_asset = Asset(
+                name=data.get('name'),
+                description=data.get('description', ''),
+                asset_type=data.get('asset_type'),
+                location=data.get('location', ''),
+                token_symbol=token_symbol,
+                token_supply=data.get('token_supply'),
+                token_price=data.get('token_price'),
+                remaining_supply=data.get('token_supply'),  # 初始剩余供应量等于总供应量
+                images=json.dumps(images) if images else None,
+                documents=json.dumps(documents) if documents else None,
+                annual_revenue=data.get('annual_revenue', 1),
+                status=1,  # 默认状态：待审核
+                creator_address=creator_address,
+                owner_address=creator_address,
+                payment_tx_hash=data.get('payment_tx_hash'),
+                created_at=datetime.now()
+            )
+            
+            # 保存到数据库
+            db.session.add(new_asset)
+            db.session.commit()
+            
+            current_app.logger.info(f"资产创建API：成功创建资产 {new_asset.id}, {token_symbol}")
+            
+            # 返回成功响应
+            return jsonify({
+                'success': True,
+                'message': '资产创建成功',
+                'id': new_asset.id,
+                'token_symbol': token_symbol
+            }), 201
+            
+        except Exception as db_error:
+            db.session.rollback()
+            current_app.logger.error(f"资产创建API：数据库操作失败 {str(db_error)}")
+            return jsonify({
+                'success': False,
+                'error': f'数据库操作失败: {str(db_error)}'
+            }), 500
+            
+    except Exception as e:
+        current_app.logger.error(f"资产创建API：处理请求失败 {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'处理请求失败: {str(e)}'
+        }), 500
