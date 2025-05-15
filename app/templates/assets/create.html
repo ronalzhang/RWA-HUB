@@ -658,6 +658,25 @@
 <script>
     // 确保SPL Token库全局可用
     window.splToken = window.spl?.token || {};
+    
+    // 检查并初始化SPL Token库
+    document.addEventListener('DOMContentLoaded', function() {
+        // 判断SPL Token库是否正确加载
+        if (!window.splToken || !window.splToken.createTransferInstruction) {
+            console.warn('SPL Token库未正确加载，尝试重新加载');
+            
+            // 动态加载SPL Token库
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js';
+            script.onload = function() {
+                window.splToken = window.spl?.token || {};
+                console.log('SPL Token库已成功重新加载', window.splToken);
+            };
+            document.head.appendChild(script);
+        } else {
+            console.log('SPL Token库已正确加载', window.splToken);
+        }
+    });
 </script>
 
 <!-- 引入钱包相关脚本 -->
