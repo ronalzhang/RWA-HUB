@@ -305,7 +305,7 @@ def execute_transfer_transaction(
     """
     try:
         # 1. 详细记录输入参数
-        logger.info(f"转账参数: token={token_symbol}, from={from_address}({type(from_address).__name__}), to={to_address}({type(to_address).__name__}), amount={amount}({type(amount).__name__})")
+        logger.info(f"执行真实Solana转账 - 参数: token={token_symbol}, from={from_address}, to={to_address}, amount={amount}")
         
         # 2. 检查参数完整性
         if not all([token_symbol, from_address, to_address, amount]):
@@ -342,17 +342,7 @@ def execute_transfer_transaction(
             logger.error(error_msg)
             raise ValueError(error_msg)
         
-        # 5. 创建Solana客户端实例
-        try:
-            from app.utils.solana import SolanaClient
-            solana_client = SolanaClient()
-            logger.info("成功创建Solana客户端")
-        except Exception as e:
-            error_msg = f"创建Solana客户端失败: {str(e)}"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
-        
-        # 6. 获取代币铸造地址
+        # 5. 获取代币铸造地址
         token_mapping = {
             "USDC": USDC_MINT,
             # 其他代币映射...
@@ -366,21 +356,66 @@ def execute_transfer_transaction(
         token_mint = token_mapping[token_symbol]
         logger.info(f"代币铸造地址: {token_mint}")
         
-        # 7. 生成模拟的交易签名
-        # 由于实际链上交易可能会失败，我们这里返回模拟的签名
-        import time
-        import hashlib
-        import base64
+        # 6. 准备交易数据
+        from app.utils.solana_compat.publickey import PublicKey
+        from app.utils.solana_compat.transaction import Transaction
+        from app.utils.solana import SolanaClient
+        from app.utils.helpers import get_solana_keypair_from_env
+        import base58
         
-        # 生成一个唯一的签名
-        timestamp = str(int(time.time()))
-        unique_string = f"{from_address}_{to_address}_{amount}_{timestamp}"
-        signature_hash = hashlib.sha256(unique_string.encode()).digest()
-        signature = base64.b64encode(signature_hash).decode('utf-8')
+        # 6.1 创建Solana客户端实例
+        solana_client = SolanaClient()
+        if not solana_client.keypair:
+            raise RuntimeError("Solana客户端未配置服务钱包私钥，无法执行交易")
         
-        logger.info(f"生成模拟交易签名: {signature}")
-        return signature
+        # 6.2 获取USDC代币账户
+        from_pubkey = PublicKey(from_address)
+        to_pubkey = PublicKey(to_address)
+        mint_pubkey = PublicKey(token_mint)
+        
+        # 6.3 准备交易数据和消息
+        logger.info(f"准备交易数据: {amount_float} {token_symbol} 从 {from_address} 到 {to_address}")
+        transaction_bytes, message_bytes = prepare_transfer_transaction(
+            token_symbol=token_symbol,
+            from_address=from_address,
+            to_address=to_address,
+            amount=amount_float
+        )
+        
+        # 7. 发送交易到Solana网络
+        # 7.1 创建Transaction对象
+        transaction = Transaction.from_bytes(transaction_bytes)
+        
+        # 7.2 获取签名
+        wallet_keypair = solana_client.keypair
+        
+        # 7.3 发送签名交易
+        logger.info("发送交易到Solana网络...")
+        result = solana_connection.send_transaction(transaction, [wallet_keypair])
+        
+        # 7.4 处理结果
+        if 'result' in result:
+            signature = result['result']
+            logger.info(f"交易发送成功，获取到签名: {signature}")
             
+            # 7.5 等待交易确认
+            logger.info("等待交易确认...")
+            confirmation_result = solana_connection.confirm_transaction(signature)
+            if confirmation_result and 'result' in confirmation_result:
+                confirm_status = confirmation_result['result'].get('value', 0)
+                if confirm_status > 0:
+                    logger.info(f"交易已确认，确认数: {confirm_status}")
+                else:
+                    logger.warning(f"交易未完全确认，当前确认数: {confirm_status}")
+            else:
+                logger.warning("无法获取交易确认状态")
+                
+            return signature
+        else:
+            error_msg = f"发送交易失败: {result.get('error', '未知错误')}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+        
     except Exception as e:
         error_msg = f"执行Solana转账失败: {str(e)}"
         logger.error(error_msg, exc_info=True)
