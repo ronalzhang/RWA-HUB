@@ -8,6 +8,7 @@ Solana区块链服务，提供交易构建和处理功能
 import base64
 import logging
 import time
+import os
 import json
 from typing import Tuple, Dict, Any, Optional
 
@@ -45,7 +46,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # 通用常量
-SOLANA_ENDPOINT = Config.SOLANA_RPC_URL or 'https://api.mainnet-beta.solana.com'
+SOLANA_ENDPOINT = os.environ.get("SOLANA_NETWORK_URL") or Config.SOLANA_RPC_URL or "https://api.mainnet-beta.solana.com"
 PROGRAM_ID = Config.SOLANA_PROGRAM_ID or 'RWAxxx111111111111111111111111111111111111'
 USDC_MINT = Config.SOLANA_USDC_MINT or 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'  # Solana Mainnet USDC
 
@@ -55,7 +56,7 @@ solana_connection = None
 def initialize_solana_connection():
     """初始化Solana连接"""
     global solana_connection
-    endpoint = Config.SOLANA_RPC_URL or Config.SOLANA_ENDPOINT or 'https://api.mainnet-beta.solana.com'
+    endpoint = Config.SOLANA_RPC_URL or os.environ.get("SOLANA_NETWORK_URL", "https://api.mainnet-beta.solana.com") or 'https://api.mainnet-beta.solana.com'
     logger.info(f"初始化Solana连接，使用端点: {endpoint}")
     try:
         solana_connection = Connection(endpoint)
