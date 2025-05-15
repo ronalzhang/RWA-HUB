@@ -959,11 +959,10 @@ def api_execute_transfer_v2():
         try:
             logger.info(f"执行转账: {mapped_data}")
             signature = execute_transfer_transaction(
-                token=mapped_data['token_symbol'],
+                token_symbol=mapped_data['token_symbol'],
                 from_address=mapped_data['from_address'],
                 to_address=mapped_data['to_address'],
-                amount=float(mapped_data['amount']),
-                metadata=mapped_data.get('metadata')
+                amount=float(mapped_data['amount'])
             )
             logger.info(f"转账成功，交易签名: {signature}")
             return jsonify({
