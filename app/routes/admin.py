@@ -854,19 +854,31 @@ def check_asset_owner(asset_id):
         }), 500
 
 # 优化现有的 check_admin 端点
-@admin_api_bp.route('/check', methods=['POST', 'GET'])
+@admin_api_bp.route('/check', methods=['POST', 'GET', 'OPTIONS'])
 def check_admin():
     """检查管理员权限"""
+    # 处理OPTIONS请求
+    if request.method == 'OPTIONS':
+        response = current_app.make_default_options_response()
+        # 添加CORS头
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,X-Eth-Address')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+        return response
+        
     try:
         eth_address = request.headers.get('X-Eth-Address') or \
                      request.args.get('eth_address') or \
+                     (request.json.get('address') if request.is_json else None) or \
                      session.get('admin_eth_address')
                      
         current_app.logger.info(f'检查管理员权限 - 原始地址: {eth_address}')
         
         if not eth_address:
             current_app.logger.warning('未提供钱包地址')
-            return jsonify({'is_admin': False}), 200
+            response = jsonify({'is_admin': False})
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response, 200
             
         # 区分ETH和SOL地址处理，ETH地址转小写，SOL地址保持原样
         if eth_address.startswith('0x'):
@@ -888,10 +900,17 @@ def check_admin():
             session['admin_info'] = admin_data
         
         current_app.logger.info(f'检查管理员权限 - 结果: {is_admin}')
-        return jsonify({'is_admin': is_admin, **(admin_data or {})}), 200
+        # 添加CORS头
+        response = jsonify({'is_admin': is_admin, **(admin_data or {})})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,X-Eth-Address')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+        return response, 200
     except Exception as e:
         current_app.logger.error(f'检查管理员权限失败: {str(e)}')
-        return jsonify({'is_admin': False, 'error': str(e)}), 500
+        response = jsonify({'is_admin': False, 'error': str(e)})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response, 500
 
 @admin_api_bp.route('/admins')
 @admin_required

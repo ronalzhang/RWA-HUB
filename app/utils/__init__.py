@@ -28,10 +28,14 @@ def save_files(files, asset_type, asset_id, token_symbol=None):
         保存的文件 URL 列表
     """
     import time
+    import os
     import shutil
+    from werkzeug.utils import secure_filename
+    from flask import current_app
+    from .storage import get_storage
     
-    # 允许的文件扩展名
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
+    # 允许的文件扩展名 - 添加webp格式
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx'}
     MAX_RETRIES = 3  # 最大重试次数
     RETRY_DELAY = 1  # 重试延迟（秒）
     
@@ -41,9 +45,26 @@ def save_files(files, asset_type, asset_id, token_symbol=None):
     # 获取存储服务实例
     try:
         storage = get_storage()
+        if not storage:
+            current_app.logger.error('存储服务初始化失败')
+            # 尝试再次初始化
+            from .storage import init_storage
+            init_storage(current_app)
+            storage = get_storage()
+            if not storage:
+                raise ValueError('存储服务未准备就绪')
     except Exception as e:
         current_app.logger.error(f'获取存储服务失败: {str(e)}')
-        raise ValueError('存储服务未准备就绪')
+        # 使用本地存储方式
+        try:
+            from .storage import LocalStorage
+            upload_folder = os.path.join(current_app.static_folder, 'uploads')
+            os.makedirs(upload_folder, exist_ok=True)
+            storage = LocalStorage(upload_folder)
+            current_app.logger.info('已创建临时本地存储实例')
+        except Exception as inner_e:
+            current_app.logger.error(f'创建临时存储实例失败: {str(inner_e)}')
+            raise ValueError('存储服务未准备就绪')
     
     # 检查参数
     if not files:
@@ -129,16 +150,33 @@ def save_files(files, asset_type, asset_id, token_symbol=None):
                         })
                         break
                 
+                # 确保目录存在
+                target_dir = os.path.join(current_app.static_folder, 'uploads', os.path.dirname(filename))
+                os.makedirs(target_dir, exist_ok=True)
+                
                 # 上传到本地存储
                 current_app.logger.info(f'尝试上传文件 (第{retry_count + 1}次): {filename}')
+                
+                # 首先尝试使用storage服务
                 result = storage.upload(file_data, filename)
                 
                 if result and result.get('url'):
+                    # 存储服务上传成功
                     file_urls.append(result['url'])
                     current_app.logger.info(f'文件上传成功: {result["url"]}')
                     break
                 else:
-                    raise Exception("存储返回空URL")
+                    # 存储服务失败，尝试直接保存到本地文件系统
+                    current_app.logger.warning(f'存储服务失败，尝试直接保存到本地')
+                    full_path = os.path.join(target_dir, os.path.basename(filename))
+                    with open(full_path, 'wb') as f:
+                        f.write(file_data)
+                    
+                    # 构建URL
+                    url = f'/static/uploads/{filename}'
+                    file_urls.append(url)
+                    current_app.logger.info(f'文件保存成功: {url}')
+                    break
                     
             except Exception as e:
                 last_error = str(e)

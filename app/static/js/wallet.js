@@ -276,7 +276,7 @@ const walletState = {
         // 更新购买按钮状态
         if (isConnected) {
             buyButton.disabled = false;
-            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>购买';
+            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
             buyButton.removeAttribute('title');
         } else {
             buyButton.disabled = true;
@@ -542,6 +542,9 @@ const walletState = {
                 console.log(`${walletType} 钱包连接成功`);
                 // -- 修改：连接成功后触发事件 --
                 this.triggerWalletStateChanged();
+                
+                // 更新详情页购买按钮状态
+                this.updateDetailPageButtonState();
             } else {
                 console.log(`${walletType} 钱包连接失败或被用户取消`);
                 // 确保状态回滚
@@ -678,6 +681,16 @@ const walletState = {
             document.dispatchEvent(event);
             console.log('[triggerWalletStateChanged] 钱包状态变化事件已触发');
             
+            // 更新详情页按钮状态
+            if (typeof this.updateDetailPageButtonState === 'function') {
+                try {
+                    this.updateDetailPageButtonState();
+                    console.log('[triggerWalletStateChanged] 详情页按钮状态已更新');
+                } catch (btnError) {
+                    console.error('[triggerWalletStateChanged] 更新按钮状态失败:', btnError);
+                }
+            }
+            
         } catch (error) {
             console.error('[triggerWalletStateChanged] 触发钱包状态变化事件失败:', error);
             
@@ -744,11 +757,14 @@ const walletState = {
         this.provider = null;
         this.web3 = null;
             
-            // 更新UI
-            this.updateUI();
+        // 更新UI
+        this.updateUI();
             
         // -- 修改：断开连接后触发事件 --
         this.triggerWalletStateChanged();
+        
+        // 更新详情页购买按钮状态
+        this.updateDetailPageButtonState();
         
         // 通知状态变更
         // -- 修改：移除 notifyStateChange 调用 --

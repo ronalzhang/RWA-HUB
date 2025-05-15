@@ -52,6 +52,9 @@ function initializeCreatePage() {
     // 设置初始化标志
     window.assetFormInitialized = true;
     
+    // 首先重置上传区域状态，确保不显示"uploading"
+    resetUploadAreas();
+    
     // 检查钱包连接
     setTimeout(initializeWalletCheck, 500); // 延迟执行，确保钱包状态已初始化
     
@@ -149,7 +152,7 @@ function checkAdmin(address) {
     window.checkingAdmin = true;
     
     console.log('检查管理员状态:', address);
-    fetch('/api/check_admin', {
+    fetch('/api/admin/check', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -157,7 +160,12 @@ function checkAdmin(address) {
         },
         body: JSON.stringify({ address: address })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         isAdminUser = data.is_admin === true;
         console.log('管理员状态:', isAdminUser);
@@ -165,6 +173,9 @@ function checkAdmin(address) {
     })
     .catch(error => {
         console.error('检查管理员状态出错:', error);
+        // 如果API调用失败，默认为非管理员
+        isAdminUser = false;
+        updateUiForAdminStatus(false);
     })
     .finally(() => {
         window.checkingAdmin = false;
@@ -259,6 +270,50 @@ function initializeFormFields() {
     
     // 初始化文件上传
     initializeFileUploads();
+    
+    // 初始化上传区域显示状态
+    resetUploadAreas();
+}
+
+// 重置上传区域状态
+function resetUploadAreas() {
+    // 重置图片上传区域
+    const imageUploadProgress = document.getElementById('imageUploadProgress');
+    const imageUploadStatus = document.getElementById('imageUploadStatus');
+    const imageUploadPercent = document.getElementById('imageUploadPercent');
+    
+    if (imageUploadProgress) {
+        imageUploadProgress.style.display = 'none';
+    }
+    
+    if (imageUploadStatus) {
+        imageUploadStatus.textContent = '';
+    }
+    
+    if (imageUploadPercent) {
+        imageUploadPercent.textContent = '0';
+    }
+    
+    // 重置文档上传区域
+    const documentUploadProgress = document.getElementById('documentUploadProgress');
+    const documentUploadStatus = document.getElementById('documentUploadStatus');
+    const documentUploadPercent = document.getElementById('documentUploadPercent');
+    
+    if (documentUploadProgress) {
+        documentUploadProgress.style.display = 'none';
+    }
+    
+    if (documentUploadStatus) {
+        documentUploadStatus.textContent = '';
+    }
+    
+    if (documentUploadPercent) {
+        documentUploadPercent.textContent = '0';
+    }
+    
+    // 初始化渲染空的图片和文档区域
+    renderImages();
+    renderDocuments();
 }
 
 // 初始化文件上传
@@ -529,12 +584,10 @@ async function handleFiles(files, fileType) {
         return;
     }
 
-    // 显示进度条区域
+    // 显示进度条区域并重置状态
     progressContainer.style.display = 'block';
-    
-    // 重置进度条状态
-    percentElement.textContent = '0';
     progressBar.style.width = '0%';
+    percentElement.textContent = '0';
     statusElement.textContent = '准备上传文件...';
     
     // 处理文件上传
@@ -556,8 +609,9 @@ async function handleFiles(files, fileType) {
         }
         
         // 检查文件大小
-        if (file.size > 5 * 1024 * 1024) { // 5MB
-            statusElement.textContent = `文件过大: ${file.name} (${(file.size/1024/1024).toFixed(2)}MB > 5MB)`;
+        const maxSize = isImage ? CONFIG.IMAGE.MAX_SIZE : CONFIG.DOCUMENT.MAX_SIZE;
+        if (file.size > maxSize) {
+            statusElement.textContent = `文件过大: ${file.name} (${(file.size/1024/1024).toFixed(2)}MB > ${maxSize/1024/1024}MB)`;
             console.error(`文件过大: ${file.name}, 大小: ${(file.size/1024/1024).toFixed(2)}MB`);
             failed++;
             continue;
@@ -574,7 +628,7 @@ async function handleFiles(files, fileType) {
         formData.append('asset_type', assetType);
         
         // 获取代币符号
-        const tokenSymbolInput = document.getElementById('token_symbol');
+        const tokenSymbolInput = document.getElementById('tokensymbol');
         const tokenSymbol = tokenSymbolInput ? tokenSymbolInput.value : '';
         if (tokenSymbol) {
             formData.append('token_symbol', tokenSymbol);
@@ -596,35 +650,70 @@ async function handleFiles(files, fileType) {
         try {
             statusElement.textContent = `正在上传: ${file.name} (${i+1}/${files.length})`;
             
-            // 发送上传请求
-            console.log(`发送上传请求到 /api/upload-images，文件大小: ${(file.size/1024).toFixed(2)}KB`);
-            const response = await fetch('/api/upload-images', {
+            // 发送上传请求 - 使用正确的API路径
+            console.log(`发送上传请求到 /api/assets/upload-images，文件大小: ${(file.size/1024).toFixed(2)}KB`);
+            
+            // 添加防抖动计时器，避免服务器过载
+            await new Promise(resolve => setTimeout(resolve, i * 300)); // 每个文件间隔300ms
+            
+            const response = await fetch('/api/assets/upload-images', {
                 method: 'POST',
+                headers: {
+                    'X-Wallet-Address': address || 'anonymous'
+                },
                 body: formData
             });
             
             console.log(`收到响应，状态码: ${response.status}`);
             
+            // 处理HTTP错误
             if (!response.ok) {
                 let errorMessage = `上传失败: HTTP ${response.status}`;
+                
+                // 尝试解析错误消息
                 try {
                     const errorJson = await response.json();
-                    if (errorJson && errorJson.message) {
-                        errorMessage = errorJson.message;
+                    if (errorJson && (errorJson.message || errorJson.error)) {
+                        errorMessage = errorJson.message || errorJson.error;
                     }
                 } catch (e) {
                     // 无法解析JSON，使用默认错误消息
+                    console.warn('无法解析错误响应JSON:', e);
                 }
+                
+                // 常见错误的更友好提示
+                if (response.status === 413) {
+                    errorMessage = `文件 ${file.name} 过大，超出服务器限制`;
+                } else if (response.status === 404) {
+                    errorMessage = `上传接口不存在，请联系管理员`;
+                } else if (response.status === 500) {
+                    errorMessage = `服务器处理错误，请稍后重试`;
+                }
+                
                 throw new Error(errorMessage);
             }
             
+            // 解析成功响应
             const result = await response.json();
             console.log('上传响应:', result);
             
-            // 同时支持新旧两种格式的响应
-            if ((result.urls && result.urls.length > 0) || (result.image_paths && result.image_paths.length > 0)) {
+            // 处理成功响应
+            if (result.success || (result.urls && result.urls.length > 0) || (result.image_paths && result.image_paths.length > 0)) {
+                // 确定URL
+                let url;
+                if (result.urls && result.urls.length > 0) {
+                    url = result.urls[0];
+                } else if (result.image_paths && result.image_paths.length > 0) {
+                    url = result.image_paths[0];
+                } else if (result.url) {
+                    url = result.url;
+                }
+                
+                if (!url) {
+                    throw new Error('服务器返回的URL为空');
+                }
+                
                 // 添加到上传文件列表
-                const url = result.urls ? result.urls[0] : result.image_paths[0];
                 if (isImage) {
                     uploadedImages.push({
                         name: file.name,
@@ -641,7 +730,7 @@ async function handleFiles(files, fileType) {
                 completed++;
                 statusElement.textContent = `成功上传 ${completed} 个文件`;
             } else {
-                throw new Error(result.error || result.message || '上传失败');
+                throw new Error(result.error || result.message || '上传失败，服务器未返回有效数据');
             }
         } catch (error) {
             console.error(`上传文件失败:`, error);
@@ -936,8 +1025,49 @@ async function checkAndConnectWallet() {
 
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', function() {
-    // 在setTimeout中执行初始化，防止页面刷新
+    console.log('DOM内容加载完成，准备初始化资产创建页面...');
+    
+    // 确保所有DOM元素都存在
+    const requiredElements = [
+        'imageDropzone', 'documentDropzone', 
+        'imageUploadProgress', 'documentUploadProgress',
+        'imageUploadStatus', 'documentUploadStatus',
+        'imagePreview', 'documentPreview'
+    ];
+    
+    let missingElements = [];
+    for (const id of requiredElements) {
+        if (!document.getElementById(id)) {
+            missingElements.push(id);
+        }
+    }
+    
+    if (missingElements.length > 0) {
+        console.warn(`以下元素缺失，可能在其他页面或DOM尚未完全加载: ${missingElements.join(', ')}`);
+    }
+    
+    // 判断当前是否在创建资产页面
+    const isCreateAssetPage = document.getElementById('assetForm') !== null;
+    if (!isCreateAssetPage) {
+        console.log('不在创建资产页面，跳过初始化');
+        return;
+    }
+    
+    // 在setTimeout中执行初始化，让DOM和其他脚本有时间完全加载
     setTimeout(initializeCreatePage, 100);
+    
+    // 添加500ms后的再次检查，以防DOM内容加载后又发生变化
+    setTimeout(function() {
+        if (!window.assetFormInitialized) {
+            console.log('页面可能尚未初始化，再次尝试');
+            initializeCreatePage();
+        }
+        
+        // 无论如何，再次重置上传区域状态
+        if (typeof resetUploadAreas === 'function') {
+            resetUploadAreas();
+        }
+    }, 500);
 });
 
 // 验证表单
