@@ -38,15 +38,16 @@ def get_associated_token_address(
     import base58
     
     # 创建种子和程序ID
-    # 种子包括：'token'前缀、owner地址、程序ID和mint地址
+    # 种子包括：'token'前缀、owner地址和mint地址
     seed_prefix = "token"
     
+    # 从PublicKey获取字节表示
+    # 注意：这里使用字符串表示，因为直接bytes(PublicKey)可能导致类型错误
+    owner_bytes = str(owner).encode("utf-8")
+    mint_bytes = str(mint).encode("utf-8")
+    
     # 将种子组合成字节数组
-    seed_bytes = (
-        seed_prefix.encode("utf-8") + 
-        bytes(owner) + 
-        bytes(mint)
-    )
+    seed_bytes = seed_prefix.encode("utf-8") + owner_bytes + mint_bytes
     
     # 计算哈希
     digest = hashlib.sha256(seed_bytes).digest()
