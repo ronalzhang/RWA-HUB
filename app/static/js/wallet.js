@@ -4604,3 +4604,80 @@ async function signSolanaTransaction(transactionData) {
 // 添加到全局命名空间
 window.signAndConfirmTransaction = signAndConfirmTransaction;
 
+// 添加全局wallet对象，提供与create.js兼容的接口
+window.wallet = {
+    // 获取当前钱包
+    getCurrentWallet: function() {
+        try {
+            // 检查walletState是否已初始化
+            if (!window.walletState || !window.walletState.connected) {
+                console.log('当前未连接钱包');
+                return null;
+            }
+            
+            // 返回当前钱包信息
+            return {
+                type: window.walletState.walletType,
+                address: window.walletState.address,
+                connected: window.walletState.connected
+            };
+        } catch (error) {
+            console.error('获取当前钱包信息失败:', error);
+            return null;
+        }
+    },
+    
+    // 转账接口 - 调用walletState的转账方法
+    transferToken: async function(tokenSymbol, to, amount) {
+        try {
+            console.log(`window.wallet.transferToken调用: ${tokenSymbol}, ${to}, ${amount}`);
+            
+            // 检查walletState是否存在
+            if (!window.walletState) {
+                throw new Error('钱包状态对象不存在');
+            }
+            
+            // 调用walletState的转账方法
+            if (typeof window.walletState.transferToken === 'function') {
+                return await window.walletState.transferToken(tokenSymbol, to, amount);
+            } else {
+                // 兼容处理：如果walletState没有transferToken方法，使用transferSolanaToken
+                if (typeof window.walletState.transferSolanaToken === 'function') {
+                    return await window.walletState.transferSolanaToken(tokenSymbol, to, amount);
+                } else {
+                    throw new Error('钱包不支持转账功能');
+                }
+            }
+        } catch (error) {
+            console.error('window.wallet.transferToken失败:', error);
+            return {
+                success: false,
+                error: error.message || '转账失败'
+            };
+        }
+    },
+    
+    // 检查钱包连接状态
+    isConnected: function() {
+        return window.walletState && window.walletState.connected;
+    },
+    
+    // 获取钱包地址
+    getAddress: function() {
+        return window.walletState ? window.walletState.address : null;
+    },
+    
+    // 获取钱包类型
+    getWalletType: function() {
+        return window.walletState ? window.walletState.walletType : null;
+    }
+};
+
+// 确保已有walletState对象
+if (!window.walletState) {
+    console.warn('walletState未找到，使用window.wallet时将无法获取钱包信息');
+}
+
+// 导出钱包接口
+console.log('钱包接口初始化完成');
+
