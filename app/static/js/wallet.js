@@ -2817,6 +2817,7 @@ checkIfReturningFromWalletApp(walletType) {
             try {
                 // 检查是否已加载
                 if (window.splToken) {
+                    console.log('SPL Token已加载，直接使用现有实例');
                     return resolve();
                 }
                 
@@ -2827,32 +2828,152 @@ checkIfReturningFromWalletApp(walletType) {
                     return resolve();
                 }
                 
-                // 需要加载库
-                const splTokenScript = document.createElement('script');
-                splTokenScript.src = 'https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js';
-                splTokenScript.onload = () => {
-                    console.log('SPL Token 库已加载');
+                // 获取库加载状态
+                const isPreparing = document.getElementById('spl-token-loading') !== null;
+                const isError = document.getElementById('spl-token-error') !== null;
+                
+                // 如果已在加载中，等待结果
+                if (isPreparing) {
+                    console.log('SPL Token库正在加载中，等待完成...');
                     
-                    // 设置全局变量
-                    if (window.spl && window.spl.token) {
-                        window.splToken = window.spl.token;
-                        console.log('已从window.spl.token初始化splToken库');
-                    }
+                    // 等待加载完成
+                    const checkInterval = setInterval(() => {
+                        if (window.splToken || (window.spl && window.spl.token)) {
+                            clearInterval(checkInterval);
+                            window.splToken = window.splToken || window.spl.token;
+                            console.log('等待后，SPL Token库已加载完成');
+                            resolve();
+                        } else if (isError) {
+                            clearInterval(checkInterval);
+                            reject(new Error('SPL Token库加载失败(检测到错误)'));
+                        }
+                    }, 300);
                     
-                    // 检查关键方法是否存在
-                    if (!window.splToken || !window.splToken.getAssociatedTokenAddress) {
-                        console.error('SPL Token库已加载但找不到getAssociatedTokenAddress方法');
-                        reject(new Error('SPL Token库功能不完整'));
+                    // 设置超时
+                    setTimeout(() => {
+                        clearInterval(checkInterval);
+                        reject(new Error('SPL Token库加载超时'));
+                    }, 10000);
+                    
+                    return;
+                }
+                
+                console.log('开始加载SPL Token库...');
+                
+                // 创建标记元素，避免重复加载
+                const loadingMark = document.createElement('div');
+                loadingMark.id = 'spl-token-loading';
+                loadingMark.style.display = 'none';
+                document.body.appendChild(loadingMark);
+                
+                // 尝试多种CDN源加载库
+                const cdnUrls = [
+                    '/static/js/contracts/spl-token.iife.min.js', // 本地备份优先
+                    'https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js',
+                    'https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.8/lib/index.iife.min.js',
+                    'https://raw.githack.com/solana-labs/solana-program-library/master/token/js/dist/index.iife.min.js'
+                ];
+                
+                let loadAttempt = 0;
+                
+                // 尝试加载库的函数
+                const attemptLoad = (urlIndex) => {
+                    if (urlIndex >= cdnUrls.length) {
+                        const errorMark = document.createElement('div');
+                        errorMark.id = 'spl-token-error';
+                        errorMark.style.display = 'none';
+                        document.body.appendChild(errorMark);
+                        
+                        // 所有尝试都失败了
+                        document.body.removeChild(loadingMark);
+                        reject(new Error('所有SPL Token库加载源都失败'));
                         return;
                     }
                     
-                    resolve();
+                    loadAttempt++;
+                    console.log(`尝试加载SPL Token库 (尝试 ${loadAttempt}/${cdnUrls.length}): ${cdnUrls[urlIndex]}`);
+                    
+                    const splTokenScript = document.createElement('script');
+                    splTokenScript.src = cdnUrls[urlIndex];
+                    splTokenScript.async = true;
+                    
+                    // 设置超时处理
+                    let timeoutId = setTimeout(() => {
+                        console.warn(`加载 ${cdnUrls[urlIndex]} 超时，尝试下一个源`);
+                        attemptLoad(urlIndex + 1);
+                    }, 10000);
+                    
+                    // 成功处理
+                    splTokenScript.onload = () => {
+                        clearTimeout(timeoutId);
+                        console.log(`SPL Token库已从 ${cdnUrls[urlIndex]} 加载`);
+                        
+                        // 延迟检查库是否实际加载成功
+                        setTimeout(() => {
+                            // 设置全局变量
+                            if (window.spl && window.spl.token) {
+                                window.splToken = window.spl.token;
+                                console.log('已从window.spl.token初始化splToken库');
+                                
+                                // 检查关键方法是否存在
+                                if (!window.splToken.getAssociatedTokenAddress) {
+                                    console.error('SPL Token库已加载但找不到getAssociatedTokenAddress方法');
+                                    
+                                    // 使用备选方案
+                                    if (window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID) {
+                                        console.log('找到ASSOCIATED_TOKEN_PROGRAM_ID，尝试自定义实现getAssociatedTokenAddress');
+                                        
+                                        // 自定义实现
+                                        window.splToken.getAssociatedTokenAddress = async function(mint, owner) {
+                                            const { PublicKey, SystemProgram } = window.solanaWeb3;
+                                            return PublicKey.findProgramAddressSync(
+                                                [
+                                                    owner.toBuffer(),
+                                                    window.splToken.TOKEN_PROGRAM_ID.toBuffer(),
+                                                    mint.toBuffer(),
+                                                ],
+                                                window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID
+                                            )[0];
+                                        };
+                                        
+                                        console.log('成功实现自定义getAssociatedTokenAddress');
+                                    } else {
+                                        document.body.removeChild(loadingMark);
+                                        attemptLoad(urlIndex + 1);
+                                        return;
+                                    }
+                                }
+                                
+                                // 成功加载
+                                document.body.removeChild(loadingMark);
+                                resolve();
+                            } else {
+                                console.warn('SPL Token库加载后window.spl.token不可用，尝试下一个源');
+                                attemptLoad(urlIndex + 1);
+                            }
+                        }, 500);
+                    };
+                    
+                    // 错误处理
+                    splTokenScript.onerror = (e) => {
+                        clearTimeout(timeoutId);
+                        // 特别检查本地文件加载错误
+                        if (urlIndex === 0) {
+                            console.error(`本地SPL Token库加载失败:`, e);
+                            console.warn(`请确保服务器上存在文件: ${cdnUrls[0]}`); 
+                            console.warn(`可以通过命令创建: mkdir -p app/static/js/contracts/ && curl -o app/static/js/contracts/spl-token.iife.min.js https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js`);
+                        } else {
+                            console.error(`从 ${cdnUrls[urlIndex]} 加载SPL Token库失败:`, e);
+                        }
+                        attemptLoad(urlIndex + 1);
+                    };
+                    
+                    document.head.appendChild(splTokenScript);
                 };
-                splTokenScript.onerror = (e) => {
-                    console.error('加载SPL Token库失败:', e);
-                    reject(new Error('加载SPL Token库失败'));
-                };
-                document.head.appendChild(splTokenScript);
+                
+                // 开始尝试
+                attemptLoad(0);
+                
             } catch (error) {
                 console.error('加载SPL Token库出错:', error);
                 reject(error);
