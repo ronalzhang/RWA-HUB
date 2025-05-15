@@ -873,6 +873,15 @@ function handleFileUpload(event) {
 </script>
 
 <!-- 引入资产创建脚本 -->
+<!-- 先引入依赖库 -->
+<script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
+<script>
+    // 确保solanaWeb3变量可用
+    if (typeof solanaWeb3 === 'undefined' && typeof solanaWeb3 !== 'undefined') {
+        window.solanaWeb3 = solanaWeb3;
+        console.log('Solana Web3.js库已加载');
+    }
+</script>
 <script src="{{ url_for('static', filename='js/assets/create.js') }}"></script>
 {% endblock %}
 

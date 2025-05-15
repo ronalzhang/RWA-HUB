@@ -1467,125 +1467,94 @@ async function processPayment() {
             showLoadingState('处理支付交易...');
             updateProgress(20, '请求支付...');
             
+            // 确保solana web3对象可用
+            if (typeof solanaWeb3 === 'undefined') {
+                console.error('solanaWeb3库未加载');
+                // 尝试加载solanaWeb3库
+                try {
+                    await loadExternalScript('https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js');
+                    console.log('solanaWeb3库动态加载成功');
+                } catch (loadErr) {
+                    throw new Error('无法加载Solana Web3.js库，支付无法继续');
+                }
+            }
+            
             // 从配置或API获取平台收款地址和发布费用
-            // 使用API动态获取这些配置值，避免硬编码
-            let platformAddress, feeAmount;
+            let platformAddress = 'AKx2YJWMAcqVfGcHytJMLXjf5P7YQQHmYJSGzrS88wdj'; // 默认地址
+            let feeAmount = 0.01; // 默认发布费用 0.01 USDC
             
             try {
                 // 尝试从API获取最新的支付配置
                 const configResponse = await fetch('/api/config/payment_settings');
                 if (configResponse.ok) {
                     const configData = await configResponse.json();
-                    platformAddress = configData.platform_address;
-                    feeAmount = configData.publishing_fee;
+                    if (configData.platform_address) {
+                        platformAddress = configData.platform_address;
+                    }
+                    if (configData.publishing_fee) {
+                        feeAmount = configData.publishing_fee;
+                    }
                     console.log('从API获取支付配置成功:', configData);
                 }
             } catch (configError) {
-                console.warn('从API获取支付配置失败，使用默认值:', configError);
+                console.warn('获取支付配置失败，使用默认值:', configError);
             }
             
-            // 如果API获取失败，使用备用值
-            if (!platformAddress) {
-                platformAddress = window.RWA_HUB_CONFIG?.platformFeeAddress || 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd';
-            }
+            updateProgress(30, '准备支付交易...');
             
-            if (!feeAmount) {
-                const publishingFeeText = document.getElementById('publishingFee').textContent;
-                // 从文本中提取数字，例如 "0.01 USDC" => 0.01
-                const feeMatch = publishingFeeText.match(/(\d+\.?\d*)/);
-                feeAmount = feeMatch ? parseFloat(feeMatch[1]) : 0.01; // 默认0.01 USDC
-                console.log(`从发布费用文本中提取: "${publishingFeeText}" => ${feeAmount}`);
-            }
-
-            console.log(`准备支付 ${feeAmount} USDC 到平台地址: ${platformAddress}`);
-            updateProgress(25, '连接钱包...');
-            
-            // 检查钱包状态
-            if (!window.walletState) {
-                throw new Error('钱包连接不可用');
-            }
-            
-            if (!window.walletState.connected || !window.walletState.address) {
+            // 获取用户当前选择的钱包类型
+            const currentWallet = window.wallet.getCurrentWallet();
+            if (!currentWallet) {
                 throw new Error('请先连接钱包');
             }
             
-            // 直接执行转账，不检查余额
-            updateProgress(35, '请求钱包授权...');
-            console.log('使用钱包API执行USDC转账');
+            console.log('当前钱包:', currentWallet);
+            console.log(`准备支付 ${feeAmount} USDC 到 ${platformAddress}`);
             
-            if (window.walletState && typeof window.walletState.transferToken === 'function') {
-                const result = await window.walletState.transferToken('USDC', platformAddress, feeAmount);
+            updateProgress(50, '等待钱包确认...');
+            
+            try {
+                // 执行转账
+                const transferResult = await window.wallet.transferToken('USDC', platformAddress, feeAmount);
+                console.log('转账结果:', transferResult);
                 
-                if (result && result.success && result.txHash) {
-                    console.log('转账初步成功:', result.txHash);
-                    updateProgress(40, '支付已提交，创建资产...');
-                    
-                    // 检查支付是否已被初步确认
-                    try {
-                        await checkInitialTransactionConfirmation(result.txHash);
-                        console.log('交易初步确认成功');
-                    } catch (confirmError) {
-                        console.warn('交易初步确认失败，但继续处理:', confirmError);
-                        // 继续创建资产，后端会再次确认
-                    }
-                    
-                    hideLoadingState(); // 隐藏加载状态，让创建过程接管
-                    resolve({
-                        success: true,
-                        txHash: result.txHash,
-                        amount: feeAmount,
-                        recipient: platformAddress
-                    });
-                } else {
-                    throw new Error('转账失败: ' + (result.error || '未知错误'));
+                if (!transferResult.success) {
+                    throw new Error(`${_("Transfer failed")}: ${transferResult.error || '未知错误'}`);
                 }
-            } else {
-                throw new Error('钱包API不可用，无法处理转账');
+                
+                // 存储交易哈希，后续可能需要用于验证
+                $('#tx_hash').val(transferResult.txHash);
+                
+                updateProgress(90, '支付成功，完成资产创建...');
+                resolve(transferResult.txHash);
+            } catch (transferError) {
+                console.error('支付处理错误:', transferError);
+                
+                // 尝试备用支付方法 - 请求管理员手动处理
+                const approvePayment = confirm('标准支付方式失败。您希望请求管理员手动处理支付吗？（您将需要联系管理员并提供凭证）');
+                if (approvePayment) {
+                    $('#manual_payment').val('1');
+                    $('#tx_hash').val('manual_payment_requested');
+                    resolve('manual_payment');
+                } else {
+                    reject(transferError);
+                }
             }
         } catch (error) {
-            hideLoadingState();
             console.error('支付处理错误:', error);
-            // 直接 reject 错误对象，让调用处处理
             reject(error);
         }
     });
 }
 
-// 检查交易初步确认状态
-async function checkInitialTransactionConfirmation(txHash, maxAttempts = 3, interval = 1000) {
+// 辅助函数：动态加载外部脚本
+function loadExternalScript(url) {
     return new Promise((resolve, reject) => {
-        let attempts = 0;
-        
-        const checkStatus = async () => {
-            attempts++;
-            try {
-                const response = await fetch(`/api/transactions/status?tx_hash=${txHash}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                if (data.confirmed || data.status === 'confirmed' || data.status === 'finalized') {
-                    console.log(`交易 ${txHash} 已初步确认`);
-                    return resolve(true);
-                }
-                
-                if (attempts >= maxAttempts) {
-                    console.log(`达到最大尝试次数(${maxAttempts})，交易可能仍在处理中`);
-                    return resolve(false);
-                }
-                
-                setTimeout(checkStatus, interval);
-            } catch (error) {
-                console.warn(`检查交易状态出错(尝试 ${attempts}/${maxAttempts}):`, error);
-                if (attempts >= maxAttempts) {
-                    return reject(error);
-                }
-                setTimeout(checkStatus, interval);
-            }
-        };
-        
-        checkStatus();
+        const script = document.createElement('script');
+        script.src = url;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`无法加载脚本: ${url}`));
+        document.head.appendChild(script);
     });
 }
 

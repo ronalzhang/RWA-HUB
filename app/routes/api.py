@@ -955,12 +955,34 @@ def api_execute_transfer_v2():
                 'message': f"缺少必要参数: {', '.join(missing_fields)}"
             }), 400
             
-        # 执行真实转账
-        try:
-            from app.utils.utils import get_solana_client
-            from app.blockchain.solana_service import execute_transfer_transaction
+        # 告知前端优先使用钱包直接转账
+        if not os.environ.get('SOLANA_PRIVATE_KEY'):
+            logger.warning("服务器未配置Solana私钥，无法执行转账")
+            return jsonify({
+                'success': False,
+                'message': "服务器未配置Solana私钥，请使用钱包直接转账"
+            }), 400
             
-            logger.info(f"执行转账: {mapped_data}")
+        # 尝试执行转账
+        try:
+            # 导入必要模块 - 使用更健壮的方式
+            try:
+                import importlib
+                utils_module = importlib.import_module('app.utils.utils')
+                get_solana_client = utils_module.get_solana_client
+                
+                solana_service = importlib.import_module('app.blockchain.solana_service')
+                execute_transfer_transaction = solana_service.execute_transfer_transaction
+                
+                logger.info("成功导入Solana交易所需模块")
+            except ImportError as ie:
+                logger.error(f"无法导入必要模块: {str(ie)}")
+                return jsonify({
+                    'success': False,
+                    'message': f"服务器配置错误: 无法加载必要模块，请使用钱包直接转账"
+                }), 500
+            
+            logger.info(f"准备执行转账: {mapped_data}")
             
             # 验证是否配置了服务钱包私钥
             solana_private_key = os.environ.get('SOLANA_PRIVATE_KEY')
@@ -971,12 +993,14 @@ def api_execute_transfer_v2():
                     'message': "服务器未配置转账私钥，请使用钱包直接转账"
                 }), 400
                 
+            # 执行转账
             signature = execute_transfer_transaction(
                 token_symbol=mapped_data['token_symbol'],
                 from_address=mapped_data['from_address'],
                 to_address=mapped_data['to_address'],
                 amount=float(mapped_data['amount'])
             )
+            
             logger.info(f"转账成功，交易签名: {signature}")
             return jsonify({
                 'success': True,
@@ -984,7 +1008,7 @@ def api_execute_transfer_v2():
                 'message': '转账成功'
             })
         except ModuleNotFoundError as me:
-            logger.error(f"执行转账失败，缺少必要模块: {str(me)}")
+            logger.error(f"执行转账失败: 缺少必要模块 {str(me)}")
             return jsonify({
                 'success': False,
                 'message': f'执行转账失败: 服务器配置错误，缺少必要模块'
