@@ -1492,7 +1492,7 @@ async function processPayment() {
             
             if (!feeAmount) {
                 const publishingFeeText = document.getElementById('publishingFee').textContent;
-                feeAmount = parseFloat(publishingFeeText) || window.RWA_HUB_CONFIG?.publishingFee || 1.0;
+                feeAmount = parseFloat(publishingFeeText) || window.RWA_HUB_CONFIG?.publishingFee || 0.01; // 默认为0.01，降低测试门槛
             }
 
             console.log(`准备支付 ${feeAmount} USDC 到平台地址: ${platformAddress}`);
@@ -1507,25 +1507,11 @@ async function processPayment() {
                 throw new Error('{{ _("Please connect your wallet first") }}');
             }
             
-            // 检查钱包余额
-            try {
-                updateProgress(30, '{{ _("Checking wallet balance...") }}');
-                const balanceCheckResult = await window.walletState.checkTokenBalance('USDC');
-                if (balanceCheckResult && balanceCheckResult.balance !== undefined) {
-                    if (parseFloat(balanceCheckResult.balance) < feeAmount) {
-                        throw new Error(`{{ _("Insufficient USDC balance. Required: ") }}${feeAmount}, {{ _("Available: ") }}${balanceCheckResult.balance}`);
-                    }
-                    console.log(`钱包余额充足: ${balanceCheckResult.balance} USDC`);
-                }
-            } catch (balanceError) {
-                console.warn('余额检查失败，继续处理:', balanceError);
-                // 继续执行，让钱包自己处理余额不足的情况
-            }
+            // 直接执行转账，不检查余额
+            updateProgress(35, '{{ _("Requesting wallet approval...") }}');
+            console.log('使用钱包API执行USDC转账');
             
-            // 执行转账
             if (window.walletState && typeof window.walletState.transferToken === 'function') {
-                updateProgress(35, '{{ _("Requesting wallet approval...") }}');
-                console.log('使用钱包API执行USDC转账');
                 const result = await window.walletState.transferToken('USDC', platformAddress, feeAmount);
                 
                 if (result && result.success && result.txHash) {
