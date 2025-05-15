@@ -18,6 +18,7 @@ from flask import current_app
 from app.utils.solana_compat.connection import Connection
 from app.utils.solana_compat.publickey import PublicKey
 from app.utils.solana_compat.transaction import Transaction, TransactionInstruction
+from app.utils.solana_compat.keypair import Keypair
 from app.utils.solana_compat.tx_opts import TxOpts
 from app.config import Config
 from app.extensions import db
@@ -420,12 +421,12 @@ def execute_transfer_transaction(
         # 6. 准备交易数据
         from app.utils.solana_compat.publickey import PublicKey
         from app.utils.solana_compat.transaction import Transaction
-        from app.utils.solana import SolanaClient
+        from app.blockchain.solana import SolanaClient
         from app.utils.helpers import get_solana_keypair_from_env
         import base58
         
         # 6.1 创建Solana客户端实例
-        solana_client = SolanaClient()
+        solana_client = SolanaClient(private_key=os.environ.get("SOLANA_PRIVATE_KEY", ""))
         if not solana_client.keypair:
             raise RuntimeError("Solana客户端未配置服务钱包私钥，无法执行交易")
         

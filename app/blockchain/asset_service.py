@@ -334,7 +334,7 @@ class AssetService:
                     'error': '未初始化钱包公钥，无法查询余额',
                     'wallet_initialized': False,
                     'needs_setup': True,
-                    'network': solana_client.network_url,
+                    'network': solana_client.endpoint,
                     'env_vars_found': [k for k in os.environ.keys() if k.startswith('SOLANA_')]
                 }
             
@@ -366,7 +366,7 @@ class AssetService:
                 'threshold': threshold,
                 'is_sufficient': is_sufficient,
                 'wallet_address': str(solana_client.public_key),
-                'network': solana_client.network_url,
+                'network': solana_client.endpoint,
                 'readonly_mode': readonly,
                 'transaction_capable': not readonly and balance is not None and balance > 0
             }
@@ -406,7 +406,7 @@ class AssetService:
             # 初始化Solana客户端
             try:
                 solana_client = SolanaClient(wallet_address=wallet_address)
-                network_url = solana_client.network_url
+                network_url = solana_client.endpoint
                 logger.info(f"Solana客户端初始化成功，网络URL: {network_url}")
             except Exception as client_err:
                 logger.error(f"Solana客户端初始化失败: {str(client_err)}")
@@ -440,8 +440,8 @@ class AssetService:
                 except ImportError:
                     from app.utils.solana_compat.rpc.api import Client
                 
-                rpc_client = Client(solana_client.network_url)
-                logger.info(f"创建RPC客户端成功，连接到: {solana_client.network_url}")
+                rpc_client = Client(solana_client.endpoint)
+                logger.info(f"创建RPC客户端成功，连接到: {solana_client.endpoint}")
             except Exception as rpc_err:
                 logger.error(f"创建RPC客户端失败: {str(rpc_err)}")
                 return 0.0
