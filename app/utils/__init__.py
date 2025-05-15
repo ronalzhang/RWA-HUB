@@ -142,11 +142,11 @@ def save_files(files, asset_type, asset_id, token_symbol=None):
                     file_size = len(file_data)
                     current_app.logger.info(f'文件大小: {file_size} bytes')
                     
-                    if file_size > 10 * 1024 * 1024:  # 10MB
+                    if file_size > 20 * 1024 * 1024:  # 20MB
                         current_app.logger.error(f'文件大小超过限制: {filename} ({file_size} bytes)')
                         failed_files.append({
                             'name': file.filename,
-                            'error': '文件大小超过限制(10MB)'
+                            'error': '文件大小超过限制(20MB)'
                         })
                         break
                 
