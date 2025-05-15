@@ -58,6 +58,7 @@ class Asset(db.Model):
     
     # 支付相关字段
     payment_details = db.Column(db.Text)  # 支付详情，JSON格式
+    payment_tx_hash = db.Column(db.String(200))  # 支付交易哈希
     payment_confirmed = db.Column(db.Boolean, default=False)  # 支付是否已确认
     payment_confirmed_at = db.Column(db.DateTime)  # 支付确认时间
     
