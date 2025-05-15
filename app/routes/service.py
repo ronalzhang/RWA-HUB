@@ -2,7 +2,7 @@ import os
 from flask import jsonify, current_app, Blueprint, request
 from app.blockchain.asset_service import AssetService
 from app.blockchain.solana import SolanaClient
-from app.blockchain.solana_service import execute_transfer_transaction, validate_solana_address
+from app.blockchain.solana_service import execute_transfer_transaction, validate_solana_address, check_transaction
 from . import service_bp  # 从__init__.py导入正确的蓝图
 import json
 import logging
@@ -167,21 +167,37 @@ def execute_transfer_v2():
         data = request.json
         logger.info(f"收到转账请求: {data}")
         
-        # 验证必要参数
-        required_fields = ['fromAddress', 'toAddress', 'amount', 'token']
+        # 验证必要参数 - 修复参数名称不匹配问题
+        required_fields = ['from_address', 'to_address', 'amount', 'token_symbol']
+        
+        # 前端传来的参数名称可能有所不同，进行兼容处理
+        mapped_data = {
+            'from_address': data.get('from_address') or data.get('fromAddress'),
+            'to_address': data.get('to_address') or data.get('toAddress'),
+            'amount': data.get('amount'),
+            'token_symbol': data.get('token_symbol') or data.get('token'),
+            'purpose': data.get('purpose'),
+            'metadata': data.get('metadata')
+        }
+        
+        # 检查必填字段
+        missing_fields = []
         for field in required_fields:
-            if field not in data:
-                return jsonify({'success': False, 'message': f'缺少必要参数: {field}'}), 400
+            if not mapped_data[field]:
+                missing_fields.append(field)
+        
+        if missing_fields:
+            return jsonify({'success': False, 'message': f'缺少必要参数: {", ".join(missing_fields)}'}), 400
         
         # 验证地址格式
-        if not validate_solana_address(data['fromAddress']):
+        if not validate_solana_address(mapped_data['from_address']):
             return jsonify({'success': False, 'message': '发送方地址格式无效'}), 400
-        if not validate_solana_address(data['toAddress']):
+        if not validate_solana_address(mapped_data['to_address']):
             return jsonify({'success': False, 'message': '接收方地址格式无效'}), 400
         
         # 验证金额
         try:
-            amount = float(data['amount'])
+            amount = float(mapped_data['amount'])
             if amount <= 0:
                 return jsonify({'success': False, 'message': '转账金额必须大于0'}), 400
         except ValueError:
@@ -189,22 +205,22 @@ def execute_transfer_v2():
         
         # 执行转账
         signature = execute_transfer_transaction(
-            token_symbol=data['token'],
-            from_address=data['fromAddress'],
-            to_address=data['toAddress'],
+            token_symbol=mapped_data['token_symbol'],
+            from_address=mapped_data['from_address'],
+            to_address=mapped_data['to_address'],
             amount=amount
         )
         
         # 记录资产创建费用支付
-        if data.get('purpose') == 'asset_creation' and data.get('metadata'):
-            asset_symbol = data['metadata'].get('assetSymbol')
+        if mapped_data.get('purpose') == 'asset_creation' and mapped_data.get('metadata'):
+            asset_symbol = mapped_data['metadata'].get('assetSymbol')
             if asset_symbol:
                 logger.info(f"记录资产创建费用支付: {asset_symbol}")
                 # 记录交易
                 new_trade = Trade(
                     asset_symbol=asset_symbol,
-                    buyer_address=data['fromAddress'],
-                    seller_address=data['toAddress'],
+                    buyer_address=mapped_data['from_address'],
+                    seller_address=mapped_data['to_address'],
                     amount=Decimal(str(amount)),
                     price=Decimal('1.0'),  # 单价为1 USDC
                     total=Decimal(str(amount)),
@@ -226,3 +242,30 @@ def execute_transfer_v2():
         logger.error(f"执行转账失败: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({'success': False, 'message': f'执行转账失败: {str(e)}'}), 500 
+
+@service_bp.route('/blockchain/solana/check-transaction', methods=['GET'])
+def check_solana_transaction():
+    """检查Solana交易状态"""
+    try:
+        # 获取交易签名
+        signature = request.args.get('signature')
+        if not signature:
+            return jsonify({'success': False, 'message': '缺少交易签名参数'}), 400
+        
+        logger.info(f"检查Solana交易状态: {signature}")
+        
+        # 调用检查函数
+        status = check_transaction(signature)
+        
+        # 添加成功标志
+        if 'error' not in status:
+            status['success'] = True
+        else:
+            status['success'] = False
+        
+        return jsonify(status)
+        
+    except Exception as e:
+        logger.error(f"检查交易状态失败: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({'success': False, 'message': f'检查交易状态失败: {str(e)}'}), 500 
