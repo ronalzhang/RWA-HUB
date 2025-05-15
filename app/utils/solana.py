@@ -45,15 +45,65 @@ class SolanaClient:
     """Solana 客户端工具类"""
     
     def __init__(self):
-        self.client = Client(SOLANA_RPC_URL)
+        # 尝试使用多个RPC节点以增加可靠性
+        self.rpc_nodes = [
+            SOLANA_RPC_URL,
+            "https://api.mainnet-beta.solana.com",
+            "https://solana-api.projectserum.com",
+            "https://rpc.ankr.com/solana"
+        ]
+        
+        self.client = None
+        self._init_client()
+        
         self.program_id = PublicKey(PROGRAM_ID)
         self.usdc_mint = PublicKey(USDC_MINT)
         self.platform_fee_address = PublicKey(PLATFORM_FEE_ADDRESS)
     
+    def _init_client(self):
+        """初始化Solana RPC客户端，尝试多个节点"""
+        for rpc_url in self.rpc_nodes:
+            try:
+                logging.info(f"尝试连接Solana RPC节点: {rpc_url}")
+                test_client = Client(rpc_url)
+                
+                # 测试连接是否可用
+                response = test_client.get_health()
+                if response and 'result' in response and response['result'] == 'ok':
+                    logging.info(f"成功连接到Solana RPC节点: {rpc_url}")
+                    self.client = test_client
+                    return
+                else:
+                    logging.warning(f"Solana RPC节点连接测试失败: {rpc_url}, 响应: {response}")
+            except Exception as e:
+                logging.warning(f"连接Solana RPC节点失败: {rpc_url}, 错误: {str(e)}")
+        
+        # 如果所有节点都失败，使用默认节点
+        logging.warning("所有RPC节点连接失败，使用默认设置")
+        self.client = Client(SOLANA_RPC_URL)
+        
     def get_account_info(self, pubkey):
         """获取账户信息"""
-        response = self.client.get_account_info(pubkey)
-        return response["result"]["value"]
+        try:
+            response = self.client.get_account_info(pubkey)
+            if 'error' in response:
+                logging.error(f"获取账户信息失败: {response['error']}")
+                # 尝试重新初始化客户端
+                self._init_client()
+                # 重试一次
+                response = self.client.get_account_info(pubkey)
+                
+            return response["result"]["value"]
+        except Exception as e:
+            logging.error(f"获取账户信息异常: {str(e)}")
+            # 尝试重新初始化客户端后再次尝试
+            try:
+                self._init_client()
+                response = self.client.get_account_info(pubkey)
+                return response["result"]["value"]
+            except Exception as retry_e:
+                logging.error(f"重试获取账户信息也失败: {str(retry_e)}")
+                raise
     
     def get_asset_account(self, asset_id):
         """获取资产账户"""

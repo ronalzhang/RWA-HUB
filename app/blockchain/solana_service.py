@@ -50,7 +50,43 @@ PROGRAM_ID = Config.SOLANA_PROGRAM_ID or 'RWAxxx11111111111111111111111111111111
 USDC_MINT = Config.SOLANA_USDC_MINT or 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'  # Solana Mainnet USDC
 
 # 创建Solana连接
-solana_connection = Connection(SOLANA_ENDPOINT)
+solana_connection = None
+
+def initialize_solana_connection():
+    """初始化Solana连接"""
+    global solana_connection
+    endpoint = Config.SOLANA_RPC_URL or Config.SOLANA_ENDPOINT or 'https://api.mainnet-beta.solana.com'
+    logger.info(f"初始化Solana连接，使用端点: {endpoint}")
+    try:
+        solana_connection = Connection(endpoint)
+        logger.info("Solana连接初始化成功")
+    except Exception as e:
+        logger.error(f"初始化Solana连接失败: {str(e)}")
+        # 尝试使用备用节点
+        backup_endpoints = [
+            'https://api.mainnet-beta.solana.com',
+            'https://solana-api.projectserum.com',
+            'https://rpc.ankr.com/solana'
+        ]
+        for backup_endpoint in backup_endpoints:
+            if backup_endpoint != endpoint:
+                try:
+                    logger.info(f"尝试使用备用节点: {backup_endpoint}")
+                    solana_connection = Connection(backup_endpoint)
+                    logger.info(f"使用备用节点 {backup_endpoint} 连接成功")
+                    return
+                except Exception as be:
+                    logger.error(f"备用节点 {backup_endpoint} 连接失败: {str(be)}")
+        
+        # 如果所有尝试都失败，使用默认节点再试一次
+        try:
+            logger.warning("所有节点连接失败，使用默认节点")
+            solana_connection = Connection('https://api.mainnet-beta.solana.com')
+        except Exception as fe:
+            logger.critical(f"无法初始化Solana连接: {str(fe)}")
+
+# 初始化连接
+initialize_solana_connection()
 
 def prepare_transfer_transaction(
     token_symbol: str,
@@ -322,6 +358,15 @@ def execute_transfer_transaction(
         # 1. 详细记录输入参数
         logger.info(f"执行真实Solana转账 - 参数: token={token_symbol}, from={from_address}, to={to_address}, amount={amount}")
         
+        # 检查solana_connection是否已初始化
+        global solana_connection
+        if solana_connection is None:
+            logger.warning("Solana连接未初始化，尝试重新初始化")
+            initialize_solana_connection()
+            
+        if solana_connection is None:
+            raise RuntimeError("无法初始化Solana连接，请检查网络连接和RPC节点状态")
+        
         # 2. 检查参数完整性
         if not all([token_symbol, from_address, to_address, amount]):
             missing = []
@@ -406,28 +451,44 @@ def execute_transfer_transaction(
         
         # 7.3 发送签名交易
         logger.info("发送交易到Solana网络...")
-        result = solana_connection.send_transaction(transaction, [wallet_keypair])
+        try:
+            result = solana_connection.send_transaction(transaction, [wallet_keypair])
+            logger.info(f"发送交易响应: {result}")
+        except Exception as tx_error:
+            logger.error(f"发送交易失败: {str(tx_error)}")
+            # 尝试重新初始化连接
+            initialize_solana_connection()
+            if solana_connection is None:
+                raise RuntimeError(f"发送交易失败且无法重新连接: {str(tx_error)}")
+            
+            # 重试发送交易
+            logger.info("重试发送交易...")
+            result = solana_connection.send_transaction(transaction, [wallet_keypair])
         
         # 7.4 处理结果
-        if 'result' in result:
+        if result and 'result' in result:
             signature = result['result']
             logger.info(f"交易发送成功，获取到签名: {signature}")
             
             # 7.5 等待交易确认
             logger.info("等待交易确认...")
-            confirmation_result = solana_connection.confirm_transaction(signature)
-            if confirmation_result and 'result' in confirmation_result:
-                confirm_status = confirmation_result['result'].get('value', 0)
-                if confirm_status > 0:
-                    logger.info(f"交易已确认，确认数: {confirm_status}")
+            try:
+                confirmation_result = solana_connection.confirm_transaction(signature)
+                if confirmation_result and 'result' in confirmation_result:
+                    confirm_status = confirmation_result['result'].get('value', 0)
+                    if confirm_status > 0:
+                        logger.info(f"交易已确认，确认数: {confirm_status}")
+                    else:
+                        logger.warning(f"交易未完全确认，当前确认数: {confirm_status}")
                 else:
-                    logger.warning(f"交易未完全确认，当前确认数: {confirm_status}")
-            else:
-                logger.warning("无法获取交易确认状态")
+                    logger.warning("无法获取交易确认状态")
+            except Exception as confirm_error:
+                logger.warning(f"确认交易状态时出错: {str(confirm_error)}")
+                # 确认失败不阻止返回签名
                 
             return signature
         else:
-            error_msg = f"发送交易失败: {result.get('error', '未知错误')}"
+            error_msg = f"发送交易失败: {result.get('error', '未知错误')}" if result else "发送交易失败: 无响应"
             logger.error(error_msg)
             raise RuntimeError(error_msg)
         
