@@ -42,17 +42,35 @@ from .service import *
 
 # 注册蓝图函数
 def register_blueprints(app):
-    # 注册所有蓝图
-    app.register_blueprint(api_bp, url_prefix='/api')
-    app.register_blueprint(main_bp)
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(assets_bp)
-    app.register_blueprint(assets_api_bp)
-    app.register_blueprint(admin_bp)
-    app.register_blueprint(admin_api_bp)
-    app.register_blueprint(service_bp)
-    app.register_blueprint(proxy_bp)  # 注册代理蓝图
-    app.register_blueprint(admin_test_bp)  # 注册管理员测试蓝图
+    """注册所有蓝图"""
+    from . import views, auth, admin, assets, api, service
+    
+    # 注册主页蓝图
+    app.register_blueprint(views.main_bp)
+    
+    # 注册认证蓝图
+    app.register_blueprint(auth.auth_bp, url_prefix='/auth')
+    app.register_blueprint(auth.auth_api_bp, url_prefix='/api/auth')
+    
+    # 注册管理后台蓝图
+    app.register_blueprint(admin.admin_bp, url_prefix='/admin')
+    app.register_blueprint(admin.admin_api_bp, url_prefix='/api/admin')
+    
+    # 注册资产蓝图
+    app.register_blueprint(assets.assets_bp, url_prefix='/assets')
+    app.register_blueprint(assets.assets_api_bp, url_prefix='/api/assets')
+    
+    # 注册API蓝图
+    app.register_blueprint(api.api_bp, url_prefix='/api')
+    
+    # 注册服务蓝图
+    app.register_blueprint(service.service_bp, url_prefix='/api')
+    
+    # 注册代理蓝图
+    app.register_blueprint(proxy_bp)
+    
+    # 注册管理员测试蓝图
+    app.register_blueprint(admin_test_bp)
     
     # 注册全局URL前缀修正处理器
     register_global_handlers(app)
