@@ -1,0 +1,2 @@
+    <!-- API错误强制修复脚本 -->
+    <script src="{{ url_for("static", filename="js/api_error_fix.js") }}"></script>

@@ -122,9 +122,9 @@ if (window.walletApiFixInitialized) {
           
           // 如果按钮被禁用且没有强制更新标志，不进行更新
           if (btn.disabled && !force) {
-            return false;
-          }
-          
+        return false;
+    }
+    
           // 对于普通按钮，更新内容
           const hasSpinner = btn.querySelector('.spinner-border') !== null;
           const originalText = btn.dataset.originalText || btn.textContent.trim();
@@ -350,7 +350,7 @@ if (window.walletApiFixInitialized) {
             break;
           }
           
-        } catch (error) {
+            } catch (error) {
           if (timeoutId) {
             clearTimeout(timeoutId);
           }
@@ -405,8 +405,8 @@ if (window.walletApiFixInitialized) {
         if (typeof url === 'string' && (url.includes('/api/') || options?.headers?.['X-RWA-API'])) {
           return window.fetchWithRetry(url, options, 1);
         } else {
-          return originalFetch(url, options);
-        }
+                return originalFetch(url, options);
+                        }
       };
       
       // 触发初始化完成事件
@@ -417,8 +417,8 @@ if (window.walletApiFixInitialized) {
       console.error('[钱包API] 初始化超时');
     }, 3000);
   };
-
-  // 执行初始化
+    
+    // 执行初始化
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initWalletApiFix);
   } else {

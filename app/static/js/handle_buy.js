@@ -307,10 +307,10 @@ function resetButton(button, text = '<i class="fas fa-shopping-cart me-2"></i>Bu
 function updateBuyButtonState() {
   console.log('更新购买按钮状态');
   
-  // 获取购买按钮
-  const buyButton = document.getElementById('buy-button');
-  if (!buyButton) {
-    console.warn('找不到购买按钮元素');
+  // 获取所有购买按钮
+  const buyButtons = document.querySelectorAll('.buy-button, #buy-button');
+  if (buyButtons.length === 0) {
+    console.log('找不到购买按钮元素，可能在其他页面');
     return;
   }
   
@@ -318,18 +318,20 @@ function updateBuyButtonState() {
   const walletConnected = isWalletConnected();
   console.log('钱包状态检查:', { connected: walletConnected });
   
-  // 更新按钮状态
-  if (walletConnected) {
-    console.log('钱包已连接，启用购买按钮');
-    buyButton.disabled = false;
-    buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
-    buyButton.removeAttribute('title');
-  } else {
-    console.log('钱包未连接，禁用购买按钮');
-    buyButton.disabled = true;
-    buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
-    buyButton.title = '请先连接钱包';
-  }
+  // 更新所有按钮状态
+  buyButtons.forEach(buyButton => {
+    if (walletConnected) {
+      console.log('钱包已连接，启用购买按钮');
+      buyButton.disabled = false;
+      buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
+      buyButton.removeAttribute('title');
+    } else {
+      console.log('钱包未连接，禁用购买按钮');
+      buyButton.disabled = true;
+      buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
+      buyButton.title = '请先连接钱包';
+    }
+  });
 }
 
 /**
@@ -526,25 +528,30 @@ function handleBuyButtonClick(event) {
   return false;
 }
 
-// 设置购买按钮事件
+// 初始化购买按钮
 function setupBuyButton() {
-  // 查找所有购买按钮
-  const buyButtons = document.querySelectorAll('.buy-btn, .buy-button, [data-action="buy"], #buyButton, .btn-buy, #buy-button');
+  console.log('初始化购买按钮...');
   
+  // 查找所有购买按钮
+  const buyButtons = document.querySelectorAll('.buy-button, #buy-button');
+  if (buyButtons.length === 0) {
+    console.log('当前页面没有购买按钮');
+    return;
+  }
+  
+  console.log(`找到 ${buyButtons.length} 个购买按钮`);
+  
+  // 为每个按钮添加点击事件
   buyButtons.forEach(button => {
-    // 移除旧的事件监听器并附加新的
-    const newButton = button.cloneNode(true);
-    if (button.parentNode) {
-      button.parentNode.replaceChild(newButton, button);
-    }
+    // 移除已有的点击事件(如果有)
+    button.removeEventListener('click', handleBuyButtonClick);
     
-    // 确保按钮文字为"Buy"
-    newButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
-    
-    newButton.addEventListener('click', handleBuyButtonClick);
+    // 添加新的点击事件
+    button.addEventListener('click', handleBuyButtonClick);
+    console.log('已添加购买按钮点击事件');
   });
   
-  // 更新按钮状态
+  // 初始更新按钮状态
   updateBuyButtonState();
 }
 
