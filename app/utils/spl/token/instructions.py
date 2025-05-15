@@ -1,6 +1,6 @@
 from typing import Optional, Tuple
 from app.utils.solana_compat.publickey import PublicKey
-from app.utils.solana_compat.transaction import Transaction
+from app.utils.solana_compat.transaction import Transaction, TransactionInstruction
 from app.utils.solana_compat.connection import Connection
 from .constants import TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
 
@@ -39,6 +39,50 @@ def get_associated_token_address(
     # 使用owner地址和mint地址的前缀生成一个模拟地址
     address_str = f"{str(owner)[:16]}-{str(mint)[:16]}"
     return PublicKey(address_str)
+
+def transfer(
+    token_program_id: PublicKey,
+    source: PublicKey,
+    destination: PublicKey,
+    owner: PublicKey,
+    amount: int,
+    signers=None
+) -> TransactionInstruction:
+    """
+    SPL Token转账指令
+    
+    :param token_program_id: Token程序ID
+    :param source: 源Token账户
+    :param destination: 目标Token账户
+    :param owner: 源账户所有者
+    :param amount: 转账金额(lamports)
+    :param signers: 可选的其他签名者列表
+    :return: TransactionInstruction对象
+    """
+    import struct
+    from app.utils.solana_compat.transaction import AccountMeta
+    
+    keys = [
+        AccountMeta(pubkey=source, is_signer=False, is_writable=True),
+        AccountMeta(pubkey=destination, is_signer=False, is_writable=True),
+        AccountMeta(pubkey=owner, is_signer=True, is_writable=False)
+    ]
+    
+    # 如果有额外的签名者，添加到keys中
+    if signers:
+        for signer in signers:
+            keys.append(AccountMeta(pubkey=signer, is_signer=True, is_writable=False))
+    
+    # 转账指令的命令ID是3，然后是amount（u64，8字节）
+    # SPL Token指令格式：命令ID (u8) + 参数...
+    # 转账指令格式：3 (u8) + amount (u64)
+    data = struct.pack("<BI", 3, amount)
+    
+    return TransactionInstruction(
+        keys=keys,
+        program_id=token_program_id,
+        data=bytes(data)
+    )
 
 def create_mint(
     conn: Connection,
