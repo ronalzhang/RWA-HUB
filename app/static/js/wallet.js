@@ -1205,6 +1205,7 @@ const walletState = {
                 console.warn(`尝试获取余额失败: ${fallbackError}`);
                 return this.balance || 0;
         }
+            }
     },
     
     /**
