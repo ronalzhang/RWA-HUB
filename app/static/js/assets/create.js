@@ -1490,7 +1490,7 @@ async function processPayment() {
             
             try {
                 // 尝试从API获取最新的支付配置
-                const configResponse = await fetch('/api/config/payment_settings');
+                const configResponse = await fetch('/api/service/config/payment_settings');
                 if (configResponse.ok) {
                     const configData = await configResponse.json();
                     platformAddress = configData.platform_fee_address || platformAddress;

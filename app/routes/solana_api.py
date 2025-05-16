@@ -257,7 +257,6 @@ def after_request(response):
         
         # 记录API调用
         log_api_call(
-            method=request.method,
             endpoint=request.path,
             status_code=response.status_code,
             response_time=response_time,
@@ -265,7 +264,8 @@ def after_request(response):
                 'query_params': dict(request.args),
                 'remote_addr': request.remote_addr,
                 'response_status': 'success' if response.status_code < 400 else 'error',
-                'response_data': response_data
+                'response_data': response_data,
+                'method': request.method  # 作为详情的一部分传递
             }
         )
     
