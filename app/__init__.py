@@ -14,14 +14,23 @@ from logging.handlers import RotatingFileHandler
 
 # 全局应用实例，供其他模块导入
 current_app = None
+# 全局日志记录器，供其他模块导入
+logger = logging.getLogger('app')
+
+# 配置根日志记录器
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+)
 
 def create_app(config_name='development'):
     """创建Flask应用实例"""
-    global current_app
+    global current_app, logger
     app = Flask(__name__)
     
     # 设置全局变量
     current_app = app
+    logger = app.logger
     
     # 加载配置
     app.config.from_object(config[config_name])
