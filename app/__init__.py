@@ -156,10 +156,14 @@ def create_app(config_name='development'):
             
             # 确保支付自动监控任务启动
             try:
-                from app.tasks import auto_monitor_payments_task
-                app.logger.info("支付自动监控任务已注册")
+                from app.tasks import auto_monitor_payments_task, start_scheduled_tasks
+                # 显式调用启动定时任务函数
+                start_scheduled_tasks()
+                app.logger.info("支付自动监控任务已启动")
             except Exception as task_err:
-                app.logger.error(f"注册支付自动监控任务失败: {str(task_err)}")
+                app.logger.error(f"启动支付自动监控任务失败: {str(task_err)}")
+                import traceback
+                app.logger.error(traceback.format_exc())
                 
         except Exception as e:
             app.logger.error(f"初始化后台任务处理系统失败: {str(e)}")
