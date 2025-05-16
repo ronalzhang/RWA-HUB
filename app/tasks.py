@@ -48,7 +48,9 @@ class DelayedTask:
     
     def delay(self, *args, **kwargs):
         """模拟Celery的delay方法"""
+        # 确保在delay调用时立即添加任务到队列
         self._add_to_queue(*args, **kwargs)
+        logger.info(f"任务已添加到队列: func={self.func.__name__}, args={args}, kwargs={kwargs}")
         return self
 
 def _ensure_task_processor_running():

@@ -1018,8 +1018,9 @@ def create_asset_api():
                 try:
                     from app.tasks import monitor_creation_payment
                     current_app.logger.info(f"触发支付确认监控任务: AssetID={new_asset.id}, TxHash={new_asset.payment_tx_hash}")
-                    monitor_task = monitor_creation_payment.delay(new_asset.id, new_asset.payment_tx_hash)
-                    current_app.logger.info(f"支付确认监控任务已触发: {monitor_task}")
+                    # 修复：直接调用任务函数而不使用延迟执行
+                    Thread(target=monitor_creation_payment, args=(new_asset.id, new_asset.payment_tx_hash)).start()
+                    current_app.logger.info(f"支付确认监控任务已在新线程中启动: AssetID={new_asset.id}")
                     
                     # 更新支付详情
                     payment_details = {
