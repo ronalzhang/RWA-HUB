@@ -3406,3 +3406,10 @@ async function transferUSDC(fromAddress, toAddress, amount) {
 {% set js_loaded = true %}
 <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
 {% endblock %}
+
+<!-- Solana Web3 Libraries -->
+<script src="{{ url_for('static', filename='js/contracts/solana-web3.iife.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
+
+<!-- Solana Connection Proxy -->
+<script src="{{ url_for('static', filename='js/utils/solana_connection_proxy.js') }}"></script>
