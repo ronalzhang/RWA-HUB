@@ -31,7 +31,7 @@ from . import proxy  # 导入代理模块的视图函数
 from .assets import register_global_handlers
 
 # 导入solana_api蓝图
-from .solana_api import solana_api_bp
+from .solana_api import solana_api as solana_api_bp
 
 # 导入Solana管理蓝图
 from .admin_solana import admin_solana_bp
