@@ -613,10 +613,14 @@ def get_latest_blockhash():
         )
         
         if result["success"]:
+            # 修复结果解析，从正确的路径获取区块哈希和有效区块高度
+            blockhash = result["result"]["value"]["blockhash"]
+            last_valid_block_height = result["result"]["value"]["lastValidBlockHeight"]
+            
             return jsonify({
                 "success": True,
-                "blockhash": result["result"]["blockhash"],
-                "lastValidBlockHeight": result["result"]["lastValidBlockHeight"]
+                "blockhash": blockhash,
+                "lastValidBlockHeight": last_valid_block_height
             })
         else:
             error_msg = result.get("error", "未知错误")
