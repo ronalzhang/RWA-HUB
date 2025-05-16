@@ -228,6 +228,88 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
             logger.error(traceback.format_exc())
             db.session.rollback()
 
+def auto_monitor_pending_payments():
+    """
+    自动监控所有状态为PENDING且有payment_tx_hash的资产，触发支付确认监控任务
+    此任务应定期执行，检查是否有需要确认的支付交易
+    """
+    logger.info("开始自动监控待处理的支付交易...")
+    
+    from app import create_app
+    app = create_app()
+    with app.app_context():
+        try:
+            from app.models.asset import Asset, AssetStatus
+            
+            # 查询所有PENDING状态且有payment_tx_hash的资产
+            pending_assets = Asset.query.filter(
+                Asset.status == AssetStatus.PENDING.value,
+                Asset.payment_tx_hash.isnot(None),
+                Asset.payment_confirmed.is_(False)
+            ).all()
+            
+            if not pending_assets:
+                logger.info("没有需要监控的待处理支付交易")
+                return
+                
+            logger.info(f"找到 {len(pending_assets)} 个待处理的支付交易")
+            
+            # 为每个资产触发支付确认监控任务
+            for asset in pending_assets:
+                try:
+                    # 检查是否有支付确认记录
+                    if asset.payment_confirmed:
+                        logger.info(f"资产 {asset.id} 支付已确认，跳过")
+                        continue
+                        
+                    # 检查是否有错误消息
+                    if asset.error_message and ('支付交易失败' in asset.error_message or '支付确认超时' in asset.error_message):
+                        # 如果上次检查失败，清除错误信息以便重新检查
+                        asset.error_message = None
+                        db.session.commit()
+                        
+                    logger.info(f"为资产 {asset.id} 触发支付确认监控任务，交易哈希: {asset.payment_tx_hash}")
+                    monitor_creation_payment.delay(asset.id, asset.payment_tx_hash)
+                    
+                except Exception as e:
+                    logger.error(f"处理资产 {asset.id} 时发生错误: {str(e)}")
+            
+            logger.info("待处理支付交易监控完成")
+            
+        except Exception as e:
+            logger.error(f"自动监控支付交易失败: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+
+# 创建定期任务
+auto_monitor_payments_task = DelayedTask(auto_monitor_pending_payments)
+
+# 系统启动时触发一次，之后每5分钟执行一次
+def start_scheduled_tasks():
+    """启动定时任务"""
+    logger.info("启动定时任务...")
+    
+    # 立即执行一次
+    auto_monitor_payments_task.delay()
+    
+    # 每5分钟执行一次
+    import threading
+    def run_scheduler():
+        while True:
+            time.sleep(300)  # 5分钟
+            auto_monitor_payments_task.delay()
+    
+    # 启动后台线程
+    scheduler_thread = threading.Thread(target=run_scheduler)
+    scheduler_thread.daemon = True
+    scheduler_thread.start()
+    
+    logger.info("定时任务已启动")
+
+# 应用启动时启动定时任务
+start_scheduled_tasks()
+
 def run_task(func_name, *args, **kwargs):
     """
     运行一个任务

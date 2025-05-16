@@ -137,6 +137,14 @@ def create_app(config_name='development'):
         try:
             import app.tasks
             app.logger.info("后台任务处理系统已初始化")
+            
+            # 确保支付自动监控任务启动
+            try:
+                from app.tasks import auto_monitor_payments_task
+                app.logger.info("支付自动监控任务已注册")
+            except Exception as task_err:
+                app.logger.error(f"注册支付自动监控任务失败: {str(task_err)}")
+                
         except Exception as e:
             app.logger.error(f"初始化后台任务处理系统失败: {str(e)}")
     
