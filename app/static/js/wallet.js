@@ -2794,11 +2794,12 @@ checkIfReturningFromWalletApp(walletType) {
                     'X-Wallet-Type': walletType
                 },
                 body: JSON.stringify({
-                    transaction: transactionBase64,
-                    skipPreflight: false,
-                    wallet_address: walletAddress,
-                    wallet_type: walletType,
-                    encoding: 'base64'
+                    serialized_transaction: transactionBase64,
+                    skip_preflight: false,
+                    from_address: walletAddress,
+                    to_address: to,
+                    amount: amount,
+                    token: tokenSymbol
                 })
             });
             
