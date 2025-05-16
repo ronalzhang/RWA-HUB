@@ -8,7 +8,7 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 # API蓝图
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 assets_api_bp = Blueprint('assets_api', __name__, url_prefix='/api/assets')
-trades_api_bp = Blueprint('trades_api', __name__)
+trades_api_bp = Blueprint('trades_api', __name__, url_prefix='/api')
 admin_api_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
 service_bp = Blueprint('service', __name__, url_prefix='/api/service')
 
