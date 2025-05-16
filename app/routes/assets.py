@@ -67,8 +67,8 @@ def list_assets_page():
             query = query.filter(Asset.status != 0)  # 0 表示已删除
         else:
             current_app.logger.info('普通用户或未登录用户：只显示已审核通过的资产')
-            # 普通用户或未登录用户：只显示已审核通过的资产
-            query = query.filter(Asset.status == 2)  # 2 表示已审核通过
+            # 普通用户或未登录用户：只显示已审核通过的资产且已上链的资产
+            query = query.filter(Asset.status == AssetStatus.ON_CHAIN.value)  # 使用枚举值更清晰
         
         # 记录过滤后的查询结果数量
         filtered_count = query.count()
