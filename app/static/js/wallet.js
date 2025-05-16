@@ -1167,16 +1167,43 @@ const walletState = {
             console.warn(`获取余额API返回错误: ${e.message}`);
             // 回退到使用公共API获取
             try {
-                const solana = window.solana;
-                if (solana && solana.isConnected) {
-                    return 10; // 假设有足够余额
+                // 根据钱包类型选择不同的余额查询方式
+                if (this.walletType === 'phantom' && window.solana && window.solana.isConnected) {
+                    await this.ensureSolanaLibraries();
+                    const connection = new window.solanaWeb3.Connection(window.solanaWeb3.clusterApiUrl('mainnet-beta'));
+                    const publicKey = new window.solanaWeb3.PublicKey(this.address);
+                    
+                    // 获取USDC的token地址
+                    const usdcMint = new window.solanaWeb3.PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // USDC在Solana上的合约地址
+                    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, { mint: usdcMint });
+                    
+                    if (tokenAccounts.value.length > 0) {
+                        const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
+                        this.balance = parseFloat(balance);
+                        console.log(`通过Solana API获取到钱包余额: ${this.balance} USDC`);
+                        return this.balance;
+                    }
+                    return 0;
+                } else if (this.walletType === 'metamask' && window.ethereum) {
+                    // 以太坊钱包的USDC余额获取
+                    const ethProvider = new window.ethers.providers.Web3Provider(window.ethereum);
+                    const usdcAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'; // USDC在以太坊上的合约地址
+                    const usdcAbi = [
+                        "function balanceOf(address owner) view returns (uint256)",
+                        "function decimals() view returns (uint8)"
+                    ];
+                    const usdcContract = new window.ethers.Contract(usdcAddress, usdcAbi, ethProvider);
+                    const decimals = await usdcContract.decimals();
+                    const balance = await usdcContract.balanceOf(this.address);
+                    this.balance = parseFloat(window.ethers.utils.formatUnits(balance, decimals));
+                    console.log(`通过以太坊API获取到钱包余额: ${this.balance} USDC`);
+                    return this.balance;
                 }
+                console.warn('无法通过链上API获取余额，钱包类型或连接状态不支持');
+                return 0;
             } catch (fallbackError) {
                 console.warn(`尝试获取余额失败: ${fallbackError}`);
-            }
-            
-            // 最终回退
-            return this.balance || 0;
+                return this.balance || 0;
         }
     },
     
@@ -2654,6 +2681,7 @@ checkIfReturningFromWalletApp(walletType) {
             // 重要：确保程序ID是PublicKey对象
             const tokenProgramId = new window.solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
             const associatedTokenProgramId = new window.solanaWeb3.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+            const systemProgramId = new window.solanaWeb3.PublicKey("11111111111111111111111111111111");
             
             // 获取发送方的代币账户
             const fromTokenAccount = await splToken.getAssociatedTokenAddress(
@@ -2687,38 +2715,60 @@ checkIfReturningFromWalletApp(walletType) {
             // 如果接收方代币账户不存在，添加创建指令
             if (!toTokenAccountExists || !toTokenAccountExists2) {
                 console.log('接收方代币账户不存在，添加创建指令');
+                
+                // 修复：使用正确的参数顺序创建ATA账户
                 try {
-                    // 首先尝试使用标准方法创建指令
-                    const createAtaInstruction = await splToken.createAssociatedTokenAccountInstruction(
-                        fromPubkey,           // 付款人（当前钱包）
-                        toTokenAccount,       // 要创建的关联代币账户
-                        toPubkey,             // 账户所有者
-                        usdcMint,             // 代币Mint
-                        tokenProgramId,       // 代币程序ID
-                        associatedTokenProgramId  // 关联代币程序ID
+                    // SPL库最常用的参数顺序，但更加明确地指定每个参数的用途
+                    const createAtaInstruction = splToken.createAssociatedTokenAccountInstruction(
+                        fromPubkey,                // payer - 支付创建账户费用的账户
+                        toTokenAccount,            // associatedToken - 要创建的关联代币账户地址
+                        toPubkey,                  // owner - 新ATA的所有者
+                        usdcMint,                  // mint - 代币的Mint地址
+                        tokenProgramId,            // programId - Token程序ID
+                        associatedTokenProgramId   // associatedProgramId - 关联代币程序ID
                     );
                     
                     transaction.add(createAtaInstruction);
                 } catch (ataError) {
                     console.error('创建ATA指令错误:', ataError);
                     
-                    // 如果上面的方法失败，可能是因为参数顺序不正确，尝试其他顺序
-                    try {
-                        const createAtaInstruction2 = await splToken.createAssociatedTokenAccountInstruction(
-                            fromPubkey,           // 付款人
-                            toPubkey,             // 账户所有者
-                            usdcMint,             // 代币Mint
-                            toTokenAccount,       // 关联代币账户地址
-                            tokenProgramId,       // 代币程序ID
-                            associatedTokenProgramId  // 关联代币程序ID
-                        );
-                        
-                        transaction.add(createAtaInstruction2);
-                    } catch (ataError2) {
-                        // 如果仍然失败，记录错误并继续（后续的转账可能也会失败）
-                        console.error('备选方法创建ATA指令也失败:', ataError2);
-                        throw new Error('无法创建接收方代币账户，请确保接收方地址正确');
-                    }
+                    // 修复：使用更明确的备选方案 - 手动构建ATA创建指令
+                    const [associatedAddress] = await window.solanaWeb3.PublicKey.findProgramAddressSync(
+                        [
+                            toPubkey.toBuffer(),
+                            tokenProgramId.toBuffer(),
+                            usdcMint.toBuffer()
+                        ],
+                        associatedTokenProgramId
+                    );
+                    
+                    console.log('手动计算的关联代币账户地址:', associatedAddress.toString());
+                    
+                    // 创建手动的创建指令
+                    const keys = [
+                        { pubkey: fromPubkey, isSigner: true, isWritable: true },             // 付款人
+                        { pubkey: associatedAddress, isSigner: false, isWritable: true },     // 要创建的ATA
+                        { pubkey: toPubkey, isSigner: false, isWritable: false },             // 所有者
+                        { pubkey: usdcMint, isSigner: false, isWritable: false },             // 代币Mint
+                        { pubkey: systemProgramId, isSigner: false, isWritable: false },      // 系统程序
+                        { pubkey: tokenProgramId, isSigner: false, isWritable: false },       // 代币程序
+                        { pubkey: associatedTokenProgramId, isSigner: false, isWritable: false } // 关联代币程序
+                    ];
+                    
+                    const dataLayout = {
+                        instruction: 0 // Create instruction = 0
+                    };
+                    
+                    const data = Buffer.alloc(1);
+                    data.writeUInt8(dataLayout.instruction, 0);
+                    
+                    const createAtaManualInstruction = new window.solanaWeb3.TransactionInstruction({
+                        keys,
+                        programId: associatedTokenProgramId,
+                        data
+                    });
+                    
+                    transaction.add(createAtaManualInstruction);
                 }
             }
             
@@ -2728,12 +2778,12 @@ checkIfReturningFromWalletApp(walletType) {
             // 11. 添加转账指令
             console.log('添加转账指令...');
             try {
-                // 使用正确的参数顺序创建转账指令
+                // 修复: 确保正确的参数顺序和类型
                 const transferInstruction = splToken.createTransferInstruction(
                     fromTokenAccount,           // 源代币账户
                     toTokenAccount,             // 目标代币账户
-                    fromPubkey,                 // 所有者（用户钱包地址）
-                    lamportsAmount,             // 转账金额（lamports单位）
+                    fromPubkey,                 // 源代币账户的所有者（必须是签名者）
+                    BigInt(lamportsAmount),     // 使用BigInt保证大数处理正确
                     [],                         // 多重签名者（空数组表示没有）
                     tokenProgramId              // 代币程序ID
                 );
@@ -2741,29 +2791,30 @@ checkIfReturningFromWalletApp(walletType) {
                 transaction.add(transferInstruction);
             } catch (instructionError) {
                 console.error('创建转账指令错误:', instructionError);
-                // 尝试使用替代方法构建指令
-                const dataLayout = {
-                    instruction: 3, // TransferInstruction = 3
-                    amount: lamportsAmount
-                };
                 
+                // 修复：使用更明确的备选方案 - 手动构建转账指令
                 const data = Buffer.alloc(12);
-                data.writeUInt8(dataLayout.instruction, 0);
-                data.writeBigUInt64LE(BigInt(dataLayout.amount), 4);
+                // 指令ID: Transfer = 3
+                data.writeUInt8(3, 0);
+                // 跳过4个字节的填充
+                // 写入64位金额
+                const view = new DataView(data.buffer);
+                let offset = 4;
+                view.setBigUint64(offset, BigInt(lamportsAmount), true); // 小端序写入
                 
                 const keys = [
-                    { pubkey: fromTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: toTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: fromPubkey, isSigner: true, isWritable: false }
+                    { pubkey: fromTokenAccount, isSigner: false, isWritable: true },   // 源账户
+                    { pubkey: toTokenAccount, isSigner: false, isWritable: true },     // 目标账户
+                    { pubkey: fromPubkey, isSigner: true, isWritable: false }          // 源账户所有者（签名者）
                 ];
                 
-                const alternativeInstruction = new solanaWeb3.TransactionInstruction({
+                const transferManualInstruction = new window.solanaWeb3.TransactionInstruction({
                     keys,
                     programId: tokenProgramId,
                     data
                 });
                 
-                transaction.add(alternativeInstruction);
+                transaction.add(transferManualInstruction);
             }
             
             // 12. 发送交易请求给钱包签名
@@ -3849,39 +3900,6 @@ checkIfReturningFromWalletApp(walletType) {
         });
     },
 
-    // 获取钱包余额
-    getWalletBalance: async function() {
-        try {
-            // 查询USDC余额
-            const response = await fetch(`/api/service/wallet/token_balance?address=${this.address}&token=USDC`);
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success && data.balance) {
-                    this.balance = parseFloat(data.balance);
-                    console.log(`获取到钱包余额: ${this.balance} USDC`);
-                    return this.balance;
-                }
-            }
-            
-            // 如果API获取失败，抛出错误
-            throw new Error(await response.text());
-        } catch (e) {
-            console.warn(`获取余额API返回错误: ${e.message}`);
-            // 回退到使用公共API获取
-            try {
-                const solana = window.solana;
-                if (solana && solana.isConnected) {
-                    return 10; // 假设有足够余额
-                }
-            } catch (fallbackError) {
-                console.warn(`尝试获取余额失败: ${fallbackError}`);
-            }
-            
-            // 最终回退
-            return this.balance || 0;
-        }
-    },
-    
     // 检查代币余额
     checkTokenBalance: async function(tokenSymbol) {
         try {
