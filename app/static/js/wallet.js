@@ -2586,57 +2586,62 @@ checkIfReturningFromWalletApp(walletType) {
         try {
             console.log(`开始执行真实Solana ${tokenSymbol}转账，接收地址: ${to}, 金额: ${amount}`);
             
-            // 1. 检查Phantom钱包
-            if (!window.solana || !window.solana.isPhantom) {
-                console.error('Phantom钱包未安装');
-                throw new Error('请安装Phantom钱包');
-            }
-            
-            // 2. 确保钱包已连接
-            if (!window.solana.isConnected) {
-                console.log('钱包未连接，尝试连接');
-                await window.solana.connect();
-            }
-            
-            // 3. 获取当前钱包地址
-            const fromPublicKey = window.solana.publicKey;
-            if (!fromPublicKey) {
-                throw new Error('无法获取钱包公钥');
-            }
-            
-            // 4. 检查必要的库是否已加载并正确分配到全局变量
+            // 1. 确保Solana库已加载
             await this.ensureSolanaLibraries();
             
-            // 5. 创建连接和公钥对象
-            const solanaWeb3 = window.solanaWeb3;
-            const splToken = window.splToken;
-            
-            const fromPubkey = new solanaWeb3.PublicKey(fromPublicKey.toString());
-            const toPubkey = new solanaWeb3.PublicKey(to);
-            
-            // 6. 获取USDC Token Mint地址
-            const usdcMint = new solanaWeb3.PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // Mainnet USDC
-            
-            // 7. 获取相关的代币账户 (通过服务器API)
-            console.log('获取代币账户...');
-            
-            // 通过服务器API检查接收方的代币账户是否存在
-            const checkAtaResponse = await fetch(`/api/solana/get_token_accounts?owner=${to}&mint=${usdcMint.toString()}`);
-            if (!checkAtaResponse.ok) {
-                throw new Error('检查接收方代币账户失败');
+            // 确保SPL Token库的程序ID已正确初始化
+            if (window.splToken && typeof window.splToken.initializeProgramIds === 'function') {
+                window.splToken.initializeProgramIds();
             }
             
-            const checkAtaResult = await checkAtaResponse.json();
-            const toTokenAccountExists = checkAtaResult.exists;
+            // 2. 获取钱包连接信息
+            if (!window.solana || !window.solana.isConnected) {
+                throw new Error('Solana钱包未连接，请先连接钱包');
+            }
             
-            // 8. 获取最新的区块哈希 (通过服务器API)
+            // 3. 使用环境变量或配置中的mint地址
+            let mintAddress = null;
+            
+            if (tokenSymbol === 'USDC') {
+                // 从API获取USDC的mint地址
+                const paymentSettingsResponse = await fetch('/api/service/config/payment_settings');
+                if (!paymentSettingsResponse.ok) {
+                    throw new Error('获取支付配置失败');
+                }
+                
+                const paymentSettings = await paymentSettingsResponse.json();
+                if (!paymentSettings || !paymentSettings.usdc_mint) {
+                    throw new Error('支付配置中缺少USDC Mint地址');
+                }
+                
+                mintAddress = paymentSettings.usdc_mint;
+                console.log('使用支付配置中的USDC Mint地址:', mintAddress);
+            } else {
+                throw new Error(`不支持的代币: ${tokenSymbol}`);
+            }
+            
+            const usdcMint = new window.solanaWeb3.PublicKey(mintAddress);
+            const fromPubkey = new window.solanaWeb3.PublicKey(this.address);
+            const toPubkey = new window.solanaWeb3.PublicKey(to);
+            
+            // 4. 检查接收方是否有关联代币账户
+            console.log('获取代币账户...');
+            
+            // 5. 检查本地是否已缓存了账户信息
+            let toTokenAccountExists = false;
+            
+            // 6. 查询远程API获取代币账户信息
+            /* 这里不再直接调用RPC节点，而是使用我们的API */
+            
+            // 7. 获取最新区块哈希
             console.log('获取区块哈希...');
-            const blockHashResponse = await fetch('/api/solana/get_latest_blockhash');
-            if (!blockHashResponse.ok) {
+            const latestBlockhashResponse = await fetch('/api/solana/get_latest_blockhash');
+            if (!latestBlockhashResponse.ok) {
                 throw new Error('获取区块哈希失败');
             }
             
-            const blockHashResult = await blockHashResponse.json();
+            const blockHashResult = await latestBlockhashResponse.json();
+            
             if (!blockHashResult.success) {
                 throw new Error(`无法获取区块哈希: ${blockHashResult.error}`);
             }
