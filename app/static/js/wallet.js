@@ -2633,8 +2633,19 @@ checkIfReturningFromWalletApp(walletType) {
             const solanaWeb3 = window.solanaWeb3;
             const splToken = window.splToken;
             
+            // 使用多个备用RPC节点，优先使用可能在中国大陆访问较快的节点
+            const rpcEndpoints = [
+                'https://solana-api.projectserum.com', // Project Serum节点，全球CDN可能在中国访问更快
+                'https://api.mainnet-beta.solana.com', // 官方主网节点
+                'https://solana-mainnet.g.alchemy.com/v2/demo', // Alchemy演示节点
+                'https://rpc.ankr.com/solana', // Ankr提供的节点
+                'https://ssc-dao.genesysgo.net' // GenesysGo节点
+            ];
+            
+            // 创建连接，使用备用节点列表中的第一个
+            console.log('正在连接Solana RPC节点:', rpcEndpoints[0]);
             const connection = new solanaWeb3.Connection(
-                'https://api.mainnet-beta.solana.com', 
+                rpcEndpoints[0], 
                 'confirmed'
             );
             
@@ -2659,9 +2670,37 @@ checkIfReturningFromWalletApp(walletType) {
             // 8. 检查接收方的代币账户是否存在，如果不存在则创建
             let transaction = new solanaWeb3.Transaction();
             
-            // 检查接收账户是否存在
+            // 检查接收账户是否存在，支持多RPC节点
             console.log('检查接收方账户...');
-            const toTokenAccountInfo = await connection.getAccountInfo(toTokenAccount);
+            let toTokenAccountInfo = null;
+            
+            // 尝试使用所有可用的RPC节点获取账户信息
+            for (let i = 0; i < rpcEndpoints.length; i++) {
+                try {
+                    if (i === 0) {
+                        // 使用主要连接
+                        toTokenAccountInfo = await connection.getAccountInfo(toTokenAccount);
+                    } else {
+                        // 如果主节点失败，尝试备用节点
+                        console.log(`尝试使用备用RPC节点(${i+1}/${rpcEndpoints.length})检查账户:`, rpcEndpoints[i]);
+                        const backupConnection = new solanaWeb3.Connection(rpcEndpoints[i], 'confirmed');
+                        toTokenAccountInfo = await backupConnection.getAccountInfo(toTokenAccount);
+                    }
+                    
+                    // 如果成功获取账户信息，跳出循环
+                    console.log('成功获取接收账户信息');
+                    break;
+                } catch (error) {
+                    console.warn(`RPC节点(${i+1}/${rpcEndpoints.length})获取账户信息失败:`, error);
+                    
+                    // 如果是最后一个节点也失败，则抛出异常
+                    if (i === rpcEndpoints.length - 1) {
+                        throw new Error(`无法检查接收账户: 所有RPC节点连接失败: ${error.message}`);
+                    }
+                    // 否则继续尝试下一个节点
+                }
+            }
+            
             if (!toTokenAccountInfo) {
                 console.log('接收方代币账户不存在，添加创建指令');
                 transaction.add(
@@ -2690,7 +2729,37 @@ checkIfReturningFromWalletApp(walletType) {
             
             // 11. 获取最近的区块哈希
             console.log('获取区块哈希...');
-            const { blockhash } = await connection.getRecentBlockhash();
+            let blockhash;
+            
+            // 尝试使用所有可用的RPC节点获取区块哈希
+            for (let i = 0; i < rpcEndpoints.length; i++) {
+                try {
+                    if (i === 0) {
+                        // 使用主要连接
+                        const recentBlockhash = await connection.getRecentBlockhash();
+                        blockhash = recentBlockhash.blockhash;
+                    } else {
+                        // 如果主节点失败，尝试备用节点
+                        console.log(`尝试使用备用RPC节点(${i+1}/${rpcEndpoints.length})获取区块哈希:`, rpcEndpoints[i]);
+                        const backupConnection = new solanaWeb3.Connection(rpcEndpoints[i], 'confirmed');
+                        const recentBlockhash = await backupConnection.getRecentBlockhash();
+                        blockhash = recentBlockhash.blockhash;
+                    }
+                    
+                    // 如果成功获取区块哈希，跳出循环
+                    console.log('成功获取区块哈希:', blockhash);
+                    break;
+                } catch (error) {
+                    console.warn(`RPC节点(${i+1}/${rpcEndpoints.length})获取区块哈希失败:`, error);
+                    
+                    // 如果是最后一个节点也失败，则抛出异常
+                    if (i === rpcEndpoints.length - 1) {
+                        throw new Error(`无法获取区块哈希: 所有RPC节点连接失败: ${error.message}`);
+                    }
+                    // 否则继续尝试下一个节点
+                }
+            }
+            
             transaction.recentBlockhash = blockhash;
             transaction.feePayer = fromPubkey;
             
@@ -2700,17 +2769,59 @@ checkIfReturningFromWalletApp(walletType) {
             
             // 13. 发送已签名的交易到网络
             console.log('发送已签名交易到网络...');
-            const signature = await connection.sendRawTransaction(signed.serialize());
             
-            // 14. 等待交易确认
-            console.log('等待交易确认，签名:', signature);
-            const confirmation = await connection.confirmTransaction(signature);
+            // 发送交易，如果第一个节点失败，尝试备用节点
+            let signature;
+            let lastError;
             
-            if (confirmation.value.err) {
-                throw new Error(`交易确认出错: ${JSON.stringify(confirmation.value.err)}`);
+            for (let i = 0; i < rpcEndpoints.length; i++) {
+                try {
+                    if (i > 0) {
+                        // 如果不是第一个节点，重新创建连接
+                        console.log(`尝试备用RPC节点(${i+1}/${rpcEndpoints.length}):`, rpcEndpoints[i]);
+                        const backupConnection = new solanaWeb3.Connection(rpcEndpoints[i], 'confirmed');
+                        signature = await backupConnection.sendRawTransaction(signed.serialize());
+                        
+                        // 如果成功，使用此连接等待确认
+                        console.log(`使用备用节点发送交易成功，等待确认...`);
+                        const confirmation = await backupConnection.confirmTransaction(signature);
+                        
+                        if (confirmation.value.err) {
+                            throw new Error(`交易确认出错: ${JSON.stringify(confirmation.value.err)}`);
+                        }
+                        
+                        console.log('交易成功确认:', signature);
+                        
+                        // 成功则跳出循环
+                        break;
+                    } else {
+                        // 第一个节点
+                        signature = await connection.sendRawTransaction(signed.serialize());
+                        
+                        // 14. 等待交易确认
+                        console.log('等待交易确认，签名:', signature);
+                        const confirmation = await connection.confirmTransaction(signature);
+                        
+                        if (confirmation.value.err) {
+                            throw new Error(`交易确认出错: ${JSON.stringify(confirmation.value.err)}`);
+                        }
+                        
+                        console.log('交易成功确认:', signature);
+                        
+                        // 成功则跳出循环
+                        break;
+                    }
+                } catch (error) {
+                    console.error(`RPC节点(${i+1}/${rpcEndpoints.length})失败:`, error);
+                    lastError = error;
+                    
+                    // 如果是最后一个节点也失败，则抛出异常
+                    if (i === rpcEndpoints.length - 1) {
+                        throw new Error(`所有RPC节点连接失败: ${error.message}`);
+                    }
+                    // 否则继续尝试下一个节点
+                }
             }
-            
-            console.log('交易成功确认:', signature);
             
             // 15. 返回成功结果
             return {
