@@ -2778,14 +2778,27 @@ checkIfReturningFromWalletApp(walletType) {
             const transactionBuffer = signedTransaction.serialize();
             const transactionBase64 = window.btoa(String.fromCharCode(...transactionBuffer));
             
+            // 添加详细的调试日志
+            console.log('准备发送交易到服务器，交易数据长度:', transactionBase64.length);
+            
+            // 确保包含所有必要参数
+            const walletAddress = this.address || window.walletState?.address;
+            const walletType = this.walletType || window.walletState?.walletType || 'phantom';
+            
+            // 增加必要参数以满足API需求
             const submitResponse = await fetch('/api/solana/submit_transaction', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-Wallet-Address': walletAddress,
+                    'X-Wallet-Type': walletType
                 },
                 body: JSON.stringify({
                     transaction: transactionBase64,
-                    skipPreflight: false // 启用预检查以捕获错误
+                    skipPreflight: false,
+                    wallet_address: walletAddress,
+                    wallet_type: walletType,
+                    encoding: 'base64'
                 })
             });
             
