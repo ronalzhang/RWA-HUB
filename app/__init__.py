@@ -126,26 +126,19 @@ def create_app(config_name='development'):
         raise RuntimeError("存储初始化失败")
     
     # 注册蓝图
-    from .routes import register_blueprints
+    from app.routes import register_blueprints
     register_blueprints(app)
-    
-    # 注册管理员API v2蓝图
-    with app.app_context():
-        from app.routes.admin_api import register_admin_v2_blueprint
-        register_admin_v2_blueprint(app)
-    
-    # 在生产环境启动交易监控
-    if app.config.get('ENV', 'development') == 'production':
-        from app.utils.monitor import start_monitor
-        start_monitor()
-        app.logger.info('交易监控服务已启动')
     
     # 注册初始化分销佣金设置命令
     app.cli.add_command(init_distribution_command)
     
-    # 导入任务处理模块，确保异步任务处理器启动
+    # 初始化后台任务处理系统
     with app.app_context():
-        import app.tasks
+        try:
+            import app.tasks
+            app.logger.info("后台任务处理系统已初始化")
+        except Exception as e:
+            app.logger.error(f"初始化后台任务处理系统失败: {str(e)}")
     
     # -- 修改：使用正确的配置键 RATELIMIT_STORAGE_URI --
     db_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
