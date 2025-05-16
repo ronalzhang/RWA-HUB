@@ -2746,14 +2746,12 @@ checkIfReturningFromWalletApp(walletType) {
             // 11. 添加转账指令
             console.log('添加转账指令...');
             try {
-                // 修复: 使用SPL库提供的最新方法，不再需要手动检查所有者权限
-                const transferInstruction = splToken.createTransferCheckedInstruction(
+                // 使用兼容性更好的标准TransferInstruction方法
+                const transferInstruction = splToken.createTransferInstruction(
                     fromTokenAccount,           // 源代币账户
-                    usdcMint,                   // 代币Mint地址
                     toTokenAccount,             // 目标代币账户  
                     fromPubkey,                 // 源代币账户的所有者（必须是签名者）
                     BigInt(lamportsAmount),     // 金额，使用BigInt类型
-                    6,                          // 小数位数（USDC为6位）
                     []                          // 多重签名者（空数组表示没有）
                 );
                 
