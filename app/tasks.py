@@ -523,9 +523,19 @@ def auto_monitor_pending_payments():
 # 创建定期任务
 auto_monitor_payments_task = DelayedTask(auto_monitor_pending_payments)
 
+# 任务调度器初始化标志
+scheduler_initialized = False
+
 # 系统启动时触发一次，之后每5分钟执行一次
 def start_scheduled_tasks():
     """启动定时任务"""
+    global scheduler_initialized
+    
+    # 如果已经初始化过，直接返回
+    if scheduler_initialized:
+        logger.info("定时任务已经初始化，跳过重复初始化")
+        return
+        
     logger.info("启动定时任务...")
     
     try:
@@ -549,6 +559,8 @@ def start_scheduled_tasks():
         else:
             logger.info("定时任务已存在，跳过添加")
         
+        # 设置全局初始化标志
+        scheduler_initialized = True
         logger.info("定时任务已启动")
     except Exception as e:
         logger.error(f"启动定时任务失败: {str(e)}")
