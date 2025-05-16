@@ -25,6 +25,9 @@ class AssetStatus(enum.Enum):
     DELETED = 4    # 已删除
     ON_CHAIN = 2  # 已上链（与APPROVED相同值，保持兼容性）
     ACTIVE = 2     # 活跃状态（与APPROVED和ON_CHAIN相同值，保持兼容性）
+    CONFIRMED = 5  # 支付已确认，准备上链
+    PAYMENT_FAILED = 6  # 支付失败
+    DEPLOYMENT_FAILED = 7  # 部署上链失败
 
 class Asset(db.Model):
     __tablename__ = 'assets'
@@ -83,7 +86,7 @@ class Asset(db.Model):
         CheckConstraint('annual_revenue > 0', name='ck_annual_revenue_positive'),  # 年收益必须大于0
         CheckConstraint('area > 0', name='ck_area_positive'),  # 面积必须大于0
         CheckConstraint('total_value > 0', name='ck_total_value_positive'),  # 总价值必须大于0
-        CheckConstraint('status IN (1, 2, 3)', name='ck_status_valid'),  # 状态必须在有效范围内
+        CheckConstraint('status IN (1, 2, 3, 4, 5, 6, 7)', name='ck_status_valid'),  # 状态必须在有效范围内
     )
 
     @validates('asset_type')
