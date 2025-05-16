@@ -6,6 +6,7 @@ __pycache__/
 .Python
 env/
 .venv/
+.venv-*/
 build/
 develop-eggs/
 dist/
@@ -24,6 +25,7 @@ var/
 venv/
 .venv/
 ENV/
+.venv-solana/
 
 # Node
 node_modules/
@@ -78,6 +80,7 @@ logs/
 *.old
 *.orig
 *.tmp
+archived_restore_files/
 
 # 临时文件
 temp/
@@ -85,6 +88,7 @@ tmp/
 *.tmp
 **/temp/**
 instance/
+*.temp
 
 # 上传文件
 app/static/uploads/
@@ -94,6 +98,7 @@ app/static/uploads/
 *.dat
 *.tar
 *.gz
+*.tgz
 *.zip
 *.rar
 *.7z
@@ -167,6 +172,7 @@ setup_*.py
 force_*.py
 cleanup_*.py
 create_test_*.py
+fix.py
 
 # Node.js
 node_modules/
@@ -206,6 +212,10 @@ app/docs/
 
 # 临时脚本和工具
 /load_db_config.py
+server_service.py
+
+# 临时服务文件
+app/routes/service.py.temp
 
 # 本地环境文件
 .env.local
