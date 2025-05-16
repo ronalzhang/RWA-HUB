@@ -293,3 +293,19 @@ class Asset(db.Model):
     # 上链进度跟踪
     deployment_in_progress = db.Column(db.Boolean, default=False)  # 标记上链操作是否正在进行中
     deployment_started_at = db.Column(db.DateTime, nullable=True)  # 记录上链操作开始时间
+
+class AssetStatusHistory(db.Model):
+    """资产状态变更历史记录"""
+    __tablename__ = 'asset_status_history'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False)
+    old_status = db.Column(db.Integer, nullable=False)
+    new_status = db.Column(db.Integer, nullable=False)
+    change_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    change_reason = db.Column(db.String(512))
+    
+    asset = db.relationship('Asset', backref=db.backref('status_history', lazy='dynamic'))
+    
+    def __repr__(self):
+        return f'<AssetStatusHistory {self.id}: Asset {self.asset_id} {self.old_status}->{self.new_status}>'
