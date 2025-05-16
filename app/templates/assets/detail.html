@@ -34,12 +34,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- 添加jQuery库 -->
 <script src="{{ url_for('static', filename='vendor/jquery.min.js') }}"></script>
-<!-- 使用内置bs58实现 -->
-<!-- <script src="https://unpkg.com/bs58@5.0.0/dist/index.js"></script> -->
-<!-- 添加Solana Web3 SDK -->
-<script src="{{ url_for('proxy.cached_vendor', filename='solana-web3-stable.js') }}"></script>
-<!-- 添加SPL Token库 -->
-<script src="{{ url_for('proxy.cached_vendor', filename='solana-spl-token.js') }}"></script>
+
+<!-- 添加Solana Web3 SDK (使用本地文件) -->
+<script src="{{ url_for('static', filename='js/contracts/solana-web3.iife.js') }}"></script>
+<!-- 添加SPL Token库 (使用本地文件) -->
+<script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
+
 <!-- 初始化Solana库 -->
 <script>
     // 创建全局对象 - 仅在未定义时初始化，避免重复
@@ -3407,9 +3407,5 @@ async function transferUSDC(fromAddress, toAddress, amount) {
 <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
 {% endblock %}
 
-<!-- Solana Web3 Libraries -->
-<script src="{{ url_for('static', filename='js/contracts/solana-web3.iife.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
-
-<!-- Solana Connection Proxy -->
-<script src="{{ url_for('static', filename='js/utils/solana_connection_proxy.js') }}"></script>
+<!-- 确保只使用一次Solana库，删除所有冗余加载 -->
+</script>
