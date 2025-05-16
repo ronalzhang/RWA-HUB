@@ -325,7 +325,7 @@ function updateBuyButtonState() {
       buyButton.disabled = false;
       buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
       buyButton.removeAttribute('title');
-    } else {
+        } else {
       console.log('钱包未连接，禁用购买按钮');
       buyButton.disabled = true;
       buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
@@ -371,7 +371,7 @@ function getWalletAddress() {
  */
 function getWalletType() {
   // 方法1: 从walletState获取
-  if (window.walletState && window.walletState.walletType) {
+        if (window.walletState && window.walletState.walletType) {
     return window.walletState.walletType;
   }
   
@@ -491,29 +491,29 @@ function hideLoadingState() {
 // 处理按钮点击的简化函数
 function handleBuyButtonClick(event) {
   // 阻止默认行为
-  event.preventDefault();
+        event.preventDefault();
   
   try {
     // 获取按钮和相关数据
-    const button = event.currentTarget;
-    
-    // 获取资产ID
-    let assetId = button.getAttribute('data-asset-id');
-    if (!assetId) {
+            const button = event.currentTarget;
+            
+            // 获取资产ID
+            let assetId = button.getAttribute('data-asset-id');
+            if (!assetId) {
       const assetElement = document.querySelector('[data-asset-id]');
       if (assetElement) {
         assetId = assetElement.getAttribute('data-asset-id');
       }
     }
     
-    if (!assetId) {
+            if (!assetId) {
       showError('无法确定资产ID');
       return false;
-    }
-    
-    // 获取购买数量
+            }
+            
+            // 获取购买数量
     const amountInput = document.querySelector('#purchase-amount, #amount-input, input[name="amount"]');
-    if (!amountInput) {
+            if (!amountInput) {
       showError('无法确定购买数量');
       return false;
     }
@@ -536,9 +536,9 @@ function setupBuyButton() {
   const buyButtons = document.querySelectorAll('.buy-button, #buy-button');
   if (buyButtons.length === 0) {
     console.log('当前页面没有购买按钮');
-    return;
-  }
-  
+                return;
+            }
+            
   console.log(`找到 ${buyButtons.length} 个购买按钮`);
   
   // 为每个按钮添加点击事件
@@ -573,11 +573,11 @@ document.addEventListener('walletDisconnected', function() {
   updateBuyButtonState();
 });
     
-// 初始化
+    // 初始化
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function() {
-    setupBuyButton();
-    
+        setupBuyButton();
+        
     // 如果walletState可用，调用其更新方法
     if (window.walletState && typeof window.walletState.updateDetailPageButtonState === 'function') {
       try {
