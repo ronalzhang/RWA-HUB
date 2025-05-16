@@ -450,12 +450,12 @@ def auto_monitor_pending_payments():
     try:
         logger.info("开始自动监控待处理的支付交易...")
         
-        app = get_flask_app()
-        if not app:
+        flask_app = get_flask_app()
+        if not flask_app:
             logger.error("无法获取应用上下文，取消自动监控")
             return
         
-        with app.app_context():
+        with flask_app.app_context():
             try:
                 # 查找已支付确认但未上链的资产
                 confirmed_assets = Asset.query.filter(
