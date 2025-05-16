@@ -83,6 +83,15 @@ class AssetService:
             if not asset:
                 raise ValueError(f"未找到ID为{asset_id}的资产")
                 
+            # 检查是否已在处理中
+            if asset.deployment_in_progress:
+                logger.warning(f"资产已在其他进程中上链处理中: AssetID={asset_id}, 处理开始时间: {asset.deployment_started_at}")
+                return {
+                    "success": False,
+                    "error": "资产已经在上链处理中，请勿重复操作",
+                    "in_progress": True
+                }
+                
             # 检查资产状态 - 应该是在 CONFIRMED 状态才能上链
             if asset.status != AssetStatus.CONFIRMED.value:
                 logger.warning(f"尝试部署状态不正确的资产: AssetID={asset_id}, Status={asset.status}. 预期状态: CONFIRMED")
@@ -106,6 +115,12 @@ class AssetService:
                     "token_address": asset.token_address,
                     "already_deployed": True
                 }
+            
+            # 设置上链进行中标记
+            asset.deployment_in_progress = True
+            asset.deployment_started_at = datetime.utcnow()
+            db.session.commit()
+            logger.info(f"标记资产 {asset_id} 开始上链处理")
                 
             # --- 开始实际部署 --- 
             logger.info(f"开始将资产部署到区块链: AssetID={asset_id}, Name={asset.name}")
@@ -145,7 +160,8 @@ class AssetService:
                 if hasattr(asset, 'blockchain_details'):
                     asset.blockchain_details = json.dumps(blockchain_details)
                 
-                # 保存到数据库
+                # 清除上链进行中标记并保存到数据库
+                asset.deployment_in_progress = False
                 db.session.commit()
                 
                 logger.info(f"模拟模式：成功部署资产 {asset.name} 到区块链，token地址: {token_address}")
@@ -159,6 +175,10 @@ class AssetService:
             
             # 检查服务钱包余额 (保持不变)
             if not self.solana_client.check_balance_sufficient():
+                # 清除上链进行中标记
+                asset.deployment_in_progress = False
+                asset.error_message = "服务钱包SOL余额不足，无法创建代币"
+                db.session.commit()
                 raise ValueError("服务钱包SOL余额不足，无法创建代币")
                 
             # --- 调用 Solana 客户端创建 SPL 代币 --- 
@@ -182,6 +202,8 @@ class AssetService:
                 asset.deployment_time = datetime.utcnow()
                 asset.blockchain_details = json.dumps(details)
                 
+                # 清除上链进行中标记
+                asset.deployment_in_progress = False
                 db.session.commit()
                 logger.info(f"资产成功上链: AssetID={asset_id}, TokenAddress={token_address}, Status=ON_CHAIN")
                 
@@ -200,6 +222,8 @@ class AssetService:
                 # 更新资产状态为部署失败
                 asset.status = AssetStatus.DEPLOYMENT_FAILED.value
                 asset.error_message = error_message
+                # 清除上链进行中标记
+                asset.deployment_in_progress = False
                 db.session.commit()
                 
                 return {
@@ -215,11 +239,22 @@ class AssetService:
                      # 发生未知异常时，也标记为部署失败
                      asset.status = AssetStatus.DEPLOYMENT_FAILED.value
                      asset.error_message = error_str
+                     # 清除上链进行中标记
+                     asset.deployment_in_progress = False
                      db.session.commit()
                      logger.info(f"资产状态因异常更新为 DEPLOYMENT_FAILED: AssetID={asset_id}")
                  except Exception as db_err:
                      logger.error(f"在异常处理中更新资产状态失败: AssetID={asset_id}, DB Error: {str(db_err)}")
                      db.session.rollback()
+                     # 尝试单独清除上链标记
+                     try:
+                         asset = Asset.query.get(asset_id)
+                         if asset:
+                             asset.deployment_in_progress = False
+                             db.session.commit()
+                     except:
+                         logger.error(f"清除上链标记失败: AssetID={asset_id}")
+                         db.session.rollback()
             else:
                  logger.error(f"无法更新资产状态，因为未能获取资产对象: AssetID={asset_id}")
                  
@@ -249,6 +284,38 @@ class AssetService:
                     'error': f"资产不存在: {asset_id}"
                 }
                 
+            # 检查是否已经确认支付
+            if asset.payment_confirmed:
+                logger.info(f"资产 {asset_id} 支付已确认，跳过重复处理")
+                
+                # 如果状态已是CONFIRMED但尚未上链，尝试触发上链
+                if asset.status == AssetStatus.CONFIRMED.value and not asset.token_address:
+                    if asset.deployment_in_progress:
+                        logger.info(f"资产 {asset_id} 正在上链中，无需触发")
+                        return {
+                            'success': True,
+                            'message': "支付已确认，资产正在上链中",
+                            'payment_confirmed': True,
+                            'deployment_in_progress': True
+                        }
+                    else:
+                        logger.info(f"资产 {asset_id} 支付已确认但尚未上链，触发上链流程")
+                        deploy_result = self.deploy_asset_to_blockchain(asset_id)
+                        return {
+                            'success': deploy_result.get('success', False),
+                            'message': "支付已确认，触发上链流程",
+                            'payment_confirmed': True,
+                            'deploy_result': deploy_result
+                        }
+                # 如果已经完成了完整流程
+                elif asset.token_address:
+                    return {
+                        'success': True,
+                        'message': "支付已确认且资产已上链",
+                        'payment_confirmed': True,
+                        'token_address': asset.token_address
+                    }
+                
             logger.info(f"处理资产支付: {asset_id}, 支付信息: {payment_info}")
             
             # 检查支付金额
@@ -271,18 +338,20 @@ class AssetService:
                     'error': f"支付未确认: {payment_status}"
                 }
                 
-            # 记录支付信息
-            if not hasattr(asset, 'payment_details') or not asset.payment_details:
-                asset.payment_details = json.dumps(payment_info)
-                asset.payment_confirmed = True
-                asset.payment_confirmed_at = datetime.utcnow()
-                db.session.commit()
+            # 更新支付信息，标记为已确认
+            asset.payment_details = json.dumps(payment_info)
+            asset.payment_confirmed = True
+            asset.payment_confirmed_at = datetime.utcnow()
+            asset.status = AssetStatus.CONFIRMED.value
+            db.session.commit()
+            logger.info(f"资产 {asset_id} 支付已确认，状态更新为 CONFIRMED")
                 
             # 触发上链流程
             deploy_result = self.deploy_asset_to_blockchain(asset_id)
             
             return {
                 'success': deploy_result.get('success', False),
+                'message': "支付已确认，已触发上链流程",
                 'payment_processed': True,
                 'deploy_result': deploy_result
             }

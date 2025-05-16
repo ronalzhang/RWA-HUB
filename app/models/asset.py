@@ -7,6 +7,7 @@ from sqlalchemy import Index, CheckConstraint
 import re
 from flask import current_app, url_for
 from urllib.parse import urlparse
+from sqlalchemy.dialects.postgresql import JSON
 
 class AssetType(enum.Enum):
     REAL_ESTATE = 10        # 不动产
@@ -28,6 +29,7 @@ class AssetStatus(enum.Enum):
     CONFIRMED = 5  # 支付已确认，准备上链
     PAYMENT_FAILED = 6  # 支付失败
     DEPLOYMENT_FAILED = 7  # 部署上链失败
+    DRAFT = 3  # 草稿状态
 
 class Asset(db.Model):
     __tablename__ = 'assets'
@@ -60,10 +62,10 @@ class Asset(db.Model):
     deployment_tx_hash = db.Column(db.String(100))  # 部署交易哈希
     
     # 支付相关字段
-    payment_details = db.Column(db.Text)  # 支付详情，JSON格式
-    payment_tx_hash = db.Column(db.String(200))  # 支付交易哈希
+    payment_tx_hash = db.Column(db.String(255), nullable=True)  # 支付交易哈希
+    payment_details = db.Column(db.Text, nullable=True)  # 支付详情（JSON字符串）
     payment_confirmed = db.Column(db.Boolean, default=False)  # 支付是否已确认
-    payment_confirmed_at = db.Column(db.DateTime)  # 支付确认时间
+    payment_confirmed_at = db.Column(db.DateTime, nullable=True)  # 支付确认时间
     
     # 添加审核信息
     approved_at = db.Column(db.DateTime)  # 审核通过时间
@@ -286,3 +288,7 @@ class Asset(db.Model):
                 raise ValueError('证券资产必须提供代币发行量')
                 
         return Asset(**data)
+
+    # 上链进度跟踪
+    deployment_in_progress = db.Column(db.Boolean, default=False)  # 标记上链操作是否正在进行中
+    deployment_started_at = db.Column(db.DateTime, nullable=True)  # 记录上链操作开始时间

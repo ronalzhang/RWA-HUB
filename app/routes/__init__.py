@@ -27,6 +27,9 @@ from . import assets
 from . import service
 from . import proxy
 
+# 导入交易API视图
+from . import trades_api
+
 # 导入全局处理器
 from .assets import register_global_handlers
 
