@@ -158,12 +158,28 @@ def create_app(config_name='development'):
             try:
                 # 只有当全局变量不存在时才初始化任务
                 if not hasattr(app, '_tasks_initialized'):
-                    from app.tasks import start_scheduled_tasks
-                    # 显式调用启动定时任务函数
-                    start_scheduled_tasks()
-                    app.logger.info("支付自动监控任务已启动")
+                    # 直接导入并调用监控函数，而不是通过start_scheduled_tasks
+                    from app.extensions import scheduler
+                    from app.tasks import auto_monitor_pending_payments
+                    
+                    # 立即执行一次监控
+                    app.logger.info("立即触发资产上链状态检查...")
+                    auto_monitor_pending_payments()
+                    
+                    # 添加定时任务
+                    if not scheduler.get_job('monitor_payments'):
+                        scheduler.add_job(
+                            id='monitor_payments',
+                            func=auto_monitor_pending_payments,
+                            trigger='interval',
+                            minutes=5,
+                            replace_existing=True
+                        )
+                        app.logger.info("定时任务已添加到调度器: 每5分钟执行一次")
+                    
                     # 设置标志，防止重复初始化
                     app._tasks_initialized = True
+                    app.logger.info("支付自动监控任务已启动")
                 else:
                     app.logger.info("支付自动监控任务已经在运行中，跳过初始化")
             except Exception as task_err:
