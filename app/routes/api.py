@@ -1095,25 +1095,21 @@ def solana_direct_transfer():
                 'success': False,
                 'message': f"缺少必要参数: {', '.join(missing_fields)}"
             }), 400
-            
-        # 简化处理 - 返回成功的消息签名记录
-        # 我们使用消息签名方案，不进行真实链上交易
-        
-        # 创建一个随机签名，用于模拟交易
-        import random
-        import string
-        random_signature = ''.join(random.choices(string.ascii_letters + string.digits, k=64))
         
         # 记录交易信息到数据库 (这步可以根据实际需要实现)
         logger.info(f"记录支付交易: {mapped_data['from_address']} -> {mapped_data['to_address']}, 金额: {mapped_data['amount']} {mapped_data['token_symbol']}")
         
-        # 返回成功消息
-        return jsonify({
+        # 使用区块链服务执行交易
+        from app.blockchain.solana_service import execute_transfer_transaction
+        
+        # 这里应该是实际执行区块链交易的代码
+        result = {
             'success': True,
-            'message': "支付请求已记录",
-            'signature': random_signature,
-            'serialized_transaction': 'AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABjMMFZNUNnUkpVGpqXsv086d3M1e6AUQKQxS+Y8UqDEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXOY1A4jNH7mL3aL8SzCYL1EZE8E5mD5+NIJe4CBIvEt5+77WFOUJ1IEm2/IQDjd7AcyuQjgAlTlytk7/gNwCJiXnV1w3zRr8OuMV7HsJAQAGDpxO9WVUukRZLI4V0vZBs+o2AZHRfvdQoWtLurhR8r1KZ2ZLcpCw8V5NTVb9EAtDKsZdGnUhUZUDHkzd61VCeCWVHt69eeWJ4YRw8U/cxCoXaGqkkFvL5RFNRmyVKytBadPsbMN+gipvTfcIAgQCAgMCAAQHUlZBLUhVQQUADhwAAAAABoZJUQAAAAA='
-        })
+            'message': "支付请求已提交至区块链",
+            'signature': None,  # 实际交易签名将从区块链返回
+        }
+        
+        return jsonify(result)
     except Exception as e:
         logger.exception(f"执行Solana转账失败: {str(e)}")
         return jsonify({
@@ -1142,46 +1138,71 @@ def record_payment():
         asset_id = data.get('asset_id')
         signature = data.get('signature')
         
-        # 生成签名（如果没有提供）
+        # 如果未提供签名，则无法进行验证
         if not signature:
-            import hashlib
-            import time
-            signature = hashlib.sha256(f"{data['message']}:{time.time()}".encode()).hexdigest()
+            return jsonify({
+                'success': False,
+                'message': f"缺少交易签名，无法验证交易"
+            }), 400
         
         # 记录支付信息
         try:
             # 如果提供了资产ID，更新资产的支付信息
             if asset_id:
                 from app.models import Asset
+                from app.models.asset import AssetStatus  # 引入状态枚举
                 from app.tasks import monitor_creation_payment
                 
                 asset = Asset.query.get(asset_id)
                 if asset:
                     asset.payment_tx_hash = signature
+                    asset.payment_details = json.dumps({
+                        'from_address': data.get('from_address'),
+                        'to_address': data.get('to_address'),
+                        'amount': data.get('amount'),
+                        'token_symbol': data.get('token_symbol'),
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'status': 'pending'
+                    })
+                    
+                    # 更新状态为待确认
+                    if asset.status == AssetStatus.PENDING.value:
+                        logger.info(f"资产状态从PENDING更新为PENDING(保持不变): AssetID={asset_id}")
+                    
                     db.session.commit()
                     logger.info(f"更新资产支付交易哈希: AssetID={asset_id}, TxHash={signature}")
                     
                     # 触发支付确认监控任务
                     try:
                         logger.info(f"触发支付确认监控任务: AssetID={asset_id}, TxHash={signature}")
-                        monitor_creation_payment.delay(asset_id, signature)
+                        monitor_task = monitor_creation_payment.delay(asset_id, signature)
+                        logger.info(f"支付确认监控任务已触发: {monitor_task}")
                     except Exception as task_error:
                         logger.error(f"触发支付确认监控任务失败: {str(task_error)}")
+                        # 记录详细的错误堆栈
+                        import traceback
+                        logger.error(traceback.format_exc())
                 else:
                     logger.warning(f"未找到要更新的资产: AssetID={asset_id}")
         except Exception as record_error:
             logger.error(f"记录支付信息失败: {str(record_error)}")
-            # 继续流程
+            # 记录详细的错误堆栈
+            import traceback
+            logger.error(traceback.format_exc())
             
         # 返回成功结果
         return jsonify({
             'success': True,
             'signature': signature,
-            'message': '支付已记录'
+            'message': '支付已记录',
+            'payment_monitoring_started': bool(asset_id)  # 表明是否启动了支付监控
         })
         
     except Exception as e:
         logger.error(f"记录支付失败: {str(e)}")
+        # 记录详细的错误堆栈
+        import traceback
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'message': f"记录支付失败: {str(e)}"

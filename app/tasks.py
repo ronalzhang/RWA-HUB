@@ -100,6 +100,8 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
         confirmed = False
         transaction_error = None
         
+        logger.info(f"使用RPC地址: {rpc_url}")
+        
         while retry_count < max_retries:
             try:
                 # 构造 RPC 请求
@@ -118,8 +120,10 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
                     ]
                 }
                 
+                logger.info(f"发送Solana RPC请求 (尝试 {retry_count+1}/{max_retries}): {tx_hash}")
+                
                 # 发送 RPC 请求
-                response = requests.post(rpc_url, headers=headers, data=json.dumps(payload), timeout=10)
+                response = requests.post(rpc_url, headers=headers, data=json.dumps(payload), timeout=30)
                 response.raise_for_status()
                 response_data = response.json()
                 
@@ -141,12 +145,16 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
                 logger.error(f"检查交易状态时 RPC 请求失败: {str(req_err)}")
             except Exception as e:
                 logger.error(f"检查交易状态时发生未知错误: {str(e)}")
+                import traceback
+                logger.error(traceback.format_exc())
             
             retry_count += 1
             time.sleep(retry_interval)
 
         # ----- 更新数据库状态 -----
         try:
+            from app.models.asset import Asset, AssetStatus
+            
             asset = Asset.query.get(asset_id)
             if not asset:
                 logger.error(f"在更新状态时未找到资产: AssetID={asset_id}")
@@ -164,19 +172,28 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
                 asset.payment_details = json.dumps(details)
                 
                 db.session.commit()
-                logger.info(f"资产状态更新为 CONFIRMED: AssetID={asset_id}")
+                logger.info(f"资产状态更新为 CONFIRMED (状态值:{AssetStatus.CONFIRMED.value}): AssetID={asset_id}")
 
                 # --- 触发上链流程 --- (在数据库提交后进行)
                 try:
                     logger.info(f"支付已确认，开始触发资产上链流程: AssetID={asset_id}")
+                    
+                    from app.blockchain.asset_service import AssetService
                     asset_service = AssetService()
                     deploy_result = asset_service.deploy_asset_to_blockchain(asset_id)
-                    logger.info(f"资产上链流程已触发 (结果可能异步): AssetID={asset_id}, Deploy Result Success: {deploy_result.get('success')}")
+                    
+                    if deploy_result.get('success'):
+                        logger.info(f"资产上链成功: AssetID={asset_id}, TokenAddress={deploy_result.get('token_address')}")
+                        # 状态已在deploy_asset_to_blockchain中更新为ON_CHAIN(状态2)
+                    else:
+                        logger.error(f"资产上链失败: AssetID={asset_id}, Error: {deploy_result.get('error')}")
+                        # 状态已在deploy_asset_to_blockchain中更新为DEPLOYMENT_FAILED(状态7)
                 except Exception as deploy_err:
                     logger.error(f"触发或执行上链流程失败: AssetID={asset_id}, Error: {str(deploy_err)}")
                     asset.status = AssetStatus.DEPLOYMENT_FAILED.value
                     asset.error_message = f"触发上链失败: {str(deploy_err)}"
                     db.session.commit()
+                    logger.info(f"资产状态更新为 DEPLOYMENT_FAILED (状态值:{AssetStatus.DEPLOYMENT_FAILED.value}): AssetID={asset_id}")
 
             elif transaction_error is not None:
                 # 交易失败
@@ -191,16 +208,24 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
                 asset.payment_details = json.dumps(details)
                 
                 db.session.commit()
-                logger.warning(f"资产状态更新为 PAYMENT_FAILED: AssetID={asset_id}, Error: {asset.error_message}")
+                logger.warning(f"资产状态更新为 PAYMENT_FAILED (状态值:{AssetStatus.PAYMENT_FAILED.value}): AssetID={asset_id}, Error: {asset.error_message}")
             else:
                 # 达到最大重试次数，状态未定
                 asset.status = AssetStatus.PENDING.value
                 asset.error_message = "支付确认超时，状态未知"
+                
+                details = json.loads(asset.payment_details) if asset.payment_details else {}
+                details['status'] = 'timeout'
+                details['timeout_at'] = datetime.utcnow().isoformat()
+                asset.payment_details = json.dumps(details)
+                
                 db.session.commit()
-                logger.warning(f"支付确认超时，资产状态保持 PENDING: AssetID={asset_id}")
+                logger.warning(f"支付确认超时，资产状态保持 PENDING (状态值:{AssetStatus.PENDING.value}): AssetID={asset_id}")
 
         except Exception as db_err:
             logger.error(f"更新资产数据库状态失败: AssetID={asset_id}, Error: {str(db_err)}")
+            import traceback
+            logger.error(traceback.format_exc())
             db.session.rollback()
 
 def run_task(func_name, *args, **kwargs):
