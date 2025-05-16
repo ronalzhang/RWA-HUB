@@ -121,114 +121,123 @@ class AssetService:
             asset.deployment_started_at = datetime.utcnow()
             db.session.commit()
             logger.info(f"标记资产 {asset_id} 开始上链处理")
-                
-            # --- 开始实际部署 --- 
-            logger.info(f"开始将资产部署到区块链: AssetID={asset_id}, Name={asset.name}")
             
-            # 可以在这里临时更新状态为 DEPLOYING (如果需要更细粒度的状态)
-            # asset.status = AssetStatus.DEPLOYING.value
-            # db.session.commit()
-            
-            # 模拟模式处理 (保持不变)
-            if getattr(self.solana_client, 'mock_mode', False):
-                logger.info(f"模拟模式：部署资产 {asset.name} 到区块链")
+            try:
+                # --- 开始实际部署 --- 
+                logger.info(f"开始将资产部署到区块链: AssetID={asset_id}, Name={asset.name}")
                 
-                # 生成模拟的token地址和交易hash
-                seed = f"{asset.name}_{asset.token_symbol}_{int(time.time())}".encode()
-                hash_bytes = hashlib.sha256(seed).digest()[:32]
-                token_address = "So" + base58.b58encode(hash_bytes).decode()[:40]
-                tx_hash = base58.b58encode(hashlib.sha256(f"{token_address}_{int(time.time())}".encode()).digest()).decode()
+                # 模拟模式处理 (保持不变)
+                if getattr(self.solana_client, 'mock_mode', False):
+                    logger.info(f"模拟模式：部署资产 {asset.name} 到区块链")
+                    
+                    # 生成模拟的token地址和交易hash
+                    seed = f"{asset.name}_{asset.token_symbol}_{int(time.time())}".encode()
+                    hash_bytes = hashlib.sha256(seed).digest()[:32]
+                    token_address = "So" + base58.b58encode(hash_bytes).decode()[:40]
+                    tx_hash = base58.b58encode(hashlib.sha256(f"{token_address}_{int(time.time())}".encode()).digest()).decode()
+                    
+                    # 更新资产信息
+                    asset.token_address = token_address
+                    asset.deployment_tx_hash = tx_hash
+                    asset.status = AssetStatus.ON_CHAIN.value
+                    asset.deployment_time = datetime.utcnow()
+                    
+                    # 构建blockchain_details
+                    blockchain_details = {
+                        "network": "solana_mainnet",
+                        "token_type": "spl",
+                        "decimals": 9,
+                        "deployment_time": datetime.now().isoformat(),
+                        "creator": str(self.solana_client.public_key),
+                        "supply": asset.token_supply,
+                        "mock_mode": True
+                    }
+                    
+                    # 如果数据库有blockchain_details字段，则设置
+                    if hasattr(asset, 'blockchain_details'):
+                        asset.blockchain_details = json.dumps(blockchain_details)
+                    
+                    # 清除上链进行中标记并保存到数据库
+                    asset.deployment_in_progress = False
+                    db.session.commit()
+                    
+                    logger.info(f"模拟模式：成功部署资产 {asset.name} 到区块链，token地址: {token_address}")
+                    return {
+                        "success": True,
+                        "message": "资产成功部署到区块链（模拟模式）",
+                        "token_address": token_address,
+                        "tx_hash": tx_hash,
+                        "mock": True
+                    }
                 
-                # 更新资产信息
-                asset.token_address = token_address
-                asset.deployment_tx_hash = tx_hash
-                asset.status = AssetStatus.ON_CHAIN.value
-                asset.deployment_time = datetime.utcnow()
+                # 检查服务钱包余额 (保持不变)
+                if not self.solana_client.check_balance_sufficient():
+                    raise ValueError("服务钱包SOL余额不足，无法创建代币")
+                    
+                # --- 调用 Solana 客户端创建 SPL 代币 --- 
+                token_result = self.solana_client.create_spl_token(
+                    asset_name=asset.name,
+                    token_symbol=asset.token_symbol,
+                    token_supply=asset.token_supply,
+                    decimals=9  # 或从资产配置读取
+                )
                 
-                # 构建blockchain_details
-                blockchain_details = {
-                    "network": "solana_mainnet",
-                    "token_type": "spl",
-                    "decimals": 9,
-                    "deployment_time": datetime.now().isoformat(),
-                    "creator": str(self.solana_client.public_key),
-                    "supply": asset.token_supply,
-                    "mock_mode": True
-                }
+                # --- 处理部署结果 --- 
+                if token_result.get('success', False):
+                    # 部署成功
+                    token_address = token_result.get('token_address')
+                    tx_hash = token_result.get('tx_hash') # 获取交易哈希
+                    details = token_result.get('details', {})
+                    
+                    asset.token_address = token_address
+                    asset.deployment_tx_hash = tx_hash
+                    asset.status = AssetStatus.ON_CHAIN.value # 更新状态为 ON_CHAIN
+                    asset.deployment_time = datetime.utcnow()
+                    asset.blockchain_details = json.dumps(details)
+                    
+                    # 清除上链进行中标记
+                    asset.deployment_in_progress = False
+                    db.session.commit()
+                    logger.info(f"资产成功上链: AssetID={asset_id}, TokenAddress={token_address}, Status=ON_CHAIN")
+                    
+                    return {
+                        'success': True,
+                        'asset_id': asset_id,
+                        'token_address': token_address,
+                        'tx_hash': tx_hash,
+                        'details': details
+                    }
+                else:
+                    # 部署失败
+                    error_message = token_result.get('error', '部署到区块链失败')
+                    logger.error(f"资产上链失败: AssetID={asset_id}, Error: {error_message}")
+                    
+                    # 更新资产状态为部署失败
+                    asset.status = AssetStatus.DEPLOYMENT_FAILED.value
+                    asset.error_message = error_message
+                    # 清除上链进行中标记
+                    asset.deployment_in_progress = False
+                    db.session.commit()
+                    
+                    return {
+                        'success': False,
+                        'error': error_message
+                    }
+            except Exception as deploy_error:
+                # 内部部署异常处理
+                error_str = f"部署资产操作异常: {str(deploy_error)}"
+                logger.exception(error_str)
                 
-                # 如果数据库有blockchain_details字段，则设置
-                if hasattr(asset, 'blockchain_details'):
-                    asset.blockchain_details = json.dumps(blockchain_details)
-                
-                # 清除上链进行中标记并保存到数据库
-                asset.deployment_in_progress = False
-                db.session.commit()
-                
-                logger.info(f"模拟模式：成功部署资产 {asset.name} 到区块链，token地址: {token_address}")
-                return {
-                    "success": True,
-                    "message": "资产成功部署到区块链（模拟模式）",
-                    "token_address": token_address,
-                    "tx_hash": tx_hash,
-                    "mock": True
-                }
-            
-            # 检查服务钱包余额 (保持不变)
-            if not self.solana_client.check_balance_sufficient():
-                # 清除上链进行中标记
-                asset.deployment_in_progress = False
-                asset.error_message = "服务钱包SOL余额不足，无法创建代币"
-                db.session.commit()
-                raise ValueError("服务钱包SOL余额不足，无法创建代币")
-                
-            # --- 调用 Solana 客户端创建 SPL 代币 --- 
-            token_result = self.solana_client.create_spl_token(
-                asset_name=asset.name,
-                token_symbol=asset.token_symbol,
-                token_supply=asset.token_supply,
-                decimals=9  # 或从资产配置读取
-            )
-            
-            # --- 处理部署结果 --- 
-            if token_result.get('success', False):
-                # 部署成功
-                token_address = token_result.get('token_address')
-                tx_hash = token_result.get('tx_hash') # 获取交易哈希
-                details = token_result.get('details', {})
-                
-                asset.token_address = token_address
-                asset.deployment_tx_hash = tx_hash
-                asset.status = AssetStatus.ON_CHAIN.value # 更新状态为 ON_CHAIN
-                asset.deployment_time = datetime.utcnow()
-                asset.blockchain_details = json.dumps(details)
-                
-                # 清除上链进行中标记
-                asset.deployment_in_progress = False
-                db.session.commit()
-                logger.info(f"资产成功上链: AssetID={asset_id}, TokenAddress={token_address}, Status=ON_CHAIN")
-                
-                return {
-                    'success': True,
-                    'asset_id': asset_id,
-                    'token_address': token_address,
-                    'tx_hash': tx_hash,
-                    'details': details
-                }
-            else:
-                # 部署失败
-                error_message = token_result.get('error', '部署到区块链失败')
-                logger.error(f"资产上链失败: AssetID={asset_id}, Error: {error_message}")
-                
-                # 更新资产状态为部署失败
+                # 更新状态为部署失败
                 asset.status = AssetStatus.DEPLOYMENT_FAILED.value
-                asset.error_message = error_message
+                asset.error_message = error_str
                 # 清除上链进行中标记
                 asset.deployment_in_progress = False
                 db.session.commit()
                 
                 return {
                     'success': False,
-                    'error': error_message
+                    'error': error_str
                 }
                 
         except Exception as e:
@@ -257,7 +266,7 @@ class AssetService:
                          db.session.rollback()
             else:
                  logger.error(f"无法更新资产状态，因为未能获取资产对象: AssetID={asset_id}")
-                 
+            
             return {
                 'success': False,
                 'error': error_str
@@ -284,9 +293,18 @@ class AssetService:
                     'error': f"资产不存在: {asset_id}"
                 }
                 
+            # 检查是否正在部署中
+            if asset.deployment_in_progress:
+                logger.info(f"资产 {asset_id} 正在部署中，跳过重复处理")
+                return {
+                    'success': True,
+                    'message': "资产正在部署中",
+                    'deployment_in_progress': True
+                }
+                
             # 检查是否已经确认支付
             if asset.payment_confirmed:
-                logger.info(f"资产 {asset_id} 支付已确认，跳过重复处理")
+                logger.info(f"资产 {asset_id} 支付已确认，检查是否需要上链")
                 
                 # 如果状态已是CONFIRMED但尚未上链，尝试触发上链
                 if asset.status == AssetStatus.CONFIRMED.value and not asset.token_address:
@@ -318,6 +336,14 @@ class AssetService:
                 
             logger.info(f"处理资产支付: {asset_id}, 支付信息: {payment_info}")
             
+            # 检查资产当前状态
+            if asset.status not in [AssetStatus.PENDING.value, AssetStatus.APPROVED.value]:
+                logger.warning(f"资产状态({asset.status})不允许处理支付，应为PENDING或APPROVED")
+                return {
+                    'success': False,
+                    'error': f"资产状态不允许处理支付，当前状态: {asset.status}"
+                }
+            
             # 检查支付金额
             min_payment = float(os.environ.get('MIN_PAYMENT_AMOUNT', 100))
             payment_amount = float(payment_info.get('amount', 0))
@@ -336,6 +362,15 @@ class AssetService:
                 return {
                     'success': False,
                     'error': f"支付未确认: {payment_status}"
+                }
+            
+            # 在更新数据库之前，再次检查是否有其他进程正在处理
+            if asset.deployment_in_progress:
+                logger.info(f"资产 {asset_id} 正在被其他进程处理，跳过")
+                return {
+                    'success': True,
+                    'message': "资产正在被其他进程处理",
+                    'deployment_in_progress': True
                 }
                 
             # 更新支付信息，标记为已确认

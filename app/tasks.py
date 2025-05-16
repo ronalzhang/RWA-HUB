@@ -113,8 +113,13 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
             logger.info(f"资产支付已确认，跳过重复处理: AssetID={asset_id}")
             return
             
-        if asset.token_address or asset.blockchain_tx_hash:
+        if asset.token_address:
             logger.info(f"资产已存在上链信息，跳过支付确认: AssetID={asset_id}, TokenAddress={asset.token_address}")
+            return
+            
+        # 检查是否有其他进程正在处理该资产
+        if asset.deployment_in_progress:
+            logger.info(f"资产正在被其他进程处理中，跳过: AssetID={asset_id}, 处理开始时间: {asset.deployment_started_at}")
             return
         
         retry_count = 0
@@ -188,6 +193,11 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
             if asset.payment_confirmed:
                 logger.info(f"资产支付已在其他进程中确认，跳过重复处理: AssetID={asset_id}")
                 return
+                
+            # 检查是否有其他进程已开始处理
+            if asset.deployment_in_progress:
+                logger.info(f"资产已在其他进程中处理，跳过: AssetID={asset_id}, 处理开始: {asset.deployment_started_at}")
+                return
 
             if confirmed:
                 # 支付确认成功
@@ -207,8 +217,12 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
                 try:
                     # 最后一次检查确保资产没有被其他进程上链
                     asset = Asset.query.get(asset_id)
-                    if asset.token_address or asset.blockchain_tx_hash:
+                    if asset.token_address:
                         logger.info(f"资产已在其他进程中上链，跳过重复上链: AssetID={asset_id}, TokenAddress={asset.token_address}")
+                        return
+                        
+                    if asset.deployment_in_progress:
+                        logger.info(f"资产正在由其他进程处理上链，跳过: AssetID={asset_id}, 开始时间: {asset.deployment_started_at}")
                         return
 
                     logger.info(f"支付已确认，开始触发资产上链流程: AssetID={asset_id}")
@@ -301,9 +315,8 @@ def auto_monitor_pending_payments():
                 Asset.status == AssetStatus.PENDING.value,
                 Asset.payment_tx_hash.isnot(None),
                 Asset.payment_confirmed.is_(False),
-                # 确保不处理已经上链或上链失败的资产
-                Asset.blockchain_tx_hash.is_(None),  # 没有上链交易哈希
-                Asset.token_address.is_(None)        # 没有代币地址
+                Asset.deployment_in_progress.is_(False),  # 不处理正在上链中的资产
+                Asset.token_address.is_(None)             # 没有代币地址
             ).all()
             
             if not pending_assets:
@@ -325,7 +338,12 @@ def auto_monitor_pending_payments():
                         logger.info(f"资产 {asset.id} 支付已确认，跳过")
                         continue
                     
-                    # 检查是否已有处理标记（添加一个临时处理标记避免重复执行）
+                    # 检查是否已有上链标记
+                    if asset.deployment_in_progress:
+                        logger.info(f"资产 {asset.id} 正在处理上链中，跳过")
+                        continue
+                    
+                    # 检查是否有其他处理标记（添加一个临时处理标记避免重复执行）
                     processing_key = f"asset_{asset.id}_processing"
                     if hasattr(app, processing_key) and getattr(app, processing_key):
                         logger.info(f"资产 {asset.id} 正在处理中，跳过")
