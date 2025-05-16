@@ -1155,7 +1155,8 @@ const walletState = {
             if (this.walletType === 'phantom' && window.solana && window.solana.isConnected) {
                 await this.ensureSolanaLibraries();
                 // 使用主网RPC节点
-                const connection = new window.solanaWeb3.Connection(window.solanaWeb3.clusterApiUrl('mainnet-beta'));
+                // 直接使用RPC URL而不是clusterApiUrl函数
+const connection = new window.solanaWeb3.Connection('https://api.mainnet-beta.solana.com');
                 const publicKey = new window.solanaWeb3.PublicKey(this.address);
                 
                 // 使用Solana上的USDC合约地址

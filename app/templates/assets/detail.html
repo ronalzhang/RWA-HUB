@@ -796,8 +796,19 @@ document.addEventListener('DOMContentLoaded', function() {
                         throw new Error('参数验证失败: ' + validation.errors.join(', '));
                     }
                     
-                    // 发起API请求
-                    const response = await fetch(`/api/trades?asset_id=${queryParams.asset_id}&page=${queryParams.page}&per_page=${queryParams.per_page}`);
+                    // 发起API请求 - 使用正确的API路径
+                    // 判断资产使用ID还是符号
+                    const assetIdentifier = "{{ asset.token_symbol }}" || queryParams.asset_id;
+                    let apiUrl = "";
+                    if (typeof assetIdentifier === "string" && assetIdentifier.includes("RH-")) {
+                        // 使用token_symbol
+                        apiUrl = `/api/v2/trades/${assetIdentifier}?page=${queryParams.page}&per_page=${queryParams.per_page}`;
+                    } else {
+                        // 使用ID
+                        apiUrl = `/api/trades?asset_id=${queryParams.asset_id}&page=${queryParams.page}&per_page=${queryParams.per_page}`;
+                    }
+                    console.log("尝试获取交易历史，API地址:", apiUrl);
+                    const response = await fetch(apiUrl);
                     if (!response.ok) {
                         throw new Error('{{ _("Failed to load transaction history") }}: ' + (response.status === 404 ? '{{ _("API service temporarily unavailable") }}' : response.statusText));
                     }
