@@ -563,8 +563,9 @@ function setupBuyButton() {
   updateBuyButtonState();
 }
 
-// 用于跟踪最后一次状态更新的时间戳
+// 用于跟踪最后一次状态更新的时间戳和正在进行的更新操作
 let lastStateUpdateTimestamp = 0;
+let pendingUpdateTimer = null;
 
 // 添加钱包状态变化监听器
 document.addEventListener('walletStateChanged', function(event) {
@@ -575,35 +576,57 @@ document.addEventListener('walletStateChanged', function(event) {
     return;
   }
   
-  lastStateUpdateTimestamp = timestamp;
-  console.log('钱包状态变化，更新购买按钮状态:', event.detail);
-  updateBuyButtonState();
+  // 使用延迟更新，避免短时间内多次触发
+  if (pendingUpdateTimer) {
+    clearTimeout(pendingUpdateTimer);
+  }
+  
+  pendingUpdateTimer = setTimeout(() => {
+    lastStateUpdateTimestamp = timestamp;
+    console.log('钱包状态变化，更新购买按钮状态:', event.detail);
+    updateBuyButtonState();
+    pendingUpdateTimer = null;
+  }, 2000); // 延迟2秒执行，减轻服务器负担
 });
 
-// 监听钱包连接事件
+// 监听钱包连接事件，使用同样的延迟机制
 document.addEventListener('walletConnected', function(event) {
   const timestamp = Date.now();
-  if (timestamp <= lastStateUpdateTimestamp + 500) {
-    console.log('短时间内已处理过状态变化，跳过');
+  if (timestamp <= lastStateUpdateTimestamp + 2000) {
+    console.log('忽略短时间内的重复钱包连接事件');
     return;
   }
   
-  lastStateUpdateTimestamp = timestamp;
-  console.log('钱包已连接，更新购买按钮状态:', event.detail);
-  updateBuyButtonState();
+  if (pendingUpdateTimer) {
+    clearTimeout(pendingUpdateTimer);
+  }
+  
+  pendingUpdateTimer = setTimeout(() => {
+    lastStateUpdateTimestamp = timestamp;
+    console.log('钱包已连接，更新购买按钮状态:', event.detail);
+    updateBuyButtonState();
+    pendingUpdateTimer = null;
+  }, 2000);
 });
 
 // 监听钱包断开连接事件
 document.addEventListener('walletDisconnected', function() {
   const timestamp = Date.now();
-  if (timestamp <= lastStateUpdateTimestamp + 500) {
+  if (timestamp <= lastStateUpdateTimestamp + 2000) {
     console.log('短时间内已处理过状态变化，跳过');
     return;
   }
   
-  lastStateUpdateTimestamp = timestamp;
-  console.log('钱包已断开连接，更新购买按钮状态');
-  updateBuyButtonState();
+  if (pendingUpdateTimer) {
+    clearTimeout(pendingUpdateTimer);
+  }
+  
+  pendingUpdateTimer = setTimeout(() => {
+    lastStateUpdateTimestamp = timestamp;
+    console.log('钱包已断开连接，更新购买按钮状态');
+    updateBuyButtonState();
+    pendingUpdateTimer = null;
+  }, 2000);
 });
     
     // 初始化
