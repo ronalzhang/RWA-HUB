@@ -99,17 +99,32 @@ def get_flask_app():
         try:
             from flask import current_app
             if current_app:
-                return current_app._get_current_object()
+                app_obj = current_app._get_current_object()
+                logger.debug("从current_app获取Flask应用上下文成功")
+                return app_obj
         except Exception as ca_err:
             logger.debug(f"从current_app获取Flask应用上下文失败: {str(ca_err)}")
             pass
         
-        # 如果无法从current_app获取，则创建新的应用实例
-        # 修改导入方式，避免名称冲突
-        import app as app_module
-        flask_app = app_module.create_app()
-        logger.debug("创建了新的Flask应用上下文")
-        return flask_app
+        # 如果无法从current_app获取，则直接创建新的Flask应用实例
+        try:
+            from flask import Flask
+            from config import Config
+            
+            # 直接创建Flask应用实例
+            app_obj = Flask(__name__.split('.')[0])
+            app_obj.config.from_object(Config)
+            
+            # 初始化基本的扩展，但不需要完整初始化
+            from app.extensions import db
+            db.init_app(app_obj)
+            
+            logger.debug("直接创建新的Flask应用实例成功")
+            return app_obj
+        except Exception as flask_err:
+            logger.error(f"直接创建Flask应用实例失败: {str(flask_err)}")
+            logger.error(traceback.format_exc())
+            raise
     except Exception as e:
         logger.error(f"获取Flask应用上下文失败: {str(e)}")
         logger.error(traceback.format_exc())
