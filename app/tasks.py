@@ -19,9 +19,8 @@ from flask import current_app
 from app.extensions import db
 from app.models import Asset, Trade, AssetStatus
 from app.blockchain.asset_service import AssetService
-
-# 获取日志记录器
-logger = logging.getLogger(__name__)
+# 导入app模块的logger
+from app import logger
 
 # 任务队列
 task_queue = Queue()
