@@ -2651,16 +2651,26 @@ checkIfReturningFromWalletApp(walletType) {
             transaction.recentBlockhash = blockHashResult.blockhash;
             transaction.feePayer = fromPubkey;
             
+            // 重要：确保程序ID是PublicKey对象
+            const tokenProgramId = new window.solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+            const associatedTokenProgramId = new window.solanaWeb3.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+            
             // 获取发送方的代币账户
             const fromTokenAccount = await splToken.getAssociatedTokenAddress(
                 usdcMint,
-                fromPubkey
+                fromPubkey,
+                false,
+                tokenProgramId,
+                associatedTokenProgramId
             );
             
             // 获取接收方的代币账户
             const toTokenAccount = await splToken.getAssociatedTokenAddress(
                 usdcMint,
-                toPubkey
+                toPubkey,
+                false,
+                tokenProgramId,
+                associatedTokenProgramId
             );
             
             // 检查接收方账户
@@ -2678,11 +2688,13 @@ checkIfReturningFromWalletApp(walletType) {
             if (!toTokenAccountExists || !toTokenAccountExists2) {
                 console.log('接收方代币账户不存在，添加创建指令');
                 transaction.add(
-                    splToken.createAssociatedTokenAccountInstruction(
+                    await splToken.createAssociatedTokenAccountInstruction(
                         fromPubkey,
                         toTokenAccount,
                         toPubkey,
-                        usdcMint
+                        usdcMint,
+                        tokenProgramId,
+                        associatedTokenProgramId
                     )
                 );
             }
@@ -2697,7 +2709,9 @@ checkIfReturningFromWalletApp(walletType) {
                     fromTokenAccount,
                     toTokenAccount,
                     fromPubkey,
-                    lamportsAmount
+                    lamportsAmount,
+                    [],
+                    tokenProgramId
                 )
             );
             
@@ -2817,11 +2831,27 @@ checkIfReturningFromWalletApp(walletType) {
         if (!window.solanaWeb3 || !window.splToken) {
             throw new Error('无法加载必要的Solana区块链库，请刷新页面重试');
         }
+
+        // 确保程序ID已初始化为PublicKey对象
+        if (window.splToken.initializeProgramIds) {
+            window.splToken.initializeProgramIds();
+            
+            // 额外检查，如果程序ID仍然是字符串，则手动创建PublicKey对象
+            if (window.splToken.TOKEN_PROGRAM_ID && typeof window.splToken.TOKEN_PROGRAM_ID === 'string') {
+                window.splToken.TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey(window.splToken.TOKEN_PROGRAM_ID);
+            }
+            
+            if (window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID && typeof window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID === 'string') {
+                window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey(window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID);
+            }
+        }
         
         console.log('Solana库已准备就绪:', {
             'solanaWeb3': !!window.solanaWeb3,
             'splToken': !!window.splToken,
-            'hasGetAssociatedTokenAddress': !!(window.splToken && window.splToken.getAssociatedTokenAddress)
+            'hasGetAssociatedTokenAddress': !!(window.splToken && window.splToken.getAssociatedTokenAddress),
+            'TOKEN_PROGRAM_ID类型': typeof window.splToken.TOKEN_PROGRAM_ID,
+            'ASSOCIATED_TOKEN_PROGRAM_ID类型': typeof window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID
         });
     },
     
