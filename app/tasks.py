@@ -105,10 +105,11 @@ def get_flask_app():
             pass
         
         # 如果无法从current_app获取，则创建新的应用实例
-        from app import create_app
-        app = create_app()
+        # 修改导入方式，避免名称冲突
+        import app as app_module
+        flask_app = app_module.create_app()
         logger.debug("创建了新的Flask应用上下文")
-        return app
+        return flask_app
     except Exception as e:
         logger.error(f"获取Flask应用上下文失败: {str(e)}")
         logger.error(traceback.format_exc())
