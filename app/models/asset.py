@@ -66,6 +66,7 @@ class Asset(db.Model):
     payment_details = db.Column(db.Text, nullable=True)  # 支付详情（JSON字符串）
     payment_confirmed = db.Column(db.Boolean, default=False)  # 支付是否已确认
     payment_confirmed_at = db.Column(db.DateTime, nullable=True)  # 支付确认时间
+    error_message = db.Column(db.Text, nullable=True)  # 错误消息
     
     # 添加审核信息
     approved_at = db.Column(db.DateTime)  # 审核通过时间
