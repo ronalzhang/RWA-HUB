@@ -96,6 +96,27 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
         from app.config import Config
         rpc_url = Config.SOLANA_RPC_URL or 'https://api.mainnet-beta.solana.com'
         
+        # 首先检查资产当前状态，确保不重复处理
+        from app.models.asset import Asset, AssetStatus
+        
+        asset = Asset.query.get(asset_id)
+        if not asset:
+            logger.error(f"未找到资产: AssetID={asset_id}")
+            return
+            
+        # 如果资产已经不是PENDING状态，或已支付确认，或已上链，则不处理
+        if asset.status != AssetStatus.PENDING.value:
+            logger.info(f"资产已不是PENDING状态，当前状态: {asset.status}，跳过支付确认: AssetID={asset_id}")
+            return
+            
+        if asset.payment_confirmed:
+            logger.info(f"资产支付已确认，跳过重复处理: AssetID={asset_id}")
+            return
+            
+        if asset.token_address or asset.blockchain_tx_hash:
+            logger.info(f"资产已存在上链信息，跳过支付确认: AssetID={asset_id}, TokenAddress={asset.token_address}")
+            return
+        
         retry_count = 0
         confirmed = False
         transaction_error = None
@@ -153,11 +174,19 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
 
         # ----- 更新数据库状态 -----
         try:
-            from app.models.asset import Asset, AssetStatus
-            
+            # 重新获取资产，确保使用最新数据
             asset = Asset.query.get(asset_id)
             if not asset:
                 logger.error(f"在更新状态时未找到资产: AssetID={asset_id}")
+                return
+                
+            # 再次检查资产状态，确保不重复处理
+            if asset.status != AssetStatus.PENDING.value:
+                logger.info(f"资产状态已发生变化，当前状态: {asset.status}，跳过后续处理: AssetID={asset_id}")
+                return
+                
+            if asset.payment_confirmed:
+                logger.info(f"资产支付已在其他进程中确认，跳过重复处理: AssetID={asset_id}")
                 return
 
             if confirmed:
@@ -176,10 +205,23 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
 
                 # --- 触发上链流程 --- (在数据库提交后进行)
                 try:
+                    # 最后一次检查确保资产没有被其他进程上链
+                    asset = Asset.query.get(asset_id)
+                    if asset.token_address or asset.blockchain_tx_hash:
+                        logger.info(f"资产已在其他进程中上链，跳过重复上链: AssetID={asset_id}, TokenAddress={asset.token_address}")
+                        return
+
                     logger.info(f"支付已确认，开始触发资产上链流程: AssetID={asset_id}")
                     
                     from app.blockchain.asset_service import AssetService
                     asset_service = AssetService()
+                    
+                    # 添加上链进行中标记，避免重复触发
+                    asset.deployment_in_progress = True
+                    asset.deployment_started_at = datetime.utcnow()
+                    db.session.commit()
+                    
+                    # 执行上链操作
                     deploy_result = asset_service.deploy_asset_to_blockchain(asset_id)
                     
                     if deploy_result.get('success'):
@@ -188,12 +230,24 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
                     else:
                         logger.error(f"资产上链失败: AssetID={asset_id}, Error: {deploy_result.get('error')}")
                         # 状态已在deploy_asset_to_blockchain中更新为DEPLOYMENT_FAILED(状态7)
+                    
+                    # 清除上链进行中标记
+                    asset = Asset.query.get(asset_id)
+                    if asset:
+                        asset.deployment_in_progress = False
+                        db.session.commit()
+                        
                 except Exception as deploy_err:
                     logger.error(f"触发或执行上链流程失败: AssetID={asset_id}, Error: {str(deploy_err)}")
-                    asset.status = AssetStatus.DEPLOYMENT_FAILED.value
-                    asset.error_message = f"触发上链失败: {str(deploy_err)}"
-                    db.session.commit()
-                    logger.info(f"资产状态更新为 DEPLOYMENT_FAILED (状态值:{AssetStatus.DEPLOYMENT_FAILED.value}): AssetID={asset_id}")
+                    
+                    # 获取最新资产状态
+                    asset = Asset.query.get(asset_id)
+                    if asset:
+                        asset.status = AssetStatus.DEPLOYMENT_FAILED.value
+                        asset.error_message = f"触发上链失败: {str(deploy_err)}"
+                        asset.deployment_in_progress = False  # 清除上链进行中标记
+                        db.session.commit()
+                        logger.info(f"资产状态更新为 DEPLOYMENT_FAILED (状态值:{AssetStatus.DEPLOYMENT_FAILED.value}): AssetID={asset_id}")
 
             elif transaction_error is not None:
                 # 交易失败
@@ -242,10 +296,14 @@ def auto_monitor_pending_payments():
             from app.models.asset import Asset, AssetStatus
             
             # 查询所有PENDING状态且有payment_tx_hash的资产
+            # 重要：只处理状态为PENDING、有交易哈希、未确认支付且不在处理中的资产
             pending_assets = Asset.query.filter(
                 Asset.status == AssetStatus.PENDING.value,
                 Asset.payment_tx_hash.isnot(None),
-                Asset.payment_confirmed.is_(False)
+                Asset.payment_confirmed.is_(False),
+                # 确保不处理已经上链或上链失败的资产
+                Asset.blockchain_tx_hash.is_(None),  # 没有上链交易哈希
+                Asset.token_address.is_(None)        # 没有代币地址
             ).all()
             
             if not pending_assets:
@@ -257,10 +315,24 @@ def auto_monitor_pending_payments():
             # 为每个资产触发支付确认监控任务
             for asset in pending_assets:
                 try:
+                    # 最后一道防线：再次检查资产状态，确保不会重复处理
+                    if asset.status != AssetStatus.PENDING.value:
+                        logger.info(f"资产 {asset.id} 状态已不是PENDING (当前状态: {asset.status})，跳过")
+                        continue
+                        
                     # 检查是否有支付确认记录
                     if asset.payment_confirmed:
                         logger.info(f"资产 {asset.id} 支付已确认，跳过")
                         continue
+                    
+                    # 检查是否已有处理标记（添加一个临时处理标记避免重复执行）
+                    processing_key = f"asset_{asset.id}_processing"
+                    if hasattr(app, processing_key) and getattr(app, processing_key):
+                        logger.info(f"资产 {asset.id} 正在处理中，跳过")
+                        continue
+                    
+                    # 设置处理标记
+                    setattr(app, processing_key, True)
                         
                     # 检查是否有错误消息
                     if asset.error_message and ('支付交易失败' in asset.error_message or '支付确认超时' in asset.error_message):
@@ -273,6 +345,10 @@ def auto_monitor_pending_payments():
                     
                 except Exception as e:
                     logger.error(f"处理资产 {asset.id} 时发生错误: {str(e)}")
+                finally:
+                    # 确保处理完成后清除处理标记
+                    if asset and hasattr(app, f"asset_{asset.id}_processing"):
+                        setattr(app, f"asset_{asset.id}_processing", False)
             
             logger.info("待处理支付交易监控完成")
             
