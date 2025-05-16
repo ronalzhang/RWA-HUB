@@ -793,4 +793,66 @@ def generate_demo_data():
         return jsonify({
             'status': 'error',
             'message': str(e)
-        }), 500 
+        }), 500
+
+@solana_api.route('/check_account', methods=['GET'])
+def check_account_info():
+    """
+    检查账户信息
+    
+    参数:
+    - address: 账户地址
+    """
+    try:
+        address = request.args.get('address')
+        if not address:
+            return jsonify({"success": False, "error": "缺少address参数"}), 400
+        
+        # 获取账户信息
+        result = make_rpc_request(
+            "getAccountInfo",
+            [address, {"encoding": "jsonParsed", "commitment": "confirmed"}]
+        )
+        
+        if result["success"]:
+            return jsonify({
+                "success": True,
+                "exists": result["result"] is not None,
+                "account_info": result["result"]
+            })
+        else:
+            return jsonify({"success": False, "error": result["error"]}), 400
+    except Exception as e:
+        logger.exception(f"检查账户信息时发生异常: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@solana_api.route('/get_balance', methods=['GET'])
+def get_balance():
+    """
+    获取账户SOL余额
+    
+    参数:
+    - address: 账户地址
+    """
+    try:
+        address = request.args.get('address')
+        if not address:
+            return jsonify({"success": False, "error": "缺少address参数"}), 400
+        
+        # 获取账户余额
+        result = make_rpc_request(
+            "getBalance",
+            [address, {"commitment": "confirmed"}]
+        )
+        
+        if result["success"]:
+            return jsonify({
+                "success": True,
+                "balance": result["result"],
+                "lamports": result["result"]
+            })
+        else:
+            return jsonify({"success": False, "error": result["error"]}), 400
+    except Exception as e:
+        logger.exception(f"获取账户余额时发生异常: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500 
