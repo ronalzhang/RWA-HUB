@@ -10,7 +10,6 @@ from app.utils.solana_log_reader import SolanaLogReader
 import os
 from datetime import datetime, timedelta, timezone
 from threading import Lock
-from app import app
 
 # 创建日志器
 logger = logging.getLogger('solana_api')
@@ -666,7 +665,7 @@ def check_ata_exists():
             data = request.args.copy()
             data["owner"] = owner
             data["mint"] = mint
-            with app.test_request_context(f'/api/solana/get_token_accounts?owner={owner}&mint={mint}'):
+            with current_app.test_request_context(f'/api/solana/get_token_accounts?owner={owner}&mint={mint}'):
                 response = get_token_accounts()
                 
             return response
