@@ -2687,16 +2687,39 @@ checkIfReturningFromWalletApp(walletType) {
             // 如果接收方代币账户不存在，添加创建指令
             if (!toTokenAccountExists || !toTokenAccountExists2) {
                 console.log('接收方代币账户不存在，添加创建指令');
-                transaction.add(
-                    await splToken.createAssociatedTokenAccountInstruction(
-                        fromPubkey,
-                        toTokenAccount,
-                        toPubkey,
-                        usdcMint,
-                        tokenProgramId,
-                        associatedTokenProgramId
-                    )
-                );
+                try {
+                    // 首先尝试使用标准方法创建指令
+                    const createAtaInstruction = await splToken.createAssociatedTokenAccountInstruction(
+                        fromPubkey,           // 付款人（当前钱包）
+                        toTokenAccount,       // 要创建的关联代币账户
+                        toPubkey,             // 账户所有者
+                        usdcMint,             // 代币Mint
+                        tokenProgramId,       // 代币程序ID
+                        associatedTokenProgramId  // 关联代币程序ID
+                    );
+                    
+                    transaction.add(createAtaInstruction);
+                } catch (ataError) {
+                    console.error('创建ATA指令错误:', ataError);
+                    
+                    // 如果上面的方法失败，可能是因为参数顺序不正确，尝试其他顺序
+                    try {
+                        const createAtaInstruction2 = await splToken.createAssociatedTokenAccountInstruction(
+                            fromPubkey,           // 付款人
+                            toPubkey,             // 账户所有者
+                            usdcMint,             // 代币Mint
+                            toTokenAccount,       // 关联代币账户地址
+                            tokenProgramId,       // 代币程序ID
+                            associatedTokenProgramId  // 关联代币程序ID
+                        );
+                        
+                        transaction.add(createAtaInstruction2);
+                    } catch (ataError2) {
+                        // 如果仍然失败，记录错误并继续（后续的转账可能也会失败）
+                        console.error('备选方法创建ATA指令也失败:', ataError2);
+                        throw new Error('无法创建接收方代币账户，请确保接收方地址正确');
+                    }
+                }
             }
             
             // 10. 准备转账金额（USDC有6位小数）
@@ -2704,16 +2727,44 @@ checkIfReturningFromWalletApp(walletType) {
             
             // 11. 添加转账指令
             console.log('添加转账指令...');
-            transaction.add(
-                splToken.createTransferInstruction(
-                    fromTokenAccount,
-                    toTokenAccount,
-                    fromPubkey,
-                    lamportsAmount,
-                    [],
-                    tokenProgramId
-                )
-            );
+            try {
+                // 使用正确的参数顺序创建转账指令
+                const transferInstruction = splToken.createTransferInstruction(
+                    fromTokenAccount,           // 源代币账户
+                    toTokenAccount,             // 目标代币账户
+                    fromPubkey,                 // 所有者（用户钱包地址）
+                    lamportsAmount,             // 转账金额（lamports单位）
+                    [],                         // 多重签名者（空数组表示没有）
+                    tokenProgramId              // 代币程序ID
+                );
+                
+                transaction.add(transferInstruction);
+            } catch (instructionError) {
+                console.error('创建转账指令错误:', instructionError);
+                // 尝试使用替代方法构建指令
+                const dataLayout = {
+                    instruction: 3, // TransferInstruction = 3
+                    amount: lamportsAmount
+                };
+                
+                const data = Buffer.alloc(12);
+                data.writeUInt8(dataLayout.instruction, 0);
+                data.writeBigUInt64LE(BigInt(dataLayout.amount), 4);
+                
+                const keys = [
+                    { pubkey: fromTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: toTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: fromPubkey, isSigner: true, isWritable: false }
+                ];
+                
+                const alternativeInstruction = new solanaWeb3.TransactionInstruction({
+                    keys,
+                    programId: tokenProgramId,
+                    data
+                });
+                
+                transaction.add(alternativeInstruction);
+            }
             
             // 12. 发送交易请求给钱包签名
             console.log('请求钱包签名交易...');
