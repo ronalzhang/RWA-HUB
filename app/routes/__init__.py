@@ -33,9 +33,6 @@ from .assets import register_global_handlers
 # 导入Solana API
 from .solana_api import solana_api as solana_api_bp
 
-# 导入管理员版本2蓝图 (暂不可用)
-# from .admin_v2 import admin_v2_bp
-
 # 导入Solana管理功能
 from .admin_solana import admin_solana_bp
 
@@ -59,9 +56,6 @@ def register_blueprints(app):
     
     # 注册管理员测试蓝图
     app.register_blueprint(admin_test_bp)
-    
-    # 注册管理员版本2蓝图 (暂不可用)
-    # app.register_blueprint(admin_v2_bp)
     
     # 注册Solana API蓝图
     app.register_blueprint(solana_api_bp)
