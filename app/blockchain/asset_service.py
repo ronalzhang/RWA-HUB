@@ -382,8 +382,14 @@ class AssetService:
             logger.info(f"资产 {asset_id} 支付已确认，状态更新为 CONFIRMED")
                 
             # 触发上链流程
+            logger.info(f"开始为资产 {asset_id} 触发上链流程...")
             deploy_result = self.deploy_asset_to_blockchain(asset_id)
             
+            if deploy_result.get('success'):
+                logger.info(f"资产 {asset_id} 上链流程触发成功: {deploy_result}")
+            else:
+                logger.error(f"资产 {asset_id} 上链流程触发失败: {deploy_result}")
+                
             return {
                 'success': deploy_result.get('success', False),
                 'message': "支付已确认，已触发上链流程",

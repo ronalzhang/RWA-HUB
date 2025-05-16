@@ -111,8 +111,15 @@ def confirm_asset_payment():
         logger.info(f"已更新资产 {asset_id} 的支付信息, 交易哈希: {tx_hash}")
         
         # 使用资产服务处理支付并触发上链
+        logger.info(f"开始调用资产服务处理支付确认: AssetID={asset_id}")
         asset_service = AssetService()
         result = asset_service.process_asset_payment(asset_id, payment_info)
+        
+        # 记录处理结果
+        if result.get('success', False):
+            logger.info(f"支付确认处理成功: AssetID={asset_id}, 结果: {result}")
+        else:
+            logger.error(f"支付确认处理失败: AssetID={asset_id}, 错误: {result.get('error', '未知错误')}")
         
         # 返回处理结果
         return jsonify({

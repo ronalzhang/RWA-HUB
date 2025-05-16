@@ -452,7 +452,7 @@ def auto_monitor_pending_payments():
                     Asset.payment_confirmed == True,
                     Asset.token_address == None,
                     Asset.deployment_in_progress != True,
-                    Asset.status == AssetStatus.PENDING.value
+                    Asset.status == AssetStatus.CONFIRMED.value
                 ).all()
                 
                 if confirmed_assets:
@@ -518,29 +518,36 @@ def start_scheduled_tasks():
     """启动定时任务"""
     logger.info("启动定时任务...")
     
-    # 立即执行一次
-    auto_monitor_payments_task.delay()
-    
-    # 每5分钟执行一次
-    from app.extensions import scheduler
-    
-    # 确保任务只添加一次
-    if not scheduler.get_job('monitor_payments'):
-        scheduler.add_job(
-            id='monitor_payments',
-            func=auto_monitor_pending_payments,
-            trigger='interval',
-            minutes=5,
-            replace_existing=True
-        )
-        logger.info("定时任务已添加到调度器: 每5分钟执行一次")
-    else:
-        logger.info("定时任务已存在，跳过添加")
-    
-    logger.info("定时任务已启动")
+    try:
+        # 立即执行一次自动监控
+        logger.info("立即触发资产上链状态检查...")
+        auto_monitor_pending_payments()
+        
+        # 每5分钟执行一次
+        from app.extensions import scheduler
+        
+        # 确保任务只添加一次
+        if not scheduler.get_job('monitor_payments'):
+            scheduler.add_job(
+                id='monitor_payments',
+                func=auto_monitor_pending_payments,
+                trigger='interval',
+                minutes=5,
+                replace_existing=True
+            )
+            logger.info("定时任务已添加到调度器: 每5分钟执行一次")
+        else:
+            logger.info("定时任务已存在，跳过添加")
+        
+        logger.info("定时任务已启动")
+    except Exception as e:
+        logger.error(f"启动定时任务失败: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
 
 # 应用启动时启动定时任务
-start_scheduled_tasks()
+# 注意: 这行代码不会在应用启动时立即执行，需要在app/__init__.py中显式调用
+# start_scheduled_tasks()
 
 def run_task(func_name, *args, **kwargs):
     """
