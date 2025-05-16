@@ -1,6 +1,11 @@
 import logging
 import os
 from app import create_app
+from app.routes.api import api
+from app.routes.admin import admin
+from app.routes.auth import auth
+from app.routes.dashboard import dashboard
+from app.routes.solana_api import solana_api
 
 # 配置日志
 logging.basicConfig(level=logging.DEBUG)

@@ -2633,75 +2633,66 @@ checkIfReturningFromWalletApp(walletType) {
             const solanaWeb3 = window.solanaWeb3;
             const splToken = window.splToken;
             
-            // 使用多个备用RPC节点，优先使用可能在中国大陆访问较快的节点
-            const rpcEndpoints = [
-                'https://solana-api.projectserum.com', // Project Serum节点，全球CDN可能在中国访问更快
-                'https://api.mainnet-beta.solana.com', // 官方主网节点
-                'https://solana-mainnet.g.alchemy.com/v2/demo', // Alchemy演示节点
-                'https://rpc.ankr.com/solana', // Ankr提供的节点
-                'https://ssc-dao.genesysgo.net' // GenesysGo节点
-            ];
-            
-            // 创建连接，使用备用节点列表中的第一个
-            console.log('正在连接Solana RPC节点:', rpcEndpoints[0]);
-            const connection = new solanaWeb3.Connection(
-                rpcEndpoints[0], 
-                'confirmed'
-            );
-            
             const fromPubkey = new solanaWeb3.PublicKey(fromPublicKey.toString());
             const toPubkey = new solanaWeb3.PublicKey(to);
             
             // 6. 获取USDC Token Mint地址
             const usdcMint = new solanaWeb3.PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // Mainnet USDC
             
-            // 7. 获取相关的代币账户
+            // 7. 获取相关的代币账户 (通过服务器API)
             console.log('获取代币账户...');
+            
+            // 通过服务器API检查接收方的代币账户是否存在
+            const checkAtaResponse = await fetch(`/api/solana/get_token_accounts?owner=${to}&mint=${usdcMint.toString()}`);
+            if (!checkAtaResponse.ok) {
+                throw new Error('检查接收方代币账户失败');
+            }
+            
+            const checkAtaResult = await checkAtaResponse.json();
+            const toTokenAccountExists = checkAtaResult.exists;
+            
+            // 8. 获取最新的区块哈希 (通过服务器API)
+            console.log('获取区块哈希...');
+            const blockHashResponse = await fetch('/api/solana/get_latest_blockhash');
+            if (!blockHashResponse.ok) {
+                throw new Error('获取区块哈希失败');
+            }
+            
+            const blockHashResult = await blockHashResponse.json();
+            if (!blockHashResult.success) {
+                throw new Error(`无法获取区块哈希: ${blockHashResult.error}`);
+            }
+            
+            // 9. 构建交易
+            const transaction = new solanaWeb3.Transaction();
+            transaction.recentBlockhash = blockHashResult.blockhash;
+            transaction.feePayer = fromPubkey;
+            
+            // 获取发送方的代币账户
             const fromTokenAccount = await splToken.getAssociatedTokenAddress(
                 usdcMint,
                 fromPubkey
             );
             
+            // 获取接收方的代币账户
             const toTokenAccount = await splToken.getAssociatedTokenAddress(
                 usdcMint,
                 toPubkey
             );
             
-            // 8. 检查接收方的代币账户是否存在，如果不存在则创建
-            let transaction = new solanaWeb3.Transaction();
-            
-            // 检查接收账户是否存在，支持多RPC节点
+            // 检查接收方账户
             console.log('检查接收方账户...');
-            let toTokenAccountInfo = null;
-            
-            // 尝试使用所有可用的RPC节点获取账户信息
-            for (let i = 0; i < rpcEndpoints.length; i++) {
-                try {
-                    if (i === 0) {
-                        // 使用主要连接
-                        toTokenAccountInfo = await connection.getAccountInfo(toTokenAccount);
-                    } else {
-                        // 如果主节点失败，尝试备用节点
-                        console.log(`尝试使用备用RPC节点(${i+1}/${rpcEndpoints.length})检查账户:`, rpcEndpoints[i]);
-                        const backupConnection = new solanaWeb3.Connection(rpcEndpoints[i], 'confirmed');
-                        toTokenAccountInfo = await backupConnection.getAccountInfo(toTokenAccount);
-                    }
-                    
-                    // 如果成功获取账户信息，跳出循环
-                    console.log('成功获取接收账户信息');
-                    break;
-                } catch (error) {
-                    console.warn(`RPC节点(${i+1}/${rpcEndpoints.length})获取账户信息失败:`, error);
-                    
-                    // 如果是最后一个节点也失败，则抛出异常
-                    if (i === rpcEndpoints.length - 1) {
-                        throw new Error(`无法检查接收账户: 所有RPC节点连接失败: ${error.message}`);
-                    }
-                    // 否则继续尝试下一个节点
-                }
+            // 使用服务器API检查账户，而不是直接连接Solana节点
+            const checkAccountResponse = await fetch(`/api/solana/check_account?address=${toTokenAccount.toString()}`);
+            if (!checkAccountResponse.ok) {
+                throw new Error('检查接收方账户失败');
             }
             
-            if (!toTokenAccountInfo) {
+            const checkAccountResult = await checkAccountResponse.json();
+            const toTokenAccountExists2 = checkAccountResult.exists;
+            
+            // 如果接收方代币账户不存在，添加创建指令
+            if (!toTokenAccountExists || !toTokenAccountExists2) {
                 console.log('接收方代币账户不存在，添加创建指令');
                 transaction.add(
                     splToken.createAssociatedTokenAccountInstruction(
@@ -2713,10 +2704,10 @@ checkIfReturningFromWalletApp(walletType) {
                 );
             }
             
-            // 9. 准备转账金额（USDC有6位小数）
+            // 10. 准备转账金额（USDC有6位小数）
             const lamportsAmount = Math.round(amount * 1000000); // 转换为USDC的最小单位
             
-            // 10. 添加转账指令
+            // 11. 添加转账指令
             console.log('添加转账指令...');
             transaction.add(
                 splToken.createTransferInstruction(
@@ -2727,109 +2718,81 @@ checkIfReturningFromWalletApp(walletType) {
                 )
             );
             
-            // 11. 获取最近的区块哈希
-            console.log('获取区块哈希...');
-            let blockhash;
-            
-            // 尝试使用所有可用的RPC节点获取区块哈希
-            for (let i = 0; i < rpcEndpoints.length; i++) {
-                try {
-                    if (i === 0) {
-                        // 使用主要连接
-                        const recentBlockhash = await connection.getRecentBlockhash();
-                        blockhash = recentBlockhash.blockhash;
-                    } else {
-                        // 如果主节点失败，尝试备用节点
-                        console.log(`尝试使用备用RPC节点(${i+1}/${rpcEndpoints.length})获取区块哈希:`, rpcEndpoints[i]);
-                        const backupConnection = new solanaWeb3.Connection(rpcEndpoints[i], 'confirmed');
-                        const recentBlockhash = await backupConnection.getRecentBlockhash();
-                        blockhash = recentBlockhash.blockhash;
-                    }
-                    
-                    // 如果成功获取区块哈希，跳出循环
-                    console.log('成功获取区块哈希:', blockhash);
-                    break;
-                } catch (error) {
-                    console.warn(`RPC节点(${i+1}/${rpcEndpoints.length})获取区块哈希失败:`, error);
-                    
-                    // 如果是最后一个节点也失败，则抛出异常
-                    if (i === rpcEndpoints.length - 1) {
-                        throw new Error(`无法获取区块哈希: 所有RPC节点连接失败: ${error.message}`);
-                    }
-                    // 否则继续尝试下一个节点
-                }
-            }
-            
-            transaction.recentBlockhash = blockhash;
-            transaction.feePayer = fromPubkey;
-            
             // 12. 发送交易请求给钱包签名
             console.log('请求钱包签名交易...');
             const signed = await window.solana.signTransaction(transaction);
             
-            // 13. 发送已签名的交易到网络
-            console.log('发送已签名交易到网络...');
+            // 13. 通过服务器API发送已签名的交易
+            console.log('通过服务器API发送已签名交易...');
+            const serializedTransaction = Buffer.from(signed.serialize()).toString('base64');
             
-            // 发送交易，如果第一个节点失败，尝试备用节点
-            let signature;
-            let lastError;
+            const submitResponse = await fetch('/api/solana/submit_transaction', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    serialized_transaction: serializedTransaction,
+                    skip_preflight: false,
+                    from_address: fromPubkey.toString(),
+                    to_address: toPubkey.toString(),
+                    amount: amount,
+                    token: tokenSymbol
+                })
+            });
             
-            for (let i = 0; i < rpcEndpoints.length; i++) {
-                try {
-                    if (i > 0) {
-                        // 如果不是第一个节点，重新创建连接
-                        console.log(`尝试备用RPC节点(${i+1}/${rpcEndpoints.length}):`, rpcEndpoints[i]);
-                        const backupConnection = new solanaWeb3.Connection(rpcEndpoints[i], 'confirmed');
-                        signature = await backupConnection.sendRawTransaction(signed.serialize());
-                        
-                        // 如果成功，使用此连接等待确认
-                        console.log(`使用备用节点发送交易成功，等待确认...`);
-                        const confirmation = await backupConnection.confirmTransaction(signature);
-                        
-                        if (confirmation.value.err) {
-                            throw new Error(`交易确认出错: ${JSON.stringify(confirmation.value.err)}`);
-                        }
-                        
-                        console.log('交易成功确认:', signature);
-                        
-                        // 成功则跳出循环
-                        break;
-                    } else {
-                        // 第一个节点
-                        signature = await connection.sendRawTransaction(signed.serialize());
-                        
-                        // 14. 等待交易确认
-                        console.log('等待交易确认，签名:', signature);
-                        const confirmation = await connection.confirmTransaction(signature);
-                        
-                        if (confirmation.value.err) {
-                            throw new Error(`交易确认出错: ${JSON.stringify(confirmation.value.err)}`);
-                        }
-                        
-                        console.log('交易成功确认:', signature);
-                        
-                        // 成功则跳出循环
-                        break;
-                    }
-                } catch (error) {
-                    console.error(`RPC节点(${i+1}/${rpcEndpoints.length})失败:`, error);
-                    lastError = error;
-                    
-                    // 如果是最后一个节点也失败，则抛出异常
-                    if (i === rpcEndpoints.length - 1) {
-                        throw new Error(`所有RPC节点连接失败: ${error.message}`);
-                    }
-                    // 否则继续尝试下一个节点
-                }
+            if (!submitResponse.ok) {
+                const errorData = await submitResponse.json();
+                throw new Error(`发送交易失败: ${errorData.error || submitResponse.statusText}`);
             }
             
-            // 15. 返回成功结果
+            const submitResult = await submitResponse.json();
+            
+            if (!submitResult.success) {
+                throw new Error(`交易提交失败: ${submitResult.error}`);
+            }
+            
+            // 14. 获取交易签名
+            const signature = submitResult.signature;
+            console.log('交易已提交，签名:', signature);
+            
+            // 15. 等待交易确认
+            console.log('等待交易确认...');
+            // 轮询服务器API查询交易状态
+            let confirmed = false;
+            let retries = 0;
+            const maxRetries = 20;
+            
+            while (!confirmed && retries < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 1000)); // 等待1秒
+                
+                const checkResponse = await fetch(`/api/solana/check_transaction?signature=${signature}&from_address=${fromPubkey.toString()}&to_address=${toPubkey.toString()}&amount=${amount}&token=${tokenSymbol}`);
+                if (!checkResponse.ok) {
+                    retries++;
+                    continue;
+                }
+                
+                const checkResult = await checkResponse.json();
+                
+                if (checkResult.success) {
+                    if (checkResult.confirmed) {
+                        confirmed = true;
+                        console.log('交易已确认:', checkResult);
+                    } else if (checkResult.status === 'not_found' && retries >= maxRetries - 1) {
+                        // 最后一次重试仍未找到交易
+                        console.warn('未能通过API确认交易状态，但交易可能已成功');
+                    }
+                }
+                
+                retries++;
+            }
+            
+            // 16. 返回成功结果
             return {
                 success: true,
                 txHash: signature,
                 error: null
             };
-            
         } catch (error) {
             console.error('Solana链上转账失败:', error);
             return {
@@ -2889,9 +2852,10 @@ checkIfReturningFromWalletApp(walletType) {
                 // 加载 solana/web3.js
                 if (!window.solanaWeb3) {
                     const web3Script = document.createElement('script');
-                    web3Script.src = 'https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js';
+                    // 优先使用本地文件
+                    web3Script.src = '/static/js/contracts/solana-web3.iife.min.js';
                     web3Script.onload = () => {
-                        console.log('Solana Web3.js 库已加载');
+                        console.log('Solana Web3.js 库已从本地加载');
                         
                         // 确保全局变量正确设置
                         if (window.solanaWeb3js) {
@@ -2904,8 +2868,24 @@ checkIfReturningFromWalletApp(walletType) {
                         this.loadSplTokenLibrary().then(resolve).catch(reject);
                     };
                     web3Script.onerror = (e) => {
-                        console.error('加载Solana Web3.js库失败:', e);
-                        reject(new Error('加载Solana Web3.js库失败'));
+                        console.error('加载本地Solana Web3.js库失败, 尝试CDN:', e);
+                        // 尝试从CDN加载
+                        const cdnScript = document.createElement('script');
+                        cdnScript.src = 'https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js';
+                        cdnScript.onload = () => {
+                            console.log('Solana Web3.js 库已从CDN加载');
+                            if (window.solanaWeb3js) {
+                                window.solanaWeb3 = window.solanaWeb3js;
+                            } else if (window.solana && window.solana.web3) {
+                                window.solanaWeb3 = window.solana.web3;
+                            }
+                            this.loadSplTokenLibrary().then(resolve).catch(reject);
+                        };
+                        cdnScript.onerror = (cdnErr) => {
+                            console.error('从CDN加载Solana Web3.js库失败:', cdnErr);
+                            reject(new Error('无法加载Solana Web3.js库'));
+                        };
+                        document.head.appendChild(cdnScript);
                     };
                     document.head.appendChild(web3Script);
                 } else {
@@ -3596,10 +3576,80 @@ checkIfReturningFromWalletApp(walletType) {
             });
 
             // --- 3. 构建和发送交易 ---
-            const connection = new window.solanaWeb3.Connection(
-                window.SOLANA_NETWORK_URL || 'https://api.mainnet-beta.solana.com', // 从全局或默认
-                'confirmed'
-            );
+            // 原版: 
+            // const connection = new window.solanaWeb3.Connection(
+            //    window.SOLANA_NETWORK_URL || 'https://api.mainnet-beta.solana.com', // 从全局或默认
+            //    'confirmed'
+            // );
+            
+            // 修改为使用我们的服务器API中继
+            let connection;
+            console.log('正在使用服务器中继API代替直接连接Solana节点');
+            try {
+                connection = new window.solanaWeb3.Connection(
+                    '/api/solana', // 使用我们的服务器API中继
+                    'confirmed'
+                );
+                // 覆盖某些方法以确保使用API中继
+                const originalGetLatestBlockhash = connection.getLatestBlockhash;
+                connection.getLatestBlockhash = async function(commitment) {
+                    try {
+                        console.log('通过服务器API中继获取最新blockhash');
+                        const response = await fetch('/api/solana/latest-blockhash');
+                        if (!response.ok) throw new Error('API请求失败');
+                        const data = await response.json();
+                        if (!data.success) throw new Error(data.error || '未知错误');
+                        return data.result;
+                    } catch (error) {
+                        console.warn('通过API中继获取blockhash失败，尝试回退到原始方法', error);
+                        return originalGetLatestBlockhash.call(this, commitment);
+                    }
+                };
+                
+                const originalSendRawTransaction = connection.sendRawTransaction;
+                connection.sendRawTransaction = async function(rawTransaction, options) {
+                    try {
+                        console.log('通过服务器API中继发送交易');
+                        const txBase64 = Buffer.from(rawTransaction).toString('base64');
+                        const response = await fetch('/api/solana/send-transaction', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                transaction: txBase64,
+                                options: options
+                            })
+                        });
+                        if (!response.ok) throw new Error('API请求失败');
+                        const data = await response.json();
+                        if (!data.success) throw new Error(data.error || '未知错误');
+                        return data.signature;
+                    } catch (error) {
+                        console.warn('通过API中继发送交易失败，尝试回退到原始方法', error);
+                        return originalSendRawTransaction.call(this, rawTransaction, options);
+                    }
+                };
+                
+                const originalConfirmTransaction = connection.confirmTransaction;
+                connection.confirmTransaction = async function(signature, commitment) {
+                    try {
+                        console.log('通过服务器API中继确认交易');
+                        const response = await fetch(`/api/solana/confirm-transaction?signature=${signature}&commitment=${commitment || 'confirmed'}`);
+                        if (!response.ok) throw new Error('API请求失败');
+                        const data = await response.json();
+                        if (!data.success) throw new Error(data.error || '未知错误');
+                        return data.result;
+                    } catch (error) {
+                        console.warn('通过API中继确认交易失败，尝试回退到原始方法', error);
+                        return originalConfirmTransaction.call(this, signature, commitment);
+                    }
+                };
+            } catch (error) {
+                console.error('创建中继API连接失败，回退到直接连接:', error);
+                connection = new window.solanaWeb3.Connection(
+                    window.SOLANA_NETWORK_URL || 'https://api.mainnet-beta.solana.com',
+                    'confirmed'
+                );
+            }
 
             // 使用Anchor Provider和Program (如果全局Anchor可用)
             let program;
