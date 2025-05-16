@@ -619,10 +619,34 @@ def get_latest_blockhash():
                 "lastValidBlockHeight": result["result"]["lastValidBlockHeight"]
             })
         else:
-            return jsonify({"success": False, "error": result["error"]}), 400
+            error_msg = result.get("error", "未知错误")
+            logger.error(f"获取区块哈希失败: {error_msg}")
+            return jsonify({
+                "success": False, 
+                "error": error_msg,
+                "message": "RPC节点未能返回有效的区块哈希"
+            }), 400
     except Exception as e:
         logger.exception(f"获取区块哈希时发生异常: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        
+        # 记录错误
+        log_error({
+            'error_id': str(uuid.uuid4()),
+            'level': "ERROR",
+            'message': str(e),
+            'component': "get_latest_blockhash",
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'stack_trace': traceback.format_exc(),
+            'details': {
+                "remote_addr": request.remote_addr
+            }
+        })
+        
+        return jsonify({
+            "success": False, 
+            "error": str(e),
+            "message": "获取区块哈希时发生服务器内部错误"
+        }), 500
 
 @solana_api.route('/get_token_balance', methods=['GET'])
 def get_token_balance():
