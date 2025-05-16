@@ -154,12 +154,18 @@ def create_app(config_name='development'):
             import app.tasks
             app.logger.info("后台任务处理系统已初始化")
             
-            # 确保支付自动监控任务启动
+            # 确保支付自动监控任务启动（增加一个全局变量防止重复初始化）
             try:
-                from app.tasks import start_scheduled_tasks
-                # 显式调用启动定时任务函数
-                start_scheduled_tasks()
-                app.logger.info("支付自动监控任务已启动")
+                # 只有当全局变量不存在时才初始化任务
+                if not hasattr(app, '_tasks_initialized'):
+                    from app.tasks import start_scheduled_tasks
+                    # 显式调用启动定时任务函数
+                    start_scheduled_tasks()
+                    app.logger.info("支付自动监控任务已启动")
+                    # 设置标志，防止重复初始化
+                    app._tasks_initialized = True
+                else:
+                    app.logger.info("支付自动监控任务已经在运行中，跳过初始化")
             except Exception as task_err:
                 app.logger.error(f"启动支付自动监控任务失败: {str(task_err)}")
                 import traceback
