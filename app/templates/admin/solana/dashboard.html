@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Solana监控仪表盘 - RWA-HUB后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for("static", filename="fonts/fontawesome/css/all.min.css") }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
+    
+<style>
+        body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            padding-top: 56px; /* 为固定导航栏留出空间 */
+            background-color: #f8f9fc;
+        }
+        .card {
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid #e3e6f0;
+            padding: 15px 20px;
+        }
+        .card-body {
+            padding: 20px;
+        }
+        .page-container {
+            padding: 20px;
+        }
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .navbar-nav .nav-link.active {
+            font-weight: bold;
+            color: #4e73df;
+        }
+        .stats-card {
+            border-left: 4px solid;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+        }
+        .stats-card-primary {
+            border-left-color: #4e73df;
+        }
+        .stats-card-success {
+            border-left-color: #1cc88a;
+        }
+        .stats-card-warning {
+            border-left-color: #f6c23e;
+        }
+        .stats-card-danger {
+            border-left-color: #e74a3b;
+        }
+        .stats-icon {
+            color: #dddfeb;
+            font-size: 2rem;
+        }
+        .stats-value {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: #5a5c69;
+        }
+        .stats-label {
+            color: #858796;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        .dropdown-menu a {
+            cursor: pointer;
+        }
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+</style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/admin/dashboard">
+                <i class="fas fa-building me-2"></i>RWA-HUB管理系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/dashboard">
+                            <i class="fas fa-tachometer-alt me-1"></i>仪表盘
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/assets">
+                            <i class="fas fa-building me-1"></i>资产管理
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle active" href="#" id="solanaDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-solar-panel me-1"></i>Solana监控
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item active" href="/admin/solana/dashboard">监控仪表盘</a></li>
+                            <li><a class="dropdown-item" href="/admin/solana/transactions">交易日志</a></li>
+                            <li><a class="dropdown-item" href="/admin/solana/api-logs">API调用日志</a></li>
+                            <li><a class="dropdown-item" href="/admin/solana/error-logs">错误日志</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/operation_logs">
+                            <i class="fas fa-history me-1"></i>操作日志
+                        </a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <a href="/" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-home me-1"></i>回到首页
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <div class="container-fluid">
+            <div class="d-sm-flex align-items-center justify-content-between mb-4">
+                <h1 class="h3 mb-0 text-gray-800">Solana监控仪表盘</h1>
+                <div class="d-flex">
+                    <div class="dropdown me-2">
+                        <button class="btn btn-outline-primary btn-sm dropdown-toggle" type="button" id="timeRangeDropdown" data-bs-toggle="dropdown">
+                            <i class="fas fa-calendar me-1"></i>时间范围: 7天
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item time-range" data-days="7">7天</a></li>
+                            <li><a class="dropdown-item time-range" data-days="14">14天</a></li>
+                            <li><a class="dropdown-item time-range" data-days="30">30天</a></li>
+                        </ul>
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="refreshBtn">
+                        <i class="fas fa-sync-alt"></i> 刷新数据
+                    </button>
+                </div>
+            </div>
+            
+            <div id="alertArea" class="mb-4"></div>
+            
+            <!-- 统计卡片行 -->
+            <div class="row">
+                <!-- 交易总数卡片 -->
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card stats-card stats-card-primary h-100">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="stats-label mb-1">交易总数</div>
+                                    <div class="stats-value" id="totalTransactions">-</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-exchange-alt stats-icon"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 成功交易卡片 -->
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card stats-card stats-card-success h-100">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="stats-label mb-1">成功交易</div>
+                                    <div class="stats-value" id="successfulTransactions">-</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-check-circle stats-icon"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 交易金额卡片 -->
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card stats-card stats-card-warning h-100">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="stats-label mb-1">交易金额</div>
+                                    <div class="stats-value" id="totalVolume">-</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-dollar-sign stats-icon"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 失败交易卡片 -->
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card stats-card stats-card-danger h-100">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="stats-label mb-1">失败交易</div>
+                                    <div class="stats-value" id="failedTransactions">-</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-times-circle stats-icon"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 图表行 -->
+            <div class="row">
+                <!-- 交易趋势图表 -->
+                <div class="col-lg-8 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">交易趋势</h6>
+                            <div class="dropdown no-arrow">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="transactionChartDropdown" data-bs-toggle="dropdown">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-end">
+                                    <a class="dropdown-item chart-type" data-chart="transactions" data-type="line">折线图</a>
+                                    <a class="dropdown-item chart-type" data-chart="transactions" data-type="bar">柱状图</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container position-relative">
+                                <div class="loading-overlay" id="transactionsChartLoading">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">加载中...</span>
+                                    </div>
+                                </div>
+                                <canvas id="transactionsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 代币分布图表 -->
+                <div class="col-lg-4 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">代币分布</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container position-relative">
+                                <div class="loading-overlay" id="tokenDistributionChartLoading">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">加载中...</span>
+                                    </div>
+                                </div>
+                                <canvas id="tokenDistributionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- API统计行 -->
+            <div class="row">
+                <!-- API调用统计卡片 -->
+                <div class="col-lg-4 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">API调用统计</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-sm-6">
+                                    <div class="stats-label mb-1">总调用次数</div>
+                                    <div class="stats-value" id="totalApiCalls">-</div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="stats-label mb-1">平均响应时间</div>
+                                    <div class="stats-value" id="avgResponseTime">-</div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-sm-6">
+                                    <div class="stats-label mb-1">成功调用</div>
+                                    <div class="stats-value text-success" id="successfulApiCalls">-</div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="stats-label mb-1">失败调用</div>
+                                    <div class="stats-value text-danger" id="failedApiCalls">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- API端点分布图表 -->
+                <div class="col-lg-8 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">API端点分布</h6>
+                            <div class="dropdown no-arrow">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="endpointChartDropdown" data-bs-toggle="dropdown">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-end">
+                                    <a class="dropdown-item chart-type" data-chart="endpoints" data-type="bar">柱状图</a>
+                                    <a class="dropdown-item chart-type" data-chart="endpoints" data-type="pie">饼图</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container position-relative">
+                                <div class="loading-overlay" id="endpointDistributionChartLoading">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">加载中...</span>
+                                    </div>
+                                </div>
+                                <canvas id="endpointDistributionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 错误统计行 -->
+            <div class="row">
+                <!-- 最近错误列表 -->
+                <div class="col-lg-8 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">最近错误</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="loading-overlay" id="recentErrorsLoading">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">加载中...</span>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>时间</th>
+                                            <th>类型</th>
+                                            <th>信息</th>
+                                            <th>来源</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="recentErrorsTable">
+                                        <!-- JavaScript将填充此处 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="text-center mt-3">
+                                <a href="/admin/solana/error-logs" class="btn btn-sm btn-outline-primary">查看所有错误</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 错误类型分布图表 -->
+                <div class="col-lg-4 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">错误类型分布</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container position-relative">
+                                <div class="loading-overlay" id="errorTypeChartLoading">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">加载中...</span>
+                                    </div>
+                                </div>
+                                <canvas id="errorTypeChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // 全局变量
+        let timeRange = 7; // 默认7天
+        let transactionsChart = null;
+        let tokenDistributionChart = null;
+        let endpointDistributionChart = null;
+        let errorTypeChart = null;
+        
+        // 图表类型
+        let transactionsChartType = 'line';
+        let endpointsChartType = 'bar';
+        
+        // 颜色配置
+        const CHART_COLORS = [
+            'rgba(78, 115, 223, 0.8)',
+            'rgba(28, 200, 138, 0.8)',
+            'rgba(246, 194, 62, 0.8)',
+            'rgba(231, 74, 59, 0.8)',
+            'rgba(54, 185, 204, 0.8)',
+            'rgba(133, 135, 150, 0.8)',
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(255, 159, 64, 0.8)',
+            'rgba(255, 205, 86, 0.8)',
+            'rgba(75, 192, 192, 0.8)'
+        ];
+        
+        // 图表边框颜色
+        const CHART_BORDERS = [
+            'rgb(78, 115, 223)',
+            'rgb(28, 200, 138)',
+            'rgb(246, 194, 62)',
+            'rgb(231, 74, 59)',
+            'rgb(54, 185, 204)',
+            'rgb(133, 135, 150)',
+            'rgb(255, 99, 132)',
+            'rgb(255, 159, 64)',
+            'rgb(255, 205, 86)',
+            'rgb(75, 192, 192)'
+        ];
+        
+        // 页面加载后执行
+        $(document).ready(function() {
+            // 加载所有数据
+            loadAllData();
+            
+            // 刷新按钮点击事件
+            $('#refreshBtn').click(function() {
+                loadAllData();
+            });
+            
+            // 时间范围选择事件
+            $('.time-range').click(function() {
+                timeRange = $(this).data('days');
+                $('#timeRangeDropdown').html('<i class="fas fa-calendar me-1"></i>时间范围: ' + timeRange + '天');
+                loadAllData();
+            });
+            
+            // 图表类型切换事件
+            $('.chart-type').click(function() {
+                const chartId = $(this).data('chart');
+                const chartType = $(this).data('type');
+                
+                if (chartId === 'transactions') {
+                    transactionsChartType = chartType;
+                    loadTransactionStats();
+                } else if (chartId === 'endpoints') {
+                    endpointsChartType = chartType;
+                    loadApiStats();
+                }
+            });
+        });
+        
+        // 加载所有数据
+        function loadAllData() {
+            showAlert('info', '正在加载数据...');
+            
+            // 加载交易统计
+            loadTransactionStats();
+            
+            // 加载API统计
+            loadApiStats();
+            
+            // 加载错误统计
+            loadErrorStats();
+        }
+        
+        // 加载交易统计数据
+        function loadTransactionStats() {
+            // 显示加载中
+            $('#transactionsChartLoading').show();
+            $('#tokenDistributionChartLoading').show();
+            
+            $.ajax({
+                url: '/admin/solana/api/transaction-summary',
+                method: 'GET',
+                data: { days: timeRange },
+                success: function(data) {
+                    // 更新统计卡片
+                    $('#totalTransactions').text(data.total_transactions.toLocaleString());
+                    $('#successfulTransactions').text(data.successful_transactions.toLocaleString());
+                    $('#failedTransactions').text(data.failed_transactions.toLocaleString());
+                    $('#totalVolume').text(data.total_volume.toLocaleString());
+                    
+                    // 更新交易趋势图表
+                    updateTransactionsChart(data);
+                    
+                    // 更新代币分布图表
+                    updateTokenDistributionChart(data);
+                    
+                    // 隐藏加载中
+                    $('#transactionsChartLoading').hide();
+                    $('#tokenDistributionChartLoading').hide();
+                },
+                error: function(xhr, status, error) {
+                    showAlert('danger', '加载交易统计数据失败: ' + error);
+                    $('#transactionsChartLoading').hide();
+                    $('#tokenDistributionChartLoading').hide();
+                }
+            });
+        }
+        
+        // 加载API统计数据
+        function loadApiStats() {
+            // 显示加载中
+            $('#endpointDistributionChartLoading').show();
+            
+            $.ajax({
+                url: '/admin/solana/api/api-summary',
+                method: 'GET',
+                data: { days: timeRange },
+                success: function(data) {
+                    // 更新API统计卡片
+                    $('#totalApiCalls').text(data.total_calls.toLocaleString());
+                    $('#successfulApiCalls').text(data.successful_calls.toLocaleString());
+                    $('#failedApiCalls').text(data.failed_calls.toLocaleString());
+                    $('#avgResponseTime').text(data.average_response_time.toFixed(2) + ' ms');
+                    
+                    // 更新端点分布图表
+                    updateEndpointDistributionChart(data);
+                    
+                    // 隐藏加载中
+                    $('#endpointDistributionChartLoading').hide();
+                },
+                error: function(xhr, status, error) {
+                    showAlert('danger', '加载API统计数据失败: ' + error);
+                    $('#endpointDistributionChartLoading').hide();
+                }
+            });
+        }
+        
+        // 加载错误统计数据
+        function loadErrorStats() {
+            // 显示加载中
+            $('#recentErrorsLoading').show();
+            $('#errorTypeChartLoading').show();
+            
+            $.ajax({
+                url: '/admin/solana/api/error-summary',
+                method: 'GET',
+                data: { days: timeRange },
+                success: function(data) {
+                    // 更新最近错误列表
+                    updateRecentErrorsTable(data.recent_errors);
+                    
+                    // 更新错误类型分布图表
+                    updateErrorTypeChart(data.error_distribution);
+                    
+                    // 隐藏加载中
+                    $('#recentErrorsLoading').hide();
+                    $('#errorTypeChartLoading').hide();
+                },
+                error: function(xhr, status, error) {
+                    showAlert('danger', '加载错误统计数据失败: ' + error);
+                    $('#recentErrorsLoading').hide();
+                    $('#errorTypeChartLoading').hide();
+                }
+            });
+        }
+        
+        // 更新交易趋势图表
+        function updateTransactionsChart(data) {
+            const ctx = document.getElementById('transactionsChart').getContext('2d');
+            
+            // 准备数据
+            const labels = Object.keys(data.daily_transactions).sort();
+            const transactionsData = labels.map(date => data.daily_transactions[date]);
+            const volumeData = labels.map(date => data.daily_volume[date]);
+            
+            // 销毁旧图表
+            if (transactionsChart) {
+                transactionsChart.destroy();
+            }
+            
+            // 创建新图表
+            transactionsChart = new Chart(ctx, {
+                type: transactionsChartType,
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '交易数',
+                            data: transactionsData,
+                            backgroundColor: 'rgba(78, 115, 223, 0.5)',
+                            borderColor: 'rgba(78, 115, 223, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '交易金额',
+                            data: volumeData,
+                            backgroundColor: 'rgba(28, 200, 138, 0.5)',
+                            borderColor: 'rgba(28, 200, 138, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '交易数'
+                            },
+                            position: 'left'
+                        },
+                        y1: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '交易金额'
+                            },
+                            position: 'right',
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 更新代币分布图表
+        function updateTokenDistributionChart(data) {
+            const ctx = document.getElementById('tokenDistributionChart').getContext('2d');
+            
+            // 准备数据
+            const labels = data.token_distribution.map(item => item.token);
+            const values = data.token_distribution.map(item => item.amount);
+            
+            // 销毁旧图表
+            if (tokenDistributionChart) {
+                tokenDistributionChart.destroy();
+            }
+            
+            // 创建新图表
+            tokenDistributionChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            data: values,
+                            backgroundColor: CHART_COLORS,
+                            borderColor: CHART_BORDERS,
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 更新端点分布图表
+        function updateEndpointDistributionChart(data) {
+            const ctx = document.getElementById('endpointDistributionChart').getContext('2d');
+            
+            // 准备数据
+            const labels = data.endpoint_distribution.map(item => item.endpoint);
+            const values = data.endpoint_distribution.map(item => item.count);
+            
+            // 销毁旧图表
+            if (endpointDistributionChart) {
+                endpointDistributionChart.destroy();
+            }
+            
+            // 创建新图表
+            if (endpointsChartType === 'bar') {
+                endpointDistributionChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: '调用次数',
+                                data: values,
+                                backgroundColor: CHART_COLORS,
+                                borderColor: CHART_BORDERS,
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } else {
+                endpointDistributionChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                data: values,
+                                backgroundColor: CHART_COLORS,
+                                borderColor: CHART_BORDERS,
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right'
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        // 更新错误类型分布图表
+        function updateErrorTypeChart(data) {
+            const ctx = document.getElementById('errorTypeChart').getContext('2d');
+            
+            // 准备数据
+            const labels = data.map(item => item.type);
+            const values = data.map(item => item.count);
+            
+            // 销毁旧图表
+            if (errorTypeChart) {
+                errorTypeChart.destroy();
+            }
+            
+            // 创建新图表
+            errorTypeChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            data: values,
+                            backgroundColor: CHART_COLORS,
+                            borderColor: CHART_BORDERS,
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 更新最近错误表格
+        function updateRecentErrorsTable(errors) {
+            const tableBody = $('#recentErrorsTable');
+            tableBody.empty();
+            
+            if (!errors || errors.length === 0) {
+                tableBody.append('<tr><td colspan="4" class="text-center">没有最近的错误记录</td></tr>');
+                return;
+            }
+            
+            errors.forEach((error, index) => {
+                const rowClass = index % 2 === 0 ? '' : 'table-light';
+                
+                // 截断错误信息以适应表格显示
+                const errorMessage = error.message || '';
+                const truncatedMessage = errorMessage.length > 50 
+                    ? errorMessage.substring(0, 50) + '...' 
+                    : errorMessage;
+                
+                const source = error.source || (error.details && error.details.source) || '';
+                
+                const row = `<tr class="${rowClass}">
+                    <td>${formatDateTime(error.timestamp)}</td>
+                    <td><span class="badge bg-danger">${error.type || 'Unknown'}</span></td>
+                    <td>
+                        <span class="text-truncate d-inline-block" style="max-width: 200px;" title="${errorMessage}">
+                            ${truncatedMessage}
+                        </span>
+                    </td>
+                    <td>${source}</td>
+                </tr>`;
+                tableBody.append(row);
+            });
+        }
+        
+        // 格式化日期时间
+        function formatDateTime(isoString) {
+            if (!isoString) return '';
+            const date = new Date(isoString);
+            return date.toLocaleString();
+        }
+        
+        // 显示通知
+        function showAlert(type, message) {
+            const alertArea = $('#alertArea');
+            alertArea.empty();
+            
+            const alertClass = type === 'success' ? 'alert-success' :
+                               type === 'info' ? 'alert-info' :
+                               type === 'warning' ? 'alert-warning' : 'alert-danger';
+            
+            const alert = `
+                <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            
+            alertArea.append(alert);
+            
+            // 3秒后自动隐藏成功和信息提示
+            if (type === 'success' || type === 'info') {
+                setTimeout(function() {
+                    $('.alert').alert('close');
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html> 

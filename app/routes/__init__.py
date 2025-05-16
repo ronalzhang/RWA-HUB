@@ -30,42 +30,38 @@ from . import proxy  # 导入代理模块的视图函数
 # 导入全局处理器
 from .assets import register_global_handlers
 
-# 确保所有路由都已注册
-from .main import *
-from .views import *
-from .api import *
-from .admin import *
-from .assets import *
-from .service import *
+# 导入solana_api蓝图
+from .solana_api import solana_api_bp
 
-# 注册蓝图函数
+# 导入Solana管理蓝图
+from .admin_solana import admin_solana_bp
+
+# 注册蓝图到app
 def register_blueprints(app):
-    """注册所有蓝图"""
-    from . import views, admin, assets, api, service
-    
-    # 注册主页蓝图
-    app.register_blueprint(views.main_bp)
-    
-    # 注册管理后台蓝图
-    app.register_blueprint(admin.admin_bp, url_prefix='/admin')
-    app.register_blueprint(admin.admin_api_bp, url_prefix='/api/admin')
-    
-    # 注册资产蓝图 - 直接使用全局变量而不是模块属性
-    app.register_blueprint(assets_bp, url_prefix='/assets')
-    app.register_blueprint(assets_api_bp, url_prefix='/api/assets')
+    # 注册主要蓝图
+    app.register_blueprint(main_bp)
+    app.register_blueprint(assets_bp)
+    app.register_blueprint(admin_bp)
     
     # 注册API蓝图
-    app.register_blueprint(api.api_bp, url_prefix='/api')
-    
-    # 注册服务蓝图
-    app.register_blueprint(service.service_bp, url_prefix='/api')
+    app.register_blueprint(api_bp)
+    app.register_blueprint(assets_api_bp)
+    app.register_blueprint(trades_api_bp)
+    app.register_blueprint(admin_api_bp)
+    app.register_blueprint(service_bp)
     
     # 注册代理蓝图
     app.register_blueprint(proxy_bp)
     
+    # 注册Solana API蓝图
+    app.register_blueprint(solana_api_bp)
+    
+    # 注册Solana管理蓝图
+    app.register_blueprint(admin_solana_bp)
+    
     # 注册管理员测试蓝图
     app.register_blueprint(admin_test_bp)
     
-    # 注册全局URL前缀修正处理器
+    # 注册全局处理器
     register_global_handlers(app)
     app.logger.info('已注册全局URL前缀修正处理器') 
