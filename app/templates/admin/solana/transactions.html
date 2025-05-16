@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Solana交易日志 - RWA-HUB后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for("static", filename="fonts/fontawesome/css/all.min.css") }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
+    
+<style>
+        body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            padding-top: 56px; /* 为固定导航栏留出空间 */
+            background-color: #f8f9fc;
+        }
+        .card {
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid #e3e6f0;
+            padding: 15px 20px;
+        }
+        .card-body {
+            padding: 20px;
+        }
+        .page-container {
+            padding: 20px;
+        }
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .navbar-nav .nav-link.active {
+            font-weight: bold;
+            color: #4e73df;
+        }
+        .badge {
+            font-size: 85%;
+        }
+        .badge-success {
+            background-color: #1cc88a;
+        }
+        .badge-danger {
+            background-color: #e74a3b;
+        }
+        .badge-warning {
+            background-color: #f6c23e;
+        }
+        .filter-card {
+            margin-bottom: 20px;
+        }
+        .json-viewer {
+            max-height: 500px;
+            overflow-y: auto;
+            background: #f8f9fc;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .highlight-row {
+            background-color: rgba(78, 115, 223, 0.1);
+        }
+        .pagination-container {
+            margin-top: 20px;
+        }
+        /* 自定义JSON样式 */
+        .json-key {
+            color: #7e57c2;
+        }
+        .json-string {
+            color: #4caf50;
+        }
+        .json-number {
+            color: #2196f3;
+        }
+        .json-boolean {
+            color: #ff9800;
+        }
+        .json-null {
+            color: #f44336;
+        }
+</style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/admin/dashboard">
+                <i class="fas fa-building me-2"></i>RWA-HUB管理系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/dashboard">
+                            <i class="fas fa-tachometer-alt me-1"></i>仪表盘
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/assets">
+                            <i class="fas fa-building me-1"></i>资产管理
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle active" href="#" id="solanaDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-solar-panel me-1"></i>Solana监控
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/admin/solana/dashboard">监控仪表盘</a></li>
+                            <li><a class="dropdown-item active" href="/admin/solana/transactions">交易日志</a></li>
+                            <li><a class="dropdown-item" href="/admin/solana/api-logs">API调用日志</a></li>
+                            <li><a class="dropdown-item" href="/admin/solana/error-logs">错误日志</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/operation_logs">
+                            <i class="fas fa-history me-1"></i>操作日志
+                        </a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <a href="/" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-home me-1"></i>回到首页
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <div class="container-fluid">
+            <div class="d-sm-flex align-items-center justify-content-between mb-4">
+                <h1 class="h3 mb-0 text-gray-800">Solana交易日志</h1>
+                <button class="btn btn-primary btn-sm" id="refreshBtn">
+                    <i class="fas fa-sync-alt"></i> 刷新数据
+                </button>
+            </div>
+            
+            <div id="alertArea" class="mb-4"></div>
+            
+            <!-- 过滤器卡片 -->
+            <div class="card shadow filter-card">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">筛选条件</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label for="tx_hash" class="form-label">交易哈希</label>
+                            <input type="text" class="form-control" id="tx_hash" placeholder="输入交易哈希">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="from_address" class="form-label">发送方地址</label>
+                            <input type="text" class="form-control" id="from_address" placeholder="输入发送方地址">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="to_address" class="form-label">接收方地址</label>
+                            <input type="text" class="form-control" id="to_address" placeholder="输入接收方地址">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="status" class="form-label">状态</label>
+                            <select class="form-select" id="status">
+                                <option value="">全部</option>
+                                <option value="confirmed">成功</option>
+                                <option value="failed">失败</option>
+                                <option value="pending">待处理</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label for="searchQuery" class="form-label">关键字搜索</label>
+                            <input type="text" class="form-control" id="searchQuery" placeholder="搜索关键字...">
+                        </div>
+                        <div class="col-md-4 mb-3 d-flex align-items-end">
+                            <button class="btn btn-primary w-100" id="searchBtn">
+                                <i class="fas fa-search me-2"></i>搜索
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 交易日志表格 -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">交易记录</h6>
+                    <div class="dropdown no-arrow">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end">
+                            <button class="dropdown-item" id="exportCsvBtn">导出CSV</button>
+                            <button class="dropdown-item" id="exportJsonBtn">导出JSON</button>
+                            <div class="dropdown-divider"></div>
+                            <button class="dropdown-item" id="clearFiltersBtn">清除筛选</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>时间</th>
+                                    <th>交易哈希</th>
+                                    <th>发送方</th>
+                                    <th>接收方</th>
+                                    <th>金额</th>
+                                    <th>代币</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionsTable">
+                                <!-- JavaScript将填充此处 -->
+                                <tr>
+                                    <td colspan="8" class="text-center">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 分页导航 -->
+                    <div class="d-flex justify-content-between align-items-center mt-4">
+                        <div class="dataTables_info" id="paginationInfo">显示 0 到 0，共 0 条记录</div>
+                        <div class="dataTables_paginate paging_simple_numbers">
+                            <ul class="pagination" id="pagination">
+                                <!-- JavaScript将填充此处 -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 交易详情模态框 -->
+    <div class="modal fade" id="transactionDetailModal" tabindex="-1" aria-labelledby="transactionDetailModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="transactionDetailModalLabel">交易详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs" id="detailTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" type="button" role="tab">概要</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="raw-tab" data-bs-toggle="tab" data-bs-target="#raw" type="button" role="tab">原始数据</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content mt-3" id="detailTabsContent">
+                        <div class="tab-pane fade show active" id="summary" role="tabpanel">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>交易哈希:</strong> <span id="detail-tx-hash"></span></p>
+                                    <p><strong>状态:</strong> <span id="detail-status"></span></p>
+                                    <p><strong>时间:</strong> <span id="detail-timestamp"></span></p>
+                                    <p><strong>区块确认数:</strong> <span id="detail-confirmations"></span></p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>发送方:</strong> <span id="detail-from"></span></p>
+                                    <p><strong>接收方:</strong> <span id="detail-to"></span></p>
+                                    <p><strong>金额:</strong> <span id="detail-amount"></span></p>
+                                    <p><strong>代币:</strong> <span id="detail-token"></span></p>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-12">
+                                    <h6>交易备注</h6>
+                                    <p id="detail-memo"></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="raw" role="tabpanel">
+                            <div class="json-viewer" id="detail-raw-data"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <a href="#" target="_blank" class="btn btn-outline-primary" id="viewOnExplorerBtn">
+                        <i class="fas fa-external-link-alt me-1"></i>在区块浏览器中查看
+                    </a>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // 全局变量
+        let currentPage = 1;
+        let pageSize = 20;
+        let totalItems = 0;
+        let totalPages = 0;
+        let currentFilters = {};
+        
+        // 页面加载后执行
+        $(document).ready(function() {
+            loadTransactions();
+            
+            // 刷新按钮点击事件
+            $('#refreshBtn').click(function() {
+                loadTransactions();
+            });
+            
+            // 搜索按钮点击事件
+            $('#searchBtn').click(function() {
+                currentPage = 1;
+                collectFilters();
+                loadTransactions();
+            });
+            
+            // 清除筛选按钮点击事件
+            $('#clearFiltersBtn').click(function() {
+                clearFilters();
+                loadTransactions();
+            });
+            
+            // 导出CSV按钮点击事件
+            $('#exportCsvBtn').click(function() {
+                exportData('csv');
+            });
+            
+            // 导出JSON按钮点击事件
+            $('#exportJsonBtn').click(function() {
+                exportData('json');
+            });
+            
+            // 回车键搜索
+            $('#searchQuery, #tx_hash, #from_address, #to_address').keypress(function(e) {
+                if (e.which === 13) {
+                    $('#searchBtn').click();
+                }
+            });
+        });
+        
+        // 收集过滤条件
+        function collectFilters() {
+            currentFilters = {};
+            
+            const txHash = $('#tx_hash').val().trim();
+            if (txHash) currentFilters.tx_hash = txHash;
+            
+            const fromAddress = $('#from_address').val().trim();
+            if (fromAddress) currentFilters.from = fromAddress;
+            
+            const toAddress = $('#to_address').val().trim();
+            if (toAddress) currentFilters.to = toAddress;
+            
+            const status = $('#status').val();
+            if (status) currentFilters.status = status;
+            
+            const searchQuery = $('#searchQuery').val().trim();
+            if (searchQuery) currentFilters.query = searchQuery;
+        }
+        
+        // 清除过滤条件
+        function clearFilters() {
+            $('#tx_hash').val('');
+            $('#from_address').val('');
+            $('#to_address').val('');
+            $('#status').val('');
+            $('#searchQuery').val('');
+            currentFilters = {};
+        }
+        
+        // 加载交易数据
+        function loadTransactions() {
+            showAlert('info', '正在加载数据...');
+            
+            // 构建API请求参数
+            const params = {
+                ...currentFilters,
+                limit: pageSize,
+                offset: (currentPage - 1) * pageSize
+            };
+            
+            let apiEndpoint = '/admin/solana/api/transactions';
+            if (params.query) {
+                apiEndpoint = '/admin/solana/api/search';
+                params.type = 'transaction';
+            }
+            
+            $.ajax({
+                url: apiEndpoint,
+                method: 'GET',
+                data: params,
+                success: function(data) {
+                    updateTransactionsTable(data);
+                    updatePagination(data);
+                    showAlert('success', '数据加载成功!');
+                },
+                error: function(xhr, status, error) {
+                    showAlert('danger', '加载交易数据失败: ' + error);
+                    // 清空表格
+                    $('#transactionsTable').html('<tr><td colspan="8" class="text-center">加载数据失败</td></tr>');
+                }
+            });
+        }
+        
+        // 更新交易表格
+        function updateTransactionsTable(data) {
+            const tableBody = $('#transactionsTable');
+            tableBody.empty();
+            
+            if (!data.logs || data.logs.length === 0) {
+                tableBody.append('<tr><td colspan="8" class="text-center">没有符合条件的交易记录</td></tr>');
+                return;
+            }
+            
+            data.logs.forEach((tx, index) => {
+                const statusBadge = getStatusBadge(tx.status);
+                const rowClass = index % 2 === 0 ? '' : 'highlight-row';
+                
+                const txAmount = tx.amount || (tx.details && tx.details.amount) || 0;
+                const txToken = (tx.details && tx.details.token) || 'UNKNOWN';
+                
+                const row = `<tr class="${rowClass}">
+                    <td>${formatDateTime(tx.timestamp)}</td>
+                    <td>
+                        <span class="text-truncate d-inline-block" style="max-width: 150px;" title="${tx.tx_hash || ''}">
+                            ${tx.tx_hash || '未知'}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="text-truncate d-inline-block" style="max-width: 120px;" title="${tx.from || ''}">
+                            ${tx.from || '未知'}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="text-truncate d-inline-block" style="max-width: 120px;" title="${tx.to || ''}">
+                            ${tx.to || '未知'}
+                        </span>
+                    </td>
+                    <td>${Number(txAmount).toLocaleString()}</td>
+                    <td>${txToken}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary viewDetailsBtn" data-tx='${JSON.stringify(tx)}'>
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
+                </tr>`;
+                tableBody.append(row);
+            });
+            
+            // 绑定查看详情按钮事件
+            $('.viewDetailsBtn').click(function() {
+                const txData = $(this).data('tx');
+                showTransactionDetails(txData);
+            });
+        }
+        
+        // 更新分页
+        function updatePagination(data) {
+            totalItems = data.total || 0;
+            totalPages = Math.ceil(totalItems / pageSize);
+            
+            // 更新分页信息
+            const start = Math.min(totalItems, (currentPage - 1) * pageSize + 1);
+            const end = Math.min(totalItems, currentPage * pageSize);
+            $('#paginationInfo').text(`显示 ${start} 到 ${end}，共 ${totalItems} 条记录`);
+            
+            // 生成分页链接
+            const pagination = $('#pagination');
+            pagination.empty();
+            
+            // 上一页按钮
+            pagination.append(`
+                <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                    <a class="page-link" href="#" data-page="${currentPage - 1}" aria-label="上一页">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+            `);
+            
+            // 页码按钮
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                pagination.append(`
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="#" data-page="${i}">${i}</a>
+                    </li>
+                `);
+            }
+            
+            // 下一页按钮
+            pagination.append(`
+                <li class="page-item ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}">
+                    <a class="page-link" href="#" data-page="${currentPage + 1}" aria-label="下一页">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+            `);
+            
+            // 绑定页码点击事件
+            $('.page-link').click(function(e) {
+                e.preventDefault();
+                if ($(this).parent().hasClass('disabled')) return;
+                
+                const targetPage = $(this).data('page');
+                if (targetPage >= 1 && targetPage <= totalPages) {
+                    currentPage = targetPage;
+                    loadTransactions();
+                }
+            });
+        }
+        
+        // 显示交易详情
+        function showTransactionDetails(tx) {
+            // 填充概要信息
+            $('#detail-tx-hash').text(tx.tx_hash || '未知');
+            $('#detail-status').html(getStatusBadge(tx.status));
+            $('#detail-timestamp').text(formatDateTime(tx.timestamp));
+            $('#detail-confirmations').text(tx.confirmations || 0);
+            $('#detail-from').text(tx.from || '未知');
+            $('#detail-to').text(tx.to || '未知');
+            
+            const txAmount = tx.amount || (tx.details && tx.details.amount) || 0;
+            const txToken = (tx.details && tx.details.token) || 'UNKNOWN';
+            
+            $('#detail-amount').text(Number(txAmount).toLocaleString());
+            $('#detail-token').text(txToken);
+            $('#detail-memo').text(tx.memo || '无');
+            
+            // 设置区块浏览器链接
+            const explorerUrl = `https://explorer.solana.com/tx/${tx.tx_hash}?cluster=mainnet`;
+            $('#viewOnExplorerBtn').attr('href', explorerUrl);
+            
+            // 格式化并显示原始数据
+            $('#detail-raw-data').html(formatJSON(tx));
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('transactionDetailModal'));
+            modal.show();
+        }
+        
+        // 获取状态徽章
+        function getStatusBadge(status) {
+            if (status === 'confirmed') {
+                return '<span class="badge bg-success">成功</span>';
+            } else if (status === 'failed') {
+                return '<span class="badge bg-danger">失败</span>';
+            } else {
+                return '<span class="badge bg-warning">待处理</span>';
+            }
+        }
+        
+        // 导出数据
+        function exportData(format) {
+            // 显示加载提示
+            showAlert('info', `正在准备导出${format.toUpperCase()}数据...`);
+            
+            // 构建API请求参数，获取所有数据（暂不考虑分页）
+            const params = {
+                ...currentFilters,
+                limit: 1000,
+                offset: 0
+            };
+            
+            let apiEndpoint = '/admin/solana/api/transactions';
+            if (params.query) {
+                apiEndpoint = '/admin/solana/api/search';
+                params.type = 'transaction';
+            }
+            
+            $.ajax({
+                url: apiEndpoint,
+                method: 'GET',
+                data: params,
+                success: function(data) {
+                    if (!data.logs || data.logs.length === 0) {
+                        showAlert('warning', '没有数据可导出');
+                        return;
+                    }
+                    
+                    if (format === 'csv') {
+                        exportCSV(data.logs);
+                    } else {
+                        exportJSON(data.logs);
+                    }
+                    
+                    showAlert('success', `成功导出${data.logs.length}条记录`);
+                },
+                error: function(xhr, status, error) {
+                    showAlert('danger', `导出数据失败: ${error}`);
+                }
+            });
+        }
+        
+        // 导出CSV
+        function exportCSV(data) {
+            // 定义CSV头
+            const headers = ['时间', '交易哈希', '发送方', '接收方', '金额', '代币', '状态', '确认数', '备注'];
+            
+            // 将数据转换为CSV行
+            const rows = data.map(tx => [
+                formatDateTime(tx.timestamp),
+                tx.tx_hash || '',
+                tx.from || '',
+                tx.to || '',
+                tx.amount || (tx.details && tx.details.amount) || 0,
+                (tx.details && tx.details.token) || 'UNKNOWN',
+                tx.status || '',
+                tx.confirmations || 0,
+                tx.memo || ''
+            ]);
+            
+            // 将头和行合并，然后每行用逗号分隔
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+            ].join('\n');
+            
+            // 创建下载链接
+            downloadFile(csvContent, 'solana_transactions.csv', 'text/csv');
+        }
+        
+        // 导出JSON
+        function exportJSON(data) {
+            const jsonContent = JSON.stringify(data, null, 2);
+            downloadFile(jsonContent, 'solana_transactions.json', 'application/json');
+        }
+        
+        // 下载文件
+        function downloadFile(content, fileName, contentType) {
+            const blob = new Blob([content], { type: contentType });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.click();
+            
+            URL.revokeObjectURL(url);
+        }
+        
+        // 格式化日期时间
+        function formatDateTime(isoString) {
+            if (!isoString) return '';
+            const date = new Date(isoString);
+            return date.toLocaleString();
+        }
+        
+        // 格式化JSON为高亮显示
+        function formatJSON(obj) {
+            return syntaxHighlight(JSON.stringify(obj, null, 2));
+        }
+        
+        // JSON语法高亮
+        function syntaxHighlight(json) {
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                let cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'json-key';
+                    } else {
+                        cls = 'json-string';
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'json-boolean';
+                } else if (/null/.test(match)) {
+                    cls = 'json-null';
+                }
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
+        }
+        
+        // 显示通知
+        function showAlert(type, message) {
+            const alertArea = $('#alertArea');
+            alertArea.empty();
+            
+            const alertClass = type === 'success' ? 'alert-success' :
+                               type === 'info' ? 'alert-info' :
+                               type === 'warning' ? 'alert-warning' : 'alert-danger';
+            
+            const alert = `
+                <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            
+            alertArea.append(alert);
+            
+            // 3秒后自动隐藏成功和信息提示
+            if (type === 'success' || type === 'info') {
+                setTimeout(function() {
+                    $('.alert').alert('close');
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html> 
