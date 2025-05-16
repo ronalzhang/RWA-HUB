@@ -39,6 +39,7 @@
     <div class="row g-4">
         {% if assets %}
             {% for asset in assets %}
+            {% if asset.status == 2 %}
             <div class="col-md-4">
                 <a href="{{ url_for('assets.asset_detail_page', asset_id=asset.id) }}" class="text-decoration-none">
                     <div class="card h-100">
@@ -64,13 +65,7 @@
                             
                             <!-- 状态标签 -->
                             <div class="position-absolute top-0 end-0 m-2">
-                                {% if asset.status == 1 %}
-                                <span class="badge bg-warning">待审核</span>
-                                {% elif asset.status == 2 %}
-                                <span class="badge bg-success">已通过</span>
-                                {% elif asset.status == 3 %}
-                                <span class="badge bg-danger">已拒绝</span>
-                                {% endif %}
+                                <span class="badge bg-success">上链</span>
                             </div>
                         </div>
 
@@ -106,6 +101,7 @@
                     </div>
                 </a>
             </div>
+            {% endif %}
             {% endfor %}
         {% else %}
         <div class="col-12">
@@ -158,8 +154,4 @@
         </div>
     </div>
 </div>
-
-<style>
-}
-</style>
 {% endblock %}

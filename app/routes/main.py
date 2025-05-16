@@ -23,20 +23,11 @@ def index():
         current_app.logger.info(f'- Args: {eth_address_args}')
         current_app.logger.info(f'最终使用地址: {eth_address}')
         
-        # 构建查询条件
-        query = Asset.query
-        
-        # 如果是管理员，显示所有未删除的资产
-        if eth_address and is_admin(eth_address):
-            current_app.logger.info(f'管理员用户: {eth_address}，显示所有未删除资产')
-            query = query.filter(Asset.status != AssetStatus.DELETED.value)
-        else:
-            # 非管理员只能看到已审核通过的资产
-            current_app.logger.info('普通用户或未登录用户：只显示已审核通过的资产')
-            query = query.filter(Asset.status == AssetStatus.APPROVED.value)
+        # 只显示状态为ON_CHAIN（状态值为2）的资产
+        query = Asset.query.filter(Asset.status == AssetStatus.ON_CHAIN.value)
             
-        # 获取最新6个资产
-        assets = query.order_by(Asset.created_at.desc()).limit(6).all()
+        # 获取最新3个资产
+        assets = query.order_by(Asset.created_at.desc()).limit(3).all()
         current_app.logger.info(f'获取资产列表成功: 找到 {len(assets)} 个资产')
         
         # 直接使用ORM对象列表，不转换为字典
