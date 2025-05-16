@@ -265,6 +265,20 @@ const walletState = {
     updateDetailPageButtonState() {
         console.log('购买按钮状态更新函数被调用');
         
+        // 防止由triggerWalletStateChanged引起的循环调用
+        if (this._internalUpdate) {
+            console.log('跳过内部更新，避免循环调用');
+            return;
+        }
+        
+        // 防止短时间内重复调用
+        const now = Date.now();
+        if (this._lastButtonUpdateTime && (now - this._lastButtonUpdateTime) < 800) {
+            console.log('购买按钮状态更新过于频繁，跳过此次更新');
+            return;
+        }
+        this._lastButtonUpdateTime = now;
+        
         // 先确保钱包状态一致
         this.checkWalletConsistency();
         
@@ -289,12 +303,15 @@ const walletState = {
             buyButton.title = '请先连接钱包';
         }
         
-        // 如果存在分红按钮检查函数，也一并调用
-        if (typeof window.checkDividendManagementAccess === 'function') {
+        // 如果存在分红按钮检查函数，也一并调用，但避免引起循环
+        if (typeof window.checkDividendManagementAccess === 'function' && !this._checkingDividend) {
             try {
+                this._checkingDividend = true;
                 window.checkDividendManagementAccess();
+                this._checkingDividend = false;
             } catch (error) {
                 console.error('分红按钮检查失败:', error);
+                this._checkingDividend = false;
             }
         }
     },
@@ -668,7 +685,26 @@ const walletState = {
      */
     triggerWalletStateChanged() {
         try {
-            console.log('[triggerWalletStateChanged] 触发钱包状态变化事件');
+            // 防止递归调用
+            if (this._isTriggering) {
+                console.log('[triggerWalletStateChanged] 已在触发过程中，跳过');
+                return;
+            }
+            
+            // 添加节流机制，避免短时间内重复触发
+            const now = new Date().getTime();
+            if (this._lastTriggerTime && (now - this._lastTriggerTime) < 1000) {
+                console.log('[triggerWalletStateChanged] 已在1秒内触发过，跳过此次触发');
+                return;
+            }
+            
+            // 设置触发标记
+            this._isTriggering = true;
+            
+            // 记录本次触发时间
+            this._lastTriggerTime = now;
+            
+            console.log('[triggerWalletStateChanged] 钱包状态变化事件');
             
             // 创建自定义事件
             const event = new CustomEvent('walletStateChanged', { 
@@ -678,7 +714,7 @@ const walletState = {
                     walletType: this.walletType,
                     balance: this.balance,
                     isAdmin: this.isAdmin,
-                    timestamp: new Date().getTime()
+                    timestamp: now
                 } 
             });
             
@@ -686,15 +722,22 @@ const walletState = {
             document.dispatchEvent(event);
             console.log('[triggerWalletStateChanged] 钱包状态变化事件已触发');
             
-            // 更新详情页按钮状态
+            // 更新详情页按钮状态，但不触发额外事件避免循环
             if (typeof this.updateDetailPageButtonState === 'function') {
                 try {
+                    // 标记为内部调用，避免循环
+                    this._internalUpdate = true;
                     this.updateDetailPageButtonState();
                     console.log('[triggerWalletStateChanged] 详情页按钮状态已更新');
+                    this._internalUpdate = false;
                 } catch (btnError) {
                     console.error('[triggerWalletStateChanged] 更新按钮状态失败:', btnError);
+                    this._internalUpdate = false;
                 }
             }
+            
+            // 清除触发标记
+            this._isTriggering = false;
             
         } catch (error) {
             console.error('[triggerWalletStateChanged] 触发钱包状态变化事件失败:', error);

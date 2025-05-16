@@ -307,6 +307,14 @@ function resetButton(button, text = '<i class="fas fa-shopping-cart me-2"></i>Bu
 function updateBuyButtonState() {
   console.log('更新购买按钮状态');
   
+  // 防止短时间内多次调用
+  const now = Date.now();
+  if (window._lastBuyButtonUpdate && (now - window._lastBuyButtonUpdate) < 800) {
+    console.log('购买按钮状态更新太频繁，跳过此次更新');
+    return;
+  }
+  window._lastBuyButtonUpdate = now;
+  
   // 获取所有购买按钮
   const buyButtons = document.querySelectorAll('.buy-button, #buy-button');
   if (buyButtons.length === 0) {
@@ -325,7 +333,7 @@ function updateBuyButtonState() {
       buyButton.disabled = false;
       buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
       buyButton.removeAttribute('title');
-        } else {
+    } else {
       console.log('钱包未连接，禁用购买按钮');
       buyButton.disabled = true;
       buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
@@ -555,20 +563,45 @@ function setupBuyButton() {
   updateBuyButtonState();
 }
 
+// 用于跟踪最后一次状态更新的时间戳
+let lastStateUpdateTimestamp = 0;
+
 // 添加钱包状态变化监听器
 document.addEventListener('walletStateChanged', function(event) {
+  // 检查是否是新的状态变化
+  const timestamp = event.detail?.timestamp || Date.now();
+  if (timestamp <= lastStateUpdateTimestamp) {
+    console.log('忽略重复的钱包状态变化事件');
+    return;
+  }
+  
+  lastStateUpdateTimestamp = timestamp;
   console.log('钱包状态变化，更新购买按钮状态:', event.detail);
   updateBuyButtonState();
 });
 
 // 监听钱包连接事件
 document.addEventListener('walletConnected', function(event) {
+  const timestamp = Date.now();
+  if (timestamp <= lastStateUpdateTimestamp + 500) {
+    console.log('短时间内已处理过状态变化，跳过');
+    return;
+  }
+  
+  lastStateUpdateTimestamp = timestamp;
   console.log('钱包已连接，更新购买按钮状态:', event.detail);
   updateBuyButtonState();
 });
 
 // 监听钱包断开连接事件
 document.addEventListener('walletDisconnected', function() {
+  const timestamp = Date.now();
+  if (timestamp <= lastStateUpdateTimestamp + 500) {
+    console.log('短时间内已处理过状态变化，跳过');
+    return;
+  }
+  
+  lastStateUpdateTimestamp = timestamp;
   console.log('钱包已断开连接，更新购买按钮状态');
   updateBuyButtonState();
 });
