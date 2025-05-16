@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, current_app, g
+from flask import Blueprint, request, jsonify, current_app, g, Response
 import time
 import json
 import logging
@@ -9,6 +9,8 @@ from app.utils.solana_logger import log_transaction, log_api_call, log_error, in
 from app.utils.solana_log_reader import SolanaLogReader
 import os
 from datetime import datetime, timedelta, timezone
+from threading import Lock
+from app import app
 
 # 创建日志器
 logger = logging.getLogger('solana_api')
@@ -485,6 +487,8 @@ def get_token_accounts():
         if not owner:
             return jsonify({"success": False, "error": "缺少owner参数"}), 400
         
+        logger.info(f"获取代币账户 - 所有者: {owner}, 代币Mint: {mint}")
+        
         # 构建请求参数
         params = [
             owner,
@@ -495,52 +499,90 @@ def get_token_accounts():
         result = make_rpc_request("getTokenAccountsByOwner", params)
         
         if result["success"]:
-            accounts = result["result"]["value"]
-            
-            # 如果指定了mint，过滤结果
-            if mint:
-                filtered_accounts = [
-                    account for account in accounts 
-                    if account["account"]["data"]["parsed"]["info"]["mint"] == mint
-                ]
+            try:
+                accounts = result["result"]["value"]
+                logger.info(f"获取到 {len(accounts)} 个代币账户")
                 
-                if not filtered_accounts:
-                    # 如果没有找到对应的代币账户，可能需要创建
-                    return jsonify({
-                        "success": True,
-                        "accounts": [],
-                        "exists": False
-                    })
+                # 如果指定了mint，过滤结果
+                if mint:
+                    filtered_accounts = []
+                    for account in accounts:
+                        try:
+                            account_mint = account["account"]["data"]["parsed"]["info"]["mint"]
+                            if account_mint == mint:
+                                filtered_accounts.append(account)
+                        except (KeyError, TypeError, IndexError) as e:
+                            logger.warning(f"处理代币账户时出现索引错误: {str(e)}")
+                            continue
+                    
+                    logger.info(f"过滤后找到 {len(filtered_accounts)} 个{mint}代币账户")
+                    
+                    if not filtered_accounts:
+                        # 如果没有找到对应的代币账户，返回空数组但标记成功
+                        return jsonify({
+                            "success": True,
+                            "accounts": [],
+                            "exists": False
+                        })
+                    
+                    accounts = filtered_accounts
                 
-                accounts = filtered_accounts
-            
-            # 格式化返回结果
-            formatted_accounts = []
-            for account in accounts:
-                try:
-                    info = account["account"]["data"]["parsed"]["info"]
-                    formatted_accounts.append({
-                        "address": account["pubkey"],
-                        "mint": info["mint"],
-                        "owner": info["owner"],
-                        "tokenAmount": info["tokenAmount"],
-                        "decimals": info["tokenAmount"]["decimals"],
-                        "uiAmount": info["tokenAmount"]["uiAmount"]
-                    })
-                except KeyError:
-                    # 跳过无法解析的账户
-                    continue
-            
-            return jsonify({
-                "success": True,
-                "accounts": formatted_accounts,
-                "exists": len(formatted_accounts) > 0
-            })
+                # 格式化返回结果
+                formatted_accounts = []
+                for account in accounts:
+                    try:
+                        info = account["account"]["data"]["parsed"]["info"]
+                        formatted_accounts.append({
+                            "address": account["pubkey"],
+                            "mint": info["mint"],
+                            "owner": info["owner"],
+                            "tokenAmount": info["tokenAmount"],
+                            "decimals": info["tokenAmount"]["decimals"],
+                            "uiAmount": info["tokenAmount"]["uiAmount"]
+                        })
+                    except (KeyError, TypeError, IndexError) as e:
+                        # 跳过无法解析的账户，记录详细错误
+                        logger.warning(f"格式化代币账户时出现错误: {str(e)}, 账户: {account.get('pubkey', 'unknown')}")
+                        continue
+                
+                return jsonify({
+                    "success": True,
+                    "accounts": formatted_accounts,
+                    "exists": len(formatted_accounts) > 0
+                })
+            except (KeyError, TypeError, IndexError) as e:
+                # 处理RPC返回值格式异常的情况
+                logger.error(f"解析RPC返回值时出现错误: {str(e)}, 返回值: {result}")
+                # 返回成功但账户为空的响应，避免前端出错
+                return jsonify({
+                    "success": True,
+                    "accounts": [],
+                    "exists": False,
+                    "message": "无法解析RPC返回的账户信息"
+                })
         else:
-            return jsonify({"success": False, "error": result["error"]}), 400
+            error_msg = result.get("error", "未知错误")
+            logger.error(f"RPC请求失败: {error_msg}")
+            
+            # 对于特定错误（如账户不存在），返回成功但账户为空的响应
+            if "not found" in str(error_msg).lower() or "invalid" in str(error_msg).lower():
+                return jsonify({
+                    "success": True,
+                    "accounts": [],
+                    "exists": False,
+                    "message": str(error_msg)
+                })
+            
+            return jsonify({"success": False, "error": error_msg}), 400
     except Exception as e:
         logger.exception(f"获取代币账户时发生异常: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        # 返回成功但账户为空的响应，避免前端出错
+        return jsonify({
+            "success": True,
+            "accounts": [],
+            "exists": False,
+            "message": f"处理请求时出错: {str(e)}"
+        })
 
 @solana_api.route('/get_latest_blockhash', methods=['GET'])
 def get_latest_blockhash():
@@ -609,11 +651,45 @@ def check_ata_exists():
         if not owner or not mint:
             return jsonify({"success": False, "error": "缺少必要参数"}), 400
         
-        # 获取所有代币账户并过滤
-        return get_token_accounts()
+        logger.info(f"检查ATA存在性 - 所有者: {owner}, 代币: {mint}")
+        
+        # 获取特定代币的账户
+        try:
+            # 获取所有代币账户并过滤
+            response = get_token_accounts()
+            
+            # 如果get_token_accounts返回的是Response对象，直接返回
+            if isinstance(response, Response):
+                return response
+            
+            # 否则可能是内部调用，手动获取数据
+            data = request.args.copy()
+            data["owner"] = owner
+            data["mint"] = mint
+            with app.test_request_context(f'/api/solana/get_token_accounts?owner={owner}&mint={mint}'):
+                response = get_token_accounts()
+                
+            return response
+        
+        except Exception as e:
+            logger.exception(f"检查ATA存在性时调用get_token_accounts发生异常: {str(e)}")
+            # 不抛出错误，而是返回账户不存在
+            return jsonify({
+                "success": True,
+                "accounts": [],
+                "exists": False,
+                "message": "获取账户信息失败，账户可能不存在"
+            })
+    
     except Exception as e:
         logger.exception(f"检查ATA存在性时发生异常: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        # 不抛出错误，而是返回账户不存在
+        return jsonify({
+            "success": True,
+            "accounts": [],
+            "exists": False,
+            "message": f"处理请求时出错: {str(e)}"
+        })
 
 @solana_api.route('/transactions', methods=['GET'])
 def get_transactions():
