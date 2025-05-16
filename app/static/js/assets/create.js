@@ -1521,7 +1521,9 @@ async function processPayment() {
             try {
                 updateProgress(50, '处理支付...');
                 
-                // 发起转账
+                console.log('开始处理支付交易，不预先检查余额...');
+                
+                // 直接调用钱包进行支付，不预先检查余额
                 const result = await window.wallet.transferToken(
                     'USDC',
                     platformAddress,
@@ -1530,6 +1532,7 @@ async function processPayment() {
                 
                 // 检查转账结果
                 if (!result.success) {
+                    console.error('支付失败:', result.error);
                     throw new Error(`转账失败: ${result.error || '未知原因'}`);
                 }
                 
@@ -1543,6 +1546,8 @@ async function processPayment() {
                 resolve(result);
             } catch (paymentError) {
                 console.error('支付失败:', paymentError);
+                hideLoadingState();
+                showError(`支付失败: ${paymentError.message || '支付处理出错'}`);
                 throw new Error(`转账失败: ${paymentError.message || '支付处理出错'}`);
             }
         } catch (error) {
