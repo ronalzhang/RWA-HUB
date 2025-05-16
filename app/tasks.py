@@ -95,17 +95,10 @@ def _process_tasks():
 def get_flask_app():
     """获取Flask应用上下文，避免循环导入"""
     try:
-        from flask import current_app as flask_current_app
-        if flask_current_app:
-            # 使用已存在的应用实例
-            return flask_current_app.app_context()
-        
-        # 如果没有当前应用实例，创建一个新的
-        from flask import Flask
-        from config import Config
-        app = Flask(__name__)
-        app.config.from_object(Config)
-        return app.app_context()
+        # 创建应用上下文
+        from app import create_app
+        app = create_app()
+        return app
     except Exception as e:
         logger.error(f"获取Flask应用上下文失败: {str(e)}")
         logger.error(traceback.format_exc())
@@ -443,78 +436,78 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
                 logger.info(f"完成监控创建支付: AssetID={asset_id}, TxHash={tx_hash}")
 
 def auto_monitor_pending_payments():
-    """
-    自动监控所有状态为PENDING且有payment_tx_hash的资产，触发支付确认监控任务
-    此任务应定期执行，检查是否有需要确认的支付交易
-    """
-    logger.info("开始自动监控待处理的支付交易...")
-    
-    app_context = get_flask_app()
-    if not app_context:
-        logger.error("无法获取应用上下文，取消监控支付任务")
-        return
+    """自动监控待处理的支付交易"""
+    try:
+        logger.info("开始自动监控待处理的支付交易...")
         
-    with app_context:
-        try:
-            from app.models.asset import Asset, AssetStatus
-            
-            # 查询所有PENDING状态且有payment_tx_hash的资产
-            # 重要：只处理状态为PENDING、有交易哈希、未确认支付且不在处理中的资产
-            pending_assets = Asset.query.filter(
-                Asset.status == AssetStatus.PENDING.value,
-                Asset.payment_tx_hash.isnot(None),
-                Asset.payment_confirmed.is_(False),
-                Asset.deployment_in_progress.is_(False),  # 不处理正在上链中的资产
-                Asset.token_address.is_(None)             # 没有代币地址
-            ).all()
-            
-            if not pending_assets:
-                logger.info("没有需要监控的待处理支付交易")
-                return
+        app = get_flask_app()
+        if not app:
+            logger.error("无法获取应用上下文，取消自动监控")
+            return
+        
+        with app.app_context():
+            try:
+                # 查找已支付确认但未上链的资产
+                confirmed_assets = Asset.query.filter(
+                    Asset.payment_confirmed == True,
+                    Asset.token_address == None,
+                    Asset.deployment_in_progress != True,
+                    Asset.status == AssetStatus.PENDING.value
+                ).all()
                 
-            logger.info(f"找到 {len(pending_assets)} 个待处理的支付交易")
-            
-            # 为每个资产触发支付确认监控任务
-            for asset in pending_assets:
-                try:
-                    # 使用锁确保不会重复处理
-                    if get_asset_lock(asset.id).acquire(blocking=False):
-                        try:
-                            # 再次检查资产状态
-                            if asset.status != AssetStatus.PENDING.value:
-                                logger.info(f"资产 {asset.id} 状态已不是PENDING (当前状态: {asset.status})，跳过")
-                                continue
-                                
-                            if asset.payment_confirmed:
-                                logger.info(f"资产 {asset.id} 支付已确认，跳过")
-                                continue
-                            
-                            if asset.deployment_in_progress:
-                                logger.info(f"资产 {asset.id} 正在处理上链中，跳过")
-                                continue
-                            
-                            # 检查是否有错误消息
-                            if asset.error_message and ('支付交易失败' in asset.error_message or '支付确认超时' in asset.error_message):
-                                # 如果上次检查失败，清除错误信息以便重新检查
-                                asset.error_message = None
-                                db.session.commit()
-                                
-                            logger.info(f"为资产 {asset.id} 触发支付确认监控任务，交易哈希: {asset.payment_tx_hash}")
-                            monitor_creation_payment.delay(asset.id, asset.payment_tx_hash)
-                        finally:
-                            get_asset_lock(asset.id).release()
-                    else:
-                        logger.info(f"资产 {asset.id} 正在被其他线程处理，跳过")
-                        
-                except Exception as e:
-                    logger.error(f"处理资产 {asset.id} 时发生错误: {str(e)}")
-                    logger.error(traceback.format_exc())
-            
-            logger.info("待处理支付交易监控完成")
-            
-        except Exception as e:
-            logger.error(f"自动监控支付交易失败: {str(e)}")
-            logger.error(traceback.format_exc())
+                if confirmed_assets:
+                    logger.info(f"找到 {len(confirmed_assets)} 个已支付确认但未上链的资产")
+                    
+                    for asset in confirmed_assets:
+                        if asset.payment_confirmed and not asset.token_address and not asset.deployment_in_progress:
+                            with get_asset_lock(asset.id):
+                                logger.info(f"开始处理资产 {asset.id} 的上链流程")
+                                try:
+                                    # 使用事务锁确保此资产不会被并发处理
+                                    asset_for_update = Asset.query.with_for_update(nowait=True).get(asset.id)
+                                    
+                                    if asset_for_update.deployment_in_progress:
+                                        logger.info(f"资产 {asset.id} 已经在处理中，跳过")
+                                        continue
+                                    
+                                    if asset_for_update.token_address:
+                                        logger.info(f"资产 {asset.id} 已有上链地址，跳过")
+                                        continue
+                                    
+                                    # 标记开始处理
+                                    asset_for_update.deployment_in_progress = True
+                                    asset_for_update.deployment_started_at = datetime.utcnow()
+                                    db.session.commit()
+                                    
+                                    # 调用上链服务
+                                    service = AssetService()
+                                    result = service.deploy_asset_to_blockchain(asset.id)
+                                    
+                                    if result.get('success'):
+                                        logger.info(f"资产 {asset.id} 已成功部署到区块链，地址: {result.get('token_address')}")
+                                    else:
+                                        logger.error(f"资产 {asset.id} 部署失败: {result.get('error')}")
+                                        
+                                        # 更新资产状态
+                                        asset_for_update = Asset.query.get(asset.id)
+                                        asset_for_update.deployment_in_progress = False
+                                        asset_for_update.error_message = result.get('error')
+                                        db.session.commit()
+                                    
+                                except exc.OperationalError:
+                                    logger.warning(f"资产 {asset.id} 已被另一个进程锁定，跳过处理")
+                                except Exception as e:
+                                    logger.error(f"处理资产 {asset.id} 上链时出错: {str(e)}")
+                                    logger.error(traceback.format_exc())
+                else:
+                    logger.info("没有找到待处理的资产")
+                    
+            except Exception as e:
+                logger.error(f"自动监控支付交易失败: {str(e)}")
+                logger.error(traceback.format_exc())
+    except Exception as e:
+        logger.error(f"自动监控支付交易失败: {str(e)}")
+        logger.error(traceback.format_exc())
 
 
 # 创建定期任务
