@@ -156,7 +156,7 @@ def create_app(config_name='development'):
             
             # 确保支付自动监控任务启动
             try:
-                from app.tasks import auto_monitor_payments_task, start_scheduled_tasks
+                from app.tasks import start_scheduled_tasks
                 # 显式调用启动定时任务函数
                 start_scheduled_tasks()
                 app.logger.info("支付自动监控任务已启动")
