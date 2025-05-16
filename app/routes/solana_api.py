@@ -10,6 +10,8 @@ from app.utils.solana_log_reader import SolanaLogReader
 import os
 from datetime import datetime, timedelta, timezone
 from threading import Lock
+import uuid
+import traceback
 
 # 创建日志器
 logger = logging.getLogger('solana_api')
@@ -256,18 +258,16 @@ def after_request(response):
                 pass
         
         # 记录API调用
-        log_api_call(
-            endpoint=request.path,
-            status_code=response.status_code,
-            response_time=response_time,
-            details={
-                'query_params': dict(request.args),
-                'remote_addr': request.remote_addr,
-                'response_status': 'success' if response.status_code < 400 else 'error',
-                'response_data': response_data,
-                'method': request.method  # 作为详情的一部分传递
-            }
-        )
+        log_api_call({
+            'endpoint': request.path,
+            'status_code': response.status_code,
+            'response_time': response_time,
+            'method': request.method,
+            'params': dict(request.args),
+            'client_ip': request.remote_addr,
+            'response_status': 'success' if response.status_code < 400 else 'error',
+            'response_data': response_data
+        })
     
     return response
 
@@ -323,49 +323,59 @@ def submit_transaction():
             logger.info(f"交易提交成功, 签名: {signature}")
             
             # 记录交易日志
-            log_transaction(
-                tx_hash=signature,
-                from_addr=from_address,
-                to_addr=to_address,
-                amount=amount,
-                status="submitted",
-                details={
-                    "token": token,
+            log_transaction({
+                'transaction_id': signature,
+                'wallet_address': from_address,
+                'type': 'transfer',
+                'amount': amount,
+                'token': token,
+                'status': "submitted",
+                'block_number': None,
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'to_address': to_address,
+                'details': {
                     "skip_preflight": skip_preflight,
                     "remote_addr": request.remote_addr
                 }
-            )
+            })
             
             return jsonify({"success": True, "signature": signature})
         else:
             # 记录失败交易
-            log_transaction(
-                tx_hash="failed_submission",
-                from_addr=from_address,
-                to_addr=to_address,
-                amount=amount,
-                status="failed",
-                details={
-                    "token": token,
+            log_transaction({
+                'transaction_id': "failed_submission",
+                'wallet_address': from_address,
+                'type': 'transfer',
+                'amount': amount,
+                'token': token,
+                'status': "failed",
+                'block_number': None,
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'to_address': to_address,
+                'details': {
                     "error": result["error"],
                     "remote_addr": request.remote_addr
                 }
-            )
+            })
             
             return jsonify({"success": False, "error": result["error"]}), 400
     except Exception as e:
         logger.exception(f"提交交易时发生异常: {str(e)}")
         
         # 记录错误
-        log_error(
-            error_type="transaction_submission_error",
-            message=str(e),
-            details={
+        log_error({
+            'error_id': str(uuid.uuid4()),
+            'level': "ERROR",
+            'message': str(e),
+            'component': "transaction_submission",
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'stack_trace': traceback.format_exc(),
+            'details': {
                 "from_address": data.get('from_address', 'unknown') if data else 'unknown',
                 "remote_addr": request.remote_addr,
                 "request_data": str(data) if data else 'none'
             }
-        )
+        })
         
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -417,33 +427,39 @@ def check_transaction():
             
             # 记录交易确认状态
             if confirmed:
-                log_transaction(
-                    tx_hash=signature,
-                    from_addr=from_address,
-                    to_addr=to_address,
-                    amount=amount,
-                    status="confirmed",
-                    details={
-                        "token": token,
+                log_transaction({
+                    'transaction_id': signature,
+                    'wallet_address': from_address,
+                    'type': 'transfer',
+                    'amount': amount,
+                    'token': token,
+                    'status': "confirmed",
+                    'block_number': status_info.get("slot"),
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'to_address': to_address,
+                    'details': {
                         "confirmation_status": status_info.get("confirmationStatus"),
                         "slot": status_info.get("slot"),
                         "confirmations": status_info.get("confirmations")
                     }
-                )
+                })
             elif status_info.get("err"):
                 # 交易出错
-                log_transaction(
-                    tx_hash=signature,
-                    from_addr=from_address,
-                    to_addr=to_address,
-                    amount=amount,
-                    status="failed",
-                    details={
-                        "token": token,
+                log_transaction({
+                    'transaction_id': signature,
+                    'wallet_address': from_address,
+                    'type': 'transfer',
+                    'amount': amount,
+                    'token': token,
+                    'status': "failed",
+                    'block_number': status_info.get("slot"),
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'to_address': to_address,
+                    'details': {
                         "error": str(status_info.get("err")),
                         "slot": status_info.get("slot")
                     }
-                )
+                })
             
             return jsonify({
                 "success": True,
@@ -459,14 +475,18 @@ def check_transaction():
         logger.exception(f"检查交易状态时发生异常: {str(e)}")
         
         # 记录错误
-        log_error(
-            error_type="transaction_check_error",
-            message=str(e),
-            details={
+        log_error({
+            'error_id': str(uuid.uuid4()),
+            'level': "ERROR",
+            'message': str(e),
+            'component': "transaction_check",
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'stack_trace': traceback.format_exc(),
+            'details': {
                 "signature": request.args.get('signature', 'unknown'),
                 "remote_addr": request.remote_addr
             }
-        )
+        })
         
         return jsonify({"success": False, "error": str(e)}), 500
 
