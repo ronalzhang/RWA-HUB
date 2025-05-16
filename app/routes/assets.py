@@ -1013,6 +1013,15 @@ def create_asset_api():
             
             current_app.logger.info(f"资产创建API：成功创建资产 {new_asset.id}, {token_symbol}")
             
+            # 添加: 触发支付确认监控任务
+            if new_asset.payment_tx_hash:
+                try:
+                    from app.tasks import monitor_creation_payment
+                    current_app.logger.info(f"触发支付确认监控任务: AssetID={new_asset.id}, TxHash={new_asset.payment_tx_hash}")
+                    monitor_creation_payment.delay(new_asset.id, new_asset.payment_tx_hash)
+                except Exception as task_error:
+                    current_app.logger.error(f"触发支付确认监控任务失败: {str(task_error)}")
+            
             # 返回成功响应
             return jsonify({
                 'success': True,

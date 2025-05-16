@@ -1138,17 +1138,37 @@ def record_payment():
                 'message': f"缺少必要参数: {', '.join(missing_fields)}"
             }), 400
             
-        # 生成支付记录
-        import hashlib
-        import time
+        # 获取资产信息
+        asset_id = data.get('asset_id')
+        signature = data.get('signature')
         
-        signature = data.get('signature') or hashlib.sha256(f"{data['message']}:{time.time()}".encode()).hexdigest()
+        # 生成签名（如果没有提供）
+        if not signature:
+            import hashlib
+            import time
+            signature = hashlib.sha256(f"{data['message']}:{time.time()}".encode()).hexdigest()
         
         # 记录支付信息
         try:
-            # 这里应该连接到你的支付记录系统
-            # 简化版本只返回成功
-            pass
+            # 如果提供了资产ID，更新资产的支付信息
+            if asset_id:
+                from app.models import Asset
+                from app.tasks import monitor_creation_payment
+                
+                asset = Asset.query.get(asset_id)
+                if asset:
+                    asset.payment_tx_hash = signature
+                    db.session.commit()
+                    logger.info(f"更新资产支付交易哈希: AssetID={asset_id}, TxHash={signature}")
+                    
+                    # 触发支付确认监控任务
+                    try:
+                        logger.info(f"触发支付确认监控任务: AssetID={asset_id}, TxHash={signature}")
+                        monitor_creation_payment.delay(asset_id, signature)
+                    except Exception as task_error:
+                        logger.error(f"触发支付确认监控任务失败: {str(task_error)}")
+                else:
+                    logger.warning(f"未找到要更新的资产: AssetID={asset_id}")
         except Exception as record_error:
             logger.error(f"记录支付信息失败: {str(record_error)}")
             # 继续流程
