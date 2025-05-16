@@ -5,7 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 
 # 导入基本模型
 from .user import User, UserRole, UserStatus
-from .asset import Asset, AssetType, AssetStatus
+from .asset import Asset, AssetType, AssetStatus, AssetStatusHistory
 from .trade import Trade, TradeStatus, TradeType
 from .income import PlatformIncome, IncomeType
 from .dividend import Dividend, DividendRecord
@@ -28,7 +28,7 @@ from .commission import Commission
 
 # 导出所有模型
 __all__ = [
-    'db', 'Asset', 'AssetType', 'AssetStatus', 'DividendRecord', 'Dividend', 
+    'db', 'Asset', 'AssetType', 'AssetStatus', 'AssetStatusHistory', 'DividendRecord', 'Dividend', 
     'Trade', 'TradeType', 'TradeStatus', 'User', 'UserRole', 'UserStatus', 
     'Commission', 'AdminUser', 'SystemConfig', 'CommissionSetting',
     'DistributionLevel', 'UserReferral', 'CommissionRecord', 'AdminOperationLog',
