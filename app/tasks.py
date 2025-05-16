@@ -457,6 +457,7 @@ def run_task(func_name, *args, **kwargs):
         logger.error(f"运行任务 {func_name} 出错: {str(e)}")
 
 # 导出延迟任务对象
+monitor_creation_payment_task = DelayedTask(monitor_creation_payment)
 monitor_creation_payment = DelayedTask(run_task, 'monitor_creation_payment')
 
 # 如果还需要监控购买交易确认，可以添加类似的任务

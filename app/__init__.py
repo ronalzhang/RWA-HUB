@@ -4,7 +4,7 @@ import click
 import logging
 import threading
 from decimal import Decimal
-from flask import Flask, g, request, session, jsonify, render_template, current_app
+from flask import Flask, g, request, session, jsonify, render_template, current_app as flask_current_app
 from flask_babel import gettext as _
 from flask.cli import with_appcontext
 from app.extensions import db, babel, limiter, scheduler, migrate, cors, configure_logging
@@ -12,9 +12,16 @@ from pathlib import Path
 from app.config import config
 from logging.handlers import RotatingFileHandler
 
+# 全局应用实例，供其他模块导入
+current_app = None
+
 def create_app(config_name='development'):
     """创建Flask应用实例"""
+    global current_app
     app = Flask(__name__)
+    
+    # 设置全局变量
+    current_app = app
     
     # 加载配置
     app.config.from_object(config[config_name])
