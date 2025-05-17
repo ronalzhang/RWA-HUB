@@ -38,7 +38,23 @@
                             
                             <!-- 状态标签 -->
                             <div class="position-absolute top-0 start-0 m-2">
+                                {% if asset.status == 1 %}
+                                <span class="badge bg-warning">{{ _('Pending') }}</span>
+                                {% elif asset.status == 2 %}
                                 <span class="badge bg-success">{{ _('On Chain') }}</span>
+                                {% elif asset.status == 3 %}
+                                <span class="badge bg-danger">{{ _('Rejected') }}</span>
+                                {% elif asset.status == 4 %}
+                                <span class="badge bg-secondary">{{ _('Deleted') }}</span>
+                                {% elif asset.status == 5 %}
+                                <span class="badge bg-info">{{ _('Confirmed') }}</span>
+                                {% elif asset.status == 6 %}
+                                <span class="badge bg-danger">{{ _('Payment Failed') }}</span>
+                                {% elif asset.status == 7 %}
+                                <span class="badge bg-danger">{{ _('Deployment Failed') }}</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ _('Unknown') }}</span>
+                                {% endif %}
                             </div>
                             
                             <!-- 资产类型标签 -->
