@@ -15,7 +15,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 # 导入应用
-from app.app import create_app
+from app import create_app
 from app.extensions import db
 from app.models.admin import AdminUser
 
