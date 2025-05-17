@@ -38,21 +38,18 @@ def api_admin_required(f):
     def decorated_function(*args, **kwargs):
         current_app.logger.debug(f"Admin compat API access attempt: {request.path}")
         
-        # 检查session中的admin验证标识
-        if session.get('admin_verified') and session.get('admin_wallet_address'):
-            wallet_address = session.get('admin_wallet_address')
-            
-            # 查询管理员用户
-            admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == wallet_address.lower()).first()
-            
-            if admin_user:
-                g.eth_address = wallet_address  # 设置兼容性参数
-                g.admin = admin_user
-                current_app.logger.info(f"Admin compat API access GRANTED for {wallet_address}")
-                return f(*args, **kwargs)
+        # 从请求头中获取管理员钱包地址
+        eth_address = request.headers.get('X-Eth-Address')
         
-        # 兼容旧管理员系统检查
-        eth_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address')
+        # 如果请求头中没有找到，尝试从session中获取
+        if not eth_address and session.get('admin_verified') and session.get('admin_wallet_address'):
+            eth_address = session.get('admin_wallet_address')
+            current_app.logger.info(f"使用session中的管理员地址: {eth_address}")
+        
+        # 如果上面都没有找到，尝试从cookie中获取
+        if not eth_address:
+            eth_address = request.cookies.get('eth_address')
+            
         if not eth_address:
             current_app.logger.warning("Admin compat API missing ETH address")
             return jsonify({"error": "缺少管理员钱包地址"}), 401
@@ -75,8 +72,8 @@ def api_admin_required(f):
             import os
             config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.json')
             if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
-                    config = json.load(f)
+                with open(config_path, 'r') as file:
+                    config = json.load(file)
                     admins = config.get('admins', {})
                     if eth_address.lower() in [addr.lower() for addr in admins]:
                         g.eth_address = eth_address
@@ -86,7 +83,7 @@ def api_admin_required(f):
             current_app.logger.error(f"Error checking admin config: {str(e)}")
             
         current_app.logger.warning(f"Admin compat API access DENIED for {eth_address}")
-        return jsonify({"error": "需要管理员权限", "code": "ADMIN_REQUIRED"}), 403
+        return jsonify({"error": "您没有管理员权限", "code": "ADMIN_REQUIRED"}), 403
             
     return decorated_function
 
@@ -1201,7 +1198,10 @@ def export_users():
 def register_admin_v2_blueprint(app):
     app.register_blueprint(admin_v2_bp)
     app.register_blueprint(admin_compat_bp)
-    current_app.logger.info("管理员API v2已注册")
+    app.register_blueprint(admin_compat_routes_bp)
+    app.logger.info(f"管理员API v2 已注册（{admin_v2_bp.url_prefix}）")
+    app.logger.info(f"管理员API 兼容层已注册（{admin_compat_bp.url_prefix}）")
+    app.logger.info(f"管理员前端路由 已注册（{admin_compat_routes_bp.url_prefix}）")
 
 # 添加兼容旧版API的路由
 @admin_compat_bp.route('/stats')
