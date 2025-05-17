@@ -12,12 +12,23 @@ import argparse
 import json
 import traceback
 from datetime import datetime
+import importlib.util
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-# 导入app.py中的应用实例（服务器环境特定的导入方式）
-from app import app
+# 直接导入app.py文件
+try:
+    # 使用importlib动态导入app.py文件
+    spec = importlib.util.spec_from_file_location("app_module", os.path.join(os.path.dirname(__file__), "app.py"))
+    app_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(app_module)
+    app = app_module.app
+except Exception as e:
+    print(f"无法导入app.py: {str(e)}")
+    sys.exit(1)
+
+# 导入数据库
 from app.extensions import db
 from sqlalchemy import inspect, text
 
