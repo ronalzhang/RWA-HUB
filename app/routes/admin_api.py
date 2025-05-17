@@ -1,13 +1,16 @@
 from flask import Blueprint, jsonify, request, g, current_app, session
 from app.extensions import db
 from datetime import datetime, timedelta
-from sqlalchemy import func, text
+from sqlalchemy import func, text, or_, desc
 import json
 import secrets # 导入 secrets 模块
+import traceback # 导入 traceback
+from functools import wraps
+
 from app.utils.decorators import eth_address_required, async_task, log_activity, admin_required
 from app.models.admin import (
     AdminUser, SystemConfig, CommissionSetting, DistributionLevel,
-    UserReferral, CommissionRecord, AdminOperationLog, DashboardStats
+    Commission, CommissionStatus, CommissionType
 )
 from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.user import User
@@ -16,12 +19,88 @@ from app.models.trade import Trade
 # For signature verification
 from eth_account.messages import encode_defunct
 from eth_account import Account
-import traceback # 导入 traceback
 
 # 创建蓝图
 admin_v2_bp = Blueprint('admin_v2', __name__, url_prefix='/api/admin/v2')
+
+# 为管理后台前端添加兼容路由
+admin_compat_routes_bp = Blueprint('admin_compat_routes', __name__, url_prefix='/admin/v2/api')
+
 # 为旧版API创建兼容蓝图
 admin_compat_bp = Blueprint('admin_compat', __name__, url_prefix='/api/admin')
+
+# Helper functions
+def get_user_growth_trend(days=30):
+    """获取用户增长趋势"""
+    try:
+        end_date = datetime.utcnow().date()
+        start_date = end_date - timedelta(days=days)
+        
+        # 查询每天的用户注册量
+        daily_registrations = db.session.query(
+            func.date(User.created_at).label('date'),
+            func.count().label('count')
+        ).filter(
+            func.date(User.created_at) >= start_date,
+            func.date(User.created_at) <= end_date
+        ).group_by(
+            func.date(User.created_at)
+        ).all()
+        
+        # 转换为前端所需的格式
+        date_range = [start_date + timedelta(days=x) for x in range(days + 1)]
+        result = {
+            'labels': [date.strftime('%m-%d') for date in date_range],
+            'values': [0] * (days + 1)
+        }
+        
+        # 填充每日注册量
+        date_dict = {str(r.date): r.count for r in daily_registrations}
+        for i, date in enumerate(date_range):
+            str_date = str(date)
+            if str_date in date_dict:
+                result['values'][i] = date_dict[str_date]
+        
+        return result
+    except Exception as e:
+        current_app.logger.error(f"获取用户增长趋势失败: {str(e)}", exc_info=True)
+        return {'labels': [], 'values': []}
+
+def get_trading_volume_trend(days=30):
+    """获取交易量趋势"""
+    try:
+        end_date = datetime.utcnow().date()
+        start_date = end_date - timedelta(days=days)
+        
+        # 查询每天的交易量
+        daily_volume = db.session.query(
+            func.date(Trade.created_at).label('date'),
+            func.sum(Trade.total_price).label('volume')
+        ).filter(
+            func.date(Trade.created_at) >= start_date,
+            func.date(Trade.created_at) <= end_date
+        ).group_by(
+            func.date(Trade.created_at)
+        ).all()
+        
+        # 转换为前端所需的格式
+        date_range = [start_date + timedelta(days=x) for x in range(days + 1)]
+        result = {
+            'labels': [date.strftime('%m-%d') for date in date_range],
+            'values': [0] * (days + 1)
+        }
+        
+        # 填充每日交易量
+        date_dict = {str(r.date): float(r.volume) for r in daily_volume}
+        for i, date in enumerate(date_range):
+            str_date = str(date)
+            if str_date in date_dict:
+                result['values'][i] = date_dict[str_date]
+        
+        return result
+    except Exception as e:
+        current_app.logger.error(f"获取交易量趋势失败: {str(e)}", exc_info=True)
+        return {'labels': [], 'values': []}
 
 # 后台API身份验证装饰器
 def admin_required(f):
@@ -2165,3 +2244,374 @@ def admin_auth_logout():
         current_app.logger.error(f"Error during admin logout: {str(e)}")
         current_app.logger.error(traceback.format_exc())
         return jsonify({'error': 'An unexpected error occurred during logout.', 'message': str(e)}), 500
+
+# 注册仪表盘兼容路由
+@admin_compat_routes_bp.route('/dashboard/stats', methods=['GET'])
+@api_admin_required
+def compat_dashboard_stats():
+    """管理后台V2版本仪表盘统计数据兼容API"""
+    try:
+        # 获取用户统计
+        total_users = User.query.count()
+        new_users_today = User.query.filter(
+            func.date(User.created_at) == func.date(datetime.utcnow())
+        ).count()
+        
+        # 获取资产统计
+        total_assets = Asset.query.filter(Asset.status != 0).count()
+        total_asset_value = db.session.query(func.sum(Asset.total_value)).filter(
+            Asset.status == 2  # 只统计已审核通过的资产
+        ).scalar() or 0
+        
+        # 获取交易统计
+        total_trades = Trade.query.count()
+        total_trade_volume = db.session.query(func.sum(Trade.total_price)).scalar() or 0
+        
+        return jsonify({
+            'total_users': total_users,
+            'new_users_today': new_users_today,
+            'total_assets': total_assets,
+            'total_asset_value': float(total_asset_value),
+            'total_trades': total_trades,
+            'total_trade_volume': float(total_trade_volume)
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取仪表盘统计数据失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'total_users': 0,
+            'new_users_today': 0,
+            'total_assets': 0,
+            'total_asset_value': 0,
+            'total_trades': 0,
+            'total_trade_volume': 0
+        })
+
+@admin_compat_routes_bp.route('/dashboard/trends', methods=['GET'])
+@api_admin_required
+def compat_dashboard_trends():
+    """管理后台V2版本仪表盘趋势数据兼容API"""
+    try:
+        days = int(request.args.get('days', 30))
+        if days not in [7, 30, 90]:
+            days = 30
+            
+        # 获取用户增长趋势
+        user_growth = get_user_growth_trend(days)
+        
+        # 获取交易量趋势
+        trading_volume = get_trading_volume_trend(days)
+        
+        return jsonify({
+            'user_growth': user_growth,
+            'trading_volume': trading_volume
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取仪表盘趋势数据失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'user_growth': {'labels': [], 'values': []},
+            'trading_volume': {'labels': [], 'values': []}
+        })
+
+@admin_compat_routes_bp.route('/dashboard/recent-trades', methods=['GET'])
+@api_admin_required
+def compat_dashboard_recent_trades():
+    """管理后台V2版本最近交易数据兼容API"""
+    try:
+        limit = int(request.args.get('limit', 5))
+        trades = Trade.query.order_by(Trade.created_at.desc()).limit(limit).all()
+        
+        return jsonify([{
+            'id': trade.id,
+            'asset': {
+                'name': trade.asset.name if trade.asset else None,
+                'token_symbol': trade.asset.token_symbol if trade.asset else None
+            },
+            'total_price': float(trade.total_price),
+            'token_amount': trade.token_amount,
+            'status': trade.status,
+            'created_at': trade.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        } for trade in trades])
+        
+    except Exception as e:
+        current_app.logger.error(f'获取最近交易数据失败: {str(e)}', exc_info=True)
+        return jsonify([])
+
+@admin_compat_routes_bp.route('/assets', methods=['GET'])
+@api_admin_required
+def compat_assets_list():
+    """管理后台V2版本资产列表兼容API"""
+    try:
+        # 记录请求信息，方便调试
+        current_app.logger.info(f"访问兼容路径V2资产列表API，参数: {request.args}")
+        
+        # 分页参数
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        
+        # 查询资产列表 - 管理后台始终显示所有未删除的资产
+        query = Asset.query.filter(Asset.status != 0)  # 0 表示已删除
+        
+        # 查询筛选条件
+        status = request.args.get('status')
+        asset_type = request.args.get('type')
+        keyword = request.args.get('keyword')
+        
+        if status:
+            query = query.filter(Asset.status == int(status))
+        
+        if asset_type:
+            query = query.filter(Asset.asset_type == int(asset_type))
+            
+        if keyword:
+            query = query.filter(
+                or_(
+                    Asset.name.ilike(f'%{keyword}%'),
+                    Asset.description.ilike(f'%{keyword}%'),
+                    Asset.token_symbol.ilike(f'%{keyword}%')
+                )
+            )
+        
+        # 排序
+        sort_field = request.args.get('sort', 'id')
+        sort_order = request.args.get('order', 'desc')
+        
+        if sort_order == 'desc':
+            query = query.order_by(desc(getattr(Asset, sort_field)))
+        else:
+            query = query.order_by(getattr(Asset, sort_field))
+        
+        # 执行分页查询
+        pagination = query.paginate(page=page, per_page=limit, error_out=False)
+        assets = pagination.items
+        
+        current_app.logger.info(f"查询到 {len(assets)} 个资产，总计 {pagination.total} 个")
+        
+        # 格式化返回数据
+        asset_list = []
+        for asset in assets:
+            try:
+                # 获取资产类型名称
+                asset_type_name = '未知类型'
+                asset_type_value = asset.asset_type
+                
+                # 尝试查找枚举值
+                for item in AssetType:
+                    if item.value == asset_type_value:
+                        asset_type_name = item.name
+                        break
+                
+                # 获取封面图片  
+                cover_image = '/static/images/placeholder.jpg'
+                if asset.images and len(asset.images) > 0:
+                    cover_image = asset.images[0]
+                        
+                asset_list.append({
+                    'id': asset.id,
+                    'name': asset.name,
+                    'token_symbol': asset.token_symbol,
+                    'asset_type': asset.asset_type,
+                    'asset_type_name': asset_type_name,
+                    'location': asset.location,
+                    'area': float(asset.area) if asset.area else 0,
+                    'token_price': float(asset.token_price) if asset.token_price else 0,
+                    'annual_revenue': float(asset.annual_revenue) if asset.annual_revenue else 0,
+                    'total_value': float(asset.total_value) if asset.total_value else 0,
+                    'token_supply': asset.token_supply,
+                    'creator_address': asset.creator_address,
+                    'status': asset.status,
+                    'status_text': {
+                        1: '待审核',
+                        2: '已通过',
+                        3: '已拒绝',
+                        4: '已删除'
+                    }.get(asset.status, '未知状态'),
+                    'image': cover_image,
+                    'created_at': asset.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                    'updated_at': asset.updated_at.strftime('%Y-%m-%d %H:%M:%S') if asset.updated_at else None
+                })
+            except Exception as item_error:
+                current_app.logger.error(f"处理资产 {asset.id} 数据失败: {str(item_error)}")
+                # 继续处理下一个资产
+        
+        return jsonify({
+            'items': asset_list,
+            'total': pagination.total,
+            'page': page,
+            'limit': limit,
+            'pages': pagination.pages
+        })
+    except Exception as e:
+        current_app.logger.error(f"获取资产列表失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'items': [],
+            'total': 0,
+            'page': 1,
+            'limit': 10,
+            'pages': 0
+        })
+
+@admin_compat_routes_bp.route('/assets/stats', methods=['GET'])
+@api_admin_required
+def compat_assets_stats():
+    """获取资产统计数据兼容API"""
+    try:
+        # 统计数据
+        total_assets = Asset.query.filter(Asset.status != 0).count()
+        pending_assets = Asset.query.filter(Asset.status == 1).count()
+        approved_assets = Asset.query.filter(Asset.status == 2).count()
+        rejected_assets = Asset.query.filter(Asset.status == 3).count()
+        
+        # 总价值 (只统计已审核通过的资产)
+        total_value = db.session.query(func.sum(Asset.total_value)).filter(Asset.status == 2).scalar() or 0
+        
+        # 资产类型分布
+        asset_types = {}
+        for asset_type in AssetType:
+            count = Asset.query.filter(Asset.asset_type == asset_type.value).count()
+            if count > 0:
+                asset_types[asset_type.name] = count
+        
+        # 状态分布
+        status_distribution = {
+            'pending': pending_assets,
+            'approved': approved_assets,
+            'rejected': rejected_assets
+        }
+        
+        # 返回统计数据
+        return jsonify({
+            'totalAssets': total_assets,
+            'totalValue': float(total_value),
+            'pendingAssets': pending_assets,
+            'assetTypes': len(asset_types),
+            'type_distribution': asset_types,
+            'status_distribution': status_distribution
+        })
+    except Exception as e:
+        current_app.logger.error(f"获取资产统计失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'totalAssets': 0,
+            'totalValue': 0,
+            'pendingAssets': 0,
+            'assetTypes': 0,
+            'type_distribution': {},
+            'status_distribution': {}
+        })
+
+@admin_compat_routes_bp.route('/users', methods=['GET'])
+@api_admin_required
+def compat_users_list():
+    """管理后台V2版本用户列表兼容API"""
+    try:
+        # 记录请求信息，方便调试
+        current_app.logger.info(f"访问兼容路径V2用户列表API，参数: {request.args}")
+        
+        # 分页参数
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        
+        # 查询用户列表
+        query = User.query
+        
+        # 查询筛选条件
+        keyword = request.args.get('keyword')
+        role = request.args.get('role')
+        
+        if keyword:
+            query = query.filter(
+                or_(
+                    User.eth_address.ilike(f'%{keyword}%'),
+                    User.name.ilike(f'%{keyword}%'),
+                    User.email.ilike(f'%{keyword}%')
+                )
+            )
+            
+        if role:
+            query = query.filter(User.role == role)
+        
+        # 排序
+        sort_field = request.args.get('sort', 'id')
+        sort_order = request.args.get('order', 'desc')
+        
+        if sort_order == 'desc':
+            query = query.order_by(desc(getattr(User, sort_field)))
+        else:
+            query = query.order_by(getattr(User, sort_field))
+        
+        # 执行分页查询
+        pagination = query.paginate(page=page, per_page=limit, error_out=False)
+        users = pagination.items
+        
+        current_app.logger.info(f"查询到 {len(users)} 个用户，总计 {pagination.total} 个")
+        
+        # 格式化返回数据
+        user_list = []
+        for user in users:
+            user_list.append({
+                'id': user.id,
+                'name': user.name,
+                'eth_address': user.eth_address,
+                'email': user.email,
+                'role': user.role,
+                'status': user.status,
+                'verified': user.verified,
+                'created_at': user.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'last_login': user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else None
+            })
+        
+        return jsonify({
+            'users': user_list,
+            'total': pagination.total,
+            'page': page,
+            'limit': limit,
+            'total_pages': pagination.pages
+        })
+    except Exception as e:
+        current_app.logger.error(f"获取用户列表失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'users': [],
+            'total': 0,
+            'page': 1,
+            'limit': 10,
+            'total_pages': 0
+        })
+
+@admin_compat_routes_bp.route('/user-stats', methods=['GET'])
+@api_admin_required
+def compat_user_stats():
+    """获取用户统计数据兼容API"""
+    try:
+        # 获取活跃用户数量 (过去30天有登录)
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        active_users = User.query.filter(User.last_login >= thirty_days_ago).count()
+        
+        # 获取今日新增用户
+        today = datetime.utcnow().date()
+        new_today = User.query.filter(func.date(User.created_at) == today).count()
+        
+        # 获取分销商数量
+        distributors = User.query.filter(User.role == 'distributor').count()
+        
+        # 获取总用户数
+        total_users = User.query.count()
+        
+        stats = {
+            'totalUsers': total_users,
+            'activeUsers': active_users,
+            'verifiedUsers': User.query.filter(User.verified == True).count(),
+            'distributors': distributors,
+            'newToday': new_today
+        }
+        
+        return jsonify(stats)
+    except Exception as e:
+        current_app.logger.error(f"获取用户统计失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'totalUsers': 0,
+            'activeUsers': 0,
+            'verifiedUsers': 0, 
+            'distributors': 0,
+            'newToday': 0
+        })
