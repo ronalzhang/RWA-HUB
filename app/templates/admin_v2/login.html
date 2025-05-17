@@ -8,6 +8,8 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <!-- FontAwesome 本地文件 -->
     <link href="{{ url_for('static', filename='fonts/fontawesome/css/all.min.css') }}" rel="stylesheet">
+    <!-- ethers.js CDN -->
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
     <style>
         .login-container {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -28,7 +30,7 @@
             <div class="bg-white shadow-xl rounded-lg px-8 pt-6 pb-8 mb-4">
                 <div class="text-center mb-6">
                     <h2 class="text-xl font-semibold text-gray-800">管理员登录</h2>
-                    <p class="text-sm text-gray-600 mt-1">请使用授权的钱包地址进行登录</p>
+                    <p class="text-sm text-gray-600 mt-1">请使用授权的管理员钱包进行登录</p>
                 </div>
                 
                 <div class="mb-6" id="loginAlert" style="display: none;">
@@ -37,28 +39,28 @@
                     </div>
                 </div>
                 
-                <form id="loginForm">
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2" for="wallet_address">
-                            钱包地址
-                        </label>
-                        <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="wallet_address" type="text" placeholder="输入ETH或SOL钱包地址">
+                <div class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 mb-6" id="infoMessage" style="display: none;">
+                    <p class="text-sm" id="infoMessageText"></p>
+                </div>
+                
+                <div class="flex items-center justify-center flex-col">
+                    <button id="connectWalletBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded focus:outline-none focus:shadow-outline w-full mb-4">
+                        <i class="fas fa-wallet mr-2"></i> 连接钱包登录
+                    </button>
+                    
+                    <div id="walletStatus" class="text-center my-4" style="display: none;">
+                        <p class="text-sm text-gray-600">已连接钱包:</p>
+                        <p id="walletAddress" class="text-sm font-mono bg-gray-100 p-2 rounded mt-1 break-all"></p>
                     </div>
                     
-                    <div class="flex items-center justify-between mt-8">
-                        <button id="loginBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full" type="button">
-                            登录管理后台
-                        </button>
-                    </div>
-                </form>
+                    <!-- 只有连接钱包后才显示签名按钮 -->
+                    <button id="signMessageBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded focus:outline-none focus:shadow-outline w-full" style="display: none;">
+                        <i class="fas fa-signature mr-2"></i> 签名并登录
+                    </button>
+                </div>
                 
                 <div class="text-center mt-8">
-                    <p class="text-sm text-gray-600">或使用测试管理员账号</p>
-                    <div class="flex justify-center mt-2 space-x-2">
-                        <button id="testLoginBtn" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-1 px-2 rounded">
-                            使用测试账号登录
-                        </button>
-                    </div>
+                    <p class="text-sm text-gray-600">遇到问题？请联系系统管理员</p>
                 </div>
             </div>
             
@@ -72,70 +74,132 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // 登录按钮点击事件
-            document.getElementById('loginBtn').addEventListener('click', function() {
-                const walletAddress = document.getElementById('wallet_address').value.trim();
-                
-                // 验证输入
-                if (!walletAddress) {
-                    showAlert('请输入钱包地址');
-                    return;
-                }
-                
-                // 设置cookie和本地存储
-                document.cookie = `wallet_address=${walletAddress}; path=/`;
-                sessionStorage.setItem('wallet_address', walletAddress);
-                localStorage.setItem('wallet_address', walletAddress);
-                
-                // 检查是否为管理员
-                fetch('/admin/v2/api/check-auth', {
-                    headers: {
-                        'Wallet-Address': walletAddress
-                    }
-                })
-                    .then(response => {
-                        console.log('认证检查响应状态:', response.status);
-                        if (!response.ok) {
-                            console.error('认证检查失败:', response.status, response.statusText);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('认证检查结果:', data);
-                        if (data.authenticated) {
-                            // 登录成功，重定向到管理后台
-                            console.log('认证成功，即将重定向到管理后台');
-                            window.location.href = '/admin/v2';
-                        } else {
-                            // 登录失败，显示错误信息
-                            showAlert(data.message || '无效的管理员钱包地址，请确认您有权限访问管理后台');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('登录验证失败:', error);
-                        showAlert('登录验证失败，请稍后重试');
-                    });
-            });
+            // 获取DOM元素引用
+            const connectWalletBtn = document.getElementById('connectWalletBtn');
+            const signMessageBtn = document.getElementById('signMessageBtn');
+            const walletStatus = document.getElementById('walletStatus');
+            const walletAddressElement = document.getElementById('walletAddress');
             
-            // 测试账号登录
-            document.getElementById('testLoginBtn').addEventListener('click', function() {
-                document.getElementById('wallet_address').value = '0x123456789012345678901234567890123456abcd';
-                document.getElementById('loginBtn').click();
-            });
+            // 记录状态
+            let web3Provider = null;
+            let signer = null;
+            let walletAddress = '';
             
-            // 显示警告消息
-            function showAlert(message) {
+            // 显示信息提示
+            function showAlert(message, isError = true) {
                 const alertBox = document.getElementById('loginAlert');
                 const alertMessage = document.getElementById('alertMessage');
+                const infoBox = document.getElementById('infoMessage');
+                const infoMessage = document.getElementById('infoMessageText');
                 
-                alertMessage.textContent = message;
-                alertBox.style.display = 'block';
-                
-                // 3秒后自动隐藏
-                setTimeout(() => {
+                if (isError) {
+                    alertMessage.textContent = message;
+                    alertBox.style.display = 'block';
+                    infoBox.style.display = 'none';
+                    
+                    // 3秒后自动隐藏错误信息
+                    setTimeout(() => {
+                        alertBox.style.display = 'none';
+                    }, 5000);
+                } else {
+                    infoMessage.textContent = message;
+                    infoBox.style.display = 'block';
                     alertBox.style.display = 'none';
-                }, 3000);
+                }
             }
+            
+            // 连接钱包
+            async function connectWallet() {
+                try {
+                    showAlert('正在连接钱包...', false);
+                    
+                    // 检查是否存在以太坊提供商 (MetaMask等)
+                    if (typeof window.ethereum !== 'undefined') {
+                        // 创建提供商并请求账户访问
+                        web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+                        await web3Provider.send("eth_requestAccounts", []);
+                        signer = web3Provider.getSigner();
+                        walletAddress = await signer.getAddress();
+                        
+                        // 显示钱包信息并启用签名按钮
+                        walletAddressElement.textContent = walletAddress;
+                        walletStatus.style.display = 'block';
+                        signMessageBtn.style.display = 'block';
+                        connectWalletBtn.textContent = '已连接钱包';
+                        connectWalletBtn.disabled = true;
+                        connectWalletBtn.classList.add('bg-gray-400');
+                        connectWalletBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                        
+                        showAlert('钱包连接成功，请继续签名认证', false);
+                    } else {
+                        showAlert('未检测到钱包插件 (MetaMask等)，请先安装或激活钱包扩展。');
+                    }
+                } catch (error) {
+                    console.error('连接钱包失败:', error);
+                    showAlert('连接钱包失败: ' + (error.message || '用户拒绝连接'));
+                }
+            }
+            
+            // 钱包签名并登录
+            async function signAndLogin() {
+                try {
+                    if (!signer || !walletAddress) {
+                        showAlert('请先连接钱包');
+                        return;
+                    }
+                    
+                    showAlert('正在获取认证挑战...', false);
+                    
+                    // 1. 获取服务器挑战 (nonce)
+                    const challengeResponse = await fetch('/api/admin/v2/auth/challenge');
+                    if (!challengeResponse.ok) {
+                        const errorData = await challengeResponse.json();
+                        throw new Error(errorData.error || `获取挑战失败: ${challengeResponse.status}`);
+                    }
+                    
+                    const challengeData = await challengeResponse.json();
+                    const nonce = challengeData.nonce;
+                    
+                    showAlert('请在钱包中签名消息以完成身份验证...', false);
+                    
+                    // 2. 使用钱包签名nonce
+                    const signature = await signer.signMessage(nonce);
+                    
+                    showAlert('签名成功，正在验证身份...', false);
+                    
+                    // 3. 提交签名到服务器验证
+                    const loginResponse = await fetch('/api/admin/v2/auth/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            wallet_address: walletAddress,
+                            signature: signature
+                        }),
+                    });
+                    
+                    const loginResult = await loginResponse.json();
+                    
+                    if (loginResponse.ok && loginResult.success) {
+                        showAlert('登录成功！正在跳转到管理后台...', false);
+                        
+                        // 登录成功后跳转到后台首页
+                        setTimeout(() => {
+                            window.location.href = '/admin/v2';
+                        }, 1500);
+                    } else {
+                        showAlert(`登录失败: ${loginResult.error || '验证未通过'}`);
+                    }
+                } catch (error) {
+                    console.error('登录过程中发生错误:', error);
+                    showAlert('登录错误: ' + (error.message || '未知错误'));
+                }
+            }
+            
+            // 事件监听
+            connectWalletBtn.addEventListener('click', connectWallet);
+            signMessageBtn.addEventListener('click', signAndLogin);
         });
     </script>
 </body>

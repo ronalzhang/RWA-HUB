@@ -62,7 +62,8 @@ class DelayedTask:
         """模拟Celery的delay方法"""
         # 确保在delay调用时立即添加任务到队列
         self._add_to_queue(*args, **kwargs)
-        logger.info(f"任务已添加到队列: func={self.func.__name__}, args={args}, kwargs={kwargs}")
+        # logger.info(f"任务已添加到队列: func={self.func.__name__}, args={args}, kwargs={kwargs}")
+        logger.debug(f"任务已添加到队列: func={self.func.__name__}, args={args}, kwargs={kwargs}")
         return self
 
 def _ensure_task_processor_running():
@@ -73,7 +74,8 @@ def _ensure_task_processor_running():
         t = Thread(target=_process_tasks)
         t.daemon = True
         t.start()
-        logger.info("任务处理器已启动")
+        # logger.info("任务处理器已启动")
+        logger.debug("任务处理器已启动")
 
 def _process_tasks():
     """处理队列中的任务"""
@@ -81,10 +83,11 @@ def _process_tasks():
         try:
             func, args, kwargs = task_queue.get()
             try:
-                logger.info(f"执行任务: {func.__name__}, 参数: {args}, {kwargs}")
+                # logger.info(f"执行任务: {func.__name__}, 参数: {args}, {kwargs}")
+                logger.debug(f"执行任务: func={func.__name__}, args={args}, kwargs={kwargs}")
                 func(*args, **kwargs)
             except Exception as e:
-                logger.error(f"执行任务出错: {str(e)}")
+                logger.error(f"执行任务出错: {func.__name__} - {str(e)}")
                 logger.error(traceback.format_exc())
             finally:
                 task_queue.task_done()
@@ -193,10 +196,10 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
             logger.error(f"无法获取应用上下文，取消监控支付: AssetID={asset_id}")
             return
         
-        with app_context:
+        with app_context.app_context(): # 确保使用 app_context()
             try:
                 # 获取 Solana RPC 地址
-                from config import Config
+                from config import Config # 移到 app_context 内部
                 rpc_url = Config.SOLANA_RPC_URL or 'https://api.mainnet-beta.solana.com'
                 
                 # 使用事务锁防止并发问题
@@ -210,20 +213,22 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
                         
                     # 如果资产已经不是PENDING状态，或已支付确认，或已上链，则不处理
                     if asset.status != AssetStatus.PENDING.value:
-                        logger.info(f"资产已不是PENDING状态，当前状态: {asset.status}，跳过支付确认: AssetID={asset_id}")
+                        logger.info(f"资产 {asset_id} 已不是PENDING状态 (当前: {asset.status})，跳过支付确认")
                         return
                         
                     if asset.payment_confirmed:
-                        logger.info(f"资产支付已确认，跳过重复处理: AssetID={asset_id}")
+                        logger.info(f"资产 {asset_id} 支付已确认，跳过重复处理")
                         return
                         
                     if asset.token_address:
-                        logger.info(f"资产已存在上链信息，跳过支付确认: AssetID={asset_id}, TokenAddress={asset.token_address}")
+                        logger.info(f"资产 {asset_id} 已存在上链信息 (地址: {asset.token_address})，跳过支付确认")
                         return
                         
                     # 检查是否有其他进程正在处理该资产
-                    if asset.deployment_in_progress:
-                        logger.info(f"资产正在被其他进程处理中，跳过: AssetID={asset_id}, 处理开始时间: {asset.deployment_started_at}")
+                    if (asset.deployment_in_progress and
+                        asset.deployment_started_at and
+                        (datetime.utcnow() - asset.deployment_started_at).total_seconds() < 3600): # 1小时超时
+                        logger.info(f"资产 {asset_id} 正在被其他进程处理中 (开始于 {asset.deployment_started_at})，跳过")
                         return
                         
                     # 标记正在处理
@@ -240,7 +245,8 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
                 confirmed = False
                 transaction_error = None
                 
-                logger.info(f"使用RPC地址: {rpc_url}")
+                # logger.info(f"使用RPC地址: {rpc_url}")
+                logger.debug(f"AssetID={asset_id}: 使用RPC地址: {rpc_url} 监控 {tx_hash}")
                 
                 while retry_count < max_retries:
                     try:
@@ -260,10 +266,14 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
                             ]
                         }
                         
-                        logger.info(f"发送Solana RPC请求 (尝试 {retry_count+1}/{max_retries}): {tx_hash}")
+                        # logger.info(f"发送Solana RPC请求 (尝试 {retry_count+1}/{max_retries}): {tx_hash}")
+                        if retry_count == 0 or (retry_count + 1) % 5 == 0 or retry_count == max_retries -1 :
+                             logger.info(f"AssetID={asset_id}: 发送Solana RPC请求 (尝试 {retry_count+1}/{max_retries}) for Tx: {tx_hash}")
+                        else:
+                            logger.debug(f"AssetID={asset_id}: 发送Solana RPC请求 (尝试 {retry_count+1}/{max_retries}) for Tx: {tx_hash}")
                         
                         # 发送 RPC 请求
-                        response = requests.post(rpc_url, headers=headers, data=json.dumps(payload), timeout=30)
+                        response = requests.post(rpc_url, headers=headers, data=json.dumps(payload), timeout=30) # 增加超时
                         response.raise_for_status()
                         response_data = response.json()
                         
@@ -279,12 +289,15 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
                                 logger.warning(f"资产创建支付交易失败: AssetID={asset_id}, TxHash={tx_hash}, Error: {transaction_error}")
                                 break
                         else:
-                            logger.info(f"支付交易尚未确认，可能仍在处理中... (AssetID={asset_id}, TxHash={tx_hash}, 尝试 {retry_count+1}/{max_retries})")
+                            # logger.info(f"支付交易尚未确认，可能仍在处理中... (AssetID={asset_id}, TxHash={tx_hash}, 尝试 {retry_count+1}/{max_retries})")
+                            logger.debug(f"AssetID={asset_id}: Tx {tx_hash} 尚未确认 (尝试 {retry_count+1}/{max_retries})")
 
+                    except requests.exceptions.Timeout:
+                        logger.warning(f"AssetID={asset_id}: Solana RPC请求超时 (尝试 {retry_count+1}/{max_retries}) for Tx: {tx_hash}")
                     except requests.exceptions.RequestException as req_err:
-                        logger.error(f"检查交易状态时 RPC 请求失败: {str(req_err)}")
+                        logger.error(f"AssetID={asset_id}: 检查交易状态时 RPC 请求失败 (尝试 {retry_count+1}/{max_retries}): {str(req_err)}")
                     except Exception as e:
-                        logger.error(f"检查交易状态时发生未知错误: {str(e)}")
+                        logger.error(f"AssetID={asset_id}: 检查交易状态时发生未知错误 (尝试 {retry_count+1}/{max_retries}): {str(e)}")
                         logger.error(traceback.format_exc())
                     
                     retry_count += 1
@@ -421,13 +434,13 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
                         
                         # 添加定时重试逻辑
                         if retry_count >= max_retries:
-                            logger.info(f"达到最大重试次数，安排后续重试: AssetID={asset_id}")
+                            logger.info(f"AssetID={asset_id}: 达到最大重试次数 ({max_retries}) for Tx {tx_hash}，安排30分钟后再次尝试监控。")
                             # 30分钟后再次尝试
-                            def delayed_retry():
-                                time.sleep(30 * 60)  # 30分钟
-                                monitor_creation_payment.delay(asset_id, tx_hash)
+                            def delayed_retry_func(): # 确保函数名唯一或使用lambda
+                                logger.info(f"AssetID={asset_id}: 执行延时重试任务 for Tx {tx_hash}")
+                                monitor_creation_payment_task.delay(asset_id, tx_hash)
                             
-                            retry_thread = Thread(target=delayed_retry)
+                            retry_thread = Thread(target=delayed_retry_func)
                             retry_thread.daemon = True
                             retry_thread.start()
 
@@ -462,9 +475,9 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
                 logger.info(f"完成监控创建支付: AssetID={asset_id}, TxHash={tx_hash}")
 
 def auto_monitor_pending_payments():
-    """自动监控待处理的支付交易"""
+    """自动监控待处理的支付交易 和 资产上链"""
     try:
-        logger.info("开始自动监控待处理的支付交易...")
+        logger.info("开始执行周期性任务：自动监控待处理支付及资产上链...")
         
         flask_app = get_flask_app()
         if not flask_app:
@@ -477,62 +490,69 @@ def auto_monitor_pending_payments():
                 confirmed_assets = Asset.query.filter(
                     Asset.payment_confirmed == True,
                     Asset.token_address == None,
-                    Asset.deployment_in_progress != True,
+                    Asset.deployment_in_progress != True, # 确保没有正在处理
                     Asset.status == AssetStatus.CONFIRMED.value
-                ).all()
+                ).limit(10).all() # 增加limit，防止一次处理过多
                 
                 if confirmed_assets:
-                    logger.info(f"找到 {len(confirmed_assets)} 个已支付确认但未上链的资产")
+                    logger.info(f"找到 {len(confirmed_assets)} 个已支付确认但待上链的资产，开始处理...")
                     
                     for asset in confirmed_assets:
-                        if asset.payment_confirmed and not asset.token_address and not asset.deployment_in_progress:
-                            with get_asset_lock(asset.id):
-                                logger.info(f"开始处理资产 {asset.id} 的上链流程")
-                                try:
-                                    # 使用事务锁确保此资产不会被并发处理
-                                    asset_for_update = Asset.query.with_for_update(nowait=True).get(asset.id)
-                                    
-                                    if asset_for_update.deployment_in_progress:
-                                        logger.info(f"资产 {asset.id} 已经在处理中，跳过")
-                                        continue
-                                    
-                                    if asset_for_update.token_address:
-                                        logger.info(f"资产 {asset.id} 已有上链地址，跳过")
-                                        continue
-                                    
-                                    # 标记开始处理
-                                    asset_for_update.deployment_in_progress = True
-                                    asset_for_update.deployment_started_at = datetime.utcnow()
-                                    db.session.commit()
-                                    
-                                    # 调用上链服务
-                                    service = AssetService()
-                                    result = service.deploy_asset_to_blockchain(asset.id)
-                                    
-                                    if result.get('success'):
-                                        logger.info(f"资产 {asset.id} 已成功部署到区块链，地址: {result.get('token_address')}")
-                                    else:
-                                        logger.error(f"资产 {asset.id} 部署失败: {result.get('error')}")
-                                        
-                                        # 更新资产状态
-                                        asset_for_update = Asset.query.get(asset.id)
-                                        asset_for_update.deployment_in_progress = False
-                                        asset_for_update.error_message = result.get('error')
+                        # if asset.payment_confirmed and not asset.token_address and not asset.deployment_in_progress: # 此条件已在查询中包含
+                        with get_asset_lock(asset.id):
+                            logger.info(f"开始处理资产 {asset.id} 的上链流程 (通过auto_monitor)")
+                            try:
+                                # 使用事务锁确保此资产不会被并发处理
+                                asset_for_update = db.session.query(Asset).with_for_update(nowait=True).get(asset.id) # 使用 query().get()
+                                
+                                # 再次检查条件，确保在获取锁后资产状态仍然符合预期
+                                if not asset_for_update or asset_for_update.status != AssetStatus.CONFIRMED.value or asset_for_update.token_address is not None:
+                                    logger.info(f"资产 {asset.id} 状态已变更或已上链，跳过 (当前状态: {asset_for_update.status if asset_for_update else 'Not Found'})")
+                                    continue
+
+                                if asset_for_update.deployment_in_progress:
+                                    logger.info(f"资产 {asset.id} 已经在处理中 (auto_monitor)，跳过")
+                                    continue
+                                
+                                # 标记开始处理
+                                asset_for_update.deployment_in_progress = True
+                                asset_for_update.deployment_started_at = datetime.utcnow()
+                                db.session.commit()
+                                
+                                # 调用上链服务
+                                service = AssetService()
+                                result = service.deploy_asset_to_blockchain(asset.id)
+                                
+                                if result.get('success'):
+                                    logger.info(f"资产 {asset.id} 通过 auto_monitor 已成功部署，地址: {result.get('token_address')}")
+                                else:
+                                    logger.error(f"资产 {asset.id} 通过 auto_monitor 部署失败: {result.get('error')}")
+                                    # deploy_asset_to_blockchain 应该自己处理失败状态的更新
+                                    # 但这里可以确保 deployment_in_progress 被清除
+                                    asset_recheck = Asset.query.get(asset.id) # 使用 query().get()
+                                    if asset_recheck:
+                                        asset_recheck.deployment_in_progress = False
                                         db.session.commit()
-                                    
-                                except exc.OperationalError:
-                                    logger.warning(f"资产 {asset.id} 已被另一个进程锁定，跳过处理")
-                                except Exception as e:
-                                    logger.error(f"处理资产 {asset.id} 上链时出错: {str(e)}")
-                                    logger.error(traceback.format_exc())
+                                
+                            except exc.OperationalError:
+                                logger.warning(f"资产 {asset.id} 已被另一个进程锁定 (auto_monitor)，跳过处理")
+                            except Exception as e:
+                                logger.error(f"处理资产 {asset.id} 上链时出错 (auto_monitor): {str(e)}")
+                                logger.error(traceback.format_exc())
+                                # 清理标记
+                                asset_recheck_exc = Asset.query.get(asset.id) # 使用 query().get()
+                                if asset_recheck_exc:
+                                     asset_recheck_exc.deployment_in_progress = False
+                                     db.session.commit()
                 else:
-                    logger.info("没有找到待处理的资产")
+                    # logger.info("没有找到待处理的资产")
+                    logger.debug("没有找到已支付确认但待上链的资产。")
                     
             except Exception as e:
-                logger.error(f"自动监控支付交易失败: {str(e)}")
+                logger.error(f"周期性任务执行内部失败: {str(e)}")
                 logger.error(traceback.format_exc())
     except Exception as e:
-        logger.error(f"自动监控支付交易失败: {str(e)}")
+        logger.error(f"周期性任务执行最外层失败: {str(e)}")
         logger.error(traceback.format_exc())
 
 
@@ -549,35 +569,36 @@ def start_scheduled_tasks():
     
     # 如果已经初始化过，直接返回
     if scheduler_initialized:
-        logger.info("定时任务已经初始化，跳过重复初始化")
+        # logger.info("定时任务已经初始化，跳过重复初始化")
+        logger.debug("定时任务已经初始化，跳过重复初始化")
         return
         
     logger.info("启动定时任务...")
     
     try:
         # 立即执行一次自动监控
-        logger.info("立即触发资产上链状态检查...")
+        logger.info("系统启动：立即触发一次周期性任务 (监控支付及上链)...")
         auto_monitor_pending_payments()
         
         # 每5分钟执行一次
-        from app.extensions import scheduler
+        from app.extensions import scheduler # 确保 scheduler 已初始化
         
         # 确保任务只添加一次
-        if not scheduler.get_job('monitor_payments'):
+        if not scheduler.get_job('auto_monitor_all_assets'): # 更改任务ID
             scheduler.add_job(
-                id='monitor_payments',
+                id='auto_monitor_all_assets', # 更改任务ID
                 func=auto_monitor_pending_payments,
                 trigger='interval',
-                minutes=5,
+                minutes=5, # 5分钟频率是否合适需要评估
                 replace_existing=True
             )
-            logger.info("定时任务已添加到调度器: 每5分钟执行一次")
+            logger.info("周期性任务 (监控支付及上链) 已添加到调度器: 每5分钟执行一次")
         else:
-            logger.info("定时任务已存在，跳过添加")
+            logger.info("周期性任务 (监控支付及上链) 已存在，跳过添加")
         
         # 设置全局初始化标志
         scheduler_initialized = True
-        logger.info("定时任务已启动")
+        logger.info("定时任务模块已启动")
     except Exception as e:
         logger.error(f"启动定时任务失败: {str(e)}")
         import traceback
