@@ -14,13 +14,15 @@ from datetime import datetime
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from app import create_app
+# 导入应用
 from app.extensions import db
 from app.models.admin import AdminUser
+import app as app_module
 
 def add_admin(wallet_address, username, role='admin'):
     """添加新的管理员用户"""
-    app = create_app()
+    # 正确获取Flask应用实例
+    app = app_module.create_app()
     
     with app.app_context():
         # 检查用户是否已存在
