@@ -178,71 +178,40 @@ def permission_required(permission):
     return decorator
 
 def admin_page_required(f):
-    """管理页面权限装饰器，用于网页访问"""
+    """管理页面权限装饰器，基于安全的session验证"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 记录详细的请求信息，帮助排查问题
-        current_app.logger.info(f"访问管理页面: {request.path}")
-        current_app.logger.info(f"请求头: {dict(request.headers)}")
-        current_app.logger.info(f"Cookies: {request.cookies}")
-        current_app.logger.info(f"Session: {session}")
-        
-        # 尝试从各种来源获取钱包地址
-        eth_address = None
-        
-        # 检查请求头
-        if 'X-Eth-Address' in request.headers:
-            eth_address = request.headers.get('X-Eth-Address')
-            current_app.logger.info(f"从请求头获取钱包地址: {eth_address}")
-        
-        # 检查Cookie
-        if not eth_address and 'eth_address' in request.cookies:
-            eth_address = request.cookies.get('eth_address')
-            current_app.logger.info(f"从Cookie获取钱包地址: {eth_address}")
-        
-        # 检查会话
-        if not eth_address and 'eth_address' in session:
-            eth_address = session.get('eth_address')
-            current_app.logger.info(f"从Session获取钱包地址: {eth_address}")
-        
-        if not eth_address and 'admin_eth_address' in session:
-            eth_address = session.get('admin_eth_address')
-            current_app.logger.info(f"从Session获取管理员钱包地址: {eth_address}")
-        
-        # 尝试从URL参数获取
-        if not eth_address and 'eth_address' in request.args:
-            eth_address = request.args.get('eth_address')
-            current_app.logger.info(f"从URL参数获取钱包地址: {eth_address}")
-        
-        current_app.logger.info(f"最终使用的钱包地址: {eth_address}")
-        
-        # 验证是否为管理员，如果不是管理员，但路径中有v2，返回当前V2管理页面
-        if not eth_address or not is_admin(eth_address):
-            if '/v2/' in request.path or request.path.endswith('/v2'):
-                # 如果请求是V2路径，返回登录页面
-                current_app.logger.info("重定向到管理员登录页面(V2)")
-                return redirect(url_for('admin.login_v2'))
+        current_app.logger.debug(f"Admin page access attempt: {request.path}, Session: {session}")
+        if session.get('admin_verified') and session.get('admin_wallet_address'):
+            wallet_address = session.get('admin_wallet_address')
+            admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == wallet_address.lower()).first()
+            
+            if admin_user and admin_user.is_active:
+                g.eth_address = wallet_address # 兼容旧代码中可能对 g.eth_address 的使用
+                g.admin = admin_user # 设置 g.admin 供 permission_required 等使用
+                g.admin_user_id = admin_user.id # 可选，方便使用
+                g.admin_role = admin_user.role # 可选
+                
+                # 如果需要 get_admin_info 的信息 (通常是基于配置文件的权限)
+                # 可以考虑融合 AdminUser 模型的权限和配置文件的权限，或者逐渐淘汰配置文件权限
+                # g.admin_info = get_admin_info(wallet_address) 
+                current_app.logger.info(f"Admin access GRANTED for {wallet_address} (ID: {admin_user.id}) via verified session for path {request.path}")
+                return f(*args, **kwargs)
             else:
-                # 添加简单的调试日志
-                current_app.logger.info("非V2路径，普通重定向")
-                flash('请先连接钱包并验证管理员身份', 'warning')
-                return redirect(url_for('main.index'))
-        
-        # 如果是管理员，设置当前会话和临时变量
-        g.eth_address = eth_address
-        g.admin_info = get_admin_info(eth_address)
-        
-        # 更新session，确保后续请求正常
-        session['eth_address'] = eth_address
-        session['admin_eth_address'] = eth_address
-        
-        @after_this_request
-        def set_cookie(response):
-            response.set_cookie('eth_address', eth_address, max_age=3600*24*30)
-            return response
-        
-        current_app.logger.info(f"通过管理员验证，用户: {eth_address}")
-        return f(*args, **kwargs)
+                # Session有效但用户在数据库中找不到或非激活，清除session并要求重新登录
+                session.pop('admin_verified', None)
+                session.pop('admin_wallet_address', None)
+                session.pop('admin_user_id', None)
+                session.pop('admin_role', None)
+                flash('您的管理员会话无效或账户已被禁用，请重新登录。', 'warning')
+                current_app.logger.warning(f"Admin session for {wallet_address} was valid, but user not found in DB or inactive. Redirecting to login.")
+                return redirect(url_for('admin.login_v2', next=request.url))
+        else:
+            # Session未验证
+            flash('需要管理员权限，请登录。', 'info')
+            current_app.logger.info(f"Admin access DENIED for path {request.path}. No verified session. Redirecting to login.")
+            return redirect(url_for('admin.login_v2', next=request.url))
+            
     return decorated_function
 
 # 页面路由
@@ -2218,36 +2187,37 @@ def update_billing_status():
         return jsonify({'error': str(e)}), 500 
 
 @admin_bp.route('/v2/dashboard')
-@admin_required
+@admin_page_required
 def dashboard_v2():
     """管理后台V2版本仪表板"""
     return render_template('admin_v2/dashboard.html')
 
 @admin_bp.route('/v2/users')
-@admin_required
+@admin_page_required
 def users_v2():
     """管理后台V2版本用户管理页面"""
     return render_template('admin_v2/users.html')
 
 @admin_bp.route('/v2/assets')
+@admin_page_required
 def assets_v2():
     """V2资产管理页面"""
     return render_template('admin_v2/assets.html')
 
 @admin_bp.route('/v2/commission')
-@admin_required
+@admin_page_required
 def commission_v2():
     """管理后台V2版本佣金管理页面"""
     return render_template('admin_v2/commission.html')
 
 @admin_bp.route('/v2/trades')
-@admin_required
+@admin_page_required
 def trades_v2():
     """管理后台V2版本交易管理页面"""
     return render_template('admin_v2/trades.html')
 
 @admin_bp.route('/v2/settings', methods=['GET', 'POST'])
-@admin_required # 使用页面权限装饰器
+@admin_page_required 
 @permission_required('管理设置') # 假设需要 '管理设置' 权限
 def settings_v2():
     """管理后台V2版本系统设置页面，包含支付相关配置"""
@@ -2361,24 +2331,18 @@ def login_v2():
     return render_template('admin_v2/login.html')
 
 @admin_bp.route('/v2')
-@admin_required
+@admin_page_required
 def admin_v2_index():
-    """管理后台V2版本首页"""
-    admin = None
-    eth_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address') or session.get('eth_address')
+    """V2版后台首页"""
+    # 启用严格API身份验证
+    current_app.config['STRICT_ADMIN_API_AUTH'] = True
     
-    if eth_address:
-        # 尝试从新管理员表中获取信息
-        admin = AdminUser.query.filter_by(wallet_address=eth_address).first()
-        
-        # 如果在新表中没有找到，则使用旧配置
-        if not admin and eth_address in current_app.config['ADMIN_CONFIG']:
-            admin = {'wallet_address': eth_address}
+    # 确保admin_verified在session中
+    if not session.get('admin_verified'):
+        flash('请先登录', 'error')
+        return redirect(url_for('admin.login_v2'))
     
-    if not admin:
-        return redirect(url_for('admin.login'))
-    
-    return render_template('admin_v2/index.html', admin=admin)
+    return redirect(url_for('admin.dashboard_v2'))
 
 @admin_bp.route('/v2/api/check-auth')
 def check_auth_v2():
@@ -2439,8 +2403,9 @@ def logout_v2():
     return response
 
 @admin_bp.route('/v2/api/assets', methods=['GET'])
+@api_admin_required
 def api_assets_v2():
-    """管理后台V2版本资产列表API"""
+    """获取所有资产，支持分页和筛选"""
     try:
         # 记录请求信息，方便调试
         current_app.logger.info(f"访问V2资产列表API，参数: {request.args}")
@@ -2552,8 +2517,9 @@ def api_assets_v2():
         })
 
 @admin_bp.route('/v2/api/assets/stats', methods=['GET'])
+@api_admin_required
 def api_assets_stats_v2():
-    """管理后台V2版本资产统计API"""
+    """获取资产统计数据"""
     try:
         # 统计数据
         total_assets = Asset.query.filter(Asset.status != 0).count()
@@ -2663,6 +2629,7 @@ def api_export_assets_v2():
     return "资产导出功能正在开发中", 200, {'Content-Type': 'text/plain'}
 
 @admin_bp.route('/v2/api/dashboard/stats', methods=['GET'])
+@api_admin_required
 def api_dashboard_stats_v2():
     """获取仪表盘统计数据"""
     try:
@@ -2703,6 +2670,7 @@ def api_dashboard_stats_v2():
         })
 
 @admin_bp.route('/v2/api/dashboard/trends', methods=['GET'])
+@api_admin_required
 def api_dashboard_trends_v2():
     """获取仪表盘趋势数据"""
     try:
@@ -2729,6 +2697,7 @@ def api_dashboard_trends_v2():
         })
 
 @admin_bp.route('/v2/api/dashboard/recent-trades', methods=['GET'])
+@api_admin_required
 def api_dashboard_recent_trades_v2():
     """获取最近交易数据"""
     try:
@@ -2919,8 +2888,9 @@ def update_share_messages():
         }), 500
 
 @admin_bp.route('/v2/api/users', methods=['GET'])
+@api_admin_required
 def api_users_v2():
-    """管理后台V2版本用户列表API"""
+    """获取所有用户，支持分页和筛选"""
     try:
         # 记录请求信息，方便调试
         current_app.logger.info(f"访问V2用户列表API，参数: {request.args}")
@@ -2996,8 +2966,9 @@ def api_users_v2():
         })
 
 @admin_bp.route('/v2/api/users/<int:user_id>', methods=['GET'])
+@api_admin_required
 def api_user_detail_v2(user_id):
-    """管理后台V2版本用户详情API"""
+    """获取用户详情"""
     try:
         user = User.query.get_or_404(user_id)
         
@@ -3029,8 +3000,9 @@ def api_user_detail_v2(user_id):
         }), 404
 
 @admin_bp.route('/v2/api/users/<int:user_id>', methods=['PUT'])
+@api_admin_required
 def api_edit_user_v2(user_id):
-    """管理后台V2版本编辑用户API"""
+    """编辑用户信息"""
     try:
         user = User.query.get_or_404(user_id)
         data = request.get_json()
@@ -3064,8 +3036,9 @@ def api_edit_user_v2(user_id):
         }), 500
 
 @admin_bp.route('/v2/api/users/<int:user_id>/verify', methods=['POST'])
+@api_admin_required
 def api_verify_user_v2(user_id):
-    """管理后台V2版本验证用户API"""
+    """验证用户"""
     try:
         user = User.query.get_or_404(user_id)
         user.verified = True
@@ -3084,8 +3057,9 @@ def api_verify_user_v2(user_id):
         }), 500
 
 @admin_bp.route('/v2/api/users/<int:user_id>/reject', methods=['POST'])
+@api_admin_required
 def api_reject_user_v2(user_id):
-    """管理后台V2版本拒绝用户API"""
+    """拒绝用户"""
     try:
         user = User.query.get_or_404(user_id)
         user.verified = False
@@ -3104,8 +3078,9 @@ def api_reject_user_v2(user_id):
         }), 500
 
 @admin_bp.route('/v2/api/users/batch-verify', methods=['POST'])
+@api_admin_required
 def api_batch_verify_users_v2():
-    """管理后台V2版本批量验证用户API"""
+    """批量验证用户"""
     try:
         data = request.get_json()
         user_ids = data.get('user_ids', [])
@@ -3136,8 +3111,9 @@ def api_batch_verify_users_v2():
         }), 500
 
 @admin_bp.route('/v2/api/users/batch-reject', methods=['POST'])
+@api_admin_required
 def api_batch_reject_users_v2():
-    """管理后台V2版本批量拒绝用户API"""
+    """批量拒绝用户"""
     try:
         data = request.get_json()
         user_ids = data.get('user_ids', [])
@@ -3168,8 +3144,9 @@ def api_batch_reject_users_v2():
         }), 500
 
 @admin_bp.route('/v2/api/users/export', methods=['GET'])
+@api_admin_required
 def api_export_users_v2():
-    """管理后台V2版本导出用户API"""
+    """导出用户数据"""
     try:
         users = User.query.all()
         
@@ -3433,3 +3410,56 @@ def is_valid_solana_address(address):
         return True
     except ValueError:
         return False
+
+def api_admin_required(f):
+    """API版本的管理员权限装饰器，失败时返回JSON错误而不是重定向"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 首先检查session中的安全验证状态
+        if session.get('admin_verified') and session.get('admin_wallet_address'):
+            wallet_address = session.get('admin_wallet_address')
+            admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == wallet_address.lower()).first()
+            
+            if admin_user and admin_user.is_active:
+                g.eth_address = wallet_address
+                g.admin = admin_user
+                current_app.logger.info(f"API管理员验证通过(session) - 管理员ID: {admin_user.id}, 地址: {wallet_address}")
+                return f(*args, **kwargs)
+        
+        # 否则尝试从头部、cookie等获取钱包地址并进行验证
+        # 记录请求头和参数，帮助调试
+        current_app.logger.info(f"API管理员验证 - 请求头: {dict(request.headers)}")
+        current_app.logger.info(f"API管理员验证 - 请求参数: {dict(request.args)}")
+        
+        # 检查是否有管理员验证头部
+        admin_verified = request.headers.get('Admin-Verified') == 'true'
+        
+        # 尝试从多个来源获取钱包地址
+        eth_address = request.headers.get('X-Eth-Address') or \
+                     request.cookies.get('eth_address') or \
+                     request.args.get('eth_address') or \
+                     session.get('eth_address') or \
+                     session.get('admin_eth_address')
+        
+        # 记录找到的钱包地址
+        current_app.logger.info(f"API管理员验证 - 找到的钱包地址: {eth_address}")
+                     
+        if not eth_address:
+            current_app.logger.warning("API管理员验证失败 - 未提供钱包地址")
+            return jsonify({'error': '请先连接钱包', 'code': 'AUTH_REQUIRED'}), 401
+            
+        # 如果启用了更严格的验证，需要检查Admin-Verified头部
+        if current_app.config.get('STRICT_ADMIN_API_AUTH', True) and not admin_verified:
+            current_app.logger.warning(f"API管理员验证失败 - 缺少验证头部: {eth_address}")
+            return jsonify({'error': '无效的管理员身份验证', 'code': 'INVALID_ADMIN_AUTH'}), 403
+            
+        admin_info = get_admin_permissions(eth_address.lower())
+        if not admin_info:
+            current_app.logger.warning(f"API管理员验证失败 - 非管理员地址: {eth_address}")
+            return jsonify({'error': '您没有管理员权限', 'code': 'ADMIN_REQUIRED'}), 403
+            
+        g.eth_address = eth_address.lower()
+        g.admin_info = admin_info
+        current_app.logger.info(f"API管理员验证成功 - 地址: {eth_address}")
+        return f(*args, **kwargs)
+    return decorated_function

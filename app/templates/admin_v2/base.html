@@ -16,11 +16,21 @@
     <script>
         // 配置Axios拦截器添加钱包地址到请求头
         document.addEventListener('DOMContentLoaded', function() {
+            // 尝试从Cookie获取验证状态
+            function isAdminVerified() {
+                const cookieMatch = document.cookie.match(/admin_verified=([^;]+)/);
+                return cookieMatch && cookieMatch[1] === "true";
+            }
+            
             // 从cookie、localStorage或sessionStorage获取钱包地址
             function getWalletAddress() {
                 // 尝试从Cookie获取
                 const cookieMatch = document.cookie.match(/wallet_address=([^;]+)/);
                 if (cookieMatch) return cookieMatch[1];
+                
+                // 尝试从sessionStorage获取
+                if (sessionStorage.getItem('admin_wallet_address')) 
+                    return sessionStorage.getItem('admin_wallet_address');
                 
                 // 尝试从localStorage获取
                 if (localStorage.getItem('wallet_address')) 
@@ -35,18 +45,27 @@
             
             // 配置Axios请求拦截器，添加钱包地址到请求头
             if (typeof axios !== 'undefined') {
-                console.log("配置Axios拦截器...");
+                //console.log("配置Axios拦截器..."); // 删除暴露日志
                 axios.interceptors.request.use(function(config) {
                     const walletAddress = getWalletAddress();
                     if (walletAddress) {
-                        console.log("添加钱包地址到请求头:", walletAddress);
+                        //console.log("添加钱包地址到请求头:", walletAddress); // 删除暴露日志
                         config.headers['Wallet-Address'] = walletAddress;
+                        // 新增管理员验证头部
+                        if (isAdminVerified()) {
+                            config.headers['Admin-Verified'] = 'true';
+                        }
                     } else {
-                        console.warn("未找到钱包地址，无法添加到请求头");
+                        // 静默失败，不再记录警告
+                        //console.warn("未找到钱包地址，无法添加到请求头"); // 删除暴露日志
                     }
+                    
+                    // 屏蔽所有管理后台URL的日志输出
+                    // 返回修改后的配置
                     return config;
                 }, function(error) {
-                    console.error("Axios请求拦截器错误:", error);
+                    // 不记录错误详情
+                    //console.error("Axios请求拦截器错误:", error); // 删除暴露日志
                     return Promise.reject(error);
                 });
                 
@@ -54,10 +73,12 @@
                 axios.interceptors.response.use(function(response) {
                     return response;
                 }, function(error) {
-                    console.error("API请求失败:", error.config?.url, error.response?.status, error.response?.data);
+                    // 不再显示详细错误信息
+                    //console.error("API请求失败:", error.config?.url, error.response?.status, error.response?.data); // 删除暴露日志
+                    
                     // 如果返回401或403错误，可能是认证问题
                     if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-                        console.warn("认证失败，即将重定向到登录页面");
+                        //console.warn("认证失败，即将重定向到登录页面"); // 删除暴露日志
                         // 延迟执行以确保错误信息显示
                         setTimeout(() => {
                             window.location.href = '/admin/v2/login';
@@ -66,9 +87,10 @@
                     return Promise.reject(error);
                 });
                 
-                console.log("Axios拦截器配置完成");
+                //console.log("Axios拦截器配置完成"); // 删除暴露日志
             } else {
-                console.warn("未检测到Axios库，无法配置拦截器");
+                // 静默失败，不记录警告
+                //console.warn("未检测到Axios库，无法配置拦截器"); // 删除暴露日志
             }
         });
     </script>
