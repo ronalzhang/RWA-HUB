@@ -22,7 +22,8 @@ from app.models.trade import Trade, TradeStatus, TradeType
 from app.models.user import User
 from app.models.admin import AdminUser
 from app.models.dividend import DividendDistribution, DividendRecord
-from app.models.payment import Payment, PaymentStatus
+# 移除不存在的payment模块导入
+# from app.models.payment import Payment, PaymentStatus
 from app.models.transaction import Transaction
 from app.utils.decorators import eth_address_required, admin_required, permission_required, api_admin_required
 from app.utils.admin import get_admin_permissions
