@@ -39,6 +39,9 @@ from .solana_api import solana_api as solana_api_bp
 # 导入Solana管理功能
 from .admin_solana import admin_solana_bp
 
+# 导入管理员API兼容路由
+from .admin_api import admin_compat_routes_bp
+
 # 注册蓝图到app
 def register_blueprints(app):
     """初始化所有路由"""
@@ -65,6 +68,9 @@ def register_blueprints(app):
     
     # 注册Solana管理功能蓝图
     app.register_blueprint(admin_solana_bp)
+    
+    # 注册管理员API兼容路由蓝图
+    app.register_blueprint(admin_compat_routes_bp)
     
     # 注册全局处理器
     register_global_handlers(app)
