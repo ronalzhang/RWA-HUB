@@ -283,17 +283,24 @@
                 async logout() {
                     if (confirm('确定要退出登录吗？')) {
                         try {
-                            await axios.post('/admin/v2/api/logout');
-                            // 清除所有相关的存储
-                            localStorage.removeItem('eth_address');
-                            localStorage.removeItem('walletAddress');
-                            sessionStorage.removeItem('eth_address');
+                            // 使用新的登出API
+                            await axios.post('/api/admin/v2/auth/logout');
                             
-                            // 删除cookie
+                            // 清除所有相关的存储
+                            localStorage.removeItem('wallet_address');
+                            localStorage.removeItem('eth_address');
+                            sessionStorage.removeItem('wallet_address');
+                            sessionStorage.removeItem('eth_address');
+                            sessionStorage.removeItem('admin_user_id');
+                            sessionStorage.removeItem('admin_role');
+                            
+                            // 删除cookie (所有可能的管理员相关cookie)
+                            document.cookie = 'wallet_address=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
                             document.cookie = 'eth_address=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
                             
-                            // 跳转到首页
-                            window.location.href = '/';
+                            // 显示退出成功消息并跳转到登录页面
+                            alert('已成功退出登录');
+                            window.location.href = '/admin/v2/login';
                         } catch (error) {
                             console.error('退出登录失败', error);
                             alert('退出登录失败，请重试');
