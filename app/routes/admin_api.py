@@ -1196,12 +1196,17 @@ def export_users():
 
 # 注册蓝图
 def register_admin_v2_blueprint(app):
+    """
+    注册管理员API v2蓝图
+    注意: admin_compat_routes_bp已经在__init__.py中注册
+    """
     app.register_blueprint(admin_v2_bp)
     app.register_blueprint(admin_compat_bp)
-    app.register_blueprint(admin_compat_routes_bp)
+    # admin_compat_routes_bp在__init__.py中已注册，此处不重复注册
+    
+    # 记录注册的路由前缀
     app.logger.info(f"管理员API v2 已注册（{admin_v2_bp.url_prefix}）")
     app.logger.info(f"管理员API 兼容层已注册（{admin_compat_bp.url_prefix}）")
-    app.logger.info(f"管理员前端路由 已注册（{admin_compat_routes_bp.url_prefix}）")
 
 # 添加兼容旧版API的路由
 @admin_compat_bp.route('/stats')
