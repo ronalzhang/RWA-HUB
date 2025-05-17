@@ -15,7 +15,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 # 导入应用
-from app import create_app
+from app.app import create_app
 from app.extensions import db
 from app.models.admin import AdminUser
 
@@ -36,32 +36,34 @@ def add_admin(wallet_address, username, role='admin'):
             wallet_address=wallet_address,
             username=username,
             role=role,
-            permissions=json.dumps(['all']),  # 默认所有权限
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            permissions=json.dumps(["all"]) if role == 'super_admin' else json.dumps([]),
+            created_at=datetime.now(),
+            updated_at=datetime.now()
         )
         
         try:
             db.session.add(admin)
             db.session.commit()
-            print(f"成功添加管理员: {wallet_address}, 角色: {role}")
+            print(f"管理员添加成功: {username} ({wallet_address})")
         except Exception as e:
             db.session.rollback()
             print(f"添加管理员失败: {str(e)}")
-            # 如果是缺少字段的错误，提供详细信息
-            if "missing column" in str(e).lower() or "has no column" in str(e).lower():
-                print("\n可能是表结构与模型不匹配。请检查表结构和模型定义是否一致")
-                print("您可以先运行 check_admin_table.py 来检查表结构")
-        
+
 def main():
+    """主函数"""
     if len(sys.argv) < 3:
-        print("用法: python add_admin_user.py <wallet_address> <username> [role]")
+        print(f"用法: {sys.argv[0]} <wallet_address> <username> [role]")
         sys.exit(1)
-        
+    
     wallet_address = sys.argv[1]
     username = sys.argv[2]
     role = sys.argv[3] if len(sys.argv) > 3 else 'admin'
     
+    if role not in ['admin', 'super_admin']:
+        print(f"角色必须是 'admin' 或 'super_admin'，不是 '{role}'")
+        sys.exit(1)
+    
+    print(f"添加管理员: {wallet_address}, 用户名: {username}, 角色: {role}")
     add_admin(wallet_address, username, role)
 
 if __name__ == "__main__":

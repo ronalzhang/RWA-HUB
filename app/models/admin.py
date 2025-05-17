@@ -15,13 +15,12 @@ class AdminUser(db.Model):
     __tablename__ = 'admin_users'
     
     id = Column(Integer, primary_key=True)
-    wallet_address = Column(String(80), unique=True, nullable=False)
-    username = Column(String(80))
-    email = Column(String(120))
-    role = Column(String(50), default='admin')  # admin, super_admin
-    is_active = Column(Boolean, default=True)
+    wallet_address = Column(String(100), unique=True, nullable=False)
+    username = Column(String(50))
+    role = Column(String(20), nullable=False, default='admin')  # admin, super_admin
     permissions = Column(Text)  # JSON 存储的权限列表
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_login = Column(DateTime)
     
     def __repr__(self):
@@ -32,12 +31,10 @@ class AdminUser(db.Model):
             'id': self.id,
             'wallet_address': self.wallet_address,
             'username': self.username,
-            'email': self.email,
             'role': self.role,
-            'is_active': self.is_active,
             'permissions': json.loads(self.permissions) if self.permissions else [],
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None
+            'last_login': self.last_login.strftime('%Y-%m-%d %H:%M:%S') if self.last_login else None,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
         }
     
     def has_permission(self, permission):
