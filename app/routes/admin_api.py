@@ -10,11 +10,13 @@ from functools import wraps
 from app.utils.decorators import eth_address_required, async_task, log_activity, admin_required
 from app.models.admin import (
     AdminUser, SystemConfig, CommissionSetting, DistributionLevel,
-    Commission, CommissionStatus, CommissionType
+    CommissionStatus, CommissionType, UserReferral, 
+    CommissionRecord, AdminOperationLog, DashboardStats
 )
 from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.user import User
 from app.models.trade import Trade
+from app.models.commission import Commission
 
 # For signature verification
 from eth_account.messages import encode_defunct
@@ -28,6 +30,97 @@ admin_compat_routes_bp = Blueprint('admin_compat_routes', __name__, url_prefix='
 
 # 为旧版API创建兼容蓝图
 admin_compat_bp = Blueprint('admin_compat', __name__, url_prefix='/api/admin')
+
+# 管理后台前端API身份验证装饰器
+def api_admin_required(f):
+    """管理后台前端API权限装饰器"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        current_app.logger.debug(f"Admin compat API access attempt: {request.path}")
+        
+        # 检查session中的admin验证标识
+        if session.get('admin_verified') and session.get('admin_wallet_address'):
+            wallet_address = session.get('admin_wallet_address')
+            
+            # 查询管理员用户
+            admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == wallet_address.lower()).first()
+            
+            if admin_user and admin_user.is_active:
+                g.eth_address = wallet_address  # 设置兼容性参数
+                g.admin = admin_user
+                current_app.logger.info(f"Admin compat API access GRANTED for {wallet_address}")
+                return f(*args, **kwargs)
+        
+        # 兼容旧管理员系统检查
+        eth_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address')
+        if not eth_address:
+            current_app.logger.warning("Admin compat API missing ETH address")
+            return jsonify({"error": "缺少管理员钱包地址"}), 401
+            
+        # 简单检查地址格式
+        if not eth_address.startswith('0x') or len(eth_address) != 42:
+            current_app.logger.warning(f"Admin compat API invalid ETH address format: {eth_address}")
+            return jsonify({"error": "无效的钱包地址格式"}), 401
+            
+        # 检查管理员权限
+        admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == eth_address.lower()).first()
+        if admin_user and admin_user.is_active:
+            g.eth_address = eth_address
+            g.admin = admin_user
+            current_app.logger.info(f"Admin compat API access GRANTED for {eth_address}")
+            return f(*args, **kwargs)
+            
+        # 旧版配置检查
+        try:
+            import os
+            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.json')
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                    admins = config.get('admins', {})
+                    if eth_address.lower() in [addr.lower() for addr in admins]:
+                        g.eth_address = eth_address
+                        current_app.logger.info(f"Admin compat API access GRANTED for {eth_address} via config")
+                        return f(*args, **kwargs)
+        except Exception as e:
+            current_app.logger.error(f"Error checking admin config: {str(e)}")
+            
+        current_app.logger.warning(f"Admin compat API access DENIED for {eth_address}")
+        return jsonify({"error": "需要管理员权限"}), 403
+            
+    return decorated_function
+
+# 后台API身份验证装饰器
+def admin_required(f):
+    """管理员API权限装饰器，基于安全的session验证"""
+    @wraps(f) # 保持 wraps
+    def decorated_function(*args, **kwargs):
+        current_app.logger.debug(f"Admin API access attempt: {request.path}, Session: {session}")
+        if session.get('admin_verified') and session.get('admin_wallet_address'):
+            wallet_address = session.get('admin_wallet_address')
+            # 此处直接从session获取admin_user_id和role，避免每次都查库，如果session中已存
+            # 或者，如果g.admin的完整对象更常用，则查库
+            admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == wallet_address.lower()).first()
+
+            if admin_user and admin_user.is_active:
+                g.eth_address = wallet_address # 兼容可能存在的旧代码
+                g.admin = admin_user # 设置 g.admin 供 permission_required 等使用
+                g.admin_user_id = admin_user.id
+                g.admin_role = admin_user.role
+                current_app.logger.info(f"Admin API access GRANTED for {wallet_address} (ID: {admin_user.id}) via verified session for API {request.path}")
+                return f(*args, **kwargs)
+            else:
+                session.pop('admin_verified', None)
+                session.pop('admin_wallet_address', None)
+                session.pop('admin_user_id', None)
+                session.pop('admin_role', None)
+                current_app.logger.warning(f"Admin API session for {wallet_address} was valid, but user not found/inactive. Access denied.")
+                return jsonify({'error': 'Admin session invalid or account inactive.', 'code': 'ADMIN_SESSION_INVALID'}), 401
+        else:
+            current_app.logger.info(f"Admin API access DENIED for {request.path}. No verified session.")
+            return jsonify({'error': 'Administrator authentication required.', 'code': 'ADMIN_AUTH_REQUIRED'}), 401
+            
+    return decorated_function
 
 # Helper functions
 def get_user_growth_trend(days=30):
@@ -101,38 +194,6 @@ def get_trading_volume_trend(days=30):
     except Exception as e:
         current_app.logger.error(f"获取交易量趋势失败: {str(e)}", exc_info=True)
         return {'labels': [], 'values': []}
-
-# 后台API身份验证装饰器
-def admin_required(f):
-    """管理员API权限装饰器，基于安全的session验证"""
-    @wraps(f) # 保持 wraps
-    def decorated_function(*args, **kwargs):
-        current_app.logger.debug(f"Admin API access attempt: {request.path}, Session: {session}")
-        if session.get('admin_verified') and session.get('admin_wallet_address'):
-            wallet_address = session.get('admin_wallet_address')
-            # 此处直接从session获取admin_user_id和role，避免每次都查库，如果session中已存
-            # 或者，如果g.admin的完整对象更常用，则查库
-            admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == wallet_address.lower()).first()
-
-            if admin_user and admin_user.is_active:
-                g.eth_address = wallet_address # 兼容可能存在的旧代码
-                g.admin = admin_user # 设置 g.admin 供 permission_required 等使用
-                g.admin_user_id = admin_user.id
-                g.admin_role = admin_user.role
-                current_app.logger.info(f"Admin API access GRANTED for {wallet_address} (ID: {admin_user.id}) via verified session for API {request.path}")
-                return f(*args, **kwargs)
-            else:
-                session.pop('admin_verified', None)
-                session.pop('admin_wallet_address', None)
-                session.pop('admin_user_id', None)
-                session.pop('admin_role', None)
-                current_app.logger.warning(f"Admin API session for {wallet_address} was valid, but user not found/inactive. Access denied.")
-                return jsonify({'error': 'Admin session invalid or account inactive.', 'code': 'ADMIN_SESSION_INVALID'}), 401
-        else:
-            current_app.logger.info(f"Admin API access DENIED for {request.path}. No verified session.")
-            return jsonify({'error': 'Administrator authentication required.', 'code': 'ADMIN_AUTH_REQUIRED'}), 401
-            
-    return decorated_function
 
 def permission_required(permission):
     """特定权限装饰器"""
