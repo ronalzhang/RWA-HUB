@@ -16,13 +16,17 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 # 尝试导入Flask应用
 try:
-    # 首先尝试导入app.py中创建的应用实例
-    from app import app
+    # 直接尝试导入app.py中定义的变量app（Flask应用实例）
+    from app.py import app
 except (ImportError, AttributeError):
     try:
-        # 如果失败，尝试导入create_app函数
-        from app import create_app
-        app = create_app()
+        # 再尝试从app包中导入app
+        try:
+            from app import app
+        except (ImportError, AttributeError):
+            # 如果上述都失败，尝试导入create_app函数并创建应用
+            from app import create_app
+            app = create_app()
     except ImportError:
         print("无法导入Flask应用，请确保项目结构正确")
         sys.exit(1)
