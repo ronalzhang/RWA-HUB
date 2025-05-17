@@ -875,35 +875,17 @@ const walletState = {
             return isAdmin;
         } catch (error) {
             console.error('管理员检查API响应不成功:', error.message);
-            console.log('API管理员检查失败，使用备用逻辑');
             
-            // 备用逻辑：使用缓存的状态或其他方式判断
-            const cachedIsAdmin = localStorage.getItem('isAdmin') === 'true';
+            // 安全修复：删除本地硬编码的管理员列表和备用判断
+            // 如果API检查失败，默认为非管理员
+            console.log('API管理员检查失败，默认为非管理员');
+            this.isAdmin = false;
             
-            if (this.connected && this.address) {
-              // 获取管理员配置
-              const adminAddresses = [
-                // 已知的管理员地址列表
-                '8cU6PAtRTRgfyJu48qfz2hQP5aMGwooxqrCZtyB6UcYP',
-                'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd',
-                '0x1234567890abcdef1234567890abcdef12345678'
-              ];
-              
-              // 检查当前钱包是否在管理员列表中 - 对于Solana钱包不进行大小写转换
-              const isAdmin = adminAddresses.some(addr => {
-                if (this.walletType === 'phantom' || this.walletType === 'solana') {
-                  return addr === this.address;
-                } else {
-                  return addr.toLowerCase() === this.address.toLowerCase();
-                }
-              });
-              
-              console.log('钱包管理员状态(备用判断):', isAdmin ? '是管理员' : '不是管理员');
-              this.isAdmin = isAdmin;
-              this.updateAdminDisplay();
-              return isAdmin;
-            }
+            // 清除可能存在的管理员状态
+            localStorage.removeItem('isAdmin');
             
+            // 更新管理员显示
+            this.updateAdminDisplay();
             return false;
         }
     },

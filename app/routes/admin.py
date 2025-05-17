@@ -2,13 +2,28 @@ from flask import (
     Blueprint, render_template, request, redirect, url_for, 
     flash, session, jsonify, current_app, g, after_this_request, make_response, send_file, send_from_directory, abort
 )
+from flask_login import current_user, login_user, logout_user, login_required
+from functools import wraps
+from datetime import datetime, timedelta, date
+import uuid
+import csv
+import json
+import re
+import io
+import os
+import base58
+from sqlalchemy import desc, func, or_, and_, distinct, text
+from sqlalchemy.exc import SQLAlchemyError
+from PIL import Image
+from werkzeug.utils import secure_filename
+
 from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.trade import Trade, TradeStatus, TradeType
 from app.models.user import User
 from app.models.admin import AdminUser
 from app.models.dividend import DividendDistribution, DividendRecord
-from sqlalchemy import func, desc, or_, and_
-from app.extensions import db
+from app.models.payment import Payment, PaymentStatus
+from app.models.transaction import Transaction
 from app.utils.decorators import eth_address_required, admin_required, permission_required, api_admin_required
 from app.utils.admin import get_admin_permissions
 from app.models.income import PlatformIncome as DBPlatformIncome, IncomeType
@@ -17,10 +32,6 @@ from app.models.admin import DashboardStats
 from dateutil.relativedelta import relativedelta
 from datetime import datetime, timedelta, time, date, timezone
 from functools import wraps
-import json
-import os
-from app.utils.storage import storage
-import re
 import logging
 from urllib.parse import urlparse, parse_qs
 import random
@@ -867,39 +878,69 @@ def check_admin():
         return response
         
     try:
+        # 获取请求数据并记录
+        request_data = {
+            'headers': dict(request.headers),
+            'args': dict(request.args),
+            'json': request.get_json() if request.is_json else None,
+            'session': {k: session.get(k) for k in ['eth_address', 'admin_eth_address'] if k in session},
+            'remote_addr': request.remote_addr,
+            'user_agent': request.user_agent.string if request.user_agent else None
+        }
+        current_app.logger.info(f"管理员权限检查请求详情: {json.dumps(request_data, default=str)}")
+        
+        # 从多种来源获取钱包地址
         eth_address = request.headers.get('X-Eth-Address') or \
                      request.args.get('eth_address') or \
+                     request.args.get('address') or \
                      (request.json.get('address') if request.is_json else None) or \
                      session.get('admin_eth_address')
                      
         current_app.logger.info(f'检查管理员权限 - 原始地址: {eth_address}')
         
+        # 验证地址不为空
         if not eth_address:
-            current_app.logger.warning('未提供钱包地址')
-            response = jsonify({'is_admin': False})
+            current_app.logger.warning('未提供钱包地址，拒绝管理员权限')
+            response = jsonify({'is_admin': False, 'error': '未提供钱包地址'})
             response.headers.add('Access-Control-Allow-Origin', '*')
             return response, 200
             
         # 区分ETH和SOL地址处理，ETH地址转小写，SOL地址保持原样
         if eth_address.startswith('0x'):
+            # 验证ETH地址格式
+            if not re.match(r'^0x[0-9a-fA-F]{40}$', eth_address):
+                current_app.logger.warning(f'无效的ETH地址格式: {eth_address}，拒绝管理员权限')
+                response = jsonify({'is_admin': False, 'error': '无效的ETH地址格式'})
+                response.headers.add('Access-Control-Allow-Origin', '*')
+                return response, 200
+            
             normalized_address = eth_address.lower()
             current_app.logger.info(f'检查管理员权限 - ETH地址(小写): {normalized_address}')
         else:
+            # 验证Solana地址格式
+            if not is_valid_solana_address(eth_address):
+                current_app.logger.warning(f'无效的Solana地址格式: {eth_address}，拒绝管理员权限')
+                response = jsonify({'is_admin': False, 'error': '无效的Solana地址格式'})
+                response.headers.add('Access-Control-Allow-Origin', '*')
+                return response, 200
+                
             normalized_address = eth_address
-            current_app.logger.info(f'检查管理员权限 - 非ETH地址(原样): {normalized_address}')
+            current_app.logger.info(f'检查管理员权限 - Solana地址(原样): {normalized_address}')
         
+        # 获取管理员信息
         admin_data = get_admin_info(normalized_address)
         is_admin = bool(admin_data)
         
+        # 记录验证结果
         if not is_admin:
-            current_app.logger.warning('未找到管理员权限')
+            current_app.logger.warning(f'地址 {normalized_address} 不是管理员，拒绝管理员权限')
             session.pop('admin_eth_address', None)
             session.pop('admin_info', None)
         else:
+            current_app.logger.info(f'地址 {normalized_address} 是管理员，授予管理员权限')
             session['admin_eth_address'] = normalized_address
             session['admin_info'] = admin_data
         
-        current_app.logger.info(f'检查管理员权限 - 结果: {is_admin}')
         # 添加CORS头
         response = jsonify({'is_admin': is_admin, **(admin_data or {})})
         response.headers.add('Access-Control-Allow-Origin', '*')
@@ -907,7 +948,7 @@ def check_admin():
         response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
         return response, 200
     except Exception as e:
-        current_app.logger.error(f'检查管理员权限失败: {str(e)}')
+        current_app.logger.error(f'检查管理员权限失败: {str(e)}', exc_info=True)
         response = jsonify({'is_admin': False, 'error': str(e)})
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response, 500
