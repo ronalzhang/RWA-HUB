@@ -27,8 +27,20 @@ from datetime import datetime
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-# 导入应用
-from app import create_app
+# 尝试导入Flask应用
+try:
+    # 首先尝试导入app.py中创建的应用实例
+    from app import app
+except (ImportError, AttributeError):
+    try:
+        # 如果失败，尝试导入create_app函数
+        from app import create_app
+        app = create_app()
+    except ImportError:
+        print("无法导入Flask应用，请确保项目结构正确")
+        sys.exit(1)
+
+# 导入数据库和模型
 from app.extensions import db
 from sqlalchemy import inspect, text, exc
 
@@ -175,9 +187,7 @@ def main():
     if os.path.exists(env_file):
         print(f"已加载环境变量文件: {env_file}")
     
-    # 创建应用上下文
-    app = create_app()
-    
+    # 使用Flask应用上下文
     with app.app_context():
         # 检查数据库连接
         try:
