@@ -16,7 +16,7 @@ import traceback
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 # 导入应用和数据库模型
-from app.app import create_app
+from app import create_app
 from app.extensions import db
 from app.models.admin import AdminUser, SystemConfig, CommissionSetting, DistributionLevel
 from sqlalchemy import inspect, text
