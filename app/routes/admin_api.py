@@ -45,7 +45,7 @@ def api_admin_required(f):
             # 查询管理员用户
             admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == wallet_address.lower()).first()
             
-            if admin_user and admin_user.is_active:
+            if admin_user:
                 g.eth_address = wallet_address  # 设置兼容性参数
                 g.admin = admin_user
                 current_app.logger.info(f"Admin compat API access GRANTED for {wallet_address}")
@@ -57,14 +57,14 @@ def api_admin_required(f):
             current_app.logger.warning("Admin compat API missing ETH address")
             return jsonify({"error": "缺少管理员钱包地址"}), 401
             
-        # 简单检查地址格式
-        if not eth_address.startswith('0x') or len(eth_address) != 42:
-            current_app.logger.warning(f"Admin compat API invalid ETH address format: {eth_address}")
+        # 简单检查地址格式 - 允许Solana和以太坊格式
+        if (not eth_address.startswith('0x') or len(eth_address) != 42) and len(eth_address) != 44:
+            current_app.logger.warning(f"Admin compat API invalid address format: {eth_address}")
             return jsonify({"error": "无效的钱包地址格式"}), 401
             
         # 检查管理员权限
         admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == eth_address.lower()).first()
-        if admin_user and admin_user.is_active:
+        if admin_user:
             g.eth_address = eth_address
             g.admin = admin_user
             current_app.logger.info(f"Admin compat API access GRANTED for {eth_address}")
@@ -86,7 +86,7 @@ def api_admin_required(f):
             current_app.logger.error(f"Error checking admin config: {str(e)}")
             
         current_app.logger.warning(f"Admin compat API access DENIED for {eth_address}")
-        return jsonify({"error": "需要管理员权限"}), 403
+        return jsonify({"error": "需要管理员权限", "code": "ADMIN_REQUIRED"}), 403
             
     return decorated_function
 
@@ -102,7 +102,7 @@ def admin_required(f):
             # 或者，如果g.admin的完整对象更常用，则查库
             admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == wallet_address.lower()).first()
 
-            if admin_user and admin_user.is_active:
+            if admin_user:
                 g.eth_address = wallet_address # 兼容可能存在的旧代码
                 g.admin = admin_user # 设置 g.admin 供 permission_required 等使用
                 g.admin_user_id = admin_user.id
@@ -114,8 +114,8 @@ def admin_required(f):
                 session.pop('admin_wallet_address', None)
                 session.pop('admin_user_id', None)
                 session.pop('admin_role', None)
-                current_app.logger.warning(f"Admin API session for {wallet_address} was valid, but user not found/inactive. Access denied.")
-                return jsonify({'error': 'Admin session invalid or account inactive.', 'code': 'ADMIN_SESSION_INVALID'}), 401
+                current_app.logger.warning(f"Admin API session for {wallet_address} was valid, but user not found. Access denied.")
+                return jsonify({'error': 'Admin session invalid or account not found.', 'code': 'ADMIN_SESSION_INVALID'}), 401
         else:
             current_app.logger.info(f"Admin API access DENIED for {request.path}. No verified session.")
             return jsonify({'error': 'Administrator authentication required.', 'code': 'ADMIN_AUTH_REQUIRED'}), 401
@@ -272,42 +272,33 @@ def log_admin_operation(operation_type):
 
 # 旧版API身份验证装饰器，同时兼容新旧管理员系统
 def compat_admin_required(f):
-    """管理员权限装饰器(兼容旧版)"""
+    """管理员API兼容装饰器"""
     @eth_address_required
     def admin_check(*args, **kwargs):
         # 先检查是否为新系统中的管理员
-        admin = AdminUser.query.filter_by(wallet_address=g.eth_address).first()
+        eth_address = g.eth_address
+        admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == eth_address.lower()).first()
         
-        # 如果不是新系统中的管理员，检查是否在配置中的管理员列表
-        if not admin:
-            # 尝试从config.json中获取管理员配置
-            try:
-                import os
-                import json
-                config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.json')
-                if os.path.exists(config_path):
-                    with open(config_path, 'r') as f:
-                        config = json.load(f)
-                        admins = config.get('admins', {})
-                        if g.eth_address in admins:
-                            # 设置会话标记
-                            session['is_admin'] = True
-                            return f(*args, **kwargs)
-                        
-                # 如果不在配置文件中，检查session
-                if session.get('is_admin'):
-                    return f(*args, **kwargs)
-                    
-                return jsonify({'error': '需要管理员权限'}), 403
-            except Exception as e:
-                current_app.logger.error(f"检查管理员权限失败: {str(e)}")
-                return jsonify({'error': '权限检查失败'}), 500
+        if admin_user:
+            g.admin = admin_user
+            g.admin_user_id = admin_user.id
+            g.admin_role = admin_user.role
+            return f(*args, **kwargs)
+            
+        # 兼容旧系统检查 - 从配置文件中获取管理员名单
+        try:
+            import os
+            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.json')
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as file:
+                    config = json.load(file)
+                    if eth_address.lower() in [addr.lower() for addr in config.get('admins', [])]:
+                        return f(*args, **kwargs)
+        except Exception as e:
+            current_app.logger.error(f"Error checking admin in config: {str(e)}")
+            
+        return jsonify({'error': '您没有管理员权限', 'code': 'ADMIN_REQUIRED'}), 403
         
-        # 如果是新系统中的管理员
-        g.admin = admin
-        return f(*args, **kwargs)
-        
-    admin_check.__name__ = f.__name__
     return admin_check
 
 # 仪表盘数据API
