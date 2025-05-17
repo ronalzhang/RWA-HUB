@@ -16,7 +16,6 @@
     <div class="row g-4" id="assets">
         {% if assets %}
             {% for asset in assets %}
-            {% if asset.status == 2 %}
             <div class="col-md-4">
                 <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" 
                    class="text-decoration-none asset-card-link"
@@ -84,7 +83,6 @@
                     </div>
                 </a>
             </div>
-            {% endif %}
             {% endfor %}
         {% else %}
             <div class="col-12">
