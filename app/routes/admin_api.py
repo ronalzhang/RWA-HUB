@@ -6,6 +6,7 @@ import json
 import secrets # 导入 secrets 模块
 import traceback # 导入 traceback
 from functools import wraps
+import base64 # 用于解码Base64签名
 
 from app.utils.decorators import eth_address_required, async_task, log_activity, admin_required
 from app.models.admin import (
@@ -21,6 +22,12 @@ from app.models.commission import Commission
 # For signature verification
 from eth_account.messages import encode_defunct
 from eth_account import Account
+
+# For Solana signature verification
+from solders.pubkey import Pubkey # 使用 solders 库中的 Pubkey
+from solders.keypair import Keypair # 虽然这里不用Keypair，但通常和Pubkey一起导入
+import nacl.signing
+import nacl.exceptions
 
 # 创建蓝图
 admin_v2_bp = Blueprint('admin_v2', __name__, url_prefix='/api/admin/v2')
@@ -39,50 +46,28 @@ def api_admin_required(f):
         current_app.logger.debug(f"Admin compat API access attempt: {request.path}")
         
         # 从请求头中获取管理员钱包地址
-        eth_address = request.headers.get('X-Eth-Address')
+        wallet_address = request.headers.get('X-Wallet-Address') # 改为通用名称
         
-        # 如果请求头中没有找到，尝试从session中获取
-        if not eth_address and session.get('admin_verified') and session.get('admin_wallet_address'):
-            eth_address = session.get('admin_wallet_address')
-            current_app.logger.info(f"使用session中的管理员地址: {eth_address}")
+        if not wallet_address and session.get('admin_verified') and session.get('admin_wallet_address'):
+            wallet_address = session.get('admin_wallet_address')
+            current_app.logger.info(f"使用session中的管理员地址: {wallet_address}")
         
-        # 如果上面都没有找到，尝试从cookie中获取
-        if not eth_address:
-            eth_address = request.cookies.get('eth_address')
+        if not wallet_address:
+            wallet_address = request.cookies.get('wallet_address') # 改为通用名称
             
-        if not eth_address:
-            current_app.logger.warning("Admin compat API missing ETH address")
+        if not wallet_address:
+            current_app.logger.warning("Admin compat API missing wallet address")
             return jsonify({"error": "缺少管理员钱包地址"}), 401
             
-        # 简单检查地址格式 - 允许Solana和以太坊格式
-        if (not eth_address.startswith('0x') or len(eth_address) != 42) and len(eth_address) != 44:
-            current_app.logger.warning(f"Admin compat API invalid address format: {eth_address}")
-            return jsonify({"error": "无效的钱包地址格式"}), 401
-            
-        # 检查管理员权限
-        admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == eth_address.lower()).first()
+        # 检查管理员权限 (Solana地址是大小写敏感的)
+        admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
         if admin_user:
-            g.eth_address = eth_address
+            g.wallet_address = wallet_address
             g.admin = admin_user
-            current_app.logger.info(f"Admin compat API access GRANTED for {eth_address}")
+            current_app.logger.info(f"Admin compat API access GRANTED for {wallet_address}")
             return f(*args, **kwargs)
             
-        # 旧版配置检查
-        try:
-            import os
-            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.json')
-            if os.path.exists(config_path):
-                with open(config_path, 'r') as file:
-                    config = json.load(file)
-                    admins = config.get('admins', {})
-                    if eth_address.lower() in [addr.lower() for addr in admins]:
-                        g.eth_address = eth_address
-                        current_app.logger.info(f"Admin compat API access GRANTED for {eth_address} via config")
-                        return f(*args, **kwargs)
-        except Exception as e:
-            current_app.logger.error(f"Error checking admin config: {str(e)}")
-            
-        current_app.logger.warning(f"Admin compat API access DENIED for {eth_address}")
+        current_app.logger.warning(f"Admin compat API access DENIED for {wallet_address}")
         return jsonify({"error": "您没有管理员权限", "code": "ADMIN_REQUIRED"}), 403
             
     return decorated_function
@@ -90,18 +75,16 @@ def api_admin_required(f):
 # 后台API身份验证装饰器
 def admin_required(f):
     """管理员API权限装饰器，基于安全的session验证"""
-    @wraps(f) # 保持 wraps
+    @wraps(f)
     def decorated_function(*args, **kwargs):
         current_app.logger.debug(f"Admin API access attempt: {request.path}, Session: {session}")
         if session.get('admin_verified') and session.get('admin_wallet_address'):
             wallet_address = session.get('admin_wallet_address')
-            # 此处直接从session获取admin_user_id和role，避免每次都查库，如果session中已存
-            # 或者，如果g.admin的完整对象更常用，则查库
-            admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == wallet_address.lower()).first()
+            admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
 
             if admin_user:
-                g.eth_address = wallet_address # 兼容可能存在的旧代码
-                g.admin = admin_user # 设置 g.admin 供 permission_required 等使用
+                g.wallet_address = wallet_address # 兼容可能存在的旧代码
+                g.admin = admin_user
                 g.admin_user_id = admin_user.id
                 g.admin_role = admin_user.role
                 current_app.logger.info(f"Admin API access GRANTED for {wallet_address} (ID: {admin_user.id}) via verified session for API {request.path}")
@@ -252,7 +235,7 @@ def log_admin_operation(operation_type):
                 
                 # 写入操作日志
                 AdminOperationLog.log_operation(
-                    admin_address=g.eth_address,
+                    admin_address=g.wallet_address,
                     operation_type=operation_type,
                     target_table=target_table,
                     target_id=target_id,
@@ -273,8 +256,8 @@ def compat_admin_required(f):
     @eth_address_required
     def admin_check(*args, **kwargs):
         # 先检查是否为新系统中的管理员
-        eth_address = g.eth_address
-        admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == eth_address.lower()).first()
+        wallet_address = g.wallet_address
+        admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
         
         if admin_user:
             g.admin = admin_user
@@ -289,7 +272,7 @@ def compat_admin_required(f):
             if os.path.exists(config_path):
                 with open(config_path, 'r') as file:
                     config = json.load(file)
-                    if eth_address.lower() in [addr.lower() for addr in config.get('admins', [])]:
+                    if wallet_address in [addr for addr in config.get('admins', [])]:
                         return f(*args, **kwargs)
         except Exception as e:
             current_app.logger.error(f"Error checking admin in config: {str(e)}")
@@ -1811,7 +1794,7 @@ def create_commission_setting():
             min_amount=data.get('min_amount'),
             max_amount=data.get('max_amount'),
             is_active=data.get('is_active', True),
-            created_by=g.eth_address
+            created_by=g.wallet_address
         )
         
         db.session.add(setting)
@@ -2193,10 +2176,10 @@ def get_auth_challenge():
     try:
         nonce = secrets.token_hex(32)
         session['admin_auth_nonce'] = nonce
-        # 可以考虑为nonce设置一个过期时间，例如在session中也存储一个时间戳
-        # session['admin_auth_nonce_timestamp'] = datetime.utcnow().timestamp()
+        session['admin_auth_nonce_timestamp'] = datetime.utcnow().timestamp()
         current_app.logger.info(f"Auth challenge generated for session: {session.sid}, Nonce stored.")
-        return jsonify({'nonce': nonce, 'message': 'Please sign this nonce with your admin wallet.'}), 200
+        # 前端会构建一个类似 "请签名此消息以验证您的身份: {nonce}" 的消息
+        return jsonify({'nonce': nonce, 'message_prefix': '请签名此消息以验证您的身份: '}), 200
     except Exception as e:
         current_app.logger.error(f"Error generating auth challenge: {str(e)}")
         return jsonify({'error': 'Failed to generate challenge', 'message': str(e)}), 500
@@ -2205,79 +2188,89 @@ def get_auth_challenge():
 def admin_auth_login():
     """
     验证管理员钱包签名并处理登录。
+    现在适配Solana (Phantom)签名。
     """
     data = request.get_json()
     if not data:
         return jsonify({'error': 'Request body must be JSON.'}), 400
 
-    wallet_address = data.get('wallet_address')
-    signature = data.get('signature')
+    wallet_address = data.get('wallet_address') # Solana地址
+    signature_b64 = data.get('signature')    # Base64编码的签名
+    original_message_from_frontend = data.get('message') # 前端签名的完整消息
     
-    if not wallet_address or not signature:
-        return jsonify({'error': 'wallet_address and signature are required.'}), 400
+    if not wallet_address or not signature_b64 or not original_message_from_frontend:
+        return jsonify({'error': 'wallet_address, signature (Base64), and message are required.'}), 400
 
-    # 规范化钱包地址为小写，以太坊地址不区分大小写但通常用小写比较
-    normalized_wallet_address = wallet_address.lower()
+    # 从session中获取nonce，并检查其有效性
+    nonce_from_session = session.pop('admin_auth_nonce', None)
+    nonce_timestamp = session.pop('admin_auth_nonce_timestamp', None)
 
-    nonce = session.pop('admin_auth_nonce', None)
-    # timestamp = session.pop('admin_auth_nonce_timestamp', None) # 如果实现了时间戳
-
-    if not nonce:
-        current_app.logger.warning(f"Admin login attempt for {normalized_wallet_address} failed: Nonce not found in session.")
+    if not nonce_from_session:
+        current_app.logger.warning(f"Admin login attempt for {wallet_address} failed: Nonce not found in session.")
         return jsonify({'error': 'Login challenge not found or expired. Please request a new challenge.'}), 400
+    
+    if nonce_timestamp and (datetime.utcnow().timestamp() - nonce_timestamp) > 300: # 5分钟过期
+        current_app.logger.warning(f"Admin login attempt for {wallet_address} failed: Nonce expired.")
+        return jsonify({'error': 'Login challenge expired. Please request a new challenge.'}), 400
 
-    # # 如果实现了时间戳/过期逻辑 (例如，nonce 5分钟内有效)
-    # if timestamp and (datetime.utcnow().timestamp() - timestamp) > 300:
-    #     current_app.logger.warning(f"Admin login attempt for {normalized_wallet_address} failed: Nonce expired.")
-    #     return jsonify({'error': 'Login challenge expired. Please request a new challenge.'}), 400
+    # 验证前端发送的原始消息是否包含正确的nonce
+    # 前端构建的消息格式为: `请签名此消息以验证您的身份: {nonce}`
+    expected_message_prefix = "请签名此消息以验证您的身份: "
+    if not original_message_from_frontend.startswith(expected_message_prefix) or \
+       original_message_from_frontend[len(expected_message_prefix):] != nonce_from_session:
+        current_app.logger.warning(
+            f"Admin login attempt for {wallet_address} failed: Message-Nonce mismatch. "
+            f"Frontend msg: '{original_message_from_frontend}', Expected nonce: '{nonce_from_session}'."
+        )
+        return jsonify({'error': 'Message does not match the challenge nonce. Please try again.'}), 400
 
     try:
-        message = encode_defunct(text=nonce)
-        recovered_address = Account.recover_message(message, signature=signature)
-        recovered_address_normalized = recovered_address.lower()
+        # 解码Base64签名
+        signature_bytes = base64.b64decode(signature_b64)
+        
+        # 创建Solana公钥对象
+        public_key = Pubkey.from_string(wallet_address)
+        
+        # 创建验证密钥对象
+        verify_key = nacl.signing.VerifyKey(bytes(public_key))
+        
+        # 验证签名
+        # Phantom钱包（以及Solana标准）签名的是消息的UTF-8字节
+        message_bytes = original_message_from_frontend.encode('utf-8')
+        verify_key.verify(message_bytes, signature_bytes)
+        # 如果verify没有抛出异常，则签名有效
+        current_app.logger.info(f"Solana signature verified successfully for {wallet_address}.")
 
-        if recovered_address_normalized != normalized_wallet_address:
-            current_app.logger.warning(
-                f"Admin login attempt for {normalized_wallet_address} failed: Signature mismatch. "
-                f"Recovered {recovered_address_normalized}."
-            )
-            return jsonify({'error': 'Signature verification failed. Wallet address does not match signer.'}), 403
-
-        # 验证签名者是否是数据库中的管理员
-        admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == recovered_address_normalized).first()
+        # 验证签名者是否是数据库中的管理员 (Solana地址是大小写敏感的)
+        admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
         
         if not admin_user:
-            current_app.logger.warning(f"Admin login attempt for {recovered_address_normalized} failed: Address is not a registered admin.")
+            current_app.logger.warning(f"Admin login attempt for {wallet_address} failed: Address is not a registered admin.")
             return jsonify({'error': 'Access denied. Wallet address is not registered as an administrator.'}), 403
         
         if not admin_user.is_active:
-            current_app.logger.warning(f"Admin login attempt for {recovered_address_normalized} failed: Admin account is inactive.")
+            current_app.logger.warning(f"Admin login attempt for {wallet_address} failed: Admin account is inactive.")
             return jsonify({'error': 'Access denied. Administrator account is inactive.'}), 403
 
         # 登录成功
         session['admin_verified'] = True
-        session['admin_wallet_address'] = recovered_address_normalized
-        session['admin_user_id'] = admin_user.id # 可以存储用户ID
-        session['admin_role'] = admin_user.role # 可以存储角色
+        session['admin_wallet_address'] = wallet_address # 存储Solana地址
+        session['admin_user_id'] = admin_user.id
+        session['admin_role'] = admin_user.role
         
-        # 清除旧的 admin_auth_nonce, 以防万一 (虽然前面已经 pop)
-        session.pop('admin_auth_nonce', None)
-        # session.pop('admin_auth_nonce_timestamp', None)
-
-        current_app.logger.info(f"Admin user {recovered_address_normalized} (ID: {admin_user.id}) logged in successfully.")
+        current_app.logger.info(f"Admin user {wallet_address} (ID: {admin_user.id}) logged in successfully.")
         return jsonify({
             'success': True, 
             'message': 'Admin login successful.', 
-            'wallet_address': recovered_address_normalized,
+            'wallet_address': wallet_address,
             'role': admin_user.role
         }), 200
 
-    except ValueError as ve:
-        # 通常是无效签名的错误
-        current_app.logger.error(f"Admin login signature verification error for {normalized_wallet_address}: {str(ve)}")
-        return jsonify({'error': 'Invalid signature format.', 'details': str(ve)}), 400
+    except (nacl.exceptions.BadSignatureError, ValueError) as sig_err:
+        current_app.logger.error(f"Admin login signature verification error for {wallet_address}: {str(sig_err)}")
+        return jsonify({'error': 'Signature verification failed.', 'details': str(sig_err)}), 403
     except Exception as e:
-        current_app.logger.error(f"Admin login error for {normalized_wallet_address}: {str(e)}")
+        current_app.logger.error(f"Admin login error for {wallet_address}: {str(e)}")
         current_app.logger.error(traceback.format_exc())
         return jsonify({'error': 'An unexpected error occurred during login.', 'message': str(e)}), 500
 
@@ -2293,8 +2286,6 @@ def admin_auth_logout():
         session.pop('admin_wallet_address', None)
         session.pop('admin_user_id', None)
         session.pop('admin_role', None)
-        # 可选：使整个session无效
-        # session.clear()
         current_app.logger.info(f"Admin user {wallet_address_for_log} logged out successfully.")
         return jsonify({'success': True, 'message': 'Logout successful.'}), 200
     except Exception as e:
