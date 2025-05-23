@@ -8,6 +8,26 @@ const DEBUG_MODE = window.location.hostname === 'localhost' ||
                    window.location.hostname === '127.0.0.1' || 
                    window.DEBUG_MODE === true;
 
+// Buffer polyfill for browser environment
+if (typeof Buffer === 'undefined') {
+    window.Buffer = {
+        alloc: function(size) {
+            const arr = new Uint8Array(size);
+            arr.writeUInt8 = function(value, offset) {
+                this[offset] = value;
+            };
+            arr.writeBigUInt64LE = function(value, offset) {
+                const bigintValue = BigInt(value);
+                for (let i = 0; i < 8; i++) {
+                    this[offset + i] = Number((bigintValue >> BigInt(i * 8)) & 0xFFn);
+                }
+            };
+            return arr;
+        }
+    };
+    console.log('Buffer polyfill loaded for browser environment');
+}
+
 // 调试日志函数
 function debugLog(...args) {
     if (DEBUG_MODE) {
@@ -2971,210 +2991,152 @@ checkIfReturningFromWalletApp(walletType) {
         try {
             console.log(`开始执行真实Solana ${tokenSymbol}转账，接收地址: ${to}, 金额: ${amount}`);
             
-            // 1. 确保Solana库已加载 - 使用优化的函数
+            // 1. 确保Solana库已加载
             await this.ensureSolanaLibrariesOptimized();
             
-            // 2. 获取钱包连接信息
+            // 2. 检查钱包连接
             if (!window.solana || !window.solana.isConnected) {
                 throw new Error('Solana钱包未连接，请先连接钱包');
             }
             
-            // 3. 使用环境变量或配置中的mint地址
-            let mintAddress = null;
-            
-            if (tokenSymbol === 'USDC') {
-                // 从API获取USDC的mint地址
-                const paymentSettingsResponse = await fetch('/api/service/config/payment_settings');
-                if (!paymentSettingsResponse.ok) {
-                    throw new Error('获取支付配置失败');
-                }
-                
-                const paymentSettings = await paymentSettingsResponse.json();
-                if (!paymentSettings || !paymentSettings.usdc_mint) {
-                    throw new Error('支付配置中缺少USDC Mint地址');
-                }
-                
-                mintAddress = paymentSettings.usdc_mint;
-                console.log('使用支付配置中的USDC Mint地址:', mintAddress);
-            } else {
+            // 3. 获取USDC mint地址
+            if (tokenSymbol !== 'USDC') {
                 throw new Error(`不支持的代币: ${tokenSymbol}`);
             }
             
+            const paymentSettingsResponse = await fetch('/api/service/config/payment_settings');
+            if (!paymentSettingsResponse.ok) {
+                throw new Error('获取支付配置失败');
+            }
+            
+            const paymentSettings = await paymentSettingsResponse.json();
+            if (!paymentSettings || !paymentSettings.usdc_mint) {
+                throw new Error('支付配置中缺少USDC Mint地址');
+            }
+            
+            const mintAddress = paymentSettings.usdc_mint;
+            console.log('USDC Mint地址:', mintAddress);
+            
+            // 4. 创建公钥对象
             const usdcMint = new window.solanaWeb3.PublicKey(mintAddress);
             const fromPubkey = new window.solanaWeb3.PublicKey(this.address);
             const toPubkey = new window.solanaWeb3.PublicKey(to);
             
-            // 指定正确的程序ID
-            const tokenProgramId = new window.solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-            const associatedTokenProgramId = new window.solanaWeb3.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+            // 5. SPL Token程序ID
+            const TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+            const ASSOCIATED_TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
             
-            console.log('获取代币账户...');
-            
-            // 计算ATA地址
+            // 6. 计算关联代币账户地址
+            console.log('计算ATA地址...');
             const fromTokenAccount = await window.spl_token.getAssociatedTokenAddress(
-                usdcMint,
-                fromPubkey,
-                false,
-                tokenProgramId,
-                associatedTokenProgramId
+                usdcMint, fromPubkey, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
             );
-            
             const toTokenAccount = await window.spl_token.getAssociatedTokenAddress(
-                usdcMint,
-                toPubkey,
-                false,
-                tokenProgramId,
-                associatedTokenProgramId
+                usdcMint, toPubkey, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
             );
             
-            console.log('计算得到的ATA地址:', {
-                fromATA: fromTokenAccount.toString(),
-                toATA: toTokenAccount.toString()
+            console.log('计算的ATA地址:', {
+                from: fromTokenAccount.toString(),
+                to: toTokenAccount.toString()
             });
 
             // 7. 获取最新区块哈希
             console.log('获取区块哈希...');
-            const latestBlockhashResponse = await fetch('/api/solana/get_latest_blockhash');
-            if (!latestBlockhashResponse.ok) {
+            const blockHashResponse = await fetch('/api/solana/get_latest_blockhash');
+            if (!blockHashResponse.ok) {
                 throw new Error('获取区块哈希失败');
             }
-            
-            const blockHashResult = await latestBlockhashResponse.json();
-            
+            const blockHashResult = await blockHashResponse.json();
             if (!blockHashResult.success) {
                 throw new Error(`无法获取区块哈希: ${blockHashResult.error}`);
             }
             
-            // 9. 构建交易
+            // 8. 创建交易
             const transaction = new window.solanaWeb3.Transaction();
             transaction.recentBlockhash = blockHashResult.blockhash;
             transaction.feePayer = fromPubkey;
             
-            // 检查接收方账户
-            console.log('检查接收方账户...');
-            // 使用服务器API检查账户，而不是直接连接Solana节点
+            // 9. 检查接收方ATA是否存在
             const checkAccountResponse = await fetch(`/api/solana/check_account?address=${toTokenAccount.toString()}`);
             if (!checkAccountResponse.ok) {
                 throw new Error('检查接收方账户失败');
             }
-            
             const checkAccountResult = await checkAccountResponse.json();
-            const toTokenAccountExists = checkAccountResult.exists;
             
-            // 如果接收方代币账户不存在，添加创建指令
-            if (!toTokenAccountExists) {
-                console.log('接收方代币账户不存在，添加创建指令');
-                
-                try {
-                    // 修正：使用正确的参数顺序创建关联代币账户指令
-                    const createAtaInstruction = new window.solanaWeb3.TransactionInstruction({
-                        keys: [
-                            { pubkey: fromPubkey, isSigner: true, isWritable: true },                    // payer
-                            { pubkey: toTokenAccount, isSigner: false, isWritable: true },              // associatedToken
-                            { pubkey: toPubkey, isSigner: false, isWritable: false },                  // owner
-                            { pubkey: usdcMint, isSigner: false, isWritable: false },                  // mint
-                            { pubkey: window.solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }, // systemProgram
-                            { pubkey: tokenProgramId, isSigner: false, isWritable: false },            // tokenProgram
-                            { pubkey: window.solanaWeb3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },     // rent
-                        ],
-                        programId: associatedTokenProgramId,
-                        data: new Uint8Array(0), // 创建ATA指令不需要额外数据
-                    });
-                    
-                    transaction.add(createAtaInstruction);
-                    console.log('成功添加创建ATA指令');
-                } catch (ataError) {
-                    console.error('创建ATA指令错误:', ataError);
-                    throw new Error(`创建接收方账户失败: ${ataError.message}`);
-                }
+            // 10. 如果接收方ATA不存在，添加创建指令
+            if (!checkAccountResult.exists) {
+                console.log('接收方ATA不存在，添加创建指令');
+                const createAtaInstruction = new window.solanaWeb3.TransactionInstruction({
+                    keys: [
+                        { pubkey: fromPubkey, isSigner: true, isWritable: true },
+                        { pubkey: toTokenAccount, isSigner: false, isWritable: true },
+                        { pubkey: toPubkey, isSigner: false, isWritable: false },
+                        { pubkey: usdcMint, isSigner: false, isWritable: false },
+                        { pubkey: window.solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false },
+                        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+                        { pubkey: window.solanaWeb3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+                    ],
+                    programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+                    data: new Uint8Array(0),
+                });
+                transaction.add(createAtaInstruction);
             }
             
-            // 10. 准备转账金额（USDC有6位小数）
-            const amountInSmallestUnit = Math.round(amount * 1000000); // 转换为USDC的最小单位
-            console.log('转账金额信息:', {
-                原始金额: amount,
-                最小单位金额: amountInSmallestUnit
+            // 11. 准备转账金额 (USDC有6位小数)
+            const amountLamports = Math.round(amount * 1000000);
+            console.log(`转账金额: ${amount} USDC = ${amountLamports} lamports`);
+            
+            // 12. 创建转账指令 - 使用简化的标准方法
+            console.log('创建转账指令...');
+            
+            // 创建转账指令数据 - 使用标准格式
+            const instructionData = Buffer.alloc(9);
+            instructionData.writeUInt8(3, 0); // Transfer instruction
+            instructionData.writeBigUInt64LE(BigInt(amountLamports), 1); // Amount as u64 little endian
+            
+            const transferInstruction = new window.solanaWeb3.TransactionInstruction({
+                keys: [
+                    { pubkey: fromTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: toTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: fromPubkey, isSigner: true, isWritable: false },
+                ],
+                programId: TOKEN_PROGRAM_ID,
+                data: instructionData,
             });
             
-            // 11. 添加转账指令 - 使用修复的实现
-            console.log('添加转账指令...');
-            try {
-                // 修正：手动构建转账指令，确保数据格式正确
-                const transferInstructionData = new Uint8Array(9);
-                transferInstructionData[0] = 3; // Transfer instruction discriminator
-                
-                // 将金额编码为Little Endian 64位整数
-                const amountBytes = new Uint8Array(8);
-                let amountValue = amountInSmallestUnit;
-                for (let i = 0; i < 8; i++) {
-                    amountBytes[i] = amountValue & 0xff;
-                    amountValue = Math.floor(amountValue / 256);
-                }
-                transferInstructionData.set(amountBytes, 1);
-                
-                const transferInstruction = new window.solanaWeb3.TransactionInstruction({
-                    keys: [
-                        { pubkey: fromTokenAccount, isSigner: false, isWritable: true },  // source
-                        { pubkey: toTokenAccount, isSigner: false, isWritable: true },   // destination
-                        { pubkey: fromPubkey, isSigner: true, isWritable: false },       // owner (必须是签名者)
-                    ],
-                    programId: tokenProgramId,
-                    data: transferInstructionData,
-                });
-                
-                transaction.add(transferInstruction);
-                console.log('成功添加转账指令');
-            } catch (instructionError) {
-                console.error('创建转账指令错误:', instructionError);
-                throw new Error(`创建转账指令失败: ${instructionError.message}`);
-            }
+            transaction.add(transferInstruction);
+            console.log('转账指令已添加');
             
-            // 关键修复：在签名前立即获取最新的区块哈希，确保不会过期
-            console.log('签名前重新获取最新区块哈希...');
-            const finalBlockhashResponse = await fetch('/api/solana/get_latest_blockhash');
-            if (finalBlockhashResponse.ok) {
-                const finalBlockHashResult = await finalBlockhashResponse.json();
-                if (finalBlockHashResult.success) {
-                    transaction.recentBlockhash = finalBlockHashResult.blockhash;
-                    console.log('已更新为最新区块哈希:', finalBlockHashResult.blockhash);
+            // 13. 重新获取最新区块哈希（确保不过期）
+            console.log('更新区块哈希...');
+            const finalBlockHashResponse = await fetch('/api/solana/get_latest_blockhash');
+            if (finalBlockHashResponse.ok) {
+                const finalResult = await finalBlockHashResponse.json();
+                if (finalResult.success) {
+                    transaction.recentBlockhash = finalResult.blockhash;
+                    console.log('区块哈希已更新:', finalResult.blockhash);
                 }
             }
             
-            // 12. 签名交易
-            console.log('请求钱包签名交易...');
-            let signedTransaction;
+            // 14. 请求钱包签名
+            console.log('请求钱包签名...');
+            const signedTransaction = await window.solana.signTransaction(transaction);
             
-            try {
-                signedTransaction = await window.solana.signTransaction(transaction);
-            } catch (signError) {
-                console.error('签名交易失败:', signError);
-                throw new Error(`签名失败: ${signError.message || '用户拒绝交易'}`);
-            }
+            // 15. 发送交易
+            console.log('发送交易...');
+            const transactionBase64 = this.arrayBufferToBase64(signedTransaction.serialize());
             
-            // 13. 通过服务器API发送交易，而不是直接发送到Solana网络
-            console.log('通过服务器API发送已签名交易...');
-            
-            const transactionBuffer = signedTransaction.serialize();
-            const transactionBase64 = this.arrayBufferToBase64(transactionBuffer);
-            
-            console.log('准备发送交易到服务器，交易数据长度:', transactionBase64.length);
-            
-            // 确保包含所有必要参数
-            const walletAddress = this.address || window.walletState?.address;
-            const walletType = this.walletType || window.walletState?.walletType || 'phantom';
-            
-            // 增加必要参数以满足API需求
             const submitResponse = await fetch('/api/solana/submit_transaction', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Wallet-Address': walletAddress,
-                    'X-Wallet-Type': walletType
+                    'X-Wallet-Address': this.address,
+                    'X-Wallet-Type': this.walletType || 'phantom'
                 },
                 body: JSON.stringify({
                     serialized_transaction: transactionBase64,
                     skip_preflight: false,
-                    from_address: walletAddress,
+                    from_address: this.address,
                     to_address: to,
                     amount: amount,
                     token: tokenSymbol,
@@ -3196,22 +3158,21 @@ checkIfReturningFromWalletApp(walletType) {
             
             const submitResult = await submitResponse.json();
             if (!submitResult.success) {
-                throw new Error(`链上转账失败: ${submitResult.error || '未知错误'}`);
+                throw new Error(`交易提交失败: ${submitResult.error || '未知错误'}`);
             }
             
-            const signature = submitResult.signature;
-            console.log('交易已发送，签名:', signature);
+            console.log('交易成功提交，签名:', submitResult.signature);
             
-            // 14. 显示交易状态 
-            this._showTransactionStatus(signature, tokenSymbol, amount, to);
+            // 显示交易状态
+            this._showTransactionStatus(submitResult.signature, tokenSymbol, amount, to);
             
-            // 15. 返回成功结果
             return {
                 success: true,
-                txHash: signature
+                txHash: submitResult.signature
             };
+            
         } catch (error) {
-            console.error('Solana链上转账失败:', error);
+            console.error('Solana转账失败:', error);
             return {
                 success: false,
                 error: `转账失败: ${error.message || '未知错误'}`
