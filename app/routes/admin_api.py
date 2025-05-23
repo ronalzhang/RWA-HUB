@@ -255,7 +255,7 @@ def log_admin_operation(operation_type):
 def compat_admin_required(f):
     """管理员API兼容装饰器"""
     @eth_address_required
-    def admin_check(*args, **kwargs):
+    def compat_check(*args, **kwargs):
         # 先检查是否为新系统中的管理员
         wallet_address = g.wallet_address
         admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
@@ -280,7 +280,7 @@ def compat_admin_required(f):
             
         return jsonify({'error': '您没有管理员权限', 'code': 'ADMIN_REQUIRED'}), 403
         
-    return admin_check
+    return compat_check
 
 # 仪表盘数据API
 @admin_v2_bp.route('/dashboard/stats')
