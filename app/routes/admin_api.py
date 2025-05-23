@@ -2672,3 +2672,142 @@ def compat_user_stats():
             'newToday': 0
         })
 
+# 简单的删除资产API，使用基础权限检查
+@admin_compat_bp.route('/assets/<int:asset_id>', methods=['DELETE'])
+@eth_address_required
+def delete_asset_simple(asset_id):
+    """删除单个资产 - 简化版"""
+    try:
+        current_app.logger.info(f'删除资产请求: asset_id={asset_id}')
+        
+        # 检查管理员权限
+        wallet_address = g.wallet_address
+        admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
+        if not admin_user:
+            return jsonify({'error': '您没有管理员权限'}), 403
+        
+        # 查找资产
+        asset = Asset.query.get_or_404(asset_id)
+        
+        # 如果资产已上链，不允许删除
+        if asset.token_address:
+            return jsonify({'error': '已上链资产不可删除'}), 400
+            
+        # 删除关联的分红记录
+        DividendRecord.query.filter_by(asset_id=asset_id).delete()
+        
+        # 删除关联的交易记录
+        Trade.query.filter_by(asset_id=asset_id).delete()
+        
+        # 删除资产记录
+        db.session.delete(asset)
+        db.session.commit()
+        
+        current_app.logger.info(f'资产已删除: {asset_id}')
+        return jsonify({
+            'success': True,
+            'message': '资产已删除'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'删除资产失败: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
+@admin_compat_bp.route('/assets/batch-delete', methods=['POST'])
+@eth_address_required
+def batch_delete_assets_simple():
+    """批量删除资产 - 简化版"""
+    try:
+        # 检查管理员权限
+        wallet_address = g.wallet_address
+        admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
+        if not admin_user:
+            return jsonify({'success': False, 'error': '您没有管理员权限'}), 403
+        
+        data = request.get_json()
+        if not data or 'asset_ids' not in data:
+            return jsonify({'success': False, 'error': '请提供要删除的资产ID列表'}), 400
+            
+        asset_ids = data['asset_ids']
+        current_app.logger.info(f'批量删除资产请求: asset_ids={asset_ids}')
+        
+        success_count = 0
+        failed_ids = []
+        
+        for asset_id in asset_ids:
+            try:
+                asset = Asset.query.get(asset_id)
+                
+                if not asset:
+                    failed_ids.append({"id": asset_id, "reason": "资产不存在"})
+                    continue
+                
+                # 如果资产已上链，不允许删除
+                if asset.token_address:
+                    failed_ids.append({"id": asset_id, "reason": "已上链资产不可删除"})
+                    continue
+                
+                # 删除关联记录
+                DividendRecord.query.filter_by(asset_id=asset_id).delete()
+                Trade.query.filter_by(asset_id=asset_id).delete()
+                
+                # 删除资产
+                db.session.delete(asset)
+                success_count += 1
+                
+            except Exception as e:
+                current_app.logger.error(f'删除资产 {asset_id} 失败: {str(e)}')
+                failed_ids.append({"id": asset_id, "reason": str(e)})
+                continue
+                
+        db.session.commit()
+        
+        message = f'成功删除 {success_count} 个资产'
+        if failed_ids:
+            message += f'，{len(failed_ids)} 个资产删除失败'
+            
+        return jsonify({
+            'success': True,
+            'message': message,
+            'success_count': success_count,
+            'failed_count': len(failed_ids),
+            'failed_ids': failed_ids
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'批量删除资产失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_compat_bp.route('/check_permissions', methods=['POST'])
+@eth_address_required
+def check_permissions_simple():
+    """检查管理员权限 - 简化版"""
+    try:
+        # 检查管理员权限
+        wallet_address = g.wallet_address
+        admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
+        
+        if admin_user:
+            return jsonify({
+                'success': True,
+                'has_permission': True,
+                'admin_role': admin_user.role,
+                'permissions': ['dividend_management'] if admin_user.role in ['super_admin', 'admin'] else []
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'has_permission': False,
+                'permissions': []
+            })
+            
+    except Exception as e:
+        current_app.logger.error(f"检查管理员权限失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'has_permission': False,
+            'error': '检查权限时发生错误'
+        }), 500
+
