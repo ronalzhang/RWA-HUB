@@ -306,12 +306,10 @@ function resetButton(button, text = '<i class="fas fa-shopping-cart me-2"></i>Bu
  * 检查钱包连接状态并更新按钮
  */
 function updateBuyButtonState() {
-  console.log('更新购买按钮状态');
-  
-  // 防止短时间内多次调用
+  // 增强防抖机制 - 防止短时间内多次调用
   const now = Date.now();
-  if (window._lastBuyButtonUpdate && (now - window._lastBuyButtonUpdate) < 800) {
-    console.log('购买按钮状态更新太频繁，跳过此次更新');
+  if (window._lastBuyButtonUpdate && (now - window._lastBuyButtonUpdate) < 1200) {
+    // console.log('购买按钮状态更新太频繁，跳过此次更新');
     return;
   }
   window._lastBuyButtonUpdate = now;
@@ -319,26 +317,38 @@ function updateBuyButtonState() {
   // 获取所有购买按钮
   const buyButtons = document.querySelectorAll('.buy-button, #buy-button');
   if (buyButtons.length === 0) {
-    console.log('找不到购买按钮元素，可能在其他页面');
+    // console.log('找不到购买按钮元素，可能在其他页面');
     return;
   }
   
   // 检查钱包连接状态
   const walletConnected = isWalletConnected();
-  console.log('钱包状态检查:', { connected: walletConnected });
+  
+  // 只有状态真正需要改变时才记录日志和更新
+  const shouldLog = !window._lastWalletConnectedState || window._lastWalletConnectedState !== walletConnected;
+  if (shouldLog) {
+    console.log('钱包状态检查:', { connected: walletConnected });
+    window._lastWalletConnectedState = walletConnected;
+  }
   
   // 更新所有按钮状态
   buyButtons.forEach(buyButton => {
-    if (walletConnected) {
-      console.log('钱包已连接，启用购买按钮');
-      buyButton.disabled = false;
-      buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
-      buyButton.removeAttribute('title');
-    } else {
-      console.log('钱包未连接，禁用购买按钮');
-      buyButton.disabled = true;
-      buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
-      buyButton.title = '请先连接钱包';
+    const currentDisabled = buyButton.disabled;
+    const shouldBeDisabled = !walletConnected;
+    
+    // 只有状态需要改变时才更新
+    if (currentDisabled !== shouldBeDisabled) {
+      if (walletConnected) {
+        if (shouldLog) console.log('钱包已连接，启用购买按钮');
+        buyButton.disabled = false;
+        buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
+        buyButton.removeAttribute('title');
+      } else {
+        if (shouldLog) console.log('钱包未连接，禁用购买按钮');
+        buyButton.disabled = true;
+        buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
+        buyButton.title = '请先连接钱包';
+      }
     }
   });
 }

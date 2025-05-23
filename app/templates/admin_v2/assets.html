@@ -415,12 +415,12 @@
                     const response = await fetch('/admin/v2/api/assets/stats');
                     if (response.ok) {
                         this.stats = await response.json();
-                    }
+                }
                 } catch (error) {
                     console.error('加载统计数据失败:', error);
                 }
-            },
-            
+        },
+        
             // 加载资产列表
             async loadAssets(page = null) {
                 if (page) this.pagination.page = page;
@@ -496,7 +496,7 @@
                 } catch (error) {
                     console.error('审核失败:', error);
                     alert('审核失败: ' + error.message);
-                }
+                                    }
             },
             
             // 单个资产审核拒绝
@@ -672,7 +672,7 @@
                 };
                 return classes[status] || 'bg-gray-100 text-gray-800';
             }
-        }
-    }
+                }
+            }
 </script>
 {% endblock %} 

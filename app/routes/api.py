@@ -737,20 +737,28 @@ def prepare_purchase():
         price = float(asset.token_price)
         total = price * amount
         
+        # 从系统配置获取平台收款地址
+        from app.models.admin import SystemConfig
+        platform_address = SystemConfig.get_value('PLATFORM_FEE_ADDRESS', 'EmjrXAuA6m6YxAcXhiLSFcQEFSrxmGbXuK4nvUVs5Po7')
+        
         # 生成交易ID
         import uuid
         trade_id = str(uuid.uuid4())
         
-        # 准备响应数据
+        # 准备响应数据 - 添加前端期望的字段
         response = {
             'success': True,
             'trade_id': trade_id,
+            'purchase_id': trade_id,  # 添加purchase_id别名
             'asset_id': asset.id,
             'token_symbol': asset.token_symbol,
             'name': asset.name,  # 添加资产名称
             'amount': amount,
             'price': price,
             'total': total,
+            'total_amount': total,  # 添加前端期望的total_amount字段
+            'recipient_address': platform_address,  # 添加前端期望的recipient_address字段
+            'platform_address': platform_address,  # 保留平台地址字段
             'wallet_address': wallet_address
         }
         

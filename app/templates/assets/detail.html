@@ -407,24 +407,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 同步window.walletState和window.wallet中的数据
                 function syncWalletState() {
-                    console.log('同步钱包状态...');
+                    // 防抖机制 - 短时间内不重复执行
+                    const now = Date.now();
+                    if (window._lastWalletStateSync && (now - window._lastWalletStateSync) < 1500) {
+                        return; // 1.5秒内不重复同步
+                    }
+                    window._lastWalletStateSync = now;
                     
                     try {
+                        // 检查钱包状态是否真的需要更新
+                        const currentConnected = window.walletState && (window.walletState.connected || window.walletState.isConnected);
+                        const currentAddress = window.walletState ? window.walletState.address : null;
+                        
                         // 修复钱包对象调用 - 使用正确的walletState对象
-                        const connected = window.walletState && (window.walletState.connected || window.walletState.isConnected);
-                        const address = window.walletState ? window.walletState.getAddress() : null;
+                        const newConnected = window.walletState && (window.walletState.connected || window.walletState.isConnected);
+                        const newAddress = window.walletState ? window.walletState.address : null;
                         
-                        if (!window.walletState) {
-                            window.walletState = {};
-                        }
-                        
-                        window.walletState.connected = connected;
-                        window.walletState.isConnected = connected;
-                        window.walletState.address = address;
-                        
-                        // 更新购买按钮状态
-                        if (typeof updateBuyButtonState === 'function') {
-                            updateBuyButtonState();
+                        // 只有状态真正变化时才更新
+                        if (currentConnected !== newConnected || currentAddress !== newAddress) {
+                            console.log('同步钱包状态...', {
+                                oldConnected: currentConnected, 
+                                newConnected: newConnected,
+                                oldAddress: currentAddress,
+                                newAddress: newAddress
+                            });
+                            
+                            if (!window.walletState) {
+                                window.walletState = {};
+                            }
+                            
+                            window.walletState.connected = newConnected;
+                            window.walletState.isConnected = newConnected;
+                            window.walletState.address = newAddress;
+                            
+                            // 更新购买按钮状态
+                            if (typeof updateBuyButtonState === 'function') {
+                                updateBuyButtonState();
+                            }
                         }
                     } catch (error) {
                         console.error('同步钱包状态时出错:', error);
@@ -434,12 +453,46 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 初次同步
                 syncWalletState();
                 
-                // 每秒检查钱包状态，确保状态同步
-                const walletStateInterval = setInterval(syncWalletState, 2000);
+                // 优化定时器 - 减少频率并添加智能检查
+                let walletStateInterval;
+                let checkCount = 0;
+                function startWalletStateMonitoring() {
+                    // 初始阶段检查较频繁（前30秒内每3秒检查一次）
+                    // 之后改为每30秒检查一次
+                    const startMonitoring = (interval) => {
+                        walletStateInterval = setInterval(() => {
+                            checkCount++;
+                            const isInitialPhase = checkCount <= 10; // 前10次检查（30秒）
+                            
+                            if (isInitialPhase) {
+                                syncWalletState();
+                            } else {
+                                // 长期阶段，降低频率
+                                if (checkCount % 10 === 0) { // 每10次检查执行一次同步
+                                    syncWalletState();
+                                }
+                            }
+                            
+                            // 在初始阶段结束后，重新设置更长的间隔
+                            if (checkCount === 10) {
+                                clearInterval(walletStateInterval);
+                                startMonitoring(30000); // 改为30秒间隔
+                            }
+                        }, interval);
+                    };
+                    
+                    // 开始时使用3秒间隔
+                    startMonitoring(3000);
+                }
+                
+                // 启动监控
+                startWalletStateMonitoring();
                 
                 // 页面卸载时清除定时器
                 window.addEventListener('beforeunload', function() {
-                    clearInterval(walletStateInterval);
+                    if (walletStateInterval) {
+                        clearInterval(walletStateInterval);
+                    }
                 });
                 
                 // 设置交易表单
