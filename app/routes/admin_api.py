@@ -2689,10 +2689,6 @@ def delete_asset_simple(asset_id):
         # 查找资产
         asset = Asset.query.get_or_404(asset_id)
         
-        # 如果资产已上链，不允许删除
-        if asset.token_address:
-            return jsonify({'error': '已上链资产不可删除'}), 400
-            
         # 删除关联的分红记录
         DividendRecord.query.filter_by(asset_id=asset_id).delete()
         
@@ -2703,10 +2699,10 @@ def delete_asset_simple(asset_id):
         db.session.delete(asset)
         db.session.commit()
         
-        current_app.logger.info(f'资产已删除: {asset_id}')
+        current_app.logger.info(f'资产已删除: {asset_id} (包括已上链资产，仅删除平台发布信息)')
         return jsonify({
             'success': True,
-            'message': '资产已删除'
+            'message': '资产已从平台删除'
         })
         
     except Exception as e:
@@ -2741,11 +2737,6 @@ def batch_delete_assets_simple():
                 
                 if not asset:
                     failed_ids.append({"id": asset_id, "reason": "资产不存在"})
-                    continue
-                
-                # 如果资产已上链，不允许删除
-                if asset.token_address:
-                    failed_ids.append({"id": asset_id, "reason": "已上链资产不可删除"})
                     continue
                 
                 # 删除关联记录
