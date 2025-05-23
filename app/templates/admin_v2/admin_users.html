@@ -205,9 +205,21 @@
                 }
             },
             
+            refreshAdminUsers() {
+                this.loadAdminUsers();
+            },
+            
             editAdmin(admin) {
                 this.editingAdmin = { ...admin };
                 this.showEditAdmin = true;
+            },
+            
+            resetNewAdmin() {
+                this.newAdmin = {
+                    wallet_address: '',
+                    admin_level: '',
+                    role: ''
+                };
             },
             
             async saveAdmin() {
@@ -259,7 +271,9 @@
             },
             
             async deleteAdmin(admin) {
-                if (!confirm(`确定要删除管理员 ${admin.wallet_address} 吗？此操作无法撤销。`)) return;
+                if (!confirm(`确定要删除管理员 ${admin.wallet_address} 吗？`)) {
+                    return;
+                }
                 
                 try {
                     const response = await fetch(`/api/admin_addresses/${admin.wallet_address}`, {
@@ -276,34 +290,20 @@
                 }
             },
             
-            async refreshAdminUsers() {
-                await this.loadAdminUsers();
-            },
-            
-            resetNewAdmin() {
-                this.newAdmin = {
-                    wallet_address: '',
-                    admin_level: '',
-                    role: ''
-                };
-            },
-            
-            formatDateTime(dateString) {
-                if (!dateString) return '-';
-                const date = new Date(dateString);
-                return date.toLocaleDateString('zh-CN') + ' ' + 
-                       date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-            },
-            
             getLevelText(level) {
-                const levelMap = {
-                    'super': '超级管理员',
-                    'admin': '管理员',
-                    'moderator': '审核员'
-                };
-                return levelMap[level] || '未知';
+                switch(level) {
+                    case 'super_admin': return '超级管理员';
+                    case 'admin': return '管理员';
+                    case 'moderator': return '审核员';
+                    default: return level;
+                }
+            },
+            
+            formatDateTime(dateStr) {
+                if (!dateStr) return '-';
+                return dateStr;
             }
-        }
+        };
     }
 </script>
 {% endblock %} 
