@@ -2974,12 +2974,12 @@ checkIfReturningFromWalletApp(walletType) {
         try {
             console.log(`开始执行真实Solana ${tokenSymbol}转账，接收地址: ${to}, 金额: ${amount}`);
             
-            // 1. 确保Solana库已加载
-            await this.ensureSolanaLibraries();
+            // 1. 确保Solana库已加载 - 使用优化的函数
+            await this.ensureSolanaLibrariesOptimized();
             
             // 确保SPL Token库的程序ID已正确初始化
-            if (window.splToken && typeof window.splToken.initializeProgramIds === 'function') {
-                window.splToken.initializeProgramIds();
+            if (window.spl_token && typeof window.spl_token.initializeProgramIds === 'function') {
+                window.spl_token.initializeProgramIds();
             }
             
             // 2. 获取钱包连接信息
@@ -3039,7 +3039,7 @@ checkIfReturningFromWalletApp(walletType) {
             transaction.feePayer = fromPubkey;
             
             // 获取发送方的代币账户
-            const fromTokenAccount = await splToken.getAssociatedTokenAddress(
+            const fromTokenAccount = await window.spl_token.getAssociatedTokenAddress(
                 usdcMint,
                 fromPubkey,
                 false,
@@ -3048,7 +3048,7 @@ checkIfReturningFromWalletApp(walletType) {
             );
             
             // 获取接收方的代币账户
-            const toTokenAccount = await splToken.getAssociatedTokenAddress(
+            const toTokenAccount = await window.spl_token.getAssociatedTokenAddress(
                 usdcMint,
                 toPubkey,
                 false,
@@ -3073,7 +3073,7 @@ checkIfReturningFromWalletApp(walletType) {
                 
                 try {
                     // 修复：确保使用正确的参数顺序创建关联代币账户指令
-                    const createAtaInstruction = splToken.createAssociatedTokenAccountInstruction(
+                    const createAtaInstruction = window.spl_token.createAssociatedTokenAccountInstruction(
                         fromPubkey,                // payer 
                         toTokenAccount,            // associatedToken
                         toPubkey,                  // owner
@@ -3096,7 +3096,7 @@ checkIfReturningFromWalletApp(walletType) {
             console.log('添加转账指令...');
             try {
                 // 使用兼容性更好的标准TransferInstruction方法
-                const transferInstruction = splToken.createTransferInstruction(
+                const transferInstruction = window.spl_token.createTransferInstruction(
                     fromTokenAccount,           // 源代币账户
                     toTokenAccount,             // 目标代币账户  
                     fromPubkey,                 // 源代币账户的所有者（必须是签名者）

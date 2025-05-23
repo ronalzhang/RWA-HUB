@@ -3148,7 +3148,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- 添加SPL Token库 -->
 <script src="{{ url_for('proxy.cached_vendor', filename='solana-spl-token.js') }}"></script>
 <script>
-    // 简化的SPL Token库检查 - 移除重复的初始化逻辑
+    // 简化的SPL Token库检查 - 与头部初始化逻辑保持一致
     window.initSplTokenLib = async function() {
         console.log('[initSplTokenLib] 检查SPL Token库状态');
         
@@ -3158,7 +3158,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return true;
         }
         
-        // 尝试从全局变量获取
+        // 尝试从全局变量获取 - 与头部初始化保持一致
         if (typeof SolanaToken !== 'undefined') {
             window.spl_token = SolanaToken;
             console.log('[initSplTokenLib] 从SolanaToken设置spl_token');
