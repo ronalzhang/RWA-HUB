@@ -36,6 +36,21 @@ def create_app(config_name='development'):
     app.config.from_object(config[config_name])
     config[config_name].init_app(app)
     
+    # 确保 SECRET_KEY 已设置
+    if not app.config.get('SECRET_KEY'):
+        app.logger.warning("SECRET_KEY is not set in the configuration file.")
+        secret_key_from_env = os.environ.get('SECRET_KEY')
+        if secret_key_from_env:
+            app.config['SECRET_KEY'] = secret_key_from_env
+            app.logger.info("Loaded SECRET_KEY from environment variable.")
+        elif config_name == 'development':
+            app.config['SECRET_KEY'] = 'dev_secret_key_for_flask_session_testing_only' # 仅用于开发环境
+            app.logger.warning("Using a default SECRET_KEY for development. "
+                               "Please set a strong, unique SECRET_KEY in your config or environment for production!")
+        else:
+            app.logger.error("CRITICAL: SECRET_KEY is not set. Application cannot run securely in production without it.")
+            raise ValueError("SECRET_KEY must be set for production environments.")
+    
     # 配置静态文件
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # 禁用静态文件缓存
     app.static_folder = 'static'  # 设置静态文件夹

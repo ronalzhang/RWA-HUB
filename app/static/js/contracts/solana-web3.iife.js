@@ -1,6 +1,16 @@
 // Solana Web3.js 库 - 服务器API中继版本
 // 此版本修改了Connection对象的实现，使其通过服务器API中继连接，避免直接连接RPC节点
 
+// 立即设置一个临时的Connection构造函数，避免初始化错误
+if (!window.solanaWeb3) {
+    window.solanaWeb3 = {};
+}
+
+// 创建一个临时的Connection构造函数，用于过渡期
+window.solanaWeb3.Connection = function(endpoint, commitmentOrConfig) {
+    throw new Error('Solana Web3 库正在加载中，请稍后重试');
+};
+
 // 保存原始脚本的引用
 const originalScript = document.createElement('script');
 originalScript.src = '/static/js/contracts/solana-web3.iife.min.js';
@@ -17,8 +27,8 @@ originalScript.onload = function() {
         window.solanaWeb3 = window.solana.web3;
     }
     
-    if (!window.solanaWeb3) {
-        console.error('无法找到solanaWeb3对象');
+    if (!window.solanaWeb3 || !window.solanaWeb3.Connection) {
+        console.error('无法找到solanaWeb3.Connection对象');
         return;
     }
     
@@ -183,6 +193,14 @@ originalScript.onload = function() {
     };
     
     console.log('Connection对象已成功修改为使用服务器API中继');
+    
+    // 触发全局事件，通知其他代码Solana库已就绪
+    if (typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('solanaWeb3Ready', {
+            detail: { solanaWeb3: window.solanaWeb3 }
+        }));
+        console.log('已触发solanaWeb3Ready事件');
+    }
 };
 
 // 添加错误处理
