@@ -3119,22 +3119,48 @@ document.addEventListener('DOMContentLoaded', function() {
             buyButton.addEventListener('click', localHandleBuy);
             console.log('购买按钮成功绑定点击事件');
             
-            // 防止按钮文本被意外修改
+            // 防止按钮文本被意外修改 - 优化检测逻辑
             const observer = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
                     if (mutation.type === 'childList' || mutation.type === 'characterData') {
-                        const currentText = buyButton.innerHTML;
-                        // 如果按钮文本被意外修改为数字或其他错误内容，恢复正确文本
-                        if (/^\d+$/.test(currentText.trim()) || 
-                            (!currentText.includes('Buy') && !currentText.includes('请先连接钱包') && !currentText.includes('处理中'))) {
-                            console.warn('检测到购买按钮文本被意外修改为:', currentText, '正在恢复...');
+                        const currentText = buyButton.innerHTML.trim();
+                        const textContent = buyButton.textContent.trim();
+                        
+                        // 定义合法的按钮状态
+                        const validStates = [
+                            'Buy',
+                            '请先连接钱包',
+                            '处理中',
+                            '购买',
+                            '连接钱包',
+                            '准备中...',
+                            '连接中...',
+                            '加载中...',
+                            'Connect Wallet',
+                            'Processing...',
+                            'Loading...'
+                        ];
+                        
+                        // 检查是否包含合法状态文本
+                        const isValidState = validStates.some(state => 
+                            currentText.includes(state) || textContent.includes(state)
+                        );
+                        
+                        // 检查是否只是纯数字（这通常是错误的）
+                        const isPureNumber = /^\$?\d+(\.\d+)?$/.test(textContent);
+                        
+                        // 只有在确实是错误状态时才恢复
+                        if (isPureNumber || (!isValidState && textContent.length > 0 && !currentText.includes('fas fa-'))) {
+                            if (DEBUG_MODE) {
+                                console.warn('检测到购买按钮文本被意外修改为:', currentText, '正在恢复...');
+                            }
                             buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
                         }
                     }
                 });
             });
             
-            // 开始观察按钮文本变化
+            // 开始观察按钮文本变化 - 减少观察频率
             observer.observe(buyButton, {
                 childList: true,
                 subtree: true,
