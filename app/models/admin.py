@@ -71,6 +71,34 @@ class SystemConfig(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'updated_by': self.updated_by
         }
+    
+    @classmethod
+    def get_value(cls, key, default=None):
+        """获取配置值"""
+        config = cls.query.filter_by(key=key).first()
+        return config.value if config else default
+    
+    @classmethod
+    def set_value(cls, key, value, description=None, updated_by=None):
+        """设置配置值"""
+        config = cls.query.filter_by(key=key).first()
+        if config:
+            config.value = value
+            if description:
+                config.description = description
+            if updated_by:
+                config.updated_by = updated_by
+            config.updated_at = datetime.utcnow()
+        else:
+            config = cls(
+                key=key,
+                value=value,
+                description=description,
+                updated_by=updated_by
+            )
+            db.session.add(config)
+        db.session.commit()
+        return config
 
 # 佣金设置
 class CommissionSetting(db.Model):
