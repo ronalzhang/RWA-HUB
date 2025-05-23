@@ -604,10 +604,18 @@
             
             // 删除资产
             function deleteAsset(assetId) {
+                // 获取钱包地址
+                const walletAddress = getWalletAddress();
+                if (!walletAddress) {
+                    alert('未检测到钱包连接，请先连接钱包');
+                    return;
+                }
+                
                 fetch(`/api/admin/assets/${assetId}`, {
                     method: 'DELETE',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'X-Wallet-Address': walletAddress
                     }
                 })
                 .then(response => {
@@ -621,7 +629,7 @@
                         alert('删除成功');
                         loadAssets(currentPage, getFilters());
                     } else {
-                        throw new Error(data.message || '删除失败');
+                        throw new Error(data.message || data.error || '删除失败');
                     }
                 })
                 .catch(error => {
@@ -639,11 +647,19 @@
                     return;
                 }
                 
+                // 获取钱包地址
+                const walletAddress = getWalletAddress();
+                if (!walletAddress) {
+                    alert('未检测到钱包连接，请先连接钱包');
+                    return;
+                }
+                
                 if (confirm(`确定要删除所选的 ${selectedIds.length} 个资产吗？此操作不可恢复。`)) {
                     fetch('/api/admin/assets/batch-delete', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'X-Wallet-Address': walletAddress
                         },
                         body: JSON.stringify({ asset_ids: selectedIds })
                     })
@@ -668,6 +684,38 @@
                         alert(`批量删除资产失败: ${error.message}`);
                     });
                 }
+            }
+            
+            // 获取钱包地址的函数
+            function getWalletAddress() {
+                // 方法1: 从walletState获取
+                if (window.walletState && window.walletState.address) {
+                    return window.walletState.address;
+                }
+                
+                // 方法2: 从localStorage获取
+                const stored = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
+                if (stored) {
+                    return stored;
+                }
+                
+                // 方法3: 从cookie获取
+                const cookies = document.cookie.split(';');
+                for (const cookie of cookies) {
+                    const [name, value] = cookie.trim().split('=');
+                    if (name === 'wallet_address' || name === 'eth_address') {
+                        return value;
+                    }
+                }
+                
+                // 方法4: 从URL参数获取
+                const urlParams = new URLSearchParams(window.location.search);
+                const ethAddress = urlParams.get('eth_address') || urlParams.get('wallet_address');
+                if (ethAddress) {
+                    return ethAddress;
+                }
+                
+                return null;
             }
             
             // 批量审核通过
