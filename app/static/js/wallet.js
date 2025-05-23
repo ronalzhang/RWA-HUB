@@ -3,6 +3,33 @@
  * 支持多种钱包类型的连接、管理和状态同步
  */
 
+// 添加调试模式检查 - 只在开发环境或明确启用时输出详细日志
+const DEBUG_MODE = window.location.hostname === 'localhost' || 
+                   window.location.hostname === '127.0.0.1' || 
+                   window.DEBUG_MODE === true;
+
+// 调试日志函数
+function debugLog(...args) {
+    if (DEBUG_MODE) {
+        console.log(...args);
+    }
+}
+
+function debugWarn(...args) {
+    if (DEBUG_MODE) {
+        console.warn(...args);
+    }
+}
+
+function debugError(...args) {
+    // 错误总是显示，但在非调试模式下简化
+    if (DEBUG_MODE) {
+        console.error(...args);
+    } else {
+        console.error(args[0]); // 只显示第一个参数（主要错误信息）
+    }
+}
+
 // 钱包状态管理类
 const walletState = {
     // 状态变量
@@ -230,7 +257,11 @@ const walletState = {
             // 防止频繁处理
             const now = Date.now();
             if (!forceUpdate && this._lastConsistencyCheck && (now - this._lastConsistencyCheck) < 3000) {
-                console.log('短时间内已处理过一致性检查，跳过');
+                // 减少重复日志 - 只在debug模式下显示
+                if (DEBUG_MODE && (!this._lastSkipLog || (now - this._lastSkipLog > 10000))) {
+                    debugLog('短时间内已处理过一致性检查，跳过');
+                    this._lastSkipLog = now;
+                }
                 return;
             }
             this._lastConsistencyCheck = now;
@@ -241,7 +272,7 @@ const walletState = {
             
             // 1. 本地存储有钱包信息，但内存状态未连接
             if (storedAddress && storedType && (!this.connected || !this.address || this.address !== storedAddress || this.walletType !== storedType)) {
-                console.log('检测到状态不一致：本地存储有钱包信息但状态不匹配', {
+                debugLog('检测到状态不一致：本地存储有钱包信息但状态不匹配', {
                     stored: { address: storedAddress, type: storedType },
                     current: { address: this.address, type: this.walletType, connected: this.connected }
                 });
@@ -272,14 +303,14 @@ const walletState = {
                         // 使用setTimeout避免阻塞UI线程
                         setTimeout(async () => {
                             try {
-                                console.log('尝试静默重连钱包...');
+                                debugLog('尝试静默重连钱包...');
                                 if (storedType === 'ethereum') {
                                     await this.connectEthereum(true);
                                 } else if (storedType === 'phantom' || storedType === 'solana') {
                                     await this.connectPhantom(true);
                                 }
                             } catch (err) {
-                                console.error('静默重连失败:', err);
+                                debugError('静默重连失败:', err);
                             } finally {
                                 this._isReconnecting = false;
                             }
@@ -287,12 +318,12 @@ const walletState = {
                             // 更新余额和资产信息（有限频率）
                             if (!this._lastBalanceCheck || (now - this._lastBalanceCheck > 30000)) {
                                 this._lastBalanceCheck = now;
-                                this.getWalletBalance().catch(err => console.error('获取余额失败:', err));
+                                this.getWalletBalance().catch(err => debugError('获取余额失败:', err));
                             }
                             
                             if (!this._lastAssetsCheck || (now - this._lastAssetsCheck > 60000)) {
                                 this._lastAssetsCheck = now;
-                                this.getUserAssets(this.address).catch(err => console.error('获取资产失败:', err));
+                                this.getUserAssets(this.address).catch(err => debugError('获取资产失败:', err));
                             }
                         }, 0);
                     } else {
@@ -302,7 +333,7 @@ const walletState = {
             } 
             // 2. 本地存储没有钱包信息，但内存状态显示已连接
             else if ((!storedAddress || !storedType) && this.connected && this.address) {
-                console.log('检测到状态不一致：状态显示已连接但本地存储无钱包信息');
+                debugLog('检测到状态不一致：状态显示已连接但本地存储无钱包信息');
                 // 断开连接，不刷新页面
                 this.disconnect(false);
             }
@@ -314,7 +345,7 @@ const walletState = {
                 }
             }
         } catch (err) {
-            console.error('钱包状态一致性检查失败:', err);
+            debugError('钱包状态一致性检查失败:', err);
         }
     },
     
@@ -328,21 +359,25 @@ const walletState = {
     
     // 为资产详情页提供的购买按钮状态更新函数
     updateDetailPageButtonState() {
-        console.log('购买按钮状态更新函数被调用');
-        
         // 防止由triggerWalletStateChanged引起的循环调用
         if (this._internalUpdate) {
-            console.log('跳过内部更新，避免循环调用');
+            debugLog('跳过内部更新，避免循环调用');
             return;
         }
         
         // 防止短时间内重复调用
         const now = Date.now();
         if (this._lastButtonUpdateTime && (now - this._lastButtonUpdateTime) < 800) {
-            console.log('购买按钮状态更新过于频繁，跳过此次更新');
+            debugLog('购买按钮状态更新过于频繁，跳过此次更新');
             return;
         }
         this._lastButtonUpdateTime = now;
+        
+        // 减少日志频率
+        if (!this._lastButtonLog || (now - this._lastButtonLog > 3000)) {
+            debugLog('购买按钮状态更新函数被调用');
+            this._lastButtonLog = now;
+        }
         
         // 先确保钱包状态一致
         this.checkWalletConsistency();
@@ -350,7 +385,7 @@ const walletState = {
         // 获取购买按钮
         const buyButton = document.getElementById('buy-button');
         if (!buyButton) {
-            console.warn('找不到购买按钮元素，无法更新状态');
+            debugWarn('找不到购买按钮元素，无法更新状态');
             return;
         }
         
@@ -375,7 +410,7 @@ const walletState = {
                 window.checkDividendManagementAccess();
                 this._checkingDividend = false;
             } catch (error) {
-                console.error('分红按钮检查失败:', error);
+                debugError('分红按钮检查失败:', error);
                 this._checkingDividend = false;
             }
         }
@@ -552,7 +587,11 @@ const walletState = {
      */
     updateUI() {
         try {
-            console.log('更新钱包UI, 连接状态:', this.connected);
+            // 减少日志输出频率
+            if (!this._lastUIUpdate || (Date.now() - this._lastUIUpdate > 2000)) {
+                debugLog('更新钱包UI, 连接状态:', this.connected);
+                this._lastUIUpdate = Date.now();
+            }
             
             // 获取UI元素
             const walletBtn = document.getElementById('walletBtn');
@@ -562,7 +601,7 @@ const walletState = {
             const adminEntry = document.getElementById('adminEntry');
             
             if (!walletBtn) {
-                console.warn('找不到钱包按钮元素');
+                debugWarn('找不到钱包按钮元素');
                 return;
             }
             
@@ -572,7 +611,7 @@ const walletState = {
                     // 显示格式化的地址而不是余额
                     const formattedAddress = this.formatAddress(this.address);
                     walletBtnText.textContent = formattedAddress;
-                    console.log('已设置按钮文本为地址:', formattedAddress);
+                    debugLog('已设置按钮文本为地址:', formattedAddress);
                 }
                 
                 // 确保下拉菜单中的钱包地址显示正确
@@ -580,9 +619,9 @@ const walletState = {
                     const formattedAddress = this.formatAddress(this.address);
                     walletAddressDisplay.textContent = formattedAddress;
                     walletAddressDisplay.title = this.address; // 设置完整地址为悬停提示
-                    console.log('已设置地址显示:', formattedAddress);
+                    debugLog('已设置地址显示:', formattedAddress);
                 } else {
-                    console.warn('找不到钱包地址显示元素 walletAddressDisplay');
+                    debugWarn('找不到钱包地址显示元素 walletAddressDisplay');
                 }
                 
                 // 更新下拉菜单中的余额显示
@@ -590,9 +629,9 @@ const walletState = {
                 if (dropdownBalanceElement) {
                     const formattedBalance = this.balance !== null ? parseFloat(this.balance).toFixed(2) : '0.00';
                     dropdownBalanceElement.textContent = formattedBalance;
-                    console.log('已设置下拉菜单余额显示:', formattedBalance);
+                    debugLog('已设置下拉菜单余额显示:', formattedBalance);
                 } else {
-                    console.warn('找不到余额显示元素 walletBalanceInDropdown');
+                    debugWarn('找不到余额显示元素 walletBalanceInDropdown');
                 }
                 
                 // 显示用户资产部分
@@ -603,7 +642,7 @@ const walletState = {
                 
                 // 根据管理员状态更新管理员入口显示
                 if (adminEntry) {
-                    console.log('更新管理员入口显示, 当前管理员状态:', this.isAdmin);
+                    debugLog('更新管理员入口显示, 当前管理员状态:', this.isAdmin);
                     adminEntry.style.display = this.isAdmin ? 'block' : 'none';
                 }
                 
@@ -613,7 +652,7 @@ const walletState = {
                 // 钱包未连接状态
                 if (walletBtnText) {
                     walletBtnText.textContent = window._ ? window._('Connect Wallet') : 'Connect Wallet';
-                    console.log('已设置按钮文本为连接钱包');
+                    debugLog('已设置按钮文本为连接钱包');
                 }
                 
                 // 隐藏用户资产部分
@@ -634,10 +673,10 @@ const walletState = {
                     this.triggerWalletStateChanged();
                 }
             } catch (e) {
-                console.warn('触发钱包状态变化事件失败:', e);
+                debugWarn('触发钱包状态变化事件失败:', e);
             }
         } catch (error) {
-            console.error('更新UI出错:', error);
+            debugError('更新UI出错:', error);
         }
     },
     
@@ -645,86 +684,60 @@ const walletState = {
      * 触发钱包状态变化事件
      * 通知其他组件钱包状态已变化
      */
-    triggerWalletStateChanged() {
+    triggerWalletStateChanged(details = {}) {
         try {
-            // 防止递归调用
-            if (this._isTriggering) {
-                console.log('[triggerWalletStateChanged] 已在触发过程中，跳过');
-                return;
+            // 减少重复日志输出频率
+            const now = Date.now();
+            if (!this._lastStateChangeLog || (now - this._lastStateChangeLog > 5000)) {
+                debugLog('[triggerWalletStateChanged] 详情页按钮状态已更新');
+                this._lastStateChangeLog = now;
             }
             
-            // 强化节流机制，避免短时间内重复触发
-            const now = new Date().getTime();
-            if (this._lastTriggerTime && (now - this._lastTriggerTime) < 3000) {
-                console.log('[triggerWalletStateChanged] 已在3秒内触发过，跳过此次触发');
-                return;
-            }
+            // 防止循环更新
+            this._internalUpdate = true;
             
-            // 如果已经有等待执行的触发任务，不要创建新的
-            if (this._triggerStateChangeTimer) {
-                return;
-            }
-            
-            // 使用延迟触发，合并短时间内的多次调用
-            this._triggerStateChangeTimer = setTimeout(() => {
-                // 设置触发标记
-                this._isTriggering = true;
-                
-                // 记录本次触发时间
-                this._lastTriggerTime = now;
-                
-                console.log('[triggerWalletStateChanged] 钱包状态变化事件');
-                
-                // 创建自定义事件，添加timestamp识别不同事件
-                const event = new CustomEvent('walletStateChanged', { 
-                    detail: { 
-                        connected: this.connected,
+            try {
+                // 创建自定义事件，包含当前钱包状态
+                const walletEvent = new CustomEvent('walletStateChanged', {
+                    detail: {
                         address: this.address,
                         walletType: this.walletType,
-                        balance: this.balance,
+                        connected: this.connected,
                         isAdmin: this.isAdmin,
-                        timestamp: now
-                    } 
+                        balance: this.balance,
+                        chainId: this.chainId,
+                        assets: this.assets || [],
+                        ...details
+                    }
                 });
                 
-                // 在document上分发事件
-                document.dispatchEvent(event);
-                console.log('[triggerWalletStateChanged] 钱包状态变化事件已触发');
+                // 分发事件到文档对象
+                document.dispatchEvent(walletEvent);
                 
-                // 更新详情页按钮状态，但不触发额外事件避免循环
-                if (typeof this.updateDetailPageButtonState === 'function') {
-                    try {
-                        // 标记为内部调用，避免循环
-                        this._internalUpdate = true;
-                        this.updateDetailPageButtonState();
-                        console.log('[triggerWalletStateChanged] 详情页按钮状态已更新');
-                        this._internalUpdate = false;
-                    } catch (btnError) {
-                        console.error('[triggerWalletStateChanged] 更新按钮状态失败:', btnError);
-                        this._internalUpdate = false;
-                    }
+                // 通知状态变化回调
+                this.notifyStateChange(details);
+                
+                // 如果在详情页，更新购买按钮状态
+                if (window.location.pathname.includes('/detail/') || window.location.pathname.includes('/RH-')) {
+                    // 延迟一点执行，避免与事件处理冲突
+                    setTimeout(() => {
+                        try {
+                            this.updateDetailPageButtonState();
+                        } catch (buttonError) {
+                            debugError('[triggerWalletStateChanged] 更新按钮状态失败:', buttonError);
+                        }
+                    }, 50);
                 }
                 
-                // 清除触发标记
-                this._isTriggering = false;
-                this._triggerStateChangeTimer = null;
-            }, 500);
-            
-        } catch (error) {
-            console.error('[triggerWalletStateChanged] 触发钱包状态变化事件失败:', error);
-            
-            // 清除标记，避免卡死
-            this._isTriggering = false;
-            this._triggerStateChangeTimer = null;
-            
-            // 尝试发出备用自定义事件
-            try {
-                const simpleEvent = new Event('walletChanged');
-                document.dispatchEvent(simpleEvent);
-                console.log('[triggerWalletStateChanged] 发送了备用的walletChanged事件');
-            } catch (backupError) {
-                console.error('[triggerWalletStateChanged] 备用事件也触发失败:', backupError);
+            } finally {
+                // 确保清除内部更新标志
+                setTimeout(() => {
+                    this._internalUpdate = false;
+                }, 100);
             }
+        } catch (error) {
+            debugError('[triggerWalletStateChanged] 触发钱包状态变化事件失败:', error);
+            this._internalUpdate = false;
         }
     },
     
@@ -1192,200 +1205,84 @@ const walletState = {
      */
     async getWalletBalance() {
         try {
-            // 如果钱包未连接，直接返回0
             if (!this.connected || !this.address) {
-                console.log('[getWalletBalance] 钱包未连接，余额为0');
-                this.balance = 0;
+                debugWarn('[getWalletBalance] 钱包未连接，无法获取余额');
                 return 0;
             }
+
+            const address = this.address;
+            debugLog(`[getWalletBalance] 开始获取 ${address} 的钱包余额`);
+
+            // 修复：根据钱包类型获取余额
+            let tokenSymbol = 'USDC'; // 默认获取USDC余额
             
-            console.log(`[getWalletBalance] 开始获取钱包余额: ${this.address}`);
-            
-            // 根据钱包类型选择不同的余额查询方式
-            if (this.walletType === 'phantom' && window.solana && window.solana.isConnected) {
-                console.log('[getWalletBalance] 使用Phantom钱包获取USDC余额');
-                
-                try {
-                    // 优先尝试API方式获取余额
-                    console.log('[getWalletBalance] 尝试通过API获取余额');
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 10000); // 增加到10秒超时
-                    
-                    const apiUrl = `/api/service/wallet/token_balance?address=${this.address}&token=USDC&_=${Date.now()}`;
-                    console.log('[getWalletBalance] API请求URL:', apiUrl);
-                    
-                    const response = await fetch(apiUrl, {
-                        signal: controller.signal
-                    });
-                    clearTimeout(timeoutId);
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        console.log('[getWalletBalance] API响应数据:', data);
-                        
-                        if (data.success && data.balance !== undefined) {
-                            this.balance = parseFloat(data.balance) || 0;
-                            console.log(`[getWalletBalance] 通过API获取到钱包余额: ${this.balance} USDC`);
-                            this.updateBalanceDisplay(this.balance);
-                            return this.balance;
-                        } else {
-                            console.warn('[getWalletBalance] API返回数据格式不正确:', data);
-                        }
-                    } else {
-                        console.warn('[getWalletBalance] API响应状态不正确:', response.status, response.statusText);
-                    }
-                    
-                    console.log('[getWalletBalance] API方式失败，尝试直接从区块链获取');
-                } catch (apiError) {
-                    console.warn('[getWalletBalance] API获取余额失败:', apiError);
-                }
-                
-                // API失败后，尝试直接从区块链获取
-                try {
-                    console.log('[getWalletBalance] 尝试直接从Solana区块链获取余额');
-                    
-                    // 尝试加载Solana库（使用更宽松的超时）
-                    const librariesLoaded = await this.ensureSolanaLibrariesOptimized();
-                    if (!librariesLoaded) {
-                        console.warn('[getWalletBalance] Solana库未能加载，尝试使用代理API');
-                        
-                        // 如果库未加载，尝试使用代理API
-                        try {
-                            const proxyResponse = await fetch(`/api/solana/get_token_balance?address=${this.address}&token_mint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&_=${Date.now()}`);
-                            if (proxyResponse.ok) {
-                                const proxyData = await proxyResponse.json();
-                                if (proxyData.success && proxyData.balance !== undefined) {
-                                    this.balance = parseFloat(proxyData.balance) || 0;
-                                    console.log(`[getWalletBalance] 通过代理API获取到余额: ${this.balance} USDC`);
-                                    this.updateBalanceDisplay(this.balance);
-                                    return this.balance;
-                                }
-                            }
-                        } catch (proxyError) {
-                            console.warn('[getWalletBalance] 代理API也失败:', proxyError);
-                        }
-                        
-                        this.balance = 0;
-                        this.updateBalanceDisplay(0);
-                        return 0;
-                    }
-                    
-                    // 使用多个RPC节点尝试
-                    const rpcUrls = [
-                        'https://api.mainnet-beta.solana.com',
-                        'https://solana-api.projectserum.com',
-                        'https://rpc.ankr.com/solana'
-                    ];
-                    
-                    let connection = null;
-                    for (const rpcUrl of rpcUrls) {
-                        try {
-                            connection = new window.solanaWeb3.Connection(rpcUrl, {
-                                commitment: 'confirmed',
-                                confirmTransactionInitialTimeout: 10000
-                            });
-                            
-                            // 测试连接
-                            await connection.getVersion();
-                            console.log(`[getWalletBalance] 成功连接到RPC: ${rpcUrl}`);
-                            break;
-                        } catch (rpcError) {
-                            console.warn(`[getWalletBalance] RPC连接失败 ${rpcUrl}:`, rpcError);
-                            connection = null;
-                        }
-                    }
-                    
-                    if (!connection) {
-                        throw new Error('无法连接到任何Solana RPC节点');
-                    }
-                    
-                    const publicKey = new window.solanaWeb3.PublicKey(this.address);
-                    
-                    // 使用Solana上的USDC合约地址
-                    const usdcMint = new window.solanaWeb3.PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
-                    
-                    console.log('[getWalletBalance] 查询代币账户，钱包地址:', this.address);
-                    console.log('[getWalletBalance] USDC Mint地址:', usdcMint.toString());
-                    
-                    // 直接查询代币账户余额
-                    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, { mint: usdcMint });
-                    
-                    console.log('[getWalletBalance] 找到的代币账户数量:', tokenAccounts.value.length);
-                    
-                    if (tokenAccounts.value.length > 0) {
-                        const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
-                        this.balance = parseFloat(balance) || 0;
-                        console.log(`[getWalletBalance] 直接从Solana区块链获取到钱包USDC余额: ${this.balance}`);
-                        this.updateBalanceDisplay(this.balance);
-                        return this.balance;
-                    } else {
-                        console.log('[getWalletBalance] 未找到USDC代币账户，可能用户没有USDC或账户未初始化');
-                        
-                        // 尝试查询所有代币账户
-                        try {
-                            const allTokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, { programId: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') });
-                            console.log('[getWalletBalance] 用户所有代币账户数量:', allTokenAccounts.value.length);
-                            
-                            // 输出所有代币账户信息进行调试
-                            allTokenAccounts.value.forEach((account, index) => {
-                                const mint = account.account.data.parsed.info.mint;
-                                const balance = account.account.data.parsed.info.tokenAmount.uiAmount;
-                                console.log(`[getWalletBalance] 代币账户${index + 1}: Mint=${mint}, 余额=${balance}`);
-                            });
-                        } catch (debugError) {
-                            console.warn('[getWalletBalance] 调试查询失败:', debugError);
-                        }
-                        
-                        this.balance = 0;
-                        this.updateBalanceDisplay(0);
-                        return 0;
-                    }
-                } catch (solanaError) {
-                    console.warn('[getWalletBalance] 直接查询Solana USDC余额失败:', solanaError);
-                    
-                    // 最后的回退方案 - 设置默认余额
-                    console.log('[getWalletBalance] 所有方法都失败，使用默认余额0');
-                    this.balance = 0;
-                    this.updateBalanceDisplay(0);
-                    return 0;
-                }
-                
-            } else if (this.walletType === 'ethereum' && window.ethereum) {
-                console.log('[getWalletBalance] 使用以太坊钱包获取USDC余额');
-                
-                try {
-                    // 以太坊钱包的USDC余额获取
-                    const ethProvider = new window.ethers.providers.Web3Provider(window.ethereum);
-                    const usdcAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'; // USDC在以太坊上的合约地址
-                    const usdcAbi = [
-                        "function balanceOf(address owner) view returns (uint256)",
-                        "function decimals() view returns (uint8)"
-                    ];
-                    const usdcContract = new window.ethers.Contract(usdcAddress, usdcAbi, ethProvider);
-                    const decimals = await usdcContract.decimals();
-                    const balance = await usdcContract.balanceOf(this.address);
-                    this.balance = parseFloat(window.ethers.utils.formatUnits(balance, decimals)) || 0;
-                    console.log(`[getWalletBalance] 直接从以太坊区块链获取到钱包余额: ${this.balance} USDC`);
-                    this.updateBalanceDisplay(this.balance);
-                    return this.balance;
-                } catch (ethError) {
-                    console.error('[getWalletBalance] 以太坊余额获取失败:', ethError);
-                    this.balance = 0;
-                    this.updateBalanceDisplay(0);
-                    return 0;
-                }
+            if (this.walletType === 'ethereum') {
+                tokenSymbol = 'USDC'; // 以太坊也获取USDC
+            } else if (this.walletType === 'phantom' || this.walletType === 'solana') {
+                tokenSymbol = 'USDC'; // Solana获取USDC
             }
+
+            // 发送API请求获取余额
+            const response = await fetch('/api/wallet/balance', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Wallet-Address': address,
+                    'X-Wallet-Type': this.walletType
+                },
+                body: JSON.stringify({
+                    address: address,
+                    token: tokenSymbol,
+                    wallet_type: this.walletType
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`API响应错误: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
             
-            console.warn('[getWalletBalance] 不支持的钱包类型或钱包未连接，无法获取USDC余额');
-            this.balance = 0;
-            this.updateBalanceDisplay(0);
-            return 0;
+            // 减少重复的API响应日志 - 只在debug模式或有错误时显示详细信息
+            if (DEBUG_MODE || !data.success) {
+                debugLog('[getWalletBalance] API响应数据:', data);
+            }
+
+            if (data.success) {
+                const balance = parseFloat(data.balance || 0);
+                
+                // 减少重复的余额日志
+                if (!this._lastBalanceLog || Math.abs(this.balance - balance) > 0.01 || 
+                    (Date.now() - this._lastBalanceLog > 30000)) {
+                    debugLog(`[getWalletBalance] 通过API获取到钱包余额: ${balance} ${data.symbol || tokenSymbol}`);
+                    this._lastBalanceLog = Date.now();
+                }
+                
+                // 更新余额
+                this.balance = balance;
+                this.updateBalanceDisplay(balance);
+                
+                // 触发余额更新事件
+                this.triggerBalanceUpdatedEvent();
+                
+                return balance;
+            } else {
+                const errorMsg = data.error || '获取余额失败';
+                debugError('[getWalletBalance] 获取余额失败:', errorMsg);
+                
+                // 在失败时尝试后备方案，但不记录过多日志
+                return await this.getBalanceWithFallback(address, tokenSymbol);
+            }
         } catch (error) {
-            console.error('[getWalletBalance] 获取钱包USDC余额失败:', error);
-            // 返回0而非缓存的值，避免显示过期数据
-            this.balance = 0;
-            this.updateBalanceDisplay(0);
-            return 0;
+            debugError('[getWalletBalance] 获取钱包余额出错:', error);
+            
+            // 尝试后备方案
+            try {
+                return await this.getBalanceWithFallback(this.address, 'USDC');
+            } catch (fallbackError) {
+                debugError('[getWalletBalance] 后备方案也失败:', fallbackError);
+                return 0;
+            }
         }
     },
     
@@ -1660,37 +1557,51 @@ const walletState = {
      */
     updateBalanceDisplay(balance = null) {
         try {
-            console.log('更新余额显示, 余额:', balance);
+            const displayBalance = balance !== null ? balance : this.balance;
             
-            // 如果没有提供余额，尝试从walletState获取
-            if (balance === null && this.state) {
-                balance = this.state.balance;
+            // 减少重复的余额更新日志
+            if (!this._lastBalanceDisplayUpdate || 
+                Math.abs(this._lastDisplayedBalance - displayBalance) > 0.01 ||
+                (Date.now() - this._lastBalanceDisplayUpdate > 10000)) {
+                
+                debugLog('更新余额显示, 余额:', displayBalance);
+                this._lastBalanceDisplayUpdate = Date.now();
+                this._lastDisplayedBalance = displayBalance;
             }
             
-            // 更新全局按钮文本
-            if (this.address) {
-                const shortAddress = this.formatAddress(this.address);
-                console.log('更新钱包按钮文本为地址:', shortAddress);
-                $('.wallet-address-text, .wallet-address').text(shortAddress);
+            // 更新主钱包按钮上的地址显示（不是余额）
+            const walletBtnText = document.getElementById('walletBtnText');
+            if (walletBtnText && this.connected && this.address) {
+                const formattedAddress = this.formatAddress(this.address);
+                walletBtnText.textContent = formattedAddress;
+                if (DEBUG_MODE) {
+                    debugLog('更新钱包按钮文本为地址:', formattedAddress);
+                }
             }
             
-            // 更新下拉菜单余额显示
-            const balanceStr = (balance !== null && !isNaN(parseFloat(balance))) 
-                ? parseFloat(balance).toFixed(2) 
-                : '--';
-            console.log('更新下拉菜单余额显示:', balanceStr);
-            $('.wallet-balance').text(balanceStr);
-            
-            // 更新钱包地址显示
-            if (this.address) {
-                const shortAddress = this.formatAddress(this.address);
-                console.log('更新钱包地址显示:', shortAddress, `(完整地址: ${this.address} )`);
-                $('.wallet-address-full').text(this.address);
-                $('.wallet-address').text(shortAddress);
+            // 更新下拉菜单中的余额显示
+            const dropdownBalanceElement = document.getElementById('walletBalanceInDropdown');
+            if (dropdownBalanceElement) {
+                const formattedBalance = displayBalance !== null ? parseFloat(displayBalance).toFixed(2) : '0.00';
+                dropdownBalanceElement.textContent = formattedBalance;
+                if (DEBUG_MODE) {
+                    debugLog('更新下拉菜单余额显示:', formattedBalance);
+                }
             }
+            
+            // 更新钱包地址显示（在下拉菜单中）
+            const walletAddressDisplay = document.getElementById('walletAddressDisplay');
+            if (walletAddressDisplay && this.connected && this.address) {
+                const formattedAddress = this.formatAddress(this.address);
+                walletAddressDisplay.textContent = formattedAddress;
+                walletAddressDisplay.title = this.address;
+                if (DEBUG_MODE) {
+                    debugLog('更新钱包地址显示:', formattedAddress, '(完整地址:', this.address, ')');
+                }
+            }
+            
         } catch (error) {
-            console.error('更新钱包余额显示出错:', error);
-            // 出错时不抛出异常，保持UI稳定
+            debugError('更新余额显示失败:', error);
         }
     },
     
@@ -3054,11 +2965,6 @@ checkIfReturningFromWalletApp(walletType) {
             // 1. 确保Solana库已加载 - 使用优化的函数
             await this.ensureSolanaLibrariesOptimized();
             
-            // 确保SPL Token库的程序ID已正确初始化
-            if (window.spl_token && typeof window.spl_token.initializeProgramIds === 'function') {
-                window.spl_token.initializeProgramIds();
-            }
-            
             // 2. 获取钱包连接信息
             if (!window.solana || !window.solana.isConnected) {
                 throw new Error('Solana钱包未连接，请先连接钱包');
@@ -3089,13 +2995,28 @@ checkIfReturningFromWalletApp(walletType) {
             const fromPubkey = new window.solanaWeb3.PublicKey(this.address);
             const toPubkey = new window.solanaWeb3.PublicKey(to);
             
-            // 4. 获取一个连接到Solana网络的连接对象，使用代理API减少直接RPC依赖
-            console.log('获取代币账户...');
-            
             // 指定正确的程序ID
             const tokenProgramId = new window.solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
             const associatedTokenProgramId = new window.solanaWeb3.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
-            const systemProgramId = new window.solanaWeb3.PublicKey("11111111111111111111111111111111");
+            
+            console.log('获取代币账户...');
+            
+            // 计算ATA地址
+            const fromTokenAccount = await window.spl_token.getAssociatedTokenAddress(
+                usdcMint,
+                fromPubkey,
+                false,
+                tokenProgramId,
+                associatedTokenProgramId
+            );
+            
+            const toTokenAccount = await window.spl_token.getAssociatedTokenAddress(
+                usdcMint,
+                toPubkey,
+                false,
+                tokenProgramId,
+                associatedTokenProgramId
+            );
             
             // 7. 获取最新区块哈希
             console.log('获取区块哈希...');
@@ -3111,27 +3032,9 @@ checkIfReturningFromWalletApp(walletType) {
             }
             
             // 9. 构建交易
-            const transaction = new solanaWeb3.Transaction();
+            const transaction = new window.solanaWeb3.Transaction();
             transaction.recentBlockhash = blockHashResult.blockhash;
             transaction.feePayer = fromPubkey;
-            
-            // 获取发送方的代币账户
-            const fromTokenAccount = await window.spl_token.getAssociatedTokenAddress(
-                usdcMint,
-                fromPubkey,
-                false,
-                tokenProgramId,
-                associatedTokenProgramId
-            );
-            
-            // 获取接收方的代币账户
-            const toTokenAccount = await window.spl_token.getAssociatedTokenAddress(
-                usdcMint,
-                toPubkey,
-                false,
-                tokenProgramId,
-                associatedTokenProgramId
-            );
             
             // 检查接收方账户
             console.log('检查接收方账户...');
@@ -3149,14 +3052,14 @@ checkIfReturningFromWalletApp(walletType) {
                 console.log('接收方代币账户不存在，添加创建指令');
                 
                 try {
-                    // 修复：确保使用正确的参数顺序创建关联代币账户指令
+                    // 修复：使用正确的参数顺序创建关联代币账户指令
                     const createAtaInstruction = window.spl_token.createAssociatedTokenAccountInstruction(
-                        fromPubkey,                // payer 
-                        toTokenAccount,            // associatedToken
-                        toPubkey,                  // owner
-                        usdcMint,                  // mint
-                        tokenProgramId,            // 可选：程序ID，默认是TOKEN_PROGRAM_ID
-                        associatedTokenProgramId   // 可选：关联程序ID，默认是ASSOCIATED_TOKEN_PROGRAM_ID
+                        fromPubkey,                // payer (支付账户创建费用的账户)
+                        toTokenAccount,            // associatedToken (要创建的关联代币账户地址)
+                        toPubkey,                  // owner (代币账户的所有者)
+                        usdcMint,                  // mint (代币mint地址)
+                        tokenProgramId,            // tokenProgram (代币程序ID)
+                        associatedTokenProgramId   // associatedTokenProgram (关联代币程序ID)
                     );
                     
                     transaction.add(createAtaInstruction);
@@ -3172,13 +3075,14 @@ checkIfReturningFromWalletApp(walletType) {
             // 11. 添加转账指令
             console.log('添加转账指令...');
             try {
-                // 使用兼容性更好的标准TransferInstruction方法
+                // 修复：使用正确的数据类型，避免BigInt兼容性问题
                 const transferInstruction = window.spl_token.createTransferInstruction(
                     fromTokenAccount,           // 源代币账户
                     toTokenAccount,             // 目标代币账户  
                     fromPubkey,                 // 源代币账户的所有者（必须是签名者）
-                    BigInt(lamportsAmount),     // 金额，使用BigInt类型
-                    []                          // 多重签名者（空数组表示没有）
+                    lamportsAmount,             // 金额，使用Number类型而不是BigInt
+                    [],                         // 多重签名者（空数组表示没有）
+                    tokenProgramId              // 代币程序ID
                 );
                 
                 transaction.add(transferInstruction);
@@ -3244,7 +3148,16 @@ checkIfReturningFromWalletApp(walletType) {
             if (!submitResponse.ok) {
                 const errorText = await submitResponse.text();
                 console.error('发送交易失败:', errorText);
-                throw new Error(`发送交易失败: ${errorText}`);
+                
+                // 尝试解析错误信息
+                let errorObj;
+                try {
+                    errorObj = JSON.parse(errorText);
+                } catch (e) {
+                    throw new Error(`发送交易失败: ${errorText}`);
+                }
+                
+                throw new Error(`发送交易失败: ${errorObj.error || errorText}`);
             }
             
             const submitResult = await submitResponse.json();
@@ -3950,7 +3863,7 @@ checkIfReturningFromWalletApp(walletType) {
             }
             
             return result;
-        } catch (e) {
+                } catch (e) {
             console.error('自定义Base64解码失败', e);
             
             // 尝试使用浏览器API但进行错误处理
@@ -4405,6 +4318,46 @@ checkIfReturningFromWalletApp(walletType) {
                 showError(`连接${walletType}钱包失败: ${error.message || '未知错误'}`);
             }
             return false;
+        }
+    },
+
+    /**
+     * 后备方案获取余额
+     * @param {string} address 钱包地址
+     * @param {string} tokenSymbol 代币符号
+     */
+    async getBalanceWithFallback(address, tokenSymbol) {
+        try {
+            debugLog('[getBalanceWithFallback] 尝试后备方案获取余额');
+            
+            // 尝试使用旧的API端点
+            const fallbackResponse = await fetch(`/api/service/wallet/token_balance?address=${address}&token=${tokenSymbol}&_=${Date.now()}`);
+            
+            if (fallbackResponse.ok) {
+                const fallbackData = await fallbackResponse.json();
+                if (fallbackData.success && fallbackData.balance !== undefined) {
+                    const balance = parseFloat(fallbackData.balance) || 0;
+                    debugLog(`[getBalanceWithFallback] 后备方案成功获取余额: ${balance} ${tokenSymbol}`);
+                    
+                    this.balance = balance;
+                    this.updateBalanceDisplay(balance);
+                    this.triggerBalanceUpdatedEvent();
+                    
+                    return balance;
+                }
+            }
+            
+            // 如果后备方案也失败，返回0
+            debugWarn('[getBalanceWithFallback] 后备方案也失败，返回余额0');
+            this.balance = 0;
+            this.updateBalanceDisplay(0);
+            return 0;
+            
+        } catch (error) {
+            debugError('[getBalanceWithFallback] 后备方案出错:', error);
+            this.balance = 0;
+            this.updateBalanceDisplay(0);
+            return 0;
         }
     },
 }
