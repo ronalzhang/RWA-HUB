@@ -136,6 +136,39 @@ def get_user_assets():
             'error': str(e)
         }), 500 
 
+@service_bp.route('/wallet/commission_balance')
+def wallet_commission_balance():
+    """
+    获取钱包的分佣余额
+    
+    Query参数:
+        address: 钱包地址
+    """
+    address = request.args.get('address')
+    
+    if not address:
+        return jsonify({
+            'success': False,
+            'error': '未提供钱包地址'
+        }), 400
+    
+    try:
+        # 调用AssetService的get_commission_balance方法
+        commission_balance = AssetService.get_commission_balance(address)
+        
+        return jsonify({
+            'success': True,
+            'balance': str(commission_balance),
+            'symbol': 'USDC'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取分佣余额出错: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @service_bp.route('/config/payment_settings', methods=['GET'])
 def get_payment_settings():
     """获取支付设置"""

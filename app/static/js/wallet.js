@@ -38,6 +38,7 @@ const walletState = {
     connected: false,          // 是否已连接钱包
     isAdmin: false,            // 是否是管理员账户
     balance: 0,                // 当前钱包余额
+    commissionBalance: 0,      // 分佣余额
     nativeBalance: 0,          // 原生代币余额
     connecting: false,         // 是否正在连接中
     chainId: null,             // 当前连接的链ID
@@ -1594,6 +1595,18 @@ const walletState = {
                 }
             }
             
+            // 更新分佣余额显示
+            const commissionElements = document.querySelectorAll('#walletCommissionInDropdown, .commission-balance, [data-commission-balance]');
+            if (commissionElements.length > 0) {
+                const formattedCommission = this.commissionBalance !== null ? parseFloat(this.commissionBalance).toFixed(2) : '0.00';
+                commissionElements.forEach(element => {
+                    element.textContent = formattedCommission;
+                });
+                if (DEBUG_MODE) {
+                    debugLog('更新分佣余额显示:', formattedCommission);
+                }
+            }
+            
             // 更新钱包地址显示（在下拉菜单中）
             const walletAddressDisplay = document.getElementById('walletAddressDisplay');
             if (walletAddressDisplay && this.connected && this.address) {
@@ -2957,7 +2970,7 @@ checkIfReturningFromWalletApp(walletType) {
     },
     
     /**
-     * 使用Solana钱包发送SPL代币(USDC)
+     * 使用Solana钱包发送SPL代币(USDC) - 重写版本
      * @param {string} tokenSymbol 代币符号(USDC)
      * @param {string} to 接收地址
      * @param {number} amount 转账金额
@@ -2965,7 +2978,7 @@ checkIfReturningFromWalletApp(walletType) {
      */
     async transferSolanaToken(tokenSymbol, to, amount) {
         try {
-            console.log(`开始执行真实Solana ${tokenSymbol}转账，接收地址: ${to}, 金额: ${amount}`);
+            console.log(`[transferSolanaToken] 开始真实Solana ${tokenSymbol}转账，接收地址: ${to}, 金额: ${amount}`);
             
             // 1. 确保Solana库已加载
             await this.ensureSolanaLibrariesOptimized();
@@ -2975,1156 +2988,42 @@ checkIfReturningFromWalletApp(walletType) {
                 throw new Error('Solana钱包未连接，请先连接钱包');
             }
             
-            // 3. 获取USDC mint地址
             if (tokenSymbol !== 'USDC') {
                 throw new Error(`不支持的代币: ${tokenSymbol}`);
             }
             
-            const paymentSettingsResponse = await fetch('/api/service/config/payment_settings');
-            if (!paymentSettingsResponse.ok) {
-                throw new Error('获取支付配置失败');
-            }
-            
-            const paymentSettings = await paymentSettingsResponse.json();
-            if (!paymentSettings || !paymentSettings.usdc_mint) {
-                throw new Error('支付配置中缺少USDC Mint地址');
-            }
-            
-            const mintAddress = paymentSettings.usdc_mint;
-            console.log('USDC Mint地址:', mintAddress);
-            
-            // 4. 创建公钥对象
-            const usdcMint = new window.solanaWeb3.PublicKey(mintAddress);
-            const fromPubkey = new window.solanaWeb3.PublicKey(this.address);
-            const toPubkey = new window.solanaWeb3.PublicKey(to);
-            
-            // 5. SPL Token程序ID
+            // 3. 使用标准的Solana主网USDC地址
+            const USDC_MINT = new window.solanaWeb3.PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
             const TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
             const ASSOCIATED_TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
             
-            // 6. 计算关联代币账户地址
-            console.log('计算ATA地址...');
+            const fromPubkey = new window.solanaWeb3.PublicKey(this.address);
+            const toPubkey = new window.solanaWeb3.PublicKey(to);
+            
+            console.log('[transferSolanaToken] 公钥对象创建完成');
+            
+            // 4. 计算ATA地址
             const fromTokenAccount = await window.spl_token.getAssociatedTokenAddress(
-                usdcMint, fromPubkey, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
+                USDC_MINT, fromPubkey, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
             );
             const toTokenAccount = await window.spl_token.getAssociatedTokenAddress(
-                usdcMint, toPubkey, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
+                USDC_MINT, toPubkey, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
             );
             
-            console.log('计算的ATA地址:', {
+            console.log('[transferSolanaToken] ATA地址计算完成:', {
                 from: fromTokenAccount.toString(),
                 to: toTokenAccount.toString()
             });
-
-            // 7. 获取最新区块哈希
-            console.log('获取区块哈希...');
-            const blockHashResponse = await fetch('/api/solana/get_latest_blockhash');
-            if (!blockHashResponse.ok) {
-                throw new Error('获取区块哈希失败');
-            }
-            const blockHashResult = await blockHashResponse.json();
-            if (!blockHashResult.success) {
-                throw new Error(`无法获取区块哈希: ${blockHashResult.error}`);
-            }
             
-            // 8. 创建交易
+            // 5. 直接连接Solana主网
+            const connection = new window.solanaWeb3.Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+            
+            // 6. 获取最新区块哈希
+            const { blockhash } = await connection.getLatestBlockhash('confirmed');
+            console.log('[transferSolanaToken] 获取最新区块哈希:', blockhash);
+            
+            // 7. 创建交易
             const transaction = new window.solanaWeb3.Transaction();
-            transaction.recentBlockhash = blockHashResult.blockhash;
-            transaction.feePayer = fromPubkey;
-            
-            // 9. 检查接收方ATA是否存在
-            const checkAccountResponse = await fetch(`/api/solana/check_account?address=${toTokenAccount.toString()}`);
-            if (!checkAccountResponse.ok) {
-                throw new Error('检查接收方账户失败');
-            }
-            const checkAccountResult = await checkAccountResponse.json();
-            
-            // 10. 如果接收方ATA不存在，添加创建指令
-            if (!checkAccountResult.exists) {
-                console.log('接收方ATA不存在，添加创建指令');
-                const createAtaInstruction = new window.solanaWeb3.TransactionInstruction({
-                    keys: [
-                        { pubkey: fromPubkey, isSigner: true, isWritable: true },
-                        { pubkey: toTokenAccount, isSigner: false, isWritable: true },
-                        { pubkey: toPubkey, isSigner: false, isWritable: false },
-                        { pubkey: usdcMint, isSigner: false, isWritable: false },
-                        { pubkey: window.solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false },
-                        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-                        { pubkey: window.solanaWeb3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
-                    ],
-                    programId: ASSOCIATED_TOKEN_PROGRAM_ID,
-                    data: new Uint8Array(0),
-                });
-                transaction.add(createAtaInstruction);
-            }
-            
-            // 11. 准备转账金额 (USDC有6位小数)
-            const amountLamports = Math.round(amount * 1000000);
-            console.log(`转账金额: ${amount} USDC = ${amountLamports} lamports`);
-            
-            // 12. 创建转账指令 - 使用纯Uint8Array手动编码
-            console.log('创建转账指令...');
-            
-            // 手动创建指令数据 - 确保格式正确
-            const instructionData = new Uint8Array(9);
-            instructionData[0] = 3; // Transfer instruction discriminator
-            
-            // 手动编码64位小端序整数 (Little Endian)
-            const amountBigInt = BigInt(amountLamports);
-            for (let i = 0; i < 8; i++) {
-                instructionData[1 + i] = Number((amountBigInt >> BigInt(i * 8)) & 0xFFn);
-            }
-            
-            console.log('指令数据:', {
-                discriminator: instructionData[0],
-                amount: amountLamports,
-                amountBytes: Array.from(instructionData.slice(1)).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ')
-            });
-            
-            const transferInstruction = new window.solanaWeb3.TransactionInstruction({
-                keys: [
-                    { pubkey: fromTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: toTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: fromPubkey, isSigner: true, isWritable: false },
-                ],
-                programId: TOKEN_PROGRAM_ID,
-                data: instructionData,
-            });
-            
-            transaction.add(transferInstruction);
-            console.log('转账指令已添加');
-            
-            // 13. 重新获取最新区块哈希（确保不过期）
-            console.log('更新区块哈希...');
-            const finalBlockHashResponse = await fetch('/api/solana/get_latest_blockhash');
-            if (finalBlockHashResponse.ok) {
-                const finalResult = await finalBlockHashResponse.json();
-                if (finalResult.success) {
-                    transaction.recentBlockhash = finalResult.blockhash;
-                    console.log('区块哈希已更新:', finalResult.blockhash);
-                }
-            }
-            
-            // 14. 请求钱包签名
-            console.log('请求钱包签名...');
-            const signedTransaction = await window.solana.signTransaction(transaction);
-            
-            // 15. 发送交易
-            console.log('发送交易...');
-            const transactionBase64 = this.arrayBufferToBase64(signedTransaction.serialize());
-            
-            const submitResponse = await fetch('/api/solana/submit_transaction', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Wallet-Address': this.address,
-                    'X-Wallet-Type': this.walletType || 'phantom'
-                },
-                body: JSON.stringify({
-                    serialized_transaction: transactionBase64,
-                    skip_preflight: false,
-                    from_address: this.address,
-                    to_address: to,
-                    amount: amount,
-                    token: tokenSymbol,
-                    recent_blockhash: transaction.recentBlockhash
-                })
-            });
-            
-            if (!submitResponse.ok) {
-                const errorText = await submitResponse.text();
-                console.error('发送交易失败:', errorText);
-                
-                try {
-                    const errorObj = JSON.parse(errorText);
-                    throw new Error(`发送交易失败: ${errorObj.error || errorText}`);
-                } catch (e) {
-                    throw new Error(`发送交易失败: ${errorText}`);
-                }
-            }
-            
-            const submitResult = await submitResponse.json();
-            if (!submitResult.success) {
-                throw new Error(`交易提交失败: ${submitResult.error || '未知错误'}`);
-            }
-            
-            console.log('交易成功提交，签名:', submitResult.signature);
-            
-            // 显示交易状态
-            this._showTransactionStatus(submitResult.signature, tokenSymbol, amount, to);
-            
-            return {
-                success: true,
-                txHash: submitResult.signature
-            };
-            
-        } catch (error) {
-            console.error('Solana转账失败:', error);
-            return {
-                success: false,
-                error: `转账失败: ${error.message || '未知错误'}`
-            };
-        }
-    },
-    
-    /**
-     * 确保Solana库已经正确加载
-     */
-    async ensureSolanaLibraries() {
-        // 检查Solana Web3.js库
-        if (!window.solanaWeb3 || !window.solanaWeb3.Connection) {
-            console.log('等待Solana Web3.js库完全加载...');
-            
-            // 等待solanaWeb3Ready事件
-            return new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    reject(new Error('等待Solana Web3.js库加载超时'));
-                }, 15000); // 15秒超时
-                
-                const onReady = (event) => {
-                    clearTimeout(timeout);
-                    window.removeEventListener('solanaWeb3Ready', onReady);
-                    console.log('Solana Web3.js库已就绪');
-                    
-                    // 继续检查SPL Token库
-                    this.checkSplTokenLibrary().then(resolve).catch(reject);
-                };
-                
-                // 如果库已经就绪，直接继续
-                if (window.solanaWeb3 && window.solanaWeb3.Connection && typeof window.solanaWeb3.Connection === 'function') {
-                    clearTimeout(timeout);
-                    this.checkSplTokenLibrary().then(resolve).catch(reject);
-                    return;
-                }
-                
-                window.addEventListener('solanaWeb3Ready', onReady);
-                
-                // 如果没有任何加载脚本，手动加载
-                if (!document.querySelector('script[src*="solana-web3"]')) {
-                    console.log('未找到已加载的Solana Web3.js库，尝试加载...');
-                    this.loadSolanaLibraries().then(() => {
-                        // loadSolanaLibraries本身会触发事件，这里不需要额外处理
-                    }).catch(reject);
-                }
-            });
-        }
-        
-        // 检查SPL Token库
-        return this.checkSplTokenLibrary();
-    },
-    
-    /**
-     * 检查并加载SPL Token库
-     * @private
-     */
-    async checkSplTokenLibrary() {
-        if (!window.splToken) {
-            if (window.spl && window.spl.token) {
-                window.splToken = window.spl.token;
-                console.log('已从window.spl.token初始化splToken库');
-            } else {
-                console.log('未找到已加载的SPL Token库，尝试加载...');
-                await this.loadSplTokenLibrary();
-            }
-        }
-        
-        // 最终检查
-        if (!window.solanaWeb3 || !window.solanaWeb3.Connection) {
-            throw new Error('Solana Web3.js库未正确加载');
-        }
-        
-        if (!window.splToken) {
-            console.warn('SPL Token库未加载，某些功能可能不可用');
-            // 创建最基本的mock对象
-            window.splToken = {
-                TOKEN_PROGRAM_ID: { toBuffer: () => new Uint8Array(32) },
-                ASSOCIATED_TOKEN_PROGRAM_ID: { toBuffer: () => new Uint8Array(32) },
-                getAssociatedTokenAddress: async () => null,
-                getMint: async () => ({ decimals: 6 }),
-                getAccount: async () => ({ amount: 0n })
-            };
-        }
-
-        // 确保程序ID已初始化为PublicKey对象
-        if (window.splToken.initializeProgramIds) {
-            window.splToken.initializeProgramIds();
-            
-            // 额外检查，如果程序ID仍然是字符串，则手动创建PublicKey对象
-            if (window.splToken.TOKEN_PROGRAM_ID && typeof window.splToken.TOKEN_PROGRAM_ID === 'string') {
-                window.splToken.TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey(window.splToken.TOKEN_PROGRAM_ID);
-            }
-            
-            if (window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID && typeof window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID === 'string') {
-                window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey(window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID);
-            }
-        }
-        
-        console.log('Solana库已准备就绪:', {
-            'solanaWeb3': !!window.solanaWeb3,
-            'solanaWeb3.Connection': !!(window.solanaWeb3 && window.solanaWeb3.Connection),
-            'splToken': !!window.splToken,
-            'hasGetAssociatedTokenAddress': !!(window.splToken && window.splToken.getAssociatedTokenAddress),
-            'TOKEN_PROGRAM_ID类型': typeof window.splToken.TOKEN_PROGRAM_ID,
-            'ASSOCIATED_TOKEN_PROGRAM_ID类型': typeof window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID
-        });
-    },
-    
-    /**
-     * 加载Solana相关库
-     * @private
-     */
-    async loadSolanaLibraries() {
-        return new Promise((resolve, reject) => {
-            try {
-                // 加载 solana/web3.js
-                if (!window.solanaWeb3) {
-                    const web3Script = document.createElement('script');
-                    // 优先使用本地文件
-                    web3Script.src = '/static/js/contracts/solana-web3.iife.min.js';
-                    web3Script.onload = () => {
-                        console.log('Solana Web3.js 库已从本地加载');
-                        
-                        // 确保全局变量正确设置
-                        if (window.solanaWeb3js) {
-                            window.solanaWeb3 = window.solanaWeb3js;
-                        } else if (window.solana && window.solana.web3) {
-                            window.solanaWeb3 = window.solana.web3;
-                        }
-                        
-                        // 加载 SPL Token 库
-                        this.loadSplTokenLibrary().then(resolve).catch(reject);
-                    };
-                    web3Script.onerror = (e) => {
-                        console.error('加载本地Solana Web3.js库失败, 尝试CDN:', e);
-                        // 尝试从CDN加载
-                        const cdnScript = document.createElement('script');
-                        cdnScript.src = 'https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js';
-                        cdnScript.onload = () => {
-                            console.log('Solana Web3.js 库已从CDN加载');
-                            if (window.solanaWeb3js) {
-                                window.solanaWeb3 = window.solanaWeb3js;
-                            } else if (window.solana && window.solana.web3) {
-                                window.solanaWeb3 = window.solana.web3;
-                            }
-                            this.loadSplTokenLibrary().then(resolve).catch(reject);
-                        };
-                        cdnScript.onerror = (cdnErr) => {
-                            console.error('从CDN加载Solana Web3.js库失败:', cdnErr);
-                            reject(new Error('无法加载Solana Web3.js库'));
-                        };
-                        document.head.appendChild(cdnScript);
-                    };
-                    document.head.appendChild(web3Script);
-                } else {
-                    // Web3.js已加载，继续加载SPL Token
-                    this.loadSplTokenLibrary().then(resolve).catch(reject);
-                }
-            } catch (error) {
-                console.error('加载Solana库出错:', error);
-                reject(error);
-            }
-        });
-    },
-    
-    /**
-     * 加载SPL Token库
-     * @private
-     */
-    async loadSplTokenLibrary() {
-        return new Promise((resolve, reject) => {
-            try {
-                // 仅在需要SPL Token时加载，减少不必要的操作
-                if (!this.walletType || this.walletType !== 'phantom') {
-                    console.log('当前非Phantom钱包，跳过SPL Token库加载');
-                    return resolve();
-                }
-                
-                // 检查是否已加载
-                if (window.splToken) {
-                    console.log('SPL Token已加载，直接使用现有实例');
-                    return resolve();
-                }
-                
-                // 检查是否可以从现有变量中获取
-                if (window.spl && window.spl.token) {
-                    window.splToken = window.spl.token;
-                    console.log('已从window.spl.token初始化splToken库');
-                    return resolve();
-                }
-                
-                // 模拟成功加载，避免反复尝试加载导致性能问题
-                // 这样即使库未加载也不会阻塞其他功能
-                window.splToken = window.splToken || {
-                    // 提供最基本的假实现以避免错误
-                    TOKEN_PROGRAM_ID: { toBuffer: () => new Uint8Array(32) },
-                    ASSOCIATED_TOKEN_PROGRAM_ID: { toBuffer: () => new Uint8Array(32) },
-                    getAssociatedTokenAddress: async () => null,
-                    getMint: async () => ({ decimals: 6 }),
-                    getAccount: async () => ({ amount: 0n })
-                };
-                
-                console.log('已创建SPL Token库的基本模拟对象，以避免错误');
-                return resolve();
-                
-                // 获取库加载状态
-                const isPreparing = document.getElementById('spl-token-loading') !== null;
-                const isError = document.getElementById('spl-token-error') !== null;
-                
-                // 如果已在加载中，等待结果
-                if (isPreparing) {
-                    console.log('SPL Token库正在加载中，等待完成...');
-                    
-                    // 等待加载完成，但限制等待时间
-                    const checkInterval = setInterval(() => {
-                        if (window.splToken || (window.spl && window.spl.token)) {
-                            clearInterval(checkInterval);
-                            window.splToken = window.splToken || window.spl.token;
-                            console.log('等待后，SPL Token库已加载完成');
-                            resolve();
-                        } else if (isError) {
-                            clearInterval(checkInterval);
-                            // 模拟成功而不是拒绝，避免错误
-                            window.splToken = { 
-                                TOKEN_PROGRAM_ID: {},
-                                getAssociatedTokenAddress: async () => null 
-                            };
-                            console.log('SPL Token库加载失败，使用模拟对象');
-                            resolve();
-                        }
-                    }, 300);
-                    
-                    // 设置更短的超时，避免长时间等待
-                    setTimeout(() => {
-                        clearInterval(checkInterval);
-                        window.splToken = { 
-                            TOKEN_PROGRAM_ID: {},
-                            getAssociatedTokenAddress: async () => null 
-                        };
-                        console.log('SPL Token库加载超时，使用模拟对象');
-                        resolve();
-                    }, 3000);
-                    
-                    return;
-                }
-                
-                console.log('开始加载SPL Token库...');
-                
-                // 创建标记元素，避免重复加载
-                const loadingMark = document.createElement('div');
-                loadingMark.id = 'spl-token-loading';
-                loadingMark.style.display = 'none';
-                document.body.appendChild(loadingMark);
-                
-                // 尝试多种CDN源加载库
-                const cdnUrls = [
-                    '/static/js/contracts/spl-token.iife.min.js', // 本地备份优先
-                    'https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js',
-                    'https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.8/lib/index.iife.min.js',
-                    'https://raw.githack.com/solana-labs/solana-program-library/master/token/js/dist/index.iife.min.js'
-                ];
-                
-                let loadAttempt = 0;
-                
-                // 尝试加载库的函数
-                const attemptLoad = (urlIndex) => {
-                    if (urlIndex >= cdnUrls.length) {
-                        const errorMark = document.createElement('div');
-                        errorMark.id = 'spl-token-error';
-                        errorMark.style.display = 'none';
-                        document.body.appendChild(errorMark);
-                        
-                        // 所有尝试都失败了
-                        document.body.removeChild(loadingMark);
-                        reject(new Error('所有SPL Token库加载源都失败'));
-                        return;
-                    }
-                    
-                    loadAttempt++;
-                    console.log(`尝试加载SPL Token库 (尝试 ${loadAttempt}/${cdnUrls.length}): ${cdnUrls[urlIndex]}`);
-                    
-                    const splTokenScript = document.createElement('script');
-                    splTokenScript.src = cdnUrls[urlIndex];
-                    splTokenScript.async = true;
-                    
-                    // 设置超时处理
-                    let timeoutId = setTimeout(() => {
-                        console.warn(`加载 ${cdnUrls[urlIndex]} 超时，尝试下一个源`);
-                        attemptLoad(urlIndex + 1);
-                    }, 10000);
-                    
-                    // 成功处理
-                    splTokenScript.onload = () => {
-                        clearTimeout(timeoutId);
-                        console.log(`SPL Token库已从 ${cdnUrls[urlIndex]} 加载`);
-                        
-                        // 延迟检查库是否实际加载成功
-                        setTimeout(() => {
-                            // 设置全局变量
-                            if (window.spl && window.spl.token) {
-                                window.splToken = window.spl.token;
-                                console.log('已从window.spl.token初始化splToken库');
-                                
-                                // 检查关键方法是否存在
-                                if (!window.splToken.getAssociatedTokenAddress) {
-                                    console.error('SPL Token库已加载但找不到getAssociatedTokenAddress方法');
-                                    
-                                    // 使用备选方案
-                                    if (window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID) {
-                                        console.log('找到ASSOCIATED_TOKEN_PROGRAM_ID，尝试自定义实现getAssociatedTokenAddress');
-                                        
-                                        // 自定义实现
-                                        window.splToken.getAssociatedTokenAddress = async function(mint, owner) {
-                                            const { PublicKey, SystemProgram } = window.solanaWeb3;
-                                            return PublicKey.findProgramAddressSync(
-                                                [
-                                                    owner.toBuffer(),
-                                                    window.splToken.TOKEN_PROGRAM_ID.toBuffer(),
-                                                    mint.toBuffer(),
-                                                ],
-                                                window.splToken.ASSOCIATED_TOKEN_PROGRAM_ID
-                                            )[0];
-                                        };
-                                        
-                                        console.log('成功实现自定义getAssociatedTokenAddress');
-                                    } else {
-                                        document.body.removeChild(loadingMark);
-                                        attemptLoad(urlIndex + 1);
-                                        return;
-                                    }
-                                }
-                                
-                                // 成功加载
-                                document.body.removeChild(loadingMark);
-                                resolve();
-                            } else {
-                                console.warn('SPL Token库加载后window.spl.token不可用，尝试下一个源');
-                                attemptLoad(urlIndex + 1);
-                            }
-                        }, 500);
-                    };
-                    
-                    // 错误处理
-                    splTokenScript.onerror = (e) => {
-                        clearTimeout(timeoutId);
-                        // 特别检查本地文件加载错误
-                        if (urlIndex === 0) {
-                            console.error(`本地SPL Token库加载失败:`, e);
-                            console.warn(`请确保服务器上存在文件: ${cdnUrls[0]}`); 
-                            console.warn(`可以通过命令创建: mkdir -p app/static/js/contracts/ && curl -o app/static/js/contracts/spl-token.iife.min.js https://unpkg.com/@solana/spl-token@0.3.8/lib/index.iife.min.js`);
-                        } else {
-                            console.error(`从 ${cdnUrls[urlIndex]} 加载SPL Token库失败:`, e);
-                        }
-                        attemptLoad(urlIndex + 1);
-                    };
-                    
-                    document.head.appendChild(splTokenScript);
-                };
-                
-                // 开始尝试
-                attemptLoad(0);
-                
-            } catch (error) {
-                console.error('加载SPL Token库出错:', error);
-                reject(error);
-            }
-        });
-    },
-    
-    /**
-     * 显示交易状态
-     * @param {string} signature 交易签名
-     * @param {string} tokenSymbol 代币符号
-     * @param {number} amount 转账金额
-     * @param {string} to 接收地址
-     * @private
-     */
-    _showTransactionStatus(signature, tokenSymbol, amount, to) {
-        // 使用SweetAlert2显示交易状态
-        if (window.Swal) {
-            Swal.fire({
-                title: '交易处理中',
-                html: `
-                    <div class="text-center">
-                        <div class="mb-3">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        </div>
-                        <p>您的 ${amount} ${tokenSymbol} 转账正在处理中...</p>
-                        <p class="small text-muted">
-                            交易签名: <a href="https://solscan.io/tx/${signature}" target="_blank">${signature.substring(0, 8)}...${signature.substring(signature.length - 8)}</a>
-                        </p>
-                        <p class="small">请勿关闭此窗口，交易确认通常需要几秒钟到几分钟不等</p>
-                    </div>
-                `,
-                showConfirmButton: false,
-                allowOutsideClick: false,
-                didOpen: () => {
-                    // 启动轮询检查交易状态
-                    this._pollTransactionStatus(signature, tokenSymbol, amount, to);
-                }
-            });
-        } else {
-            // 如果没有SweetAlert2，使用简单的alert
-            alert(`交易已提交，签名: ${signature}`);
-        }
-    },
-    
-    /**
-     * 轮询检查交易状态
-     * @param {string} signature 交易签名
-     * @param {string} tokenSymbol 代币符号
-     * @param {number} amount 转账金额
-     * @param {string} to 接收地址
-     * @private
-     */
-    async _pollTransactionStatus(signature, tokenSymbol, amount, to) {
-        let retryCount = 0;
-        const maxRetries = 30;
-        const pollInterval = 3000; // 3秒
-        
-        const checkStatus = async () => {
-            try {
-                const response = await fetch(`/api/blockchain/solana/check-transaction?signature=${signature}`);
-                if (!response.ok) {
-                    throw new Error('检查交易状态失败');
-                }
-                
-                const result = await response.json();
-                
-                if (result.confirmed) {
-                    // 交易确认成功
-                    if (window.Swal) {
-                        Swal.fire({
-                            title: '交易成功',
-                            html: `
-                                <div class="text-center">
-                                    <div class="mb-3">
-                                        <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
-                                    </div>
-                                    <p>您已成功转账 ${amount} ${tokenSymbol}</p>
-                                    <p class="small text-muted">
-                                        交易签名: <a href="https://solscan.io/tx/${signature}" target="_blank">${signature.substring(0, 8)}...${signature.substring(signature.length - 8)}</a>
-                                    </p>
-                                </div>
-                            `,
-                            icon: 'success',
-                            confirmButtonText: '确定'
-                        });
-                    }
-                    return;
-                }
-                
-                // 交易失败
-                if (result.error) {
-                    if (window.Swal) {
-                        Swal.fire({
-                            title: '交易失败',
-                            html: `
-                                <div class="text-center">
-                                    <div class="mb-3">
-                                        <i class="fas fa-times-circle text-danger" style="font-size: 3rem;"></i>
-                                    </div>
-                                    <p>转账失败: ${result.error}</p>
-                                    <p class="small text-muted">
-                                        交易签名: <a href="https://solscan.io/tx/${signature}" target="_blank">${signature.substring(0, 8)}...${signature.substring(signature.length - 8)}</a>
-                                    </p>
-                                </div>
-                            `,
-                            icon: 'error',
-                            confirmButtonText: '确定'
-                        });
-                    }
-                    return;
-                }
-                
-                // 交易仍在处理中
-                retryCount++;
-                if (retryCount < maxRetries) {
-                    setTimeout(checkStatus, pollInterval);
-                } else {
-                    // 达到最大重试次数
-                    if (window.Swal) {
-                        Swal.fire({
-                            title: '交易状态未知',
-                            html: `
-                                <div class="text-center">
-                                    <div class="mb-3">
-                                        <i class="fas fa-question-circle text-warning" style="font-size: 3rem;"></i>
-                                    </div>
-                                    <p>交易已提交，但尚未收到确认。您可以稍后查看交易状态。</p>
-                                    <p class="small text-muted">
-                                        交易签名: <a href="https://solscan.io/tx/${signature}" target="_blank">${signature.substring(0, 8)}...${signature.substring(signature.length - 8)}</a>
-                                    </p>
-                                </div>
-                            `,
-                            icon: 'warning',
-                            confirmButtonText: '确定'
-                        });
-                    }
-                }
-        } catch (error) {
-                console.error('检查交易状态出错:', error);
-                // 发生错误，继续重试
-                retryCount++;
-                if (retryCount < maxRetries) {
-                    setTimeout(checkStatus, pollInterval);
-                } else {
-                    // 达到最大重试次数
-                    if (window.Swal) {
-                        Swal.fire({
-                            title: '检查交易状态失败',
-                            html: `
-                                <div class="text-center">
-                                    <div class="mb-3">
-                                        <i class="fas fa-exclamation-circle text-warning" style="font-size: 3rem;"></i>
-                                    </div>
-                                    <p>无法检查交易状态，但交易可能已经成功。您可以稍后查看。</p>
-                                    <p class="small text-muted">
-                                        交易签名: <a href="https://solscan.io/tx/${signature}" target="_blank">${signature.substring(0, 8)}...${signature.substring(signature.length - 8)}</a>
-                                    </p>
-                                </div>
-                            `,
-                            icon: 'warning',
-                            confirmButtonText: '确定'
-                        });
-                    }
-                }
-            }
-        };
-        
-        // 启动状态检查
-        setTimeout(checkStatus, 2000); // 等待2秒后开始检查
-    },
-    
-    /**
-     * 通过以太坊钱包转账代币
-     * @param {string} tokenSymbol 代币符号
-     * @param {string} to 接收地址
-     * @param {number} amount 转账金额
-     * @returns {Promise<{success: boolean, txHash: string, error: string}>} 交易结果
-     */
-    async transferEthereumToken(tokenSymbol, to, amount) {
-        try {
-            console.log('使用以太坊钱包转账');
-            
-            // 检查Web3是否可用
-            if (!this.web3) {
-                throw new Error('Web3实例不可用');
-            }
-            
-            // 这里应该实现基于Web3.js的ERC20代币转账
-            // 由于我们的应用主要使用Solana，这里暂时返回一个错误
-            throw new Error('以太坊转账功能尚未实现');
-            
-        } catch (error) {
-            console.error('以太坊转账失败:', error);
-            return {
-                success: false,
-                error: error.message || '以太坊转账失败'
-            };
-        }
-    },
-    
-    // 第二个clearState函数已移除，使用上方定义的统一clearState函数
-
-    /**
-     * 成功连接钱包后的操作
-     * 更新UI并获取余额
-     */
-    afterSuccessfulConnection(address, walletType, provider = null) {
-        console.log('钱包连接成功，地址:', address, '类型:', walletType);
-        
-        // 更新钱包状态
-        this.address = address;
-        this.walletType = walletType;
-        this.connected = true;
-        
-        // 保存连接信息到本地存储
-        this.saveWalletData(address, walletType);
-        
-        // 存储钱包提供商对象（如果有）
-        if (provider) {
-            this.walletProvider = provider;
-        }
-        
-        // 更新UI
-        this.updateUI();
-        
-        // 获取余额
-        this.getWalletBalance();
-        
-        // 检查是否为管理员并更新状态
-        this.checkIsAdmin().then(isAdmin => {
-            console.log('管理员状态检查结果:', isAdmin);
-            this.isAdmin = isAdmin;
-            
-            // 更新管理员入口显示
-            const adminEntry = document.getElementById('adminEntry');
-            if (adminEntry) {
-                adminEntry.style.display = isAdmin ? 'block' : 'none';
-                console.log('已更新管理员入口显示状态:', isAdmin ? '显示' : '隐藏');
-            }
-            
-            // 触发状态变化通知
-            this.notifyStateChange({ type: 'admin_status_changed', isAdmin });
-        }).catch(error => {
-            console.error('检查管理员状态时出错:', error);
-        });
-        
-        // 通知状态变化
-        this.notifyStateChange({ type: 'connect' });
-        
-        return true;
-    },
-
-    /**
-     * 保存钱包数据到本地存储
-     * @param {string} address - 钱包地址
-     * @param {string} walletType - 钱包类型
-     */
-    saveWalletData(address, walletType) {
-        try {
-            console.log(`保存钱包数据: 地址=${address}, 类型=${walletType}`);
-            localStorage.setItem('walletType', walletType);
-            localStorage.setItem('walletAddress', address);
-            localStorage.setItem('lastWalletType', walletType);
-            localStorage.setItem('lastWalletAddress', address);
-        } catch (error) {
-            console.error('保存钱包数据失败:', error);
-        }
-    },
-
-    // 安全的Base64解码函数，处理非Latin1字符
-    safeAtob(str) {
-        try {
-            // 创建一个Base64解码器
-            const base64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-            const base64Map = {};
-            for (let i = 0; i < base64Chars.length; i++) {
-                base64Map[base64Chars.charAt(i)] = i;
-            }
-            
-            // 替换URL安全字符
-            const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-            
-            // 手动解码Base64
-            let result = '';
-            let i = 0;
-            
-            // 处理填充
-            let encodedStr = base64;
-            if (encodedStr.length % 4 === 1) {
-                throw new Error('Invalid base64 string');
-            }
-            
-            // 添加缺失的填充
-            while (encodedStr.length % 4 !== 0) {
-                encodedStr += '=';
-            }
-            
-            // 手动解码
-            while (i < encodedStr.length) {
-                const enc1 = base64Map[encodedStr.charAt(i++)];
-                const enc2 = base64Map[encodedStr.charAt(i++)];
-                const enc3 = base64Map[encodedStr.charAt(i++)];
-                const enc4 = base64Map[encodedStr.charAt(i++)];
-                
-                const chr1 = (enc1 << 2) | (enc2 >> 4);
-                const chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
-                const chr3 = ((enc3 & 3) << 6) | enc4;
-                
-                result += String.fromCharCode(chr1);
-                
-                if (enc3 !== 64) {
-                    result += String.fromCharCode(chr2);
-                }
-                if (enc4 !== 64) {
-                    result += String.fromCharCode(chr3);
-                }
-            }
-            
-            return result;
-                } catch (e) {
-            console.error('自定义Base64解码失败', e);
-            
-            // 尝试使用浏览器API但进行错误处理
-            try {
-                // 使用TextDecoder和Uint8Array间接处理
-                const binaryString = window.atob(str);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                return String.fromCharCode.apply(null, bytes);
-            } catch (fallbackError) {
-                console.error('所有Base64解码方法都失败', fallbackError);
-                // 最后的尝试：返回一个安全的空二进制字符串
-                return '';
-            }
-        }
-    },
-
-    // 将ArrayBuffer转换为Base64字符串
-    arrayBufferToBase64(buffer) {
-        // 首先转成Uint8Array确保我们有 .reduce 方法
-        const uint8Array = new Uint8Array(buffer);
-        // 然后将每个字节转换为字符
-        const binary = uint8Array.reduce((str, byte) => str + String.fromCharCode(byte), '');
-        // 最后使用btoa转为base64
-        return btoa(binary);
-    },
-
-    /**
-     * 调用购买合约 (已重构以适配Anchor合约)
-     * 与Solana智能合约交互，执行资产购买操作
-     * @param {Object} params - 合约交互参数
-     * @param {string} params.contractAddress - 购买合约程序ID (rwa-trade program ID)
-     * @param {string} params.assetId - 资产的唯一标识符 (用于查找资产账户地址和价格)
-     * @param {string} params.buyerAddress - 买家钱包地址
-     * @param {string} params.sellerAddress - 卖家钱包地址 (实际合约未使用，但保留用于查找ATA)
-     * @param {number} params.totalAmount - 用户支付的总金额 (USDC)
-     * @returns {Promise<Object>} 包含交易结果的对象，成功时包含txHash
-     */
-    async callPurchaseContract(params) {
-        console.log('开始调用购买合约 (Anchor版)，参数:', params);
-
-        try {
-            // --- 1. 参数与环境校验 ---
-            if (!params.contractAddress) throw new Error('缺少购买合约程序ID');
-            if (!params.assetId) throw new Error('缺少资产ID');
-            if (!params.buyerAddress) throw new Error('缺少买家地址');
-            if (!params.sellerAddress) throw new Error('缺少卖家地址'); // 用于计算卖家ATA
-            if (typeof params.totalAmount !== 'number' || params.totalAmount <= 0) throw new Error('无效的总支付金额');
-
-            if (!this.connected || (this.walletType !== 'phantom' && this.walletType !== 'solana')) {
-                throw new Error('请先连接Phantom或兼容的Solana钱包');
-            }
-            if (!window.solanaWeb3 || !window.solanaWeb3.Connection || !window.solanaWeb3.PublicKey || !window.solanaWeb3.Transaction || !window.solanaWeb3.SystemProgram) {
-                throw new Error('Solana Web3.js基础库未完全加载');
-            }
-            // 检查SPL Token库和Anchor库
-            if (!window.splToken || !window.splToken.getAssociatedTokenAddress || !window.splToken.TOKEN_PROGRAM_ID) {
-                 console.error("SPL Token库或关键函数未加载");
-                 // 尝试动态加载或初始化
-                 if (typeof window.initSplTokenLib === 'function') {
-                     console.log("尝试动态初始化SPL Token库...");
-                     await window.initSplTokenLib();
-                     if (!window.splToken || !window.splToken.getAssociatedTokenAddress) {
-                         throw new Error('SPL Token库初始化失败或不完整');
-                     }
-                 } else {
-                     throw new Error('SPL Token库未加载且无法动态初始化');
-                 }
-            }
-            // 检查Anchor库
-            if (!window.anchor || !window.anchor.Program || !window.anchor.workspace) {
-                 // Anchor库可能不是全局变量，需要通过Provider访问
-                 console.warn('全局Anchor对象不可用，将尝试通过Provider构建Program实例');
-            }
-
-            // --- 2. 获取必要信息 ---
-            console.log('获取资产信息...');
-            // !!关键假设!!: 后端API `/api/asset_details/{assetId}` 返回资产账户地址和价格
-            // 或者这些信息存储在全局变量 `window.currentAssetInfo` 中
-            let assetAccountAddress, assetPrice;
-            try {
-                if (window.currentAsset && window.currentAsset.asset_account_address && window.currentAsset.price) {
-                    assetAccountAddress = window.currentAsset.asset_account_address;
-                    assetPrice = parseFloat(window.currentAsset.price);
-                    console.log('从全局变量 window.currentAsset 获取资产信息:', { assetAccountAddress, assetPrice });
-                } else {
-                    console.log(`尝试通过API获取资产 ${params.assetId} 的信息...`);
-                    const response = await fetch(`/api/asset_details/${params.assetId}`);
-                    if (!response.ok) throw new Error(`无法获取资产信息: ${response.statusText}`);
-                    const assetInfo = await response.json();
-                    if (!assetInfo.asset_account_address || !assetInfo.price) {
-                        throw new Error('API返回的资产信息不完整');
-                    }
-                    assetAccountAddress = assetInfo.asset_account_address;
-                    assetPrice = parseFloat(assetInfo.price);
-                    console.log('从API获取资产信息:', { assetAccountAddress, assetPrice });
-                }
-                 if (!assetAccountAddress || isNaN(assetPrice) || assetPrice <= 0) {
-                     throw new Error('无效的资产账户地址或价格');
-                 }
-            } catch (err) {
-                 console.error("获取资产信息失败:", err);
-                 throw new Error(`获取资产信息失败: ${err.message}`);
-            }
-
-            // 计算购买的代币数量 (amount)
-            // 合约期望的是代币数量，前端传递的是总金额
-            const amount = params.totalAmount / assetPrice;
-            // !!重要!!: Solana代币通常有小数位，这里需要处理精度
-            // 假设资产代币和USDC都有6位小数
-            const amountInSmallestUnit = BigInt(Math.round(amount * Math.pow(10, 6)));
-            console.log('计算的代币数量:', { amount, amountInSmallestUnit: amountInSmallestUnit.toString() });
-             if (amountInSmallestUnit <= 0) {
-                 throw new Error('计算出的购买数量无效');
-             }
-
-            // 获取其他地址
-            const platformFeeAddress = window.PLATFORM_FEE_WALLET_ADDRESS || 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd'; // 从全局或默认
-            const usdcMintAddress = window.USDC_MINT_ADDRESS || 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // 从全局或默认
-            const tokenProgramId = window.splToken.TOKEN_PROGRAM_ID;
-            const systemProgramId = window.solanaWeb3.SystemProgram.programId;
-
-            // 创建公钥对象
-            const buyerPublicKey = new window.solanaWeb3.PublicKey(params.buyerAddress);
-            const sellerPublicKey = new window.solanaWeb3.PublicKey(params.sellerAddress);
-            const assetPublicKey = new window.solanaWeb3.PublicKey(assetAccountAddress);
-            const platformFeePublicKey = new window.solanaWeb3.PublicKey(platformFeeAddress);
-            const usdcMintPublicKey = new window.solanaWeb3.PublicKey(usdcMintAddress);
-            const contractPublicKey = new window.solanaWeb3.PublicKey(params.contractAddress);
-
-            console.log('准备公钥:', {
-                buyer: buyerPublicKey.toString(),
-                seller: sellerPublicKey.toString(),
-                asset: assetPublicKey.toString(),
-                platformFeeWallet: platformFeePublicKey.toString(),
-                usdcMint: usdcMintPublicKey.toString(),
-                contract: contractPublicKey.toString(),
-                tokenProgram: tokenProgramId.toString(),
-                systemProgram: systemProgramId.toString()
-            });
-
-            // 计算ATA地址
-            console.log('计算ATA地址...');
-            const buyerTokenAccount = await window.splToken.getAssociatedTokenAddress(usdcMintPublicKey, buyerPublicKey);
-            const sellerTokenAccount = await window.splToken.getAssociatedTokenAddress(usdcMintPublicKey, sellerPublicKey);
-            const platformFeeTokenAccount = await window.splToken.getAssociatedTokenAddress(usdcMintPublicKey, platformFeePublicKey);
-
-            console.log('计算得到的ATA地址:', {
-                buyerATA: buyerTokenAccount.toString(),
-                sellerATA: sellerTokenAccount.toString(),
-                platformFeeATA: platformFeeTokenAccount.toString()
-            });
-
-            // --- 3. 构建和发送交易 ---
-            // 原版: 
-            // const connection = new window.solanaWeb3.Connection(
-            //    window.SOLANA_NETWORK_URL || 'https://api.mainnet-beta.solana.com', // 从全局或默认
-            //    'confirmed'
-            // );
-            
-            // 修改为使用我们的服务器API中继
-            let connection;
-            console.log('正在使用服务器中继API代替直接连接Solana节点');
-            try {
-                connection = new window.solanaWeb3.Connection(
-                    '/api/solana', // 使用我们的服务器API中继
-                    'confirmed'
-                );
-                // 覆盖某些方法以确保使用API中继
-                const originalGetLatestBlockhash = connection.getLatestBlockhash;
-                connection.getLatestBlockhash = async function(commitment) {
-                    try {
-                        console.log('通过服务器API中继获取最新blockhash');
-                        const response = await fetch('/api/solana/latest-blockhash');
-                        if (!response.ok) throw new Error('API请求失败');
-                        const data = await response.json();
-                        if (!data.success) throw new Error(data.error || '未知错误');
-                        return data.result;
-                    } catch (error) {
-                        console.warn('通过API中继获取blockhash失败，尝试回退到原始方法', error);
-                        return originalGetLatestBlockhash.call(this, commitment);
-                    }
-                };
-                
-                const originalSendRawTransaction = connection.sendRawTransaction;
-                connection.sendRawTransaction = async function(rawTransaction, options) {
-                    try {
-                        console.log('通过服务器API中继发送交易');
-                        const txBase64 = this.arrayBufferToBase64(rawTransaction);
-                        const response = await fetch('/api/solana/send-transaction', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                                transaction: txBase64,
-                                options: options
-                            })
-                        });
-                        if (!response.ok) throw new Error('API请求失败');
-                        const data = await response.json();
-                        if (!data.success) throw new Error(data.error || '未知错误');
-                        return data.signature;
-                    } catch (error) {
-                        console.warn('通过API中继发送交易失败，尝试回退到原始方法', error);
-                        return originalSendRawTransaction.call(this, rawTransaction, options);
-                    }
-                };
-                
-                const originalConfirmTransaction = connection.confirmTransaction;
-                connection.confirmTransaction = async function(signature, commitment) {
-                    try {
-                        console.log('通过服务器API中继确认交易');
-                        const response = await fetch(`/api/solana/confirm-transaction?signature=${signature}&commitment=${commitment || 'confirmed'}`);
-                        if (!response.ok) throw new Error('API请求失败');
-                        const data = await response.json();
-                        if (!data.success) throw new Error(data.error || '未知错误');
-                        return data.result;
-                    } catch (error) {
-                        console.warn('通过API中继确认交易失败，尝试回退到原始方法', error);
-                        return originalConfirmTransaction.call(this, signature, commitment);
-                    }
-                };
-            } catch (error) {
-                console.error('创建中继API连接失败，回退到直接连接:', error);
-                connection = new window.solanaWeb3.Connection(
-                    window.SOLANA_NETWORK_URL || 'https://api.mainnet-beta.solana.com',
-                    'confirmed'
-                );
-            }
-
-            // 使用Anchor Provider和Program (如果全局Anchor可用)
-            let program;
-             let txSignature;
-
-            try {
-                 // 优先尝试使用 Anchor Provider 和 workspace 构建 program
-                 const provider = new window.anchor.AnchorProvider(connection, window.solana, window.anchor.AnchorProvider.defaultOptions());
-                 // 假设合约IDL已加载到 workspace
-                 if (window.anchor.workspace && window.anchor.workspace.RwaTrade) {
-                      program = window.anchor.workspace.RwaTrade;
-                      console.log("使用全局 Anchor workspace 构建 Program 实例");
-                 } else {
-                      console.warn("全局 Anchor workspace 或 RwaTrade 不可用，尝试手动构建 Program");
-                      // 需要合约的 IDL JSON 对象
-                      // !!关键假设!!: 合约IDL存储在 window.RWA_TRADE_IDL
-                      if (!window.RWA_TRADE_IDL) throw new Error("缺少 RWA Trade 合约的 IDL");
-                      program = new window.anchor.Program(window.RWA_TRADE_IDL, contractPublicKey, provider);
-                 }
-
-                 console.log('构建 Anchor 交易...');
-                 const tx = await program.methods
-                     .buyAsset(new window.anchor.BN(amountInSmallestUnit.toString())) // 传递 u64 金额 (BN类型)
-                     .accounts({
-                         buyer: buyerPublicKey,
-                         asset: assetPublicKey,
-                         buyerTokenAccount: buyerTokenAccount,
-                         sellerAccount: sellerTokenAccount, // 合约中是seller_account
-                         platformFeeAccount: platformFeeTokenAccount, // 合约中是platform_fee_account
-                         tokenProgram: tokenProgramId,
-                         systemProgram: systemProgramId,
-                     })
-                      // .signers([provider.wallet.payer]) // Anchor Provider 会自动添加签名者
-                     .transaction(); // 获取未签名的交易对象
-
-                 console.log('交易已构建，请求用户签名...');
-                 const signedTx = await provider.wallet.signTransaction(tx); // 请求钱包签名
-
-                 console.log('交易已签名，发送到网络...');
-                 txSignature = await connection.sendRawTransaction(signedTx.serialize());
-                 console.log('交易已发送，签名:', txSignature);
-
-             } catch (anchorError) {
-                  console.error("使用 Anchor Provider 构建/发送交易失败:", anchorError);
-                  console.log("尝试回退到手动构建 TransactionInstruction...");
-
-                  // --- 回退方案：手动构建 TransactionInstruction ---
-                  // (如果Anchor Provider方式失败或不可用)
-                  const transaction = new window.solanaWeb3.Transaction();
                   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
                   transaction.recentBlockhash = blockhash;
                   transaction.lastValidBlockHeight = lastValidBlockHeight;
@@ -4339,6 +3238,67 @@ checkIfReturningFromWalletApp(walletType) {
             debugError('[getBalanceWithFallback] 后备方案出错:', error);
             this.balance = 0;
             this.updateBalanceDisplay(0);
+            return 0;
+        }
+    },
+
+    /**
+     * 获取钱包分佣余额
+     * @returns {Promise<number>} 分佣余额
+     */
+    async getCommissionBalance() {
+        try {
+            if (!this.connected || !this.address) {
+                debugWarn('[getCommissionBalance] 钱包未连接，无法获取分佣余额');
+                return 0;
+            }
+
+            const address = this.address;
+            debugLog(`[getCommissionBalance] 开始获取 ${address} 的分佣余额`);
+
+            // 调用分佣余额API
+            const apiUrl = `/api/service/wallet/commission_balance?address=${address}&_=${Date.now()}`;
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Wallet-Address': address,
+                    'X-Wallet-Type': this.walletType
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`API响应错误: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            if (DEBUG_MODE) {
+                debugLog('[getCommissionBalance] API响应数据:', data);
+            }
+
+            if (data.success) {
+                const commission = parseFloat(data.balance || 0);
+                
+                // 减少重复的分佣日志
+                if (!this._lastCommissionLog || Math.abs(this.commissionBalance - commission) > 0.01 || 
+                    (Date.now() - this._lastCommissionLog > 30000)) {
+                    debugLog(`[getCommissionBalance] 获取到分佣余额: ${commission} USDC`);
+                    this._lastCommissionLog = Date.now();
+                }
+                
+                // 更新分佣余额
+                this.commissionBalance = commission;
+                this.updateBalanceDisplay();
+                
+                return commission;
+            } else {
+                const errorMsg = data.error || '获取分佣余额失败';
+                debugError('[getCommissionBalance] 获取分佣余额失败:', errorMsg);
+                return 0;
+            }
+        } catch (error) {
+            debugError('[getCommissionBalance] 获取分佣余额出错:', error);
             return 0;
         }
     },
