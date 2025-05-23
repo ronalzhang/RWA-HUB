@@ -2361,7 +2361,7 @@ def settings_v2():
     }
     for key in required_configs:
         try:
-        configs[key] = SystemConfig.get_value(key, default=default_values.get(key, ''))
+            configs[key] = SystemConfig.get_value(key, default=default_values.get(key, ''))
         except Exception as e:
             current_app.logger.error(f"获取系统设置失败: {str(e)}", exc_info=True)
             configs[key] = default_values.get(key, '')
