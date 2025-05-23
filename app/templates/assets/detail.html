@@ -407,10 +407,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 同步window.walletState和window.wallet中的数据
                 function syncWalletState() {
-                    // 防抖机制 - 短时间内不重复执行
+                    // 增强防抖机制 - 短时间内不重复执行
                     const now = Date.now();
-                    if (window._lastWalletStateSync && (now - window._lastWalletStateSync) < 1500) {
-                        return; // 1.5秒内不重复同步
+                    if (window._lastWalletStateSync && (now - window._lastWalletStateSync) < 2000) {
+                        return; // 2秒内不重复同步
                     }
                     window._lastWalletStateSync = now;
                     
@@ -419,34 +419,37 @@ document.addEventListener('DOMContentLoaded', function() {
                         const currentConnected = window.walletState && (window.walletState.connected || window.walletState.isConnected);
                         const currentAddress = window.walletState ? window.walletState.address : null;
                         
-                        // 修复钱包对象调用 - 使用正确的walletState对象
-                        const newConnected = window.walletState && (window.walletState.connected || window.walletState.isConnected);
-                        const newAddress = window.walletState ? window.walletState.address : null;
+                        // 如果状态没有变化，跳过更新
+                        if (window._lastSyncedConnected === currentConnected && 
+                            window._lastSyncedAddress === currentAddress) {
+                            return;
+                        }
                         
-                        // 只有状态真正变化时才更新
-                        if (currentConnected !== newConnected || currentAddress !== newAddress) {
-                            console.log('同步钱包状态...', {
-                                oldConnected: currentConnected, 
-                                newConnected: newConnected,
-                                oldAddress: currentAddress,
-                                newAddress: newAddress
-                            });
-                            
-                            if (!window.walletState) {
-                                window.walletState = {};
-                            }
-                            
-                            window.walletState.connected = newConnected;
-                            window.walletState.isConnected = newConnected;
-                            window.walletState.address = newAddress;
+                        // 记录当前状态
+                        window._lastSyncedConnected = currentConnected;
+                        window._lastSyncedAddress = currentAddress;
+                        
+                        // 修复钱包对象调用 - 使用正确的walletState对象
+                        const walletConnected = window.wallet && typeof window.wallet.isWalletConnected === 'function' 
+                            ? window.wallet.isWalletConnected() 
+                            : (window.walletState && (window.walletState.connected || window.walletState.isConnected));
+                        
+                        if (walletConnected && window.walletState) {
+                            // 只在状态真正变化时记录日志
+                            console.log('同步钱包状态...');
                             
                             // 更新购买按钮状态
                             if (typeof updateBuyButtonState === 'function') {
                                 updateBuyButtonState();
                             }
+                            
+                            // 同步钱包余额显示（降低频率）
+                            if (typeof window.wallet.updateBalanceDisplay === 'function') {
+                                window.wallet.updateBalanceDisplay();
+                            }
                         }
                     } catch (error) {
-                        console.error('同步钱包状态时出错:', error);
+                        console.error('同步钱包状态失败:', error);
                     }
                 }
                 
@@ -1940,12 +1943,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 如果存在全局handleBuy函数，优先使用全局函数
                     if (typeof window.handleBuy === 'function') {
                         console.log('[detail.html] localHandleBuy: 调用全局handleBuy函数');
-                        // 添加明确的钱包参数
-                        window.handleBuy(assetId, amountInput, buyButton, tokenPrice, {
-                            walletConnected: isConnected,
-                            walletAddress: walletAddress,
-                            walletType: walletType
-                        });
+                        // 修复：确保参数正确传递，符合handleBuy函数期望的参数格式
+                        window.handleBuy(assetId, amountInput, buyButton);
                     } else {
                         // 全局函数不可用，显示错误
                         console.error('[detail.html] localHandleBuy: 全局handleBuy函数不可用');
@@ -3174,11 +3173,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const buyButton = document.getElementById('buy-button');
             
             if (amountInput && totalPriceInput && buyButton) {
-                const amount = parseInt(amountInput.value) || 0;
+                const amount = parseInt(amountInput.value) || 1;
                 const pricePerToken = parseFloat(buyButton.getAttribute('data-token-price')) || 0;
                 const totalPrice = (amount * pricePerToken).toFixed(2);
                 
                 totalPriceInput.value = totalPrice;
+                
+                // 重要：确保购买按钮文本不会被修改为数字
+                if (buyButton.innerHTML !== '<i class="fas fa-shopping-cart me-2"></i>Buy' && 
+                    buyButton.innerHTML !== '<i class="fas fa-wallet me-2"></i>请先连接钱包') {
+                    buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
+                }
             }
         }
         
@@ -3188,7 +3193,34 @@ document.addEventListener('DOMContentLoaded', function() {
         // 为购买按钮添加事件监听器
         const buyButton = document.getElementById('buy-button');
         if (buyButton) {
+            // 确保按钮文本正确初始化
+            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
+            
+            // 添加事件监听器
             buyButton.addEventListener('click', localHandleBuy);
+            console.log('购买按钮成功绑定点击事件');
+            
+            // 防止按钮文本被意外修改
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'childList' || mutation.type === 'characterData') {
+                        const currentText = buyButton.innerHTML;
+                        // 如果按钮文本被意外修改为数字或其他错误内容，恢复正确文本
+                        if (/^\d+$/.test(currentText.trim()) || 
+                            (!currentText.includes('Buy') && !currentText.includes('请先连接钱包') && !currentText.includes('处理中'))) {
+                            console.warn('检测到购买按钮文本被意外修改为:', currentText, '正在恢复...');
+                            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
+                        }
+                    }
+                });
+            });
+            
+            // 开始观察按钮文本变化
+            observer.observe(buyButton, {
+                childList: true,
+                subtree: true,
+                characterData: true
+            });
         }
     });
 </script>
