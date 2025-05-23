@@ -2667,40 +2667,53 @@ def api_export_assets_v2():
 def api_dashboard_stats_v2():
     """获取仪表盘统计数据"""
     try:
-        # 获取用户统计
+        # 用户统计 - 使用User表而不是Asset表
         total_users = User.query.count()
         new_users_today = User.query.filter(
-            func.date(User.created_at) == func.date(datetime.now())
+            func.date(User.created_at) == datetime.now().date()
         ).count()
         
-        # 获取资产统计
-        total_assets = Asset.query.filter(Asset.status != 0).count()
-        total_asset_value = db.session.query(func.sum(Asset.total_value)).filter(
-            Asset.status == 2  # 只统计已审核通过的资产
+        # 资产统计
+        total_assets = Asset.query.count()
+        active_assets = Asset.query.filter(Asset.status == 'active').count()
+        
+        # 交易统计 - 统一使用total字段
+        total_trades = Trade.query.count()
+        total_volume = db.session.query(func.sum(Trade.total)).scalar() or 0
+        
+        # 今日交易统计
+        today_trades = Trade.query.filter(
+            func.date(Trade.created_at) == datetime.now().date()
+        ).count()
+        today_volume = db.session.query(func.sum(Trade.total)).filter(
+            func.date(Trade.created_at) == datetime.now().date()
         ).scalar() or 0
         
-        # 获取交易统计
-        total_trades = Trade.query.count()
-        total_trade_volume = db.session.query(func.sum(Trade.total)).scalar() or 0
-        
         return jsonify({
-            'total_users': total_users,
-            'new_users_today': new_users_today,
-            'total_assets': total_assets,
-            'total_asset_value': float(total_asset_value),
-            'total_trades': total_trades,
-            'total_trade_volume': float(total_trade_volume)
+            'users': {
+                'total': total_users,
+                'new_today': new_users_today,
+                'growth_rate': round((new_users_today / max(total_users - new_users_today, 1)) * 100, 2)
+            },
+            'assets': {
+                'total': total_assets,
+                'active': active_assets,
+                'active_rate': round((active_assets / max(total_assets, 1)) * 100, 2)
+            },
+            'trades': {
+                'total': total_trades,
+                'today': today_trades,
+                'volume': float(total_volume),
+                'today_volume': float(today_volume)
+            }
         })
         
     except Exception as e:
-        current_app.logger.error(f'获取仪表盘统计数据失败: {str(e)}', exc_info=True)
+        current_app.logger.error(f'获取仪表板统计失败: {str(e)}', exc_info=True)
         return jsonify({
-            'total_users': 0,
-            'new_users_today': 0,
-            'total_assets': 0,
-            'total_asset_value': 0,
-            'total_trades': 0,
-            'total_trade_volume': 0
+            'users': {'total': 0, 'new_today': 0, 'growth_rate': 0},
+            'assets': {'total': 0, 'active': 0, 'active_rate': 0},
+            'trades': {'total': 0, 'today': 0, 'volume': 0, 'today_volume': 0}
         })
 
 @admin_bp.route('/v2/api/dashboard/trends', methods=['GET'])
@@ -2744,7 +2757,7 @@ def api_dashboard_recent_trades_v2():
                 'name': trade.asset.name if trade.asset else None,
                 'token_symbol': trade.asset.token_symbol if trade.asset else None
             },
-            'total_price': float(trade.total) if trade.total else 0,  # 使用total字段
+            'total_price': float(trade.total) if trade.total else 0,  # 统一使用total字段
             'token_amount': trade.token_amount,
             'status': trade.status,
             'created_at': trade.created_at.strftime('%Y-%m-%d %H:%M:%S')
@@ -2789,7 +2802,7 @@ def get_trading_volume_trend(days):
     end_date = datetime.now()
     start_date = end_date - timedelta(days=days)
     
-    # 按日期分组统计交易量
+    # 按日期分组统计交易量 - 统一使用total字段
     daily_stats = db.session.query(
         func.date(Trade.created_at).label('date'),
         func.sum(Trade.total).label('volume')
@@ -2805,7 +2818,7 @@ def get_trading_volume_trend(days):
     volumes = [0] * days
     
     # 填充实际数据
-    date_dict = {stat.date.strftime('%Y-%m-%d'): float(stat.volume) for stat in daily_stats}
+    date_dict = {stat.date.strftime('%Y-%m-%d'): float(stat.volume) if stat.volume else 0 for stat in daily_stats}
     for i, date in enumerate(dates):
         volumes[i] = date_dict.get(date, 0)
     
@@ -2924,80 +2937,73 @@ def update_share_messages():
 @admin_bp.route('/v2/api/users', methods=['GET'])
 @api_admin_required
 def api_users_v2():
-    """获取所有用户，支持分页和筛选"""
+    """用户管理V2版本API"""
     try:
-        # 记录请求信息，方便调试
-        current_app.logger.info(f"访问V2用户列表API，参数: {request.args}")
-        
         # 分页参数
         page = request.args.get('page', 1, type=int)
         limit = request.args.get('limit', 10, type=int)
         
-        # 查询用户列表
+        # 筛选参数
+        status = request.args.get('status')
+        search = request.args.get('search')
+        sort_by = request.args.get('sort_by', 'created_at')
+        sort_order = request.args.get('sort_order', 'desc')
+        
+        # 构建查询
         query = User.query
         
-        # 查询筛选条件
-        keyword = request.args.get('keyword')
-        role = request.args.get('role')
+        # 应用筛选条件
+        if status:
+            if status == 'active':
+                query = query.filter(User.is_active == True)
+            elif status == 'inactive':
+                query = query.filter(User.is_active == False)
         
-        if keyword:
+        if search:
             query = query.filter(
                 or_(
-                    User.eth_address.ilike(f'%{keyword}%'),
-                    User.username.ilike(f'%{keyword}%'),
-                    User.email.ilike(f'%{keyword}%')
+                    User.username.ilike(f'%{search}%'),
+                    User.email.ilike(f'%{search}%'),
+                    User.wallet_address.ilike(f'%{search}%')
                 )
             )
-            
-        if role:
-            query = query.filter(User.role == role)
         
         # 排序
-        sort_field = request.args.get('sort', 'id')
-        sort_order = request.args.get('order', 'desc')
-        
+        sort_column = getattr(User, sort_by, User.created_at)
         if sort_order == 'desc':
-            query = query.order_by(desc(getattr(User, sort_field)))
+            query = query.order_by(sort_column.desc())
         else:
-            query = query.order_by(getattr(User, sort_field))
+            query = query.order_by(sort_column)
         
-        # 执行分页查询
+        # 分页
         pagination = query.paginate(page=page, per_page=limit, error_out=False)
-        users = pagination.items
         
-        current_app.logger.info(f"查询到 {len(users)} 个用户，总计 {pagination.total} 个")
-        
-        # 格式化返回数据
-        user_list = []
-        for user in users:
-            user_list.append({
+        # 格式化数据
+        users = []
+        for user in pagination.items:
+            users.append({
                 'id': user.id,
-                'name': user.username,  # 使用username代替name
-                'eth_address': user.eth_address,
+                'username': user.username,
                 'email': user.email,
-                'role': user.role,
-                'status': user.status,
-                'verified': user.is_active,  # 使用is_active代替verified
+                'wallet_address': user.wallet_address,
+                'is_active': user.is_active,
                 'created_at': user.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                'last_login': user.last_login_at.strftime('%Y-%m-%d %H:%M:%S') if user.last_login_at else None  # 使用last_login_at
+                'last_login_at': user.last_login_at.strftime('%Y-%m-%d %H:%M:%S') if user.last_login_at else None,
+                'assets_count': user.assets.count() if hasattr(user, 'assets') else 0,
+                'trades_count': Trade.query.filter(Trade.trader_address == user.wallet_address).count()
             })
         
         return jsonify({
-            'items': user_list,
+            'items': users,
             'total': pagination.total,
             'page': page,
-            'limit': limit,
-            'pages': pagination.pages
+            'pages': pagination.pages,
+            'limit': limit
         })
+        
     except Exception as e:
-        current_app.logger.error(f"获取用户列表失败: {str(e)}", exc_info=True)
-        return jsonify({
-            'items': [],
-            'total': 0,
-            'page': 1,
-            'limit': 10,
-            'pages': 0
-        })
+        current_app.logger.error(f'获取用户列表失败: {str(e)}', exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 @admin_bp.route('/v2/api/users/<int:user_id>', methods=['GET'])
 @api_admin_required
@@ -3540,7 +3546,7 @@ def api_trades_v2():
             page=page, per_page=limit, error_out=False
         )
         
-        # 格式化数据
+        # 格式化数据 - 使用正确的字段名
         trades = []
         for trade in pagination.items:
             asset_name = trade.asset.name if trade.asset else '未知资产'
@@ -3551,10 +3557,10 @@ def api_trades_v2():
                 'asset_name': asset_name,
                 'asset_symbol': asset_symbol,
                 'type': trade.type,
-                'trader_address': trade.trader_address,
-                'amount': trade.amount,
+                'trader_address': trade.trader_address,  # 统一使用trader_address
+                'amount': trade.token_amount,  # 统一使用token_amount
                 'price': float(trade.price) if trade.price else 0,
-                'total': float(trade.total) if trade.total else 0,
+                'total': float(trade.total) if trade.total else 0,  # 统一使用total
                 'status': trade.status,
                 'tx_hash': trade.tx_hash,
                 'created_at': trade.created_at.strftime('%Y-%m-%d %H:%M:%S')
@@ -3580,7 +3586,7 @@ def api_trades_stats_v2():
         # 总交易数
         total_trades = Trade.query.count()
         
-        # 交易总额
+        # 交易总额 - 统一使用total字段
         total_volume = db.session.query(func.sum(Trade.total)).scalar() or 0
         
         # 待处理交易数
@@ -3678,4 +3684,317 @@ def api_export_trades_v2():
         
     except Exception as e:
         current_app.logger.error(f'导出交易数据失败: {str(e)}', exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+# 佣金管理API
+@admin_api_bp.route('/commission/stats', methods=['GET'])
+@api_admin_required
+def get_commission_stats():
+    """获取佣金统计数据"""
+    try:
+        from app.models.admin import CommissionRecord, UserReferral
+        
+        # 总佣金
+        total_commission = db.session.query(func.sum(CommissionRecord.amount)).scalar() or 0
+        
+        # 待发放佣金
+        pending_commission = db.session.query(func.sum(CommissionRecord.amount))\
+            .filter(CommissionRecord.status == 'pending').scalar() or 0
+        
+        # 推荐用户总数
+        total_referrals = UserReferral.query.count()
+        
+        return jsonify({
+            'total_commission': float(total_commission),
+            'pending_commission': float(pending_commission),
+            'total_referrals': total_referrals,
+            'commission_rate': 5.0  # 默认佣金率
+        })
+    except Exception as e:
+        current_app.logger.error(f'获取佣金统计失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'total_commission': 0,
+            'pending_commission': 0,
+            'total_referrals': 0,
+            'commission_rate': 5.0
+        })
+
+@admin_api_bp.route('/commission/records', methods=['GET'])
+@api_admin_required
+def get_commission_records():
+    """获取佣金记录列表"""
+    try:
+        from app.models.admin import CommissionRecord
+        
+        # 分页参数
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        
+        # 筛选参数
+        status = request.args.get('status')
+        commission_type = request.args.get('type')
+        time_range = request.args.get('time_range')
+        search = request.args.get('search')
+        
+        # 构建查询
+        query = CommissionRecord.query
+        
+        # 应用筛选条件
+        if status:
+            query = query.filter(CommissionRecord.status == status)
+        if commission_type:
+            query = query.filter(CommissionRecord.commission_type == commission_type)
+        if search:
+            query = query.filter(
+                or_(
+                    CommissionRecord.recipient_address.ilike(f'%{search}%'),
+                    CommissionRecord.id.like(f'%{search}%')
+                )
+            )
+        
+        # 时间范围筛选
+        if time_range:
+            now = datetime.utcnow()
+            if time_range == 'today':
+                start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                query = query.filter(CommissionRecord.created_at >= start_date)
+            elif time_range == 'week':
+                start_date = now - timedelta(days=7)
+                query = query.filter(CommissionRecord.created_at >= start_date)
+            elif time_range == 'month':
+                start_date = now - timedelta(days=30)
+                query = query.filter(CommissionRecord.created_at >= start_date)
+        
+        # 分页查询
+        pagination = query.order_by(CommissionRecord.created_at.desc())\
+            .paginate(page=page, per_page=limit, error_out=False)
+        
+        # 格式化数据
+        records = []
+        for record in pagination.items:
+            records.append({
+                'id': record.id,
+                'recipient_address': record.recipient_address,
+                'amount': float(record.amount),
+                'commission_type': record.commission_type,
+                'status': record.status,
+                'trade_id': record.trade_id,
+                'asset_id': record.asset_id,
+                'transaction_hash': record.transaction_hash,
+                'payment_time': record.payment_time.strftime('%Y-%m-%d %H:%M:%S') if record.payment_time else None,
+                'created_at': record.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            })
+        
+        return jsonify({
+            'items': records,
+            'total': pagination.total,
+            'page': page,
+            'pages': pagination.pages,
+            'limit': limit
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取佣金记录失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'items': [],
+            'total': 0,
+            'page': 1,
+            'pages': 0,
+            'limit': limit
+        })
+
+@admin_api_bp.route('/commission/records/<int:record_id>/pay', methods=['POST'])
+@api_admin_required
+def pay_commission_record(record_id):
+    """发放佣金"""
+    try:
+        from app.models.admin import CommissionRecord
+        
+        record = CommissionRecord.query.get_or_404(record_id)
+        
+        if record.status != 'pending':
+            return jsonify({'error': '该佣金记录不在待发放状态'}), 400
+        
+        # 更新状态为已发放
+        record.status = 'paid'
+        record.payment_time = datetime.utcnow()
+        
+        # 这里应该调用区块链支付逻辑
+        # TODO: 实现实际的区块链支付
+        
+        db.session.commit()
+        
+        current_app.logger.info(f'佣金记录 {record_id} 已发放给地址 {record.recipient_address}')
+        
+        return jsonify({
+            'success': True,
+            'message': '佣金发放成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'发放佣金失败: {str(e)}', exc_info=True)
+        return jsonify({'error': f'发放佣金失败: {str(e)}'}), 500
+
+@admin_api_bp.route('/commission/settings', methods=['GET'])
+@api_admin_required
+def get_commission_settings():
+    """获取佣金设置"""
+    try:
+        from app.models.admin import SystemConfig
+        
+        # 获取佣金设置
+        settings = {
+            'global_rate': float(SystemConfig.get_value('COMMISSION_GLOBAL_RATE', '5.0')),
+            'min_amount': float(SystemConfig.get_value('COMMISSION_MIN_AMOUNT', '1.0')),
+            'referral_levels': int(SystemConfig.get_value('COMMISSION_REFERRAL_LEVELS', '3')),
+            'level1_rate': float(SystemConfig.get_value('COMMISSION_LEVEL1_RATE', '5.0')),
+            'level2_rate': float(SystemConfig.get_value('COMMISSION_LEVEL2_RATE', '3.0')),
+            'level3_rate': float(SystemConfig.get_value('COMMISSION_LEVEL3_RATE', '1.0'))
+        }
+        
+        return jsonify(settings)
+        
+    except Exception as e:
+        current_app.logger.error(f'获取佣金设置失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'global_rate': 5.0,
+            'min_amount': 1.0,
+            'referral_levels': 3,
+            'level1_rate': 5.0,
+            'level2_rate': 3.0,
+            'level3_rate': 1.0
+        })
+
+@admin_api_bp.route('/commission/settings', methods=['POST'])
+@api_admin_required
+def update_commission_settings():
+    """更新佣金设置"""
+    try:
+        from app.models.admin import SystemConfig
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '请求数据无效'}), 400
+        
+        # 获取管理员地址
+        admin_address = g.eth_address if hasattr(g, 'eth_address') else 'unknown'
+        
+        # 更新设置
+        settings_map = {
+            'global_rate': 'COMMISSION_GLOBAL_RATE',
+            'min_amount': 'COMMISSION_MIN_AMOUNT', 
+            'referral_levels': 'COMMISSION_REFERRAL_LEVELS',
+            'level1_rate': 'COMMISSION_LEVEL1_RATE',
+            'level2_rate': 'COMMISSION_LEVEL2_RATE',
+            'level3_rate': 'COMMISSION_LEVEL3_RATE'
+        }
+        
+        for key, config_key in settings_map.items():
+            if key in data:
+                SystemConfig.set_value(
+                    config_key, 
+                    str(data[key]), 
+                    description=f'佣金设置 - {key}',
+                    updated_by=admin_address
+                )
+        
+        current_app.logger.info(f'管理员 {admin_address} 更新了佣金设置')
+        
+        return jsonify({
+            'success': True,
+            'message': '佣金设置更新成功'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'更新佣金设置失败: {str(e)}', exc_info=True)
+        return jsonify({'error': f'更新佣金设置失败: {str(e)}'}), 500
+
+@admin_api_bp.route('/commission/referrals', methods=['GET'])
+@api_admin_required
+def get_commission_referrals():
+    """获取推荐关系列表"""
+    try:
+        from app.models.admin import UserReferral
+        
+        # 分页参数
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        
+        # 分页查询
+        pagination = UserReferral.query.order_by(UserReferral.joined_at.desc())\
+            .paginate(page=page, per_page=limit, error_out=False)
+        
+        # 格式化数据
+        referrals = []
+        for referral in pagination.items:
+            referrals.append({
+                'id': referral.id,
+                'user_address': referral.user_address,
+                'referrer_address': referral.referrer_address,
+                'referral_level': referral.referral_level,
+                'referral_code': referral.referral_code,
+                'joined_at': referral.joined_at.strftime('%Y-%m-%d %H:%M:%S')
+            })
+        
+        return jsonify({
+            'items': referrals,
+            'total': pagination.total,
+            'page': page,
+            'pages': pagination.pages
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取推荐关系失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'items': [],
+            'total': 0,
+            'page': 1,
+            'pages': 0
+        })
+
+@admin_api_bp.route('/commission/records/export', methods=['GET'])
+@api_admin_required
+def export_commission_records():
+    """导出佣金记录"""
+    try:
+        from app.models.admin import CommissionRecord
+        
+        records = CommissionRecord.query.order_by(CommissionRecord.created_at.desc()).all()
+        
+        # 生成CSV数据
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 写入标题行
+        writer.writerow([
+            '佣金ID', '接收地址', '佣金金额', '佣金类型', '状态', 
+            '交易ID', '资产ID', '支付时间', '创建时间'
+        ])
+        
+        # 写入数据行
+        for record in records:
+            writer.writerow([
+                record.id,
+                record.recipient_address,
+                float(record.amount),
+                '直接佣金' if record.commission_type == 'direct' else '推荐佣金',
+                {'pending': '待发放', 'paid': '已发放', 'failed': '发放失败'}.get(record.status, record.status),
+                record.trade_id,
+                record.asset_id,
+                record.payment_time.strftime('%Y-%m-%d %H:%M:%S') if record.payment_time else '',
+                record.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            ])
+        
+        output.seek(0)
+        
+        # 返回CSV文件
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename=commission_records_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'}
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f'导出佣金记录失败: {str(e)}', exc_info=True)
         return jsonify({'error': str(e)}), 500
