@@ -575,68 +575,69 @@ function setupBuyButton() {
 }
 
 // 用于跟踪最后一次状态更新的时间戳和正在进行的更新操作
-let lastStateUpdateTimestamp = 0;
-let pendingUpdateTimer = null;
+// 使用window对象避免重复声明错误
+window.lastStateUpdateTimestamp = window.lastStateUpdateTimestamp || 0;
+window.pendingUpdateTimer = window.pendingUpdateTimer || null;
 
 // 添加钱包状态变化监听器
 document.addEventListener('walletStateChanged', function(event) {
   // 检查是否是新的状态变化
   const timestamp = event.detail?.timestamp || Date.now();
-  if (timestamp <= lastStateUpdateTimestamp) {
+  if (timestamp <= window.lastStateUpdateTimestamp) {
     console.log('忽略重复的钱包状态变化事件');
     return;
   }
   
   // 使用延迟更新，避免短时间内多次触发
-  if (pendingUpdateTimer) {
-    clearTimeout(pendingUpdateTimer);
+  if (window.pendingUpdateTimer) {
+    clearTimeout(window.pendingUpdateTimer);
   }
   
-  pendingUpdateTimer = setTimeout(() => {
-    lastStateUpdateTimestamp = timestamp;
+  window.pendingUpdateTimer = setTimeout(() => {
+    window.lastStateUpdateTimestamp = timestamp;
     console.log('钱包状态变化，更新购买按钮状态:', event.detail);
     updateBuyButtonState();
-    pendingUpdateTimer = null;
+    window.pendingUpdateTimer = null;
   }, 2000); // 延迟2秒执行，减轻服务器负担
 });
 
 // 监听钱包连接事件，使用同样的延迟机制
 document.addEventListener('walletConnected', function(event) {
   const timestamp = Date.now();
-  if (timestamp <= lastStateUpdateTimestamp + 2000) {
+  if (timestamp <= window.lastStateUpdateTimestamp + 2000) {
     console.log('忽略短时间内的重复钱包连接事件');
     return;
   }
   
-  if (pendingUpdateTimer) {
-    clearTimeout(pendingUpdateTimer);
+  if (window.pendingUpdateTimer) {
+    clearTimeout(window.pendingUpdateTimer);
   }
   
-  pendingUpdateTimer = setTimeout(() => {
-    lastStateUpdateTimestamp = timestamp;
+  window.pendingUpdateTimer = setTimeout(() => {
+    window.lastStateUpdateTimestamp = timestamp;
     console.log('钱包已连接，更新购买按钮状态:', event.detail);
     updateBuyButtonState();
-    pendingUpdateTimer = null;
+    window.pendingUpdateTimer = null;
   }, 2000);
 });
 
 // 监听钱包断开连接事件
 document.addEventListener('walletDisconnected', function() {
   const timestamp = Date.now();
-  if (timestamp <= lastStateUpdateTimestamp + 2000) {
+  if (timestamp <= window.lastStateUpdateTimestamp + 2000) {
     console.log('短时间内已处理过状态变化，跳过');
     return;
   }
   
-  if (pendingUpdateTimer) {
-    clearTimeout(pendingUpdateTimer);
+  if (window.pendingUpdateTimer) {
+    clearTimeout(window.pendingUpdateTimer);
   }
   
-  pendingUpdateTimer = setTimeout(() => {
-    lastStateUpdateTimestamp = timestamp;
+  window.pendingUpdateTimer = setTimeout(() => {
+    window.lastStateUpdateTimestamp = timestamp;
     console.log('钱包已断开连接，更新购买按钮状态');
     updateBuyButtonState();
-    pendingUpdateTimer = null;
+    window.pendingUpdateTimer = null;
   }, 2000);
 });
     

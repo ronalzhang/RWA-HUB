@@ -3019,73 +3019,90 @@ checkIfReturningFromWalletApp(walletType) {
             const connection = new window.solanaWeb3.Connection('https://api.mainnet-beta.solana.com', 'confirmed');
             
             // 6. 获取最新区块哈希
-            const { blockhash } = await connection.getLatestBlockhash('confirmed');
-            console.log('[transferSolanaToken] 获取最新区块哈希:', blockhash);
+            const latestBlockhash = await connection.getLatestBlockhash('confirmed');
+            console.log('[transferSolanaToken] 获取最新区块哈希:', latestBlockhash.blockhash);
             
             // 7. 创建交易
             const transaction = new window.solanaWeb3.Transaction();
-                  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-                  transaction.recentBlockhash = blockhash;
-                  transaction.lastValidBlockHeight = lastValidBlockHeight;
-                  transaction.feePayer = buyerPublicKey;
-
-                  // 构建 Anchor 指令数据 (序列化方法名 + 参数)
-                  const instructionName = "buy_asset"; // 小驼峰或蛇形，取决于Anchor版本和IDL
-                  const instructionData = window.anchor.coder.instruction.encode(instructionName, {
-                      amount: new window.anchor.BN(amountInSmallestUnit.toString())
-                  });
-
-                  // 手动构建指令
-                  transaction.add(
-                      new window.solanaWeb3.TransactionInstruction({
-                          keys: [
-                              { pubkey: buyerPublicKey, isSigner: true, isWritable: true },
-                              { pubkey: assetPublicKey, isSigner: false, isWritable: true }, // 假设asset账户会被修改
-                              { pubkey: buyerTokenAccount, isSigner: false, isWritable: true },
-                              { pubkey: sellerTokenAccount, isSigner: false, isWritable: true },
-                              { pubkey: platformFeeTokenAccount, isSigner: false, isWritable: true },
-                              { pubkey: tokenProgramId, isSigner: false, isWritable: false },
-                              { pubkey: systemProgramId, isSigner: false, isWritable: false },
-                          ],
-                          programId: contractPublicKey,
-                          data: instructionData,
-                      })
-                  );
-
-                  console.log('手动构建交易完成，请求用户签名...');
-                  const signedTransaction = await window.solana.signTransaction(transaction);
-
-                  console.log('交易已签名，发送到网络...');
-                  txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
-                  console.log('交易已发送，签名:', txSignature);
-             }
-
-
-            // --- 4. 确认交易 ---
-            console.log('等待交易确认...');
+            transaction.recentBlockhash = latestBlockhash.blockhash;
+            transaction.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
+            transaction.feePayer = fromPubkey;
+            
+            // 8. 将转账金额转换为最小单位（USDC有6位小数）
+            const decimals = 6; // USDC有6位小数
+            const transferAmount = Math.floor(amount * Math.pow(10, decimals));
+            
+            console.log('[transferSolanaToken] 转账金额转换:', {
+                原始金额: amount,
+                最小单位: transferAmount
+            });
+            
+            // 9. 检查接收方是否有USDC账户，如果没有则创建
+            const toAccountInfo = await connection.getAccountInfo(toTokenAccount);
+            if (!toAccountInfo) {
+                console.log('[transferSolanaToken] 接收方没有USDC账户，需要创建');
+                
+                // 创建接收方的ATA账户指令
+                const createATAInstruction = window.spl_token.createAssociatedTokenAccountInstruction(
+                    fromPubkey,
+                    toTokenAccount,
+                    toPubkey,
+                    USDC_MINT,
+                    TOKEN_PROGRAM_ID,
+                    ASSOCIATED_TOKEN_PROGRAM_ID
+                );
+                
+                transaction.add(createATAInstruction);
+            }
+            
+            // 10. 创建转账指令
+            const transferInstruction = window.spl_token.createTransferInstruction(
+                fromTokenAccount,
+                toTokenAccount,
+                fromPubkey,
+                transferAmount,
+                [],
+                TOKEN_PROGRAM_ID
+            );
+            
+            transaction.add(transferInstruction);
+            
+            console.log('[transferSolanaToken] 交易指令已添加');
+            
+            // 11. 使用钱包签名交易
+            console.log('[transferSolanaToken] 请求钱包签名...');
+            const signedTransaction = await window.solana.signTransaction(transaction);
+            
+            // 12. 发送交易
+            console.log('[transferSolanaToken] 发送交易到网络...');
+            const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
+            
+            console.log('[transferSolanaToken] 交易已发送，签名:', txSignature);
+            
+            // 13. 确认交易
+            console.log('[transferSolanaToken] 等待交易确认...');
             const confirmationStatus = await connection.confirmTransaction({
                 signature: txSignature,
-                blockhash: (await connection.getLatestBlockhash()).blockhash, // 获取最新的 blockhash
-                lastValidBlockHeight: (await connection.getLatestBlockhash()).lastValidBlockHeight // 获取最新的 LBH
-            }, 'confirmed'); // 使用 'confirmed' 或 'finalized'
-
+                blockhash: latestBlockhash.blockhash,
+                lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+            }, 'confirmed');
+            
             if (confirmationStatus.value.err) {
-                console.error('交易确认失败:', confirmationStatus.value.err);
+                console.error('[transferSolanaToken] 交易确认失败:', confirmationStatus.value.err);
                 throw new Error('交易确认失败: ' + JSON.stringify(confirmationStatus.value.err));
             }
-
-            console.log('交易已确认，签名:', txSignature);
-
-            // --- 5. 返回成功结果 ---
+            
+            console.log('[transferSolanaToken] 交易已确认，签名:', txSignature);
+            
+            // 14. 返回成功结果
             return {
                 success: true,
                 txHash: txSignature,
-                // 可以选择性返回计算的费用等信息
-                // platformFee: ...,
-                // sellerAmount: ...
+                message: `成功转账 ${amount} ${tokenSymbol}`
             };
+            
         } catch (error) {
-            console.error('调用购买合约失败:', error);
+            console.error('[transferSolanaToken] 转账失败:', error);
             return {
                 success: false,
                 error: error.message || '未知错误'

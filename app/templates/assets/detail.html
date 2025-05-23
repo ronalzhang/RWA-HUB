@@ -5,6 +5,11 @@
 {% block head %}
 <!-- 费用计算函数的定义 - 放在最前面 -->
 <script>
+// 添加调试模式检查 - 只在开发环境或明确启用时输出详细日志
+const DEBUG_MODE = window.location.hostname === 'localhost' || 
+                   window.location.hostname === '127.0.0.1' || 
+                   window.DEBUG_MODE === true;
+
 // 定义全局常量和函数
 window.PLATFORM_FEE_RATE = 0.035; // 3.5%平台费率
 window.ACTUAL_PAYMENT_RATE = 0.965; // 96.5%实际支付率
