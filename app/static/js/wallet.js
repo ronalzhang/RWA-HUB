@@ -4297,15 +4297,23 @@ function updateAssetInfoDisplay(data) {
         });
     }
     
-    // 更新价格显示
-    const priceElements = document.querySelectorAll('.token-price, [data-token-price]');
+    // 更新价格显示 - 使用更具体的选择器，避免选中购买按钮
     if (data.token_price) {
+        // 明确排除按钮元素，只选择价格显示元素
+        const priceElements = document.querySelectorAll('.token-price:not(button):not(.btn):not([role="button"]), [data-token-price]:not(button):not(.btn):not([role="button"])');
         priceElements.forEach(el => {
-            el.textContent = formatCurrency(data.token_price);
-            
-            // 更新数据属性
-            if (el.hasAttribute('data-token-price')) {
-                el.setAttribute('data-token-price', data.token_price);
+            // 双重检查：确保不是按钮类型的元素
+            if (el.tagName.toLowerCase() !== 'button' && 
+                !el.classList.contains('btn') && 
+                !el.classList.contains('button') &&
+                el.getAttribute('role') !== 'button') {
+                
+                el.textContent = formatCurrency(data.token_price);
+                
+                // 更新数据属性
+                if (el.hasAttribute('data-token-price')) {
+                    el.setAttribute('data-token-price', data.token_price);
+                }
             }
         });
     }
