@@ -1194,96 +1194,126 @@ const walletState = {
         try {
             // 如果钱包未连接，直接返回0
             if (!this.connected || !this.address) {
-                console.log('钱包未连接，余额为0');
+                console.log('[getWalletBalance] 钱包未连接，余额为0');
                 this.balance = 0;
                 return 0;
             }
             
-            // 直接从区块链获取USDC余额，跳过API调用
+            console.log(`[getWalletBalance] 开始获取钱包余额: ${this.address}`);
+            
             // 根据钱包类型选择不同的余额查询方式
             if (this.walletType === 'phantom' && window.solana && window.solana.isConnected) {
-                // 优化：使用更短的超时时间和更可靠的库加载检查
-                await this.ensureSolanaLibrariesOptimized();
-                
-                // 使用主网RPC节点
-                const connection = new window.solanaWeb3.Connection('https://api.mainnet-beta.solana.com', {
-                    commitment: 'confirmed',
-                    confirmTransactionInitialTimeout: 10000
-                });
-                const publicKey = new window.solanaWeb3.PublicKey(this.address);
-                
-                // 使用Solana上的USDC合约地址
-                const usdcMint = new window.solanaWeb3.PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+                console.log('[getWalletBalance] 使用Phantom钱包获取USDC余额');
                 
                 try {
+                    // 优先尝试API方式获取余额
+                    console.log('[getWalletBalance] 尝试通过API获取余额');
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8秒超时
+                    
+                    const response = await fetch(`/api/service/wallet/token_balance?address=${this.address}&token=USDC&_=${Date.now()}`, {
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success && data.balance !== undefined) {
+                            this.balance = parseFloat(data.balance) || 0;
+                            console.log(`[getWalletBalance] 通过API获取到钱包余额: ${this.balance} USDC`);
+                            this.updateBalanceDisplay(this.balance);
+                            return this.balance;
+                        }
+                    }
+                    
+                    console.log('[getWalletBalance] API方式失败，尝试直接从区块链获取');
+                } catch (apiError) {
+                    console.warn('[getWalletBalance] API获取余额失败:', apiError);
+                }
+                
+                // API失败后，尝试直接从区块链获取
+                try {
+                    console.log('[getWalletBalance] 尝试直接从Solana区块链获取余额');
+                    
+                    // 尝试加载Solana库（使用更宽松的超时）
+                    const librariesLoaded = await this.ensureSolanaLibrariesOptimized();
+                    if (!librariesLoaded) {
+                        console.warn('[getWalletBalance] Solana库未能加载，使用默认余额');
+                        this.balance = 0;
+                        this.updateBalanceDisplay(0);
+                        return 0;
+                    }
+                    
+                    // 使用主网RPC节点
+                    const connection = new window.solanaWeb3.Connection('https://api.mainnet-beta.solana.com', {
+                        commitment: 'confirmed',
+                        confirmTransactionInitialTimeout: 15000
+                    });
+                    const publicKey = new window.solanaWeb3.PublicKey(this.address);
+                    
+                    // 使用Solana上的USDC合约地址
+                    const usdcMint = new window.solanaWeb3.PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+                    
                     // 直接查询代币账户余额
                     const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, { mint: usdcMint });
                     
                     if (tokenAccounts.value.length > 0) {
                         const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
                         this.balance = parseFloat(balance) || 0;
-                        console.log(`直接从Solana区块链获取到钱包USDC余额: ${this.balance}`);
+                        console.log(`[getWalletBalance] 直接从Solana区块链获取到钱包USDC余额: ${this.balance}`);
+                        this.updateBalanceDisplay(this.balance);
                         return this.balance;
                     } else {
-                        console.log('未找到USDC代币账户，余额为0');
+                        console.log('[getWalletBalance] 未找到USDC代币账户，余额为0');
                         this.balance = 0;
+                        this.updateBalanceDisplay(0);
                         return 0;
                     }
                 } catch (solanaError) {
-                    console.error('直接查询Solana USDC余额出错:', solanaError);
+                    console.warn('[getWalletBalance] 直接查询Solana USDC余额失败:', solanaError);
                     
-                    // 作为备选方案，尝试API获取（减少超时时间）
-                    console.log('尝试通过API获取USDC余额');
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
-                    
-                    try {
-                        const response = await fetch(`/api/service/wallet/token_balance?address=${this.address}&token=USDC`, {
-                            signal: controller.signal
-                        });
-                        clearTimeout(timeoutId);
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            if (data.success && data.balance !== undefined) {
-                                this.balance = parseFloat(data.balance) || 0;
-                                console.log(`通过API获取到钱包余额: ${this.balance} USDC`);
-                                return this.balance;
-                            }
-                        }
-                    } catch (apiError) {
-                        clearTimeout(timeoutId);
-                        console.error('API获取USDC余额失败:', apiError);
-                    }
-                    
-                    // 如果所有方法都失败，返回0
-                    console.warn('无法获取USDC余额，默认为0');
+                    // 最后的回退方案 - 设置默认余额
+                    console.log('[getWalletBalance] 所有方法都失败，使用默认余额0');
                     this.balance = 0;
+                    this.updateBalanceDisplay(0);
                     return 0;
                 }
-            } else if (this.walletType === 'metamask' && window.ethereum) {
-                // 以太坊钱包的USDC余额获取
-                const ethProvider = new window.ethers.providers.Web3Provider(window.ethereum);
-                const usdcAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'; // USDC在以太坊上的合约地址
-                const usdcAbi = [
-                    "function balanceOf(address owner) view returns (uint256)",
-                    "function decimals() view returns (uint8)"
-                ];
-                const usdcContract = new window.ethers.Contract(usdcAddress, usdcAbi, ethProvider);
-                const decimals = await usdcContract.decimals();
-                const balance = await usdcContract.balanceOf(this.address);
-                this.balance = parseFloat(window.ethers.utils.formatUnits(balance, decimals)) || 0;
-                console.log(`直接从以太坊区块链获取到钱包余额: ${this.balance} USDC`);
-                return this.balance;
+                
+            } else if (this.walletType === 'ethereum' && window.ethereum) {
+                console.log('[getWalletBalance] 使用以太坊钱包获取USDC余额');
+                
+                try {
+                    // 以太坊钱包的USDC余额获取
+                    const ethProvider = new window.ethers.providers.Web3Provider(window.ethereum);
+                    const usdcAddress = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'; // USDC在以太坊上的合约地址
+                    const usdcAbi = [
+                        "function balanceOf(address owner) view returns (uint256)",
+                        "function decimals() view returns (uint8)"
+                    ];
+                    const usdcContract = new window.ethers.Contract(usdcAddress, usdcAbi, ethProvider);
+                    const decimals = await usdcContract.decimals();
+                    const balance = await usdcContract.balanceOf(this.address);
+                    this.balance = parseFloat(window.ethers.utils.formatUnits(balance, decimals)) || 0;
+                    console.log(`[getWalletBalance] 直接从以太坊区块链获取到钱包余额: ${this.balance} USDC`);
+                    this.updateBalanceDisplay(this.balance);
+                    return this.balance;
+                } catch (ethError) {
+                    console.error('[getWalletBalance] 以太坊余额获取失败:', ethError);
+                    this.balance = 0;
+                    this.updateBalanceDisplay(0);
+                    return 0;
+                }
             }
             
-            console.warn('不支持的钱包类型或钱包未连接，无法获取USDC余额');
+            console.warn('[getWalletBalance] 不支持的钱包类型或钱包未连接，无法获取USDC余额');
             this.balance = 0;
+            this.updateBalanceDisplay(0);
             return 0;
         } catch (error) {
-            console.error('获取钱包USDC余额失败:', error);
+            console.error('[getWalletBalance] 获取钱包USDC余额失败:', error);
             // 返回0而非缓存的值，避免显示过期数据
             this.balance = 0;
+            this.updateBalanceDisplay(0);
             return 0;
         }
     },
@@ -1294,26 +1324,230 @@ const walletState = {
      */
     async ensureSolanaLibrariesOptimized() {
         // 如果库已经加载，直接返回
-        if (window.solanaWeb3 && window.spl_token) {
+        if (window.solanaWeb3 && window.solanaWeb3.Connection && window.spl_token && window.spl_token.getAssociatedTokenAddress) {
+            console.log('[ensureSolanaLibrariesOptimized] 库已完全加载，直接返回');
             return true;
         }
         
-        // 减少超时时间到5秒
-        const maxWaitTime = 5000;
-        const checkInterval = 200;
+        console.log('[ensureSolanaLibrariesOptimized] 开始检查和加载Solana库');
+        
+        // 延长超时时间到15秒，并使用更智能的检查
+        const maxWaitTime = 15000; // 15秒超时
+        const checkInterval = 300;
         let elapsedTime = 0;
         
+        // 尝试多种方法获取库
+        const tryLoadLibraries = () => {
+            console.log('[ensureSolanaLibrariesOptimized] 尝试加载库...');
+            
+            // 方法1: 检查全局对象
+            if (typeof window.solanaWeb3 === 'undefined' && typeof SolanaWeb3 !== 'undefined') {
+                window.solanaWeb3 = SolanaWeb3;
+                console.log('[ensureSolanaLibrariesOptimized] 从SolanaWeb3全局对象加载');
+            }
+            
+            if (typeof window.spl_token === 'undefined' && typeof window.splToken !== 'undefined') {
+                window.spl_token = window.splToken;
+                console.log('[ensureSolanaLibrariesOptimized] 从splToken全局对象加载');
+            }
+            
+            if (typeof window.spl_token === 'undefined' && typeof SolanaToken !== 'undefined') {
+                window.spl_token = SolanaToken;
+                console.log('[ensureSolanaLibrariesOptimized] 从SolanaToken全局对象加载');
+            }
+            
+            // 方法2: 尝试从CDN动态加载（如果没有）
+            if (!window.solanaWeb3 && !this._loadingWeb3) {
+                this._loadingWeb3 = true;
+                this.loadSolanaWeb3FromCDN();
+            }
+        };
+        
+        // 立即尝试一次
+        tryLoadLibraries();
+        
+        // 检查循环
         while (elapsedTime < maxWaitTime) {
-            if (window.solanaWeb3 && window.spl_token) {
-                console.log('Solana库已成功加载');
-                return true;
+            // 检查核心库
+            if (window.solanaWeb3 && window.solanaWeb3.Connection) {
+                console.log('[ensureSolanaLibrariesOptimized] Solana Web3库检查通过');
+                
+                // 检查SPL Token库
+                if (window.spl_token && window.spl_token.getAssociatedTokenAddress) {
+                    console.log('[ensureSolanaLibrariesOptimized] SPL Token库检查通过');
+                    return true;
+                }
+                
+                // 如果只有Web3但没有SPL Token，尝试创建基本接口
+                if (!window.spl_token) {
+                    console.log('[ensureSolanaLibrariesOptimized] 创建基本SPL Token接口');
+                    this.createBasicSplTokenInterface();
+                    if (window.spl_token && window.spl_token.getAssociatedTokenAddress) {
+                        return true;
+                    }
+                }
             }
             
             await new Promise(resolve => setTimeout(resolve, checkInterval));
             elapsedTime += checkInterval;
+            
+            // 每3秒重新尝试加载
+            if (elapsedTime % 3000 === 0) {
+                tryLoadLibraries();
+            }
         }
         
-        throw new Error('Solana库加载超时（5秒）- 请检查网络连接或刷新页面');
+        // 超时后尝试创建最小接口
+        console.warn('[ensureSolanaLibrariesOptimized] 库加载超时，尝试创建最小接口');
+        return this.createMinimalSolanaInterface();
+    },
+    
+    /**
+     * 从CDN动态加载Solana Web3库
+     */
+    async loadSolanaWeb3FromCDN() {
+        if (this._web3Loading) return;
+        this._web3Loading = true;
+        
+        try {
+            console.log('[loadSolanaWeb3FromCDN] 开始从CDN加载Solana Web3库');
+            
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js';
+            script.async = true;
+            
+            const loadPromise = new Promise((resolve, reject) => {
+                script.onload = () => {
+                    console.log('[loadSolanaWeb3FromCDN] CDN加载成功');
+                    if (window.solanaWeb3js) {
+                        window.solanaWeb3 = window.solanaWeb3js;
+                    }
+                    resolve();
+                };
+                script.onerror = reject;
+                setTimeout(reject, 10000); // 10秒超时
+            });
+            
+            document.head.appendChild(script);
+            await loadPromise;
+        } catch (error) {
+            console.warn('[loadSolanaWeb3FromCDN] CDN加载失败:', error);
+        } finally {
+            this._web3Loading = false;
+        }
+    },
+    
+    /**
+     * 创建基本的SPL Token接口
+     */
+    createBasicSplTokenInterface() {
+        if (!window.solanaWeb3 || !window.solanaWeb3.PublicKey) {
+            console.error('[createBasicSplTokenInterface] 缺少Solana Web3基础库');
+            return false;
+        }
+        
+        try {
+            console.log('[createBasicSplTokenInterface] 创建基本SPL Token接口');
+            
+            window.spl_token = {
+                TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+                ASSOCIATED_TOKEN_PROGRAM_ID: new window.solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
+                
+                getAssociatedTokenAddress: async function(mint, owner, allowOffCurve = false, programId = this.TOKEN_PROGRAM_ID, associatedTokenProgramId = this.ASSOCIATED_TOKEN_PROGRAM_ID) {
+                    const [address] = await window.solanaWeb3.PublicKey.findProgramAddress(
+                        [
+                            owner.toBuffer(),
+                            programId.toBuffer(),
+                            mint.toBuffer(),
+                        ],
+                        associatedTokenProgramId
+                    );
+                    return address;
+                },
+                
+                createAssociatedTokenAccountInstruction: function(payer, associatedToken, owner, mint, programId = this.TOKEN_PROGRAM_ID, associatedTokenProgramId = this.ASSOCIATED_TOKEN_PROGRAM_ID) {
+                    const keys = [
+                        { pubkey: payer, isSigner: true, isWritable: true },
+                        { pubkey: associatedToken, isSigner: false, isWritable: true },
+                        { pubkey: owner, isSigner: false, isWritable: false },
+                        { pubkey: mint, isSigner: false, isWritable: false },
+                        { pubkey: window.solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false },
+                        { pubkey: programId, isSigner: false, isWritable: false },
+                        { pubkey: window.solanaWeb3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+                    ];
+                    
+                    const data = Buffer.alloc(0);
+                    
+                    return new window.solanaWeb3.TransactionInstruction({
+                        keys,
+                        programId: associatedTokenProgramId,
+                        data,
+                    });
+                },
+                
+                createTransferInstruction: function(source, destination, owner, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
+                    const keys = [
+                        { pubkey: source, isSigner: false, isWritable: true },
+                        { pubkey: destination, isSigner: false, isWritable: true },
+                        { pubkey: owner, isSigner: multiSigners.length === 0, isWritable: false },
+                    ];
+                    
+                    multiSigners.forEach(signer => {
+                        keys.push({ pubkey: signer, isSigner: true, isWritable: false });
+                    });
+                    
+                    // 简化的数据编码，不依赖BufferLayout
+                    const data = Buffer.alloc(9);
+                    data.writeUInt8(3, 0); // Transfer instruction code
+                    
+                    // 转换amount为Little Endian的64位整数
+                    const amountBigInt = BigInt(amount);
+                    const amountBuffer = Buffer.alloc(8);
+                    amountBuffer.writeBigUInt64LE(amountBigInt, 0);
+                    amountBuffer.copy(data, 1);
+                    
+                    return new window.solanaWeb3.TransactionInstruction({
+                        keys,
+                        programId,
+                        data,
+                    });
+                }
+            };
+            
+            console.log('[createBasicSplTokenInterface] 基本SPL Token接口创建成功');
+            return true;
+        } catch (error) {
+            console.error('[createBasicSplTokenInterface] 创建基本接口失败:', error);
+            return false;
+        }
+    },
+    
+    /**
+     * 创建最小的Solana接口
+     */
+    createMinimalSolanaInterface() {
+        console.warn('[createMinimalSolanaInterface] 创建最小Solana接口作为回退方案');
+        
+        try {
+            // 创建最基本的对象结构
+            window.solanaWeb3 = window.solanaWeb3 || {
+                Connection: function() { throw new Error('Solana库未正确加载'); },
+                PublicKey: function() { throw new Error('Solana库未正确加载'); },
+                Transaction: function() { throw new Error('Solana库未正确加载'); }
+            };
+            
+            window.spl_token = window.spl_token || {
+                getAssociatedTokenAddress: async function() { 
+                    throw new Error('SPL Token库未正确加载，请刷新页面重试'); 
+                }
+            };
+            
+            console.log('[createMinimalSolanaInterface] 最小接口创建完成');
+            return false; // 返回false表示这只是回退方案
+        } catch (error) {
+            console.error('[createMinimalSolanaInterface] 创建最小接口失败:', error);
+            return false;
+        }
     },
     
     /**
