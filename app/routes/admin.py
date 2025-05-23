@@ -2252,6 +2252,30 @@ def settings_v2():
         'ASSET_CREATION_FEE_ADDRESS'
     ]
     
+    # 确保SystemConfig表存在
+    try:
+        # 检查表是否存在
+        inspector = db.inspect(db.engine)
+        if not inspector.has_table("system_config"):
+            current_app.logger.warning("SystemConfig表不存在，正在创建...")
+            # 创建表
+            SystemConfig.__table__.create(db.engine)
+            current_app.logger.info("SystemConfig表创建成功")
+            
+            # 初始化默认值
+            default_values = {
+                'PLATFORM_FEE_BASIS_POINTS': '350', # 3.5%
+                'PLATFORM_FEE_ADDRESS': 'EmjrXAuA6m6YxAcXhiLSFcQEFSrxmGbXuK4nvUVs5Po7', # 默认值
+                'PURCHASE_CONTRACT_ADDRESS': 'EmjrXAuA6m6YxAcXhiLSFcQEFSrxmGbXuK4nvUVs5Po7', # 默认值
+                'ASSET_CREATION_FEE_AMOUNT': '1.0', # 1 USDC
+                'ASSET_CREATION_FEE_ADDRESS': 'EmjrXAuA6m6YxAcXhiLSFcQEFSrxmGbXuK4nvUVs5Po7' # 默认值
+            }
+            for key, value in default_values.items():
+                SystemConfig.set_value(key, value, description=f'Default setting for {key}')
+            current_app.logger.info("SystemConfig默认值初始化成功")
+    except Exception as e:
+        current_app.logger.error(f"检查或创建SystemConfig表时出错: {str(e)}", exc_info=True)
+    
     if request.method == 'POST':
         try:
             # 获取并验证表单数据
@@ -2290,9 +2314,9 @@ def settings_v2():
             # 资产创建费用金额 (USDC)
             creation_fee = request.form.get('asset_creation_fee_amount')
             try:
-                val = Decimal(creation_fee)
+                val = float(creation_fee)
                 if val >= 0:
-                    config_updates['ASSET_CREATION_FEE_AMOUNT'] = str(val.quantize(Decimal('0.000001')))
+                    config_updates['ASSET_CREATION_FEE_AMOUNT'] = str(val)
                 else:
                     errors['asset_creation_fee_amount'] = '创建费用金额不能为负数'
             except (ValueError, TypeError):
@@ -2315,9 +2339,7 @@ def settings_v2():
                 for key, value in config_updates.items():
                     SystemConfig.set_value(key, value, description=f'System setting for {key}')
                 flash('系统设置已成功更新', 'success')
-                current_app.logger.info(f"管理员 {g.eth_address} 更新了系统设置: {config_updates.keys()}")
-                # 更新配置后最好重新加载或清除缓存（如果应用有缓存配置）
-                # current_app.config.update(SystemConfig.load_all_to_dict()) # 示例：如果配置缓存在 app.config
+                current_app.logger.info(f"管理员更新了系统设置: {config_updates.keys()}")
 
             # 无论成功或失败，都重定向回 GET 请求，以显示更新后的值或错误
             return redirect(url_for('admin.settings_v2'))
@@ -2332,13 +2354,17 @@ def settings_v2():
     # 提供默认值，避免后端 API 因配置缺失而出错
     default_values = {
         'PLATFORM_FEE_BASIS_POINTS': '350', # 3.5%
-        'PLATFORM_FEE_ADDRESS': '', # 必须配置
-        'PURCHASE_CONTRACT_ADDRESS': '', # 必须配置
+        'PLATFORM_FEE_ADDRESS': 'EmjrXAuA6m6YxAcXhiLSFcQEFSrxmGbXuK4nvUVs5Po7', # 默认值
+        'PURCHASE_CONTRACT_ADDRESS': 'EmjrXAuA6m6YxAcXhiLSFcQEFSrxmGbXuK4nvUVs5Po7', # 默认值
         'ASSET_CREATION_FEE_AMOUNT': '1.0', # 1 USDC
-        'ASSET_CREATION_FEE_ADDRESS': '' # 必须配置
+        'ASSET_CREATION_FEE_ADDRESS': 'EmjrXAuA6m6YxAcXhiLSFcQEFSrxmGbXuK4nvUVs5Po7' # 默认值
     }
     for key in required_configs:
-        configs[key] = SystemConfig.get_value(key, default=default_values.get(key, ''))
+        try:
+            configs[key] = SystemConfig.get_value(key, default=default_values.get(key, ''))
+        except Exception as e:
+            current_app.logger.error(f"获取系统设置失败: {str(e)}", exc_info=True)
+            configs[key] = default_values.get(key, '')
         
     return render_template('admin_v2/settings.html', configs=configs)
 
@@ -4003,7 +4029,7 @@ def api_get_admin_users():
             admin_list.append({
                 'id': admin.id,
                 'wallet_address': admin.wallet_address,
-                'admin_level': admin.admin_level,
+                'admin_level': admin.role,  # 使用role字段代替admin_level
                 'role': admin.role or '管理员',
                 'created_at': admin.created_at.strftime('%Y-%m-%d %H:%M:%S') if admin.created_at else None
             })
@@ -4015,37 +4041,45 @@ def api_get_admin_users():
         return jsonify([])
 
 @admin_bp.route('/api/admin_addresses/<address>', methods=['PUT'])
-@admin_required
-@permission_required('管理用户')
+@api_admin_required
 def update_admin_address(address):
     """更新管理员信息"""
     try:
+        # 获取请求数据
         data = request.get_json()
         if not data:
-            return jsonify({'error': '请求数据无效'}), 400
+            return jsonify({'success': False, 'message': '无效的请求数据'}), 400
         
         # 查找管理员
-        admin_user = AdminUser.query.filter_by(wallet_address=address).first()
-        if not admin_user:
-            return jsonify({'error': '管理员不存在'}), 404
+        admin = AdminUser.query.filter_by(wallet_address=address).first()
+        if not admin:
+            return jsonify({'success': False, 'message': '找不到该管理员'}), 404
         
-        # 更新字段
+        # 更新管理员信息
         if 'admin_level' in data:
-            admin_user.admin_level = data['admin_level']
+            admin.role = data['admin_level']  # 使用role字段代替admin_level
+        
         if 'role' in data:
-            admin_user.role = data['role']
+            admin.role = data['role']
         
         db.session.commit()
         
         return jsonify({
-            'success': True,
-            'message': '管理员信息更新成功'
+            'success': True, 
+            'message': '管理员信息更新成功',
+            'admin': {
+                'id': admin.id,
+                'wallet_address': admin.wallet_address,
+                'admin_level': admin.role,
+                'role': admin.role or '管理员',
+                'created_at': admin.created_at.strftime('%Y-%m-%d %H:%M:%S') if admin.created_at else None
+            }
         })
         
     except Exception as e:
-        current_app.logger.error(f"更新管理员信息失败: {str(e)}", exc_info=True)
         db.session.rollback()
-        return jsonify({'error': '更新管理员信息失败'}), 500
+        current_app.logger.error(f"更新管理员信息失败: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'message': f'更新管理员信息失败: {str(e)}'}), 500
 
 @admin_bp.route('/v2/api/user-stats', methods=['GET'])
 @api_admin_required 
