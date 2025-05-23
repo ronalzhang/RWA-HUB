@@ -143,33 +143,35 @@
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
-                        <template x-for="trade in recentTrades" :key="trade.id">
-                            <tr>
-                                <td class="px-3 py-2 whitespace-nowrap">
-                                    <div class="text-sm font-medium text-gray-900" x-text="trade.asset?.name || '资产已删除'"></div>
-                                    <div class="text-xs text-gray-500" x-text="trade.asset?.token_symbol || '-'"></div>
-                                </td>
-                                <td class="px-3 py-2 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900" x-text="formatCurrency(trade.total_price) + ' ETH'"></div>
-                                    <div class="text-xs text-gray-500" x-text="trade.token_amount + ' 通证'"></div>
-                                </td>
-                                <td class="px-3 py-2 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900" x-text="formatDate(trade.created_at)"></div>
-                                </td>
-                                <td class="px-3 py-2 whitespace-nowrap">
-                                    <span 
-                                        :class="{
-                                            'bg-green-100 text-green-800': trade.status === 'completed',
-                                            'bg-yellow-100 text-yellow-800': trade.status === 'pending',
-                                            'bg-red-100 text-red-800': trade.status === 'cancelled'
-                                        }" 
-                                        class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
-                                        x-text="trade.status"
-                                    ></span>
-                                </td>
-                            </tr>
+                        <template x-if="Array.isArray(recentTrades) && recentTrades.length > 0">
+                            <template x-for="trade in recentTrades" :key="trade.id">
+                                <tr>
+                                    <td class="px-3 py-2 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900" x-text="trade.asset?.name || '资产已删除'"></div>
+                                        <div class="text-xs text-gray-500" x-text="trade.asset?.token_symbol || '-'"></div>
+                                    </td>
+                                    <td class="px-3 py-2 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900" x-text="formatCurrency(trade.total_price) + ' ETH'"></div>
+                                        <div class="text-xs text-gray-500" x-text="trade.token_amount + ' 通证'"></div>
+                                    </td>
+                                    <td class="px-3 py-2 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900" x-text="formatDate(trade.created_at)"></div>
+                                    </td>
+                                    <td class="px-3 py-2 whitespace-nowrap">
+                                        <span 
+                                            :class="{
+                                                'bg-green-100 text-green-800': trade.status === 'completed',
+                                                'bg-yellow-100 text-yellow-800': trade.status === 'pending',
+                                                'bg-red-100 text-red-800': trade.status === 'cancelled'
+                                            }" 
+                                            class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                            x-text="trade.status"
+                                        ></span>
+                                    </td>
+                                </tr>
+                            </template>
                         </template>
-                        <tr x-show="recentTrades.length === 0">
+                        <tr x-show="!Array.isArray(recentTrades) || recentTrades.length === 0">
                             <td colspan="4" class="px-3 py-4 text-center text-gray-500">暂无交易数据</td>
                         </tr>
                     </tbody>
@@ -366,9 +368,11 @@
                 try {
                     const response = await fetch('/admin/v2/api/dashboard/recent-trades?limit=5');
                     if (!response.ok) throw new Error('加载最近交易失败');
-                    this.recentTrades = await response.json();
+                    const data = await response.json();
+                    this.recentTrades = Array.isArray(data) ? data : [];
                 } catch (error) {
                     console.error('加载最近交易失败', error);
+                    this.recentTrades = [];
                 }
             },
             
