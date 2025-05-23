@@ -407,10 +407,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 同步window.walletState和window.wallet中的数据
                 function syncWalletState() {
-                    if (window.wallet) {
-                        // 从wallet对象同步状态
-                        const connected = window.wallet.connected || !!window.wallet.getAddress();
-                        const address = window.wallet.getAddress();
+                    console.log('同步钱包状态...');
+                    
+                    try {
+                        // 修复钱包对象调用 - 使用正确的walletState对象
+                        const connected = window.walletState && (window.walletState.connected || window.walletState.isConnected);
+                        const address = window.walletState ? window.walletState.getAddress() : null;
                         
                         if (!window.walletState) {
                             window.walletState = {};
@@ -424,6 +426,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (typeof updateBuyButtonState === 'function') {
                             updateBuyButtonState();
                         }
+                    } catch (error) {
+                        console.error('同步钱包状态时出错:', error);
                     }
                 }
                 
@@ -797,16 +801,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // 发起API请求 - 使用正确的API路径
-                    // 判断资产使用ID还是符号
-                    const assetIdentifier = "{{ asset.token_symbol }}" || queryParams.asset_id;
-                    let apiUrl = "";
-                    if (typeof assetIdentifier === "string" && assetIdentifier.includes("RH-")) {
-                        // 使用token_symbol
-                        apiUrl = `/api/v2/trades/${assetIdentifier}?page=${queryParams.page}&per_page=${queryParams.per_page}`;
-                    } else {
-                        // 使用ID
-                        apiUrl = `/api/trades?asset_id=${queryParams.asset_id}&page=${queryParams.page}&per_page=${queryParams.per_page}`;
-                    }
+                    // 修复：统一使用 /api/trades 路由，移除不存在的 v2 版本
+                    const apiUrl = `/api/trades?asset_id=${queryParams.asset_id}&page=${queryParams.page}&per_page=${queryParams.per_page}`;
                     console.log("尝试获取交易历史，API地址:", apiUrl);
                     const response = await fetch(apiUrl);
                     if (!response.ok) {
@@ -1351,11 +1347,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                     
-                    // 方法3: 检查window.wallet对象
-                    if (!isConnected && window.wallet && (
-                        window.wallet.connected ||
-                        window.wallet.getAddress && window.wallet.getAddress() ||
-                        window.wallet.getConnectionStatus && window.wallet.getConnectionStatus())
+                    // 方法3: 检查window.walletState对象（修复：不再使用错误的window.wallet对象）
+                    if (!isConnected && window.walletState && (
+                        window.walletState.connected || window.walletState.isConnected ||
+                        (typeof window.walletState.getAddress === 'function' && window.walletState.getAddress()) ||
+                        (typeof window.walletState.getConnectionStatus === 'function' && window.walletState.getConnectionStatus()))
                     ) {
                         isConnected = true;
                     }

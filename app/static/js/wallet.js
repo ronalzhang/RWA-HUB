@@ -2864,31 +2864,77 @@ checkIfReturningFromWalletApp(walletType) {
      */
     async ensureSolanaLibraries() {
         // 检查Solana Web3.js库
-        if (!window.solanaWeb3) {
-            if (window.solanaWeb3js) {
-                window.solanaWeb3 = window.solanaWeb3js;
-            } else if (window.solana && window.solana.web3) {
-                window.solanaWeb3 = window.solana.web3;
-            } else {
-                console.log('未找到已加载的Solana Web3.js库，尝试加载...');
-                await this.loadSolanaLibraries();
-            }
+        if (!window.solanaWeb3 || !window.solanaWeb3.Connection) {
+            console.log('等待Solana Web3.js库完全加载...');
+            
+            // 等待solanaWeb3Ready事件
+            return new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error('等待Solana Web3.js库加载超时'));
+                }, 15000); // 15秒超时
+                
+                const onReady = (event) => {
+                    clearTimeout(timeout);
+                    window.removeEventListener('solanaWeb3Ready', onReady);
+                    console.log('Solana Web3.js库已就绪');
+                    
+                    // 继续检查SPL Token库
+                    this.checkSplTokenLibrary().then(resolve).catch(reject);
+                };
+                
+                // 如果库已经就绪，直接继续
+                if (window.solanaWeb3 && window.solanaWeb3.Connection && typeof window.solanaWeb3.Connection === 'function') {
+                    clearTimeout(timeout);
+                    this.checkSplTokenLibrary().then(resolve).catch(reject);
+                    return;
+                }
+                
+                window.addEventListener('solanaWeb3Ready', onReady);
+                
+                // 如果没有任何加载脚本，手动加载
+                if (!document.querySelector('script[src*="solana-web3"]')) {
+                    console.log('未找到已加载的Solana Web3.js库，尝试加载...');
+                    this.loadSolanaLibraries().then(() => {
+                        // loadSolanaLibraries本身会触发事件，这里不需要额外处理
+                    }).catch(reject);
+                }
+            });
         }
         
         // 检查SPL Token库
+        return this.checkSplTokenLibrary();
+    },
+    
+    /**
+     * 检查并加载SPL Token库
+     * @private
+     */
+    async checkSplTokenLibrary() {
         if (!window.splToken) {
             if (window.spl && window.spl.token) {
                 window.splToken = window.spl.token;
                 console.log('已从window.spl.token初始化splToken库');
             } else {
                 console.log('未找到已加载的SPL Token库，尝试加载...');
-                await this.loadSolanaLibraries();
+                await this.loadSplTokenLibrary();
             }
         }
         
         // 最终检查
-        if (!window.solanaWeb3 || !window.splToken) {
-            throw new Error('无法加载必要的Solana区块链库，请刷新页面重试');
+        if (!window.solanaWeb3 || !window.solanaWeb3.Connection) {
+            throw new Error('Solana Web3.js库未正确加载');
+        }
+        
+        if (!window.splToken) {
+            console.warn('SPL Token库未加载，某些功能可能不可用');
+            // 创建最基本的mock对象
+            window.splToken = {
+                TOKEN_PROGRAM_ID: { toBuffer: () => new Uint8Array(32) },
+                ASSOCIATED_TOKEN_PROGRAM_ID: { toBuffer: () => new Uint8Array(32) },
+                getAssociatedTokenAddress: async () => null,
+                getMint: async () => ({ decimals: 6 }),
+                getAccount: async () => ({ amount: 0n })
+            };
         }
 
         // 确保程序ID已初始化为PublicKey对象
@@ -2907,6 +2953,7 @@ checkIfReturningFromWalletApp(walletType) {
         
         console.log('Solana库已准备就绪:', {
             'solanaWeb3': !!window.solanaWeb3,
+            'solanaWeb3.Connection': !!(window.solanaWeb3 && window.solanaWeb3.Connection),
             'splToken': !!window.splToken,
             'hasGetAssociatedTokenAddress': !!(window.splToken && window.splToken.getAssociatedTokenAddress),
             'TOKEN_PROGRAM_ID类型': typeof window.splToken.TOKEN_PROGRAM_ID,

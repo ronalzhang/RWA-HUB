@@ -6,8 +6,8 @@
 // 全局变量，用于存储timeout ID (使用window对象避免重复声明)
 window.buyTimeoutId = null;
 
-// 平台费率配置
-const PLATFORM_FEE_RATE = 0.035; // 3.5%平台费率
+// 使用模板中已定义的平台费率，避免重复声明
+// const PLATFORM_FEE_RATE = 0.035; // 删除这行，改用window.PLATFORM_FEE_RATE
 
 /**
  * 计算平台费用
@@ -15,7 +15,8 @@ const PLATFORM_FEE_RATE = 0.035; // 3.5%平台费率
  * @returns {number} - 平台费用
  */
 function calculatePlatformFee(amount) {
-  return amount * PLATFORM_FEE_RATE;
+  // 使用window对象上的PLATFORM_FEE_RATE，避免重复声明错误
+  return amount * (window.PLATFORM_FEE_RATE || 0.035);
 }
 
 /**
