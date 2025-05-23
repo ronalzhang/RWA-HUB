@@ -3319,6 +3319,82 @@ checkIfReturningFromWalletApp(walletType) {
             return 0;
         }
     },
+
+    /**
+     * 连接成功后的统一处理流程
+     * @param {string} address - 钱包地址
+     * @param {string} walletType - 钱包类型
+     * @param {Object} provider - 钱包提供商实例
+     * @returns {Promise<boolean>} 处理是否成功
+     */
+    async afterSuccessfulConnection(address, walletType, provider) {
+        try {
+            console.log(`[afterSuccessfulConnection] 处理${walletType}钱包连接成功，地址: ${address}`);
+            
+            // 更新钱包状态
+            this.address = address;
+            this.walletType = walletType;
+            this.connected = true;
+            this.provider = provider;
+            
+            // 保存状态到本地存储
+            localStorage.setItem('walletType', walletType);
+            localStorage.setItem('walletAddress', address);
+            localStorage.setItem('lastWalletType', walletType);
+            localStorage.setItem('lastWalletAddress', address);
+            
+            console.log(`[afterSuccessfulConnection] 钱包状态已保存到localStorage`);
+            
+            // 获取余额和分佣余额
+            try {
+                await this.getWalletBalance();
+                await this.getCommissionBalance();
+            } catch (balanceError) {
+                console.warn('[afterSuccessfulConnection] 获取余额失败:', balanceError);
+                // 余额获取失败不应该影响连接状态
+            }
+            
+            // 获取用户资产
+            try {
+                await this.getUserAssets(address);
+            } catch (assetsError) {
+                console.warn('[afterSuccessfulConnection] 获取资产失败:', assetsError);
+                // 资产获取失败不应该影响连接状态
+            }
+            
+            // 检查是否为管理员
+            try {
+                await this.checkIsAdmin();
+            } catch (adminError) {
+                console.warn('[afterSuccessfulConnection] 管理员检查失败:', adminError);
+                // 管理员检查失败不应该影响连接状态
+            }
+            
+            // 更新UI
+            this.updateUI();
+            
+            // 触发状态变更事件
+            this.triggerWalletStateChanged({
+                type: 'connect',
+                address: this.address,
+                walletType: this.walletType,
+                balance: this.balance,
+                commissionBalance: this.commissionBalance
+            });
+            
+            // 显示成功消息
+            const truncatedAddress = address.slice(0, 6) + '...' + address.slice(-4);
+            showSuccess(`钱包已连接: ${truncatedAddress}`);
+            
+            console.log(`[afterSuccessfulConnection] ${walletType}钱包连接处理完成`);
+            return true;
+            
+        } catch (error) {
+            console.error('[afterSuccessfulConnection] 连接后处理失败:', error);
+            // 连接后处理失败，但连接本身可能是成功的，所以只记录错误
+            return false;
+        }
+    },
 }
 
 // 页面初始化时就自动调用钱包初始化方法

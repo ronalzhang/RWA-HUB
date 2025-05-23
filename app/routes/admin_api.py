@@ -2670,3 +2670,51 @@ def compat_user_stats():
             'distributors': 0,
             'newToday': 0
         })
+
+# 旧版API兼容蓝图
+admin_compat_bp = Blueprint('admin_compat', __name__, url_prefix='/api/admin')
+
+# 检查管理员权限的端点
+@admin_compat_bp.route('/check_permissions', methods=['POST'])
+def check_permissions():
+    """检查用户是否有管理员权限"""
+    try:
+        # 从请求头中获取钱包地址
+        wallet_address = request.headers.get('X-Wallet-Address') or request.headers.get('X-Eth-Address')
+        
+        if not wallet_address:
+            # 尝试从请求体中获取
+            data = request.get_json() or {}
+            wallet_address = data.get('wallet_address') or data.get('address')
+        
+        if not wallet_address:
+            return jsonify({
+                'success': False,
+                'has_permission': False,
+                'error': '缺少钱包地址'
+            }), 400
+        
+        # 检查是否为管理员
+        admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
+        
+        if admin_user:
+            return jsonify({
+                'success': True,
+                'has_permission': True,
+                'admin_role': admin_user.role,
+                'permissions': ['dividend_management'] if admin_user.role in ['super_admin', 'admin'] else []
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'has_permission': False,
+                'permissions': []
+            })
+            
+    except Exception as e:
+        current_app.logger.error(f"检查管理员权限失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'has_permission': False,
+            'error': '检查权限时发生错误'
+        }), 500
