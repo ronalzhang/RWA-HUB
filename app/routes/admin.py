@@ -25,7 +25,7 @@ from app.models.dividend import DividendDistribution, DividendRecord
 # 移除不存在的payment模块导入
 # from app.models.payment import Payment, PaymentStatus
 from app.models.transaction import Transaction
-from app.utils.decorators import eth_address_required, admin_required, permission_required, api_admin_required
+from app.utils.decorators import eth_address_required, admin_required, permission_required
 from app.utils.admin import get_admin_permissions
 from app.models.income import PlatformIncome as DBPlatformIncome, IncomeType
 from app.models.commission import Commission
@@ -50,6 +50,54 @@ from app.utils.datetime_compat import get_utc_now, get_utc_today  # 导入兼容
 
 # 从routes/__init__.py中获取蓝图
 from . import admin_bp, admin_api_bp
+
+def api_admin_required(f):
+    """API版本的管理员权限装饰器，失败时返回JSON错误而不是重定向"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 优先检查session中的安全验证状态
+        if session.get('admin_verified') and session.get('admin_wallet_address'):
+            wallet_address = session.get('admin_wallet_address')
+            admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == wallet_address.lower()).first()
+            
+            # 修复：AdminUser模型没有is_active字段，删除此检查
+            # 假设所有数据库中的管理员用户都是活跃的
+            if admin_user: # and admin_user.is_active:
+                g.eth_address = wallet_address
+                g.admin = admin_user
+                g.admin_user_id = admin_user.id
+                g.admin_role = admin_user.role
+                current_app.logger.info(f"API管理员验证通过(session) - 管理员ID: {admin_user.id}, 地址: {wallet_address}")
+                return f(*args, **kwargs)
+        
+        # 如果session验证失败，尝试其他认证方式（向后兼容）
+        current_app.logger.info(f"API管理员验证 - Session验证失败，尝试其他方式")
+        
+        # 尝试从多个来源获取钱包地址
+        eth_address = request.headers.get('X-Eth-Address') or \
+                     request.cookies.get('eth_address') or \
+                     request.args.get('eth_address') or \
+                     session.get('eth_address') or \
+                     session.get('admin_eth_address')
+        
+        # 记录找到的钱包地址
+        current_app.logger.info(f"API管理员验证 - 找到的钱包地址: {eth_address}")
+                     
+        if not eth_address:
+            current_app.logger.warning("API管理员验证失败 - 未提供钱包地址")
+            return jsonify({'error': '请先连接钱包并登录', 'code': 'AUTH_REQUIRED'}), 401
+            
+        # 检查管理员权限（向后兼容旧的配置文件方式）
+        admin_info = get_admin_permissions(eth_address.lower())
+        if not admin_info:
+            current_app.logger.warning(f"API管理员验证失败 - 非管理员地址: {eth_address}")
+            return jsonify({'error': '您没有管理员权限，请使用管理员账户登录', 'code': 'ADMIN_REQUIRED'}), 403
+            
+        g.eth_address = eth_address.lower()
+        g.admin_info = admin_info
+        current_app.logger.info(f"API管理员验证成功(配置文件) - 地址: {eth_address}")
+        return f(*args, **kwargs)
+    return decorated_function
 
 def get_admin_info(eth_address):
     """获取管理员权限"""
