@@ -1476,7 +1476,7 @@ const walletState = {
                         { pubkey: window.solanaWeb3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
                     ];
                     
-                    const data = Buffer.alloc(0);
+                    const data = new Uint8Array(0);
                     
                     return new window.solanaWeb3.TransactionInstruction({
                         keys,
@@ -1496,15 +1496,21 @@ const walletState = {
                         keys.push({ pubkey: signer, isSigner: true, isWritable: false });
                     });
                     
-                    // 简化的数据编码，不依赖BufferLayout
-                    const data = Buffer.alloc(9);
-                    data.writeUInt8(3, 0); // Transfer instruction code
+                    // 使用Uint8Array替代Buffer，实现浏览器兼容
+                    const data = new Uint8Array(9);
+                    data[0] = 3; // Transfer instruction code
                     
-                    // 转换amount为Little Endian的64位整数
+                    // 手动实现Little Endian的64位整数编码
                     const amountBigInt = BigInt(amount);
-                    const amountBuffer = Buffer.alloc(8);
-                    amountBuffer.writeBigUInt64LE(amountBigInt, 0);
-                    amountBuffer.copy(data, 1);
+                    const amountBuffer = new Uint8Array(8);
+                    
+                    // 将BigInt转换为Little Endian字节数组
+                    for (let i = 0; i < 8; i++) {
+                        amountBuffer[i] = Number((amountBigInt >> BigInt(i * 8)) & 0xFFn);
+                    }
+                    
+                    // 复制amount数据到指令数据中
+                    data.set(amountBuffer, 1);
                     
                     return new window.solanaWeb3.TransactionInstruction({
                         keys,
@@ -3125,7 +3131,7 @@ checkIfReturningFromWalletApp(walletType) {
             console.log('通过服务器API发送已签名交易...');
             
             const transactionBuffer = signedTransaction.serialize();
-            const transactionBase64 = window.btoa(String.fromCharCode(...transactionBuffer));
+            const transactionBase64 = this.arrayBufferToBase64(transactionBuffer);
             
             // 添加详细的调试日志
             console.log('准备发送交易到服务器，交易数据长度:', transactionBase64.length);
@@ -4052,7 +4058,7 @@ checkIfReturningFromWalletApp(walletType) {
                 connection.sendRawTransaction = async function(rawTransaction, options) {
                     try {
                         console.log('通过服务器API中继发送交易');
-                        const txBase64 = Buffer.from(rawTransaction).toString('base64');
+                        const txBase64 = this.arrayBufferToBase64(rawTransaction);
                         const response = await fetch('/api/solana/send-transaction', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -5375,7 +5381,15 @@ async function signSolanaTransaction(transactionData) {
     
     // 创建交易对象
     const transaction = {
-      serialize: () => Buffer.from(transactionData.message, 'base64')
+        serialize: () => {
+            // 使用atob解码base64，然后转换为Uint8Array
+            const binaryString = atob(transactionData.message);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes;
+        }
     };
     
     // 请求签名
