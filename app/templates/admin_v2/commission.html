@@ -98,18 +98,18 @@
                 <div class="flex space-x-2">
                     <button @click="refreshRecords()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
                         <i class="fas fa-sync-alt mr-2"></i>刷新
-                    </button>
+            </button>
                     <button @click="exportRecords()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
                         <i class="fas fa-download mr-2"></i>导出
-                    </button>
-                </div>
+                </button>
             </div>
+                </div>
         </div>
 
         <!-- 筛选条件 -->
         <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
+            <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
                     <select x-model="recordFilters.status" @change="loadRecords()" class="w-full border-gray-300 rounded-md shadow-sm">
                         <option value="">全部状态</option>
@@ -117,16 +117,16 @@
                         <option value="paid">已发放</option>
                         <option value="failed">发放失败</option>
                     </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">佣金类型</label>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">佣金类型</label>
                     <select x-model="recordFilters.type" @change="loadRecords()" class="w-full border-gray-300 rounded-md shadow-sm">
-                        <option value="">全部类型</option>
-                        <option value="direct">直接佣金</option>
-                        <option value="referral">推荐佣金</option>
-                    </select>
-                </div>
-                <div>
+                    <option value="">全部类型</option>
+                    <option value="direct">直接佣金</option>
+                    <option value="referral">推荐佣金</option>
+                </select>
+            </div>
+            <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">时间范围</label>
                     <select x-model="recordFilters.time_range" @change="loadRecords()" class="w-full border-gray-300 rounded-md shadow-sm">
                         <option value="">全部时间</option>
@@ -134,14 +134,14 @@
                         <option value="week">本周</option>
                         <option value="month">本月</option>
                     </select>
-                </div>
-                <div>
+            </div>
+            <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
                     <input x-model="recordFilters.search" @input.debounce.500ms="loadRecords()" 
                            type="text" placeholder="搜索地址或交易ID..." 
                            class="w-full border-gray-300 rounded-md shadow-sm">
-                </div>
             </div>
+        </div>
         </div>
 
         <!-- 佣金记录表格 -->
@@ -163,40 +163,40 @@
                         <tr>
                             <td colspan="7" class="px-6 py-4 text-center text-gray-500">
                                 <i class="fas fa-spinner fa-spin mr-2"></i>加载佣金记录中...
-                            </td>
-                        </tr>
+                        </td>
+                    </tr>
                     </template>
                     
                     <template x-if="!recordsLoading && records.length === 0">
                         <tr>
                             <td colspan="7" class="px-6 py-4 text-center text-gray-500">暂无佣金记录</td>
-                        </tr>
+                    </tr>
                     </template>
                     
                     <template x-for="record in records" :key="record.id">
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" x-text="record.id"></td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                        <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm text-gray-900" x-text="record.recipient_address ? record.recipient_address.slice(0, 8) + '...' + record.recipient_address.slice(-6) : '-'"></div>
-                            </td>
+                        </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatCurrency(record.amount || 0)"></td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                        <td class="px-6 py-4 whitespace-nowrap">
                                 <span :class="{
                                     'bg-blue-100 text-blue-800': record.commission_type === 'direct',
                                     'bg-green-100 text-green-800': record.commission_type === 'referral'
                                 }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
                                     <span x-text="record.commission_type === 'direct' ? '直接佣金' : '推荐佣金'"></span>
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span :class="{
-                                    'bg-yellow-100 text-yellow-800': record.status === 'pending',
-                                    'bg-green-100 text-green-800': record.status === 'paid',
-                                    'bg-red-100 text-red-800': record.status === 'failed'
-                                }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span :class="{
+                                'bg-yellow-100 text-yellow-800': record.status === 'pending',
+                                'bg-green-100 text-green-800': record.status === 'paid',
+                                'bg-red-100 text-red-800': record.status === 'failed'
+                            }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
                                     <span x-text="getStatusText(record.status)"></span>
-                                </span>
-                            </td>
+                            </span>
+                        </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDateTime(record.created_at)"></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                 <button x-show="record.status === 'pending'" @click="payCommission(record)" 
@@ -206,8 +206,8 @@
                                 <button @click="viewRecord(record)" class="text-blue-600 hover:text-blue-900">
                                     <i class="fas fa-eye"></i>
                                 </button>
-                            </td>
-                        </tr>
+                        </td>
+                    </tr>
                     </template>
                 </tbody>
             </table>
@@ -216,11 +216,11 @@
         <!-- 分页 -->
         <div class="px-6 py-4 border-t border-gray-200">
             <div class="flex items-center justify-between">
-                <div class="text-sm text-gray-700">
+            <div class="text-sm text-gray-700">
                     显示 <span x-text="(recordPagination.page - 1) * recordPagination.limit + 1"></span> 到 
                     <span x-text="Math.min(recordPagination.page * recordPagination.limit, recordPagination.total)"></span> 条，
                     共 <span x-text="recordPagination.total"></span> 条记录
-                </div>
+            </div>
                 <div class="flex space-x-2">
                     <button @click="loadRecords(1)" :disabled="recordPagination.page === 1" 
                             class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">首页</button>
@@ -230,17 +230,17 @@
                             class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">下一页</button>
                     <button @click="loadRecords(recordPagination.pages)" :disabled="recordPagination.page >= recordPagination.pages" 
                             class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">末页</button>
-                </div>
             </div>
         </div>
-    </div>
+            </div>
+        </div>
 
     <!-- 佣金设置 -->
     <div x-show="activeTab === 'settings'" class="bg-white rounded-lg shadow-sm" x-cloak>
         <div class="px-6 py-4 border-b border-gray-200">
             <h3 class="text-lg font-semibold text-gray-700">佣金设置</h3>
         </div>
-        
+
         <div class="px-6 py-6">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="space-y-4">
@@ -251,24 +251,24 @@
                         <input x-model="settings.global_rate" type="number" step="0.01" min="0" max="100"
                                class="w-full border-gray-300 rounded-md shadow-sm">
                         <p class="text-xs text-gray-500 mt-1">适用于所有资产类型的默认佣金率</p>
-                    </div>
-                    
-                    <div>
+        </div>
+
+        <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">最低佣金金额 (USDC)</label>
                         <input x-model="settings.min_amount" type="number" step="0.01" min="0"
                                class="w-full border-gray-300 rounded-md shadow-sm">
-                    </div>
-                    
-                    <div>
+    </div>
+
+                                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">推荐等级</label>
                         <select x-model="settings.referral_levels" class="w-full border-gray-300 rounded-md shadow-sm">
                             <option value="1">一级推荐</option>
                             <option value="2">二级推荐</option>
                             <option value="3">三级推荐</option>
                         </select>
-                    </div>
-                </div>
-                
+                                    </div>
+                                </div>
+                                
                 <div class="space-y-4">
                     <h4 class="text-md font-semibold text-gray-700">分级佣金率</h4>
                     
@@ -276,53 +276,53 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">一级推荐佣金率 (%)</label>
                         <input x-model="settings.level1_rate" type="number" step="0.01" min="0" max="100"
                                class="w-full border-gray-300 rounded-md shadow-sm">
-                    </div>
-                    
+                                </div>
+                                
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">二级推荐佣金率 (%)</label>
                         <input x-model="settings.level2_rate" type="number" step="0.01" min="0" max="100"
                                class="w-full border-gray-300 rounded-md shadow-sm">
-                    </div>
-                    
-                    <div>
+    </div>
+
+                                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">三级推荐佣金率 (%)</label>
                         <input x-model="settings.level3_rate" type="number" step="0.01" min="0" max="100"
                                class="w-full border-gray-300 rounded-md shadow-sm">
-                    </div>
-                </div>
-            </div>
-            
+                                    </div>
+                                    </div>
+                                </div>
+                                
             <div class="mt-6 flex justify-end">
                 <button @click="saveSettings()" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">
                     <i class="fas fa-save mr-2"></i>保存设置
                 </button>
-            </div>
-        </div>
-    </div>
-
+                                    </div>
+                                    </div>
+                                </div>
+                                
     <!-- 推荐关系 -->
     <div x-show="activeTab === 'referrals'" class="bg-white rounded-lg shadow-sm" x-cloak>
         <div class="px-6 py-4 border-b border-gray-200">
             <h3 class="text-lg font-semibold text-gray-700">推荐关系</h3>
-        </div>
-        
+                                </div>
+                                
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
+                                        <table class="min-w-full divide-y divide-gray-200">
+                                            <thead class="bg-gray-50">
+                                                <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户地址</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">推荐人地址</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">推荐等级</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">推荐码</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">加入时间</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white divide-y divide-gray-200">
                     <template x-if="referralsLoading">
                         <tr>
                             <td colspan="5" class="px-6 py-4 text-center text-gray-500">
                                 <i class="fas fa-spinner fa-spin mr-2"></i>加载推荐关系中...
-                            </td>
+                                                    </td>
                         </tr>
                     </template>
                     
@@ -346,13 +346,13 @@
                                 }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
                                     <span x-text="'L' + referral.referral_level"></span>
                                 </span>
-                            </td>
+                                                    </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="referral.referral_code || '-'"></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDateTime(referral.joined_at)"></td>
-                        </tr>
+                                                </tr>
                     </template>
-                </tbody>
-            </table>
+                                            </tbody>
+                                        </table>
         </div>
     </div>
 </div>
@@ -376,12 +376,12 @@
             },
             recordsLoading: false,
             referralsLoading: false,
-            recordFilters: {
+        recordFilters: {
                 status: '',
-                type: '',
+            type: '',
                 time_range: '',
                 search: ''
-            },
+        },
             recordPagination: {
                 page: 1,
                 limit: 10,
@@ -495,7 +495,7 @@
                 } catch (error) {
                     console.error('发放佣金失败:', error);
                     alert('发放佣金失败: ' + error.message);
-                }
+            }
             },
             
             viewRecord(record) {
@@ -562,6 +562,6 @@
                 window.commissionData.loadReferrals();
             }
         });
-    });
+});
 </script>
 {% endblock %} 

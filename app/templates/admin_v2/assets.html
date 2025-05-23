@@ -14,733 +14,358 @@
 </li>
 {% endblock %}
 
-{% block extra_head %}
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
-{% endblock %}
-
 {% block content %}
-<div id="assetsApp">
+<div x-data="assetManagement()" x-init="loadData()" x-cloak>
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <div class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-blue-500">
             <div class="flex items-center">
                 <div class="p-3 rounded-full bg-blue-100 mr-4">
                     <i class="fas fa-cubes text-blue-500"></i>
                 </div>
                 <div>
-                    <h3 class="text-sm font-medium text-gray-500">总资产数量</h3>
-                    <p class="text-xl font-bold">${stats.totalAssets}</p>
+                    <h3 class="text-lg font-semibold text-gray-500">总资产数量</h3>
+                    <p class="text-2xl font-bold" x-text="stats.totalAssets || 0"></p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-green-500">
             <div class="flex items-center">
                 <div class="p-3 rounded-full bg-green-100 mr-4">
                     <i class="fas fa-dollar-sign text-green-500"></i>
                 </div>
                 <div>
-                    <h3 class="text-sm font-medium text-gray-500">资产总价值</h3>
-                    <p class="text-xl font-bold">${formatMoney(stats.totalValue)}</p>
+                    <h3 class="text-lg font-semibold text-gray-500">资产总价值</h3>
+                    <p class="text-2xl font-bold" x-text="formatCurrency(stats.totalValue || 0)"></p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-yellow-500">
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-yellow-500">
             <div class="flex items-center">
                 <div class="p-3 rounded-full bg-yellow-100 mr-4">
                     <i class="fas fa-clock text-yellow-500"></i>
                 </div>
                 <div>
-                    <h3 class="text-sm font-medium text-gray-500">待审核资产</h3>
-                    <p class="text-xl font-bold">${stats.pendingAssets}</p>
+                    <h3 class="text-lg font-semibold text-gray-500">待审核资产</h3>
+                    <p class="text-2xl font-bold" x-text="stats.pendingAssets || 0"></p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-white rounded-lg shadow-sm p-4 border-l-4 border-purple-500">
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-purple-500">
             <div class="flex items-center">
                 <div class="p-3 rounded-full bg-purple-100 mr-4">
                     <i class="fas fa-tags text-purple-500"></i>
                 </div>
                 <div>
-                    <h3 class="text-sm font-medium text-gray-500">资产类型</h3>
-                    <p class="text-xl font-bold">${stats.assetTypes}</p>
+                    <h3 class="text-lg font-semibold text-gray-500">资产类型</h3>
+                    <p class="text-2xl font-bold" x-text="stats.assetTypes || 0"></p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 资产类型分布图 -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">资产类型分布</h3>
-            <div class="h-64">
-                <canvas id="assetTypeChart"></canvas>
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">资产状态分布</h3>
-            <div class="h-64">
-                <canvas id="assetStatusChart"></canvas>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 功能区 -->
-    <div class="bg-white p-6 rounded-lg shadow-sm mb-6">
-        <div class="flex flex-wrap items-center justify-between mb-4">
-            <h3 class="text-lg font-medium text-gray-900">资产列表</h3>
-            <div class="flex space-x-2">
-                <button @click="refreshAssets" class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-sm">
-                    <i class="fas fa-sync-alt mr-1"></i> 刷新
-                </button>
-                <button @click="exportAssets" class="px-3 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded text-sm">
-                    <i class="fas fa-file-export mr-1"></i> 导出
-                </button>
-                <button @click="addAsset" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">
-                    <i class="fas fa-plus mr-1"></i> 添加资产
-                </button>
-            </div>
-        </div>
-        
-        <!-- 筛选和搜索 -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">资产类型</label>
-                <select v-model="filters.type" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">全部类型</option>
-                    <option v-for="type in assetTypes" :key="type.id" :value="type.id">
-                        ${type.name}
-                    </option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">资产状态</label>
-                <select v-model="filters.status" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">全部状态</option>
-                    <option value="pending">待审核</option>
-                    <option value="approved">已批准</option>
-                    <option value="rejected">已拒绝</option>
-                    <option value="listed">已上架</option>
-                    <option value="sold">已售出</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">价格范围</label>
+    <!-- 资产管理主面板 -->
+    <div class="bg-white rounded-lg shadow-sm mb-6">
+        <!-- 顶部操作栏 -->
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex flex-wrap items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-700">资产列表</h3>
                 <div class="flex space-x-2">
-                    <input type="number" v-model="filters.minPrice" placeholder="最低价" class="w-1/2 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <input type="number" v-model="filters.maxPrice" placeholder="最高价" class="w-1/2 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
-                <div class="relative">
-                    <input 
-                        type="text" 
-                        v-model="filters.search" 
-                        @keyup.enter="loadAssets(1)" 
-                        placeholder="搜索资产名称、描述或位置..." 
-                        class="w-full border border-gray-300 rounded px-3 py-2 pl-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <div class="absolute left-0 top-0 mt-2 ml-3 text-gray-400">
-                        <i class="fas fa-search"></i>
-                    </div>
+                    <button @click="refreshData()" 
+                            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm">
+                        <i class="fas fa-sync-alt mr-2"></i>刷新
+                    </button>
+                    <button @click="exportAssets()" 
+                            class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm">
+                        <i class="fas fa-download mr-2"></i>导出
+                    </button>
                 </div>
             </div>
         </div>
-        
-        <!-- 排序和批量操作 -->
-        <div class="flex flex-wrap justify-between items-center">
-            <div class="flex items-center">
-                <label class="text-sm font-medium text-gray-700 mr-2">排序:</label>
-                <select v-model="sort.field" @change="loadAssets(1)" class="border border-gray-300 rounded mr-2 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="created_at">创建时间</option>
-                    <option value="name">名称</option>
-                    <option value="price">价格</option>
-                    <option value="updated_at">更新时间</option>
-                </select>
-                <button @click="toggleSortOrder" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm">
-                    <i :class="sort.order === 'desc' ? 'fas fa-sort-amount-down' : 'fas fa-sort-amount-up'"></i>
-                </button>
-            </div>
-            <div class="flex mt-4 md:mt-0 space-x-2">
-                <button 
-                    :disabled="selectedAssets.length === 0" 
-                    @click="batchApprove" 
-                    class="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded text-sm"
-                >
-                    <i class="fas fa-check mr-1"></i> 批量审核
-                </button>
-                <button 
-                    :disabled="selectedAssets.length === 0" 
-                    @click="confirmBatchReject" 
-                    class="px-3 py-1 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded text-sm"
-                >
-                    <i class="fas fa-times mr-1"></i> 批量拒绝
-                </button>
-                <button 
-                    :disabled="selectedAssets.length === 0" 
-                    @click="confirmBatchDelete" 
-                    class="px-3 py-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded text-sm"
-                >
-                    <i class="fas fa-trash mr-1"></i> 批量删除
-                </button>
-            </div>
-        </div>
-    </div>
 
-    <!-- 资产表格 -->
-    <div class="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
-        <div class="min-w-full divide-y divide-gray-200">
-            <!-- 表头 -->
-            <div class="bg-gray-50">
-                <div class="grid grid-cols-12 gap-4 py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <div class="col-span-1">
-                        <input 
-                            type="checkbox" 
-                            :checked="selectedAll" 
-                            @change="toggleSelectAll" 
-                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        >
-                    </div>
-                    <div class="col-span-1">ID</div>
-                    <div class="col-span-3">资产信息</div>
-                    <div class="col-span-2">类型</div>
-                    <div class="col-span-1">价格</div>
-                    <div class="col-span-1">状态</div>
-                    <div class="col-span-1">创建时间</div>
-                    <div class="col-span-2 text-right">操作</div>
+        <!-- 筛选条件 -->
+        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                    <select x-model="filters.status" @change="loadAssets()" 
+                            class="w-full border-gray-300 rounded-md shadow-sm">
+                        <option value="">全部状态</option>
+                        <option value="1">待审核</option>
+                        <option value="2">已通过</option>
+                        <option value="3">已拒绝</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">资产类型</label>
+                    <select x-model="filters.type" @change="loadAssets()" 
+                            class="w-full border-gray-300 rounded-md shadow-sm">
+                        <option value="">全部类型</option>
+                        <option value="10">不动产</option>
+                        <option value="20">类不动产</option>
+                        <option value="30">工业地产</option>
+                        <option value="40">土地资产</option>
+                        <option value="50">证券资产</option>
+                        <option value="60">艺术品</option>
+                        <option value="70">收藏品</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">排序</label>
+                    <select x-model="filters.sort" @change="loadAssets()" 
+                            class="w-full border-gray-300 rounded-md shadow-sm">
+                        <option value="id">ID</option>
+                        <option value="created_at">创建时间</option>
+                        <option value="updated_at">更新时间</option>
+                        <option value="token_price">价格</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">排序方式</label>
+                    <select x-model="filters.order" @change="loadAssets()" 
+                            class="w-full border-gray-300 rounded-md shadow-sm">
+                        <option value="desc">降序</option>
+                        <option value="asc">升序</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
+                    <input x-model="filters.keyword" @input.debounce.500ms="loadAssets()" 
+                           type="text" placeholder="搜索资产名称..." 
+                           class="w-full border-gray-300 rounded-md shadow-sm">
                 </div>
             </div>
-            
-            <!-- 表格内容 -->
-            <div class="bg-white divide-y divide-gray-200">
-                <!-- 加载中 -->
-                <template v-if="loading">
-                    <div class="py-16 text-center text-gray-500">
-                        <i class="fas fa-spinner fa-spin text-2xl"></i>
-                        <p class="mt-2">加载资产数据中...</p>
-                    </div>
-                </template>
-                
-                <!-- 无数据 -->
-                <template v-else-if="assets.length === 0">
-                    <div class="py-16 text-center text-gray-500">
-                        <i class="fas fa-box-open text-4xl mb-3"></i>
-                        <p>没有找到匹配的资产</p>
-                        <button @click="resetFilters" class="mt-2 text-blue-500 hover:underline text-sm">
-                            清除筛选条件
-                        </button>
-                    </div>
-                </template>
-                
-                <!-- 资产数据 -->
-                <template v-else>
-                    <div v-for="asset in assets" :key="asset.id" class="grid grid-cols-12 gap-4 py-4 px-4 hover:bg-gray-50">
-                        <!-- 选择框 -->
-                        <div class="col-span-1 flex items-center">
-                            <input 
-                                type="checkbox" 
-                                v-model="selectedAssets" 
-                                :value="asset.id" 
-                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                            >
-                        </div>
-                        
-                        <!-- ID -->
-                        <div class="col-span-1 flex items-center">
-                            ${asset.id}
-                        </div>
-                        
-                        <!-- 资产信息 -->
-                        <div class="col-span-3 flex items-center">
-                            <div class="flex-shrink-0 h-12 w-12 mr-3">
-                                <img 
-                                    v-if="asset.image_url" 
-                                    :src="asset.image_url" 
-                                    alt="资产图片"
-                                    class="h-12 w-12 rounded object-cover"
-                                >
-                                <div v-else class="h-12 w-12 rounded bg-gray-200 flex items-center justify-center">
-                                    <i class="fas fa-image text-gray-400"></i>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="text-sm font-medium text-gray-900">${asset.name}</div>
-                                <div class="text-xs text-gray-500 truncate" :title="asset.description">
-                                    ${asset.description || '无描述'}
-                                </div>
-                                <div v-if="asset.location" class="text-xs text-gray-500 mt-1">
-                                    <i class="fas fa-map-marker-alt mr-1 text-gray-400"></i> ${asset.location}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- 类型 -->
-                        <div class="col-span-2 flex items-center">
-                            <span class="px-2 py-1 text-xs rounded-full" :class="getTypeClass(asset.type)">
-                                ${asset.type_name}
-                            </span>
-                        </div>
-                        
-                        <!-- 价格 -->
-                        <div class="col-span-1 flex items-center">
-                            <span class="text-sm font-medium">${formatMoney(asset.price)}</span>
-                        </div>
-                        
-                        <!-- 状态 -->
-                        <div class="col-span-1 flex items-center">
-                            <span class="px-2 py-1 text-xs rounded-full" :class="getStatusClass(asset.status)">
-                                ${getStatusText(asset.status)}
-                            </span>
-                        </div>
-                        
-                        <!-- 创建时间 -->
-                        <div class="col-span-1 flex items-center text-sm text-gray-500">
-                            ${formatDate(asset.created_at)}
-                        </div>
-                        
-                        <!-- 操作 -->
-                        <div class="col-span-2 flex justify-end items-center space-x-1">
-                            <button @click="viewAssetDetails(asset)" class="p-1 text-blue-600 hover:text-blue-800" title="查看详情">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <button @click="editAsset(asset)" class="p-1 text-indigo-600 hover:text-indigo-800" title="编辑">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button v-if="asset.status === 'pending'" @click="approveAsset(asset.id)" class="p-1 text-green-600 hover:text-green-800" title="批准">
-                                <i class="fas fa-check"></i>
-                            </button>
-                            <button v-if="asset.status === 'pending'" @click="rejectAsset(asset.id)" class="p-1 text-orange-600 hover:text-orange-800" title="拒绝">
-                                <i class="fas fa-times"></i>
-                            </button>
-                            <button @click="confirmDelete(asset.id)" class="p-1 text-red-600 hover:text-red-800" title="删除">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                </template>
+        </div>
+
+        <!-- 批量操作 -->
+        <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" x-model="selectAll" @change="toggleSelectAll()" 
+                           class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                    <span class="text-sm text-gray-600">全选</span>
+                    <span x-show="selectedAssets.length > 0" class="text-sm text-gray-500">
+                        （已选择 <span x-text="selectedAssets.length"></span> 项）
+                    </span>
+                </div>
+                <div class="flex space-x-2">
+                    <button x-show="selectedAssets.length > 0" @click="batchApprove()" 
+                            class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">
+                        <i class="fas fa-check mr-1"></i>批量通过
+                    </button>
+                    <button x-show="selectedAssets.length > 0" @click="batchReject()" 
+                            class="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600">
+                        <i class="fas fa-times mr-1"></i>批量拒绝
+                    </button>
+                    <button x-show="selectedAssets.length > 0" @click="batchDelete()" 
+                            class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">
+                        <i class="fas fa-trash mr-1"></i>批量删除
+                    </button>
+                </div>
             </div>
         </div>
-        
+
+        <!-- 资产表格 -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">选择</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">资产信息</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">价格</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <!-- 加载状态 -->
+                    <template x-if="loading">
+                        <tr>
+                            <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>加载资产数据中...
+                            </td>
+                        </tr>
+                    </template>
+                    
+                    <!-- 无数据 -->
+                    <template x-if="!loading && assets.length === 0">
+                        <tr>
+                            <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                                <i class="fas fa-box-open text-2xl mb-2"></i>
+                                <p>暂无资产数据</p>
+                            </td>
+                        </tr>
+                    </template>
+                    
+                    <!-- 资产数据 -->
+                    <template x-for="asset in assets" :key="asset.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <input type="checkbox" x-model="selectedAssets" :value="asset.id" 
+                                       class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" x-text="asset.id"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10">
+                                        <img x-show="asset.image" :src="asset.image" :alt="asset.name" 
+                                             class="h-10 w-10 rounded-full object-cover">
+                                        <div x-show="!asset.image" 
+                                             class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                            <i class="fas fa-image text-gray-400"></i>
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900" x-text="asset.name"></div>
+                                        <div class="text-sm text-gray-500" x-text="asset.token_symbol"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full" 
+                                      :class="getTypeClass(asset.asset_type)" x-text="asset.asset_type_name"></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatCurrency(asset.token_price || 0)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full" 
+                                      :class="getStatusClass(asset.status)" x-text="asset.status_text"></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDate(asset.created_at)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div class="flex space-x-2">
+                                    <button @click="viewAsset(asset)" 
+                                            class="text-blue-600 hover:text-blue-900" title="查看详情">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button x-show="asset.status === 1" @click="approveAsset(asset.id)" 
+                                            class="text-green-600 hover:text-green-900" title="通过">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    <button x-show="asset.status === 1" @click="rejectAsset(asset.id)" 
+                                            class="text-orange-600 hover:text-orange-900" title="拒绝">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                    <button @click="deleteAsset(asset.id)" 
+                                            class="text-red-600 hover:text-red-900" title="删除">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
         <!-- 分页 -->
-        <div v-if="assets.length > 0" class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200">
-            <div class="flex-1 flex justify-between sm:hidden">
-                <button 
-                    @click="loadAssets(currentPage - 1)" 
-                    :disabled="currentPage === 1" 
-                    class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                >
-                    上一页
-                </button>
-                <button 
-                    @click="loadAssets(currentPage + 1)" 
-                    :disabled="currentPage === totalPages" 
-                    class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                >
-                    下一页
-                </button>
-            </div>
-            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                    <p class="text-sm text-gray-700">
-                        显示 
-                        <span class="font-medium">${(currentPage - 1) * pageSize + 1}</span>
-                        到
-                        <span class="font-medium">${Math.min(currentPage * pageSize, totalItems)}</span>
-                        条，共
-                        <span class="font-medium">${totalItems}</span>
-                        条记录
-                    </p>
+        <div class="px-6 py-4 border-t border-gray-200">
+            <div class="flex items-center justify-between">
+                <div class="text-sm text-gray-700">
+                    显示 <span x-text="(pagination.page - 1) * pagination.limit + 1"></span> 到 
+                    <span x-text="Math.min(pagination.page * pagination.limit, pagination.total)"></span> 条，
+                    共 <span x-text="pagination.total"></span> 条记录
                 </div>
-                <div>
-                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                        <button 
-                            @click="loadAssets(1)" 
-                            :disabled="currentPage === 1" 
-                            class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                        >
-                            <span class="sr-only">首页</span>
-                            <i class="fas fa-angle-double-left"></i>
-                        </button>
-                        <button 
-                            @click="loadAssets(currentPage - 1)" 
-                            :disabled="currentPage === 1" 
-                            class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                        >
-                            <span class="sr-only">上一页</span>
-                            <i class="fas fa-angle-left"></i>
-                        </button>
-                        
-                        <template v-for="page in displayedPages">
-                            <span 
-                                v-if="page === '...'" 
-                                class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700"
-                            >
-                                ...
-                            </span>
-                            <button 
-                                v-else 
-                                @click="loadAssets(page)" 
-                                :class="page === currentPage ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'" 
-                                class="relative inline-flex items-center px-4 py-2 border text-sm font-medium"
-                            >
-                                ${page}
-                            </button>
-                        </template>
-                        
-                        <button 
-                            @click="loadAssets(currentPage + 1)" 
-                            :disabled="currentPage === totalPages" 
-                            class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                        >
-                            <span class="sr-only">下一页</span>
-                            <i class="fas fa-angle-right"></i>
-                        </button>
-                        <button 
-                            @click="loadAssets(totalPages)" 
-                            :disabled="currentPage === totalPages" 
-                            class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                        >
-                            <span class="sr-only">末页</span>
-                            <i class="fas fa-angle-double-right"></i>
-                        </button>
-                    </nav>
+                <div class="flex space-x-2">
+                    <button @click="loadAssets(1)" :disabled="pagination.page === 1" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">首页</button>
+                    <button @click="loadAssets(pagination.page - 1)" :disabled="pagination.page === 1" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">上一页</button>
+                    <button @click="loadAssets(pagination.page + 1)" :disabled="pagination.page >= pagination.pages" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">下一页</button>
+                    <button @click="loadAssets(pagination.pages)" :disabled="pagination.page >= pagination.pages" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">末页</button>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- 确认删除模态框 -->
-<div v-if="showDeleteModal" class="fixed z-50 inset-0 overflow-y-auto">
-    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
-            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-        </div>
-        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div class="sm:flex sm:items-start">
-                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                        <i class="fas fa-exclamation-triangle text-red-600"></i>
+    <!-- 资产详情模态框 -->
+    <div x-show="showAssetModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="closeAssetModal()"></div>
+            <div class="relative bg-white rounded-lg max-w-4xl w-full max-h-96 overflow-y-auto shadow-xl transform transition-all">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-900">资产详情</h3>
+                        <button @click="closeAssetModal()" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times"></i>
+                        </button>
                     </div>
-                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">确认删除</h3>
-                        <div class="mt-2">
-                            <p class="text-sm text-gray-500">
-                                您确定要删除这${deleteMultiple ? '些' : '个'}资产吗？此操作无法撤销。
-                            </p>
+                </div>
+                <div x-show="selectedAsset" class="px-6 py-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <img x-show="selectedAsset?.image" :src="selectedAsset?.image" :alt="selectedAsset?.name" 
+                                 class="w-full h-64 object-cover rounded-lg">
+                            <div x-show="!selectedAsset?.image" 
+                                 class="w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-image text-gray-400 text-4xl"></i>
+                            </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button @click="deleteAsset" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm">
-                    确认删除
-                </button>
-                <button @click="showDeleteModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                    取消
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 拒绝资产模态框 -->
-<div v-if="showRejectModal" class="fixed z-50 inset-0 overflow-y-auto">
-    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
-            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-        </div>
-        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div class="sm:flex sm:items-start">
-                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-orange-100 sm:mx-0 sm:h-10 sm:w-10">
-                        <i class="fas fa-times text-orange-600"></i>
-                    </div>
-                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">拒绝资产</h3>
-                        <div class="mt-2">
-                            <p class="text-sm text-gray-500 mb-2">
-                                请输入拒绝理由，这将通知资产提交者。
-                            </p>
-                            <textarea v-model="rejectReason" class="w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" rows="4" placeholder="请输入拒绝理由..."></textarea>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button @click="rejectAssetConfirm" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-orange-600 text-base font-medium text-white hover:bg-orange-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm">
-                    确认拒绝
-                </button>
-                <button @click="showRejectModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                    取消
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 资产详情模态框 -->
-<div v-if="showAssetDetailsModal" class="fixed z-50 inset-0 overflow-y-auto">
-    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="showAssetDetailsModal = false">
-            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-        </div>
-        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
-            <div v-if="selectedAsset" class="bg-white">
-                <div class="px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                    <div class="sm:flex sm:items-start">
-                        <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
-                            <h3 class="text-lg leading-6 font-medium text-gray-900">资产详情</h3>
-                            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <!-- 资产图片 -->
-                                <div class="flex justify-center md:justify-start">
-                                    <div class="w-full md:w-48 h-48 rounded-lg overflow-hidden bg-gray-200 flex items-center justify-center">
-                                        <img 
-                                            v-if="selectedAsset.image_url" 
-                                            :src="selectedAsset.image_url" 
-                                            alt="资产图片"
-                                            class="w-full h-full object-cover"
-                                        >
-                                        <i v-else class="fas fa-image text-4xl text-gray-400"></i>
-                                    </div>
-                                </div>
-                                
-                                <!-- 资产信息 -->
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-lg font-semibold" x-text="selectedAsset?.name"></h4>
+                                <p class="text-gray-600" x-text="selectedAsset?.token_symbol"></p>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
                                 <div>
-                                    <h4 class="text-xl font-semibold text-gray-900 mb-2">${selectedAsset.name}</h4>
-                                    <div class="mb-3">
-                                        <span class="px-2 py-1 text-xs rounded-full" :class="getTypeClass(selectedAsset.type)">
-                                            ${selectedAsset.type_name}
-                                        </span>
-                                        <span class="ml-2 px-2 py-1 text-xs rounded-full" :class="getStatusClass(selectedAsset.status)">
-                                            ${getStatusText(selectedAsset.status)}
-                                        </span>
-                                    </div>
-                                    <div class="text-sm text-gray-700 mb-1">
-                                        <span class="font-medium">价格:</span> ${formatMoney(selectedAsset.price)}
-                                    </div>
-                                    <div v-if="selectedAsset.location" class="text-sm text-gray-700 mb-1">
-                                        <span class="font-medium">位置:</span> ${selectedAsset.location}
-                                    </div>
-                                    <div class="text-sm text-gray-700 mb-1">
-                                        <span class="font-medium">创建时间:</span> ${formatDateTime(selectedAsset.created_at)}
-                                    </div>
-                                    <div class="text-sm text-gray-700 mb-3">
-                                        <span class="font-medium">最后更新:</span> ${formatDateTime(selectedAsset.updated_at)}
-                                    </div>
-                                    <div v-if="selectedAsset.owner_address" class="text-sm text-gray-700 mb-3">
-                                        <span class="font-medium">拥有者:</span> 
-                                        <span class="text-gray-800">${truncateAddress(selectedAsset.owner_address)}</span>
-                                    </div>
+                                    <span class="text-gray-500">资产类型：</span>
+                                    <span x-text="selectedAsset?.asset_type_name"></span>
                                 </div>
-                            </div>
-                            
-                            <!-- 资产描述 -->
-                            <div class="mt-4">
-                                <h5 class="text-sm font-medium text-gray-700 mb-2">描述</h5>
-                                <div class="bg-gray-50 p-3 rounded text-sm text-gray-800">
-                                    ${selectedAsset.description || '暂无描述'}
-                                </div>
-                            </div>
-                            
-                            <!-- 资产特性 -->
-                            <div v-if="selectedAsset.attributes && selectedAsset.attributes.length > 0" class="mt-4">
-                                <h5 class="text-sm font-medium text-gray-700 mb-2">资产特性</h5>
-                                <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    <div v-for="attr in selectedAsset.attributes" :key="attr.key" class="bg-gray-50 p-2 rounded">
-                                        <span class="text-xs text-gray-500">${attr.key}</span>
-                                        <div class="text-sm font-medium text-gray-800">${attr.value}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button v-if="selectedAsset.status === 'pending'" @click="approveAsset(selectedAsset.id)" class="ml-3 inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none sm:w-auto sm:text-sm">
-                        批准
-                    </button>
-                    <button v-if="selectedAsset.status === 'pending'" @click="rejectAsset(selectedAsset.id)" class="ml-3 inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-orange-600 text-base font-medium text-white hover:bg-orange-700 focus:outline-none sm:w-auto sm:text-sm">
-                        拒绝
-                    </button>
-                    <button @click="editAsset(selectedAsset)" class="ml-3 inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none sm:w-auto sm:text-sm">
-                        编辑
-                    </button>
-                    <button @click="showAssetDetailsModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:w-auto sm:text-sm">
-                        关闭
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 添加/编辑资产模态框 -->
-<div v-if="showAssetFormModal" class="fixed z-50 inset-0 overflow-y-auto">
-    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
-            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-        </div>
-        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
-            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div class="sm:flex sm:items-start">
-                    <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">
-                            ${editMode ? '编辑资产' : '添加新资产'}
-                        </h3>
-                        <div class="mt-4">
-                            <form @submit.prevent="saveAsset">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <!-- 左侧表单 -->
-                                    <div>
-                                        <div class="mb-4">
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">资产名称 <span class="text-red-500">*</span></label>
-                                            <input 
-                                                type="text" 
-                                                v-model="assetForm.name" 
-                                                required
-                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                placeholder="请输入资产名称"
-                                            >
-                                        </div>
-                                        <div class="mb-4">
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">资产类型 <span class="text-red-500">*</span></label>
-                                            <select 
-                                                v-model="assetForm.type" 
-                                                required
-                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            >
-                                                <option value="">请选择资产类型</option>
-                                                <option v-for="type in assetTypes" :key="type.id" :value="type.id">
-                                                    ${type.name}
-                                                </option>
-                                            </select>
-                                        </div>
-                                        <div class="mb-4">
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">价格 <span class="text-red-500">*</span></label>
-                                            <div class="flex items-center">
-                                                <span class="inline-flex items-center px-3 py-2 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500">$</span>
-                                                <input 
-                                                    type="number" 
-                                                    v-model="assetForm.price" 
-                                                    step="0.01" 
-                                                    min="0" 
-                                                    required
-                                                    class="w-full px-3 py-2 border border-gray-300 rounded-r-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    placeholder="0.00"
-                                                >
-                                            </div>
-                                        </div>
-                                        <div class="mb-4">
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">位置</label>
-                                            <input 
-                                                type="text" 
-                                                v-model="assetForm.location" 
-                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                placeholder="资产所在位置（城市或地区）"
-                                            >
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- 右侧表单 -->
-                                    <div>
-                                        <div class="mb-4">
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">图片URL</label>
-                                            <input 
-                                                type="url" 
-                                                v-model="assetForm.image_url" 
-                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                placeholder="资产图片链接"
-                                            >
-                                            <div v-if="assetForm.image_url" class="mt-2 flex justify-center">
-                                                <img :src="assetForm.image_url" alt="预览" class="h-20 object-cover rounded">
-                                            </div>
-                                        </div>
-                                        <div class="mb-4">
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">状态 <span class="text-red-500">*</span></label>
-                                            <select 
-                                                v-model="assetForm.status" 
-                                                required
-                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            >
-                                                <option value="pending">待审核</option>
-                                                <option value="approved">已批准</option>
-                                                <option value="rejected">已拒绝</option>
-                                                <option value="listed">已上架</option>
-                                                <option value="sold">已售出</option>
-                                            </select>
-                                        </div>
-                                        <div class="mb-4">
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">拥有者地址</label>
-                                            <input 
-                                                type="text" 
-                                                v-model="assetForm.owner_address" 
-                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                placeholder="拥有者钱包地址"
-                                            >
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- 描述 -->
-                                <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">描述</label>
-                                    <textarea 
-                                        v-model="assetForm.description" 
-                                        rows="4" 
-                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="请描述该资产的特点和详情..."
-                                    ></textarea>
-                                </div>
-                                
-                                <!-- 资产特性 -->
                                 <div>
-                                    <div class="flex justify-between items-center mb-2">
-                                        <label class="block text-sm font-medium text-gray-700">资产特性</label>
-                                        <button type="button" @click="addAttribute" class="text-sm text-blue-600 hover:text-blue-800">
-                                            <i class="fas fa-plus mr-1"></i> 添加特性
-                                        </button>
-                                    </div>
-                                    <div v-for="(attr, index) in assetForm.attributes" :key="index" class="flex mb-3">
-                                        <input 
-                                            type="text" 
-                                            v-model="attr.key" 
-                                            placeholder="特性名称" 
-                                            class="w-1/3 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        >
-                                        <input 
-                                            type="text" 
-                                            v-model="attr.value" 
-                                            placeholder="特性值" 
-                                            class="w-2/3 px-3 py-2 border-l-0 border border-gray-300 rounded-r-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        >
-                                        <button type="button" @click="removeAttribute(index)" class="ml-2 text-red-500 hover:text-red-700">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
+                                    <span class="text-gray-500">代币价格：</span>
+                                    <span x-text="formatCurrency(selectedAsset?.token_price || 0)"></span>
                                 </div>
-                            </form>
+                                <div>
+                                    <span class="text-gray-500">总价值：</span>
+                                    <span x-text="formatCurrency(selectedAsset?.total_value || 0)"></span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500">代币供应量：</span>
+                                    <span x-text="selectedAsset?.token_supply || 0"></span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500">创建者：</span>
+                                    <span x-text="formatAddress(selectedAsset?.creator_address)"></span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500">状态：</span>
+                                    <span x-text="selectedAsset?.status_text"></span>
+                                </div>
+                            </div>
+                            <div x-show="selectedAsset?.location">
+                                <span class="text-gray-500">位置：</span>
+                                <span x-text="selectedAsset?.location"></span>
+                            </div>
+                            <div x-show="selectedAsset?.area">
+                                <span class="text-gray-500">面积：</span>
+                                <span x-text="selectedAsset?.area + ' 平方米'"></span>
+                            </div>
+                            <div class="pt-4 border-t">
+                                <div class="flex space-x-2">
+                                    <button x-show="selectedAsset?.status === 1" @click="approveAsset(selectedAsset.id)" 
+                                            class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                                        <i class="fas fa-check mr-2"></i>通过审核
+                                    </button>
+                                    <button x-show="selectedAsset?.status === 1" @click="rejectAsset(selectedAsset.id)" 
+                                            class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">
+                                        <i class="fas fa-times mr-2"></i>拒绝审核
+                                    </button>
+                                    <button @click="deleteAsset(selectedAsset?.id)" 
+                                            class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                                        <i class="fas fa-trash mr-2"></i>删除资产
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button @click="saveAsset" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm">
-                    ${editMode ? '保存修改' : '创建资产'}
-                </button>
-                <button @click="showAssetFormModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                    取消
-                </button>
             </div>
         </div>
     </div>
@@ -749,771 +374,305 @@
 
 {% block scripts %}
 <script>
-    // 资产管理Vue应用
-    new Vue({
-        el: '#assetsApp',
-        delimiters: ['${', '}'],
-        data: {
-            // 统计数据
-            stats: {
-                totalAssets: 0,
-                totalValue: 0,
-                pendingAssets: 0,
-                assetTypes: 0
-            },
-            
-            // 资产列表数据
+    function assetManagement() {
+        return {
+            // 数据状态
+            loading: false,
             assets: [],
-            loading: true,
+            stats: {},
+            selectedAssets: [],
+            selectedAsset: null,
+            selectAll: false,
+            showAssetModal: false,
             
-            // 分页
-            currentPage: 1,
-            pageSize: 10,
-            totalItems: 0,
-            totalPages: 1,
-            
-            // 筛选条件
+            // 筛选和分页
             filters: {
-                type: '',
                 status: '',
-                minPrice: '',
-                maxPrice: '',
-                search: ''
-            },
-            
-            // 排序
-            sort: {
-                field: 'created_at',
+                type: '',
+                keyword: '',
+                sort: 'id',
                 order: 'desc'
             },
-            
-            // 选择的资产
-            selectedAssets: [],
-            
-            // 资产类型列表
-            assetTypes: [
-                { id: 'real_estate', name: '房地产' },
-                { id: 'artwork', name: '艺术品' },
-                { id: 'collectible', name: '收藏品' },
-                { id: 'jewelry', name: '珠宝' },
-                { id: 'vehicle', name: '车辆' },
-                { id: 'luxury_goods', name: '奢侈品' },
-                { id: 'other', name: '其他' }
-            ],
-            
-            // 模态框控制
-            showDeleteModal: false,
-            showRejectModal: false,
-            showAssetDetailsModal: false,
-            showAssetFormModal: false,
-            deleteMultiple: false,
-            deleteId: null,
-            rejectId: null,
-            rejectReason: '',
-            selectedAsset: null,
-            
-            // 编辑模式
-            editMode: false,
-            
-            // 资产表单
-            assetForm: {
-                id: null,
-                name: '',
-                type: '',
-                price: '',
-                location: '',
-                description: '',
-                image_url: '',
-                status: 'pending',
-                owner_address: '',
-                attributes: []
+            pagination: {
+                page: 1,
+                limit: 10,
+                total: 0,
+                pages: 0
             },
             
-            // 图表实例
-            typeChart: null,
-            statusChart: null
-        },
-        
-        computed: {
-            // 是否全选
-            selectedAll: function() {
-                return this.assets.length > 0 && this.selectedAssets.length === this.assets.length;
+            // 初始化加载数据
+            async loadData() {
+                console.log('Alpine.js 初始化完成');
+                await Promise.all([
+                    this.loadStats(),
+                    this.loadAssets()
+                ]);
             },
-            
-            // 显示的页码
-            displayedPages: function() {
-                const pages = [];
-                
-                if (this.totalPages <= 7) {
-                    // 显示所有页码
-                    for (let i = 1; i <= this.totalPages; i++) {
-                        pages.push(i);
-                    }
-                } else {
-                    // 始终显示第一页
-                    pages.push(1);
-                    
-                    // 当前页在前面部分
-                    if (this.currentPage <= 3) {
-                        pages.push(2, 3, 4, '...', this.totalPages);
-                    } 
-                    // 当前页在后面部分
-                    else if (this.currentPage >= this.totalPages - 2) {
-                        pages.push('...', this.totalPages - 3, this.totalPages - 2, this.totalPages - 1, this.totalPages);
-                    } 
-                    // 当前页在中间
-                    else {
-                        pages.push('...', this.currentPage - 1, this.currentPage, this.currentPage + 1, '...', this.totalPages);
-                    }
-                }
-                
-                return pages;
-            }
-        },
-        
-        mounted() {
-            // 加载资产数据
-            this.loadAssets(1);
             
             // 加载统计数据
-            this.loadStats();
-        },
-        
-        updated() {
-            // 在数据更新后更新图表
-            this.$nextTick(() => {
-                if (this.typeChart) {
-                    this.updateTypeChart();
+            async loadStats() {
+                try {
+                    const response = await fetch('/admin/v2/api/assets/stats');
+                    if (response.ok) {
+                        this.stats = await response.json();
+                    }
+                } catch (error) {
+                    console.error('加载统计数据失败:', error);
                 }
-                if (this.statusChart) {
-                    this.updateStatusChart();
-                }
-            });
-        },
-        
-        methods: {
-            // 加载资产数据
-            loadAssets(page) {
-                if (page < 1 || (page > this.totalPages && this.totalPages > 0)) {
-                    return;
-                }
-                
+            },
+            
+            // 加载资产列表
+            async loadAssets(page = null) {
+                if (page) this.pagination.page = page;
                 this.loading = true;
-                this.currentPage = page;
                 
-                // 构建查询参数
-                const params = {
-                    page: this.currentPage,
-                    limit: this.pageSize,
-                    sort_by: this.sort.field,
-                    order: this.sort.order
-                };
-                
-                // 添加筛选条件
-                if (this.filters.type) params.type = this.filters.type;
-                if (this.filters.status) params.status = this.filters.status;
-                if (this.filters.minPrice) params.min_price = this.filters.minPrice;
-                if (this.filters.maxPrice) params.max_price = this.filters.maxPrice;
-                if (this.filters.search) params.search = this.filters.search;
-                
-                // 构建查询字符串
-                const queryString = Object.keys(params)
-                    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
-                    .join('&');
-                
-                // 发送请求获取数据
-                axios.get(`/admin/v2/api/assets?${queryString}`)
-                    .then(response => {
-                        this.assets = response.data.items;
-                        this.totalItems = response.data.total;
-                        this.totalPages = Math.ceil(this.totalItems / this.pageSize);
-                        this.selectedAssets = [];
-                    })
-                    .catch(error => {
-                        console.error('加载资产失败:', error);
-                        alert('加载资产数据失败，请重试');
-                    })
-                    .finally(() => {
-                        this.loading = false;
+                try {
+                    const params = new URLSearchParams({
+                        page: this.pagination.page,
+                        limit: this.pagination.limit,
+                        ...this.filters
                     });
-            },
-            
-            // 加载统计数据
-            loadStats() {
-                axios.get('/admin/v2/api/assets/stats')
-                    .then(response => {
-                        this.stats = response.data;
-                        this.$nextTick(() => {
-                            this.initCharts();
-                        });
-                    })
-                    .catch(error => {
-                        console.error('加载统计数据失败:', error);
-                    });
-            },
-            
-            // 初始化图表
-            initCharts() {
-                // 初始化资产类型分布图表
-                this.initTypeChart();
-                
-                // 初始化资产状态分布图表
-                this.initStatusChart();
-            },
-            
-            // 初始化资产类型分布图表
-            initTypeChart() {
-                const ctx = document.getElementById('assetTypeChart').getContext('2d');
-                const data = {
-                    labels: [],
-                    datasets: [{
-                        data: [],
-                        backgroundColor: [
-                            '#4F46E5', '#7C3AED', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#9333EA'
-                        ],
-                        borderWidth: 0
-                    }]
-                };
-                
-                // 如果有类型数据，添加到图表
-                if (this.stats.type_distribution) {
-                    for (const type in this.stats.type_distribution) {
-                        const typeName = this.getTypeName(type);
-                        data.labels.push(typeName);
-                        data.datasets[0].data.push(this.stats.type_distribution[type]);
-                    }
-                }
-                
-                this.typeChart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: data,
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'right',
-                                labels: {
-                                    boxWidth: 15,
-                                    padding: 15,
-                                    font: {
-                                        size: 12
-                                    }
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const label = context.label || '';
-                                        const value = context.raw || 0;
-                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                        const percentage = Math.round((value / total) * 100);
-                                        return `${label}: ${value} (${percentage}%)`;
-                                    }
-                                }
-                            }
-                        },
-                        cutout: '70%'
-                    }
-                });
-            },
-            
-            // 初始化资产状态分布图表
-            initStatusChart() {
-                const ctx = document.getElementById('assetStatusChart').getContext('2d');
-                const data = {
-                    labels: [],
-                    datasets: [{
-                        data: [],
-                        backgroundColor: [
-                            '#F59E0B', '#10B981', '#EF4444', '#3B82F6', '#6B7280'
-                        ],
-                        borderWidth: 0
-                    }]
-                };
-                
-                // 如果有状态数据，添加到图表
-                if (this.stats.status_distribution) {
-                    const statusMap = {
-                        'pending': '待审核',
-                        'approved': '已批准',
-                        'rejected': '已拒绝',
-                        'listed': '已上架',
-                        'sold': '已售出'
-                    };
                     
-                    for (const status in this.stats.status_distribution) {
-                        data.labels.push(statusMap[status] || status);
-                        data.datasets[0].data.push(this.stats.status_distribution[status]);
-                    }
-                }
-                
-                this.statusChart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: data,
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'right',
-                                labels: {
-                                    boxWidth: 15,
-                                    padding: 15,
-                                    font: {
-                                        size: 12
-                                    }
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const label = context.label || '';
-                                        const value = context.raw || 0;
-                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                        const percentage = Math.round((value / total) * 100);
-                                        return `${label}: ${value} (${percentage}%)`;
-                                    }
-                                }
-                            }
-                        },
-                        cutout: '70%'
-                    }
-                });
-            },
-            
-            // 更新资产类型分布图表
-            updateTypeChart() {
-                if (!this.typeChart) return;
-                
-                const data = {
-                    labels: [],
-                    datasets: [{
-                        data: [],
-                        backgroundColor: [
-                            '#4F46E5', '#7C3AED', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#9333EA'
-                        ],
-                        borderWidth: 0
-                    }]
-                };
-                
-                // 如果有类型数据，添加到图表
-                if (this.stats.type_distribution) {
-                    for (const type in this.stats.type_distribution) {
-                        const typeName = this.getTypeName(type);
-                        data.labels.push(typeName);
-                        data.datasets[0].data.push(this.stats.type_distribution[type]);
-                    }
-                }
-                
-                this.typeChart.data = data;
-                this.typeChart.update();
-            },
-            
-            // 更新资产状态分布图表
-            updateStatusChart() {
-                if (!this.statusChart) return;
-                
-                const data = {
-                    labels: [],
-                    datasets: [{
-                        data: [],
-                        backgroundColor: [
-                            '#F59E0B', '#10B981', '#EF4444', '#3B82F6', '#6B7280'
-                        ],
-                        borderWidth: 0
-                    }]
-                };
-                
-                // 如果有状态数据，添加到图表
-                if (this.stats.status_distribution) {
-                    const statusMap = {
-                        'pending': '待审核',
-                        'approved': '已批准',
-                        'rejected': '已拒绝',
-                        'listed': '已上架',
-                        'sold': '已售出'
-                    };
+                    const response = await fetch(`/admin/v2/api/assets?${params}`);
+                    if (!response.ok) throw new Error('加载资产失败');
                     
-                    for (const status in this.stats.status_distribution) {
-                        data.labels.push(statusMap[status] || status);
-                        data.datasets[0].data.push(this.stats.status_distribution[status]);
-                    }
-                }
-                
-                this.statusChart.data = data;
-                this.statusChart.update();
-            },
-            
-            // 切换排序顺序
-            toggleSortOrder() {
-                this.sort.order = this.sort.order === 'asc' ? 'desc' : 'asc';
-                this.loadAssets(1);
-            },
-            
-            // 重置筛选条件
-            resetFilters() {
-                this.filters = {
-                    type: '',
-                    status: '',
-                    minPrice: '',
-                    maxPrice: '',
-                    search: ''
-                };
-                this.loadAssets(1);
-            },
-            
-            // 刷新资产列表
-            refreshAssets() {
-                this.loadAssets(this.currentPage);
-                this.loadStats();
-            },
-            
-            // 导出资产数据
-            exportAssets() {
-                const params = {};
-                
-                // 添加筛选条件
-                if (this.filters.type) params.type = this.filters.type;
-                if (this.filters.status) params.status = this.filters.status;
-                if (this.filters.minPrice) params.min_price = this.filters.minPrice;
-                if (this.filters.maxPrice) params.max_price = this.filters.maxPrice;
-                if (this.filters.search) params.search = this.filters.search;
-                
-                // 构建查询字符串
-                const queryString = Object.keys(params)
-                    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
-                    .join('&');
-                
-                // 打开导出链接
-                window.open(`/admin/v2/api/assets/export?${queryString}`);
-            },
-            
-            // 切换全选
-            toggleSelectAll() {
-                if (this.selectedAssets.length === this.assets.length) {
-                    // 如果已经全选，则清空选择
+                    const data = await response.json();
+                    this.assets = data.items || [];
+                    this.pagination.total = data.total || 0;
+                    this.pagination.pages = data.pages || 0;
+                    
+                    // 重置选择状态
                     this.selectedAssets = [];
-                } else {
-                    // 否则全选
-                    this.selectedAssets = this.assets.map(asset => asset.id);
+                    this.selectAll = false;
+                    
+                } catch (error) {
+                    console.error('加载资产失败:', error);
+                    alert('加载资产失败: ' + error.message);
+                } finally {
+                    this.loading = false;
                 }
             },
             
-            // 格式化货币
-            formatMoney(value) {
-                if (!value && value !== 0) return '-';
-                return '$' + parseFloat(value).toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
+            // 刷新数据
+            async refreshData() {
+                await this.loadData();
             },
             
-            // 格式化日期
-            formatDate(dateString) {
-                if (!dateString) return '-';
-                const date = new Date(dateString);
-                return date.toLocaleDateString('zh-CN');
-            },
-            
-            // 格式化日期时间
-            formatDateTime(dateString) {
-                if (!dateString) return '-';
-                const date = new Date(dateString);
-                return date.toLocaleString('zh-CN');
-            },
-            
-            // 截断地址
-            truncateAddress(address) {
-                if (!address) return '-';
-                return address.substring(0, 6) + '...' + address.substring(address.length - 4);
-            },
-            
-            // 获取类型名称
-            getTypeName(typeId) {
-                const type = this.assetTypes.find(t => t.id === typeId);
-                return type ? type.name : typeId;
-            },
-            
-            // 获取类型样式类
-            getTypeClass(type) {
-                const typeClasses = {
-                    'real_estate': 'bg-blue-100 text-blue-800',
-                    'artwork': 'bg-purple-100 text-purple-800',
-                    'collectible': 'bg-pink-100 text-pink-800',
-                    'jewelry': 'bg-yellow-100 text-yellow-800',
-                    'vehicle': 'bg-green-100 text-green-800',
-                    'luxury_goods': 'bg-indigo-100 text-indigo-800',
-                    'other': 'bg-gray-100 text-gray-800'
-                };
-                
-                return typeClasses[type] || 'bg-gray-100 text-gray-800';
-            },
-            
-            // 获取状态样式类
-            getStatusClass(status) {
-                const statusClasses = {
-                    'pending': 'bg-yellow-100 text-yellow-800',
-                    'approved': 'bg-green-100 text-green-800',
-                    'rejected': 'bg-red-100 text-red-800',
-                    'listed': 'bg-blue-100 text-blue-800',
-                    'sold': 'bg-gray-100 text-gray-800'
-                };
-                
-                return statusClasses[status] || 'bg-gray-100 text-gray-800';
-            },
-            
-            // 获取状态文本
-            getStatusText(status) {
-                const statusTexts = {
-                    'pending': '待审核',
-                    'approved': '已批准',
-                    'rejected': '已拒绝',
-                    'listed': '已上架',
-                    'sold': '已售出'
-                };
-                
-                return statusTexts[status] || status;
+            // 全选切换
+            toggleSelectAll() {
+                if (this.selectAll) {
+                    this.selectedAssets = this.assets.map(asset => asset.id);
+                } else {
+                    this.selectedAssets = [];
+                }
             },
             
             // 查看资产详情
-            viewAssetDetails(asset) {
+            viewAsset(asset) {
                 this.selectedAsset = asset;
-                this.showAssetDetailsModal = true;
+                this.showAssetModal = true;
             },
             
-            // 添加新资产
-            addAsset() {
-                this.editMode = false;
-                this.assetForm = {
-                    id: null,
-                    name: '',
-                    type: '',
-                    price: '',
-                    location: '',
-                    description: '',
-                    image_url: '',
-                    status: 'pending',
-                    owner_address: '',
-                    attributes: []
-                };
-                this.showAssetFormModal = true;
+            // 关闭资产详情模态框
+            closeAssetModal() {
+                this.showAssetModal = false;
+                this.selectedAsset = null;
             },
             
-            // 编辑资产
-            editAsset(asset) {
-                this.editMode = true;
-                this.assetForm = {
-                    id: asset.id,
-                    name: asset.name,
-                    type: asset.type,
-                    price: asset.price,
-                    location: asset.location || '',
-                    description: asset.description || '',
-                    image_url: asset.image_url || '',
-                    status: asset.status,
-                    owner_address: asset.owner_address || '',
-                    attributes: asset.attributes ? [...asset.attributes] : []
-                };
-                this.showAssetFormModal = true;
-            },
-            
-            // 保存资产
-            saveAsset() {
-                // 表单验证
-                if (!this.assetForm.name || !this.assetForm.type || !this.assetForm.price) {
-                    alert('请填写必填字段：资产名称、类型和价格');
-                    return;
+            // 单个资产审核通过
+            async approveAsset(assetId) {
+                if (!confirm('确定要通过这个资产的审核吗？')) return;
+                
+                try {
+                    const response = await fetch(`/admin/v2/api/assets/${assetId}/approve`, {
+                        method: 'POST'
+                    });
+                    
+                    if (!response.ok) throw new Error('审核失败');
+                    
+                    alert('资产审核通过成功');
+                    await this.refreshData();
+                    this.closeAssetModal();
+                } catch (error) {
+                    console.error('审核失败:', error);
+                    alert('审核失败: ' + error.message);
                 }
+            },
+            
+            // 单个资产审核拒绝
+            async rejectAsset(assetId) {
+                const reason = prompt('请输入拒绝理由:');
+                if (!reason) return;
                 
-                const url = this.editMode
-                    ? `/admin/v2/api/assets/${this.assetForm.id}`
-                    : '/admin/v2/api/assets';
-                
-                const method = this.editMode ? 'put' : 'post';
-                
-                // 发送请求
-                axios({
-                    method: method,
-                    url: url,
-                    data: this.assetForm
-                })
-                .then(response => {
-                    alert(this.editMode ? '资产更新成功' : '资产创建成功');
-                    this.showAssetFormModal = false;
-                    this.refreshAssets();
-                })
-                .catch(error => {
-                    console.error('保存资产失败:', error);
-                    alert('操作失败，请重试：' + (error.response?.data?.message || error.message));
-                });
-            },
-            
-            // 添加资产特性
-            addAttribute() {
-                this.assetForm.attributes.push({ key: '', value: '' });
-            },
-            
-            // 移除资产特性
-            removeAttribute(index) {
-                this.assetForm.attributes.splice(index, 1);
-            },
-            
-            // 确认删除对话框
-            confirmDelete(assetId) {
-                this.deleteId = assetId;
-                this.deleteMultiple = false;
-                this.showDeleteModal = true;
-            },
-            
-            // 确认批量删除对话框
-            confirmBatchDelete() {
-                if (this.selectedAssets.length === 0) {
-                    alert('请至少选择一个资产');
-                    return;
+                try {
+                    const response = await fetch(`/admin/v2/api/assets/${assetId}/reject`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reason })
+                    });
+                    
+                    if (!response.ok) throw new Error('拒绝失败');
+                    
+                    alert('资产审核拒绝成功');
+                    await this.refreshData();
+                    this.closeAssetModal();
+                } catch (error) {
+                    console.error('拒绝失败:', error);
+                    alert('拒绝失败: ' + error.message);
                 }
-                
-                this.deleteMultiple = true;
-                this.showDeleteModal = true;
             },
             
             // 删除资产
-            deleteAsset() {
-                if (this.deleteMultiple) {
-                    // 批量删除
-                    axios.post('/admin/v2/api/assets/batch-delete', {
-                        asset_ids: this.selectedAssets
-                    })
-                    .then(response => {
-                        alert(`成功删除 ${this.selectedAssets.length} 个资产`);
-                        this.showDeleteModal = false;
-                        this.selectedAssets = [];
-                        this.refreshAssets();
-                    })
-                    .catch(error => {
-                        console.error('批量删除资产失败:', error);
-                        alert('删除失败，请重试：' + (error.response?.data?.message || error.message));
+            async deleteAsset(assetId) {
+                if (!confirm('确定要删除这个资产吗？此操作无法撤销。')) return;
+                
+                try {
+                    const response = await fetch(`/admin/v2/api/assets/${assetId}`, {
+                        method: 'DELETE'
                     });
-                } else {
-                    // 单个删除
-                    axios.delete(`/admin/v2/api/assets/${this.deleteId}`)
-                    .then(response => {
-                        alert('资产删除成功');
-                        this.showDeleteModal = false;
-                        this.refreshAssets();
-                    })
-                    .catch(error => {
-                        console.error('删除资产失败:', error);
-                        alert('删除失败，请重试：' + (error.response?.data?.message || error.message));
-                    });
+                    
+                    if (!response.ok) throw new Error('删除失败');
+                    
+                    alert('资产删除成功');
+                    await this.refreshData();
+                    this.closeAssetModal();
+                } catch (error) {
+                    console.error('删除失败:', error);
+                    alert('删除失败: ' + error.message);
                 }
             },
             
-            // 批准资产
-            approveAsset(assetId) {
-                axios.post(`/admin/v2/api/assets/${assetId}/approve`)
-                .then(response => {
-                    alert('资产已成功批准');
+            // 批量审核通过
+            async batchApprove() {
+                if (this.selectedAssets.length === 0) return;
+                if (!confirm(`确定要通过 ${this.selectedAssets.length} 个资产的审核吗？`)) return;
+                
+                try {
+                    const response = await fetch('/admin/v2/api/assets/batch-approve', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ asset_ids: this.selectedAssets })
+                    });
                     
-                    // 如果详情模态框打开，需要更新选中的资产
-                    if (this.showAssetDetailsModal && this.selectedAsset && this.selectedAsset.id === assetId) {
-                        this.selectedAsset.status = 'approved';
-                    }
+                    if (!response.ok) throw new Error('批量审核失败');
                     
-                    this.refreshAssets();
-                })
-                .catch(error => {
-                    console.error('批准资产失败:', error);
-                    alert('操作失败，请重试：' + (error.response?.data?.message || error.message));
+                    alert('批量审核通过成功');
+                    await this.refreshData();
+                } catch (error) {
+                    console.error('批量审核失败:', error);
+                    alert('批量审核失败: ' + error.message);
+                }
+            },
+            
+            // 批量审核拒绝
+            async batchReject() {
+                if (this.selectedAssets.length === 0) return;
+                const reason = prompt('请输入拒绝理由:');
+                if (!reason) return;
+                
+                try {
+                    const response = await fetch('/admin/v2/api/assets/batch-reject', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            asset_ids: this.selectedAssets,
+                            reason: reason
+                        })
+                    });
+                    
+                    if (!response.ok) throw new Error('批量拒绝失败');
+                    
+                    alert('批量拒绝成功');
+                    await this.refreshData();
+                } catch (error) {
+                    console.error('批量拒绝失败:', error);
+                    alert('批量拒绝失败: ' + error.message);
+                }
+            },
+            
+            // 批量删除
+            async batchDelete() {
+                if (this.selectedAssets.length === 0) return;
+                if (!confirm(`确定要删除 ${this.selectedAssets.length} 个资产吗？此操作无法撤销。`)) return;
+                
+                try {
+                    const response = await fetch('/admin/v2/api/assets/batch-delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ asset_ids: this.selectedAssets })
+                    });
+                    
+                    if (!response.ok) throw new Error('批量删除失败');
+                    
+                    const result = await response.json();
+                    alert(result.message);
+                    await this.refreshData();
+                } catch (error) {
+                    console.error('批量删除失败:', error);
+                    alert('批量删除失败: ' + error.message);
+                }
+            },
+            
+            // 导出资产数据
+            async exportAssets() {
+                try {
+                    const response = await fetch('/admin/v2/api/assets/export');
+                    if (!response.ok) throw new Error('导出失败');
+                    
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `assets_${new Date().getTime()}.csv`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } catch (error) {
+                    console.error('导出失败:', error);
+                    alert('导出失败: ' + error.message);
+                }
+            },
+            
+            // 工具函数
+            formatCurrency(value) {
+                return '$' + parseFloat(value || 0).toLocaleString();
+            },
+            
+            formatDate(dateString) {
+                if (!dateString) return '-';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('zh-CN') + ' ' + date.toLocaleTimeString('zh-CN', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
                 });
             },
             
-            // 批量批准资产
-            batchApprove() {
-                if (this.selectedAssets.length === 0) {
-                    alert('请至少选择一个资产');
-                    return;
-                }
-                
-                axios.post('/admin/v2/api/assets/batch-approve', {
-                    asset_ids: this.selectedAssets
-                })
-                .then(response => {
-                    alert(`成功批准 ${this.selectedAssets.length} 个资产`);
-                    this.selectedAssets = [];
-                    this.refreshAssets();
-                })
-                .catch(error => {
-                    console.error('批量批准资产失败:', error);
-                    alert('操作失败，请重试：' + (error.response?.data?.message || error.message));
-                });
+            formatAddress(address) {
+                if (!address) return '-';
+                return address.slice(0, 6) + '...' + address.slice(-4);
             },
             
-            // 显示拒绝资产对话框
-            rejectAsset(assetId) {
-                this.rejectId = assetId;
-                this.rejectReason = '';
-                this.showRejectModal = true;
+            getTypeClass(type) {
+                const classes = {
+                    10: 'bg-blue-100 text-blue-800',
+                    20: 'bg-green-100 text-green-800',
+                    30: 'bg-yellow-100 text-yellow-800',
+                    40: 'bg-purple-100 text-purple-800',
+                    50: 'bg-red-100 text-red-800',
+                    60: 'bg-indigo-100 text-indigo-800',
+                    70: 'bg-pink-100 text-pink-800'
+                };
+                return classes[type] || 'bg-gray-100 text-gray-800';
             },
             
-            // 确认批量拒绝对话框
-            confirmBatchReject() {
-                if (this.selectedAssets.length === 0) {
-                    alert('请至少选择一个资产');
-                    return;
-                }
-                
-                this.rejectReason = '';
-                this.rejectId = null;
-                this.showRejectModal = true;
-            },
-            
-            // 确认拒绝资产
-            rejectAssetConfirm() {
-                if (!this.rejectReason.trim()) {
-                    alert('请输入拒绝理由');
-                    return;
-                }
-                
-                if (this.rejectId) {
-                    // 单个拒绝
-                    axios.post(`/admin/v2/api/assets/${this.rejectId}/reject`, {
-                        reason: this.rejectReason
-                    })
-                    .then(response => {
-                        alert('资产已被拒绝');
-                        
-                        // 如果详情模态框打开，需要更新选中的资产
-                        if (this.showAssetDetailsModal && this.selectedAsset && this.selectedAsset.id === this.rejectId) {
-                            this.selectedAsset.status = 'rejected';
-                        }
-                        
-                        this.showRejectModal = false;
-                        this.refreshAssets();
-                    })
-                    .catch(error => {
-                        console.error('拒绝资产失败:', error);
-                        alert('操作失败，请重试：' + (error.response?.data?.message || error.message));
-                    });
-                } else {
-                    // 批量拒绝
-                    axios.post('/admin/v2/api/assets/batch-reject', {
-                        asset_ids: this.selectedAssets,
-                        reason: this.rejectReason
-                    })
-                    .then(response => {
-                        alert(`成功拒绝 ${this.selectedAssets.length} 个资产`);
-                        this.showRejectModal = false;
-                        this.selectedAssets = [];
-                        this.refreshAssets();
-                    })
-                    .catch(error => {
-                        console.error('批量拒绝资产失败:', error);
-                        alert('操作失败，请重试：' + (error.response?.data?.message || error.message));
-                    });
-                }
+            getStatusClass(status) {
+                const classes = {
+                    1: 'bg-yellow-100 text-yellow-800',  // 待审核
+                    2: 'bg-green-100 text-green-800',    // 已通过
+                    3: 'bg-red-100 text-red-800'         // 已拒绝
+                };
+                return classes[status] || 'bg-gray-100 text-gray-800';
             }
         }
-    });
+    }
 </script>
 {% endblock %} 
