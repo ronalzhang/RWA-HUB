@@ -500,6 +500,97 @@ def get_trade_history():
             'error': f"获取交易历史失败: {str(e)}"
         }), 500
 
+@api_bp.route('/v2/trades/<string:asset_identifier>', methods=['GET'])
+def get_trade_history_v2(asset_identifier):
+    """获取资产交易历史 - V2版本，支持RESTful风格URL"""
+    try:
+        # 获取查询参数
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 5, type=int)
+        
+        # 处理资产标识符，支持数字ID或RH-XXXXX格式
+        from app.models.asset import Asset
+        asset = None
+        
+        # 如果是数字，直接按ID查询
+        if asset_identifier.isdigit():
+            asset = Asset.query.get(int(asset_identifier))
+        # 如果是RH-格式，按token_symbol查询
+        elif asset_identifier.startswith('RH-'):
+            asset = Asset.query.filter_by(token_symbol=asset_identifier).first()
+        # 其他情况尝试提取数字ID
+        else:
+            import re
+            match = re.search(r'(\d+)', asset_identifier)
+            if match:
+                numeric_id = int(match.group(1))
+                asset = Asset.query.get(numeric_id)
+        
+        if not asset:
+            current_app.logger.warning(f"V2 API: 找不到资产 {asset_identifier}")
+            return jsonify({
+                'success': False,
+                'error': f'找不到资产: {asset_identifier}'
+            }), 404
+
+        # 限制每页数量，避免过大查询
+        if per_page > 100:
+            per_page = 100
+            
+        # 查询交易记录
+        from app.models.trade import Trade, TradeStatus
+        
+        # 筛选条件：指定资产ID和已完成状态
+        trades_query = Trade.query.filter_by(
+            asset_id=asset.id
+        ).order_by(Trade.created_at.desc())
+        
+        # 计算总记录数和总页数
+        total_count = trades_query.count()
+        total_pages = (total_count + per_page - 1) // per_page if total_count > 0 else 1
+        
+        # 分页
+        trades = trades_query.offset((page - 1) * per_page).limit(per_page).all()
+        
+        # 格式化交易记录
+        trade_list = []
+        for trade in trades:
+            trade_list.append({
+                'id': trade.id,
+                'created_at': trade.created_at.isoformat(),
+                'trader_address': trade.trader_address,
+                'type': trade.type,
+                'amount': trade.amount,
+                'price': float(trade.price) if trade.price else 0,
+                'total': float(trade.total) if trade.total else None,
+                'status': trade.status,
+                'tx_hash': trade.tx_hash
+            })
+            
+        # 构建分页信息
+        pagination = {
+            'total': total_count,
+            'pages': total_pages,
+            'page': page,
+            'per_page': per_page
+        }
+            
+        current_app.logger.info(f"V2 API: 成功获取资产 {asset_identifier} 的交易历史，共 {len(trade_list)} 条")
+        
+        # 返回结果
+        return jsonify({
+            'success': True,
+            'trades': trade_list,
+            'pagination': pagination
+        }), 200
+            
+    except Exception as e:
+        current_app.logger.error(f"V2 API: 获取交易历史失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"API服务暂时不可用，请稍后重试"
+        }), 500
+
 @api_bp.route('/assets/symbol/<string:symbol>', methods=['GET'])
 def get_asset_by_symbol(symbol):
     """通过代币符号获取资产详情"""
