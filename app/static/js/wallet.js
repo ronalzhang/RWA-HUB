@@ -1021,6 +1021,12 @@ const walletState = {
      */
     updateAdminDisplay() {
         try {
+            // 只有在用户明确需要管理员功能时才进行检查
+            const needsAdminCheck = this.shouldCheckAdminStatus();
+            if (!needsAdminCheck) {
+                return; // 跳过不必要的管理员检查
+            }
+            
             console.log('更新管理员入口显示状态，当前状态:', this.isAdmin);
             const adminEntry = document.getElementById('adminEntry');
             if (adminEntry) {
@@ -1033,9 +1039,9 @@ const walletState = {
                 }
             }
             
-            // 检查是否在资产详情页，如果是则更新分红入口
+            // 检查是否在资产详情页，如果是则更新分红入口（仅管理员）
             const isDetailPage = document.querySelector('.asset-detail-page') !== null;
-            if (isDetailPage) {
+            if (isDetailPage && this.isAdmin) {
                 if (typeof window.checkDividendManagementAccess === 'function') {
                     console.log('检测到资产详情页，更新分红入口状态');
                     window.checkDividendManagementAccess();
@@ -1047,6 +1053,36 @@ const walletState = {
         } catch (error) {
             console.error('更新管理员显示状态失败:', error);
         }
+    },
+    
+    /**
+     * 判断是否需要检查管理员状态
+     * 减少不必要的管理员权限检查
+     */
+    shouldCheckAdminStatus() {
+        // 1. 如果页面中有管理员入口元素，则需要检查
+        if (document.getElementById('adminEntry')) {
+            return true;
+        }
+        
+        // 2. 如果在管理员页面，则需要检查
+        if (window.location.pathname.includes('/admin')) {
+            return true;
+        }
+        
+        // 3. 如果页面有分红管理相关元素，则需要检查
+        if (document.querySelector('[id*="dividend"], [class*="dividend"]')) {
+            return true;
+        }
+        
+        // 4. 如果用户明确点击了管理相关按钮，则需要检查
+        if (window._userRequestedAdminCheck) {
+            window._userRequestedAdminCheck = false; // 重置标志
+            return true;
+        }
+        
+        // 其他情况不需要检查管理员状态
+        return false;
     },
     
     /**
@@ -1156,13 +1192,24 @@ const walletState = {
      */
     async getWalletBalance() {
         try {
+            // 如果钱包未连接，直接返回0
+            if (!this.connected || !this.address) {
+                console.log('钱包未连接，余额为0');
+                this.balance = 0;
+                return 0;
+            }
+            
             // 直接从区块链获取USDC余额，跳过API调用
             // 根据钱包类型选择不同的余额查询方式
             if (this.walletType === 'phantom' && window.solana && window.solana.isConnected) {
-                await this.ensureSolanaLibraries();
+                // 优化：使用更短的超时时间和更可靠的库加载检查
+                await this.ensureSolanaLibrariesOptimized();
+                
                 // 使用主网RPC节点
-                // 直接使用RPC URL而不是clusterApiUrl函数
-const connection = new window.solanaWeb3.Connection('https://api.mainnet-beta.solana.com');
+                const connection = new window.solanaWeb3.Connection('https://api.mainnet-beta.solana.com', {
+                    commitment: 'confirmed',
+                    confirmTransactionInitialTimeout: 10000
+                });
                 const publicKey = new window.solanaWeb3.PublicKey(this.address);
                 
                 // 使用Solana上的USDC合约地址
@@ -1174,7 +1221,7 @@ const connection = new window.solanaWeb3.Connection('https://api.mainnet-beta.so
                     
                     if (tokenAccounts.value.length > 0) {
                         const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
-                        this.balance = parseFloat(balance);
+                        this.balance = parseFloat(balance) || 0;
                         console.log(`直接从Solana区块链获取到钱包USDC余额: ${this.balance}`);
                         return this.balance;
                     } else {
@@ -1185,20 +1232,33 @@ const connection = new window.solanaWeb3.Connection('https://api.mainnet-beta.so
                 } catch (solanaError) {
                     console.error('直接查询Solana USDC余额出错:', solanaError);
                     
-                    // 作为备选方案，尝试API获取
+                    // 作为备选方案，尝试API获取（减少超时时间）
                     console.log('尝试通过API获取USDC余额');
-                    const response = await fetch(`/api/service/wallet/token_balance?address=${this.address}&token=USDC`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.success && data.balance) {
-                            this.balance = parseFloat(data.balance);
-                            console.log(`通过API获取到钱包余额: ${this.balance} USDC`);
-                            return this.balance;
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+                    
+                    try {
+                        const response = await fetch(`/api/service/wallet/token_balance?address=${this.address}&token=USDC`, {
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.success && data.balance !== undefined) {
+                                this.balance = parseFloat(data.balance) || 0;
+                                console.log(`通过API获取到钱包余额: ${this.balance} USDC`);
+                                return this.balance;
+                            }
                         }
+                    } catch (apiError) {
+                        clearTimeout(timeoutId);
+                        console.error('API获取USDC余额失败:', apiError);
                     }
                     
-                    // 如果备选方案也失败，返回0而不是cached值
+                    // 如果所有方法都失败，返回0
                     console.warn('无法获取USDC余额，默认为0');
+                    this.balance = 0;
                     return 0;
                 }
             } else if (this.walletType === 'metamask' && window.ethereum) {
@@ -1212,18 +1272,48 @@ const connection = new window.solanaWeb3.Connection('https://api.mainnet-beta.so
                 const usdcContract = new window.ethers.Contract(usdcAddress, usdcAbi, ethProvider);
                 const decimals = await usdcContract.decimals();
                 const balance = await usdcContract.balanceOf(this.address);
-                this.balance = parseFloat(window.ethers.utils.formatUnits(balance, decimals));
+                this.balance = parseFloat(window.ethers.utils.formatUnits(balance, decimals)) || 0;
                 console.log(`直接从以太坊区块链获取到钱包余额: ${this.balance} USDC`);
                 return this.balance;
             }
             
             console.warn('不支持的钱包类型或钱包未连接，无法获取USDC余额');
+            this.balance = 0;
             return 0;
         } catch (error) {
             console.error('获取钱包USDC余额失败:', error);
             // 返回0而非缓存的值，避免显示过期数据
+            this.balance = 0;
             return 0;
         }
+    },
+    
+    /**
+     * 优化的Solana库加载检查
+     * 减少超时时间，改进错误处理
+     */
+    async ensureSolanaLibrariesOptimized() {
+        // 如果库已经加载，直接返回
+        if (window.solanaWeb3 && window.spl_token) {
+            return true;
+        }
+        
+        // 减少超时时间到5秒
+        const maxWaitTime = 5000;
+        const checkInterval = 200;
+        let elapsedTime = 0;
+        
+        while (elapsedTime < maxWaitTime) {
+            if (window.solanaWeb3 && window.spl_token) {
+                console.log('Solana库已成功加载');
+                return true;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, checkInterval));
+            elapsedTime += checkInterval;
+        }
+        
+        throw new Error('Solana库加载超时（5秒）- 请检查网络连接或刷新页面');
     },
     
     /**
