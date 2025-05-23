@@ -1428,8 +1428,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     updateBuyButtonState();
                 });
                 
-                // 添加购买按钮点击事件
-                if (buyButton) {
+                // 添加购买按钮点击事件 - 注释掉，使用页面底部的统一绑定
+                /* if (buyButton) {
                     // 先移除可能存在的旧事件监听
                     const newBuyButton = buyButton.cloneNode(true);
                     if (buyButton.parentNode) {
@@ -1439,7 +1439,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 在新按钮上添加事件监听
                     newBuyButton.addEventListener('click', localHandleBuy);
                     console.log('购买按钮成功绑定点击事件');
-                }
+                } */
                 
                 // 设置输入金额改变时的处理
                 if (amountInput) {
@@ -3123,44 +3123,55 @@ document.addEventListener('DOMContentLoaded', function() {
             const observer = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
                     if (mutation.type === 'childList' || mutation.type === 'characterData') {
-                        const currentText = buyButton.innerHTML.trim();
+                        const currentHTML = buyButton.innerHTML.trim();
                         const textContent = buyButton.textContent.trim();
                         
-                        // 定义合法的按钮状态
+                        // 定义合法的按钮状态文本
                         const validStates = [
                             'Buy',
-                            '请先连接钱包',
-                            '处理中',
                             '购买',
+                            'Connect Wallet',
+                            '请先连接钱包',
                             '连接钱包',
+                            'Processing...',
+                            '处理中',
+                            '处理中...',
+                            'Loading...',
+                            '加载中',
+                            '加载中...',
                             '准备中...',
                             '连接中...',
-                            '加载中...',
-                            'Connect Wallet',
-                            'Processing...',
-                            'Loading...'
+                            'Confirming...',
+                            '确认中...',
+                            'Please wait...',
+                            '请稍候...'
                         ];
                         
+                        // 检查是否是价格数字（这是错误的）
+                        const isPricePattern = /^\$?\d+(\.\d{2})?$/.test(textContent);
+                        
                         // 检查是否包含合法状态文本
-                        const isValidState = validStates.some(state => 
-                            currentText.includes(state) || textContent.includes(state)
+                        const hasValidState = validStates.some(state => 
+                            textContent.includes(state) || currentHTML.includes(state)
                         );
                         
-                        // 检查是否只是纯数字（这通常是错误的）
-                        const isPureNumber = /^\$?\d+(\.\d+)?$/.test(textContent);
+                        // 检查是否包含图标（正常按钮应该有图标）
+                        const hasIcon = currentHTML.includes('fas fa-') || currentHTML.includes('<i ');
                         
-                        // 只有在确实是错误状态时才恢复
-                        if (isPureNumber || (!isValidState && textContent.length > 0 && !currentText.includes('fas fa-'))) {
-                            if (DEBUG_MODE) {
-                                console.warn('检测到购买按钮文本被意外修改为:', currentText, '正在恢复...');
-                            }
+                        // 只有在明确是价格数字时才恢复按钮文本
+                        if (isPricePattern && !hasValidState) {
+                            console.warn('检测到购买按钮文本被修改为价格:', textContent, '正在恢复...');
+                            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
+                        } else if (!hasValidState && !hasIcon && textContent.length > 0 && textContent !== 'Buy') {
+                            // 如果既没有合法状态文本，也没有图标，但有内容，可能是被错误修改了
+                            console.warn('检测到购买按钮可能被错误修改:', textContent, '正在恢复...');
                             buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
                         }
                     }
                 });
             });
             
-            // 开始观察按钮文本变化 - 减少观察频率
+            // 开始观察按钮文本变化
             observer.observe(buyButton, {
                 childList: true,
                 subtree: true,
