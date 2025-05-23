@@ -1299,9 +1299,9 @@ const walletState = {
         
         console.log('[ensureSolanaLibrariesOptimized] 开始检查和加载Solana库');
         
-        // 延长超时时间到15秒，并使用更智能的检查
-        const maxWaitTime = 15000; // 15秒超时
-        const checkInterval = 300;
+        // 缩短超时时间到10秒，并使用更智能的检查
+        const maxWaitTime = 10000; // 10秒超时
+        const checkInterval = 200; // 减少检查间隔到200ms
         let elapsedTime = 0;
         
         // 尝试多种方法获取库
@@ -1346,11 +1346,11 @@ const walletState = {
                     return true;
                 }
                 
-                // 如果只有Web3但没有SPL Token，尝试创建基本接口
-                if (!window.spl_token) {
+                // 如果只有Web3但没有SPL Token，创建基本接口
+                if (!window.spl_token || !window.spl_token.getAssociatedTokenAddress) {
                     console.log('[ensureSolanaLibrariesOptimized] 创建基本SPL Token接口');
-                    this.createBasicSplTokenInterface();
-                    if (window.spl_token && window.spl_token.getAssociatedTokenAddress) {
+                    if (this.createBasicSplTokenInterface()) {
+                        console.log('[ensureSolanaLibrariesOptimized] 基本SPL Token接口创建成功');
                         return true;
                     }
                 }
@@ -1359,14 +1359,19 @@ const walletState = {
             await new Promise(resolve => setTimeout(resolve, checkInterval));
             elapsedTime += checkInterval;
             
-            // 每3秒重新尝试加载
-            if (elapsedTime % 3000 === 0) {
+            // 每2秒重新尝试加载
+            if (elapsedTime % 2000 === 0) {
                 tryLoadLibraries();
             }
         }
         
         // 超时后尝试创建最小接口
-        console.warn('[ensureSolanaLibrariesOptimized] 库加载超时，尝试创建最小接口');
+        console.warn('[ensureSolanaLibrariesOptimized] 库加载超时，尝试创建基本接口');
+        if (window.solanaWeb3 && window.solanaWeb3.Connection) {
+            return this.createBasicSplTokenInterface();
+        }
+        
+        // 最后的回退方案
         return this.createMinimalSolanaInterface();
     },
     
@@ -1433,6 +1438,7 @@ const walletState = {
                     return address;
                 },
                 
+                // 简化的创建ATA指令函数 - 现在主要用于兼容性
                 createAssociatedTokenAccountInstruction: function(payer, associatedToken, owner, mint, programId = this.TOKEN_PROGRAM_ID, associatedTokenProgramId = this.ASSOCIATED_TOKEN_PROGRAM_ID) {
                     const keys = [
                         { pubkey: payer, isSigner: true, isWritable: true },
@@ -1453,7 +1459,10 @@ const walletState = {
                     });
                 },
                 
+                // 简化的转账指令函数 - 现在主要用于兼容性，实际使用手动构建的版本
                 createTransferInstruction: function(source, destination, owner, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
+                    console.warn('[createTransferInstruction] 使用兼容性函数，建议使用手动构建的指令');
+                    
                     const keys = [
                         { pubkey: source, isSigner: false, isWritable: true },
                         { pubkey: destination, isSigner: false, isWritable: true },
@@ -1464,21 +1473,21 @@ const walletState = {
                         keys.push({ pubkey: signer, isSigner: true, isWritable: false });
                     });
                     
-                    // 使用Uint8Array替代Buffer，实现浏览器兼容
+                    // 构建指令数据
                     const data = new Uint8Array(9);
-                    data[0] = 3; // Transfer instruction code
+                    data[0] = 3; // Transfer instruction discriminator
                     
-                    // 手动实现Little Endian的64位整数编码
-                    const amountBigInt = BigInt(amount);
-                    const amountBuffer = new Uint8Array(8);
+                    // 将金额编码为Little Endian 64位整数
+                    const amountValue = Number(amount); // 确保是数字类型
+                    const amountBytes = new Uint8Array(8);
+                    let tempAmount = amountValue;
                     
-                    // 将BigInt转换为Little Endian字节数组
                     for (let i = 0; i < 8; i++) {
-                        amountBuffer[i] = Number((amountBigInt >> BigInt(i * 8)) & 0xFFn);
+                        amountBytes[i] = tempAmount & 0xff;
+                        tempAmount = Math.floor(tempAmount / 256);
                     }
                     
-                    // 复制amount数据到指令数据中
-                    data.set(amountBuffer, 1);
+                    data.set(amountBytes, 1);
                     
                     return new window.solanaWeb3.TransactionInstruction({
                         keys,
@@ -3018,6 +3027,11 @@ checkIfReturningFromWalletApp(walletType) {
                 associatedTokenProgramId
             );
             
+            console.log('计算得到的ATA地址:', {
+                fromATA: fromTokenAccount.toString(),
+                toATA: toTokenAccount.toString()
+            });
+
             // 7. 获取最新区块哈希
             console.log('获取区块哈希...');
             const latestBlockhashResponse = await fetch('/api/solana/get_latest_blockhash');
@@ -3052,17 +3066,23 @@ checkIfReturningFromWalletApp(walletType) {
                 console.log('接收方代币账户不存在，添加创建指令');
                 
                 try {
-                    // 修复：使用正确的参数顺序创建关联代币账户指令
-                    const createAtaInstruction = window.spl_token.createAssociatedTokenAccountInstruction(
-                        fromPubkey,                // payer (支付账户创建费用的账户)
-                        toTokenAccount,            // associatedToken (要创建的关联代币账户地址)
-                        toPubkey,                  // owner (代币账户的所有者)
-                        usdcMint,                  // mint (代币mint地址)
-                        tokenProgramId,            // tokenProgram (代币程序ID)
-                        associatedTokenProgramId   // associatedTokenProgram (关联代币程序ID)
-                    );
+                    // 修正：使用正确的参数顺序创建关联代币账户指令
+                    const createAtaInstruction = new window.solanaWeb3.TransactionInstruction({
+                        keys: [
+                            { pubkey: fromPubkey, isSigner: true, isWritable: true },                    // payer
+                            { pubkey: toTokenAccount, isSigner: false, isWritable: true },              // associatedToken
+                            { pubkey: toPubkey, isSigner: false, isWritable: false },                  // owner
+                            { pubkey: usdcMint, isSigner: false, isWritable: false },                  // mint
+                            { pubkey: window.solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }, // systemProgram
+                            { pubkey: tokenProgramId, isSigner: false, isWritable: false },            // tokenProgram
+                            { pubkey: window.solanaWeb3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },     // rent
+                        ],
+                        programId: associatedTokenProgramId,
+                        data: new Uint8Array(0), // 创建ATA指令不需要额外数据
+                    });
                     
                     transaction.add(createAtaInstruction);
+                    console.log('成功添加创建ATA指令');
                 } catch (ataError) {
                     console.error('创建ATA指令错误:', ataError);
                     throw new Error(`创建接收方账户失败: ${ataError.message}`);
@@ -3070,22 +3090,40 @@ checkIfReturningFromWalletApp(walletType) {
             }
             
             // 10. 准备转账金额（USDC有6位小数）
-            const lamportsAmount = Math.round(amount * 1000000); // 转换为USDC的最小单位
+            const amountInSmallestUnit = Math.round(amount * 1000000); // 转换为USDC的最小单位
+            console.log('转账金额信息:', {
+                原始金额: amount,
+                最小单位金额: amountInSmallestUnit
+            });
             
-            // 11. 添加转账指令
+            // 11. 添加转账指令 - 使用修复的实现
             console.log('添加转账指令...');
             try {
-                // 修复：使用正确的数据类型，避免BigInt兼容性问题
-                const transferInstruction = window.spl_token.createTransferInstruction(
-                    fromTokenAccount,           // 源代币账户
-                    toTokenAccount,             // 目标代币账户  
-                    fromPubkey,                 // 源代币账户的所有者（必须是签名者）
-                    lamportsAmount,             // 金额，使用Number类型而不是BigInt
-                    [],                         // 多重签名者（空数组表示没有）
-                    tokenProgramId              // 代币程序ID
-                );
+                // 修正：手动构建转账指令，确保数据格式正确
+                const transferInstructionData = new Uint8Array(9);
+                transferInstructionData[0] = 3; // Transfer instruction discriminator
+                
+                // 将金额编码为Little Endian 64位整数
+                const amountBytes = new Uint8Array(8);
+                let amountValue = amountInSmallestUnit;
+                for (let i = 0; i < 8; i++) {
+                    amountBytes[i] = amountValue & 0xff;
+                    amountValue = Math.floor(amountValue / 256);
+                }
+                transferInstructionData.set(amountBytes, 1);
+                
+                const transferInstruction = new window.solanaWeb3.TransactionInstruction({
+                    keys: [
+                        { pubkey: fromTokenAccount, isSigner: false, isWritable: true },  // source
+                        { pubkey: toTokenAccount, isSigner: false, isWritable: true },   // destination
+                        { pubkey: fromPubkey, isSigner: true, isWritable: false },       // owner (必须是签名者)
+                    ],
+                    programId: tokenProgramId,
+                    data: transferInstructionData,
+                });
                 
                 transaction.add(transferInstruction);
+                console.log('成功添加转账指令');
             } catch (instructionError) {
                 console.error('创建转账指令错误:', instructionError);
                 throw new Error(`创建转账指令失败: ${instructionError.message}`);
@@ -3119,7 +3157,6 @@ checkIfReturningFromWalletApp(walletType) {
             const transactionBuffer = signedTransaction.serialize();
             const transactionBase64 = this.arrayBufferToBase64(transactionBuffer);
             
-            // 添加详细的调试日志
             console.log('准备发送交易到服务器，交易数据长度:', transactionBase64.length);
             
             // 确保包含所有必要参数
@@ -3141,7 +3178,7 @@ checkIfReturningFromWalletApp(walletType) {
                     to_address: to,
                     amount: amount,
                     token: tokenSymbol,
-                    recent_blockhash: transaction.recentBlockhash // 包含使用的区块哈希
+                    recent_blockhash: transaction.recentBlockhash
                 })
             });
             
@@ -3149,15 +3186,12 @@ checkIfReturningFromWalletApp(walletType) {
                 const errorText = await submitResponse.text();
                 console.error('发送交易失败:', errorText);
                 
-                // 尝试解析错误信息
-                let errorObj;
                 try {
-                    errorObj = JSON.parse(errorText);
+                    const errorObj = JSON.parse(errorText);
+                    throw new Error(`发送交易失败: ${errorObj.error || errorText}`);
                 } catch (e) {
                     throw new Error(`发送交易失败: ${errorText}`);
                 }
-                
-                throw new Error(`发送交易失败: ${errorObj.error || errorText}`);
             }
             
             const submitResult = await submitResponse.json();
