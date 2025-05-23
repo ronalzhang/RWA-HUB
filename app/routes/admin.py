@@ -3460,3 +3460,50 @@ def is_valid_solana_address(address):
         return True
     except ValueError:
         return False
+
+@admin_bp.route('/v2/api/asset-type-stats', methods=['GET'])
+@api_admin_required
+def api_asset_type_stats_v2():
+    """获取V2版本资产类型分布统计"""
+    try:
+        # 查询资产类型分布
+        distribution = db.session.query(
+            Asset.asset_type,
+            func.count(Asset.id).label('count'),
+            func.sum(Asset.total_value).label('value')
+        ).filter(Asset.status != 0).group_by(Asset.asset_type).all()
+        
+        # 类型名称映射
+        asset_type_names = {
+            10: '不动产',
+            20: '类不动产',
+            30: '工业地产',
+            40: '土地资产',
+            50: '证券资产',
+            60: '艺术品',
+            70: '收藏品'
+        }
+        
+        labels = []
+        values = []
+        
+        for type_id, count, value in distribution:
+            labels.append(asset_type_names.get(type_id, f'类型{type_id}'))
+            values.append(count)
+            
+        # 如果没有数据，返回空数组
+        if not labels:
+            labels = ['暂无数据']
+            values = [0]
+            
+        return jsonify({
+            'labels': labels,
+            'values': values
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取V2版本资产类型分布统计失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'labels': ['暂无数据'],
+            'values': [0]
+        })
