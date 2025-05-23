@@ -2249,15 +2249,21 @@ def admin_auth_login():
             current_app.logger.warning(f"Admin login attempt for {wallet_address} failed: Address is not a registered admin.")
             return jsonify({'error': 'Access denied. Wallet address is not registered as an administrator.'}), 403
         
-        if not admin_user.is_active:
-            current_app.logger.warning(f"Admin login attempt for {wallet_address} failed: Admin account is inactive.")
-            return jsonify({'error': 'Access denied. Administrator account is inactive.'}), 403
+        # 修复：AdminUser模型没有is_active字段，删除此检查
+        # 假设所有数据库中的管理员用户都是活跃的
+        # if not admin_user.is_active:
+        #     current_app.logger.warning(f"Admin login attempt for {wallet_address} failed: Admin account is inactive.")
+        #     return jsonify({'error': 'Access denied. Administrator account is inactive.'}), 403
 
         # 登录成功
         session['admin_verified'] = True
         session['admin_wallet_address'] = wallet_address # 存储Solana地址
         session['admin_user_id'] = admin_user.id
         session['admin_role'] = admin_user.role
+        
+        # 更新最后登录时间
+        admin_user.last_login = datetime.utcnow()
+        db.session.commit()
         
         current_app.logger.info(f"Admin user {wallet_address} (ID: {admin_user.id}) logged in successfully.")
         return jsonify({
