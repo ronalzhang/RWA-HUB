@@ -13,8 +13,8 @@ from app.models import Asset, User, Trade, AssetType
 from app.extensions import db
 from app.blockchain.solana_service import execute_transfer_transaction
 
-# 创建蓝图
-api_bp = Blueprint('api', __name__)
+# 从__init__.py导入正确的API蓝图
+from . import api_bp
 
 # 日志记录器
 logger = logging.getLogger(__name__)
