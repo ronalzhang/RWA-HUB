@@ -65,10 +65,6 @@ def create_flask_app():
         # 注册蓝图和路由
         from app.routes import register_blueprints
         register_blueprints(app)
-        
-        # 注册管理员API v2蓝图
-        from app.routes.admin_api import register_admin_v2_blueprint
-        register_admin_v2_blueprint(app)
     
     return app
 
