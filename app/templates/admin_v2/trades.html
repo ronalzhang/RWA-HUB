@@ -1,0 +1,422 @@
+{% extends "admin_v2/base.html" %}
+
+{% block title %}RWA-HUB 管理后台 - 交易管理{% endblock %}
+
+{% block page_title %}交易管理{% endblock %}
+{% block page_subtitle %}监控和管理平台上的所有交易{% endblock %}
+
+{% block breadcrumb %}
+<li aria-current="page">
+    <div class="flex items-center">
+        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+        <span class="text-gray-500">交易管理</span>
+    </div>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="tradesData()" x-init="loadTrades()">
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6" x-cloak>
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-green-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 mr-4">
+                    <i class="fas fa-chart-line text-green-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-500">总交易数</h3>
+                    <p class="text-2xl font-bold" x-text="stats.total_trades || 0"></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-blue-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 mr-4">
+                    <i class="fas fa-dollar-sign text-blue-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-500">交易总额</h3>
+                    <p class="text-2xl font-bold" x-text="formatCurrency(stats.total_volume || 0)"></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-yellow-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-yellow-100 mr-4">
+                    <i class="fas fa-clock text-yellow-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-500">待处理交易</h3>
+                    <p class="text-2xl font-bold" x-text="stats.pending_trades || 0"></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-purple-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100 mr-4">
+                    <i class="fas fa-percentage text-purple-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-500">成功率</h3>
+                    <p class="text-2xl font-bold" x-text="(stats.success_rate || 0) + '%'"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 交易列表 -->
+    <div class="bg-white rounded-lg shadow-sm">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-700">交易列表</h3>
+                <div class="flex space-x-2">
+                    <button @click="refreshTrades()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        <i class="fas fa-sync-alt mr-2"></i>刷新
+                    </button>
+                    <button @click="exportTrades()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                        <i class="fas fa-download mr-2"></i>导出
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 筛选条件 -->
+        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">交易状态</label>
+                    <select x-model="filters.status" @change="loadTrades()" class="w-full border-gray-300 rounded-md shadow-sm">
+                        <option value="">全部状态</option>
+                        <option value="pending">待处理</option>
+                        <option value="completed">已完成</option>
+                        <option value="failed">失败</option>
+                        <option value="cancelled">已取消</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">交易类型</label>
+                    <select x-model="filters.type" @change="loadTrades()" class="w-full border-gray-300 rounded-md shadow-sm">
+                        <option value="">全部类型</option>
+                        <option value="buy">购买</option>
+                        <option value="sell">出售</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">时间范围</label>
+                    <select x-model="filters.time_range" @change="loadTrades()" class="w-full border-gray-300 rounded-md shadow-sm">
+                        <option value="">全部时间</option>
+                        <option value="today">今天</option>
+                        <option value="week">本周</option>
+                        <option value="month">本月</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
+                    <input x-model="filters.search" @input.debounce.500ms="loadTrades()" 
+                           type="text" placeholder="搜索交易ID或地址..." 
+                           class="w-full border-gray-300 rounded-md shadow-sm">
+                </div>
+            </div>
+        </div>
+
+        <!-- 交易表格 -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">资产</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易者</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">数量</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">金额</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="loading">
+                        <tr>
+                            <td colspan="9" class="px-6 py-4 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>加载交易数据中...
+                            </td>
+                        </tr>
+                    </template>
+                    
+                    <template x-if="!loading && trades.length === 0">
+                        <tr>
+                            <td colspan="9" class="px-6 py-4 text-center text-gray-500">暂无交易数据</td>
+                        </tr>
+                    </template>
+                    
+                    <template x-for="trade in trades" :key="trade.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" x-text="trade.id"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900" x-text="trade.asset_name || '未知资产'"></div>
+                                <div class="text-sm text-gray-500" x-text="trade.asset_symbol || '-'"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span :class="{
+                                    'bg-green-100 text-green-800': trade.type === 'buy',
+                                    'bg-red-100 text-red-800': trade.type === 'sell'
+                                }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
+                                    <span x-text="trade.type === 'buy' ? '购买' : '出售'"></span>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="trade.trader_address ? trade.trader_address.slice(0, 8) + '...' + trade.trader_address.slice(-6) : '-'"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="trade.amount || 0"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900" x-text="formatCurrency(trade.total || 0)"></div>
+                                <div class="text-sm text-gray-500" x-text="'单价: ' + formatCurrency(trade.price || 0)"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span :class="{
+                                    'bg-yellow-100 text-yellow-800': trade.status === 'pending',
+                                    'bg-green-100 text-green-800': trade.status === 'completed',
+                                    'bg-red-100 text-red-800': trade.status === 'failed',
+                                    'bg-gray-100 text-gray-800': trade.status === 'cancelled'
+                                }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
+                                    <span x-text="getStatusText(trade.status)"></span>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDateTime(trade.created_at)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button @click="viewTrade(trade)" class="text-blue-600 hover:text-blue-900 mr-2">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button x-show="trade.status === 'pending'" @click="updateTradeStatus(trade, 'completed')" 
+                                        class="text-green-600 hover:text-green-900 mr-2">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button x-show="trade.status === 'pending'" @click="updateTradeStatus(trade, 'failed')" 
+                                        class="text-red-600 hover:text-red-900">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 分页 -->
+        <div class="px-6 py-4 border-t border-gray-200">
+            <div class="flex items-center justify-between">
+                <div class="text-sm text-gray-700">
+                    显示 <span x-text="(pagination.page - 1) * pagination.limit + 1"></span> 到 
+                    <span x-text="Math.min(pagination.page * pagination.limit, pagination.total)"></span> 条，
+                    共 <span x-text="pagination.total"></span> 条记录
+                </div>
+                <div class="flex space-x-2">
+                    <button @click="loadTrades(1)" :disabled="pagination.page === 1" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">首页</button>
+                    <button @click="loadTrades(pagination.page - 1)" :disabled="pagination.page === 1" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">上一页</button>
+                    <button @click="loadTrades(pagination.page + 1)" :disabled="pagination.page >= pagination.pages" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">下一页</button>
+                    <button @click="loadTrades(pagination.pages)" :disabled="pagination.page >= pagination.pages" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">末页</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 交易详情弹窗 -->
+    <div x-show="showTradeDetail" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+        <div class="bg-white rounded-lg max-w-2xl w-full m-4 max-h-screen overflow-y-auto">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-700">交易详情</h3>
+            </div>
+            <div class="px-6 py-4" x-show="selectedTrade">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">交易ID</label>
+                        <p class="text-sm text-gray-900" x-text="selectedTrade?.id"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">交易类型</label>
+                        <p class="text-sm text-gray-900" x-text="selectedTrade?.type === 'buy' ? '购买' : '出售'"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">资产名称</label>
+                        <p class="text-sm text-gray-900" x-text="selectedTrade?.asset_name || '未知资产'"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">交易者地址</label>
+                        <p class="text-sm text-gray-900" x-text="selectedTrade?.trader_address"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">交易数量</label>
+                        <p class="text-sm text-gray-900" x-text="selectedTrade?.amount"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">单价</label>
+                        <p class="text-sm text-gray-900" x-text="formatCurrency(selectedTrade?.price)"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">总金额</label>
+                        <p class="text-sm text-gray-900" x-text="formatCurrency(selectedTrade?.total)"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">交易状态</label>
+                        <p class="text-sm text-gray-900" x-text="getStatusText(selectedTrade?.status)"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">创建时间</label>
+                        <p class="text-sm text-gray-900" x-text="formatDateTime(selectedTrade?.created_at)"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">交易哈希</label>
+                        <p class="text-sm text-gray-900" x-text="selectedTrade?.tx_hash || '未知'"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-2">
+                <button @click="showTradeDetail = false" class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function tradesData() {
+        return {
+            trades: [],
+            stats: {},
+            loading: false,
+            showTradeDetail: false,
+            selectedTrade: null,
+            filters: {
+                status: '',
+                type: '',
+                time_range: '',
+                search: ''
+            },
+            pagination: {
+                page: 1,
+                limit: 10,
+                total: 0,
+                pages: 0
+            },
+            
+            async loadTrades(page = null) {
+                if (page) this.pagination.page = page;
+                this.loading = true;
+                
+                try {
+                    const params = new URLSearchParams({
+                        page: this.pagination.page,
+                        limit: this.pagination.limit,
+                        ...this.filters
+                    });
+                    
+                    const response = await fetch(`/admin/v2/api/trades?${params}`);
+                    if (!response.ok) throw new Error('加载交易数据失败');
+                    
+                    const data = await response.json();
+                    this.trades = data.items || [];
+                    this.pagination.total = data.total || 0;
+                    this.pagination.pages = data.pages || 0;
+                    
+                    // 加载统计数据
+                    await this.loadStats();
+                } catch (error) {
+                    console.error('加载交易数据失败:', error);
+                    alert('加载交易数据失败: ' + error.message);
+                } finally {
+                    this.loading = false;
+                }
+            },
+            
+            async loadStats() {
+                try {
+                    const response = await fetch('/admin/v2/api/trades/stats');
+                    if (response.ok) {
+                        this.stats = await response.json();
+                    }
+                } catch (error) {
+                    console.error('加载统计数据失败:', error);
+                }
+            },
+            
+            viewTrade(trade) {
+                this.selectedTrade = trade;
+                this.showTradeDetail = true;
+            },
+            
+            async updateTradeStatus(trade, status) {
+                if (!confirm(`确定要将交易状态更新为"${this.getStatusText(status)}"吗？`)) return;
+                
+                try {
+                    const response = await fetch(`/admin/v2/api/trades/${trade.id}/status`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status })
+                    });
+                    
+                    if (!response.ok) throw new Error('更新失败');
+                    
+                    trade.status = status;
+                    alert('状态更新成功');
+                    await this.loadStats();
+                } catch (error) {
+                    console.error('更新状态失败:', error);
+                    alert('更新状态失败: ' + error.message);
+                }
+            },
+            
+            async refreshTrades() {
+                await this.loadTrades();
+            },
+            
+            async exportTrades() {
+                try {
+                    const response = await fetch('/admin/v2/api/trades/export');
+                    if (!response.ok) throw new Error('导出失败');
+                    
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `trades_${new Date().getTime()}.csv`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } catch (error) {
+                    console.error('导出失败:', error);
+                    alert('导出失败: ' + error.message);
+                }
+            },
+            
+            formatCurrency(value) {
+                return parseFloat(value || 0).toFixed(2);
+            },
+            
+            formatDateTime(dateString) {
+                if (!dateString) return '-';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('zh-CN') + ' ' + 
+                       date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            },
+            
+            getStatusText(status) {
+                const statusMap = {
+                    'pending': '待处理',
+                    'completed': '已完成',
+                    'failed': '失败',
+                    'cancelled': '已取消'
+                };
+                return statusMap[status] || '未知';
+            }
+        }
+    }
+</script>
+{% endblock %} 

@@ -1,6 +1,6 @@
 from flask import (
     Blueprint, render_template, request, redirect, url_for, 
-    flash, session, jsonify, current_app, g, after_this_request, make_response, send_file, send_from_directory, abort
+    flash, session, jsonify, current_app, g, after_this_request, make_response, send_file, send_from_directory, abort, Response
 )
 from flask_login import current_user, login_user, logout_user, login_required
 from functools import wraps
@@ -3491,3 +3491,192 @@ def api_asset_type_stats_v2():
             'labels': ['暂无数据'],
             'values': [0]
         })
+
+@admin_bp.route('/v2/api/trades', methods=['GET'])
+@api_admin_required
+def api_trades_v2():
+    """交易管理V2版本API"""
+    try:
+        # 分页参数
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        
+        # 筛选参数
+        status = request.args.get('status')
+        trade_type = request.args.get('type')
+        time_range = request.args.get('time_range')
+        search = request.args.get('search')
+        
+        # 构建查询
+        query = Trade.query
+        
+        # 应用筛选条件
+        if status:
+            query = query.filter(Trade.status == status)
+        if trade_type:
+            query = query.filter(Trade.type == trade_type)
+        if search:
+            query = query.filter(
+                or_(
+                    Trade.id.like(f'%{search}%'),
+                    Trade.trader_address.ilike(f'%{search}%')
+                )
+            )
+        
+        # 时间范围筛选
+        if time_range:
+            now = datetime.utcnow()
+            if time_range == 'today':
+                start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                query = query.filter(Trade.created_at >= start_date)
+            elif time_range == 'week':
+                start_date = now - timedelta(days=7)
+                query = query.filter(Trade.created_at >= start_date)
+            elif time_range == 'month':
+                start_date = now - timedelta(days=30)
+                query = query.filter(Trade.created_at >= start_date)
+        
+        # 分页
+        pagination = query.order_by(Trade.created_at.desc()).paginate(
+            page=page, per_page=limit, error_out=False
+        )
+        
+        # 格式化数据
+        trades = []
+        for trade in pagination.items:
+            asset_name = trade.asset.name if trade.asset else '未知资产'
+            asset_symbol = trade.asset.token_symbol if trade.asset else '-'
+            
+            trades.append({
+                'id': trade.id,
+                'asset_name': asset_name,
+                'asset_symbol': asset_symbol,
+                'type': trade.type,
+                'trader_address': trade.trader_address,
+                'amount': trade.amount,
+                'price': float(trade.price) if trade.price else 0,
+                'total': float(trade.total) if trade.total else 0,
+                'status': trade.status,
+                'tx_hash': trade.tx_hash,
+                'created_at': trade.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            })
+        
+        return jsonify({
+            'items': trades,
+            'total': pagination.total,
+            'page': page,
+            'pages': pagination.pages,
+            'limit': limit
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取交易列表失败: {str(e)}', exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/v2/api/trades/stats', methods=['GET'])
+@api_admin_required
+def api_trades_stats_v2():
+    """交易统计V2版本API"""
+    try:
+        # 总交易数
+        total_trades = Trade.query.count()
+        
+        # 交易总额
+        total_volume = db.session.query(func.sum(Trade.total)).scalar() or 0
+        
+        # 待处理交易数
+        pending_trades = Trade.query.filter(Trade.status == 'pending').count()
+        
+        # 成功率计算
+        completed_trades = Trade.query.filter(Trade.status == 'completed').count()
+        success_rate = (completed_trades / total_trades * 100) if total_trades > 0 else 0
+        
+        return jsonify({
+            'total_trades': total_trades,
+            'total_volume': float(total_volume),
+            'pending_trades': pending_trades,
+            'success_rate': round(success_rate, 2)
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取交易统计失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'total_trades': 0,
+            'total_volume': 0,
+            'pending_trades': 0,
+            'success_rate': 0
+        })
+
+@admin_bp.route('/v2/api/trades/<int:trade_id>/status', methods=['PUT'])
+@api_admin_required
+def api_update_trade_status_v2(trade_id):
+    """更新交易状态V2版本API"""
+    try:
+        trade = Trade.query.get_or_404(trade_id)
+        data = request.get_json()
+        new_status = data.get('status')
+        
+        if new_status not in ['pending', 'completed', 'failed', 'cancelled']:
+            return jsonify({'error': '无效的状态值'}), 400
+        
+        trade.status = new_status
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '交易状态更新成功',
+            'trade': {
+                'id': trade.id,
+                'status': trade.status
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'更新交易状态失败: {str(e)}', exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/v2/api/trades/export', methods=['GET'])
+@api_admin_required
+def api_export_trades_v2():
+    """导出交易数据V2版本API"""
+    try:
+        trades = Trade.query.order_by(Trade.created_at.desc()).all()
+        
+        # 生成CSV数据
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 写入标题行
+        writer.writerow([
+            '交易ID', '资产名称', '交易类型', '交易者地址', 
+            '数量', '单价', '总金额', '状态', '创建时间'
+        ])
+        
+        # 写入数据行
+        for trade in trades:
+            asset_name = trade.asset.name if trade.asset else '未知资产'
+            writer.writerow([
+                trade.id,
+                asset_name,
+                '购买' if trade.type == 'buy' else '出售',
+                trade.trader_address,
+                trade.amount,
+                float(trade.price) if trade.price else 0,
+                float(trade.total) if trade.total else 0,
+                trade.status,
+                trade.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            ])
+        
+        output.seek(0)
+        
+        # 返回CSV文件
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': 'attachment; filename=trades.csv'}
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f'导出交易数据失败: {str(e)}', exc_info=True)
+        return jsonify({'error': str(e)}), 500
