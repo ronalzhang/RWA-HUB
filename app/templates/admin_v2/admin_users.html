@@ -1,0 +1,309 @@
+{% extends "admin_v2/base.html" %}
+
+{% block title %}RWA-HUB 管理后台 - 管理员用户{% endblock %}
+
+{% block page_title %}管理员用户{% endblock %}
+{% block page_subtitle %}管理平台管理员账户{% endblock %}
+
+{% block breadcrumb %}
+<li aria-current="page">
+    <div class="flex items-center">
+        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+        <span class="text-gray-500">管理员用户</span>
+    </div>
+</li>
+{% endblock %}
+
+{% block content %}
+<div x-data="adminUsersData()" x-init="loadAdminUsers()">
+    <!-- 管理员列表 -->
+    <div class="bg-white rounded-lg shadow-sm">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-700">管理员列表</h3>
+                <div class="flex space-x-2">
+                    <button @click="refreshAdminUsers()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        <i class="fas fa-sync-alt mr-2"></i>刷新
+                    </button>
+                    <button @click="showAddAdmin = true" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                        <i class="fas fa-plus mr-2"></i>添加管理员
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 管理员表格 -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">钱包地址</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">角色</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">等级</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="loading">
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>加载管理员数据中...
+                            </td>
+                        </tr>
+                    </template>
+                    
+                    <template x-if="!loading && adminUsers.length === 0">
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">暂无管理员数据</td>
+                        </tr>
+                    </template>
+                    
+                    <template x-for="admin in adminUsers" :key="admin.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" x-text="admin.id"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="admin.wallet_address ? admin.wallet_address.slice(0, 8) + '...' + admin.wallet_address.slice(-6) : '-'"></div>
+                                <div class="text-xs text-gray-500" x-text="admin.wallet_address"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="admin.role || '管理员'"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span :class="{
+                                    'bg-red-100 text-red-800': admin.admin_level === 'super',
+                                    'bg-blue-100 text-blue-800': admin.admin_level === 'admin',
+                                    'bg-green-100 text-green-800': admin.admin_level === 'moderator'
+                                }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
+                                    <span x-text="getLevelText(admin.admin_level)"></span>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDateTime(admin.created_at)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button @click="editAdmin(admin)" class="text-blue-600 hover:text-blue-900 mr-2">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button x-show="admin.id !== currentAdminId" @click="deleteAdmin(admin)" 
+                                        class="text-red-600 hover:text-red-900">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 添加管理员弹窗 -->
+    <div x-show="showAddAdmin" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+        <div class="bg-white rounded-lg max-w-md w-full m-4">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-700">添加管理员</h3>
+            </div>
+            <div class="px-6 py-4">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">钱包地址 *</label>
+                        <input x-model="newAdmin.wallet_address" type="text" 
+                               placeholder="输入Solana钱包地址" 
+                               class="w-full border-gray-300 rounded-md shadow-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">管理员等级 *</label>
+                        <select x-model="newAdmin.admin_level" class="w-full border-gray-300 rounded-md shadow-sm">
+                            <option value="">请选择等级</option>
+                            <option value="moderator">审核员</option>
+                            <option value="admin">管理员</option>
+                            <option value="super">超级管理员</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">角色描述</label>
+                        <input x-model="newAdmin.role" type="text" 
+                               placeholder="例如：系统管理员" 
+                               class="w-full border-gray-300 rounded-md shadow-sm">
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-2">
+                <button @click="showAddAdmin = false; resetNewAdmin()" 
+                        class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50">取消</button>
+                <button @click="saveAdmin()" :disabled="!newAdmin.wallet_address || !newAdmin.admin_level"
+                        class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑管理员弹窗 -->
+    <div x-show="showEditAdmin" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+        <div class="bg-white rounded-lg max-w-md w-full m-4">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-700">编辑管理员</h3>
+            </div>
+            <div class="px-6 py-4" x-show="editingAdmin">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">钱包地址</label>
+                        <input x-model="editingAdmin.wallet_address" type="text" readonly
+                               class="w-full border-gray-300 rounded-md shadow-sm bg-gray-100">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">管理员等级 *</label>
+                        <select x-model="editingAdmin.admin_level" class="w-full border-gray-300 rounded-md shadow-sm">
+                            <option value="moderator">审核员</option>
+                            <option value="admin">管理员</option>
+                            <option value="super">超级管理员</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">角色描述</label>
+                        <input x-model="editingAdmin.role" type="text" 
+                               placeholder="例如：系统管理员" 
+                               class="w-full border-gray-300 rounded-md shadow-sm">
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-2">
+                <button @click="showEditAdmin = false; editingAdmin = null" 
+                        class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50">取消</button>
+                <button @click="updateAdmin()" 
+                        class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">保存修改</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function adminUsersData() {
+        return {
+            adminUsers: [],
+            loading: false,
+            showAddAdmin: false,
+            showEditAdmin: false,
+            editingAdmin: null,
+            currentAdminId: null, // 当前登录的管理员ID，防止删除自己
+            newAdmin: {
+                wallet_address: '',
+                admin_level: '',
+                role: ''
+            },
+            
+            async loadAdminUsers() {
+                this.loading = true;
+                try {
+                    const response = await fetch('/api/admin/admins');
+                    if (!response.ok) throw new Error('加载管理员数据失败');
+                    
+                    this.adminUsers = await response.json();
+                } catch (error) {
+                    console.error('加载管理员数据失败:', error);
+                    alert('加载管理员数据失败: ' + error.message);
+                } finally {
+                    this.loading = false;
+                }
+            },
+            
+            editAdmin(admin) {
+                this.editingAdmin = { ...admin };
+                this.showEditAdmin = true;
+            },
+            
+            async saveAdmin() {
+                if (!this.newAdmin.wallet_address || !this.newAdmin.admin_level) {
+                    alert('请填写必填字段');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/admin_addresses', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.newAdmin)
+                    });
+                    
+                    if (!response.ok) throw new Error('添加管理员失败');
+                    
+                    alert('管理员添加成功');
+                    this.showAddAdmin = false;
+                    this.resetNewAdmin();
+                    await this.loadAdminUsers();
+                } catch (error) {
+                    console.error('添加管理员失败:', error);
+                    alert('添加管理员失败: ' + error.message);
+                }
+            },
+            
+            async updateAdmin() {
+                try {
+                    const response = await fetch(`/api/admin_addresses/${this.editingAdmin.wallet_address}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            admin_level: this.editingAdmin.admin_level,
+                            role: this.editingAdmin.role
+                        })
+                    });
+                    
+                    if (!response.ok) throw new Error('更新管理员失败');
+                    
+                    alert('管理员更新成功');
+                    this.showEditAdmin = false;
+                    this.editingAdmin = null;
+                    await this.loadAdminUsers();
+                } catch (error) {
+                    console.error('更新管理员失败:', error);
+                    alert('更新管理员失败: ' + error.message);
+                }
+            },
+            
+            async deleteAdmin(admin) {
+                if (!confirm(`确定要删除管理员 ${admin.wallet_address} 吗？此操作无法撤销。`)) return;
+                
+                try {
+                    const response = await fetch(`/api/admin_addresses/${admin.wallet_address}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (!response.ok) throw new Error('删除管理员失败');
+                    
+                    alert('管理员删除成功');
+                    await this.loadAdminUsers();
+                } catch (error) {
+                    console.error('删除管理员失败:', error);
+                    alert('删除管理员失败: ' + error.message);
+                }
+            },
+            
+            async refreshAdminUsers() {
+                await this.loadAdminUsers();
+            },
+            
+            resetNewAdmin() {
+                this.newAdmin = {
+                    wallet_address: '',
+                    admin_level: '',
+                    role: ''
+                };
+            },
+            
+            formatDateTime(dateString) {
+                if (!dateString) return '-';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('zh-CN') + ' ' + 
+                       date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            },
+            
+            getLevelText(level) {
+                const levelMap = {
+                    'super': '超级管理员',
+                    'admin': '管理员',
+                    'moderator': '审核员'
+                };
+                return levelMap[level] || '未知';
+            }
+        }
+    }
+</script>
+{% endblock %} 
