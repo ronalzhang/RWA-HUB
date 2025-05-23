@@ -2474,14 +2474,43 @@ async connectPhantom(isReconnect = false) {
             
             // 检查钱包是否被锁定
             try {
-                // 尝试获取钱包状态（不会触发连接请求）
-                const accounts = await window.solana.connect({ onlyIfTrusted: true }).catch(() => null);
-                if (accounts && accounts.publicKey) {
-                    console.log('Phantom钱包已授权过，可以直接连接');
+                console.log('检查Phantom钱包是否已授权...');
+                
+                // 创建一个带超时的Promise，避免卡住
+                const checkTrustedPromise = new Promise(async (resolve) => {
+                    try {
+                        const accounts = await window.solana.connect({ onlyIfTrusted: true });
+                        if (accounts && accounts.publicKey) {
+                            console.log('Phantom钱包已授权过，可以直接连接');
+                            resolve(true);
+                        } else {
+                            resolve(false);
+                        }
+                    } catch (error) {
+                        console.log('Phantom钱包需要用户授权:', error.message);
+                        resolve(false);
+                    }
+                });
+                
+                // 设置超时，如果1秒内没有响应就跳过
+                const timeoutPromise = new Promise(resolve => {
+                    setTimeout(() => {
+                        console.log('Phantom钱包授权检查超时，继续连接流程');
+                        resolve(false);
+                    }, 1000);
+                });
+                
+                // 竞争检查和超时
+                const isAlreadyAuthorized = await Promise.race([checkTrustedPromise, timeoutPromise]);
+                
+                if (isAlreadyAuthorized) {
+                    if (!isReconnect) {
+                        showSuccess('检测到已授权的Phantom钱包，正在连接...');
+                    }
                     return true;
                 }
             } catch (error) {
-                console.log('Phantom钱包需要用户授权:', error.message);
+                console.log('Phantom钱包授权检查出错，继续连接流程:', error.message);
             }
             
             // 给用户提示即将打开钱包
