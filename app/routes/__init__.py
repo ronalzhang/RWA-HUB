@@ -40,7 +40,7 @@ from .solana_api import solana_api as solana_api_bp
 from .admin_solana import admin_solana_bp
 
 # 导入管理员API兼容路由
-from .admin_api import admin_compat_routes_bp
+from .admin_api import admin_compat_routes_bp, admin_v2_bp, admin_compat_bp
 
 # 注册蓝图到app
 def register_blueprints(app):
@@ -69,8 +69,10 @@ def register_blueprints(app):
     # 注册Solana管理功能蓝图
     app.register_blueprint(admin_solana_bp)
     
-    # 注册管理员API兼容路由蓝图
-    app.register_blueprint(admin_compat_routes_bp)
+    # 注册管理员API v2和兼容路由蓝图
+    app.register_blueprint(admin_v2_bp)           # 添加：/api/admin/v2 路由
+    app.register_blueprint(admin_compat_bp)        # 添加：/api/admin 兼容路由
+    app.register_blueprint(admin_compat_routes_bp)  # 保留：/admin/v2/api 路由
     
     # 注册全局处理器
     register_global_handlers(app)
