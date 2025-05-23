@@ -2361,7 +2361,7 @@ def settings_v2():
     }
     for key in required_configs:
         try:
-            configs[key] = SystemConfig.get_value(key, default=default_values.get(key, ''))
+        configs[key] = SystemConfig.get_value(key, default=default_values.get(key, ''))
         except Exception as e:
             current_app.logger.error(f"获取系统设置失败: {str(e)}", exc_info=True)
             configs[key] = default_values.get(key, '')
@@ -2426,7 +2426,7 @@ def check_auth_v2():
             return jsonify({
                 'authenticated': True,
                 'wallet_address': wallet_address,
-                'admin_level': admin_user.admin_level,
+                'admin_level': admin_user.role,
                 'message': '认证成功'
             })
         else:

@@ -73,19 +73,19 @@
         <div class="px-6 py-4 border-b border-gray-200">
             <div class="flex flex-wrap items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-700">资产列表</h3>
-                <div class="flex space-x-2">
+            <div class="flex space-x-2">
                     <button @click="refreshData()" 
                             class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm">
                         <i class="fas fa-sync-alt mr-2"></i>刷新
-                    </button>
+                </button>
                     <button @click="exportAssets()" 
                             class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm">
                         <i class="fas fa-download mr-2"></i>导出
-                    </button>
+                </button>
                 </div>
             </div>
         </div>
-
+        
         <!-- 筛选条件 -->
         <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
             <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -99,11 +99,11 @@
                         <option value="3">已拒绝</option>
                     </select>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">资产类型</label>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">资产类型</label>
                     <select x-model="filters.type" @change="loadAssets()" 
                             class="w-full border-gray-300 rounded-md shadow-sm">
-                        <option value="">全部类型</option>
+                    <option value="">全部类型</option>
                         <option value="10">不动产</option>
                         <option value="20">类不动产</option>
                         <option value="30">工业地产</option>
@@ -111,9 +111,9 @@
                         <option value="50">证券资产</option>
                         <option value="60">艺术品</option>
                         <option value="70">收藏品</option>
-                    </select>
-                </div>
-                <div>
+                </select>
+            </div>
+            <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">排序</label>
                     <select x-model="filters.sort" @change="loadAssets()" 
                             class="w-full border-gray-300 rounded-md shadow-sm">
@@ -121,25 +121,25 @@
                         <option value="created_at">创建时间</option>
                         <option value="updated_at">更新时间</option>
                         <option value="token_price">价格</option>
-                    </select>
-                </div>
-                <div>
+                </select>
+            </div>
+            <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">排序方式</label>
                     <select x-model="filters.order" @change="loadAssets()" 
                             class="w-full border-gray-300 rounded-md shadow-sm">
                         <option value="desc">降序</option>
                         <option value="asc">升序</option>
                     </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
                     <input x-model="filters.keyword" @input.debounce.500ms="loadAssets()" 
                            type="text" placeholder="搜索资产名称..." 
                            class="w-full border-gray-300 rounded-md shadow-sm">
                 </div>
             </div>
         </div>
-
+        
         <!-- 批量操作 -->
         <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
             <div class="flex items-center justify-between">
@@ -150,25 +150,25 @@
                     <span x-show="selectedAssets.length > 0" class="text-sm text-gray-500">
                         （已选择 <span x-text="selectedAssets.length"></span> 项）
                     </span>
-                </div>
+            </div>
                 <div class="flex space-x-2">
                     <button x-show="selectedAssets.length > 0" @click="batchApprove()" 
                             class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">
                         <i class="fas fa-check mr-1"></i>批量通过
-                    </button>
+                </button>
                     <button x-show="selectedAssets.length > 0" @click="batchReject()" 
                             class="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600">
                         <i class="fas fa-times mr-1"></i>批量拒绝
-                    </button>
+                </button>
                     <button x-show="selectedAssets.length > 0" @click="batchDelete()" 
                             class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">
                         <i class="fas fa-trash mr-1"></i>批量删除
-                    </button>
-                </div>
+                </button>
             </div>
         </div>
+    </div>
 
-        <!-- 资产表格 -->
+    <!-- 资产表格 -->
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
@@ -191,9 +191,9 @@
                                 <i class="fas fa-spinner fa-spin mr-2"></i>加载资产数据中...
                             </td>
                         </tr>
-                    </template>
-                    
-                    <!-- 无数据 -->
+                </template>
+                
+                <!-- 无数据 -->
                     <template x-if="!loading && assets.length === 0">
                         <tr>
                             <td colspan="8" class="px-6 py-8 text-center text-gray-500">
@@ -201,9 +201,9 @@
                                 <p>暂无资产数据</p>
                             </td>
                         </tr>
-                    </template>
-                    
-                    <!-- 资产数据 -->
+                </template>
+                
+                <!-- 资产数据 -->
                     <template x-for="asset in assets" :key="asset.id">
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -218,13 +218,13 @@
                                              class="h-10 w-10 rounded-full object-cover">
                                         <div x-show="!asset.image" 
                                              class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                            <i class="fas fa-image text-gray-400"></i>
-                                        </div>
-                                    </div>
+                                    <i class="fas fa-image text-gray-400"></i>
+                                </div>
+                            </div>
                                     <div class="ml-4">
                                         <div class="text-sm font-medium text-gray-900" x-text="asset.name"></div>
                                         <div class="text-sm text-gray-500" x-text="asset.token_symbol"></div>
-                                    </div>
+                                </div>
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -241,28 +241,28 @@
                                 <div class="flex space-x-2">
                                     <button @click="viewAsset(asset)" 
                                             class="text-blue-600 hover:text-blue-900" title="查看详情">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
+                                <i class="fas fa-eye"></i>
+                            </button>
                                     <button x-show="asset.status === 1" @click="approveAsset(asset.id)" 
                                             class="text-green-600 hover:text-green-900" title="通过">
-                                        <i class="fas fa-check"></i>
-                                    </button>
+                                <i class="fas fa-check"></i>
+                            </button>
                                     <button x-show="asset.status === 1" @click="rejectAsset(asset.id)" 
                                             class="text-orange-600 hover:text-orange-900" title="拒绝">
-                                        <i class="fas fa-times"></i>
-                                    </button>
+                                <i class="fas fa-times"></i>
+                            </button>
                                     <button @click="deleteAsset(asset.id)" 
                                             class="text-red-600 hover:text-red-900" title="删除">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                             </td>
                         </tr>
-                    </template>
+                </template>
                 </tbody>
             </table>
         </div>
-
+        
         <!-- 分页 -->
         <div class="px-6 py-4 border-t border-gray-200">
             <div class="flex items-center justify-between">
@@ -270,7 +270,7 @@
                     显示 <span x-text="(pagination.page - 1) * pagination.limit + 1"></span> 到 
                     <span x-text="Math.min(pagination.page * pagination.limit, pagination.total)"></span> 条，
                     共 <span x-text="pagination.total"></span> 条记录
-                </div>
+            </div>
                 <div class="flex space-x-2">
                     <button @click="loadAssets(1)" :disabled="pagination.page === 1" 
                             class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">首页</button>
@@ -280,12 +280,12 @@
                             class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">下一页</button>
                     <button @click="loadAssets(pagination.pages)" :disabled="pagination.page >= pagination.pages" 
                             class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">末页</button>
-                </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- 资产详情模态框 -->
+<!-- 资产详情模态框 -->
     <div x-show="showAssetModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto">
         <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
             <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="closeAssetModal()"></div>
@@ -295,74 +295,74 @@
                         <h3 class="text-lg font-semibold text-gray-900">资产详情</h3>
                         <button @click="closeAssetModal()" class="text-gray-400 hover:text-gray-600">
                             <i class="fas fa-times"></i>
-                        </button>
-                    </div>
+                    </button>
                 </div>
+            </div>
                 <div x-show="selectedAsset" class="px-6 py-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
                             <img x-show="selectedAsset?.image" :src="selectedAsset?.image" :alt="selectedAsset?.name" 
                                  class="w-full h-64 object-cover rounded-lg">
                             <div x-show="!selectedAsset?.image" 
                                  class="w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center">
                                 <i class="fas fa-image text-gray-400 text-4xl"></i>
-                            </div>
-                        </div>
+                                        </div>
+                                        </div>
                         <div class="space-y-4">
                             <div>
                                 <h4 class="text-lg font-semibold" x-text="selectedAsset?.name"></h4>
                                 <p class="text-gray-600" x-text="selectedAsset?.token_symbol"></p>
-                            </div>
+                                            </div>
                             <div class="grid grid-cols-2 gap-4 text-sm">
                                 <div>
                                     <span class="text-gray-500">资产类型：</span>
                                     <span x-text="selectedAsset?.asset_type_name"></span>
-                                </div>
+                                        </div>
                                 <div>
                                     <span class="text-gray-500">代币价格：</span>
                                     <span x-text="formatCurrency(selectedAsset?.token_price || 0)"></span>
-                                </div>
+                                        </div>
                                 <div>
                                     <span class="text-gray-500">总价值：</span>
                                     <span x-text="formatCurrency(selectedAsset?.total_value || 0)"></span>
-                                </div>
-                                <div>
+                                    </div>
+                                    <div>
                                     <span class="text-gray-500">代币供应量：</span>
                                     <span x-text="selectedAsset?.token_supply || 0"></span>
-                                </div>
+                                            </div>
                                 <div>
                                     <span class="text-gray-500">创建者：</span>
                                     <span x-text="formatAddress(selectedAsset?.creator_address)"></span>
-                                </div>
+                                        </div>
                                 <div>
                                     <span class="text-gray-500">状态：</span>
                                     <span x-text="selectedAsset?.status_text"></span>
-                                </div>
-                            </div>
+                                        </div>
+                                        </div>
                             <div x-show="selectedAsset?.location">
                                 <span class="text-gray-500">位置：</span>
                                 <span x-text="selectedAsset?.location"></span>
-                            </div>
+                                    </div>
                             <div x-show="selectedAsset?.area">
                                 <span class="text-gray-500">面积：</span>
                                 <span x-text="selectedAsset?.area + ' 平方米'"></span>
-                            </div>
+                                </div>
                             <div class="pt-4 border-t">
                                 <div class="flex space-x-2">
-                                    <button x-show="selectedAsset?.status === 1" @click="approveAsset(selectedAsset.id)" 
-                                            class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
-                                        <i class="fas fa-check mr-2"></i>通过审核
+                                    <button x-show="selectedAsset?.status === 1" @click="approveAsset(selectedAsset?.id)"
+                                            class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 mx-1">
+                                        <i class="fas fa-check mr-1"></i>通过
+                                        </button>
+                                    <button x-show="selectedAsset?.status === 1" @click="rejectAsset(selectedAsset?.id)"
+                                            class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 mx-1">
+                                        <i class="fas fa-times mr-1"></i>拒绝
                                     </button>
-                                    <button x-show="selectedAsset?.status === 1" @click="rejectAsset(selectedAsset.id)" 
-                                            class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">
-                                        <i class="fas fa-times mr-2"></i>拒绝审核
-                                    </button>
-                                    <button @click="deleteAsset(selectedAsset?.id)" 
-                                            class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
-                                        <i class="fas fa-trash mr-2"></i>删除资产
-                                    </button>
+                                    <button @click="deleteAsset(selectedAsset?.id)"
+                                            class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 mx-1">
+                                        <i class="fas fa-trash mr-1"></i>删除
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -442,14 +442,14 @@
                     this.pagination.pages = data.pages || 0;
                     
                     // 重置选择状态
-                    this.selectedAssets = [];
+                        this.selectedAssets = [];
                     this.selectAll = false;
                     
                 } catch (error) {
-                    console.error('加载资产失败:', error);
+                        console.error('加载资产失败:', error);
                     alert('加载资产失败: ' + error.message);
                 } finally {
-                    this.loading = false;
+                        this.loading = false;
                 }
             },
             
@@ -590,7 +590,7 @@
                 }
             },
             
-            // 批量删除
+                    // 批量删除
             async batchDelete() {
                 if (this.selectedAssets.length === 0) return;
                 if (!confirm(`确定要删除 ${this.selectedAssets.length} 个资产吗？此操作无法撤销。`)) return;

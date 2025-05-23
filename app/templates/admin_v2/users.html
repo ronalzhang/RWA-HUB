@@ -430,9 +430,9 @@
                     if (!response.ok) throw new Error('加载用户失败');
                     
                     const data = await response.json();
-                    this.users = data.users || [];
+                    this.users = data.items || [];
                     this.pagination.totalItems = data.total || 0;
-                    this.pagination.totalPages = data.total_pages || 0;
+                    this.pagination.totalPages = data.pages || 0;
                     
                 } catch (error) {
                     console.error('加载用户失败:', error);
