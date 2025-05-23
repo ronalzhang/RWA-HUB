@@ -956,8 +956,12 @@
         const adminNavLink = document.getElementById('adminNavLink');
         if (adminNavLink && window.walletState && window.walletState.address) {
             const baseUrl = adminNavLink.getAttribute('href').split('?')[0];
-            adminNavLink.href = `${baseUrl}?eth_address=${window.walletState.address}`;
-            console.log('已更新管理员入口链接:', adminNavLink.href);
+            const newHref = `${baseUrl}?eth_address=${window.walletState.address}`;
+            adminNavLink.href = newHref;
+            // 只在开发环境或调试模式下输出日志
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.DEBUG_MODE) {
+                console.log('已更新管理员入口链接:', adminNavLink.href);
+            }
         }
     }
 
