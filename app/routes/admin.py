@@ -186,7 +186,9 @@ def admin_page_required(f):
             wallet_address = session.get('admin_wallet_address')
             admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == wallet_address.lower()).first()
             
-            if admin_user and admin_user.is_active:
+            # 修复：AdminUser模型没有is_active字段，删除此检查
+            # 假设所有数据库中的管理员用户都是活跃的
+            if admin_user: # and admin_user.is_active:
                 g.eth_address = wallet_address # 兼容旧代码中可能对 g.eth_address 的使用
                 g.admin = admin_user # 设置 g.admin 供 permission_required 等使用
                 g.admin_user_id = admin_user.id # 可选，方便使用
@@ -198,13 +200,13 @@ def admin_page_required(f):
                 current_app.logger.info(f"Admin access GRANTED for {wallet_address} (ID: {admin_user.id}) via verified session for path {request.path}")
                 return f(*args, **kwargs)
             else:
-                # Session有效但用户在数据库中找不到或非激活，清除session并要求重新登录
+                # Session有效但用户在数据库中找不到，清除session并要求重新登录
                 session.pop('admin_verified', None)
                 session.pop('admin_wallet_address', None)
                 session.pop('admin_user_id', None)
                 session.pop('admin_role', None)
                 flash('您的管理员会话无效或账户已被禁用，请重新登录。', 'warning')
-                current_app.logger.warning(f"Admin session for {wallet_address} was valid, but user not found in DB or inactive. Redirecting to login.")
+                current_app.logger.warning(f"Admin session for {wallet_address} was valid, but user not found in DB. Redirecting to login.")
                 return redirect(url_for('admin.login_v2', next=request.url))
         else:
             # Session未验证
@@ -3420,7 +3422,9 @@ def api_admin_required(f):
             wallet_address = session.get('admin_wallet_address')
             admin_user = AdminUser.query.filter(func.lower(AdminUser.wallet_address) == wallet_address.lower()).first()
             
-            if admin_user and admin_user.is_active:
+            # 修复：AdminUser模型没有is_active字段，删除此检查
+            # 假设所有数据库中的管理员用户都是活跃的
+            if admin_user: # and admin_user.is_active:
                 g.eth_address = wallet_address
                 g.admin = admin_user
                 current_app.logger.info(f"API管理员验证通过(session) - 管理员ID: {admin_user.id}, 地址: {wallet_address}")
