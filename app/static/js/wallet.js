@@ -1209,21 +1209,30 @@ const walletState = {
                     // 优先尝试API方式获取余额
                     console.log('[getWalletBalance] 尝试通过API获取余额');
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8秒超时
+                    const timeoutId = setTimeout(() => controller.abort(), 10000); // 增加到10秒超时
                     
-                    const response = await fetch(`/api/service/wallet/token_balance?address=${this.address}&token=USDC&_=${Date.now()}`, {
+                    const apiUrl = `/api/service/wallet/token_balance?address=${this.address}&token=USDC&_=${Date.now()}`;
+                    console.log('[getWalletBalance] API请求URL:', apiUrl);
+                    
+                    const response = await fetch(apiUrl, {
                         signal: controller.signal
                     });
                     clearTimeout(timeoutId);
                     
                     if (response.ok) {
                         const data = await response.json();
+                        console.log('[getWalletBalance] API响应数据:', data);
+                        
                         if (data.success && data.balance !== undefined) {
                             this.balance = parseFloat(data.balance) || 0;
                             console.log(`[getWalletBalance] 通过API获取到钱包余额: ${this.balance} USDC`);
                             this.updateBalanceDisplay(this.balance);
                             return this.balance;
+                        } else {
+                            console.warn('[getWalletBalance] API返回数据格式不正确:', data);
                         }
+                    } else {
+                        console.warn('[getWalletBalance] API响应状态不正确:', response.status, response.statusText);
                     }
                     
                     console.log('[getWalletBalance] API方式失败，尝试直接从区块链获取');
@@ -1238,24 +1247,70 @@ const walletState = {
                     // 尝试加载Solana库（使用更宽松的超时）
                     const librariesLoaded = await this.ensureSolanaLibrariesOptimized();
                     if (!librariesLoaded) {
-                        console.warn('[getWalletBalance] Solana库未能加载，使用默认余额');
+                        console.warn('[getWalletBalance] Solana库未能加载，尝试使用代理API');
+                        
+                        // 如果库未加载，尝试使用代理API
+                        try {
+                            const proxyResponse = await fetch(`/api/solana/get_token_balance?address=${this.address}&token_mint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&_=${Date.now()}`);
+                            if (proxyResponse.ok) {
+                                const proxyData = await proxyResponse.json();
+                                if (proxyData.success && proxyData.balance !== undefined) {
+                                    this.balance = parseFloat(proxyData.balance) || 0;
+                                    console.log(`[getWalletBalance] 通过代理API获取到余额: ${this.balance} USDC`);
+                                    this.updateBalanceDisplay(this.balance);
+                                    return this.balance;
+                                }
+                            }
+                        } catch (proxyError) {
+                            console.warn('[getWalletBalance] 代理API也失败:', proxyError);
+                        }
+                        
                         this.balance = 0;
                         this.updateBalanceDisplay(0);
                         return 0;
                     }
                     
-                    // 使用主网RPC节点
-                    const connection = new window.solanaWeb3.Connection('https://api.mainnet-beta.solana.com', {
-                        commitment: 'confirmed',
-                        confirmTransactionInitialTimeout: 15000
-                    });
+                    // 使用多个RPC节点尝试
+                    const rpcUrls = [
+                        'https://api.mainnet-beta.solana.com',
+                        'https://solana-api.projectserum.com',
+                        'https://rpc.ankr.com/solana'
+                    ];
+                    
+                    let connection = null;
+                    for (const rpcUrl of rpcUrls) {
+                        try {
+                            connection = new window.solanaWeb3.Connection(rpcUrl, {
+                                commitment: 'confirmed',
+                                confirmTransactionInitialTimeout: 10000
+                            });
+                            
+                            // 测试连接
+                            await connection.getVersion();
+                            console.log(`[getWalletBalance] 成功连接到RPC: ${rpcUrl}`);
+                            break;
+                        } catch (rpcError) {
+                            console.warn(`[getWalletBalance] RPC连接失败 ${rpcUrl}:`, rpcError);
+                            connection = null;
+                        }
+                    }
+                    
+                    if (!connection) {
+                        throw new Error('无法连接到任何Solana RPC节点');
+                    }
+                    
                     const publicKey = new window.solanaWeb3.PublicKey(this.address);
                     
                     // 使用Solana上的USDC合约地址
                     const usdcMint = new window.solanaWeb3.PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
                     
+                    console.log('[getWalletBalance] 查询代币账户，钱包地址:', this.address);
+                    console.log('[getWalletBalance] USDC Mint地址:', usdcMint.toString());
+                    
                     // 直接查询代币账户余额
                     const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, { mint: usdcMint });
+                    
+                    console.log('[getWalletBalance] 找到的代币账户数量:', tokenAccounts.value.length);
                     
                     if (tokenAccounts.value.length > 0) {
                         const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
@@ -1264,7 +1319,23 @@ const walletState = {
                         this.updateBalanceDisplay(this.balance);
                         return this.balance;
                     } else {
-                        console.log('[getWalletBalance] 未找到USDC代币账户，余额为0');
+                        console.log('[getWalletBalance] 未找到USDC代币账户，可能用户没有USDC或账户未初始化');
+                        
+                        // 尝试查询所有代币账户
+                        try {
+                            const allTokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, { programId: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') });
+                            console.log('[getWalletBalance] 用户所有代币账户数量:', allTokenAccounts.value.length);
+                            
+                            // 输出所有代币账户信息进行调试
+                            allTokenAccounts.value.forEach((account, index) => {
+                                const mint = account.account.data.parsed.info.mint;
+                                const balance = account.account.data.parsed.info.tokenAmount.uiAmount;
+                                console.log(`[getWalletBalance] 代币账户${index + 1}: Mint=${mint}, 余额=${balance}`);
+                            });
+                        } catch (debugError) {
+                            console.warn('[getWalletBalance] 调试查询失败:', debugError);
+                        }
+                        
                         this.balance = 0;
                         this.updateBalanceDisplay(0);
                         return 0;
@@ -3116,6 +3187,17 @@ checkIfReturningFromWalletApp(walletType) {
                 throw new Error(`创建转账指令失败: ${instructionError.message}`);
             }
             
+            // 关键修复：在签名前立即获取最新的区块哈希，确保不会过期
+            console.log('签名前重新获取最新区块哈希...');
+            const finalBlockhashResponse = await fetch('/api/solana/get_latest_blockhash');
+            if (finalBlockhashResponse.ok) {
+                const finalBlockHashResult = await finalBlockhashResponse.json();
+                if (finalBlockHashResult.success) {
+                    transaction.recentBlockhash = finalBlockHashResult.blockhash;
+                    console.log('已更新为最新区块哈希:', finalBlockHashResult.blockhash);
+                }
+            }
+            
             // 12. 签名交易
             console.log('请求钱包签名交易...');
             let signedTransaction;
@@ -3154,7 +3236,8 @@ checkIfReturningFromWalletApp(walletType) {
                     from_address: walletAddress,
                     to_address: to,
                     amount: amount,
-                    token: tokenSymbol
+                    token: tokenSymbol,
+                    recent_blockhash: transaction.recentBlockhash // 包含使用的区块哈希
                 })
             });
             
