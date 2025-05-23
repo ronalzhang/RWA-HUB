@@ -12,18 +12,19 @@ import re
 import io
 import os
 import base58
-from sqlalchemy import desc, func, or_, and_, distinct, text
+from sqlalchemy import desc, func, or_, and_, distinct, text, literal
 from sqlalchemy.exc import SQLAlchemyError
 from PIL import Image
 from werkzeug.utils import secure_filename
+from decimal import Decimal
 
+# 添加缺失的导入
+from app import db
 from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.trade import Trade, TradeStatus, TradeType
 from app.models.user import User
 from app.models.admin import AdminUser
 from app.models.dividend import DividendDistribution, DividendRecord
-# 移除不存在的payment模块导入
-# from app.models.payment import Payment, PaymentStatus
 from app.models.transaction import Transaction
 from app.utils.decorators import eth_address_required, admin_required, permission_required
 from app.utils.admin import get_admin_permissions
@@ -1810,15 +1811,21 @@ def get_user_growth():
                 date_str = date.strftime('%m-%d')
                 labels.append(date_str)
                 
-                # 统计该日期创建的用户数量
+                # 统计该日期创建的用户数量 - 使用User表
                 start_date = datetime.combine(date, datetime.min.time())
                 end_date = datetime.combine(date, datetime.max.time())
                 
-                count = db.session.query(db.func.count(db.func.distinct(Asset.owner_address)))\
-                    .filter(Asset.created_at.between(start_date, end_date))\
+                # 新注册用户数 - 使用User表
+                new_user_count = db.session.query(func.count(User.id))\
+                    .filter(User.created_at.between(start_date, end_date))\
                     .scalar() or 0
                 
-                values.append(count)
+                # 活跃用户数（以交易活动作为活跃指标）
+                active_user_count = db.session.query(func.count(func.distinct(Trade.trader_address)))\
+                    .filter(Trade.created_at.between(start_date, end_date))\
+                    .scalar() or 0
+                
+                values.append(new_user_count)
                 
         elif period == 'monthly':
             # 过去12个月的数据
@@ -1843,9 +1850,9 @@ def get_user_growth():
                 date_str = start_date.strftime('%Y-%m')
                 labels.append(date_str)
                 
-                # 统计该月创建的用户数量
-                count = db.session.query(db.func.count(db.func.distinct(Asset.owner_address)))\
-                    .filter(Asset.created_at.between(start_date, end_date))\
+                # 统计该月创建的用户数量 - 使用User表
+                count = db.session.query(func.count(User.id))\
+                    .filter(User.created_at.between(start_date, end_date))\
                     .scalar() or 0
                 
                 values.append(count)
@@ -1914,20 +1921,10 @@ def get_user_stats():
                     .filter(User.created_at.between(day_start, day_end))\
                     .scalar() or 0
                 
-                # 活跃用户数（以交易或查看资产作为活跃指标）
-                # 修复：使用trader_address替代不存在的user_id
-                active_trade_users = db.session.query(db.func.count(db.distinct(Trade.trader_address)))\
+                # 活跃用户数（以交易活动作为活跃指标）
+                active_user_count = db.session.query(func.count(func.distinct(Trade.trader_address)))\
                     .filter(Trade.created_at.between(day_start, day_end))\
                     .scalar() or 0
-                
-                # 统计当天有资产查看记录的用户数量
-                # 为简化，这里仅以资产创建者作为访问记录替代
-                active_asset_users = db.session.query(db.func.count(db.distinct(Asset.creator_address)))\
-                    .filter(Asset.updated_at.between(day_start, day_end))\
-                    .scalar() or 0
-                
-                # 合并去重
-                active_user_count = active_trade_users + active_asset_users
                 
                 # 添加当天数据
                 result.append({
@@ -1954,15 +1951,9 @@ def get_user_stats():
                     .scalar() or 0
                 
                 # 活跃用户数
-                active_trade_users = db.session.query(db.func.count(db.distinct(Trade.trader_address)))\
+                active_user_count = db.session.query(func.count(func.distinct(Trade.trader_address)))\
                     .filter(Trade.created_at.between(week_start_dt, week_end_dt))\
                     .scalar() or 0
-                
-                active_asset_users = db.session.query(db.func.count(db.distinct(Asset.creator_address)))\
-                    .filter(Asset.updated_at.between(week_start_dt, week_end_dt))\
-                    .scalar() or 0
-                
-                active_user_count = active_trade_users + active_asset_users
                 
                 # 添加当周数据
                 result.append({
@@ -1990,15 +1981,9 @@ def get_user_stats():
                     .scalar() or 0
                 
                 # 活跃用户数
-                active_trade_users = db.session.query(db.func.count(db.distinct(Trade.trader_address)))\
+                active_user_count = db.session.query(func.count(func.distinct(Trade.trader_address)))\
                     .filter(Trade.created_at.between(month_start_dt, month_end_dt))\
                     .scalar() or 0
-                
-                active_asset_users = db.session.query(db.func.count(db.distinct(Asset.creator_address)))\
-                    .filter(Asset.updated_at.between(month_start_dt, month_end_dt))\
-                    .scalar() or 0
-                
-                active_user_count = active_trade_users + active_asset_users
                 
                 # 添加当月数据
                 result.append({
@@ -2697,7 +2682,7 @@ def api_dashboard_stats_v2():
         
         # 获取交易统计
         total_trades = Trade.query.count()
-        total_trade_volume = db.session.query(func.sum(Trade.total_price)).scalar() or 0
+        total_trade_volume = db.session.query(func.sum(Trade.total)).scalar() or 0
         
         return jsonify({
             'total_users': total_users,
@@ -2760,7 +2745,7 @@ def api_dashboard_recent_trades_v2():
                 'name': trade.asset.name if trade.asset else None,
                 'token_symbol': trade.asset.token_symbol if trade.asset else None
             },
-            'total_price': float(trade.total_price),
+            'total_price': float(trade.total) if trade.total else 0,  # 使用total字段
             'token_amount': trade.token_amount,
             'status': trade.status,
             'created_at': trade.created_at.strftime('%Y-%m-%d %H:%M:%S')
@@ -2808,7 +2793,7 @@ def get_trading_volume_trend(days):
     # 按日期分组统计交易量
     daily_stats = db.session.query(
         func.date(Trade.created_at).label('date'),
-        func.sum(Trade.total_price).label('volume')
+        func.sum(Trade.total).label('volume')
     ).filter(
         Trade.created_at >= start_date,
         Trade.created_at <= end_date
@@ -2960,7 +2945,7 @@ def api_users_v2():
             query = query.filter(
                 or_(
                     User.eth_address.ilike(f'%{keyword}%'),
-                    User.name.ilike(f'%{keyword}%'),
+                    User.username.ilike(f'%{keyword}%'),
                     User.email.ilike(f'%{keyword}%')
                 )
             )
@@ -2988,14 +2973,14 @@ def api_users_v2():
         for user in users:
             user_list.append({
                 'id': user.id,
-                'name': user.name,
+                'name': user.username,  # 使用username代替name
                 'eth_address': user.eth_address,
                 'email': user.email,
                 'role': user.role,
                 'status': user.status,
-                'verified': user.verified,
+                'verified': user.is_active,  # 使用is_active代替verified
                 'created_at': user.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                'last_login': user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else None
+                'last_login': user.last_login_at.strftime('%Y-%m-%d %H:%M:%S') if user.last_login_at else None  # 使用last_login_at
             })
         
         return jsonify({
@@ -3023,22 +3008,22 @@ def api_user_detail_v2(user_id):
         user = User.query.get_or_404(user_id)
         
         # 统计用户的资产数量
-        asset_count = Asset.query.filter_by(owner_address=user.eth_address).count()
+        asset_count = Asset.query.filter_by(creator_address=user.eth_address).count()
         
-        # 获取用户的交易记录数量
-        trade_count = Trade.query.filter_by(buyer_address=user.eth_address).count()
+        # 获取用户的交易记录数量 - 使用正确的字段名
+        trade_count = Trade.query.filter_by(trader_address=user.eth_address).count()
         
         return jsonify({
             'id': user.id,
-            'name': user.name,
+            'name': user.username,  # 使用username代替name
             'eth_address': user.eth_address,
             'email': user.email,
-            'phone': user.phone,
+            'phone': '',  # phone字段不存在，返回空字符串
             'role': user.role,
             'status': user.status,
-            'verified': user.verified,
+            'verified': user.is_active,  # 使用is_active代替verified
             'created_at': user.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'last_login': user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else None,
+            'last_login': user.last_login_at.strftime('%Y-%m-%d %H:%M:%S') if user.last_login_at else None,  # 使用last_login_at
             'asset_count': asset_count,
             'trade_count': trade_count
         })
@@ -3059,17 +3044,16 @@ def api_edit_user_v2(user_id):
         
         # 更新用户信息
         if 'name' in data:
-            user.name = data['name']
+            user.username = data['name']  # 使用username代替name
         if 'email' in data:
             user.email = data['email']
-        if 'phone' in data:
-            user.phone = data['phone']
+        # phone字段不存在，跳过
         if 'role' in data:
             user.role = data['role']
         if 'status' in data:
             user.status = data['status']
         if 'verified' in data:
-            user.verified = data['verified']
+            user.is_active = data['verified']  # 使用is_active代替verified
             
         db.session.commit()
         
@@ -3091,7 +3075,7 @@ def api_verify_user_v2(user_id):
     """验证用户"""
     try:
         user = User.query.get_or_404(user_id)
-        user.verified = True
+        user.is_active = True  # 使用is_active代替verified
         db.session.commit()
         
         return jsonify({
@@ -3112,7 +3096,7 @@ def api_reject_user_v2(user_id):
     """拒绝用户"""
     try:
         user = User.query.get_or_404(user_id)
-        user.verified = False
+        user.is_active = False  # 使用is_active代替verified
         db.session.commit()
         
         return jsonify({
@@ -3144,7 +3128,7 @@ def api_batch_verify_users_v2():
         users = User.query.filter(User.id.in_(user_ids)).all()
         
         for user in users:
-            user.verified = True
+            user.is_active = True  # 使用is_active代替verified
             
         db.session.commit()
         
@@ -3177,7 +3161,7 @@ def api_batch_reject_users_v2():
         users = User.query.filter(User.id.in_(user_ids)).all()
         
         for user in users:
-            user.verified = False
+            user.is_active = False  # 使用is_active代替verified
             
         db.session.commit()
         
@@ -3205,12 +3189,12 @@ def api_export_users_v2():
         for user in users:
             user_list.append({
                 'id': user.id,
-                'name': user.name,
+                'name': user.username,  # 使用username代替name
                 'eth_address': user.eth_address,
                 'email': user.email,
                 'role': user.role,
                 'status': user.status,
-                'verified': user.verified,
+                'verified': user.is_active,  # 使用is_active代替verified
                 'created_at': user.created_at.strftime('%Y-%m-%d %H:%M:%S')
             })
             
@@ -3354,7 +3338,7 @@ def api_admin_v2_users():
             query = query.filter(
                 or_(
                     User.eth_address.ilike(f'%{keyword}%'),
-                    User.name.ilike(f'%{keyword}%'),
+                    User.username.ilike(f'%{keyword}%'),  # 使用username代替name
                     User.email.ilike(f'%{keyword}%')
                 )
             )
@@ -3382,14 +3366,14 @@ def api_admin_v2_users():
         for user in users:
             user_list.append({
                 'id': user.id,
-                'name': user.name,
+                'name': user.username,  # 使用username代替name
                 'eth_address': user.eth_address,
                 'email': user.email,
                 'role': user.role,
                 'status': user.status,
-                'verified': user.verified,
+                'verified': user.is_active,  # 使用is_active代替verified
                 'created_at': user.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                'last_login': user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else None
+                'last_login': user.last_login_at.strftime('%Y-%m-%d %H:%M:%S') if user.last_login_at else None  # 使用last_login_at
             })
         
         return jsonify({
@@ -3427,7 +3411,7 @@ def api_admin_v2_dashboard_stats():
         
         # 获取交易统计
         total_trades = Trade.query.count()
-        total_trade_volume = db.session.query(func.sum(Trade.total_price)).scalar() or 0
+        total_trade_volume = db.session.query(func.sum(Trade.total)).scalar() or 0
         
         return jsonify({
             'total_users': total_users,
