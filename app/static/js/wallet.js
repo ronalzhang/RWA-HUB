@@ -2472,51 +2472,9 @@ async connectPhantom(isReconnect = false) {
                 return true;
             }
             
-            // 检查钱包是否被锁定
-            try {
-                console.log('检查Phantom钱包是否已授权...');
-                
-                // 创建一个带超时的Promise，避免卡住
-                const checkTrustedPromise = new Promise(async (resolve) => {
-                    try {
-                        const accounts = await window.solana.connect({ onlyIfTrusted: true });
-                        if (accounts && accounts.publicKey) {
-                            console.log('Phantom钱包已授权过，可以直接连接');
-                            resolve(true);
-                        } else {
-                            resolve(false);
-                        }
-                    } catch (error) {
-                        console.log('Phantom钱包需要用户授权:', error.message);
-                        resolve(false);
-                    }
-                });
-                
-                // 设置超时，如果1秒内没有响应就跳过
-                const timeoutPromise = new Promise(resolve => {
-                    setTimeout(() => {
-                        console.log('Phantom钱包授权检查超时，继续连接流程');
-                        resolve(false);
-                    }, 1000);
-                });
-                
-                // 竞争检查和超时
-                const isAlreadyAuthorized = await Promise.race([checkTrustedPromise, timeoutPromise]);
-                
-                if (isAlreadyAuthorized) {
-                    if (!isReconnect) {
-                        showSuccess('检测到已授权的Phantom钱包，正在连接...');
-                    }
-                    return true;
-                }
-            } catch (error) {
-                console.log('Phantom钱包授权检查出错，继续连接流程:', error.message);
-            }
-            
             // 给用户提示即将打开钱包
             if (!isReconnect) {
                 console.log('Phantom钱包准备就绪，等待用户授权');
-                // 这里不显示提示，让connectToWallet函数来处理
             }
             
             return true;
@@ -2524,15 +2482,8 @@ async connectPhantom(isReconnect = false) {
         
         // 2. 连接到钱包
         connectToWallet: async () => {
-            let connectionTimeout;
-            
             try {
-                console.log('准备连接Phantom钱包，检查钱包状态');
-                console.log('Phantom钱包状态:', {
-                    isPhantom: window.solana.isPhantom,
-                    isConnected: window.solana.isConnected,
-                    publicKey: window.solana.publicKey
-                });
+                console.log('正在请求Phantom钱包连接...');
                 
                 // 如果已经连接，直接返回当前连接
                 if (window.solana.isConnected && window.solana.publicKey) {
@@ -2546,42 +2497,16 @@ async connectPhantom(isReconnect = false) {
                 
                 // 显示用户提示
                 if (!isReconnect) {
-                    showSuccess('正在打开Phantom钱包，请在钱包中确认连接授权', null);
+                    showSuccess('正在打开Phantom钱包，请在钱包中确认连接授权');
                 }
                 
-                console.log('正在请求Phantom钱包连接...');
+                // 简单的连接请求，不设置超时
+                const response = await window.solana.connect();
                 
-                // 创建超时Promise - 缩短到15秒
-                const timeoutPromise = new Promise((_, reject) => {
-                    connectionTimeout = setTimeout(() => {
-                        reject(new Error('连接超时：请确保您已安装Phantom钱包并在弹出窗口中点击"连接"'));
-                    }, 15000);
-                });
-                
-                // 开始连接请求
-                const connectPromise = window.solana.connect({ onlyIfTrusted: false });
-                console.log('连接Promise已创建，等待用户在Phantom钱包中确认...');
-                
-                // 竞争连接和超时
-                const response = await Promise.race([
-                    connectPromise,
-                    timeoutPromise
-                ]);
-                
-                // 清除超时定时器
-                clearTimeout(connectionTimeout);
                 console.log('Phantom连接响应收到:', response);
                 
                 // 验证响应
-                if (!response) {
-                    console.error('Phantom连接响应为空');
-                    if (!isReconnect) {
-                        showError('连接失败：Phantom钱包未响应，请重试');
-                    }
-                    return { success: false, error: '钱包未响应' };
-                }
-                
-                if (!response.publicKey) {
+                if (!response || !response.publicKey) {
                     console.error('无法获取Phantom钱包公钥');
                     if (!isReconnect) {
                         showError('连接失败：无法获取钱包地址，请重试');
@@ -2591,9 +2516,6 @@ async connectPhantom(isReconnect = false) {
                 
                 const addressString = response.publicKey.toString();
                 console.log('Phantom钱包连接成功！地址:', addressString);
-                
-                // 确保设置钱包已连接状态
-                window.solana.isConnected = true;
                 
                 if (!isReconnect) {
                     showSuccess('Phantom钱包连接成功！');
@@ -2606,60 +2528,26 @@ async connectPhantom(isReconnect = false) {
                 };
                 
             } catch (connectError) {
-                // 清除超时定时器
-                if (connectionTimeout) {
-                    clearTimeout(connectionTimeout);
-                }
-                
                 console.error('连接Phantom钱包时出错:', connectError);
                 
-                // 分析错误类型并给出相应提示
+                // 简化错误处理
                 let userMessage = '';
-                let errorType = 'unknown';
                 
                 // 用户拒绝连接
-                if (connectError.code === 4001 || connectError.code === -32002) {
+                if (connectError.code === 4001 || connectError.message?.includes('User rejected')) {
                     console.log('用户拒绝了钱包连接请求');
                     userMessage = '您拒绝了连接请求，请重新点击连接并在Phantom钱包中确认授权';
-                    errorType = 'user_rejected';
-                } 
-                // 连接超时
-                else if (connectError.message && connectError.message.includes('超时')) {
-                    console.log('连接Phantom钱包超时');
-                    userMessage = '连接超时！请检查：\n1. Phantom钱包是否已解锁\n2. 是否有弹出窗口被拦截\n3. 重新尝试连接';
-                    errorType = 'timeout';
-                } 
-                // 其他错误
-                else {
-                    userMessage = `连接失败：${connectError.message || '未知错误'}`;
-                    errorType = 'connection_failed';
+                } else {
+                    userMessage = `连接失败：${connectError.message || '请确保Phantom钱包已解锁并重试'}`;
                 }
                 
                 if (!isReconnect) {
                     showError(userMessage);
                 }
                 
-                // 尝试一些恢复策略
-                if (errorType === 'timeout') {
-                    console.log('超时错误，尝试检查钱包状态...');
-                    
-                    // 等待一下再检查钱包状态
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    
-                    // 检查是否在超时期间钱包实际上已经连接了
-                    if (window.solana.isConnected && window.solana.publicKey) {
-                        console.log('检测到钱包实际上已经连接');
-                        return {
-                            success: true,
-                            address: window.solana.publicKey.toString(),
-                            provider: window.solana
-                        };
-                    }
-                }
-                
                 return { 
                     success: false, 
-                    error: errorType,
+                    error: 'connection_failed',
                     message: userMessage
                 };
             }
