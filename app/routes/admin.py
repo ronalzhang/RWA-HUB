@@ -2253,7 +2253,6 @@ def trades_v2():
 
 @admin_bp.route('/v2/settings', methods=['GET', 'POST'])
 @admin_page_required 
-@permission_required('管理设置') # 假设需要 '管理设置' 权限
 def settings_v2():
     """管理后台V2版本系统设置页面，包含支付相关配置"""
     required_configs = [
