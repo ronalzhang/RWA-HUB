@@ -8,26 +8,6 @@ const DEBUG_MODE = window.location.hostname === 'localhost' ||
                    window.location.hostname === '127.0.0.1' || 
                    window.DEBUG_MODE === true;
 
-// Buffer polyfill for browser environment
-if (typeof Buffer === 'undefined') {
-    window.Buffer = {
-        alloc: function(size) {
-            const arr = new Uint8Array(size);
-            arr.writeUInt8 = function(value, offset) {
-                this[offset] = value;
-            };
-            arr.writeBigUInt64LE = function(value, offset) {
-                const bigintValue = BigInt(value);
-                for (let i = 0; i < 8; i++) {
-                    this[offset + i] = Number((bigintValue >> BigInt(i * 8)) & 0xFFn);
-                }
-            };
-            return arr;
-        }
-    };
-    console.log('Buffer polyfill loaded for browser environment');
-}
-
 // 调试日志函数
 function debugLog(...args) {
     if (DEBUG_MODE) {
@@ -1242,19 +1222,15 @@ const walletState = {
                 tokenSymbol = 'USDC'; // Solana获取USDC
             }
 
-            // 发送API请求获取余额
-            const response = await fetch('/api/wallet/balance', {
-                method: 'POST',
+            // 修复：使用正确的API路径
+            const apiUrl = `/api/service/wallet/token_balance?address=${address}&token=${tokenSymbol}&_=${Date.now()}`;
+            const response = await fetch(apiUrl, {
+                method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Wallet-Address': address,
                     'X-Wallet-Type': this.walletType
-                },
-                body: JSON.stringify({
-                    address: address,
-                    token: tokenSymbol,
-                    wallet_type: this.walletType
-                })
+                }
             });
 
             if (!response.ok) {
@@ -3086,13 +3062,24 @@ checkIfReturningFromWalletApp(walletType) {
             const amountLamports = Math.round(amount * 1000000);
             console.log(`转账金额: ${amount} USDC = ${amountLamports} lamports`);
             
-            // 12. 创建转账指令 - 使用简化的标准方法
+            // 12. 创建转账指令 - 使用纯Uint8Array手动编码
             console.log('创建转账指令...');
             
-            // 创建转账指令数据 - 使用标准格式
-            const instructionData = Buffer.alloc(9);
-            instructionData.writeUInt8(3, 0); // Transfer instruction
-            instructionData.writeBigUInt64LE(BigInt(amountLamports), 1); // Amount as u64 little endian
+            // 手动创建指令数据 - 确保格式正确
+            const instructionData = new Uint8Array(9);
+            instructionData[0] = 3; // Transfer instruction discriminator
+            
+            // 手动编码64位小端序整数 (Little Endian)
+            const amountBigInt = BigInt(amountLamports);
+            for (let i = 0; i < 8; i++) {
+                instructionData[1 + i] = Number((amountBigInt >> BigInt(i * 8)) & 0xFFn);
+            }
+            
+            console.log('指令数据:', {
+                discriminator: instructionData[0],
+                amount: amountLamports,
+                amountBytes: Array.from(instructionData.slice(1)).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ')
+            });
             
             const transferInstruction = new window.solanaWeb3.TransactionInstruction({
                 keys: [
@@ -4325,7 +4312,7 @@ checkIfReturningFromWalletApp(walletType) {
         try {
             debugLog('[getBalanceWithFallback] 尝试后备方案获取余额');
             
-            // 尝试使用旧的API端点
+            // 修复：使用正确的API路径
             const fallbackResponse = await fetch(`/api/service/wallet/token_balance?address=${address}&token=${tokenSymbol}&_=${Date.now()}`);
             
             if (fallbackResponse.ok) {
