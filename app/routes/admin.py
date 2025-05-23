@@ -51,6 +51,18 @@ from app.utils.datetime_compat import get_utc_now, get_utc_today  # 导入兼容
 # 从routes/__init__.py中获取蓝图
 from . import admin_bp, admin_api_bp
 
+# Helper function to validate Solana address (basic check)
+def is_valid_solana_address(address):
+    """验证Solana地址格式"""
+    import base58
+    if not address or not (32 <= len(address) <= 44):
+        return False
+    try:
+        base58.b58decode(address)
+        return True
+    except ValueError:
+        return False
+
 def api_admin_required(f):
     """API版本的管理员权限装饰器，失败时返回JSON错误而不是重定向"""
     @wraps(f)
