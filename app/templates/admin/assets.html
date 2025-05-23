@@ -727,11 +727,19 @@
                     return;
                 }
                 
+                // 获取钱包地址
+                const walletAddress = getWalletAddress();
+                if (!walletAddress) {
+                    alert('未检测到钱包连接，请先连接钱包');
+                    return;
+                }
+                
                 if (confirm(`确定要批量通过所选的 ${selectedIds.length} 个资产吗？`)) {
                     fetch('/api/admin/assets/batch-approve', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'X-Wallet-Address': walletAddress
                         },
                         body: JSON.stringify({ asset_ids: selectedIds })
                     })
@@ -743,10 +751,10 @@
                     })
                     .then(data => {
                         if (data.success) {
-                            alert('批量审核通过成功');
+                            alert(data.message || '批量审核通过成功');
                             loadAssets(currentPage, getFilters());
                         } else {
-                            throw new Error(data.message || '批量审核通过失败');
+                            throw new Error(data.error || data.message || '批量审核通过失败');
                         }
                     })
                     .catch(error => {
@@ -765,13 +773,30 @@
                     return;
                 }
                 
+                // 获取拒绝理由
+                const reason = prompt('请输入拒绝理由:');
+                if (!reason) {
+                    return;
+                }
+                
+                // 获取钱包地址
+                const walletAddress = getWalletAddress();
+                if (!walletAddress) {
+                    alert('未检测到钱包连接，请先连接钱包');
+                    return;
+                }
+                
                 if (confirm(`确定要批量拒绝所选的 ${selectedIds.length} 个资产吗？`)) {
                     fetch('/api/admin/assets/batch-reject', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'X-Wallet-Address': walletAddress
                         },
-                        body: JSON.stringify({ asset_ids: selectedIds })
+                        body: JSON.stringify({ 
+                            asset_ids: selectedIds,
+                            reason: reason
+                        })
                     })
                     .then(response => {
                         if (!response.ok) {
@@ -781,10 +806,10 @@
                     })
                     .then(data => {
                         if (data.success) {
-                            alert('批量拒绝成功');
+                            alert(data.message || '批量拒绝成功');
                             loadAssets(currentPage, getFilters());
                         } else {
-                            throw new Error(data.message || '批量拒绝失败');
+                            throw new Error(data.error || data.message || '批量拒绝失败');
                         }
                     })
                     .catch(error => {
