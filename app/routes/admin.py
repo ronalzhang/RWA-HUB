@@ -23,7 +23,7 @@ from app import db
 from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.trade import Trade, TradeStatus, TradeType
 from app.models.user import User
-from app.models.admin import AdminUser
+from app.models.admin import AdminUser, SystemConfig  # 添加SystemConfig导入
 from app.models.dividend import DividendDistribution, DividendRecord
 from app.models.transaction import Transaction
 from app.utils.decorators import eth_address_required, admin_required, permission_required
@@ -39,7 +39,6 @@ from urllib.parse import urlparse, parse_qs
 import random
 from app.models.platform_income import PlatformIncome
 from app.models.dividend import Dividend
-from app.models.admin import AdminUser
 from app.models.commission import Commission
 from app.models.admin import DashboardStats
 from .common import get_pagination_info
