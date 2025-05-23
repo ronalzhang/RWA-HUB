@@ -567,6 +567,12 @@ const walletState = {
                 this.updateDetailPageButtonState();
             } else {
                 console.log(`${walletType} 钱包连接失败或被用户取消`);
+                
+                // 为用户提供重试选项
+                if (walletType === 'phantom') {
+                    this.showPhantomRetryOption();
+                }
+                
                 // 确保状态回滚
                 if (!this.connected) { // 只有在确实没连上的情况下才清除
                     this.clearState();
@@ -2428,67 +2434,60 @@ async connectPhantom(isReconnect = false) {
             
             // 检查钱包是否存在
             if (!window.solana || !window.solana.isPhantom) {
-                console.log('暂未检测到Phantom钱包，尝试等待...');
+                console.log('未检测到Phantom钱包扩展');
                 
-                // 重连模式或已设置类型为phantom时等待一下
-                if (isReconnect || this.walletType === 'phantom') {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                if (!isReconnect) {
+                    // 更友好的错误提示
+                    const errorMsg = this.isMobile() 
+                        ? '请在Phantom App中打开本页面，或在桌面浏览器中安装Phantom扩展' 
+                        : '未检测到Phantom钱包扩展。请先安装Phantom钱包浏览器扩展';
                     
-                    if (!window.solana || !window.solana.isPhantom) {
-                        console.log('等待后仍未检测到Phantom钱包');
-                        
-                        // 使用已存储信息
-                        if (isReconnect && localStorage.getItem('walletAddress') && 
-                            localStorage.getItem('walletType') === 'phantom') {
-                            console.log('使用localStorage存储的钱包状态');
-                            return false;
+                    showError(errorMsg);
+                    
+                    // 显示安装指引
+                    setTimeout(() => {
+                        if (confirm('是否现在前往Phantom官网下载安装？')) {
+                            window.open('https://phantom.app/', '_blank');
                         }
-                        
-                        if (!isReconnect) {
-                            if (this.isMobile()) {
-                                showError('请在Phantom App中打开本页面，或使用桌面浏览器');
-                            } else {
-                                showError('请安装Phantom钱包浏览器扩展');
-                            }
-                        }
-                        return false;
-                    }
-                    
-                    console.log('等待后成功检测到Phantom钱包');
-                } else {
-                    // 非重连模式，检查本地存储
-                    if (localStorage.getItem('walletType') === 'phantom' && localStorage.getItem('walletAddress')) {
-                        console.log('虽然未检测到Phantom钱包，但有存储的钱包地址，保持状态');
-                        this.connected = true;
-                        this.walletType = 'phantom';
-                        this.address = localStorage.getItem('walletAddress');
-                        this.updateUI();
-                        return false;
-                    }
-                    
-                    console.error('Phantom钱包未安装或未加载');
-                    
-                    if (!isReconnect) {
-                        if (this.isMobile()) {
-                            showError('请在Phantom App中打开本页面，或使用桌面浏览器');
-                        } else {
-                            showError('请安装Phantom钱包浏览器扩展');
-                        }
-                    }
-                    return false;
+                    }, 2000);
                 }
+                return false;
             }
             
-            console.log('Phantom钱包状态:', {
-                'isPhantom': window.solana.isPhantom,
-                'isConnected': window.solana.isConnected,
-                'publicKey': window.solana.publicKey ? window.solana.publicKey.toString() : null
-            });
+            // 检查钱包详细状态
+            console.log('检测到Phantom钱包，检查状态...');
+            const phantomStatus = {
+                isPhantom: window.solana.isPhantom,
+                isConnected: window.solana.isConnected,
+                publicKey: window.solana.publicKey ? window.solana.publicKey.toString() : null
+            };
+            console.log('Phantom钱包状态:', phantomStatus);
             
             // 如果已经连接，可以直接使用现有连接
             if (window.solana.isConnected && window.solana.publicKey) {
-                console.log('Phantom钱包已经连接，使用现有连接');
-                return this.afterSuccessfulConnection(window.solana.publicKey.toString(), 'phantom', window.solana);
+                console.log('Phantom钱包已连接，将使用现有连接');
+                if (!isReconnect) {
+                    showSuccess('检测到已连接的Phantom钱包');
+                }
+                return true;
+            }
+            
+            // 检查钱包是否被锁定
+            try {
+                // 尝试获取钱包状态（不会触发连接请求）
+                const accounts = await window.solana.connect({ onlyIfTrusted: true }).catch(() => null);
+                if (accounts && accounts.publicKey) {
+                    console.log('Phantom钱包已授权过，可以直接连接');
+                    return true;
+                }
+            } catch (error) {
+                console.log('Phantom钱包需要用户授权:', error.message);
+            }
+            
+            // 给用户提示即将打开钱包
+            if (!isReconnect) {
+                console.log('Phantom钱包准备就绪，等待用户授权');
+                // 这里不显示提示，让connectToWallet函数来处理
             }
             
             return true;
@@ -2516,18 +2515,23 @@ async connectPhantom(isReconnect = false) {
                     };
                 }
                 
-                // 创建超时Promise
-                const timeoutPromise = new Promise((_, reject) => {
-                    connectionTimeout = setTimeout(() => {
-                        reject(new Error('连接Phantom钱包超时（20秒）'));
-                    }, 20000);
-                });
+                // 显示用户提示
+                if (!isReconnect) {
+                    showSuccess('正在打开Phantom钱包，请在钱包中确认连接授权', null);
+                }
                 
                 console.log('正在请求Phantom钱包连接...');
                 
+                // 创建超时Promise - 缩短到15秒
+                const timeoutPromise = new Promise((_, reject) => {
+                    connectionTimeout = setTimeout(() => {
+                        reject(new Error('连接超时：请确保您已安装Phantom钱包并在弹出窗口中点击"连接"'));
+                    }, 15000);
+                });
+                
                 // 开始连接请求
                 const connectPromise = window.solana.connect({ onlyIfTrusted: false });
-                console.log('连接Promise已创建，开始等待响应...');
+                console.log('连接Promise已创建，等待用户在Phantom钱包中确认...');
                 
                 // 竞争连接和超时
                 const response = await Promise.race([
@@ -2543,26 +2547,29 @@ async connectPhantom(isReconnect = false) {
                 if (!response) {
                     console.error('Phantom连接响应为空');
                     if (!isReconnect) {
-                        showError('连接Phantom钱包失败: 无响应');
+                        showError('连接失败：Phantom钱包未响应，请重试');
                     }
-                    return { success: false, error: '无响应' };
+                    return { success: false, error: '钱包未响应' };
                 }
                 
                 if (!response.publicKey) {
                     console.error('无法获取Phantom钱包公钥');
                     if (!isReconnect) {
-                        showError('连接Phantom钱包失败: 无法获取公钥');
+                        showError('连接失败：无法获取钱包地址，请重试');
                     }
-                    return { success: false, error: '无法获取公钥' };
+                    return { success: false, error: '无法获取钱包地址' };
                 }
                 
                 const addressString = response.publicKey.toString();
-                console.log('成功获取Phantom公钥:', addressString);
+                console.log('Phantom钱包连接成功！地址:', addressString);
                 
                 // 确保设置钱包已连接状态
                 window.solana.isConnected = true;
                 
-                console.log('Phantom连接成功，返回结果');
+                if (!isReconnect) {
+                    showSuccess('Phantom钱包连接成功！');
+                }
+                
                 return {
                     success: true,
                     address: addressString,
@@ -2576,90 +2583,56 @@ async connectPhantom(isReconnect = false) {
                 }
                 
                 console.error('连接Phantom钱包时出错:', connectError);
-                console.error('错误详情:', {
-                    name: connectError.name,
-                    message: connectError.message,
-                    code: connectError.code,
-                    stack: connectError.stack
-                });
                 
-                // 用户拒绝连接（标准错误码）
+                // 分析错误类型并给出相应提示
+                let userMessage = '';
+                let errorType = 'unknown';
+                
+                // 用户拒绝连接
                 if (connectError.code === 4001 || connectError.code === -32002) {
                     console.log('用户拒绝了钱包连接请求');
-                    if (!isReconnect) {
-                        showError('用户拒绝了钱包连接请求');
-                    }
-                    return { success: false, error: 'user_rejected' };
-                }
-                
+                    userMessage = '您拒绝了连接请求，请重新点击连接并在Phantom钱包中确认授权';
+                    errorType = 'user_rejected';
+                } 
                 // 连接超时
-                if (connectError.message && connectError.message.includes('超时')) {
+                else if (connectError.message && connectError.message.includes('超时')) {
                     console.log('连接Phantom钱包超时');
-                    if (!isReconnect) {
-                        showError('连接Phantom钱包超时，请重试');
-                    }
-                    return { success: false, error: 'timeout' };
+                    userMessage = '连接超时！请检查：\n1. Phantom钱包是否已解锁\n2. 是否有弹出窗口被拦截\n3. 重新尝试连接';
+                    errorType = 'timeout';
+                } 
+                // 其他错误
+                else {
+                    userMessage = `连接失败：${connectError.message || '未知错误'}`;
+                    errorType = 'connection_failed';
                 }
                 
-                // 移动设备处理
-                if (walletState.isMobile() && walletState.checkIfReturningFromWalletApp('phantom')) {
-                    console.log('移动设备从Phantom App返回');
-                    if (!isReconnect) {
-                        showError('请确保在Phantom App中授权连接');
-                    }
-                    return { success: false, error: 'mobile_app_required' };
+                if (!isReconnect) {
+                    showError(userMessage);
                 }
                 
-                // 尝试备用连接方法
-                console.log('主连接失败，尝试备用连接方法...');
-                try {
-                    // 方法1: 尝试仅受信任的连接
-                    console.log('尝试 onlyIfTrusted 连接...');
-                    const trustedResponse = await window.solana.connect({ onlyIfTrusted: true });
+                // 尝试一些恢复策略
+                if (errorType === 'timeout') {
+                    console.log('超时错误，尝试检查钱包状态...');
                     
-                    if (trustedResponse && trustedResponse.publicKey) {
-                        console.log('使用 onlyIfTrusted 方式连接成功:', trustedResponse.publicKey.toString());
+                    // 等待一下再检查钱包状态
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // 检查是否在超时期间钱包实际上已经连接了
+                    if (window.solana.isConnected && window.solana.publicKey) {
+                        console.log('检测到钱包实际上已经连接');
                         return {
                             success: true,
-                            address: trustedResponse.publicKey.toString(),
+                            address: window.solana.publicKey.toString(),
                             provider: window.solana
                         };
                     }
-                    
-                    console.log('onlyIfTrusted 连接无结果，尝试常规重连...');
-                    
-                    // 方法2: 再次尝试常规连接
-                    const retryResponse = await window.solana.connect({ onlyIfTrusted: false });
-                    
-                    if (retryResponse && retryResponse.publicKey) {
-                        console.log('备用连接方法成功，公钥:', retryResponse.publicKey.toString());
-                        return {
-                            success: true,
-                            address: retryResponse.publicKey.toString(),
-                            provider: window.solana
-                        };
-                    }
-                    
-                    throw new Error('所有备用连接方法都失败');
-                    
-                } catch (retryError) {
-                    console.error('备用连接方法也失败:', retryError);
-                    
-                    const errorMessage = walletState.isMobile() 
-                        ? '无法连接到Phantom钱包，请确保已安装Phantom App并允许连接授权'
-                        : '无法连接到Phantom钱包，请确保已安装Phantom扩展并授权连接';
-                    
-                    if (!isReconnect) {
-                        showError(errorMessage);
-                    }
-                    
-                    return { 
-                        success: false, 
-                        error: 'all_methods_failed',
-                        originalError: connectError.message,
-                        retryError: retryError.message
-                    };
                 }
+                
+                return { 
+                    success: false, 
+                    error: errorType,
+                    message: userMessage
+                };
             }
         },
         
@@ -3483,6 +3456,126 @@ checkIfReturningFromWalletApp(walletType) {
             console.error('[afterSuccessfulConnection] 连接后处理失败:', error);
             // 连接后处理失败，但连接本身可能是成功的，所以只记录错误
             return false;
+        }
+    },
+
+    /**
+     * 显示Phantom钱包重试选项
+     * 当连接失败时为用户提供友好的重试界面
+     */
+    showPhantomRetryOption() {
+        try {
+            // 检查是否存在重试提示元素，避免重复创建
+            let retryModal = document.getElementById('phantomRetryModal');
+            if (retryModal) {
+                retryModal.remove();
+            }
+            
+            // 创建重试模态框
+            retryModal = document.createElement('div');
+            retryModal.id = 'phantomRetryModal';
+            retryModal.className = 'modal fade';
+            retryModal.setAttribute('tabindex', '-1');
+            retryModal.innerHTML = `
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                                Phantom钱包连接失败
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-info">
+                                <h6 class="alert-heading">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    请检查以下几点：
+                                </h6>
+                                <ul class="mb-0">
+                                    <li>确保Phantom钱包扩展已安装并已解锁</li>
+                                    <li>检查浏览器是否拦截了弹出窗口</li>
+                                    <li>如果看到连接请求，请在Phantom钱包中点击"连接"</li>
+                                    <li>尝试刷新页面后重新连接</li>
+                                </ul>
+                            </div>
+                            <div class="text-center">
+                                <p class="mb-3">您可以：</p>
+                                <div class="d-grid gap-2">
+                                    <button id="retryPhantomBtn" class="btn btn-primary">
+                                        <i class="fas fa-redo me-2"></i>重试连接
+                                    </button>
+                                    <button id="refreshPageBtn" class="btn btn-outline-secondary">
+                                        <i class="fas fa-refresh me-2"></i>刷新页面
+                                    </button>
+                                    <a href="https://phantom.app/" target="_blank" class="btn btn-outline-info">
+                                        <i class="fas fa-download me-2"></i>下载Phantom钱包
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 添加到页面
+            document.body.appendChild(retryModal);
+            
+            // 获取按钮元素
+            const retryBtn = retryModal.querySelector('#retryPhantomBtn');
+            const refreshBtn = retryModal.querySelector('#refreshPageBtn');
+            
+            // 添加重试按钮事件
+            if (retryBtn) {
+                retryBtn.addEventListener('click', async () => {
+                    // 显示重试状态
+                    retryBtn.disabled = true;
+                    retryBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>正在重试...';
+                    
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(retryModal);
+                    if (modal) {
+                        modal.hide();
+                    }
+                    
+                    // 等待一下让模态框完全关闭
+                    setTimeout(async () => {
+                        try {
+                            const success = await this.connectPhantom();
+                            if (!success) {
+                                // 如果重试还是失败，再次显示选项
+                                setTimeout(() => this.showPhantomRetryOption(), 1000);
+                            }
+                        } catch (error) {
+                            console.error('重试连接失败:', error);
+                            showError('重试连接失败，请检查Phantom钱包状态');
+                        }
+                    }, 500);
+                });
+            }
+            
+            // 添加刷新按钮事件
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', () => {
+                    window.location.reload();
+                });
+            }
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(retryModal);
+            modal.show();
+            
+            // 自动清理：模态框关闭后移除元素
+            retryModal.addEventListener('hidden.bs.modal', () => {
+                setTimeout(() => {
+                    if (retryModal.parentNode) {
+                        retryModal.parentNode.removeChild(retryModal);
+                    }
+                }, 100);
+            });
+            
+        } catch (error) {
+            console.error('显示重试选项失败:', error);
         }
     },
 }
