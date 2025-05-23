@@ -3397,6 +3397,48 @@ checkIfReturningFromWalletApp(walletType) {
     },
 }
 
+// 立即将walletState暴露到全局作用域，确保其他文件可以立即访问
+window.walletState = walletState;
+console.log('钱包状态对象已暴露到全局作用域');
+
+// 添加钱包状态恢复功能
+function recoverWalletStateFromStorage() {
+    try {
+        const storedAddress = localStorage.getItem('walletAddress');
+        const storedType = localStorage.getItem('walletType');
+        
+        if (storedAddress && storedType) {
+            console.log('从localStorage恢复钱包状态:', { address: storedAddress, type: storedType });
+            walletState.address = storedAddress;
+            walletState.walletType = storedType;
+            walletState.connected = true;
+            
+            // 立即更新UI
+            if (typeof walletState.updateUI === 'function') {
+                walletState.updateUI();
+            }
+            
+            // 触发状态变更事件
+            if (typeof walletState.triggerWalletStateChanged === 'function') {
+                walletState.triggerWalletStateChanged({
+                    type: 'recovered',
+                    address: storedAddress,
+                    walletType: storedType
+                });
+            }
+            
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('从localStorage恢复钱包状态失败:', error);
+        return false;
+    }
+}
+
+// 立即尝试恢复钱包状态
+recoverWalletStateFromStorage();
+
 // 页面初始化时就自动调用钱包初始化方法
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('页面加载完成，初始化钱包状态');

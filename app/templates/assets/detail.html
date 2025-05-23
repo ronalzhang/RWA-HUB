@@ -289,13 +289,62 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 确保全局钱包状态变量存在
                 if (!window.walletState) {
-                    console.log('警告: window.walletState未初始化，创建临时对象');
-                    window.walletState = {
-                        connected: false,
-                        isConnected: false,
-                        address: null,
-                        _isTemporary: true  // 添加标记表示这是临时对象
+                    console.log('警告: window.walletState未初始化，尝试等待和重试');
+                    
+                    // 增强的钱包状态初始化和重试机制
+                    let retryCount = 0;
+                    const maxRetries = 10;
+                    const retryInterval = 500; // 500ms间隔
+                    
+                    const waitForWalletState = () => {
+                        return new Promise((resolve, reject) => {
+                            const checkWalletState = () => {
+                                if (window.walletState && typeof window.walletState === 'object') {
+                                    console.log('成功获取到window.walletState对象');
+                                    resolve(window.walletState);
+                                    return;
+                                }
+                                
+                                retryCount++;
+                                if (retryCount >= maxRetries) {
+                                    console.warn('无法获取walletState对象，将从localStorage恢复状态');
+                                    
+                                    // 创建基本的钱包状态对象作为后备方案
+                                    const storedAddress = localStorage.getItem('walletAddress');
+                                    const storedType = localStorage.getItem('walletType');
+                                    
+                                    window.walletState = {
+                                        connected: !!(storedAddress && storedType),
+                                        isConnected: !!(storedAddress && storedType),
+                                        address: storedAddress || '',
+                                        walletType: storedType || '',
+                                        balance: 0,
+                                        isAdmin: false,
+                                        _isRecovered: true  // 标记这是恢复的状态
+                                    };
+                                    
+                                    console.log('已从localStorage恢复钱包状态:', window.walletState);
+                                    resolve(window.walletState);
+                                } else {
+                                    console.log(`等待walletState对象，重试 ${retryCount}/${maxRetries}`);
+                                    setTimeout(checkWalletState, retryInterval);
+                                }
+                            };
+                            
+                            checkWalletState();
+                        });
                     };
+                    
+                    // 异步等待walletState
+                    waitForWalletState().then(walletState => {
+                        console.log('钱包状态已准备就绪，继续初始化');
+                        // 触发UI更新
+                        if (typeof updateBuyButtonState === 'function') {
+                            updateBuyButtonState();
+                        }
+                    }).catch(error => {
+                        console.error('获取钱包状态失败:', error);
+                    });
                 } else {
                     console.log('使用已初始化的window.walletState对象');
                 }
@@ -1298,62 +1347,103 @@ document.addEventListener('DOMContentLoaded', function() {
                         return window.updateBuyButtonStateGlobal();
                     }
                     
-                    // 获取购买按钮 - 已经有了buyButton变量，不需要重新获取
-                    // 更全面地检查钱包连接状态，增加多种检查方式
+                    // 增强的钱包连接状态检测
                     let isConnected = false;
+                    let walletAddress = '';
+                    let walletType = '';
                     
-                    // 方法1: 检查window.walletState (主要方法)
-                    if (window.walletState && (window.walletState.isConnected || window.walletState.connected)) {
-                        isConnected = true;
+                    // 方法1: 检查window.walletState (主要方法，增强检测)
+                    if (window.walletState && typeof window.walletState === 'object') {
+                        // 检查连接状态的多个属性
+                        if (window.walletState.isConnected || window.walletState.connected) {
+                            isConnected = true;
+                            walletAddress = window.walletState.address || '';
+                            walletType = window.walletState.walletType || '';
+                        }
+                        
+                        // 检查地址是否存在（即使connected属性不正确）
+                        if (!isConnected && window.walletState.address && window.walletState.address.length > 10) {
+                            isConnected = true;
+                            walletAddress = window.walletState.address;
+                            walletType = window.walletState.walletType || '';
+                            
+                            // 同步连接状态
+                            window.walletState.connected = true;
+                            window.walletState.isConnected = true;
+                        }
                     }
                     
-                    // 方法2: 检查本地存储 (备用方法)
+                    // 方法2: 检查本地存储 (备用方法，更可靠)
                     if (!isConnected) {
                         const storedAddress = localStorage.getItem('walletAddress');
                         const storedType = localStorage.getItem('walletType');
-                        if (storedAddress && storedType) {
+                        if (storedAddress && storedAddress.length > 10 && storedType) {
                             isConnected = true;
+                            walletAddress = storedAddress;
+                            walletType = storedType;
+                            
+                            console.log('从localStorage恢复钱包连接状态:', { address: walletAddress, type: walletType });
+                            
                             // 同步到walletState对象
                             if (window.walletState) {
                                 window.walletState.connected = true;
+                                window.walletState.isConnected = true;
                                 window.walletState.address = storedAddress;
-                                window.walletState.type = storedType;
+                                window.walletState.walletType = storedType;
                             }
                         }
                     }
                     
-                    // 方法3: 检查window.walletState对象（修复：不再使用错误的window.wallet对象）
-                    if (!isConnected && window.walletState && (
-                        window.walletState.connected || window.walletState.isConnected ||
-                        (typeof window.walletState.getAddress === 'function' && window.walletState.getAddress()) ||
-                        (typeof window.walletState.getConnectionStatus === 'function' && window.walletState.getConnectionStatus()))
-                    ) {
-                        isConnected = true;
+                    // 方法3: 检查钱包API函数
+                    if (!isConnected && window.walletState && typeof window.walletState.getAddress === 'function') {
+                        try {
+                            const address = window.walletState.getAddress();
+                            if (address && address.length > 10) {
+                                isConnected = true;
+                                walletAddress = address;
+                                walletType = window.walletState.getWalletType() || '';
+                            }
+                        } catch (error) {
+                            console.warn('检查钱包API函数时出错:', error);
+                        }
                     }
                     
-                    // 方法4: 检查全局地址变量
-                    if (!isConnected && (window.connectedWalletAddress || window.ethereumAddress || window.solanaAddress)) {
-                        isConnected = true;
+                    // 方法4: 检查全局地址变量（兼容性检查）
+                    if (!isConnected) {
+                        const globalAddress = window.connectedWalletAddress || window.ethereumAddress || window.solanaAddress;
+                        if (globalAddress && globalAddress.length > 10) {
+                            isConnected = true;
+                            walletAddress = globalAddress;
+                            walletType = window.connectedWalletType || 'unknown';
+                        }
                     }
                     
-                    // 记录日志
+                    // 记录详细的检测结果
                     console.log('钱包连接状态检查结果:', isConnected, {
                         'walletState': window.walletState ? '存在' : '不存在',
-                        'connectedStatus': window.walletState ? (window.walletState.connected || window.walletState.isConnected) : '未知',
+                        'walletState.connected': window.walletState ? window.walletState.connected : '无',
+                        'walletState.isConnected': window.walletState ? window.walletState.isConnected : '无',
+                        'walletState.address': window.walletState ? window.walletState.address : '无',
                         'localStorageAddress': localStorage.getItem('walletAddress') || '无',
-                        'globalAddress': window.connectedWalletAddress || window.ethereumAddress || window.solanaAddress || '无'
+                        'localStorageType': localStorage.getItem('walletType') || '无',
+                        'detectedAddress': walletAddress || '无',
+                        'detectedType': walletType || '无'
                     });
 
-                    // 更新购买按钮
+                    // 更新购买按钮状态
                     if (buyButton) {
-                        if (isConnected) {
+                        if (isConnected && walletAddress) {
                             buyButton.disabled = false;
                             buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>{{ _("Buy") }}';
                             buyButton.removeAttribute('title');
+                            buyButton.classList.remove('btn-secondary');
+                            buyButton.classList.add('btn-primary');
                         } else {
                             buyButton.disabled = true;
                             buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>{{ _("Connect Wallet First") }}';
                             buyButton.title = '{{ _("Please connect wallet first") }}';
+                            buyButton.classList.remove('btn-primary');
+                            buyButton.classList.add('btn-secondary');
                         }
                     }
                     
@@ -1361,6 +1451,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (typeof checkDividendManagementAccess === 'function') {
                         checkDividendManagementAccess();
                     }
+                    
+                    return isConnected;
                 }
                 
                 // 初始状态检查
