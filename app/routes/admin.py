@@ -280,15 +280,9 @@ def admin_page_required(f):
 @admin_bp.route('/')
 @admin_page_required
 def index():
-    """后台管理首页"""
+    """后台管理首页 - 重定向到V2版本管理后台"""
     try:
-        # 直接使用g对象中的管理员信息
-        admin_info = g.admin_info
-        eth_address = g.eth_address
-        
-        current_app.logger.info(f'管理员访问后台首页: {eth_address}')
-        
-        return render_template('admin/dashboard.html', admin_info=admin_info)
+        return redirect(url_for('admin.admin_v2_index'))
     except Exception as e:
         current_app.logger.warning(f'访问后台管理页面失败：{str(e)}')
         return redirect(url_for('main.index'))
@@ -296,8 +290,8 @@ def index():
 @admin_bp.route('/dashboard')
 @admin_page_required
 def dashboard():
-    """后台管理仪表板"""
-    return render_template('admin/dashboard.html')
+    """后台管理仪表板 - 重定向到V2版本"""
+    return redirect(url_for('admin.dashboard_v2'))
 
 @admin_bp.route('/distribution')
 @admin_page_required
@@ -308,14 +302,14 @@ def distribution():
 @admin_bp.route('/commission_settings')
 @admin_page_required
 def commission_settings():
-    """佣金设置页面"""
-    return render_template('admin/commission_settings.html')
+    """佣金设置页面 - 重定向到V2版本"""
+    return redirect(url_for('admin.commission_v2'))
 
 @admin_bp.route('/commission_records')
 @admin_page_required
 def commission_records():
-    """佣金记录页面"""
-    return render_template('admin/commission_records.html')
+    """佣金记录页面 - 重定向到V2版本"""
+    return redirect(url_for('admin.commission_v2'))
 
 @admin_bp.route('/operation_logs')
 @admin_page_required
@@ -338,39 +332,20 @@ def edit_asset(asset_id):
 @admin_bp.route('/assets')
 @admin_page_required
 def assets():
-    """资产管理页面"""
-    try:
-        # 获取所有资产
-        assets = Asset.query.all()
-        return render_template('admin/assets.html', assets=assets)
-    except Exception as e:
-        current_app.logger.warning(f'资产管理页面加载失败: {str(e)}')
-        flash('资产数据加载失败', 'danger')
-        return redirect(url_for('admin.index'))
+    """资产管理页面 - 重定向到V2版本"""
+    return redirect(url_for('admin.assets_v2'))
 
 @admin_bp.route('/users')
 @admin_page_required
 def users():
-    """用户管理页面"""
-    try:
-        users = User.query.all()
-        return render_template('admin/users.html', users=users)
-    except Exception as e:
-        current_app.logger.warning(f'用户管理页面加载失败: {str(e)}')
-        flash('用户数据加载失败', 'danger')
-        return redirect(url_for('admin.index'))
+    """用户管理页面 - 重定向到V2版本"""
+    return redirect(url_for('admin.users_v2'))
 
 @admin_bp.route('/trades')
 @admin_page_required
 def trades():
-    """交易管理页面"""
-    try:
-        trades = Trade.query.order_by(Trade.created_at.desc()).all()
-        return render_template('admin/trades.html', trades=trades)
-    except Exception as e:
-        current_app.logger.warning(f'交易管理页面加载失败: {str(e)}')
-        flash('交易数据加载失败', 'danger')
-        return redirect(url_for('admin.index'))
+    """交易管理页面 - 重定向到V2版本"""
+    return redirect(url_for('admin.trades_v2'))
 
 @admin_bp.route('/export/assets')
 @admin_page_required
@@ -492,12 +467,15 @@ def export_trades():
 
 @admin_bp.route('/logout')
 def logout():
-    """退出登录，重定向到首页"""
-    try:
-        return redirect(url_for('main.index'))
-    except Exception as e:
-        current_app.logger.error(f'退出登录失败: {str(e)}')
-        return redirect('/')
+    """管理员退出登录 - 使用V2版本退出逻辑"""
+    # 清除session中的管理员相关信息
+    session.pop('admin_verified', None)
+    session.pop('admin_wallet_address', None)
+    session.pop('eth_address', None)
+    session.pop('is_admin', None)
+    
+    # 返回重定向到登录页面
+    return redirect(url_for('admin.login_v2'))
 
 # API路由
 @admin_api_bp.route('/stats')
@@ -4165,3 +4143,25 @@ def api_unblock_user_v2(address):
         current_app.logger.error(f"解冻用户失败: {str(e)}", exc_info=True)
         db.session.rollback()
         return jsonify({'error': '解冻用户失败'}), 500
+
+@admin_bp.route('/login')
+def login():
+    """管理员登录 - 重定向到V2版本登录页面"""
+    return redirect(url_for('admin.login_v2'))
+
+# 在文件末尾添加404处理
+@admin_bp.errorhandler(404)
+def page_not_found(e):
+    """处理404错误，将请求重定向到V2版本管理后台"""
+    current_app.logger.info(f"管理后台404捕获: {request.path}，重定向到V2版本")
+    if '/v2/' in request.path:
+        # 如果已经是v2路径，则返回标准404
+        return render_template('errors/404.html'), 404
+    else:
+        # 尝试根据请求路径找到对应的V2版本页面
+        path = request.path.split('/')[-1]
+        if path in ['dashboard', 'assets', 'users', 'trades', 'commission', 'settings', 'admin-users']:
+            return redirect(url_for(f'admin.{path}_v2'))
+        else:
+            # 默认重定向到V2版本首页
+            return redirect(url_for('admin.admin_v2_index'))
