@@ -2177,7 +2177,8 @@ def get_auth_challenge():
         nonce = secrets.token_hex(32)
         session['admin_auth_nonce'] = nonce
         session['admin_auth_nonce_timestamp'] = datetime.utcnow().timestamp()
-        current_app.logger.info(f"Auth challenge generated for session: {session.sid}, Nonce stored.")
+        # 修复：Flask SecureCookieSession对象没有sid属性，改用安全的日志记录方式
+        current_app.logger.info(f"Auth challenge generated successfully. Nonce stored in session.")
         # 前端会构建一个类似 "请签名此消息以验证您的身份: {nonce}" 的消息
         return jsonify({'nonce': nonce, 'message_prefix': '请签名此消息以验证您的身份: '}), 200
     except Exception as e:
