@@ -3998,3 +3998,159 @@ def export_commission_records():
     except Exception as e:
         current_app.logger.error(f'导出佣金记录失败: {str(e)}', exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+# 在文件末尾添加管理员用户管理API
+
+@admin_bp.route('/api/admin/admins', methods=['GET'])
+@api_admin_required
+def api_get_admin_users():
+    """获取管理员用户列表"""
+    try:
+        # 从AdminUser表获取管理员列表
+        admin_users = AdminUser.query.all()
+        
+        admin_list = []
+        for admin in admin_users:
+            admin_list.append({
+                'id': admin.id,
+                'wallet_address': admin.wallet_address,
+                'admin_level': admin.admin_level,
+                'role': admin.role or '管理员',
+                'created_at': admin.created_at.strftime('%Y-%m-%d %H:%M:%S') if admin.created_at else None
+            })
+        
+        return jsonify(admin_list)
+        
+    except Exception as e:
+        current_app.logger.error(f"获取管理员列表失败: {str(e)}", exc_info=True)
+        return jsonify([])
+
+@admin_bp.route('/api/admin_addresses/<address>', methods=['PUT'])
+@admin_required
+@permission_required('管理用户')
+def update_admin_address(address):
+    """更新管理员信息"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '请求数据无效'}), 400
+        
+        # 查找管理员
+        admin_user = AdminUser.query.filter_by(wallet_address=address).first()
+        if not admin_user:
+            return jsonify({'error': '管理员不存在'}), 404
+        
+        # 更新字段
+        if 'admin_level' in data:
+            admin_user.admin_level = data['admin_level']
+        if 'role' in data:
+            admin_user.role = data['role']
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '管理员信息更新成功'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"更新管理员信息失败: {str(e)}", exc_info=True)
+        db.session.rollback()
+        return jsonify({'error': '更新管理员信息失败'}), 500
+
+@admin_bp.route('/v2/api/user-stats', methods=['GET'])
+@api_admin_required 
+def api_user_stats_v2():
+    """获取用户统计数据"""
+    try:
+        # 总用户数
+        total_users = User.query.count()
+        
+        # 活跃用户数 (有交易记录的用户)
+        active_users = db.session.query(func.count(func.distinct(Trade.trader_address))).scalar() or 0
+        
+        # 分销商数量 (假设User表有is_distributor字段)
+        distributors = User.query.filter_by(is_distributor=True).count() if hasattr(User, 'is_distributor') else 0
+        
+        # 今日新增用户
+        today = datetime.now().date()
+        new_today = User.query.filter(func.date(User.created_at) == today).count()
+        
+        return jsonify({
+            'totalUsers': total_users,
+            'activeUsers': active_users,
+            'distributors': distributors,
+            'newToday': new_today
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取用户统计失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'totalUsers': 0,
+            'activeUsers': 0,
+            'distributors': 0,
+            'newToday': 0
+        })
+
+@admin_bp.route('/v2/api/users/<address>/set-distributor', methods=['POST'])
+@api_admin_required
+def api_set_user_as_distributor_v2(address):
+    """设置用户为分销商"""
+    try:
+        user = User.query.filter_by(wallet_address=address).first()
+        if not user:
+            return jsonify({'error': '用户不存在'}), 404
+        
+        # 如果User表有is_distributor字段
+        if hasattr(user, 'is_distributor'):
+            user.is_distributor = True
+            db.session.commit()
+        
+        return jsonify({'success': True, 'message': '用户已设置为分销商'})
+        
+    except Exception as e:
+        current_app.logger.error(f"设置分销商失败: {str(e)}", exc_info=True)
+        db.session.rollback()
+        return jsonify({'error': '设置分销商失败'}), 500
+
+@admin_bp.route('/v2/api/users/<address>/block', methods=['POST'])
+@api_admin_required
+def api_block_user_v2(address):
+    """冻结用户"""
+    try:
+        user = User.query.filter_by(wallet_address=address).first()
+        if not user:
+            return jsonify({'error': '用户不存在'}), 404
+        
+        # 如果User表有is_blocked字段
+        if hasattr(user, 'is_blocked'):
+            user.is_blocked = True
+            db.session.commit()
+        
+        return jsonify({'success': True, 'message': '用户已冻结'})
+        
+    except Exception as e:
+        current_app.logger.error(f"冻结用户失败: {str(e)}", exc_info=True)
+        db.session.rollback()
+        return jsonify({'error': '冻结用户失败'}), 500
+
+@admin_bp.route('/v2/api/users/<address>/unblock', methods=['POST'])
+@api_admin_required
+def api_unblock_user_v2(address):
+    """解冻用户"""
+    try:
+        user = User.query.filter_by(wallet_address=address).first()
+        if not user:
+            return jsonify({'error': '用户不存在'}), 404
+        
+        # 如果User表有is_blocked字段
+        if hasattr(user, 'is_blocked'):
+            user.is_blocked = False
+            db.session.commit()
+        
+        return jsonify({'success': True, 'message': '用户已解冻'})
+        
+    except Exception as e:
+        current_app.logger.error(f"解冻用户失败: {str(e)}", exc_info=True)
+        db.session.rollback()
+        return jsonify({'error': '解冻用户失败'}), 500
