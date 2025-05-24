@@ -133,7 +133,7 @@ def check_auth():
                     'authenticated': True,
                     'admin': {
                         'id': admin_user.id,
-                        'name': admin_user.name or 'Admin',
+                        'name': admin_user.username or 'Admin',
                         'wallet_address': admin_user.wallet_address,
                         'role': admin_user.role
                     }
@@ -187,7 +187,7 @@ def check_admin():
                 'is_admin': True,
                 'admin_info': {
                     'id': admin_user.id,
-                    'name': admin_user.name or 'Admin',
+                    'name': admin_user.username or 'Admin',
                     'role': admin_user.role
                 }
             })
