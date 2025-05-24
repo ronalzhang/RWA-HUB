@@ -11,7 +11,6 @@ import logging
 from threading import Thread
 from datetime import datetime, timedelta
 import time
-from app.routes.admin.utils import is_admin
 
 def token_required(f):
     @wraps(f)
@@ -345,3 +344,47 @@ def task_background(f):
             raise
     
     return decorated 
+
+def is_admin(eth_address=None):
+    """检查指定地址或当前用户是否是管理员"""
+    target_address = eth_address if eth_address else getattr(g, 'eth_address', None)
+    
+    if not target_address:
+        return False
+        
+    # 检查会话状态
+    if session.get('is_admin') and session.get('eth_address') == target_address:
+        return True
+        
+    # 检查cookie
+    cookie_address = request.cookies.get('eth_address')
+    if request.cookies.get('is_admin') == 'true' and cookie_address == target_address:
+        session['eth_address'] = target_address
+        session['is_admin'] = True
+        return True
+    
+    # 从配置中检查管理员
+    admin_config = current_app.config.get('ADMIN_CONFIG', {})
+    
+    # 区分ETH和SOL地址处理
+    if target_address.startswith('0x'):
+        normalized_address = target_address.lower()
+    else:
+        normalized_address = target_address
+    
+    # 检查地址是否在管理员配置中
+    for admin_address, info in admin_config.items():
+        if admin_address.startswith('0x'):
+            config_address = admin_address.lower()
+        else:
+            config_address = admin_address
+            
+        if normalized_address == config_address:
+            return True
+    
+    # 兼容旧配置
+    admin_addresses = current_app.config.get('ADMIN_ADDRESSES', [])
+    if target_address in admin_addresses:
+        return True
+            
+    return False 

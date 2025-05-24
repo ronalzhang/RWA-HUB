@@ -22,7 +22,8 @@ from . import utils
 
 # 导出常用函数，保持向后兼容
 from .auth import admin_required, api_admin_required, admin_page_required, permission_required
-from .utils import is_admin, has_permission, get_admin_role, get_admin_info, is_valid_solana_address
+from .utils import has_permission, get_admin_role, get_admin_info, is_valid_solana_address
+from app.utils.decorators import is_admin
 
 # 添加V2版本的页面路由（这些路由在各个专门模块中没有定义）
 @admin_bp.route('/v2')

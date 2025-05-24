@@ -58,36 +58,6 @@ def get_admin_info(eth_address):
     return None
 
 
-def is_admin(eth_address=None):
-    """检查指定地址或当前用户是否是管理员"""
-    target_address = eth_address if eth_address else getattr(g, 'eth_address', None)
-    
-    if not target_address:
-        return False
-        
-    # 检查会话状态
-    if session.get('is_admin') and session.get('eth_address') == target_address:
-        return True
-        
-    # 检查cookie
-    cookie_address = request.cookies.get('eth_address')
-    if request.cookies.get('is_admin') == 'true' and cookie_address == target_address:
-        session['eth_address'] = target_address
-        session['is_admin'] = True
-        return True
-    
-    # 从配置中检查管理员
-    admin_info = get_admin_info(target_address)
-    
-    # 兼容旧配置
-    if not admin_info:
-        admin_addresses = current_app.config.get('ADMIN_ADDRESSES', [])
-        if target_address in admin_addresses:
-            return True
-            
-    return admin_info is not None
-
-
 def has_permission(permission, eth_address=None):
     """检查管理员是否有特定权限"""
     target_address = eth_address if eth_address else getattr(g, 'eth_address', None)
