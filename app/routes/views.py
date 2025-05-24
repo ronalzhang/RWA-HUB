@@ -1,6 +1,7 @@
 from flask import render_template, send_from_directory, current_app, request, redirect, url_for, flash, session
 from . import main_bp, assets_bp
-from .admin import admin_required, is_admin
+from .admin import admin_required
+from app.utils.decorators import is_admin
 from ..models import Asset
 from ..models.asset import AssetStatus
 from sqlalchemy import or_ as db_or

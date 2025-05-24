@@ -9,11 +9,11 @@ from flask import (
 )
 from functools import wraps
 from app.models.admin import AdminUser
-from app.utils.decorators import eth_address_required
+from app.utils.decorators import eth_address_required, is_admin
 from app.utils.admin import get_admin_permissions
 from sqlalchemy import func
 from . import admin_bp, admin_api_bp
-from .utils import get_admin_info, is_admin, has_permission
+from .utils import get_admin_info, has_permission
 
 
 def api_admin_required(f):
