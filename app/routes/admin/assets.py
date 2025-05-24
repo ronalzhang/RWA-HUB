@@ -10,7 +10,7 @@ from flask import (
 from datetime import datetime
 import csv
 import io
-from sqlalchemy import desc, func, or_, and_
+from sqlalchemy import desc, func, or_, and_, text
 from app import db
 from app.models.asset import Asset, AssetType
 from app.models.trade import Trade
@@ -344,24 +344,21 @@ def api_delete_asset(asset_id):
     """删除资产（软删除）"""
     try:
         with current_app.app_context():
+            # 首先检查资产是否存在
             asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
             if not asset:
                 return jsonify({'success': False, 'error': '资产不存在或已被删除'}), 404
             
-            # 软删除：设置deleted_at时间戳
-            asset.deleted_at = datetime.utcnow()
+            # 使用原生SQL执行软删除
+            sql = text("UPDATE assets SET deleted_at = NOW() WHERE id = :asset_id AND deleted_at IS NULL")
+            result = db.session.execute(sql, {'asset_id': asset_id})
             
-            # 保存更改
-            try:
-                db.session.add(asset)
+            if result.rowcount > 0:
                 db.session.commit()
-            except Exception as commit_error:
-                db.session.rollback()
-                current_app.logger.error(f'提交失败: {str(commit_error)}')
-                raise commit_error
-            
-            current_app.logger.info(f'资产已软删除: {asset_id}')
-            return jsonify({'success': True, 'message': '资产已删除'})
+                current_app.logger.info(f'资产已软删除: {asset_id}')
+                return jsonify({'success': True, 'message': '资产已删除'})
+            else:
+                return jsonify({'success': False, 'error': '删除失败，资产可能已被删除'}), 400
         
     except Exception as e:
         try:
