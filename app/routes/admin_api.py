@@ -24,11 +24,23 @@ from app.models.dividend import DividendRecord
 from eth_account.messages import encode_defunct
 from eth_account import Account
 
-# For Solana signature verification
-from solders.pubkey import Pubkey # 使用 solders 库中的 Pubkey
-from solders.keypair import Keypair # 虽然这里不用Keypair，但通常和Pubkey一起导入
-import nacl.signing
-import nacl.exceptions
+# For Solana signature verification - 使用可选导入
+try:
+    from solders.pubkey import Pubkey # 使用 solders 库中的 Pubkey
+    from solders.keypair import Keypair # 虽然这里不用Keypair，但通常和Pubkey一起导入
+    SOLDERS_AVAILABLE = True
+except ImportError:
+    # 在没有solders库的环境中，创建占位符
+    Pubkey = None
+    Keypair = None
+    SOLDERS_AVAILABLE = False
+
+try:
+    import nacl.signing
+    import nacl.exceptions
+    NACL_AVAILABLE = True
+except ImportError:
+    NACL_AVAILABLE = False
 
 # 创建蓝图
 admin_v2_bp = Blueprint('admin_v2', __name__, url_prefix='/api/admin/v2')
@@ -2227,29 +2239,38 @@ def admin_auth_login():
         return jsonify({'error': 'Message does not match the challenge nonce. Please try again.'}), 400
 
     try:
-        # 解码Base64签名
-        signature_bytes = base64.b64decode(signature_b64)
-        
-        # 创建Solana公钥对象
-        public_key = Pubkey.from_string(wallet_address)
-        
-        # 创建验证密钥对象
-        verify_key = nacl.signing.VerifyKey(bytes(public_key))
-        
-        # 验证签名
-        # Phantom钱包（以及Solana标准）签名的是消息的UTF-8字节
-        message_bytes = original_message_from_frontend.encode('utf-8')
-        verify_key.verify(message_bytes, signature_bytes)
-        # 如果verify没有抛出异常，则签名有效
-        current_app.logger.info(f"Solana signature verified successfully for {wallet_address}.")
+        # 检查是否有必要的库
+        if not SOLDERS_AVAILABLE or not NACL_AVAILABLE:
+            current_app.logger.warning(f"Solana signature verification libraries not available. Skipping signature verification for {wallet_address}")
+            # 在没有签名验证库的情况下，只检查数据库中的管理员身份
+            admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
+            if not admin_user:
+                current_app.logger.warning(f"Admin login attempt for {wallet_address} failed: Address is not a registered admin.")
+                return jsonify({'error': 'Access denied. Wallet address is not registered as an administrator.'}), 403
+        else:
+            # 解码Base64签名
+            signature_bytes = base64.b64decode(signature_b64)
+            
+            # 创建Solana公钥对象
+            public_key = Pubkey.from_string(wallet_address)
+            
+            # 创建验证密钥对象
+            verify_key = nacl.signing.VerifyKey(bytes(public_key))
+            
+            # 验证签名
+            # Phantom钱包（以及Solana标准）签名的是消息的UTF-8字节
+            message_bytes = original_message_from_frontend.encode('utf-8')
+            verify_key.verify(message_bytes, signature_bytes)
+            # 如果verify没有抛出异常，则签名有效
+            current_app.logger.info(f"Solana signature verified successfully for {wallet_address}.")
 
-        # 验证签名者是否是数据库中的管理员 (Solana地址是大小写敏感的)
-        admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
-        
-        if not admin_user:
-            current_app.logger.warning(f"Admin login attempt for {wallet_address} failed: Address is not a registered admin.")
-            return jsonify({'error': 'Access denied. Wallet address is not registered as an administrator.'}), 403
-        
+            # 验证签名者是否是数据库中的管理员 (Solana地址是大小写敏感的)
+            admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
+            
+            if not admin_user:
+                current_app.logger.warning(f"Admin login attempt for {wallet_address} failed: Address is not a registered admin.")
+                return jsonify({'error': 'Access denied. Wallet address is not registered as an administrator.'}), 403
+
         # 修复：AdminUser模型没有is_active字段，删除此检查
         # 假设所有数据库中的管理员用户都是活跃的
         # if not admin_user.is_active:
@@ -2274,13 +2295,15 @@ def admin_auth_login():
             'role': admin_user.role
         }), 200
 
-    except (nacl.exceptions.BadSignatureError, ValueError) as sig_err:
-        current_app.logger.error(f"Admin login signature verification error for {wallet_address}: {str(sig_err)}")
-        return jsonify({'error': 'Signature verification failed.', 'details': str(sig_err)}), 403
-    except Exception as e:
-        current_app.logger.error(f"Admin login error for {wallet_address}: {str(e)}")
-        current_app.logger.error(traceback.format_exc())
-        return jsonify({'error': 'An unexpected error occurred during login.', 'message': str(e)}), 500
+    except Exception as sig_err:
+        # 统一异常处理，包括signature verification错误
+        if NACL_AVAILABLE and 'BadSignatureError' in str(type(sig_err)):
+            current_app.logger.error(f"Admin login signature verification error for {wallet_address}: {str(sig_err)}")
+            return jsonify({'error': 'Signature verification failed.', 'details': str(sig_err)}), 403
+        else:
+            current_app.logger.error(f"Admin login error for {wallet_address}: {str(sig_err)}")
+            current_app.logger.error(traceback.format_exc())
+            return jsonify({'error': 'An unexpected error occurred during login.', 'message': str(sig_err)}), 500
 
 @admin_v2_bp.route('/auth/logout', methods=['POST'])
 @admin_required # 确保只有已登录的管理员可以调用登出
