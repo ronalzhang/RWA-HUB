@@ -625,7 +625,7 @@ def list_assets():
             'page': page,
             'page_size': page_size,
             'total_pages': pagination.pages,
-            'assets': assets
+            'items': assets  # 修改：从assets改为items以匹配前端期望
         })
         
     except Exception as e:
