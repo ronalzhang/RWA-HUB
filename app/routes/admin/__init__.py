@@ -5,7 +5,7 @@
 - 优化代码结构和可维护性
 """
 
-from flask import Blueprint
+from flask import Blueprint, render_template, redirect, url_for
 
 # 创建蓝图
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -22,4 +22,72 @@ from . import utils
 
 # 导出常用函数，保持向后兼容
 from .auth import admin_required, api_admin_required, admin_page_required, permission_required
-from .utils import is_admin, has_permission, get_admin_role, get_admin_info, is_valid_solana_address 
+from .utils import is_admin, has_permission, get_admin_role, get_admin_info, is_valid_solana_address
+
+# 添加V2版本的页面路由
+@admin_bp.route('/v2')
+@admin_page_required
+def admin_v2_index():
+    """V2版本管理后台首页"""
+    return render_template('admin_v2/index.html')
+
+@admin_bp.route('/v2/dashboard')
+@admin_page_required
+def dashboard_v2():
+    """V2版本仪表板页面"""
+    return render_template('admin_v2/dashboard.html')
+
+@admin_bp.route('/v2/assets')
+@admin_page_required
+def assets_v2():
+    """V2版本资产管理页面"""
+    return render_template('admin_v2/assets.html')
+
+@admin_bp.route('/v2/users')
+@admin_page_required
+def users_v2():
+    """V2版本用户管理页面"""
+    return render_template('admin_v2/users.html')
+
+@admin_bp.route('/v2/trades')
+@admin_page_required
+def trades_v2():
+    """V2版本交易管理页面"""
+    return render_template('admin_v2/trades.html')
+
+@admin_bp.route('/v2/admin-users')
+@admin_page_required
+def admin_users_v2():
+    """V2版本管理员管理页面"""
+    return render_template('admin_v2/admin_users.html')
+
+@admin_bp.route('/v2/commission')
+@admin_page_required
+def commission_v2():
+    """V2版本佣金管理页面"""
+    return render_template('admin_v2/commission.html')
+
+@admin_bp.route('/v2/settings')
+@admin_page_required
+def settings_v2():
+    """V2版本系统设置页面"""
+    return render_template('admin_v2/settings.html')
+
+# 兼容性重定向路由
+@admin_bp.route('/assets')
+@admin_page_required
+def assets_redirect():
+    """重定向到V2版本"""
+    return redirect(url_for('admin.assets_v2'))
+
+@admin_bp.route('/users')
+@admin_page_required
+def users_redirect():
+    """重定向到V2版本"""
+    return redirect(url_for('admin.users_v2'))
+
+@admin_bp.route('/trades')
+@admin_page_required
+def trades_redirect():
+    """重定向到V2版本"""
+    return redirect(url_for('admin.trades_v2')) 

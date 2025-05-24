@@ -2794,22 +2794,24 @@ def delete_single_asset_compat(asset_id):
 def check_permissions_simple():
     """检查管理员权限 - 简化版"""
     try:
-        # 检查管理员权限
         wallet_address = g.wallet_address
+        current_app.logger.info(f'检查管理员权限: {wallet_address}')
+        
+        # 查询管理员用户
         admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
         
         if admin_user:
             return jsonify({
                 'success': True,
                 'has_permission': True,
-                'admin_role': admin_user.role,
-                'permissions': ['dividend_management'] if admin_user.role in ['super_admin', 'admin'] else []
+                'role': admin_user.role,
+                'permissions': admin_user.permissions
             })
         else:
             return jsonify({
                 'success': True,
                 'has_permission': False,
-                'permissions': []
+                'error': '您没有管理员权限'
             })
             
     except Exception as e:
@@ -2819,196 +2821,3 @@ def check_permissions_simple():
             'has_permission': False,
             'error': '检查权限时发生错误'
         }), 500
-
-@admin_compat_bp.route('/assets/batch-approve', methods=['POST'])
-@eth_address_required
-def batch_approve_assets_simple():
-    """批量审核通过资产 - 简化版"""
-    try:
-        # 检查管理员权限
-        wallet_address = g.wallet_address
-        admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
-        if not admin_user:
-            return jsonify({'success': False, 'error': '您没有管理员权限'}), 403
-        
-        data = request.get_json()
-        if not data or 'asset_ids' not in data:
-            return jsonify({'success': False, 'error': '请提供要审核的资产ID列表'}), 400
-            
-        asset_ids = data['asset_ids']
-        current_app.logger.info(f'批量审核通过资产请求: asset_ids={asset_ids}')
-        
-        # 查询待审核的资产
-        assets = Asset.query.filter(
-            Asset.id.in_(asset_ids),
-            Asset.status == 1  # 待审核状态
-        ).all()
-        
-        if not assets:
-            return jsonify({'success': False, 'error': '未找到可审核的资产'}), 404
-        
-        # 更新资产状态为已通过
-        approved_count = 0
-        for asset in assets:
-            asset.status = 2  # 已通过
-            approved_count += 1
-            
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': f'成功审核通过 {approved_count} 个资产'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f'批量审核通过资产失败: {str(e)}')
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@admin_compat_bp.route('/assets/batch-reject', methods=['POST'])
-@eth_address_required
-def batch_reject_assets_simple():
-    """批量拒绝资产 - 简化版"""
-    try:
-        # 检查管理员权限
-        wallet_address = g.wallet_address
-        admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
-        if not admin_user:
-            return jsonify({'success': False, 'error': '您没有管理员权限'}), 403
-        
-        data = request.get_json()
-        if not data or 'asset_ids' not in data:
-            return jsonify({'success': False, 'error': '请提供要拒绝的资产ID列表'}), 400
-            
-        asset_ids = data['asset_ids']
-        reject_reason = data.get('reason', '管理员拒绝')
-        current_app.logger.info(f'批量拒绝资产请求: asset_ids={asset_ids}, reason={reject_reason}')
-        
-        # 查询待审核的资产
-        assets = Asset.query.filter(
-            Asset.id.in_(asset_ids),
-            Asset.status == 1  # 待审核状态
-        ).all()
-        
-        if not assets:
-            return jsonify({'success': False, 'error': '未找到可拒绝的资产'}), 404
-        
-        # 更新资产状态为已拒绝
-        rejected_count = 0
-        for asset in assets:
-            asset.status = 3  # 已拒绝
-            if hasattr(asset, 'reject_reason'):
-                asset.reject_reason = reject_reason
-            rejected_count += 1
-            
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': f'成功拒绝 {rejected_count} 个资产'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f'批量拒绝资产失败: {str(e)}')
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-# 简单的删除资产API，使用基础权限检查
-@admin_compat_bp.route('/assets/<int:asset_id>', methods=['DELETE'])
-@eth_address_required
-def delete_asset_simple(asset_id):
-    """删除单个资产 - 简化版"""
-    try:
-        current_app.logger.info(f'删除资产请求: asset_id={asset_id}')
-        
-        # 检查管理员权限
-        wallet_address = g.wallet_address
-        admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
-        if not admin_user:
-            return jsonify({'error': '您没有管理员权限'}), 403
-        
-        # 查找资产
-        asset = Asset.query.get_or_404(asset_id)
-        
-        # 删除关联的分红记录
-        DividendRecord.query.filter_by(asset_id=asset_id).delete()
-        
-        # 删除关联的交易记录
-        Trade.query.filter_by(asset_id=asset_id).delete()
-        
-        # 删除资产记录
-        db.session.delete(asset)
-        db.session.commit()
-        
-        current_app.logger.info(f'资产已删除: {asset_id} (包括已上链资产，仅删除平台发布信息)')
-        return jsonify({
-            'success': True,
-            'message': '资产已从平台删除'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f'删除资产失败: {str(e)}')
-        return jsonify({'error': str(e)}), 500
-
-@admin_compat_bp.route('/assets/batch-delete', methods=['POST'])
-@eth_address_required
-def batch_delete_assets_simple():
-    """批量删除资产 - 简化版"""
-    try:
-        # 检查管理员权限
-        wallet_address = g.wallet_address
-        admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
-        if not admin_user:
-            return jsonify({'success': False, 'error': '您没有管理员权限'}), 403
-        
-        data = request.get_json()
-        if not data or 'asset_ids' not in data:
-            return jsonify({'success': False, 'error': '请提供要删除的资产ID列表'}), 400
-            
-        asset_ids = data['asset_ids']
-        current_app.logger.info(f'批量删除资产请求: asset_ids={asset_ids}')
-        
-        success_count = 0
-        failed_ids = []
-        
-        for asset_id in asset_ids:
-            try:
-                asset = Asset.query.get(asset_id)
-                
-                if not asset:
-                    failed_ids.append({"id": asset_id, "reason": "资产不存在"})
-                    continue
-                
-                # 删除关联记录
-                DividendRecord.query.filter_by(asset_id=asset_id).delete()
-                Trade.query.filter_by(asset_id=asset_id).delete()
-                
-                # 删除资产
-                db.session.delete(asset)
-                success_count += 1
-                
-            except Exception as e:
-                current_app.logger.error(f'删除资产 {asset_id} 失败: {str(e)}')
-                failed_ids.append({"id": asset_id, "reason": str(e)})
-                continue
-                
-        db.session.commit()
-        
-        message = f'成功删除 {success_count} 个资产'
-        if failed_ids:
-            message += f'，{len(failed_ids)} 个资产删除失败'
-            
-        return jsonify({
-            'success': True,
-            'message': message,
-            'success_count': success_count,
-            'failed_count': len(failed_ids),
-            'failed_ids': failed_ids
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f'批量删除资产失败: {str(e)}')
-        return jsonify({'success': False, 'error': str(e)}), 500
-
