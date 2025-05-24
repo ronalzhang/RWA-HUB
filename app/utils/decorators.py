@@ -11,6 +11,7 @@ import logging
 from threading import Thread
 from datetime import datetime, timedelta
 import time
+from app.routes.admin.utils import is_admin
 
 def token_required(f):
     @wraps(f)
@@ -180,7 +181,6 @@ def admin_required(f):
             return jsonify({'success': False, 'error': '未提供钱包地址', 'authenticated': False}), 401
         
         # 检查是否为管理员
-        from app.routes.admin import is_admin
         if not is_admin(eth_address):
             logging.warning(f"非管理员尝试访问管理功能: {eth_address}")
             return jsonify({'success': False, 'error': '无权访问，需要管理员权限', 'authenticated': True, 'authorized': False}), 403

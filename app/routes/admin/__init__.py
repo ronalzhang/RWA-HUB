@@ -24,7 +24,7 @@ from . import utils
 from .auth import admin_required, api_admin_required, admin_page_required, permission_required
 from .utils import is_admin, has_permission, get_admin_role, get_admin_info, is_valid_solana_address
 
-# 添加V2版本的页面路由
+# 添加V2版本的页面路由（这些路由在各个专门模块中没有定义）
 @admin_bp.route('/v2')
 @admin_page_required
 def admin_v2_index():
@@ -73,33 +73,5 @@ def admin_users_v2():
     """V2版本管理员用户页面"""
     return render_template('admin_v2/admin_users.html')
 
-# 兼容旧版本路由
-@admin_bp.route('/dashboard')
-@admin_page_required
-def dashboard():
-    """仪表盘页面"""
-    return render_template('admin_v2/dashboard.html')
-
-@admin_bp.route('/')
-@admin_page_required
-def admin_index():
-    """管理后台首页"""
-    return render_template('admin_v2/dashboard.html')
-
-@admin_bp.route('/assets')
-@admin_page_required
-def assets():
-    """资产管理页面"""
-    return render_template('admin_v2/assets.html')
-
-@admin_bp.route('/users')
-@admin_page_required
-def users():
-    """用户管理页面"""
-    return render_template('admin_v2/users.html')
-
-@admin_bp.route('/trades')
-@admin_page_required
-def trades():
-    """交易管理页面"""
-    return render_template('admin_v2/trades.html') 
+# 注意：dashboard、assets、users、trades等路由已在各自模块中定义
+# 避免重复定义导致路由冲突 

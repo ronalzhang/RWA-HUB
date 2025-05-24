@@ -7,7 +7,7 @@ from collections import defaultdict
 import random
 
 from app.utils.solana_log_reader import SolanaLogReader
-from app.routes.admin import admin_required, permission_required, admin_page_required
+from app.routes.admin.auth import admin_required, permission_required, admin_page_required
 
 # 创建蓝图
 admin_solana_bp = Blueprint('admin_solana', __name__, url_prefix='/admin/solana')
