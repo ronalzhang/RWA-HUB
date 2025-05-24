@@ -12,8 +12,9 @@ from app.utils.decorators import eth_address_required, async_task, log_activity,
 from app.models.admin import (
     AdminUser, SystemConfig, CommissionSetting, DistributionLevel,
     CommissionStatus, CommissionType, UserReferral, 
-    CommissionRecord, AdminOperationLog, DashboardStats
+    AdminOperationLog, DashboardStats
 )
+from app.models.referral import CommissionRecord
 from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.user import User
 from app.models.trade import Trade
