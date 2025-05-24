@@ -24,9 +24,115 @@ def list_assets():
     """获取资产列表"""
     try:
         current_app.logger.info("请求资产列表")
-        return jsonify([]), 200
+        
+        from app.models.asset import Asset, AssetStatus
+        from app.models.user import User
+        from sqlalchemy import desc
+        
+        # 构建查询 - 只显示已上链的资产（状态为2）
+        query = Asset.query.filter(Asset.status == AssetStatus.ON_CHAIN.value)
+        
+        # 获取分页参数
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        
+        # 获取筛选参数
+        asset_type = request.args.get('type')
+        location = request.args.get('location')
+        search = request.args.get('search')
+        
+        # 按类型筛选
+        if asset_type:
+            try:
+                type_value = int(asset_type)
+                query = query.filter(Asset.asset_type == type_value)
+            except ValueError:
+                pass
+        
+        # 按位置筛选
+        if location:
+            query = query.filter(Asset.location.ilike(f'%{location}%'))
+            
+        # 搜索功能
+        if search:
+            query = query.filter(
+                db.or_(
+                    Asset.name.ilike(f'%{search}%'),
+                    Asset.description.ilike(f'%{search}%'),
+                    Asset.token_symbol.ilike(f'%{search}%')
+                )
+            )
+        
+        # 排序 - 按创建时间倒序
+        query = query.order_by(desc(Asset.created_at))
+        
+        # 分页
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        assets = pagination.items
+        
+        # 转换为前端需要的格式
+        asset_list = []
+        for asset in assets:
+            # 获取第一张图片
+            image_url = None
+            if asset.images and len(asset.images) > 0:
+                image_url = asset.images[0]
+            
+            # 获取资产类型名称
+            asset_type_name = '其他'
+            try:
+                from app.models.asset import AssetType
+                for item in AssetType:
+                    if item.value == asset.asset_type:
+                        if item.value == 10:
+                            asset_type_name = '不动产'
+                        elif item.value == 20:
+                            asset_type_name = '商业地产'
+                        elif item.value == 30:
+                            asset_type_name = '工业地产'
+                        elif item.value == 40:
+                            asset_type_name = '土地资产'
+                        elif item.value == 50:
+                            asset_type_name = '证券资产'
+                        elif item.value == 60:
+                            asset_type_name = '艺术品'
+                        elif item.value == 70:
+                            asset_type_name = '收藏品'
+                        else:
+                            asset_type_name = '其他'
+                        break
+            except:
+                asset_type_name = '其他'
+            
+            asset_data = {
+                'id': asset.id,
+                'name': asset.name,
+                'description': asset.description,
+                'asset_type': asset.asset_type,
+                'asset_type_name': asset_type_name,
+                'location': asset.location,
+                'area': float(asset.area) if asset.area else 0,
+                'token_symbol': asset.token_symbol,
+                'token_price': float(asset.token_price) if asset.token_price else 0,
+                'token_supply': asset.token_supply,
+                'remaining_supply': asset.remaining_supply or asset.token_supply,
+                'total_value': float(asset.total_value) if asset.total_value else 0,
+                'annual_revenue': float(asset.annual_revenue) if asset.annual_revenue else 0,
+                'images': asset.images if asset.images else [],
+                'image_url': image_url,
+                'token_address': asset.token_address,
+                'creator_address': asset.creator_address,
+                'created_at': asset.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'updated_at': asset.updated_at.strftime('%Y-%m-%d %H:%M:%S') if asset.updated_at else None
+            }
+            
+            asset_list.append(asset_data)
+        
+        current_app.logger.info(f"返回 {len(asset_list)} 个资产")
+        return jsonify(asset_list), 200
+        
     except Exception as e:
-        current_app.logger.error(f"获取资产列表失败: {str(e)}")
+        current_app.logger.error(f"获取资产列表失败: {str(e)}", exc_info=True)
         return jsonify([]), 200
 
 @api_bp.route('/user/assets', methods=['GET'])
