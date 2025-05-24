@@ -350,20 +350,18 @@
     function userManagement() {
         return {
             // 数据状态
-            users: [],
             loading: false,
-            selectedUsers: [],
-            selectedUser: null,
-            selectAll: false,
-            showUserModal: false,
-            
-            // 统计数据
+            users: [],
             stats: {
                 totalUsers: 0,
                 activeUsers: 0,
                 distributors: 0,
                 newToday: 0
             },
+            selectedUsers: [],
+            selectedUser: null,
+            selectAll: false,
+            showUserModal: false,
             
             // 筛选条件
             filters: {
@@ -375,24 +373,47 @@
             // 分页
             pagination: {
                 page: 1,
-                pageSize: 10,
+                pageSize: 20,
                 totalItems: 0,
                 totalPages: 0
             },
             
-            // 初始化加载数据
+            // 获取URL参数中的钱包地址
+            getWalletAddress() {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get('eth_address');
+            },
+            
+            // 创建带认证头的fetch请求
+            authFetch(url, options = {}) {
+                const walletAddress = this.getWalletAddress();
+                return fetch(url, {
+                    ...options,
+                    headers: {
+                        'X-Wallet-Address': walletAddress,
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+            },
+            
+            // 初始化数据
+            async init() {
+                await this.loadData();
+            },
+            
+            // 加载所有数据
             async loadData() {
-                console.log('Alpine.js 初始化完成');
                 await Promise.all([
                     this.loadStats(),
-                    this.loadUsers(1)
+                    this.loadUsers()
                 ]);
             },
             
             // 加载统计数据
             async loadStats() {
                 try {
-                    const response = await fetch('/admin/v2/api/user-stats');
+                    const response = await this.authFetch('/admin/v2/api/user-stats');
                     if (response.ok) {
                         const data = await response.json();
                         this.stats = {
@@ -426,7 +447,7 @@
                     if (this.filters.registration_time) params.append('registration_time', this.filters.registration_time);
                     if (this.filters.user_type) params.append('user_type', this.filters.user_type);
                     
-                    const response = await fetch(`/admin/v2/api/users?${params}`);
+                    const response = await this.authFetch(`/admin/v2/api/users?${params}`);
                     if (!response.ok) throw new Error('加载用户失败');
                     
                     const data = await response.json();
@@ -489,7 +510,7 @@
                 if (!confirm('确认将此用户设置为分销商？')) return;
                 
                 try {
-                    const response = await fetch(`/admin/v2/api/users/${address}/set-distributor`, {
+                    const response = await this.authFetch(`/admin/v2/api/users/${address}/set-distributor`, {
                         method: 'POST'
                     });
                     
@@ -509,7 +530,7 @@
                 if (!confirm('确认冻结此用户？冻结后用户将无法进行交易和其他操作。')) return;
                 
                 try {
-                    const response = await fetch(`/admin/v2/api/users/${address}/block`, {
+                    const response = await this.authFetch(`/admin/v2/api/users/${address}/block`, {
                         method: 'POST'
                     });
                     
@@ -529,7 +550,7 @@
                 if (!confirm('确认解冻此用户？')) return;
                 
                 try {
-                    const response = await fetch(`/admin/v2/api/users/${address}/unblock`, {
+                    const response = await this.authFetch(`/admin/v2/api/users/${address}/unblock`, {
                         method: 'POST'
                     });
                     
