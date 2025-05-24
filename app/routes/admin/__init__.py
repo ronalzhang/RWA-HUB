@@ -18,4 +18,8 @@ from . import users
 from . import dashboard
 from . import commission
 from . import trades
-from . import utils 
+from . import utils
+
+# 导出常用函数，保持向后兼容
+from .auth import admin_required, api_admin_required, admin_page_required, permission_required
+from .utils import is_admin, has_permission, get_admin_role, get_admin_info, is_valid_solana_address 
