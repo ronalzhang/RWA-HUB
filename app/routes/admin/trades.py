@@ -11,11 +11,4 @@ from .auth import api_admin_required, admin_page_required
 @admin_page_required
 def trades():
     """交易管理页面"""
-    return render_template('admin/trades.html')
-
-
-@admin_bp.route('/v2/trades')
-@admin_page_required
-def trades_v2():
-    """V2版本交易管理页面"""
-    return render_template('admin/v2/trades.html') 
+    return render_template('admin/trades.html') 
