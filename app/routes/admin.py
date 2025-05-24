@@ -2463,8 +2463,8 @@ def api_assets_v2():
         page = request.args.get('page', 1, type=int)
         limit = request.args.get('limit', 10, type=int)
         
-        # 查询资产列表 - 管理后台始终显示所有未删除的资产
-        query = Asset.query.filter(Asset.status != 0)  # 0 表示已删除
+        # 查询资产列表 - 管理后台显示所有未删除的资产（排除状态为4的已删除资产）
+        query = Asset.query.filter(Asset.status != 4)  # 4 表示已删除（软删除）
         
         # 查询筛选条件
         status = request.args.get('status')
@@ -2613,61 +2613,216 @@ def api_assets_stats_v2():
             'status_distribution': {}
         })
 
-@admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['PUT'])
-@api_admin_required
-def api_edit_asset_v2(asset_id):
-    """管理后台V2版本编辑资产API"""
-    # 模拟成功响应
-    return jsonify({'success': True, 'message': '资产更新成功'})
-
-@admin_bp.route('/v2/api/assets', methods=['POST'])
-@api_admin_required
-def api_create_asset_v2():
-    """管理后台V2版本创建资产API"""
-    # 模拟成功响应
-    return jsonify({'success': True, 'message': '资产创建成功', 'id': 100})
-
 @admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['DELETE'])
 @api_admin_required
 def api_delete_asset_v2(asset_id):
-    """管理后台V2版本删除资产API"""
-    # 模拟成功响应
-    return jsonify({'success': True, 'message': '资产删除成功'})
+    """管理后台V2版本删除资产API - 软删除实现"""
+    try:
+        current_app.logger.info(f'V2版本删除资产请求: asset_id={asset_id}')
+        
+        # 查找资产
+        asset = Asset.query.get_or_404(asset_id)
+        
+        # 软删除：将状态改为4（已删除）
+        asset.status = 4
+        db.session.commit()
+        
+        current_app.logger.info(f'资产已软删除: {asset_id} (状态改为4)')
+        return jsonify({'success': True, 'message': '资产已删除'})
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'删除资产失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/v2/api/assets/<int:asset_id>/approve', methods=['POST'])
 @api_admin_required
 def api_approve_asset_v2(asset_id):
     """管理后台V2版本批准资产API"""
-    # 模拟成功响应
-    return jsonify({'success': True, 'message': '资产批准成功'})
+    try:
+        current_app.logger.info(f'V2版本审核通过资产请求: asset_id={asset_id}')
+        
+        # 查找资产
+        asset = Asset.query.get_or_404(asset_id)
+        
+        # 检查资产状态
+        if asset.status != 1:  # 待审核状态
+            return jsonify({'success': False, 'error': '只能审核待审核状态的资产'}), 400
+        
+        # 更新状态为已通过
+        asset.status = 2  # 已通过
+        db.session.commit()
+        
+        current_app.logger.info(f'资产审核通过成功: {asset_id}')
+        return jsonify({'success': True, 'message': '资产审核通过成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'审核资产失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/v2/api/assets/<int:asset_id>/reject', methods=['POST'])
 @api_admin_required
 def api_reject_asset_v2(asset_id):
     """管理后台V2版本拒绝资产API"""
-    # 模拟成功响应
-    return jsonify({'success': True, 'message': '资产拒绝成功'})
+    try:
+        current_app.logger.info(f'V2版本审核拒绝资产请求: asset_id={asset_id}')
+        
+        data = request.get_json()
+        reject_reason = data.get('reason', '管理员拒绝') if data else '管理员拒绝'
+        
+        # 查找资产
+        asset = Asset.query.get_or_404(asset_id)
+        
+        # 检查资产状态
+        if asset.status != 1:  # 待审核状态
+            return jsonify({'success': False, 'error': '只能拒绝待审核状态的资产'}), 400
+        
+        # 更新状态为已拒绝
+        asset.status = 3  # 已拒绝
+        if hasattr(asset, 'reject_reason'):
+            asset.reject_reason = reject_reason
+        db.session.commit()
+        
+        current_app.logger.info(f'资产审核拒绝成功: {asset_id}, reason={reject_reason}')
+        return jsonify({'success': True, 'message': '资产审核拒绝成功'})
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'拒绝资产失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/v2/api/assets/batch-approve', methods=['POST'])
 @api_admin_required
 def api_batch_approve_assets_v2():
     """管理后台V2版本批量批准资产API"""
-    # 模拟成功响应
-    return jsonify({'success': True, 'message': '批量批准资产成功'})
+    try:
+        data = request.get_json()
+        if not data or 'asset_ids' not in data:
+            return jsonify({'success': False, 'error': '请提供要审核的资产ID列表'}), 400
+            
+        asset_ids = data['asset_ids']
+        current_app.logger.info(f'V2版本批量审核通过资产请求: asset_ids={asset_ids}')
+        
+        # 查询待审核的资产
+        assets = Asset.query.filter(
+            Asset.id.in_(asset_ids),
+            Asset.status == 1  # 待审核状态
+        ).all()
+        
+        if not assets:
+            return jsonify({'success': False, 'error': '未找到可审核的资产'}), 404
+        
+        # 更新资产状态为已通过
+        approved_count = 0
+        for asset in assets:
+            asset.status = 2  # 已通过
+            approved_count += 1
+            
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功审核通过 {approved_count} 个资产'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'批量审核通过资产失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/v2/api/assets/batch-reject', methods=['POST'])
 @api_admin_required
 def api_batch_reject_assets_v2():
     """管理后台V2版本批量拒绝资产API"""
-    # 模拟成功响应
-    return jsonify({'success': True, 'message': '批量拒绝资产成功'})
+    try:
+        data = request.get_json()
+        if not data or 'asset_ids' not in data:
+            return jsonify({'success': False, 'error': '请提供要拒绝的资产ID列表'}), 400
+            
+        asset_ids = data['asset_ids']
+        reject_reason = data.get('reason', '管理员拒绝')
+        current_app.logger.info(f'V2版本批量拒绝资产请求: asset_ids={asset_ids}, reason={reject_reason}')
+        
+        # 查询待审核的资产
+        assets = Asset.query.filter(
+            Asset.id.in_(asset_ids),
+            Asset.status == 1  # 待审核状态
+        ).all()
+        
+        if not assets:
+            return jsonify({'success': False, 'error': '未找到可拒绝的资产'}), 404
+        
+        # 更新资产状态为已拒绝
+        rejected_count = 0
+        for asset in assets:
+            asset.status = 3  # 已拒绝
+            if hasattr(asset, 'reject_reason'):
+                asset.reject_reason = reject_reason
+            rejected_count += 1
+            
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功拒绝 {rejected_count} 个资产'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'批量拒绝资产失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/v2/api/assets/batch-delete', methods=['POST'])
 @api_admin_required
 def api_batch_delete_assets_v2():
-    """管理后台V2版本批量删除资产API"""
-    # 模拟成功响应
-    return jsonify({'success': True, 'message': '批量删除资产成功'})
+    """管理后台V2版本批量删除资产API - 软删除实现"""
+    try:
+        data = request.get_json()
+        if not data or 'asset_ids' not in data:
+            return jsonify({'success': False, 'error': '请提供要删除的资产ID列表'}), 400
+            
+        asset_ids = data['asset_ids']
+        current_app.logger.info(f'V2版本批量删除资产请求: asset_ids={asset_ids}')
+        
+        success_count = 0
+        failed_ids = []
+        
+        for asset_id in asset_ids:
+            try:
+                asset = Asset.query.get(asset_id)
+                
+                if not asset:
+                    failed_ids.append({"id": asset_id, "reason": "资产不存在"})
+                    continue
+                
+                # 软删除：将状态改为4（已删除）
+                asset.status = 4
+                success_count += 1
+                
+            except Exception as e:
+                current_app.logger.error(f'删除资产 {asset_id} 失败: {str(e)}')
+                failed_ids.append({"id": asset_id, "reason": str(e)})
+                continue
+                
+        db.session.commit()
+        
+        message = f'成功删除 {success_count} 个资产'
+        if failed_ids:
+            message += f'，{len(failed_ids)} 个资产删除失败'
+            
+        return jsonify({
+            'success': True,
+            'message': message,
+            'success_count': success_count,
+            'failed_count': len(failed_ids),
+            'failed_ids': failed_ids
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'批量删除资产失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/v2/api/assets/export', methods=['GET'])
 @api_admin_required
@@ -4199,3 +4354,83 @@ def page_not_found(e):
         else:
             # 默认重定向到V2版本首页
             return redirect(url_for('admin.admin_v2_index'))
+
+@admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['GET'])
+@api_admin_required
+def api_get_asset_v2(asset_id):
+    """管理后台V2版本获取资产详情API"""
+    try:
+        current_app.logger.info(f'V2版本获取资产详情请求: asset_id={asset_id}')
+        
+        # 查找资产
+        asset = Asset.query.get_or_404(asset_id)
+        
+        # 获取资产类型名称
+        asset_type_name = '未知类型'
+        asset_type_value = asset.asset_type
+        
+        # 尝试查找枚举值
+        for item in AssetType:
+            if item.value == asset_type_value:
+                asset_type_name = item.name
+                break
+        
+        # 获取封面图片  
+        cover_image = '/static/images/placeholder.jpg'
+        if asset.images and len(asset.images) > 0:
+            cover_image = asset.images[0]
+        
+        asset_data = {
+            'id': asset.id,
+            'name': asset.name,
+            'description': asset.description,
+            'token_symbol': asset.token_symbol,
+            'asset_type': asset.asset_type,
+            'asset_type_name': asset_type_name,
+            'location': asset.location,
+            'area': float(asset.area) if asset.area else 0,
+            'token_price': float(asset.token_price) if asset.token_price else 0,
+            'annual_revenue': float(asset.annual_revenue) if asset.annual_revenue else 0,
+            'total_value': float(asset.total_value) if asset.total_value else 0,
+            'token_supply': asset.token_supply,
+            'creator_address': asset.creator_address,
+            'status': asset.status,
+            'status_text': {
+                1: '待审核',
+                2: '已通过',
+                3: '已拒绝',
+                4: '已删除'
+            }.get(asset.status, '未知状态'),
+            'image': cover_image,
+            'images': asset.images if asset.images else [],
+            'created_at': asset.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': asset.updated_at.strftime('%Y-%m-%d %H:%M:%S') if asset.updated_at else None
+        }
+        
+        return jsonify({'success': True, 'data': asset_data})
+        
+    except Exception as e:
+        current_app.logger.error(f'获取资产详情失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['DELETE'])
+@api_admin_required
+def api_delete_asset_v2(asset_id):
+    """管理后台V2版本删除资产API - 软删除实现"""
+    try:
+        current_app.logger.info(f'V2版本删除资产请求: asset_id={asset_id}')
+        
+        # 查找资产
+        asset = Asset.query.get_or_404(asset_id)
+        
+        # 软删除：将状态改为4（已删除）
+        asset.status = 4
+        db.session.commit()
+        
+        current_app.logger.info(f'资产已软删除: {asset_id} (状态改为4)')
+        return jsonify({'success': True, 'message': '资产已删除'})
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'删除资产失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
