@@ -432,31 +432,38 @@ def api_batch_approve_assets():
             return jsonify({'success': False, 'error': '请提供要审核的资产ID列表'}), 400
             
         asset_ids = data['asset_ids']
-        success_count = 0
-        failed_ids = []
+        if not asset_ids:
+            return jsonify({'success': False, 'error': '资产ID列表不能为空'}), 400
         
-        for asset_id in asset_ids:
-            try:
-                asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
-                if asset and asset.status == 1:
-                    asset.status = 2
-                    success_count += 1
-                else:
-                    failed_ids.append(asset_id)
-            except Exception as e:
-                failed_ids.append(asset_id)
-                
+        # 验证所有asset_ids都是整数
+        try:
+            asset_ids = [int(aid) for aid in asset_ids]
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': '无效的资产ID格式'}), 400
+        
+        # 使用原生SQL执行批量审核通过
+        from sqlalchemy import text
+        sql = text("UPDATE assets SET status = 2 WHERE id = ANY(:asset_ids) AND status = 1 AND deleted_at IS NULL")
+        result = db.session.execute(sql, {'asset_ids': asset_ids})
+        
+        success_count = result.rowcount
+        failed_count = len(asset_ids) - success_count
+        
         db.session.commit()
         
         return jsonify({
             'success': True,
             'message': f'成功审核通过 {success_count} 个资产',
             'success_count': success_count,
-            'failed_ids': failed_ids
+            'failed_count': failed_count,
+            'total_requested': len(asset_ids)
         })
         
     except Exception as e:
-        db.session.rollback()
+        try:
+            db.session.rollback()
+        except:
+            pass
         current_app.logger.error(f'批量审核失败: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -472,33 +479,39 @@ def api_batch_reject_assets():
             
         asset_ids = data['asset_ids']
         reject_reason = data.get('reason', '管理员批量拒绝')
-        success_count = 0
-        failed_ids = []
         
-        for asset_id in asset_ids:
-            try:
-                asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
-                if asset and asset.status == 1:
-                    asset.status = 3
-                    if hasattr(asset, 'reject_reason'):
-                        asset.reject_reason = reject_reason
-                    success_count += 1
-                else:
-                    failed_ids.append(asset_id)
-            except Exception as e:
-                failed_ids.append(asset_id)
-                
+        if not asset_ids:
+            return jsonify({'success': False, 'error': '资产ID列表不能为空'}), 400
+        
+        # 验证所有asset_ids都是整数
+        try:
+            asset_ids = [int(aid) for aid in asset_ids]
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': '无效的资产ID格式'}), 400
+        
+        # 使用原生SQL执行批量审核拒绝
+        from sqlalchemy import text
+        sql = text("UPDATE assets SET status = 3 WHERE id = ANY(:asset_ids) AND status = 1 AND deleted_at IS NULL")
+        result = db.session.execute(sql, {'asset_ids': asset_ids})
+        
+        success_count = result.rowcount
+        failed_count = len(asset_ids) - success_count
+        
         db.session.commit()
         
         return jsonify({
             'success': True,
             'message': f'成功拒绝 {success_count} 个资产',
             'success_count': success_count,
-            'failed_ids': failed_ids
+            'failed_count': failed_count,
+            'total_requested': len(asset_ids)
         })
         
     except Exception as e:
-        db.session.rollback()
+        try:
+            db.session.rollback()
+        except:
+            pass
         current_app.logger.error(f'批量拒绝失败: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -513,31 +526,44 @@ def api_batch_delete_assets():
             return jsonify({'success': False, 'error': '请提供要删除的资产ID列表'}), 400
             
         asset_ids = data['asset_ids']
-        success_count = 0
-        failed_ids = []
+        if not asset_ids:
+            return jsonify({'success': False, 'error': '资产ID列表不能为空'}), 400
         
-        for asset_id in asset_ids:
-            try:
-                asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
-                if asset:
-                    asset.deleted_at = datetime.utcnow()  # 软删除
-                    success_count += 1
-                else:
-                    failed_ids.append(asset_id)
-            except Exception as e:
-                failed_ids.append(asset_id)
-                
+        # 验证所有asset_ids都是整数
+        try:
+            asset_ids = [int(aid) for aid in asset_ids]
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': '无效的资产ID格式'}), 400
+        
+        # 使用原生SQL执行批量软删除
+        from sqlalchemy import text
+        
+        # 先检查有多少资产存在且未被删除
+        check_sql = text("SELECT COUNT(*) FROM assets WHERE id = ANY(:asset_ids) AND deleted_at IS NULL")
+        exist_count = db.session.execute(check_sql, {'asset_ids': asset_ids}).scalar()
+        
+        # 执行批量软删除
+        sql = text("UPDATE assets SET deleted_at = NOW() WHERE id = ANY(:asset_ids) AND deleted_at IS NULL")
+        result = db.session.execute(sql, {'asset_ids': asset_ids})
+        
+        success_count = result.rowcount
+        failed_count = len(asset_ids) - success_count
+        
         db.session.commit()
         
         return jsonify({
             'success': True,
             'message': f'成功删除 {success_count} 个资产',
             'success_count': success_count,
-            'failed_ids': failed_ids
+            'failed_count': failed_count,
+            'total_requested': len(asset_ids)
         })
         
     except Exception as e:
-        db.session.rollback()
+        try:
+            db.session.rollback()
+        except:
+            pass
         current_app.logger.error(f'批量删除失败: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
