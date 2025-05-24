@@ -2828,72 +2828,124 @@ def check_permissions_simple():
 @api_admin_required
 def compat_commission_stats():
     """获取佣金统计 - 兼容API"""
-    from app.routes.admin.commission import get_commission_stats
-    return get_commission_stats()
+    from app.routes.admin.commission import api_commission_stats
+    return api_commission_stats()
 
 @admin_compat_bp.route('/commission/records', methods=['GET'])
 @api_admin_required
 def compat_commission_records():
     """获取佣金记录列表 - 兼容API"""
-    from app.routes.admin.commission import get_commission_records
-    return get_commission_records()
+    from app.routes.admin.commission import api_commission_records
+    return api_commission_records()
 
 @admin_compat_bp.route('/commission/settings', methods=['GET'])
 @api_admin_required
 def compat_commission_settings_get():
     """获取佣金设置 - 兼容API"""
-    from app.routes.admin.commission import get_commission_settings
-    return get_commission_settings()
+    from app.routes.admin.commission import api_commission_settings
+    return api_commission_settings()
 
 @admin_compat_bp.route('/commission/settings', methods=['POST'])
 @api_admin_required
 def compat_commission_settings_post():
     """保存佣金设置 - 兼容API"""
-    from app.routes.admin.commission import save_commission_settings
-    return save_commission_settings()
+    from app.routes.admin.commission import api_update_commission_settings
+    return api_update_commission_settings()
 
 @admin_compat_bp.route('/commission/records/<int:record_id>/pay', methods=['POST'])
 @api_admin_required
 def compat_commission_pay(record_id):
     """发放佣金 - 兼容API"""
-    from app.routes.admin.commission import pay_commission_record
-    return pay_commission_record(record_id)
+    from app.routes.admin.commission import api_pay_commission
+    return api_pay_commission(record_id)
 
 @admin_compat_bp.route('/commission/records/export', methods=['GET'])
 @api_admin_required
 def compat_commission_export():
     """导出佣金记录 - 兼容API"""
-    from app.routes.admin.commission import export_commission_records
-    return export_commission_records()
+    try:
+        # 直接实现导出功能
+        from app.models.referral import CommissionRecord
+        import csv
+        import io
+        from flask import make_response
+        
+        # 获取所有佣金记录
+        records = CommissionRecord.query.order_by(CommissionRecord.created_at.desc()).all()
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 写入标题行
+        writer.writerow([
+            'ID', '交易ID', '资产ID', '接收地址', '佣金金额', '货币', 
+            '佣金类型', '状态', '交易哈希', '创建时间'
+        ])
+        
+        # 写入数据行
+        for record in records:
+            writer.writerow([
+                record.id,
+                record.transaction_id,
+                record.asset_id,
+                record.recipient_address,
+                float(record.amount),
+                record.currency,
+                record.commission_type,
+                record.status,
+                record.tx_hash or '',
+                record.created_at.strftime('%Y-%m-%d %H:%M:%S') if record.created_at else ''
+            ])
+        
+        output.seek(0)
+        
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = f'attachment; filename=commission_records_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.csv'
+        
+        return response
+        
+    except Exception as e:
+        current_app.logger.error(f"导出佣金记录失败: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 @admin_compat_bp.route('/commission/referrals', methods=['GET'])
 @api_admin_required
 def compat_commission_referrals():
     """获取推荐关系 - 兼容API"""
-    from app.routes.admin.commission import get_referral_list
-    return get_referral_list()
+    try:
+        # 实现推荐关系列表功能
+        return jsonify({
+            'success': True,
+            'items': [],
+            'total': 0,
+            'message': '推荐关系功能暂未实现'
+        })
+    except Exception as e:
+        current_app.logger.error(f"获取推荐关系失败: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 # 资产管理兼容路由
 @admin_compat_bp.route('/assets', methods=['GET'])
 @api_admin_required
 def compat_assets_list_v2():
     """获取资产列表 - 兼容API"""
-    from app.routes.admin.assets import get_assets_list
-    return get_assets_list()
+    from app.routes.admin.assets import api_assets
+    return api_assets()
 
 @admin_compat_bp.route('/assets/stats', methods=['GET'])
 @api_admin_required
 def compat_assets_stats_v2():
     """获取资产统计 - 兼容API"""
-    from app.routes.admin.assets import get_assets_stats
-    return get_assets_stats()
+    from app.routes.admin.assets import api_assets_stats
+    return api_assets_stats()
 
 @admin_compat_bp.route('/assets/<int:asset_id>', methods=['GET'])
 @api_admin_required
 def compat_assets_detail(asset_id):
     """获取资产详情 - 兼容API"""
-    from app.routes.admin.assets import get_asset_detail
-    return get_asset_detail(asset_id)
+    from app.routes.admin.assets import api_get_asset
+    return api_get_asset(asset_id)
 
 @admin_compat_bp.route('/admins', methods=['GET'])
 @api_admin_required
