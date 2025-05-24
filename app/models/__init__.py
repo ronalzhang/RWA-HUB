@@ -13,15 +13,15 @@ from .shortlink import ShortLink
 from .transaction import Transaction, TransactionType, TransactionStatus
 from .holding import Holding
 
-# 从admin.py导入管理相关模型
+# 从admin.py导入管理相关模型（删除CommissionRecord）
 from .admin import (
     AdminUser, SystemConfig, CommissionSetting, 
-    DistributionLevel, UserReferral, CommissionRecord, AdminOperationLog,
+    DistributionLevel, UserReferral, AdminOperationLog,
     DashboardStats
 )
 
-# 导入新的分销模型，用不同的名称避免冲突
-from .referral import UserReferral as NewUserReferral, CommissionRecord as NewCommissionRecord, DistributionSetting
+# 导入新的分销模型
+from .referral import UserReferral as NewUserReferral, CommissionRecord, DistributionSetting
 
 # 兼容旧版本
 from .commission import Commission

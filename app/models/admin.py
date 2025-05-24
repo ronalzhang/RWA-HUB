@@ -191,44 +191,6 @@ class UserReferral(db.Model):
             'joined_at': self.joined_at.isoformat() if self.joined_at else None
         }
 
-# 佣金记录模型
-class CommissionRecord(db.Model):
-    __tablename__ = 'commission_records'
-    
-    id = Column(Integer, primary_key=True)
-    trade_id = Column(Integer, ForeignKey('trades.id'))
-    asset_id = Column(Integer, ForeignKey('assets.id'))
-    transaction_hash = Column(String(100))  # 区块链交易哈希
-    recipient_address = Column(String(80), nullable=False)  # 接收佣金的钱包地址
-    amount = Column(Float, nullable=False)  # 佣金金额
-    token_address = Column(String(80))  # ERC20代币地址，如果适用
-    commission_type = Column(String(20), nullable=False)  # direct, referral
-    status = Column(String(20), default='pending')  # pending, paid, failed
-    payment_time = Column(DateTime)  # 发放时间
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, onupdate=datetime.utcnow)
-    
-    # 关系已移除，避免外键映射问题
-    
-    def __repr__(self):
-        return f'<CommissionRecord {self.id}>'
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'trade_id': self.trade_id,
-            'asset_id': self.asset_id,
-            'transaction_hash': self.transaction_hash,
-            'recipient_address': self.recipient_address,
-            'amount': self.amount,
-            'token_address': self.token_address,
-            'commission_type': self.commission_type,
-            'status': self.status,
-            'payment_time': self.payment_time.isoformat() if self.payment_time else None,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
-
 # 管理员操作日志
 class AdminOperationLog(db.Model):
     __tablename__ = 'admin_operation_logs'
@@ -252,7 +214,7 @@ class AdminOperationLog(db.Model):
             'operation_type': self.operation_type,
             'target_table': self.target_table,
             'target_id': self.target_id,
-            'operation_details': json.loads(self.operation_details) if isinstance(self.operation_details, str) else self.operation_details,
+            'operation_details': json.loads(self.operation_details) if self.operation_details else {},
             'ip_address': self.ip_address,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
@@ -264,7 +226,7 @@ class AdminOperationLog(db.Model):
             admin_address=admin_address,
             operation_type=operation_type,
             target_table=target_table,
-            target_id=target_id,
+            target_id=str(target_id) if target_id else None,
             operation_details=json.dumps(operation_details) if operation_details else None,
             ip_address=ip_address
         )
@@ -272,7 +234,7 @@ class AdminOperationLog(db.Model):
         db.session.commit()
         return log
 
-# 仪表盘统计数据
+# 仪表板统计
 class DashboardStats(db.Model):
     __tablename__ = 'dashboard_stats'
     
@@ -285,12 +247,12 @@ class DashboardStats(db.Model):
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
     
     def __repr__(self):
-        return f'<DashboardStats {self.stat_type}_{self.stat_date}>'
+        return f'<DashboardStats {self.stat_type}>'
     
     def to_dict(self):
         return {
             'id': self.id,
-            'stat_date': self.stat_date.strftime('%Y-%m-%d') if self.stat_date else None,
+            'stat_date': self.stat_date.isoformat() if self.stat_date else None,
             'stat_type': self.stat_type,
             'stat_period': self.stat_period,
             'stat_value': self.stat_value,
@@ -301,93 +263,104 @@ class DashboardStats(db.Model):
     @classmethod
     def update_daily_stats(cls):
         """更新每日统计数据"""
-        from app.models.user import User
-        from app.models.asset import Asset
-        from app.models.trade import Trade
-        
         today = datetime.utcnow().date()
         
-        # 更新用户统计
+        # 用户统计
         user_count = User.query.count()
-        new_users = User.query.filter(func.date(User.created_at) == today).count()
+        cls._update_stat('user_count', 'daily', today, user_count)
         
-        # 更新资产统计
-        asset_count = Asset.query.filter(Asset.status != 0).count()
-        asset_value = db.session.query(func.sum(Asset.total_value)).filter(Asset.status == 2).scalar() or 0
+        # 资产统计
+        asset_count = Asset.query.count()
+        cls._update_stat('asset_count', 'daily', today, asset_count)
         
-        # 更新交易统计
+        # 交易统计
         trade_count = Trade.query.count()
-        trade_volume = db.session.query(func.sum(Trade.total_price)).scalar() or 0
+        cls._update_stat('trade_count', 'daily', today, trade_count)
         
-        # 更新或创建统计记录
-        stats = [
-            {'type': 'user_count', 'value': user_count},
-            {'type': 'new_users', 'value': new_users},
-            {'type': 'asset_count', 'value': asset_count},
-            {'type': 'asset_value', 'value': float(asset_value)},
-            {'type': 'trade_count', 'value': trade_count},
-            {'type': 'trade_volume', 'value': float(trade_volume)},
-        ]
+        # 交易金额统计
+        trade_volume = db.session.query(func.sum(Trade.amount)).scalar() or 0
+        cls._update_stat('trade_volume', 'daily', today, trade_volume)
         
-        for stat in stats:
-            # 查找今天的记录
-            record = cls.query.filter_by(
-                stat_date=today,
-                stat_type=stat['type'],
-                stat_period='daily'
-            ).first()
-            
-            if record:
-                # 更新记录
-                record.stat_value = stat['value']
-            else:
-                # 创建新记录
-                record = cls(
-                    stat_date=today,
-                    stat_type=stat['type'],
-                    stat_period='daily',
-                    stat_value=stat['value']
-                )
-                db.session.add(record)
+        # 今日新增用户
+        today_users = User.query.filter(
+            func.date(User.created_at) == today
+        ).count()
+        cls._update_stat('new_users_today', 'daily', today, today_users)
+        
+        # 今日新增资产
+        today_assets = Asset.query.filter(
+            func.date(Asset.created_at) == today
+        ).count()
+        cls._update_stat('new_assets_today', 'daily', today, today_assets)
+        
+        # 今日交易
+        today_trades = Trade.query.filter(
+            func.date(Trade.created_at) == today
+        ).count()
+        cls._update_stat('trades_today', 'daily', today, today_trades)
+        
+        # 今日交易金额
+        today_volume = db.session.query(func.sum(Trade.amount)).filter(
+            func.date(Trade.created_at) == today
+        ).scalar() or 0
+        cls._update_stat('volume_today', 'daily', today, today_volume)
         
         db.session.commit()
-        return True
     
     @classmethod
     def update_stats_from_db(cls):
-        """直接从数据库查询更新统计数据"""
+        """从数据库更新统计数据"""
         try:
-            # 执行数据库查询更新统计数据
-            current_app.logger.info("正在从数据库更新统计数据...")
+            # 获取当前统计数据
+            stats = {
+                'total_users': User.query.count(),
+                'total_assets': Asset.query.count(),
+                'total_trades': Trade.query.count(),
+                'total_volume': db.session.query(func.sum(Trade.amount)).scalar() or 0,
+                'pending_assets': Asset.query.filter_by(status=1).count(),
+                'approved_assets': Asset.query.filter_by(status=2).count(),
+                'rejected_assets': Asset.query.filter_by(status=3).count(),
+            }
             
-            result = db.session.execute("""
-                INSERT INTO dashboard_stats (stat_date, stat_type, stat_period, stat_value, created_at)
-                VALUES
-                (CURRENT_DATE, 'user_count', 'daily', (SELECT COUNT(*) FROM users), CURRENT_TIMESTAMP),
-                (CURRENT_DATE, 'new_users', 'daily', (SELECT COUNT(*) FROM users WHERE DATE(created_at) = CURRENT_DATE), CURRENT_TIMESTAMP),
-                (CURRENT_DATE, 'asset_count', 'daily', (SELECT COUNT(*) FROM assets WHERE status != 0), CURRENT_TIMESTAMP),
-                (CURRENT_DATE, 'asset_value', 'daily', COALESCE((SELECT SUM(total_value) FROM assets WHERE status = 2), 0), CURRENT_TIMESTAMP),
-                (CURRENT_DATE, 'trade_count', 'daily', (SELECT COUNT(*) FROM trades), CURRENT_TIMESTAMP),
-                (CURRENT_DATE, 'trade_volume', 'daily', COALESCE((SELECT SUM(total_price) FROM trades), 0), CURRENT_TIMESTAMP)
-                ON CONFLICT (stat_date, stat_type, stat_period) 
-                DO UPDATE SET stat_value = EXCLUDED.stat_value, updated_at = CURRENT_TIMESTAMP
-            """)
+            # 更新今日统计
+            today = datetime.utcnow().date()
+            for stat_type, value in stats.items():
+                cls._update_stat(stat_type, 'daily', today, value)
             
             db.session.commit()
-            current_app.logger.info("统计数据已成功更新")
-            return True
+            return stats
         except Exception as e:
+            current_app.logger.error(f'更新统计数据失败: {str(e)}')
             db.session.rollback()
-            current_app.logger.error(f"从数据库更新统计数据失败: {str(e)}")
-            return False
+            return None
+    
+    @classmethod
+    def _update_stat(cls, stat_type, period, date, value):
+        """更新单个统计项"""
+        stat = cls.query.filter_by(
+            stat_type=stat_type,
+            stat_period=period,
+            stat_date=date
+        ).first()
+        
+        if stat:
+            stat.stat_value = value
+            stat.updated_at = datetime.utcnow()
+        else:
+            stat = cls(
+                stat_type=stat_type,
+                stat_period=period,
+                stat_date=date,
+                stat_value=value
+            )
+            db.session.add(stat)
     
     @classmethod
     def get_trend_data(cls, stat_type, days=30):
-        """获取指定统计类型的趋势数据"""
+        """获取趋势数据"""
         end_date = datetime.utcnow().date()
         start_date = end_date - timedelta(days=days)
         
-        # 查询指定日期范围内的统计数据
         stats = cls.query.filter(
             cls.stat_type == stat_type,
             cls.stat_period == 'daily',
@@ -395,32 +368,27 @@ class DashboardStats(db.Model):
             cls.stat_date <= end_date
         ).order_by(cls.stat_date).all()
         
-        # 准备日期范围
-        date_range = []
-        for i in range(days + 1):
-            curr_date = start_date + timedelta(days=i)
-            date_range.append(curr_date)
-        
-        # 构建结果
-        result = {
-            'labels': [date.strftime('%m-%d') for date in date_range],
-            'values': [0] * (days + 1)
-        }
-        
-        # 填充数据
-        date_dict = {stat.stat_date.date(): stat.stat_value for stat in stats}
-        for i, date in enumerate(date_range):
-            if date in date_dict:
-                result['values'][i] = date_dict[date]
-        
-        return result
+        return [
+            {
+                'date': stat.stat_date.isoformat(),
+                'value': stat.stat_value
+            }
+            for stat in stats
+        ]
 
-# 事件监听器 - 自动更新仪表盘统计数据
+# 数据库事件监听器
+def async_task(func):
+    """异步任务装饰器（简化版）"""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            current_app.logger.error(f'异步任务执行失败: {str(e)}')
+    return wrapper
+
 @event.listens_for(User, 'after_insert')
 def user_created(mapper, connection, target):
-    """用户创建后，异步更新仪表盘统计"""
-    from app.utils.decorators import async_task
-    
+    """用户创建后更新统计"""
     @async_task
     def update_stats():
         DashboardStats.update_daily_stats()
@@ -430,9 +398,7 @@ def user_created(mapper, connection, target):
 @event.listens_for(Asset, 'after_insert')
 @event.listens_for(Asset, 'after_update')
 def asset_changed(mapper, connection, target):
-    """资产变更后，异步更新仪表盘统计"""
-    from app.utils.decorators import async_task
-    
+    """资产变更后更新统计"""
     @async_task
     def update_stats():
         DashboardStats.update_daily_stats()
@@ -441,9 +407,7 @@ def asset_changed(mapper, connection, target):
 
 @event.listens_for(Trade, 'after_insert')
 def trade_created(mapper, connection, target):
-    """交易创建后，异步更新仪表盘统计"""
-    from app.utils.decorators import async_task
-    
+    """交易创建后更新统计"""
     @async_task
     def update_stats():
         DashboardStats.update_daily_stats()
