@@ -32,70 +32,70 @@ def assets_page():
 @api_admin_required
 def assets_list_v2():
     """获取资产列表 - V2兼容版本"""
-    return get_assets_list()
+    return api_assets()
 
 
 @admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['GET'])
 @api_admin_required
 def asset_detail_v2(asset_id):
     """获取资产详情 - V2兼容版本"""
-    return get_asset_detail(asset_id)
+    return api_get_asset(asset_id)
 
 
 @admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['DELETE'])
 @api_admin_required
 def delete_asset_v2(asset_id):
     """删除资产 - V2兼容版本"""
-    return delete_asset(asset_id)
+    return api_delete_asset(asset_id)
 
 
 @admin_bp.route('/v2/api/assets/<int:asset_id>/approve', methods=['POST'])
 @api_admin_required
 def approve_asset_v2(asset_id):
     """审核通过资产 - V2兼容版本"""
-    return approve_asset(asset_id)
+    return api_approve_asset(asset_id)
 
 
 @admin_bp.route('/v2/api/assets/<int:asset_id>/reject', methods=['POST'])
 @api_admin_required
 def reject_asset_v2(asset_id):
     """审核拒绝资产 - V2兼容版本"""
-    return reject_asset(asset_id)
+    return api_reject_asset(asset_id)
 
 
 @admin_bp.route('/v2/api/assets/batch-approve', methods=['POST'])
 @api_admin_required
 def batch_approve_assets_v2():
     """批量审核通过 - V2兼容版本"""
-    return batch_approve_assets()
+    return api_batch_approve_assets()
 
 
 @admin_bp.route('/v2/api/assets/batch-reject', methods=['POST'])
 @api_admin_required
 def batch_reject_assets_v2():
     """批量审核拒绝 - V2兼容版本"""
-    return batch_reject_assets()
+    return api_batch_reject_assets()
 
 
 @admin_bp.route('/v2/api/assets/batch-delete', methods=['POST'])
 @api_admin_required
 def batch_delete_assets_v2():
     """批量删除 - V2兼容版本"""
-    return batch_delete_assets()
+    return api_batch_delete_assets()
 
 
 @admin_bp.route('/v2/api/assets/stats', methods=['GET'])
 @api_admin_required
 def assets_stats_v2():
     """获取资产统计 - V2兼容版本"""
-    return get_assets_stats()
+    return api_assets_stats()
 
 
 @admin_bp.route('/v2/api/assets/export', methods=['GET'])
 @api_admin_required
 def export_assets_v2():
     """导出资产数据 - V2兼容版本"""
-    return export_assets()
+    return api_export_assets()
 
 
 # API路由
@@ -105,13 +105,29 @@ def api_assets():
     """资产列表API"""
     try:
         page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
-        search = request.args.get('search', '')
-        status = request.args.get('status', '', type=str)
-        asset_type = request.args.get('asset_type', '', type=str)
+        # 兼容前端的limit参数
+        limit = request.args.get('limit', 20, type=int)
+        per_page = request.args.get('per_page', limit, type=int)
         
-        # 查询资产列表 - 排除已删除的资产（状态4）
-        query = Asset.query.filter(Asset.status != 4)
+        # 兼容前端的keyword参数
+        search = request.args.get('search', '')
+        keyword = request.args.get('keyword', '')
+        if keyword:
+            search = keyword
+            
+        status = request.args.get('status', '', type=str)
+        # 兼容前端的type参数
+        asset_type = request.args.get('asset_type', '', type=str)
+        type_param = request.args.get('type', '')
+        if type_param:
+            asset_type = type_param
+            
+        # 获取排序参数
+        sort_field = request.args.get('sort', 'id')
+        sort_order = request.args.get('order', 'desc')
+        
+        # 查询资产列表 - 排除已删除的资产（deleted_at不为空）
+        query = Asset.query.filter(Asset.deleted_at.is_(None))
         
         # 搜索条件
         if search:
@@ -125,14 +141,38 @@ def api_assets():
         
         # 状态筛选
         if status:
-            query = query.filter(Asset.status == int(status))
+            try:
+                query = query.filter(Asset.status == int(status))
+            except ValueError:
+                pass
         
         # 类型筛选
         if asset_type:
-            query = query.filter(Asset.asset_type == int(asset_type))
+            try:
+                query = query.filter(Asset.asset_type == int(asset_type))
+            except ValueError:
+                pass
         
-        # 排序
-        query = query.order_by(desc(Asset.created_at))
+        # 排序处理
+        if sort_field == 'id':
+            order_column = Asset.id
+        elif sort_field == 'name':
+            order_column = Asset.name
+        elif sort_field == 'created_at':
+            order_column = Asset.created_at
+        elif sort_field == 'updated_at':
+            order_column = Asset.updated_at
+        elif sort_field == 'token_price':
+            order_column = Asset.token_price
+        elif sort_field == 'total_value':
+            order_column = Asset.total_value
+        else:
+            order_column = Asset.id
+            
+        if sort_order.lower() == 'asc':
+            query = query.order_by(order_column.asc())
+        else:
+            query = query.order_by(order_column.desc())
         
         # 分页
         pagination = query.paginate(
@@ -144,10 +184,16 @@ def api_assets():
             # 获取资产类型名称
             asset_type_name = '未知类型'
             try:
-                for item in AssetType:
-                    if item.value == asset.asset_type:
-                        asset_type_name = item.name
-                        break
+                if asset.asset_type == 1:
+                    asset_type_name = '房地产'
+                elif asset.asset_type == 2:
+                    asset_type_name = '股权'
+                elif asset.asset_type == 3:
+                    asset_type_name = '债券'
+                elif asset.asset_type == 4:
+                    asset_type_name = '商品'
+                elif asset.asset_type == 5:
+                    asset_type_name = '其他'
             except:
                 pass
             
@@ -194,7 +240,7 @@ def api_assets():
         })
         
     except Exception as e:
-        current_app.logger.error(f'获取资产列表失败: {str(e)}')
+        current_app.logger.error(f'获取资产列表失败: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -203,15 +249,23 @@ def api_assets():
 def api_get_asset(asset_id):
     """获取单个资产详情"""
     try:
-        asset = Asset.query.get_or_404(asset_id)
+        asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
+        if not asset:
+            return jsonify({'success': False, 'error': '资产不存在或已被删除'}), 404
         
         # 获取资产类型名称
         asset_type_name = '未知类型'
         try:
-            for item in AssetType:
-                if item.value == asset.asset_type:
-                    asset_type_name = item.name
-                    break
+            if asset.asset_type == 1:
+                asset_type_name = '房地产'
+            elif asset.asset_type == 2:
+                asset_type_name = '股权'
+            elif asset.asset_type == 3:
+                asset_type_name = '债券'
+            elif asset.asset_type == 4:
+                asset_type_name = '商品'
+            elif asset.asset_type == 5:
+                asset_type_name = '其他'
         except:
             pass
         
@@ -259,10 +313,12 @@ def api_get_asset(asset_id):
 def api_delete_asset(asset_id):
     """删除资产（软删除）"""
     try:
-        asset = Asset.query.get_or_404(asset_id)
+        asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
+        if not asset:
+            return jsonify({'success': False, 'error': '资产不存在或已被删除'}), 404
         
-        # 软删除：将状态改为4（已删除）
-        asset.status = 4
+        # 软删除：设置deleted_at时间戳
+        asset.deleted_at = datetime.utcnow()
         db.session.commit()
         
         current_app.logger.info(f'资产已软删除: {asset_id}')
@@ -279,7 +335,9 @@ def api_delete_asset(asset_id):
 def api_approve_asset(asset_id):
     """审核通过资产"""
     try:
-        asset = Asset.query.get_or_404(asset_id)
+        asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
+        if not asset:
+            return jsonify({'success': False, 'error': '资产不存在或已被删除'}), 404
         
         if asset.status != 1:
             return jsonify({'success': False, 'error': '只能审核待审核状态的资产'}), 400
@@ -301,7 +359,9 @@ def api_approve_asset(asset_id):
 def api_reject_asset(asset_id):
     """审核拒绝资产"""
     try:
-        asset = Asset.query.get_or_404(asset_id)
+        asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
+        if not asset:
+            return jsonify({'success': False, 'error': '资产不存在或已被删除'}), 404
         
         if asset.status != 1:
             return jsonify({'success': False, 'error': '只能拒绝待审核状态的资产'}), 400
@@ -338,7 +398,7 @@ def api_batch_approve_assets():
         
         for asset_id in asset_ids:
             try:
-                asset = Asset.query.get(asset_id)
+                asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
                 if asset and asset.status == 1:
                     asset.status = 2
                     success_count += 1
@@ -378,7 +438,7 @@ def api_batch_reject_assets():
         
         for asset_id in asset_ids:
             try:
-                asset = Asset.query.get(asset_id)
+                asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
                 if asset and asset.status == 1:
                     asset.status = 3
                     if hasattr(asset, 'reject_reason'):
@@ -419,9 +479,9 @@ def api_batch_delete_assets():
         
         for asset_id in asset_ids:
             try:
-                asset = Asset.query.get(asset_id)
+                asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
                 if asset:
-                    asset.status = 4  # 软删除
+                    asset.deleted_at = datetime.utcnow()  # 软删除
                     success_count += 1
                 else:
                     failed_ids.append(asset_id)
@@ -448,7 +508,7 @@ def api_batch_delete_assets():
 def api_assets_stats():
     """资产统计数据"""
     try:
-        total_assets = Asset.query.filter(Asset.status != 4).count()
+        total_assets = Asset.query.filter(Asset.deleted_at.is_(None)).count()
         pending_assets = Asset.query.filter(Asset.status == 1).count()
         approved_assets = Asset.query.filter(Asset.status == 2).count()
         rejected_assets = Asset.query.filter(Asset.status == 3).count()
@@ -473,7 +533,7 @@ def api_assets_stats():
 def api_export_assets():
     """导出资产数据为CSV"""
     try:
-        assets = Asset.query.filter(Asset.status != 4).order_by(desc(Asset.created_at)).all()
+        assets = Asset.query.filter(Asset.deleted_at.is_(None)).order_by(desc(Asset.created_at)).all()
         
         output = io.StringIO()
         writer = csv.writer(output)

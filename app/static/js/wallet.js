@@ -706,7 +706,7 @@ const walletState = {
             try {
                 // 创建自定义事件，包含当前钱包状态
                 const walletEvent = new CustomEvent('walletStateChanged', {
-                    detail: {
+                    detail: { 
                         address: this.address,
                         walletType: this.walletType,
                         connected: this.connected,
@@ -729,7 +729,7 @@ const walletState = {
                     // 延迟一点执行，避免与事件处理冲突
                     setTimeout(() => {
                         try {
-                            this.updateDetailPageButtonState();
+                        this.updateDetailPageButtonState();
                         } catch (buttonError) {
                             debugError('[triggerWalletStateChanged] 更新按钮状态失败:', buttonError);
                         }
@@ -1244,7 +1244,7 @@ const walletState = {
                 throw new Error(`API响应错误: ${response.status} ${response.statusText}`);
             }
 
-            const data = await response.json();
+                        const data = await response.json();
             
             // 减少重复的API响应日志 - 只在debug模式或有错误时显示详细信息
             if (DEBUG_MODE || !data.success) {
@@ -1284,8 +1284,8 @@ const walletState = {
                 return await this.getBalanceWithFallback(this.address, 'USDC');
             } catch (fallbackError) {
                 debugError('[getWalletBalance] 后备方案也失败:', fallbackError);
-                return 0;
-            }
+                    return 0;
+                }
         }
     },
     
@@ -2450,10 +2450,10 @@ async connectPhantom(isReconnect = false) {
                             window.open('https://phantom.app/', '_blank');
                         }
                     }, 2000);
-                }
-                return false;
-            }
-            
+                        }
+                        return false;
+                    }
+                    
             // 检查钱包详细状态
             console.log('检测到Phantom钱包，检查状态...');
             const phantomStatus = {
@@ -2466,7 +2466,7 @@ async connectPhantom(isReconnect = false) {
             // 如果已经连接，可以直接使用现有连接
             if (window.solana.isConnected && window.solana.publicKey) {
                 console.log('Phantom钱包已连接，将使用现有连接');
-                if (!isReconnect) {
+                    if (!isReconnect) {
                     showSuccess('检测到已连接的Phantom钱包');
                 }
                 return true;
@@ -2545,7 +2545,7 @@ async connectPhantom(isReconnect = false) {
                     showError(userMessage);
                 }
                 
-                return { 
+                        return {
                     success: false, 
                     error: 'connection_failed',
                     message: userMessage
@@ -3024,9 +3024,9 @@ checkIfReturningFromWalletApp(walletType) {
                 transferAmount,
                 [],
                 TOKEN_PROGRAM_ID
-            );
-            
-            transaction.add(transferInstruction);
+                );
+                
+                transaction.add(transferInstruction);
             
             console.log('[transferSolanaToken] 交易指令已添加');
             
@@ -3070,7 +3070,7 @@ checkIfReturningFromWalletApp(walletType) {
             };
         }
     },
-
+    
     // 添加一个新方法用于延迟重连到Phantom钱包
     delayedPhantomReconnect() {
         if (this.walletType !== 'phantom' || !this.address) return;
@@ -3087,7 +3087,7 @@ checkIfReturningFromWalletApp(walletType) {
             console.error('延迟Phantom钱包重连出错:', err);
         });
     },
-
+    
     // 检查代币余额
     checkTokenBalance: async function(tokenSymbol) {
         try {
@@ -3113,7 +3113,7 @@ checkIfReturningFromWalletApp(walletType) {
             };
         }
     },
-
+    
     /**
      * 通用的钱包连接处理流程
      * 提取共用的钱包连接逻辑，减少代码重复
@@ -3182,8 +3182,8 @@ checkIfReturningFromWalletApp(walletType) {
             console.log(`[connectWallet] afterSuccessfulConnection处理结果: ${afterConnectionResult}`);
             
             return afterConnectionResult;
-            
-        } catch (error) {
+                
+            } catch (error) {
             console.error(`[connectWallet] 连接${walletType}钱包时出错:`, error);
             console.error('[connectWallet] 错误详情:', {
                 name: error.name,
@@ -3198,7 +3198,7 @@ checkIfReturningFromWalletApp(walletType) {
             return false;
         }
     },
-
+    
     /**
      * 后备方案获取余额
      * @param {string} address 钱包地址
@@ -3238,7 +3238,7 @@ checkIfReturningFromWalletApp(walletType) {
             return 0;
         }
     },
-
+    
     /**
      * 获取钱包分佣余额
      * @returns {Promise<number>} 分佣余额
@@ -3463,7 +3463,7 @@ checkIfReturningFromWalletApp(walletType) {
                                 // 如果重试还是失败，再次显示选项
                                 setTimeout(() => this.showPhantomRetryOption(), 1000);
                             }
-                        } catch (error) {
+                    } catch (error) {
                             console.error('重试连接失败:', error);
                             showError('重试连接失败，请检查Phantom钱包状态');
                         }
@@ -3528,12 +3528,12 @@ function recoverWalletStateFromStorage() {
             }
             
             return true;
-        }
-        return false;
+            }
+            return false;
     } catch (error) {
         console.error('从localStorage恢复钱包状态失败:', error);
         return false;
-    }
+        }
 }
 
 // 立即尝试恢复钱包状态
@@ -4450,11 +4450,11 @@ function updateAssetInfoDisplay(data) {
                 !el.classList.contains('button') &&
                 el.getAttribute('role') !== 'button') {
                 
-                el.textContent = formatCurrency(data.token_price);
-                
-                // 更新数据属性
-                if (el.hasAttribute('data-token-price')) {
-                    el.setAttribute('data-token-price', data.token_price);
+            el.textContent = formatCurrency(data.token_price);
+            
+            // 更新数据属性
+            if (el.hasAttribute('data-token-price')) {
+                el.setAttribute('data-token-price', data.token_price);
                 }
             }
         });
