@@ -2338,7 +2338,7 @@ def compat_dashboard_stats():
         ).count()
         
         # 获取资产统计
-        total_assets = Asset.query.filter(Asset.status != 0).count()
+        total_assets = Asset.query.filter(Asset.deleted_at.is_(None)).count()
         total_asset_value = db.session.query(func.sum(Asset.total_value)).filter(
             Asset.status == 2  # 只统计已审核通过的资产
         ).scalar() or 0
@@ -2431,7 +2431,7 @@ def compat_assets_list():
         limit = request.args.get('limit', 10, type=int)
         
         # 查询资产列表 - 管理后台始终显示所有未删除的资产
-        query = Asset.query.filter(Asset.status != 0)  # 0 表示已删除
+        query = Asset.query.filter(Asset.deleted_at.is_(None))
         
         # 查询筛选条件
         status = request.args.get('status')
@@ -2538,7 +2538,7 @@ def compat_assets_stats():
     """获取资产统计数据兼容API"""
     try:
         # 统计数据
-        total_assets = Asset.query.filter(Asset.status != 0).count()
+        total_assets = Asset.query.filter(Asset.deleted_at.is_(None)).count()
         pending_assets = Asset.query.filter(Asset.status == 1).count()
         approved_assets = Asset.query.filter(Asset.status == 2).count()
         rejected_assets = Asset.query.filter(Asset.status == 3).count()
