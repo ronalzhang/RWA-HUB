@@ -207,11 +207,30 @@
             tradingVolumeChart: null,
             assetTypeChart: null,
             
+            // 获取URL参数中的钱包地址
+            getWalletAddress() {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get('eth_address');
+            },
+            
+            // 创建带认证头的fetch请求
+            authFetch(url, options = {}) {
+                const walletAddress = this.getWalletAddress();
+                return fetch(url, {
+                    ...options,
+                    headers: {
+                        'X-Wallet-Address': walletAddress,
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+            },
+            
             async loadDashboardData() {
                 this.refreshing = true;
                 try {
                     // 加载仪表盘统计数据
-                    const response = await fetch('/admin/v2/api/dashboard/stats');
+                    const response = await this.authFetch('/admin/v2/api/dashboard/stats');
                     if (!response.ok) throw new Error('加载统计数据失败');
                     this.stats = await response.json();
                     
@@ -232,7 +251,7 @@
             
             async loadUserGrowthChart() {
                 try {
-                    const response = await fetch(`/admin/v2/api/dashboard/trends?days=${this.userGrowthPeriod}`);
+                    const response = await this.authFetch(`/admin/v2/api/dashboard/trends?days=${this.userGrowthPeriod}`);
                     if (!response.ok) throw new Error('加载用户增长数据失败');
                     const data = await response.json();
                     const userGrowthData = data.user_growth;
@@ -281,7 +300,7 @@
             
             async loadTradingVolumeChart() {
                 try {
-                    const response = await fetch(`/admin/v2/api/dashboard/trends?days=${this.tradingVolumePeriod}`);
+                    const response = await this.authFetch(`/admin/v2/api/dashboard/trends?days=${this.tradingVolumePeriod}`);
                     if (!response.ok) throw new Error('加载交易量数据失败');
                     const data = await response.json();
                     const tradingVolumeData = data.trading_volume;
@@ -325,7 +344,7 @@
             
             async loadAssetTypeChart() {
                 try {
-                    const response = await fetch('/admin/v2/api/asset-type-stats');
+                    const response = await this.authFetch('/admin/v2/api/asset-type-stats');
                     if (!response.ok) throw new Error('加载资产类型数据失败');
                     const data = await response.json();
                     
@@ -366,7 +385,7 @@
             
             async loadRecentTrades() {
                 try {
-                    const response = await fetch('/admin/v2/api/dashboard/recent-trades?limit=5');
+                    const response = await this.authFetch('/admin/v2/api/dashboard/recent-trades?limit=5');
                     if (!response.ok) throw new Error('加载最近交易失败');
                     const data = await response.json();
                     this.recentTrades = Array.isArray(data) ? data : [];
