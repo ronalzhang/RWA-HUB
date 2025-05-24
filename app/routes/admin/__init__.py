@@ -29,12 +29,12 @@ from .utils import is_admin, has_permission, get_admin_role, get_admin_info, is_
 @admin_page_required
 def admin_v2_index():
     """V2版本管理后台首页"""
-    return render_template('admin_v2/index.html')
+    return render_template('admin_v2/dashboard.html')
 
 @admin_bp.route('/v2/dashboard')
 @admin_page_required
 def dashboard_v2():
-    """V2版本仪表板页面"""
+    """V2版本仪表盘页面"""
     return render_template('admin_v2/dashboard.html')
 
 @admin_bp.route('/v2/assets')
@@ -55,12 +55,6 @@ def trades_v2():
     """V2版本交易管理页面"""
     return render_template('admin_v2/trades.html')
 
-@admin_bp.route('/v2/admin-users')
-@admin_page_required
-def admin_users_v2():
-    """V2版本管理员管理页面"""
-    return render_template('admin_v2/admin_users.html')
-
 @admin_bp.route('/v2/commission')
 @admin_page_required
 def commission_v2():
@@ -73,21 +67,39 @@ def settings_v2():
     """V2版本系统设置页面"""
     return render_template('admin_v2/settings.html')
 
-# 兼容性重定向路由
+@admin_bp.route('/v2/admin-users')
+@admin_page_required
+def admin_users_v2():
+    """V2版本管理员用户页面"""
+    return render_template('admin_v2/admin_users.html')
+
+# 兼容旧版本路由
+@admin_bp.route('/dashboard')
+@admin_page_required
+def dashboard():
+    """仪表盘页面"""
+    return render_template('admin_v2/dashboard.html')
+
+@admin_bp.route('/')
+@admin_page_required
+def admin_index():
+    """管理后台首页"""
+    return render_template('admin_v2/dashboard.html')
+
 @admin_bp.route('/assets')
 @admin_page_required
-def assets_redirect():
-    """重定向到V2版本"""
-    return redirect(url_for('admin.assets_v2'))
+def assets():
+    """资产管理页面"""
+    return render_template('admin_v2/assets.html')
 
 @admin_bp.route('/users')
 @admin_page_required
-def users_redirect():
-    """重定向到V2版本"""
-    return redirect(url_for('admin.users_v2'))
+def users():
+    """用户管理页面"""
+    return render_template('admin_v2/users.html')
 
 @admin_bp.route('/trades')
 @admin_page_required
-def trades_redirect():
-    """重定向到V2版本"""
-    return redirect(url_for('admin.trades_v2')) 
+def trades():
+    """交易管理页面"""
+    return render_template('admin_v2/trades.html') 
