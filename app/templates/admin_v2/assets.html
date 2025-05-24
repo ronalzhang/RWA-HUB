@@ -400,6 +400,25 @@
                 pages: 0
             },
             
+            // 获取URL参数中的钱包地址
+            getWalletAddress() {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get('eth_address');
+            },
+            
+            // 创建带认证头的fetch请求
+            authFetch(url, options = {}) {
+                const walletAddress = this.getWalletAddress();
+                return fetch(url, {
+                    ...options,
+                    headers: {
+                        'X-Wallet-Address': walletAddress,
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+            },
+            
             // 初始化加载数据
             async loadData() {
                 console.log('Alpine.js 初始化完成');
@@ -412,7 +431,7 @@
             // 加载统计数据
             async loadStats() {
                 try {
-                    const response = await fetch('/admin/v2/api/assets/stats');
+                    const response = await this.authFetch('/admin/v2/api/assets/stats');
                     if (response.ok) {
                         this.stats = await response.json();
                 }
@@ -433,7 +452,7 @@
                         ...this.filters
                     });
                     
-                    const response = await fetch(`/admin/v2/api/assets?${params}`);
+                    const response = await this.authFetch(`/admin/v2/api/assets?${params}`);
                     if (!response.ok) throw new Error('加载资产失败');
                     
                     const data = await response.json();
@@ -484,7 +503,7 @@
                 if (!confirm('确定要通过这个资产的审核吗？')) return;
                 
                 try {
-                    const response = await fetch(`/admin/v2/api/assets/${assetId}/approve`, {
+                    const response = await this.authFetch(`/admin/v2/api/assets/${assetId}/approve`, {
                         method: 'POST'
                     });
                     
@@ -505,7 +524,7 @@
                 if (!reason) return;
                 
                 try {
-                    const response = await fetch(`/admin/v2/api/assets/${assetId}/reject`, {
+                    const response = await this.authFetch(`/admin/v2/api/assets/${assetId}/reject`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ reason })
@@ -527,7 +546,7 @@
                 if (!confirm('确定要删除这个资产吗？此操作无法撤销。')) return;
                 
                 try {
-                    const response = await fetch(`/admin/v2/api/assets/${assetId}`, {
+                    const response = await this.authFetch(`/admin/v2/api/assets/${assetId}`, {
                         method: 'DELETE'
                     });
                     
@@ -548,7 +567,7 @@
                 if (!confirm(`确定要通过 ${this.selectedAssets.length} 个资产的审核吗？`)) return;
                 
                 try {
-                    const response = await fetch('/admin/v2/api/assets/batch-approve', {
+                    const response = await this.authFetch('/admin/v2/api/assets/batch-approve', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ asset_ids: this.selectedAssets })
@@ -571,7 +590,7 @@
                 if (!reason) return;
                 
                 try {
-                    const response = await fetch('/admin/v2/api/assets/batch-reject', {
+                    const response = await this.authFetch('/admin/v2/api/assets/batch-reject', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
@@ -596,7 +615,7 @@
                 if (!confirm(`确定要删除 ${this.selectedAssets.length} 个资产吗？此操作无法撤销。`)) return;
                 
                 try {
-                    const response = await fetch('/admin/v2/api/assets/batch-delete', {
+                    const response = await this.authFetch('/admin/v2/api/assets/batch-delete', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ asset_ids: this.selectedAssets })
@@ -616,7 +635,7 @@
             // 导出资产数据
             async exportAssets() {
                 try {
-                    const response = await fetch('/admin/v2/api/assets/export');
+                    const response = await this.authFetch('/admin/v2/api/assets/export');
                     if (!response.ok) throw new Error('导出失败');
                     
                     const blob = await response.blob();
