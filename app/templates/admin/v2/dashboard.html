@@ -1,6 +1,25 @@
+// 获取URL参数中的钱包地址
+function getWalletAddress() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('eth_address');
+}
+
+// 创建带认证头的fetch请求
+function authFetch(url, options = {}) {
+    const walletAddress = getWalletAddress();
+    return fetch(url, {
+        ...options,
+        headers: {
+            'X-Wallet-Address': walletAddress,
+            'Content-Type': 'application/json',
+            ...options.headers
+        }
+    });
+}
+
 // 获取交易统计
 function fetchTradeStats() {
-    fetch('/admin/v2/api/dashboard/stats')
+    authFetch('/admin/v2/api/dashboard/stats')
         .then(response => {
             if (!response.ok) {
                 throw new Error('Network response was not ok');
