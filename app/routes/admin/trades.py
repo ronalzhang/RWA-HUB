@@ -1,30 +1,33 @@
 """
 交易管理模块
+包含交易记录查询、统计、导出等功能
 """
 
-from flask import render_template, jsonify, request, current_app
-from sqlalchemy import func, or_, desc
+from flask import render_template, request, jsonify, current_app
 from datetime import datetime, timedelta
-from . import admin_bp, admin_api_bp
-from .auth import api_admin_required, admin_page_required
-from app.extensions import db
-from app.models.trade import Trade, TradeStatus
+from sqlalchemy import desc, func, or_, and_
+from app import db
+from app.models.trade import Trade, TradeStatus, TradeType
 from app.models.asset import Asset
-from app.models.user import User
+from . import admin_bp
+from .auth import api_admin_required, admin_page_required
 
 
+# 页面路由
 @admin_bp.route('/trades')
 @admin_page_required
 def trades_page():
     """交易管理页面"""
     return render_template('admin_v2/trades.html')
 
-# V2版本API路由
+
+# V2版本路由（兼容前端调用）
 @admin_bp.route('/v2/api/trades', methods=['GET'])
 @api_admin_required
 def trades_list_v2():
     """获取交易列表 - V2兼容版本"""
     return get_trades_list()
+
 
 @admin_bp.route('/v2/api/trades/stats', methods=['GET'])
 @api_admin_required
@@ -32,11 +35,13 @@ def trades_stats_v2():
     """获取交易统计 - V2兼容版本"""
     return get_trades_stats()
 
+
 @admin_bp.route('/v2/api/trades/<int:trade_id>/status', methods=['PUT'])
 @api_admin_required
 def update_trade_status_v2(trade_id):
     """更新交易状态 - V2兼容版本"""
     return update_trade_status(trade_id)
+
 
 @admin_bp.route('/v2/api/trades/export', methods=['GET'])
 @api_admin_required
@@ -44,14 +49,15 @@ def export_trades_v2():
     """导出交易数据 - V2兼容版本"""
     return export_trades()
 
-# 原有API路由
+
+# API路由
 @admin_bp.route('/api/trades', methods=['GET'])
 @api_admin_required
 def get_trades_list():
     """获取交易列表"""
     try:
         page = request.args.get('page', 1, type=int)
-        limit = request.args.get('limit', 10, type=int)
+        limit = request.args.get('limit', 20, type=int)
         status = request.args.get('status', '')
         trade_type = request.args.get('type', '')
         time_range = request.args.get('time_range', '')
@@ -60,16 +66,15 @@ def get_trades_list():
         # 构建查询
         query = Trade.query
         
-        # 状态过滤
+        # 状态筛选
         if status:
-            if hasattr(TradeStatus, status.upper()):
-                query = query.filter(Trade.status == getattr(TradeStatus, status.upper()).value)
+            query = query.filter(Trade.status == status)
         
-        # 类型过滤
+        # 类型筛选
         if trade_type:
-            query = query.filter(Trade.trade_type == trade_type)
+            query = query.filter(Trade.type == trade_type)
         
-        # 时间范围过滤
+        # 时间范围筛选
         if time_range:
             now = datetime.utcnow()
             if time_range == 'today':
@@ -86,8 +91,7 @@ def get_trades_list():
         if search:
             query = query.join(Asset, Trade.asset_id == Asset.id, isouter=True).filter(
                 or_(
-                    Trade.buyer_address.ilike(f'%{search}%'),
-                    Trade.seller_address.ilike(f'%{search}%'),
+                    Trade.trader_address.ilike(f'%{search}%'),
                     Trade.tx_hash.ilike(f'%{search}%'),
                     Asset.name.ilike(f'%{search}%'),
                     Asset.token_symbol.ilike(f'%{search}%')
@@ -112,16 +116,14 @@ def get_trades_list():
                 'asset_id': trade.asset_id,
                 'asset_name': trade.asset.name if trade.asset else '未知资产',
                 'token_symbol': trade.asset.token_symbol if trade.asset else '-',
-                'buyer_address': trade.buyer_address,
-                'seller_address': trade.seller_address,
-                'trader_address': trade.buyer_address,  # 兼容前端
+                'trader_address': trade.trader_address,
                 'token_amount': trade.token_amount,
                 'price': float(trade.price) if trade.price else 0,
                 'total': float(trade.total) if trade.total else 0,
                 'amount': trade.token_amount,  # 兼容前端
                 'status': trade.status,
-                'trade_type': getattr(trade, 'trade_type', 'buy'),
-                'type': 'buy',  # 兼容前端，简化为买入
+                'trade_type': trade.type,
+                'type': trade.type,  # 兼容前端
                 'tx_hash': trade.tx_hash,
                 'created_at': trade.created_at.isoformat()
             }
@@ -196,7 +198,7 @@ def update_trade_status(trade_id):
         new_status = data['status']
         
         # 验证状态值
-        valid_statuses = ['pending', 'completed', 'failed', 'cancelled']
+        valid_statuses = ['pending', 'completed', 'failed']
         if new_status not in valid_statuses:
             return jsonify({'error': '无效的状态值'}), 400
         
@@ -207,8 +209,6 @@ def update_trade_status(trade_id):
             trade.status = TradeStatus.COMPLETED.value
         elif new_status == 'failed':
             trade.status = TradeStatus.FAILED.value
-        elif new_status == 'cancelled':
-            trade.status = TradeStatus.CANCELLED.value
         
         db.session.commit()
         
@@ -238,7 +238,7 @@ def export_trades():
         
         # 写入标题行
         writer.writerow([
-            'ID', '资产名称', 'Token符号', '买方地址', '卖方地址', 
+            'ID', '资产名称', 'Token符号', '交易者地址', '交易类型',
             '交易数量', '价格', '总金额', '状态', '交易哈希', '创建时间'
         ])
         
@@ -247,16 +247,20 @@ def export_trades():
             status_text = {
                 TradeStatus.PENDING.value: '待处理',
                 TradeStatus.COMPLETED.value: '已完成',
-                TradeStatus.FAILED.value: '失败',
-                TradeStatus.CANCELLED.value: '已取消'
+                TradeStatus.FAILED.value: '失败'
             }.get(trade.status, '未知状态')
+            
+            type_text = {
+                TradeType.BUY.value: '购买',
+                TradeType.SELL.value: '出售'
+            }.get(trade.type, '未知类型')
             
             writer.writerow([
                 trade.id,
                 trade.asset.name if trade.asset else '未知资产',
                 trade.asset.token_symbol if trade.asset else '-',
-                trade.buyer_address,
-                trade.seller_address,
+                trade.trader_address,
+                type_text,
                 trade.token_amount,
                 float(trade.price) if trade.price else 0,
                 float(trade.total) if trade.total else 0,
