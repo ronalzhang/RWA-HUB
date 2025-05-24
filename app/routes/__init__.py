@@ -3,13 +3,11 @@ from flask import Blueprint
 # 创建蓝图
 main_bp = Blueprint('main', __name__)
 assets_bp = Blueprint('assets', __name__, url_prefix='/assets')
-admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
 # API蓝图
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 assets_api_bp = Blueprint('assets_api', __name__, url_prefix='/api/assets')
 trades_api_bp = Blueprint('trades_api', __name__, url_prefix='/api/trades')
-admin_api_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
 service_bp = Blueprint('service', __name__, url_prefix='/api/service')
 
 # 添加新的代理蓝图，用于处理外部资源代理
@@ -22,7 +20,6 @@ from .admin_test import admin_test_bp
 from . import main
 from . import views
 from . import api
-from . import admin
 from . import assets
 from . import service
 from . import proxy
@@ -42,19 +39,24 @@ from .admin_solana import admin_solana_bp
 # 导入管理员API兼容路由
 from .admin_api import admin_compat_routes_bp, admin_v2_bp, admin_compat_bp
 
+# 导入新的模块化admin系统
+from .admin import admin_bp, admin_api_bp
+
 # 注册蓝图到app
 def register_blueprints(app):
     """初始化所有路由"""
     # 注册主蓝图
     app.register_blueprint(main_bp)
     app.register_blueprint(assets_bp)
+    
+    # 注册新的模块化admin蓝图
     app.register_blueprint(admin_bp)
+    app.register_blueprint(admin_api_bp)
     
     # 注册API蓝图
     app.register_blueprint(api_bp)
     app.register_blueprint(assets_api_bp)
     app.register_blueprint(trades_api_bp)
-    app.register_blueprint(admin_api_bp)
     app.register_blueprint(service_bp)
     
     # 注册代理蓝图
@@ -78,4 +80,4 @@ def register_blueprints(app):
     register_global_handlers(app)
     app.logger.info('已注册全局URL前缀修正处理器')
     
-    print("所有路由已注册") 
+    print("所有路由已注册（使用新模块化admin系统）") 
