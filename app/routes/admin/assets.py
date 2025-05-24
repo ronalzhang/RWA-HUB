@@ -228,15 +228,13 @@ def api_assets():
         
         return jsonify({
             'success': True,
-            'data': assets,
-            'pagination': {
-                'page': page,
-                'pages': pagination.pages,
-                'per_page': per_page,
-                'total': pagination.total,
-                'has_prev': pagination.has_prev,
-                'has_next': pagination.has_next
-            }
+            'items': assets,
+            'total': pagination.total,
+            'page': page,
+            'pages': pagination.pages,
+            'per_page': per_page,
+            'has_prev': pagination.has_prev,
+            'has_next': pagination.has_next
         })
         
     except Exception as e:
