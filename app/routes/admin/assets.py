@@ -182,7 +182,7 @@ def api_assets():
         assets = []
         for asset in pagination.items:
             # 获取资产类型名称
-            asset_type_name = '未知类型'
+            asset_type_name = '其他'
             try:
                 if asset.asset_type == 1:
                     asset_type_name = '房地产'
@@ -194,8 +194,24 @@ def api_assets():
                     asset_type_name = '商品'
                 elif asset.asset_type == 5:
                     asset_type_name = '其他'
+                elif asset.asset_type == 10:
+                    asset_type_name = '不动产'
+                elif asset.asset_type == 20:
+                    asset_type_name = '商业地产'
+                elif asset.asset_type == 30:
+                    asset_type_name = '工业地产'
+                elif asset.asset_type == 40:
+                    asset_type_name = '土地资产'
+                elif asset.asset_type == 50:
+                    asset_type_name = '证券资产'
+                elif asset.asset_type == 60:
+                    asset_type_name = '艺术品'
+                elif asset.asset_type == 70:
+                    asset_type_name = '收藏品'
+                else:
+                    asset_type_name = '其他'
             except:
-                pass
+                asset_type_name = '其他'
             
             # 获取封面图片
             cover_image = '/static/images/placeholder.jpg'
@@ -252,7 +268,7 @@ def api_get_asset(asset_id):
             return jsonify({'success': False, 'error': '资产不存在或已被删除'}), 404
         
         # 获取资产类型名称
-        asset_type_name = '未知类型'
+        asset_type_name = '其他'
         try:
             if asset.asset_type == 1:
                 asset_type_name = '房地产'
@@ -264,8 +280,24 @@ def api_get_asset(asset_id):
                 asset_type_name = '商品'
             elif asset.asset_type == 5:
                 asset_type_name = '其他'
+            elif asset.asset_type == 10:
+                asset_type_name = '不动产'
+            elif asset.asset_type == 20:
+                asset_type_name = '商业地产'
+            elif asset.asset_type == 30:
+                asset_type_name = '工业地产'
+            elif asset.asset_type == 40:
+                asset_type_name = '土地资产'
+            elif asset.asset_type == 50:
+                asset_type_name = '证券资产'
+            elif asset.asset_type == 60:
+                asset_type_name = '艺术品'
+            elif asset.asset_type == 70:
+                asset_type_name = '收藏品'
+            else:
+                asset_type_name = '其他'
         except:
-            pass
+            asset_type_name = '其他'
         
         cover_image = '/static/images/placeholder.jpg'
         if asset.images and len(asset.images) > 0:
@@ -311,8 +343,12 @@ def api_get_asset(asset_id):
 def api_delete_asset(asset_id):
     """删除资产（软删除）"""
     try:
+        # 确保在新的事务中操作
+        db.session.begin()
+        
         asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
         if not asset:
+            db.session.rollback()
             return jsonify({'success': False, 'error': '资产不存在或已被删除'}), 404
         
         # 软删除：设置deleted_at时间戳
@@ -394,6 +430,9 @@ def api_batch_approve_assets():
         success_count = 0
         failed_ids = []
         
+        # 开始新事务
+        db.session.begin()
+        
         for asset_id in asset_ids:
             try:
                 asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
@@ -433,6 +472,9 @@ def api_batch_reject_assets():
         reject_reason = data.get('reason', '管理员批量拒绝')
         success_count = 0
         failed_ids = []
+        
+        # 开始新事务
+        db.session.begin()
         
         for asset_id in asset_ids:
             try:
@@ -474,6 +516,9 @@ def api_batch_delete_assets():
         asset_ids = data['asset_ids']
         success_count = 0
         failed_ids = []
+        
+        # 开始新事务
+        db.session.begin()
         
         for asset_id in asset_ids:
             try:
