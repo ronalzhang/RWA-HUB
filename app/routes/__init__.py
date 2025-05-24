@@ -68,16 +68,14 @@ def register_blueprints(app):
     # 注册Solana API蓝图
     app.register_blueprint(solana_api_bp)
     
-    # 注册Solana管理功能蓝图
-    app.register_blueprint(admin_solana_bp)
-    
-    # 注册管理员API v2和兼容路由蓝图
-    app.register_blueprint(admin_v2_bp)           # 添加：/api/admin/v2 路由
-    app.register_blueprint(admin_compat_bp)        # 添加：/api/admin 兼容路由
-    app.register_blueprint(admin_compat_routes_bp)  # 保留：/admin/v2/api 路由
+    # 临时注释掉冲突的蓝图，等重构完成后再启用
+    # app.register_blueprint(admin_solana_bp)
+    # app.register_blueprint(admin_v2_bp)           
+    # app.register_blueprint(admin_compat_bp)        
+    # app.register_blueprint(admin_compat_routes_bp)  
     
     # 注册全局处理器
     register_global_handlers(app)
     app.logger.info('已注册全局URL前缀修正处理器')
     
-    print("所有路由已注册（使用新模块化admin系统）") 
+    print("所有路由已注册（使用新模块化admin系统，临时禁用冲突蓝图）") 
