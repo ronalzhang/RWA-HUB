@@ -2,6 +2,7 @@ from flask import current_app
 from datetime import datetime
 import logging
 import json
+import requests
 from .solana import SolanaClient
 from app.models import Asset, AssetStatus
 from app.extensions import db
@@ -24,6 +25,36 @@ from app.utils.solana_compat.publickey import PublicKey
 from app.blockchain.ethereum import get_usdc_balance, get_eth_balance, send_usdc, deploy_asset_contract, create_purchase_transaction
 
 logger = logging.getLogger(__name__)
+
+def get_proxy_config():
+    """
+    获取代理配置
+    
+    Returns:
+        dict: 代理配置字典，如果没有配置代理则返回None
+    """
+    # 检查环境变量中的代理配置
+    http_proxy = os.environ.get('HTTP_PROXY') or os.environ.get('http_proxy')
+    https_proxy = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
+    
+    # 如果没有设置代理环境变量，检查是否有自定义的Solana代理配置
+    if not http_proxy and not https_proxy:
+        solana_proxy = os.environ.get('SOLANA_RPC_PROXY')
+        if solana_proxy:
+            http_proxy = https_proxy = solana_proxy
+    
+    if http_proxy or https_proxy:
+        proxy_config = {}
+        if http_proxy:
+            proxy_config['http'] = http_proxy
+        if https_proxy:
+            proxy_config['https'] = https_proxy
+        
+        logger.info(f"使用代理配置: {proxy_config}")
+        return proxy_config
+    
+    logger.info("未配置代理")
+    return None
 
 class AssetService:
     """
@@ -513,83 +544,83 @@ class AssetService:
             if token_mint_address != expected_usdc_address:
                 logger.warning(f"请求的代币地址 {token_mint_address} 不是标准USDC地址 {expected_usdc_address}")
             
-            # 使用简化的RPC调用方法
-            try:
-                import requests
-                import json
-                
-                # 使用多个RPC节点进行查询
-                rpc_urls = [
-                    "https://api.mainnet-beta.solana.com",
-                    "https://solana-api.projectserum.com",
-                    "https://rpc.ankr.com/solana"
-                ]
-                
-                for rpc_url in rpc_urls:
-                    try:
-                        logger.info(f"尝试RPC节点: {rpc_url}")
-                        
-                        # 1. 首先获取代币账户
-                        token_accounts_payload = {
-                            "jsonrpc": "2.0",
-                            "id": 1,
-                            "method": "getTokenAccountsByOwner",
-                            "params": [
-                                wallet_address,
-                                {
-                                    "mint": token_mint_address
-                                },
-                                {
-                                    "encoding": "jsonParsed"
-                                }
-                            ]
-                        }
-                        
-                        response = requests.post(
-                            rpc_url,
-                            headers={'Content-Type': 'application/json'},
-                            json=token_accounts_payload,
-                            timeout=10
-                        )
-                        
-                        if not response.ok:
-                            logger.warning(f"RPC请求失败: {response.status_code}")
-                            continue
-                            
-                        data = response.json()
-                        
-                        if 'error' in data:
-                            logger.warning(f"RPC返回错误: {data['error']}")
-                            continue
-                            
-                        token_accounts = data.get('result', {}).get('value', [])
-                        logger.info(f"找到 {len(token_accounts)} 个代币账户")
-                        
-                        total_balance = 0.0
-                        
-                        for account in token_accounts:
-                            account_data = account.get('account', {}).get('data', {}).get('parsed', {}).get('info', {})
-                            token_amount = account_data.get('tokenAmount', {})
-                            
-                            if token_amount:
-                                ui_amount = float(token_amount.get('uiAmount', 0))
-                                total_balance += ui_amount
-                                logger.info(f"账户余额: {ui_amount} USDC")
-                        
-                        logger.info(f"钱包 {wallet_address} 总USDC余额: {total_balance}")
-                        return total_balance
-                        
-                    except Exception as rpc_err:
-                        logger.warning(f"RPC节点 {rpc_url} 查询失败: {str(rpc_err)}")
+            # 使用多个RPC节点进行查询
+            rpc_urls = [
+                "https://api.mainnet-beta.solana.com",
+                "https://solana-api.projectserum.com",
+                "https://rpc.ankr.com/solana"
+            ]
+            
+            # 获取代理配置
+            proxy_config = get_proxy_config()
+            
+            for rpc_url in rpc_urls:
+                try:
+                    logger.info(f"尝试RPC节点: {rpc_url}")
+                    
+                    # 1. 首先获取代币账户
+                    token_accounts_payload = {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "getTokenAccountsByOwner",
+                        "params": [
+                            wallet_address,
+                            {
+                                "mint": token_mint_address
+                            },
+                            {
+                                "encoding": "jsonParsed"
+                            }
+                        ]
+                    }
+                    
+                    # 构建请求参数
+                    request_kwargs = {
+                        'headers': {'Content-Type': 'application/json'},
+                        'json': token_accounts_payload,
+                        'timeout': 10
+                    }
+                    
+                    # 如果有代理配置，添加到请求中
+                    if proxy_config:
+                        request_kwargs['proxies'] = proxy_config
+                    
+                    response = requests.post(rpc_url, **request_kwargs)
+                    
+                    if not response.ok:
+                        logger.warning(f"RPC请求失败: {response.status_code}")
                         continue
-                
-                # 所有RPC节点都失败了
-                logger.error("所有RPC节点查询失败")
-                return 0.0
-                
-            except Exception as e:
-                logger.error(f"获取代币余额失败: {str(e)}")
-                return 0.0
+                        
+                    data = response.json()
+                    
+                    if 'error' in data:
+                        logger.warning(f"RPC返回错误: {data['error']}")
+                        continue
+                        
+                    token_accounts = data.get('result', {}).get('value', [])
+                    logger.info(f"找到 {len(token_accounts)} 个代币账户")
+                    
+                    total_balance = 0.0
+                    
+                    for account in token_accounts:
+                        account_data = account.get('account', {}).get('data', {}).get('parsed', {}).get('info', {})
+                        token_amount = account_data.get('tokenAmount', {})
+                        
+                        if token_amount:
+                            ui_amount = float(token_amount.get('uiAmount', 0))
+                            total_balance += ui_amount
+                            logger.info(f"账户余额: {ui_amount} USDC")
+                    
+                    logger.info(f"钱包 {wallet_address} 总USDC余额: {total_balance}")
+                    return total_balance
+                    
+                except Exception as rpc_err:
+                    logger.warning(f"RPC节点 {rpc_url} 查询失败: {str(rpc_err)}")
+                    continue
+            
+            # 所有RPC节点都失败了
+            logger.error("所有RPC节点查询失败")
+            return 0.0
             
         except Exception as e:
             logger.error(f"获取代币余额过程中发生错误: {str(e)}")
