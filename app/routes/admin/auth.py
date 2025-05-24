@@ -36,7 +36,7 @@ def api_admin_required(f):
                 return f(*args, **kwargs)
         
         # 尝试其他认证方式
-        eth_address = (
+        wallet_address = (
             request.headers.get('X-Eth-Address') or 
             request.headers.get('X-Wallet-Address') or
             request.cookies.get('eth_address') or 
@@ -45,16 +45,34 @@ def api_admin_required(f):
             session.get('admin_eth_address')
         )
                      
-        if not eth_address:
+        if not wallet_address:
             return jsonify({'error': '请先连接钱包并登录', 'code': 'AUTH_REQUIRED'}), 401
             
-        # 检查管理员权限
-        admin_info = get_admin_permissions(eth_address.lower())
-        if not admin_info:
+        # 直接查询数据库检查管理员权限
+        # 对于Solana地址，保持原样（大小写敏感）
+        # 对于以太坊地址，转换为小写
+        if wallet_address.startswith('0x'):
+            admin_user = AdminUser.query.filter(
+                func.lower(AdminUser.wallet_address) == wallet_address.lower()
+            ).first()
+        else:
+            # Solana地址大小写敏感
+            admin_user = AdminUser.query.filter(
+                AdminUser.wallet_address == wallet_address
+            ).first()
+            
+        if not admin_user:
+            current_app.logger.warning(f"API管理员验证失败 - 地址: {wallet_address}")
             return jsonify({'error': '您没有管理员权限', 'code': 'ADMIN_REQUIRED'}), 403
             
-        g.eth_address = eth_address.lower()
-        g.admin_info = admin_info
+        # 设置全局变量
+        g.eth_address = wallet_address
+        g.wallet_address = wallet_address  # 兼容性
+        g.admin = admin_user
+        g.admin_user_id = admin_user.id
+        g.admin_role = admin_user.role
+        
+        current_app.logger.info(f"API管理员验证通过 - 管理员ID: {admin_user.id}, 地址: {wallet_address}")
         return f(*args, **kwargs)
     return decorated_function
 
