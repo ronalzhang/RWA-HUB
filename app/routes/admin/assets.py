@@ -22,9 +22,80 @@ from .auth import api_admin_required, admin_page_required
 # 页面路由
 @admin_bp.route('/assets')
 @admin_page_required
-def assets():
+def assets_page():
     """资产管理页面"""
-    return render_template('admin/assets.html')
+    return render_template('admin_v2/assets.html')
+
+
+# V2版本路由（兼容前端调用）
+@admin_bp.route('/v2/api/assets', methods=['GET'])
+@api_admin_required
+def assets_list_v2():
+    """获取资产列表 - V2兼容版本"""
+    return get_assets_list()
+
+
+@admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['GET'])
+@api_admin_required
+def asset_detail_v2(asset_id):
+    """获取资产详情 - V2兼容版本"""
+    return get_asset_detail(asset_id)
+
+
+@admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['DELETE'])
+@api_admin_required
+def delete_asset_v2(asset_id):
+    """删除资产 - V2兼容版本"""
+    return delete_asset(asset_id)
+
+
+@admin_bp.route('/v2/api/assets/<int:asset_id>/approve', methods=['POST'])
+@api_admin_required
+def approve_asset_v2(asset_id):
+    """审核通过资产 - V2兼容版本"""
+    return approve_asset(asset_id)
+
+
+@admin_bp.route('/v2/api/assets/<int:asset_id>/reject', methods=['POST'])
+@api_admin_required
+def reject_asset_v2(asset_id):
+    """审核拒绝资产 - V2兼容版本"""
+    return reject_asset(asset_id)
+
+
+@admin_bp.route('/v2/api/assets/batch-approve', methods=['POST'])
+@api_admin_required
+def batch_approve_assets_v2():
+    """批量审核通过 - V2兼容版本"""
+    return batch_approve_assets()
+
+
+@admin_bp.route('/v2/api/assets/batch-reject', methods=['POST'])
+@api_admin_required
+def batch_reject_assets_v2():
+    """批量审核拒绝 - V2兼容版本"""
+    return batch_reject_assets()
+
+
+@admin_bp.route('/v2/api/assets/batch-delete', methods=['POST'])
+@api_admin_required
+def batch_delete_assets_v2():
+    """批量删除 - V2兼容版本"""
+    return batch_delete_assets()
+
+
+@admin_bp.route('/v2/api/assets/stats', methods=['GET'])
+@api_admin_required
+def assets_stats_v2():
+    """获取资产统计 - V2兼容版本"""
+    return get_assets_stats()
+
+
+@admin_bp.route('/v2/api/assets/export', methods=['GET'])
+@api_admin_required
+def export_assets_v2():
+    """导出资产数据 - V2兼容版本"""
+    return export_assets()
 
 
 # API路由
