@@ -100,7 +100,7 @@ def get_dashboard_stats():
         ).count()
         
         # 获取资产统计
-        total_assets = Asset.query.filter(Asset.status != 0).count()
+        total_assets = Asset.query.filter(Asset.deleted_at.is_(None)).count()
         total_asset_value = db.session.query(func.sum(Asset.total_value)).filter(
             Asset.status == 2  # 只统计已审核通过的资产
         ).scalar() or 0
