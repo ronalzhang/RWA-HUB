@@ -140,6 +140,8 @@ def get_trades_list():
         return jsonify({'error': str(e)}), 500
 
 
+@admin_bp.route('/api/trades/stats', methods=['GET'])
+@api_admin_required
 def get_trades_stats():
     """获取交易统计数据"""
     try:
@@ -181,6 +183,8 @@ def get_trades_stats():
         return jsonify({'error': str(e)}), 500
 
 
+@admin_bp.route('/api/trades/<int:trade_id>/status', methods=['PUT'])
+@api_admin_required
 def update_trade_status(trade_id):
     """更新交易状态"""
     try:
@@ -216,68 +220,59 @@ def update_trade_status(trade_id):
         return jsonify({'error': str(e)}), 500
 
 
+@admin_bp.route('/api/trades/export', methods=['GET'])
+@api_admin_required
 def export_trades():
     """导出交易数据"""
     try:
         import csv
         import io
+        from flask import make_response
         
-        # 解析查询参数
-        status = request.args.get('status', '')
-        trade_type = request.args.get('type', '')
-        time_range = request.args.get('time_range', '')
-        search = request.args.get('search', '')
+        # 获取所有交易数据
+        trades = Trade.query.join(Asset, Trade.asset_id == Asset.id, isouter=True) \
+            .order_by(Trade.created_at.desc()).all()
         
-        # 构建查询
-        query = Trade.query
-        
-        # 应用筛选条件
-        if status and hasattr(TradeStatus, status.upper()):
-            query = query.filter(Trade.status == getattr(TradeStatus, status.upper()).value)
-        
-        if trade_type:
-            query = query.filter(Trade.trade_type == trade_type)
-        
-        # 获取所有交易
-        trades = query.order_by(Trade.created_at.desc()).all()
-        
-        # 创建CSV
         output = io.StringIO()
         writer = csv.writer(output)
         
-        # 写入CSV头
+        # 写入标题行
         writer.writerow([
-            '交易ID', '资产名称', '买方地址', '卖方地址', '数量', '单价', '总金额', 
-            '状态', '交易哈希', '创建时间'
+            'ID', '资产名称', 'Token符号', '买方地址', '卖方地址', 
+            '交易数量', '价格', '总金额', '状态', '交易哈希', '创建时间'
         ])
         
-        # 写入交易数据
+        # 写入数据行
         for trade in trades:
+            status_text = {
+                TradeStatus.PENDING.value: '待处理',
+                TradeStatus.COMPLETED.value: '已完成',
+                TradeStatus.FAILED.value: '失败',
+                TradeStatus.CANCELLED.value: '已取消'
+            }.get(trade.status, '未知状态')
+            
             writer.writerow([
                 trade.id,
                 trade.asset.name if trade.asset else '未知资产',
+                trade.asset.token_symbol if trade.asset else '-',
                 trade.buyer_address,
                 trade.seller_address,
                 trade.token_amount,
                 float(trade.price) if trade.price else 0,
                 float(trade.total) if trade.total else 0,
-                trade.status,
+                status_text,
                 trade.tx_hash or '',
                 trade.created_at.strftime('%Y-%m-%d %H:%M:%S')
             ])
         
-        # 设置响应头
         output.seek(0)
-        response = current_app.response_class(
-            output.getvalue(),
-            mimetype='text/csv',
-            headers={
-                'Content-Disposition': f'attachment; filename=trades_{datetime.now().strftime("%Y%m%d%H%M%S")}.csv'
-            }
-        )
+        
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = f'attachment; filename=trades_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.csv'
         
         return response
-    
+        
     except Exception as e:
         current_app.logger.error(f"导出交易数据失败: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500 
