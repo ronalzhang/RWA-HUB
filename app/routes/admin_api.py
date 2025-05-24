@@ -746,9 +746,11 @@ def get_pending_assets():
         page = request.args.get('page', 1, type=int)
         page_size = request.args.get('page_size', 10, type=int)
         
-        # 查询待审核资产
-        query = Asset.query.filter(Asset.status == AssetStatus.PENDING.value) \
-            .order_by(Asset.created_at.desc())
+        # 查询待审核资产 - 只显示未删除的资产
+        query = Asset.query.filter(
+            Asset.status == AssetStatus.PENDING.value,
+            Asset.deleted_at.is_(None)
+        ).order_by(Asset.created_at.desc())
         
         # 总数
         total = query.count()
@@ -2537,19 +2539,25 @@ def compat_assets_list():
 def compat_assets_stats():
     """获取资产统计数据兼容API"""
     try:
-        # 统计数据
+        # 统计数据 - 所有查询都只统计未删除的资产
         total_assets = Asset.query.filter(Asset.deleted_at.is_(None)).count()
-        pending_assets = Asset.query.filter(Asset.status == 1).count()
-        approved_assets = Asset.query.filter(Asset.status == 2).count()
-        rejected_assets = Asset.query.filter(Asset.status == 3).count()
+        pending_assets = Asset.query.filter(Asset.status == 1, Asset.deleted_at.is_(None)).count()
+        approved_assets = Asset.query.filter(Asset.status == 2, Asset.deleted_at.is_(None)).count()
+        rejected_assets = Asset.query.filter(Asset.status == 3, Asset.deleted_at.is_(None)).count()
         
-        # 总价值 (只统计已审核通过的资产)
-        total_value = db.session.query(func.sum(Asset.total_value)).filter(Asset.status == 2).scalar() or 0
+        # 总价值 (只统计已审核通过且未删除的资产)
+        total_value = db.session.query(func.sum(Asset.total_value)).filter(
+            Asset.status == 2, 
+            Asset.deleted_at.is_(None)
+        ).scalar() or 0
         
-        # 资产类型分布
+        # 资产类型分布 (只统计未删除的资产)
         asset_types = {}
         for asset_type in AssetType:
-            count = Asset.query.filter(Asset.asset_type == asset_type.value).count()
+            count = Asset.query.filter(
+                Asset.asset_type == asset_type.value,
+                Asset.deleted_at.is_(None)
+            ).count()
             if count > 0:
                 asset_types[asset_type.name] = count
         
