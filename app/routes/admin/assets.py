@@ -27,13 +27,6 @@ def assets():
     return render_template('admin/assets.html')
 
 
-@admin_bp.route('/v2/assets')
-@admin_page_required
-def assets_v2():
-    """V2版本资产管理页面"""
-    return render_template('admin/assets.html')
-
-
 # API路由
 @admin_bp.route('/v2/api/assets', methods=['GET'])
 @api_admin_required
