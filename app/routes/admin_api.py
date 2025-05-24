@@ -2822,3 +2822,113 @@ def check_permissions_simple():
             'has_permission': False,
             'error': '检查权限时发生错误'
         }), 500
+
+# 佣金管理兼容路由
+@admin_compat_bp.route('/commission/stats', methods=['GET'])
+@api_admin_required
+def compat_commission_stats():
+    """获取佣金统计 - 兼容API"""
+    from app.routes.admin.commission import get_commission_stats
+    return get_commission_stats()
+
+@admin_compat_bp.route('/commission/records', methods=['GET'])
+@api_admin_required
+def compat_commission_records():
+    """获取佣金记录列表 - 兼容API"""
+    from app.routes.admin.commission import get_commission_records
+    return get_commission_records()
+
+@admin_compat_bp.route('/commission/settings', methods=['GET'])
+@api_admin_required
+def compat_commission_settings_get():
+    """获取佣金设置 - 兼容API"""
+    from app.routes.admin.commission import get_commission_settings
+    return get_commission_settings()
+
+@admin_compat_bp.route('/commission/settings', methods=['POST'])
+@api_admin_required
+def compat_commission_settings_post():
+    """保存佣金设置 - 兼容API"""
+    from app.routes.admin.commission import save_commission_settings
+    return save_commission_settings()
+
+@admin_compat_bp.route('/commission/records/<int:record_id>/pay', methods=['POST'])
+@api_admin_required
+def compat_commission_pay(record_id):
+    """发放佣金 - 兼容API"""
+    from app.routes.admin.commission import pay_commission_record
+    return pay_commission_record(record_id)
+
+@admin_compat_bp.route('/commission/records/export', methods=['GET'])
+@api_admin_required
+def compat_commission_export():
+    """导出佣金记录 - 兼容API"""
+    from app.routes.admin.commission import export_commission_records
+    return export_commission_records()
+
+@admin_compat_bp.route('/commission/referrals', methods=['GET'])
+@api_admin_required
+def compat_commission_referrals():
+    """获取推荐关系 - 兼容API"""
+    from app.routes.admin.commission import get_referral_list
+    return get_referral_list()
+
+# 资产管理兼容路由
+@admin_compat_bp.route('/assets', methods=['GET'])
+@api_admin_required
+def compat_assets_list_v2():
+    """获取资产列表 - 兼容API"""
+    from app.routes.admin.assets import get_assets_list
+    return get_assets_list()
+
+@admin_compat_bp.route('/assets/stats', methods=['GET'])
+@api_admin_required
+def compat_assets_stats_v2():
+    """获取资产统计 - 兼容API"""
+    from app.routes.admin.assets import get_assets_stats
+    return get_assets_stats()
+
+@admin_compat_bp.route('/assets/<int:asset_id>', methods=['GET'])
+@api_admin_required
+def compat_assets_detail(asset_id):
+    """获取资产详情 - 兼容API"""
+    from app.routes.admin.assets import get_asset_detail
+    return get_asset_detail(asset_id)
+
+@admin_compat_bp.route('/admins', methods=['GET'])
+@api_admin_required
+def compat_admin_users():
+    """获取管理员用户列表 - 兼容API"""
+    try:
+        from app.models.admin import AdminUser
+        
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 20, type=int)
+        
+        # 获取管理员列表
+        query = AdminUser.query
+        total = query.count()
+        
+        admins = query.offset((page - 1) * limit).limit(limit).all()
+        
+        admin_list = []
+        for admin in admins:
+            admin_list.append({
+                'id': admin.id,
+                'wallet_address': admin.wallet_address,
+                'role': admin.role,
+                'permissions': admin.permissions,
+                'created_at': admin.created_at.isoformat(),
+                'last_login': admin.last_login.isoformat() if admin.last_login else None
+            })
+        
+        return jsonify({
+            'items': admin_list,
+            'total': total,
+            'page': page,
+            'limit': limit
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取管理员列表失败: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
