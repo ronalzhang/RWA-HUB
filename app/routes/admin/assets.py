@@ -31,7 +31,7 @@ def assets():
 @admin_page_required
 def assets_v2():
     """V2版本资产管理页面"""
-    return render_template('admin/v2/assets.html')
+    return render_template('admin/assets.html')
 
 
 # API路由
