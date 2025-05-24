@@ -343,19 +343,31 @@ def api_get_asset(asset_id):
 def api_delete_asset(asset_id):
     """删除资产（软删除）"""
     try:
-        asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
-        if not asset:
-            return jsonify({'success': False, 'error': '资产不存在或已被删除'}), 404
-        
-        # 软删除：设置deleted_at时间戳
-        asset.deleted_at = datetime.utcnow()
-        db.session.commit()
-        
-        current_app.logger.info(f'资产已软删除: {asset_id}')
-        return jsonify({'success': True, 'message': '资产已删除'})
+        with current_app.app_context():
+            asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
+            if not asset:
+                return jsonify({'success': False, 'error': '资产不存在或已被删除'}), 404
+            
+            # 软删除：设置deleted_at时间戳
+            asset.deleted_at = datetime.utcnow()
+            
+            # 保存更改
+            try:
+                db.session.add(asset)
+                db.session.commit()
+            except Exception as commit_error:
+                db.session.rollback()
+                current_app.logger.error(f'提交失败: {str(commit_error)}')
+                raise commit_error
+            
+            current_app.logger.info(f'资产已软删除: {asset_id}')
+            return jsonify({'success': True, 'message': '资产已删除'})
         
     except Exception as e:
-        db.session.rollback()
+        try:
+            db.session.rollback()
+        except:
+            pass
         current_app.logger.error(f'删除资产失败: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
