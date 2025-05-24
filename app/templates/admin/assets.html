@@ -325,7 +325,7 @@
                 }
                 
                 // 发送API请求
-                fetch(`/api/admin/v2/assets?${queryParams}`)
+                fetch(`/admin/v2/api/assets?${queryParams}`)
                     .then(response => {
                         if (!response.ok) {
                             throw new Error('网络请求失败');
@@ -521,7 +521,7 @@
                 modal.show();
                 
                 // 从API获取资产详情
-                fetch(`/api/admin/v2/assets/${assetId}`)
+                fetch(`/admin/v2/api/assets/${assetId}`)
                     .then(response => {
                         if (!response.ok) {
                             throw new Error('网络请求失败');
@@ -611,7 +611,7 @@
                     return;
                 }
                 
-                fetch(`/api/admin/assets/${assetId}`, {
+                fetch(`/admin/v2/api/assets/${assetId}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
@@ -655,7 +655,7 @@
                 }
                 
                 if (confirm(`确定要删除所选的 ${selectedIds.length} 个资产吗？此操作不可恢复。`)) {
-                    fetch('/api/admin/assets/batch-delete', {
+                    fetch('/admin/v2/api/assets/batch-delete', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -735,7 +735,7 @@
                 }
                 
                 if (confirm(`确定要批量通过所选的 ${selectedIds.length} 个资产吗？`)) {
-                    fetch('/api/admin/assets/batch-approve', {
+                    fetch('/admin/v2/api/assets/batch-approve', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -787,7 +787,7 @@
                 }
                 
                 if (confirm(`确定要批量拒绝所选的 ${selectedIds.length} 个资产吗？`)) {
-                    fetch('/api/admin/assets/batch-reject', {
+                    fetch('/admin/v2/api/assets/batch-reject', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
