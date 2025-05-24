@@ -308,6 +308,25 @@
                 pages: 0
             },
             
+            // 获取URL参数中的钱包地址
+            getWalletAddress() {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get('eth_address');
+            },
+            
+            // 创建带认证头的fetch请求
+            authFetch(url, options = {}) {
+                const walletAddress = this.getWalletAddress();
+                return fetch(url, {
+                    ...options,
+                    headers: {
+                        'X-Wallet-Address': walletAddress,
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+            },
+            
             async loadTrades(page = null) {
                 if (page) this.pagination.page = page;
                 this.loading = true;
@@ -319,7 +338,7 @@
                         ...this.filters
                     });
                     
-                    const response = await fetch(`/admin/v2/api/trades?${params}`);
+                    const response = await this.authFetch(`/admin/v2/api/trades?${params}`);
                     if (!response.ok) throw new Error('加载交易数据失败');
                     
                     const data = await response.json();
@@ -339,7 +358,7 @@
             
             async loadStats() {
                 try {
-                    const response = await fetch('/admin/v2/api/trades/stats');
+                    const response = await this.authFetch('/admin/v2/api/trades/stats');
                     if (response.ok) {
                         this.stats = await response.json();
                     }
@@ -357,7 +376,7 @@
                 if (!confirm(`确定要将交易状态更新为"${this.getStatusText(status)}"吗？`)) return;
                 
                 try {
-                    const response = await fetch(`/admin/v2/api/trades/${trade.id}/status`, {
+                    const response = await this.authFetch(`/admin/v2/api/trades/${trade.id}/status`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ status })
@@ -380,7 +399,7 @@
             
             async exportTrades() {
                 try {
-                    const response = await fetch('/admin/v2/api/trades/export');
+                    const response = await this.authFetch('/admin/v2/api/trades/export');
                     if (!response.ok) throw new Error('导出失败');
                     
                     const blob = await response.blob();
