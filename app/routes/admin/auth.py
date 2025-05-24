@@ -118,8 +118,8 @@ def login_v2():
     return render_template('admin/v2/login.html')
 
 
-@admin_bp.route('/v2/api/check-auth')
-def check_auth_v2():
+@admin_bp.route('/api/check-auth')
+def check_auth():
     """检查管理员认证状态API"""
     try:
         if session.get('admin_verified') and session.get('admin_wallet_address'):
@@ -146,9 +146,9 @@ def check_auth_v2():
         return jsonify({'authenticated': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/v2/api/logout', methods=['POST'])
-def logout_v2():
-    """V2版本管理员登出API"""
+@admin_bp.route('/api/logout', methods=['POST'])
+def logout_api():
+    """管理员登出API"""
     session.clear()
     return jsonify({'success': True, 'message': '已成功登出'})
 

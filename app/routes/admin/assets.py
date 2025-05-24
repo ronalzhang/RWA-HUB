@@ -28,10 +28,10 @@ def assets():
 
 
 # API路由
-@admin_bp.route('/v2/api/assets', methods=['GET'])
+@admin_bp.route('/api/assets', methods=['GET'])
 @api_admin_required
-def api_assets_v2():
-    """V2版本资产列表API"""
+def api_assets():
+    """资产列表API"""
     try:
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
@@ -127,9 +127,9 @@ def api_assets_v2():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['GET'])
+@admin_bp.route('/api/assets/<int:asset_id>', methods=['GET'])
 @api_admin_required
-def api_get_asset_v2(asset_id):
+def api_get_asset(asset_id):
     """获取单个资产详情"""
     try:
         asset = Asset.query.get_or_404(asset_id)
@@ -183,9 +183,9 @@ def api_get_asset_v2(asset_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['DELETE'])
+@admin_bp.route('/api/assets/<int:asset_id>', methods=['DELETE'])
 @api_admin_required
-def api_delete_asset_v2(asset_id):
+def api_delete_asset(asset_id):
     """删除资产（软删除）"""
     try:
         asset = Asset.query.get_or_404(asset_id)
@@ -203,9 +203,9 @@ def api_delete_asset_v2(asset_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/v2/api/assets/<int:asset_id>/approve', methods=['POST'])
+@admin_bp.route('/api/assets/<int:asset_id>/approve', methods=['POST'])
 @api_admin_required
-def api_approve_asset_v2(asset_id):
+def api_approve_asset(asset_id):
     """审核通过资产"""
     try:
         asset = Asset.query.get_or_404(asset_id)
@@ -225,9 +225,9 @@ def api_approve_asset_v2(asset_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/v2/api/assets/<int:asset_id>/reject', methods=['POST'])
+@admin_bp.route('/api/assets/<int:asset_id>/reject', methods=['POST'])
 @api_admin_required
-def api_reject_asset_v2(asset_id):
+def api_reject_asset(asset_id):
     """审核拒绝资产"""
     try:
         asset = Asset.query.get_or_404(asset_id)
@@ -252,9 +252,9 @@ def api_reject_asset_v2(asset_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/v2/api/assets/batch-approve', methods=['POST'])
+@admin_bp.route('/api/assets/batch-approve', methods=['POST'])
 @api_admin_required
-def api_batch_approve_assets_v2():
+def api_batch_approve_assets():
     """批量审核通过资产"""
     try:
         data = request.get_json()
@@ -291,9 +291,9 @@ def api_batch_approve_assets_v2():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/v2/api/assets/batch-reject', methods=['POST'])
+@admin_bp.route('/api/assets/batch-reject', methods=['POST'])
 @api_admin_required
-def api_batch_reject_assets_v2():
+def api_batch_reject_assets():
     """批量审核拒绝资产"""
     try:
         data = request.get_json()
@@ -333,9 +333,9 @@ def api_batch_reject_assets_v2():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/v2/api/assets/batch-delete', methods=['POST'])
+@admin_bp.route('/api/assets/batch-delete', methods=['POST'])
 @api_admin_required
-def api_batch_delete_assets_v2():
+def api_batch_delete_assets():
     """批量删除资产（软删除）"""
     try:
         data = request.get_json()
@@ -372,9 +372,9 @@ def api_batch_delete_assets_v2():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/v2/api/assets/stats', methods=['GET'])
+@admin_bp.route('/api/assets/stats', methods=['GET'])
 @api_admin_required
-def api_assets_stats_v2():
+def api_assets_stats():
     """资产统计数据"""
     try:
         total_assets = Asset.query.filter(Asset.status != 4).count()
@@ -397,9 +397,9 @@ def api_assets_stats_v2():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/v2/api/assets/export', methods=['GET'])
+@admin_bp.route('/api/assets/export', methods=['GET'])
 @api_admin_required
-def api_export_assets_v2():
+def api_export_assets():
     """导出资产数据为CSV"""
     try:
         assets = Asset.query.filter(Asset.status != 4).order_by(desc(Asset.created_at)).all()
