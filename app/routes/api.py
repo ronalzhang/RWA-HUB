@@ -29,8 +29,11 @@ def list_assets():
         from app.models.user import User
         from sqlalchemy import desc
         
-        # 构建查询 - 只显示已上链的资产（状态为2）
-        query = Asset.query.filter(Asset.status == AssetStatus.ON_CHAIN.value)
+        # 构建查询 - 只显示已上链且未删除的资产
+        query = Asset.query.filter(
+            Asset.status == AssetStatus.ON_CHAIN.value,
+            Asset.deleted_at.is_(None)  # 排除已删除的资产
+        )
         
         # 获取分页参数
         page = request.args.get('page', 1, type=int)
