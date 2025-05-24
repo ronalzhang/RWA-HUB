@@ -525,8 +525,8 @@ def list_assets():
         sort_by = request.args.get('sort_by', 'created_at')
         sort_order = request.args.get('sort_order', 'desc')
         
-        # 构建查询
-        query = Asset.query
+        # 构建查询 - 只显示未删除的资产
+        query = Asset.query.filter(Asset.deleted_at.is_(None))
         
         # 过滤条件
         if status:
