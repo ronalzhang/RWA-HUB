@@ -197,4 +197,44 @@ def check_admin():
             
     except Exception as e:
         current_app.logger.error(f"检查管理员状态失败: {str(e)}")
+        return jsonify({'is_admin': False, 'error': str(e)}), 500
+
+
+# 添加admin_api_bp蓝图的路由，匹配前端期望的/api/admin/check
+@admin_api_bp.route('/check', methods=['GET', 'POST'])
+def check_admin_api():
+    """检查钱包地址是否为管理员 - API蓝图版本"""
+    try:
+        # 获取钱包地址
+        address = None
+        if request.method == 'GET':
+            address = request.args.get('address')
+        else:  # POST
+            data = request.get_json() or {}
+            address = data.get('address')
+        
+        if not address:
+            return jsonify({'is_admin': False, 'error': '缺少钱包地址'}), 400
+        
+        # 检查是否为管理员
+        admin_user = AdminUser.query.filter(
+            func.lower(AdminUser.wallet_address) == address.lower()
+        ).first()
+        
+        if admin_user:
+            current_app.logger.info(f"管理员检查通过: {address}")
+            return jsonify({
+                'is_admin': True,
+                'admin_info': {
+                    'id': admin_user.id,
+                    'name': admin_user.username or 'Admin',
+                    'role': admin_user.role
+                }
+            })
+        else:
+            current_app.logger.info(f"非管理员地址: {address}")
+            return jsonify({'is_admin': False})
+            
+    except Exception as e:
+        current_app.logger.error(f"检查管理员状态失败: {str(e)}")
         return jsonify({'is_admin': False, 'error': str(e)}), 500 
