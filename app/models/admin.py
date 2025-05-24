@@ -269,8 +269,8 @@ class DashboardStats(db.Model):
         user_count = User.query.count()
         cls._update_stat('user_count', 'daily', today, user_count)
         
-        # 资产统计
-        asset_count = Asset.query.count()
+        # 资产统计 - 只统计未删除的资产
+        asset_count = Asset.query.filter(Asset.deleted_at.is_(None)).count()
         cls._update_stat('asset_count', 'daily', today, asset_count)
         
         # 交易统计
@@ -287,9 +287,10 @@ class DashboardStats(db.Model):
         ).count()
         cls._update_stat('new_users_today', 'daily', today, today_users)
         
-        # 今日新增资产
+        # 今日新增资产 - 只统计未删除的资产
         today_assets = Asset.query.filter(
-            func.date(Asset.created_at) == today
+            func.date(Asset.created_at) == today,
+            Asset.deleted_at.is_(None)
         ).count()
         cls._update_stat('new_assets_today', 'daily', today, today_assets)
         
@@ -311,15 +312,15 @@ class DashboardStats(db.Model):
     def update_stats_from_db(cls):
         """从数据库更新统计数据"""
         try:
-            # 获取当前统计数据
+            # 获取当前统计数据 - 只统计未删除的资产
             stats = {
                 'total_users': User.query.count(),
-                'total_assets': Asset.query.count(),
+                'total_assets': Asset.query.filter(Asset.deleted_at.is_(None)).count(),
                 'total_trades': Trade.query.count(),
                 'total_volume': db.session.query(func.sum(Trade.amount)).scalar() or 0,
-                'pending_assets': Asset.query.filter_by(status=1).count(),
-                'approved_assets': Asset.query.filter_by(status=2).count(),
-                'rejected_assets': Asset.query.filter_by(status=3).count(),
+                'pending_assets': Asset.query.filter(Asset.status == 1, Asset.deleted_at.is_(None)).count(),
+                'approved_assets': Asset.query.filter(Asset.status == 2, Asset.deleted_at.is_(None)).count(),
+                'rejected_assets': Asset.query.filter(Asset.status == 3, Asset.deleted_at.is_(None)).count(),
             }
             
             # 更新今日统计
