@@ -735,7 +735,7 @@ class AssetService:
             formatted_address = wallet_address.lower() if wallet_address.startswith('0x') else wallet_address
             
             # 查询用户的分佣记录
-            from app.models import User, Commission, Referral
+            from app.models import User, Commission, UserReferral, CommissionRecord
             from app import db
             from sqlalchemy import func
             
@@ -772,19 +772,21 @@ class AssetService:
                 except Exception as user_comm_err:
                     logger.warning(f"获取User表分佣余额失败: {str(user_comm_err)}")
                 
-                # 方法3：从Referral表计算推荐分佣
+                # 方法3：从CommissionRecord表计算推荐分佣
                 try:
-                    referral_commission = db.session.query(func.sum(Referral.commission_amount)).filter_by(
-                        referrer_id=user.id,
-                        status='confirmed'
+                    # 查找该用户作为推荐人获得的佣金
+                    referral_commission = db.session.query(func.sum(CommissionRecord.amount)).filter(
+                        CommissionRecord.recipient_address == formatted_address,
+                        CommissionRecord.status == 'paid',
+                        CommissionRecord.commission_type.like('referral_%')
                     ).scalar()
                     
                     if referral_commission:
                         total_commission += float(referral_commission)
-                        logger.info(f"从Referral表获取推荐分佣: {referral_commission}")
+                        logger.info(f"从CommissionRecord表获取推荐分佣: {referral_commission}")
                         
                 except Exception as ref_err:
-                    logger.warning(f"查询Referral表失败（可能表不存在）: {str(ref_err)}")
+                    logger.warning(f"查询CommissionRecord表失败（可能表不存在）: {str(ref_err)}")
                 
                 # 方法4：如果以上都没有，返回模拟数据用于测试
                 if total_commission == 0.0:
