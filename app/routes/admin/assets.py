@@ -574,9 +574,9 @@ def api_assets_stats():
     """资产统计数据"""
     try:
         total_assets = Asset.query.filter(Asset.deleted_at.is_(None)).count()
-        pending_assets = Asset.query.filter(Asset.status == 1).count()
-        approved_assets = Asset.query.filter(Asset.status == 2).count()
-        rejected_assets = Asset.query.filter(Asset.status == 3).count()
+        pending_assets = Asset.query.filter(Asset.status == 1, Asset.deleted_at.is_(None)).count()
+        approved_assets = Asset.query.filter(Asset.status == 2, Asset.deleted_at.is_(None)).count()
+        rejected_assets = Asset.query.filter(Asset.status == 3, Asset.deleted_at.is_(None)).count()
         
         return jsonify({
             'success': True,
