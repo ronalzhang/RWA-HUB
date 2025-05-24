@@ -343,12 +343,8 @@ def api_get_asset(asset_id):
 def api_delete_asset(asset_id):
     """删除资产（软删除）"""
     try:
-        # 确保在新的事务中操作
-        db.session.begin()
-        
         asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
         if not asset:
-            db.session.rollback()
             return jsonify({'success': False, 'error': '资产不存在或已被删除'}), 404
         
         # 软删除：设置deleted_at时间戳
@@ -430,9 +426,6 @@ def api_batch_approve_assets():
         success_count = 0
         failed_ids = []
         
-        # 开始新事务
-        db.session.begin()
-        
         for asset_id in asset_ids:
             try:
                 asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
@@ -472,9 +465,6 @@ def api_batch_reject_assets():
         reject_reason = data.get('reason', '管理员批量拒绝')
         success_count = 0
         failed_ids = []
-        
-        # 开始新事务
-        db.session.begin()
         
         for asset_id in asset_ids:
             try:
@@ -516,9 +506,6 @@ def api_batch_delete_assets():
         asset_ids = data['asset_ids']
         success_count = 0
         failed_ids = []
-        
-        # 开始新事务
-        db.session.begin()
         
         for asset_id in asset_ids:
             try:
