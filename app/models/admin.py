@@ -387,30 +387,33 @@ def async_task(func):
             current_app.logger.error(f'异步任务执行失败: {str(e)}')
     return wrapper
 
-@event.listens_for(User, 'after_insert')
-def user_created(mapper, connection, target):
-    """用户创建后更新统计"""
-    @async_task
-    def update_stats():
-        DashboardStats.update_daily_stats()
-    
-    update_stats()
+# 注释掉事件监听器，避免事务冲突
+# 改为在需要时手动调用统计更新
 
-@event.listens_for(Asset, 'after_insert')
-@event.listens_for(Asset, 'after_update')
-def asset_changed(mapper, connection, target):
-    """资产变更后更新统计"""
-    @async_task
-    def update_stats():
-        DashboardStats.update_daily_stats()
-    
-    update_stats()
+# @event.listens_for(User, 'after_insert')
+# def user_created(mapper, connection, target):
+#     """用户创建后更新统计"""
+#     @async_task
+#     def update_stats():
+#         DashboardStats.update_daily_stats()
+#     
+#     update_stats()
 
-@event.listens_for(Trade, 'after_insert')
-def trade_created(mapper, connection, target):
-    """交易创建后更新统计"""
-    @async_task
-    def update_stats():
-        DashboardStats.update_daily_stats()
-    
-    update_stats() 
+# @event.listens_for(Asset, 'after_insert')
+# @event.listens_for(Asset, 'after_update')
+# def asset_changed(mapper, connection, target):
+#     """资产变更后更新统计"""
+#     @async_task
+#     def update_stats():
+#         DashboardStats.update_daily_stats()
+#     
+#     update_stats()
+
+# @event.listens_for(Trade, 'after_insert')
+# def trade_created(mapper, connection, target):
+#     """交易创建后更新统计"""
+#     @async_task
+#     def update_stats():
+#         DashboardStats.update_daily_stats()
+#     
+#     update_stats() 
