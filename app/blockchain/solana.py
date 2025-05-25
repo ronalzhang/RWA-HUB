@@ -360,7 +360,7 @@ class SolanaClient:
         # 首先尝试主节点
         try:
             logger.info(f"正在获取钱包 {self.public_key} 的SOL余额...")
-            balance_resp = self.client.get_balance(self.public_key)
+            balance_resp = self.client.get_balance(str(self.public_key))
             logger.debug(f"余额查询响应: {balance_resp}")
             
             if 'result' in balance_resp and 'value' in balance_resp['result']:
@@ -378,7 +378,7 @@ class SolanaClient:
                 try:
                     logger.info(f"尝试使用备用节点: {backup_node}")
                     backup_client = SolanaRpcClient(backup_node)
-                    balance_resp = backup_client.get_balance(self.public_key)
+                    balance_resp = backup_client.get_balance(str(self.public_key))
                     
                     if 'result' in balance_resp and 'value' in balance_resp['result']:
                         balance_lamports = balance_resp['result']['value']
