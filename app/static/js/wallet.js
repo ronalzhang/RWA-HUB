@@ -3002,25 +3002,39 @@ checkIfReturningFromWalletApp(walletType) {
             
             // 9. 创建接收方的ATA账户指令（如果账户已存在，Solana会自动跳过）
             console.log('[transferSolanaToken] 添加创建ATA账户指令...');
-            const createATAInstruction = window.spl_token.createAssociatedTokenAccountInstruction(
-                fromPubkey,                      // payer (付费者)
-                toTokenAccount,                  // associatedToken (ATA地址)
-                toPubkey,                        // owner (所有者)
-                USDC_MINT,                       // mint (代币mint地址)
-                TOKEN_PROGRAM_ID,                // programId
-                ASSOCIATED_TOKEN_PROGRAM_ID      // associatedTokenProgramId
-            );
+            
+            // 手动创建ATA指令，避免自定义函数的问题
+            const createATAInstruction = new window.solanaWeb3.TransactionInstruction({
+                keys: [
+                    { pubkey: fromPubkey, isSigner: true, isWritable: true },
+                    { pubkey: toTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: toPubkey, isSigner: false, isWritable: false },
+                    { pubkey: USDC_MINT, isSigner: false, isWritable: false },
+                    { pubkey: window.solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false },
+                    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+                    { pubkey: window.solanaWeb3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+                ],
+                programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+                data: new Uint8Array(0)
+            });
             transaction.add(createATAInstruction);
             
             // 10. 创建转账指令
-            const transferInstruction = window.spl_token.createTransferInstruction(
-                fromTokenAccount,    // source (源账户)
-                toTokenAccount,      // destination (目标账户)
-                fromPubkey,          // owner (所有者)
-                transferAmount,      // amount (转账金额)
-                [],                  // multiSigners (多重签名者，空数组表示单一签名)
-                TOKEN_PROGRAM_ID     // programId
-            );
+            // 手动创建转账指令，避免自定义函数的问题
+            const transferData = new Uint8Array(9);
+            transferData[0] = 3; // Transfer instruction
+            const amountBytes = new Uint8Array(new BigUint64Array([transferAmount]).buffer);
+            transferData.set(amountBytes, 1);
+            
+            const transferInstruction = new window.solanaWeb3.TransactionInstruction({
+                keys: [
+                    { pubkey: fromTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: toTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: fromPubkey, isSigner: true, isWritable: false },
+                ],
+                programId: TOKEN_PROGRAM_ID,
+                data: transferData
+            });
                 
                 transaction.add(transferInstruction);
             
