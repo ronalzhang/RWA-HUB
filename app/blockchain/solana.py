@@ -92,12 +92,18 @@ class SolanaClient:
                 try:
                     # 尝试base58解码
                     private_key_bytes = base58.b58decode(private_key)
+                    # 如果是64字节，取前32字节作为seed
+                    if len(private_key_bytes) == 64:
+                        private_key_bytes = private_key_bytes[:32]
                     auth_method = "provided_private_key"
                 except Exception as e:
                     logger.warning(f"Base58解码失败，尝试Base64解码: {e}")
                     try:
                         # 备用方案：尝试base64解码
                         private_key_bytes = base64.b64decode(private_key)
+                        # 如果是64字节，取前32字节作为seed
+                        if len(private_key_bytes) == 64:
+                            private_key_bytes = private_key_bytes[:32]
                         auth_method = "provided_private_key_base64"
                     except Exception as e2:
                         logger.error(f"无法解码提供的私钥: {e2}")
@@ -107,6 +113,9 @@ class SolanaClient:
                 logger.info(f"使用keypair文件初始化: {auth_keypair}")
                 with open(auth_keypair, 'r') as f:
                     private_key_bytes = bytes([int(n) for n in json.load(f)])
+                    # 如果是64字节，取前32字节作为seed
+                    if len(private_key_bytes) == 64:
+                        private_key_bytes = private_key_bytes[:32]
                     auth_method = "keypair_file"
             # 3. 尝试从环境变量获取
             else:
