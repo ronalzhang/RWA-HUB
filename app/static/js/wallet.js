@@ -3049,8 +3049,12 @@ checkIfReturningFromWalletApp(walletType) {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    transaction: base64Tx,
-                    encoding: "base64"
+                    serialized_transaction: base64Tx,
+                    skip_preflight: false,
+                    from_address: fromAddress.toString(),
+                    to_address: to,
+                    amount: parseFloat(amount),
+                    token: tokenSymbol
                 })
             });
             
@@ -3079,7 +3083,7 @@ checkIfReturningFromWalletApp(walletType) {
                 await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
                 
                 try {
-                    const checkResponse = await fetch(`/api/solana/check_transaction?signature=${txSignature}`);
+                    const checkResponse = await fetch(`/api/solana/check_transaction?signature=${txSignature}&from_address=${fromAddress.toString()}&to_address=${to}&amount=${parseFloat(amount)}&token=${tokenSymbol}`);
                     if (checkResponse.ok) {
                         const checkData = await checkResponse.json();
                         if (checkData.success && checkData.confirmed) {
