@@ -70,9 +70,9 @@ function initializeCreatePage() {
     // 监听钱包状态变化事件
     document.addEventListener('walletStateChanged', function(event) {
         console.log('资产创建页面收到钱包状态变化事件:', event.detail);
-        // 只更新UI状态，不重新初始化钱包连接
-        if (event.detail && event.detail.connected) {
-            updateWalletUI(event.detail);
+        // 重新检查钱包状态并更新UI
+        if (event.detail && typeof event.detail.connected !== 'undefined') {
+            initializeWalletCheck();
         }
     });
     
@@ -87,29 +87,7 @@ function initializeCreatePage() {
 }
 
 // 检查钱包连接状态
-// 更新钱包UI状态
-function updateWalletUI(walletData) {
-    console.log('更新钱包UI状态:', walletData);
-    // 这里只更新UI，不触发新的连接
-    if (walletData.connected && walletData.address) {
-        // 更新UI显示钱包已连接状态
-        const walletCheck = document.getElementById('walletCheck');
-        const formContent = document.getElementById('formContent');
-        
-        if (walletCheck && formContent) {
-            walletCheck.style.display = 'none';
-            formContent.style.display = 'block';
-        }
-        
-        console.log('钱包已连接:', walletData.address);
-        
-        // 检查管理员状态（如果还没有检查过）
-        if (typeof isAdminUser === 'undefined' || isAdminUser === null) {
-            setTimeout(() => checkAdmin(walletData.address), 100);
-        }
-    }
-}
-
+// 检查钱包连接状态
 function initializeWalletCheck() {
     console.log('执行钱包连接状态检查...');
     const walletCheck = document.getElementById('walletCheck');
