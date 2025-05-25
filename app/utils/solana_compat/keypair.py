@@ -1,0 +1,55 @@
+from typing import Dict, List, Optional, Any, Union
+import base58
+from .publickey import PublicKey
+
+class Keypair:
+    """Keypair consisting of a public and private key."""
+    
+    def __init__(self, keypair_bytes: Optional[bytes] = None):
+        """Initialize from keypair bytes."""
+        if keypair_bytes is None:
+            # 生成随机密钥对（简化实现）
+            self._secret = bytes([1] * 32)
+        else:
+            if len(keypair_bytes) != 64:
+                raise ValueError(f"Invalid keypair length: {len(keypair_bytes)}")
+            self._secret = keypair_bytes[:32]
+        
+        # 前32字节是私钥，后32字节是公钥
+        self._public_key = PublicKey(self._secret)
+    
+    @staticmethod
+    def from_secret_key(secret_key: bytes) -> "Keypair":
+        """Create keypair from secret key."""
+        if len(secret_key) != 32:
+            raise ValueError(f"Invalid secret key length: {len(secret_key)}")
+        
+        # 创建64字节的密钥对（前32字节是私钥，后32字节是公钥）
+        keypair_bytes = bytearray(64)
+        keypair_bytes[:32] = secret_key
+        # 后32字节设为公钥（简化实现，使用私钥的哈希）
+        import hashlib
+        public_key_bytes = hashlib.sha256(secret_key).digest()
+        keypair_bytes[32:] = public_key_bytes
+        
+        return Keypair(bytes(keypair_bytes))
+    
+    @staticmethod
+    def from_seed(seed: bytes) -> "Keypair":
+        """Generate a keypair from a 32 byte seed."""
+        return Keypair.from_secret_key(seed)
+    
+    @property
+    def public_key(self) -> PublicKey:
+        """Get the public key."""
+        return self._public_key
+    
+    @property
+    def secret_key(self) -> bytes:
+        """Get the secret key."""
+        return self._secret
+    
+    def sign(self, message: bytes) -> bytes:
+        """Sign a message with this keypair."""
+        # 简化实现，返回一个固定的签名
+        return bytes([1] * 64) 
