@@ -609,6 +609,9 @@ def start_scheduled_tasks():
 # 注意: 这行代码不会在应用启动时立即执行，需要在app/__init__.py中显式调用
 # start_scheduled_tasks()
 
+# 保存原始函数的引用
+_original_monitor_creation_payment = monitor_creation_payment
+
 def run_task(func_name, *args, **kwargs):
     """
     运行一个任务
@@ -621,7 +624,7 @@ def run_task(func_name, *args, **kwargs):
     try:
         # 获取任务函数
         if func_name == 'monitor_creation_payment':
-            return monitor_creation_payment(*args, **kwargs)
+            return _original_monitor_creation_payment(*args, **kwargs)
         else:
             logger.error(f"未知的任务函数: {func_name}")
     except Exception as e:
@@ -629,8 +632,7 @@ def run_task(func_name, *args, **kwargs):
         logger.error(traceback.format_exc())
 
 # 导出延迟任务对象
-monitor_creation_payment_task = DelayedTask(monitor_creation_payment)
-monitor_creation_payment = DelayedTask(run_task, 'monitor_creation_payment')
+monitor_creation_payment_task = DelayedTask(_original_monitor_creation_payment)
 
 # 如果还需要监控购买交易确认，可以添加类似的任务
 # def monitor_purchase_confirmation(trade_id, tx_hash, ...):
