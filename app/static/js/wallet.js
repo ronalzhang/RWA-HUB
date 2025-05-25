@@ -2179,8 +2179,7 @@ const walletState = {
                         nativeBalance: this.nativeBalance
                     });
                     
-                    const truncatedAddress = this.address.slice(0, 6) + '...' + this.address.slice(-4);
-                    showSuccess(`钱包已连接: ${truncatedAddress}`);
+                    // 钱包连接成功，不显示弹出框，用户可以从UI状态看到连接状态
                 } catch (e) {
                     console.warn('处理Solflare连接后续操作失败:', e);
                 }
@@ -2254,8 +2253,7 @@ const walletState = {
                         nativeBalance: this.nativeBalance
                     });
                     
-                    const truncatedAddress = this.address.slice(0, 6) + '...' + this.address.slice(-4);
-                    showSuccess(`钱包已连接: ${truncatedAddress}`);
+                    // 钱包连接成功，不显示弹出框，用户可以从UI状态看到连接状态
                 } catch (e) {
                     console.warn('处理Coinbase连接后续操作失败:', e);
                 }
@@ -2327,8 +2325,7 @@ const walletState = {
                         nativeBalance: this.nativeBalance
                     });
                     
-                    const truncatedAddress = this.address.slice(0, 6) + '...' + this.address.slice(-4);
-                    showSuccess(`钱包已连接: ${truncatedAddress}`);
+                    // 钱包连接成功，不显示弹出框，用户可以从UI状态看到连接状态
                 } catch (e) {
                     console.warn('处理Slope连接后续操作失败:', e);
                 }
@@ -2394,8 +2391,7 @@ const walletState = {
                         nativeBalance: this.nativeBalance
                     });
                     
-                    const truncatedAddress = this.address.slice(0, 6) + '...' + this.address.slice(-4);
-                    showSuccess(`钱包已连接: ${truncatedAddress}`);
+                    // 钱包连接成功，不显示弹出框，用户可以从UI状态看到连接状态
                 } catch (e) {
                     console.warn('处理Glow连接后续操作失败:', e);
                 }
@@ -2466,9 +2462,7 @@ async connectPhantom(isReconnect = false) {
             // 如果已经连接，可以直接使用现有连接
             if (window.solana.isConnected && window.solana.publicKey) {
                 console.log('Phantom钱包已连接，将使用现有连接');
-                    if (!isReconnect) {
-                    showSuccess('检测到已连接的Phantom钱包');
-                }
+                    // 钱包已连接，不显示弹出框
                 return true;
             }
             
@@ -2495,10 +2489,7 @@ async connectPhantom(isReconnect = false) {
                     };
                 }
                 
-                // 显示用户提示
-                if (!isReconnect) {
-                    showSuccess('正在打开Phantom钱包，请在钱包中确认连接授权');
-                }
+                // 钱包连接中，不显示弹出框
                 
                 // 简单的连接请求，不设置超时
                 const response = await window.solana.connect();
@@ -2517,9 +2508,7 @@ async connectPhantom(isReconnect = false) {
                 const addressString = response.publicKey.toString();
                 console.log('Phantom钱包连接成功！地址:', addressString);
                 
-                if (!isReconnect) {
-                    showSuccess('Phantom钱包连接成功！');
-                }
+                // 钱包连接成功，不显示弹出框，用户可以从UI状态看到连接状态
                 
                 return {
                     success: true,
@@ -3417,9 +3406,7 @@ checkIfReturningFromWalletApp(walletType) {
                 commissionBalance: this.commissionBalance
             });
             
-            // 显示成功消息
-            const truncatedAddress = address.slice(0, 6) + '...' + address.slice(-4);
-            showSuccess(`钱包已连接: ${truncatedAddress}`);
+            // 钱包连接成功，不显示弹出框，用户可以从UI状态看到连接状态
             
             console.log(`[afterSuccessfulConnection] ${walletType}钱包连接处理完成`);
             return true;
