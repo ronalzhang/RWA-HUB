@@ -3003,10 +3003,12 @@ checkIfReturningFromWalletApp(walletType) {
             // 9. 创建接收方的ATA账户指令（如果账户已存在，Solana会自动跳过）
             console.log('[transferSolanaToken] 添加创建ATA账户指令...');
             const createATAInstruction = window.spl_token.createAssociatedTokenAccountInstruction(
-                fromPubkey,        // payer (付费者)
-                toTokenAccount,    // associatedToken (ATA地址)
-                toPubkey,          // owner (所有者)
-                USDC_MINT          // mint (代币mint地址)
+                fromPubkey,                      // payer (付费者)
+                toTokenAccount,                  // associatedToken (ATA地址)
+                toPubkey,                        // owner (所有者)
+                USDC_MINT,                       // mint (代币mint地址)
+                TOKEN_PROGRAM_ID,                // programId
+                ASSOCIATED_TOKEN_PROGRAM_ID      // associatedTokenProgramId
             );
             transaction.add(createATAInstruction);
             
@@ -3015,7 +3017,9 @@ checkIfReturningFromWalletApp(walletType) {
                 fromTokenAccount,    // source (源账户)
                 toTokenAccount,      // destination (目标账户)
                 fromPubkey,          // owner (所有者)
-                transferAmount       // amount (转账金额)
+                transferAmount,      // amount (转账金额)
+                [],                  // multiSigners (多重签名者，空数组表示单一签名)
+                TOKEN_PROGRAM_ID     // programId
             );
                 
                 transaction.add(transferInstruction);
