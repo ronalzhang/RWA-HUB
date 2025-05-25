@@ -2954,10 +2954,14 @@ checkIfReturningFromWalletApp(walletType) {
             
             // 4. 计算ATA地址
             const fromTokenAccount = await window.spl_token.getAssociatedTokenAddress(
-                USDC_MINT, fromPubkey, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
+                USDC_MINT,     // mint
+                fromPubkey,    // owner
+                false          // allowOwnerOffCurve
             );
             const toTokenAccount = await window.spl_token.getAssociatedTokenAddress(
-                USDC_MINT, toPubkey, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
+                USDC_MINT,     // mint
+                toPubkey,      // owner
+                false          // allowOwnerOffCurve
             );
             
             console.log('[transferSolanaToken] ATA地址计算完成:', {
@@ -2989,34 +2993,22 @@ checkIfReturningFromWalletApp(walletType) {
             
             // 8. 将转账金额转换为最小单位（USDC有6位小数）
             const decimals = 6; // USDC有6位小数
-            const transferAmount = Math.floor(amount * Math.pow(10, decimals));
+            const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
             
             console.log('[transferSolanaToken] 转账金额转换:', {
                 原始金额: amount,
                 最小单位: transferAmount
             });
             
-            // 9. 检查接收方是否有USDC账户，如果没有则创建
-            console.log('[transferSolanaToken] 检查接收方USDC账户...');
-            const checkAccountResponse = await fetch(`/api/solana/check_account?address=${toTokenAccount.toString()}`);
-            let toAccountInfo = null;
-            if (checkAccountResponse.ok) {
-                const accountData = await checkAccountResponse.json();
-                toAccountInfo = accountData.success && accountData.exists ? {} : null;
-            }
-            if (!toAccountInfo) {
-                console.log('[transferSolanaToken] 接收方没有USDC账户，需要创建');
-                
-                // 创建接收方的ATA账户指令
-                const createATAInstruction = window.spl_token.createAssociatedTokenAccountInstruction(
-                    fromPubkey,        // payer (付费者)
-                    toTokenAccount,    // associatedToken (ATA地址)
-                    toPubkey,          // owner (所有者)
-                    USDC_MINT          // mint (代币mint地址)
-                );
-                
-                transaction.add(createATAInstruction);
-            }
+            // 9. 创建接收方的ATA账户指令（如果账户已存在，Solana会自动跳过）
+            console.log('[transferSolanaToken] 添加创建ATA账户指令...');
+            const createATAInstruction = window.spl_token.createAssociatedTokenAccountInstruction(
+                fromPubkey,        // payer (付费者)
+                toTokenAccount,    // associatedToken (ATA地址)
+                toPubkey,          // owner (所有者)
+                USDC_MINT          // mint (代币mint地址)
+            );
+            transaction.add(createATAInstruction);
             
             // 10. 创建转账指令
             const transferInstruction = window.spl_token.createTransferInstruction(
