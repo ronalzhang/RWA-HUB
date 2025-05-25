@@ -2976,12 +2976,20 @@ checkIfReturningFromWalletApp(walletType) {
                 to: toTokenAccount.toString()
             });
             
-            // 5. 直接连接Solana主网
-            // 使用代理API而不是直接连接
-            // const connection = new window.solanaWeb3.Connection("https://api.mainnet-beta.solana.com", "confirmed");
-            
-            // 6. 获取最新区块哈希
-            const latestBlockhash = await connection.getLatestBlockhash('confirmed');
+            // 5. 使用代理API获取最新区块哈希
+            console.log('[transferSolanaToken] 使用代理API获取区块哈希...');
+            const blockhashResponse = await fetch("/api/solana/get_latest_blockhash");
+            if (!blockhashResponse.ok) {
+                throw new Error("获取区块哈希失败: " + blockhashResponse.statusText);
+            }
+            const blockhashData = await blockhashResponse.json();
+            if (!blockhashData.success) {
+                throw new Error("获取区块哈希失败: " + blockhashData.error);
+            }
+            const latestBlockhash = {
+                blockhash: blockhashData.blockhash,
+                lastValidBlockHeight: blockhashData.lastValidBlockHeight
+            };
             console.log('[transferSolanaToken] 获取最新区块哈希:', latestBlockhash.blockhash);
             
             // 7. 创建交易
@@ -3000,7 +3008,13 @@ checkIfReturningFromWalletApp(walletType) {
             });
             
             // 9. 检查接收方是否有USDC账户，如果没有则创建
-            const toAccountInfo = await connection.getAccountInfo(toTokenAccount);
+            console.log('[transferSolanaToken] 检查接收方USDC账户...');
+            const checkAccountResponse = await fetch(`/api/solana/check_account?address=${toTokenAccount.toString()}`);
+            let toAccountInfo = null;
+            if (checkAccountResponse.ok) {
+                const accountData = await checkAccountResponse.json();
+                toAccountInfo = accountData.success && accountData.exists ? {} : null;
+            }
             if (!toAccountInfo) {
                 console.log('[transferSolanaToken] 接收方没有USDC账户，需要创建');
                 
@@ -3035,23 +3049,63 @@ checkIfReturningFromWalletApp(walletType) {
             console.log('[transferSolanaToken] 请求钱包签名...');
             const signedTransaction = await window.solana.signTransaction(transaction);
             
-            // 12. 发送交易
-            console.log('[transferSolanaToken] 发送交易到网络...');
-            const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
+            // 12. 使用代理API发送交易
+            console.log('[transferSolanaToken] 使用代理API发送交易...');
+            const serializedTx = signedTransaction.serialize();
+            const base64Tx = btoa(String.fromCharCode(...serializedTx));
+            
+            const sendResponse = await fetch("/api/solana/submit_transaction", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    transaction: base64Tx,
+                    encoding: "base64"
+                })
+            });
+            
+            if (!sendResponse.ok) {
+                throw new Error("发送交易失败: " + sendResponse.statusText);
+            }
+            
+            const sendData = await sendResponse.json();
+            if (!sendData.success) {
+                throw new Error("发送交易失败: " + sendData.error);
+            }
+            
+            const txSignature = sendData.signature;
             
             console.log('[transferSolanaToken] 交易已发送，签名:', txSignature);
             
-            // 13. 确认交易
+            // 13. 使用代理API确认交易
             console.log('[transferSolanaToken] 等待交易确认...');
-            const confirmationStatus = await connection.confirmTransaction({
-                signature: txSignature,
-                blockhash: latestBlockhash.blockhash,
-                lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
-            }, 'confirmed');
             
-            if (confirmationStatus.value.err) {
-                console.error('[transferSolanaToken] 交易确认失败:', confirmationStatus.value.err);
-                throw new Error('交易确认失败: ' + JSON.stringify(confirmationStatus.value.err));
+            let confirmed = false;
+            let attempts = 0;
+            const maxAttempts = 30; // 最多等待30次，每次2秒
+            
+            while (!confirmed && attempts < maxAttempts) {
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+                
+                try {
+                    const checkResponse = await fetch(`/api/solana/check_transaction?signature=${txSignature}`);
+                    if (checkResponse.ok) {
+                        const checkData = await checkResponse.json();
+                        if (checkData.success && checkData.confirmed) {
+                            confirmed = true;
+                            console.log('[transferSolanaToken] 交易确认成功');
+                            break;
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`[transferSolanaToken] 检查交易状态失败 (尝试 ${attempts}/${maxAttempts}):`, error);
+                }
+            }
+            
+            if (!confirmed) {
+                throw new Error('交易确认超时，请稍后检查交易状态');
             }
             
             console.log('[transferSolanaToken] 交易已确认，签名:', txSignature);
