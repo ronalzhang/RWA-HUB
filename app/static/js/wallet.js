@@ -3000,43 +3000,18 @@ checkIfReturningFromWalletApp(walletType) {
                 最小单位: transferAmount
             });
             
-            // 9. 创建接收方的ATA账户指令（如果账户已存在，Solana会自动跳过）
-            console.log('[transferSolanaToken] 添加创建ATA账户指令...');
+            // 9. 简化：直接创建转账指令，假设ATA账户已存在
+            console.log('[transferSolanaToken] 创建转账指令...');
             
-            // 手动创建ATA指令，避免自定义函数的问题
-            const createATAInstruction = new window.solanaWeb3.TransactionInstruction({
-                keys: [
-                    { pubkey: fromPubkey, isSigner: true, isWritable: true },
-                    { pubkey: toTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: toPubkey, isSigner: false, isWritable: false },
-                    { pubkey: USDC_MINT, isSigner: false, isWritable: false },
-                    { pubkey: window.solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false },
-                    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-                    { pubkey: window.solanaWeb3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
-                ],
-                programId: ASSOCIATED_TOKEN_PROGRAM_ID,
-                data: new Uint8Array(0)
-            });
-            transaction.add(createATAInstruction);
+            // 使用标准的SPL Token转账指令
+            const transferInstruction = window.spl_token.createTransferInstruction(
+                fromTokenAccount,    // source
+                toTokenAccount,      // destination  
+                fromPubkey,          // owner
+                transferAmount       // amount
+            );
             
-            // 10. 创建转账指令
-            // 手动创建转账指令，避免自定义函数的问题
-            const transferData = new Uint8Array(9);
-            transferData[0] = 3; // Transfer instruction
-            const amountBytes = new Uint8Array(new BigUint64Array([transferAmount]).buffer);
-            transferData.set(amountBytes, 1);
-            
-            const transferInstruction = new window.solanaWeb3.TransactionInstruction({
-                keys: [
-                    { pubkey: fromTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: toTokenAccount, isSigner: false, isWritable: true },
-                    { pubkey: fromPubkey, isSigner: true, isWritable: false },
-                ],
-                programId: TOKEN_PROGRAM_ID,
-                data: transferData
-            });
-                
-                transaction.add(transferInstruction);
+            transaction.add(transferInstruction);
             
             console.log('[transferSolanaToken] 交易指令已添加');
             
@@ -3044,31 +3019,45 @@ checkIfReturningFromWalletApp(walletType) {
             console.log('[transferSolanaToken] 请求钱包签名...');
             const signedTransaction = await window.solana.signTransaction(transaction);
             
-            // 12. 使用代理API发送交易
-            console.log('[transferSolanaToken] 使用代理API发送交易...');
+            // 12. 序列化交易
+            console.log('[transferSolanaToken] 序列化交易...');
             const serializedTx = signedTransaction.serialize();
             const base64Tx = btoa(String.fromCharCode(...serializedTx));
+            
+            console.log('[transferSolanaToken] 交易序列化完成，长度:', base64Tx.length);
+            
+            // 13. 使用代理API发送交易
+            console.log('[transferSolanaToken] 使用代理API发送交易...');
+            const requestBody = {
+                serialized_transaction: base64Tx,
+                skip_preflight: false,
+                from_address: fromPubkey.toString(),
+                to_address: to,
+                amount: parseFloat(amount),
+                token: tokenSymbol
+            };
+            
+            console.log('[transferSolanaToken] 请求体:', requestBody);
             
             const sendResponse = await fetch("/api/solana/submit_transaction", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({
-                    serialized_transaction: base64Tx,
-                    skip_preflight: false,
-                    from_address: fromPubkey.toString(),
-                    to_address: to,
-                    amount: parseFloat(amount),
-                    token: tokenSymbol
-                })
+                body: JSON.stringify(requestBody)
             });
             
+            console.log('[transferSolanaToken] API响应状态:', sendResponse.status);
+            
             if (!sendResponse.ok) {
-                throw new Error("发送交易失败: " + sendResponse.statusText);
+                const errorText = await sendResponse.text();
+                console.error('[transferSolanaToken] API错误响应:', errorText);
+                throw new Error("发送交易失败: " + sendResponse.statusText + " - " + errorText);
             }
             
             const sendData = await sendResponse.json();
+            console.log('[transferSolanaToken] API响应数据:', sendData);
+            
             if (!sendData.success) {
                 throw new Error("发送交易失败: " + sendData.error);
             }
