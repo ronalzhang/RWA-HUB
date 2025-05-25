@@ -3009,12 +3009,10 @@ checkIfReturningFromWalletApp(walletType) {
                 
                 // 创建接收方的ATA账户指令
                 const createATAInstruction = window.spl_token.createAssociatedTokenAccountInstruction(
-                    fromPubkey,
-                    toTokenAccount,
-                    toPubkey,
-                    USDC_MINT,
-                    TOKEN_PROGRAM_ID,
-                    ASSOCIATED_TOKEN_PROGRAM_ID
+                    fromPubkey,        // payer (付费者)
+                    toTokenAccount,    // associatedToken (ATA地址)
+                    toPubkey,          // owner (所有者)
+                    USDC_MINT          // mint (代币mint地址)
                 );
                 
                 transaction.add(createATAInstruction);
@@ -3022,13 +3020,11 @@ checkIfReturningFromWalletApp(walletType) {
             
             // 10. 创建转账指令
             const transferInstruction = window.spl_token.createTransferInstruction(
-                fromTokenAccount,
-                toTokenAccount,
-                fromPubkey,
-                transferAmount,
-                [],
-                TOKEN_PROGRAM_ID
-                );
+                fromTokenAccount,    // source (源账户)
+                toTokenAccount,      // destination (目标账户)
+                fromPubkey,          // owner (所有者)
+                transferAmount       // amount (转账金额)
+            );
                 
                 transaction.add(transferInstruction);
             
