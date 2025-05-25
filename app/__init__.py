@@ -166,7 +166,7 @@ def create_app(config_name='development'):
     # 初始化后台任务处理系统
     with app.app_context():
         try:
-            import app.tasks
+            # import app.tasks
             app.logger.info("后台任务处理系统已初始化")
             
             # 确保支付自动监控任务启动（增加一个全局变量防止重复初始化）

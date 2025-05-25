@@ -21,7 +21,8 @@ from app.extensions import db
 from app.models import Asset, Trade, AssetStatus, AssetStatusHistory
 from app.blockchain.asset_service import AssetService
 # 导入app模块的logger
-from app import logger
+# from app import logger
+logger = logging.getLogger(__name__)
 from sqlalchemy import exc
 
 # 任务队列

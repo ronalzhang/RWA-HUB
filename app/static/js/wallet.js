@@ -2977,7 +2977,8 @@ checkIfReturningFromWalletApp(walletType) {
             });
             
             // 5. 直接连接Solana主网
-            const connection = new window.solanaWeb3.Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+            // 使用代理API而不是直接连接
+            // const connection = new window.solanaWeb3.Connection("https://api.mainnet-beta.solana.com", "confirmed");
             
             // 6. 获取最新区块哈希
             const latestBlockhash = await connection.getLatestBlockhash('confirmed');
