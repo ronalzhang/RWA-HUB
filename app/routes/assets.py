@@ -28,6 +28,7 @@ import logging
 from sqlalchemy import text
 import qrcode
 from io import BytesIO
+from threading import Thread
 
 # 页面路由
 @assets_bp.route("/")

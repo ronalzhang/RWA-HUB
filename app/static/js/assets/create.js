@@ -1915,6 +1915,24 @@ async function handlePaymentSuccess(txHash, formData) {
     try {
         updateProgress(85, '支付已确认，正在创建资产...');
         
+        // 重新生成Token Symbol，避免重复使用
+        const assetType = formData.type || '20';
+        console.log('重新生成Token Symbol，资产类型:', assetType);
+        const newTokenSymbol = await generateTokenSymbol(assetType);
+        
+        if (newTokenSymbol) {
+            formData.token_symbol = newTokenSymbol;
+            console.log('使用新的Token Symbol:', newTokenSymbol);
+            
+            // 更新页面上的Token Symbol显示
+            const tokenSymbolInput = document.getElementById('tokensymbol');
+            if (tokenSymbolInput) {
+                tokenSymbolInput.value = newTokenSymbol;
+            }
+        } else {
+            console.warn('无法生成新的Token Symbol，使用原有的');
+        }
+        
         // 创建资产
         const result = await processAssetCreation(formData, txHash);
         
@@ -1950,23 +1968,33 @@ async function handlePaymentSuccess(txHash, formData) {
             `;
             
             // 显示成功消息
-            Swal.fire({
-                title: '提交成功',
-                html: successMessage,
-                icon: 'success',
-                confirmButtonText: '查看资产',
-                showCancelButton: true,
-                cancelButtonText: '返回首页',
-                allowOutsideClick: false
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // 跳转到资产详情页
+            try {
+                Swal.fire({
+                    title: '提交成功',
+                    html: successMessage,
+                    icon: 'success',
+                    confirmButtonText: '查看资产',
+                    showCancelButton: true,
+                    cancelButtonText: '返回首页',
+                    allowOutsideClick: false
+                }).then((swalResult) => {
+                    if (swalResult.isConfirmed) {
+                        // 跳转到资产详情页
+                        window.location.href = `/assets/${result.asset_id}`;
+                    } else {
+                        // 返回首页
+                        window.location.href = '/';
+                    }
+                });
+            } catch (swalError) {
+                console.error('SweetAlert显示失败，使用备用跳转:', swalError);
+                // 备用跳转逻辑
+                if (confirm('资产创建成功！是否查看资产详情？')) {
                     window.location.href = `/assets/${result.asset_id}`;
                 } else {
-                    // 返回首页
                     window.location.href = '/';
                 }
-            });
+            }
             
             // 设置定时任务轮询交易状态
             _pollTransactionStatus(txHash, result.asset_id);
