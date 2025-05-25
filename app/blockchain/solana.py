@@ -115,19 +115,36 @@ class SolanaClient:
                 if wallet_info and 'value' in wallet_info:
                     try:
                         private_key_str = wallet_info['value']
-                        # 尝试base58解码
-                        try:
+                        key_type = wallet_info.get('type', 'base58')
+                        
+                        # 根据检测到的格式进行解码
+                        if key_type == 'base58':
                             private_key_bytes = base58.b58decode(private_key_str)
-                            auth_method = "env_private_key"
-                        except Exception as e:
-                            logger.warning(f"Base58解码失败，尝试Base64解码: {e}")
-                            try:
-                                # 备用方案：尝试base64解码
-                                private_key_bytes = base64.b64decode(private_key_str)
-                                auth_method = "env_private_key_base64"
-                            except Exception as e2:
-                                logger.error(f"无法解码环境变量中的私钥: {e2}")
-                                raise ValueError("环境变量中的私钥格式无效")
+                            # Solana私钥是64字节，但只需要前32字节作为seed
+                            if len(private_key_bytes) == 64:
+                                private_key_bytes = private_key_bytes[:32]
+                            auth_method = "env_private_key_base58"
+                        elif key_type == 'hex':
+                            private_key_bytes = bytes.fromhex(private_key_str)
+                            # 如果是64字节，取前32字节
+                            if len(private_key_bytes) == 64:
+                                private_key_bytes = private_key_bytes[:32]
+                            auth_method = "env_private_key_hex"
+                        elif key_type == 'base64':
+                            private_key_bytes = base64.b64decode(private_key_str)
+                            # 如果是64字节，取前32字节
+                            if len(private_key_bytes) == 64:
+                                private_key_bytes = private_key_bytes[:32]
+                            auth_method = "env_private_key_base64"
+                        else:
+                            logger.error(f"不支持的私钥类型: {key_type}")
+                            private_key_bytes = None
+                            
+                        # 验证私钥长度
+                        if private_key_bytes and len(private_key_bytes) != 32:
+                            logger.error(f"私钥长度错误: {len(private_key_bytes)}，期望32字节")
+                            private_key_bytes = None
+                            
                     except Exception as e:
                         logger.error(f"处理环境变量私钥失败: {e}")
                         private_key_bytes = None

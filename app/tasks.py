@@ -487,24 +487,23 @@ def auto_monitor_pending_payments():
         
         with flask_app.app_context():
             try:
-                # 查找已支付确认但未上链的资产
+                # 1. 查找已支付确认但未上链的资产
                 confirmed_assets = Asset.query.filter(
                     Asset.payment_confirmed == True,
                     Asset.token_address == None,
-                    Asset.deployment_in_progress != True, # 确保没有正在处理
+                    Asset.deployment_in_progress != True,
                     Asset.status == AssetStatus.CONFIRMED.value
-                ).limit(10).all() # 增加limit，防止一次处理过多
+                ).limit(10).all()
                 
                 if confirmed_assets:
                     logger.info(f"找到 {len(confirmed_assets)} 个已支付确认但待上链的资产，开始处理...")
                     
                     for asset in confirmed_assets:
-                        # if asset.payment_confirmed and not asset.token_address and not asset.deployment_in_progress: # 此条件已在查询中包含
                         with get_asset_lock(asset.id):
                             logger.info(f"开始处理资产 {asset.id} 的上链流程 (通过auto_monitor)")
                             try:
                                 # 使用事务锁确保此资产不会被并发处理
-                                asset_for_update = db.session.query(Asset).with_for_update(nowait=True).get(asset.id) # 使用 query().get()
+                                asset_for_update = db.session.query(Asset).with_for_update(nowait=True).get(asset.id)
                                 
                                 # 再次检查条件，确保在获取锁后资产状态仍然符合预期
                                 if not asset_for_update or asset_for_update.status != AssetStatus.CONFIRMED.value or asset_for_update.token_address is not None:
@@ -530,7 +529,7 @@ def auto_monitor_pending_payments():
                                     logger.error(f"资产 {asset.id} 通过 auto_monitor 部署失败: {result.get('error')}")
                                     # deploy_asset_to_blockchain 应该自己处理失败状态的更新
                                     # 但这里可以确保 deployment_in_progress 被清除
-                                    asset_recheck = Asset.query.get(asset.id) # 使用 query().get()
+                                    asset_recheck = Asset.query.get(asset.id)
                                     if asset_recheck:
                                         asset_recheck.deployment_in_progress = False
                                         db.session.commit()
@@ -541,13 +540,50 @@ def auto_monitor_pending_payments():
                                 logger.error(f"处理资产 {asset.id} 上链时出错 (auto_monitor): {str(e)}")
                                 logger.error(traceback.format_exc())
                                 # 清理标记
-                                asset_recheck_exc = Asset.query.get(asset.id) # 使用 query().get()
+                                asset_recheck_exc = Asset.query.get(asset.id)
                                 if asset_recheck_exc:
                                      asset_recheck_exc.deployment_in_progress = False
                                      db.session.commit()
                 else:
-                    # logger.info("没有找到待处理的资产")
                     logger.debug("没有找到已支付确认但待上链的资产。")
+                
+                # 2. 清理超时的部署标记（超过2小时的）
+                timeout_assets = Asset.query.filter(
+                    Asset.deployment_in_progress == True,
+                    Asset.deployment_started_at != None
+                ).all()
+                
+                current_time = datetime.utcnow()
+                for asset in timeout_assets:
+                    time_diff = (current_time - asset.deployment_started_at).total_seconds()
+                    if time_diff > 7200:  # 2小时超时
+                        logger.warning(f"清理超时的部署标记: AssetID={asset.id}, 开始时间: {asset.deployment_started_at}, 超时: {time_diff}秒")
+                        asset.deployment_in_progress = False
+                        asset.error_message = f"部署超时（{time_diff}秒），已清理标记"
+                        db.session.commit()
+                
+                # 3. 检查部署失败的资产，如果失败时间超过30分钟，尝试重新部署
+                failed_assets = Asset.query.filter(
+                    Asset.status == AssetStatus.DEPLOYMENT_FAILED.value,
+                    Asset.payment_confirmed == True,
+                    Asset.token_address == None,
+                    Asset.deployment_in_progress != True
+                ).limit(5).all()  # 限制重试数量
+                
+                for asset in failed_assets:
+                    # 检查失败时间（如果有记录的话）
+                    should_retry = True
+                    if hasattr(asset, 'updated_at') and asset.updated_at:
+                        time_since_failure = (current_time - asset.updated_at).total_seconds()
+                        if time_since_failure < 1800:  # 30分钟内不重试
+                            should_retry = False
+                    
+                    if should_retry:
+                        logger.info(f"尝试重新部署失败的资产: AssetID={asset.id}")
+                        # 重置状态为CONFIRMED，让正常流程处理
+                        asset.status = AssetStatus.CONFIRMED.value
+                        asset.error_message = None
+                        db.session.commit()
                     
             except Exception as e:
                 logger.error(f"周期性任务执行内部失败: {str(e)}")
