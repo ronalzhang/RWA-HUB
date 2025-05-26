@@ -13,7 +13,7 @@
 {% endblock %}
 
 {% block content %}
-<div x-data="settingsManager()" class="space-y-6">
+<div x-data="settingsManager()" x-init="init()" class="space-y-6">
     
     <!-- 系统配置 -->
     <div class="bg-white shadow rounded-lg p-6">
@@ -184,6 +184,11 @@ function settingsManager() {
         walletInfo: null,
         cryptoPassword: '',
         privateKey: '',
+        
+        init() {
+            console.log('Settings manager initialized');
+            this.loadWalletInfo();
+        },
         
         async loadWalletInfo() {
             try {
