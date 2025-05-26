@@ -51,7 +51,7 @@ function initializeCreatePage() {
         
     // 设置初始化标志
     window.assetFormInitialized = true;
-    
+        
     // 首先重置上传区域状态，确保不显示"uploading"
     resetUploadAreas();
     
@@ -74,17 +74,17 @@ function initializeCreatePage() {
         if (event.detail && typeof event.detail.connected !== 'undefined') {
             initializeWalletCheck();
         }
-    });
-    
+        });
+        
     // 监听钱包初始化完成事件
         document.addEventListener('walletStateInitialized', function(event) {
         console.log('资产创建页面收到钱包初始化完成事件:', event.detail);
         // 重新检查钱包状态
         setTimeout(initializeWalletCheck, 100);
-    });
-    
+        });
+        
     console.log('初始化完成');
-}
+    }
 
 // 检查钱包连接状态
 // 检查钱包连接状态
@@ -118,7 +118,7 @@ function initializeWalletCheck() {
         // 检查管理员状态
         setTimeout(() => checkAdmin(sessionWalletAddress), 100);
         return;
-    }
+            }
     
     if (localWalletAddress && localWalletType) {
         console.log('从localStorage找到钱包地址:', localWalletAddress);
@@ -180,8 +180,8 @@ function checkAdmin(address) {
     })
     .finally(() => {
         window.checkingAdmin = false;
-    });
-}
+        });
+    }
 
 // 更新UI显示管理员状态
 function updateUiForAdminStatus(isAdmin) {
@@ -211,8 +211,8 @@ function updateUiForAdminStatus(isAdmin) {
                     console.error('生成代币符号出错:', error);
                 });
         });
-    }
-    
+        }
+        
     // 不动产面积
         const areaInput = document.getElementById('area');
         if (areaInput) {
@@ -245,8 +245,8 @@ function updateUiForAdminStatus(isAdmin) {
                 showAssetPreview();
             }
         });
-    }
-    
+        }
+        
     // 支付并发布按钮
         const publishButton = document.getElementById('payAndPublish');
         if (publishButton) {
@@ -382,7 +382,7 @@ function initializeFileUploads() {
             }
         });
     }
-}
+    }
 
 // 处理资产类型切换
     function toggleAssetTypeFields(type) {
@@ -426,7 +426,7 @@ function updateTokenPrice() {
     const totalValue = parseFloat(document.getElementById('total_value').value) || 0;
             const tokenCountElement = document.getElementById('token_count');
             const tokenPriceElement = document.getElementById('token_price');
-
+            
     if (!tokenCountElement || !tokenPriceElement) return;
     
     const tokenCountText = tokenCountElement.textContent.replace(/,/g, '');
@@ -478,10 +478,24 @@ function updateTokenPriceSimilar() {
         totalValue = parseFloat(document.getElementById('total_value_similar').value) || 0;
     }
     
-    // 计算发布费用 - 保持0.01 USDC固定费用用于测试
-    // 在测试环境中保持最低费用，在生产环境可以调整费率
-    let fee = 0.01; // 固定费用0.01 USDC，方便测试
-            publishingFeeElement.textContent = `${fee.toFixed(2)} USDC`;
+    // 计算发布费用 - 从API动态获取
+    (async () => {
+        let fee = 0.01; // 默认费用，如果API获取失败则使用此值
+        
+        try {
+            // 从API获取最新的支付配置
+            const configResponse = await fetch('/api/service/config/payment_settings');
+            if (configResponse.ok) {
+                const configData = await configResponse.json();
+                fee = parseFloat(configData.creation_fee?.amount) || fee;
+                console.log('从API获取发布费用:', fee, 'USDC');
+            }
+        } catch (configError) {
+            console.warn('获取发布费用配置失败，使用默认值:', configError);
+        }
+        
+        publishingFeeElement.textContent = `${fee.toFixed(2)} USDC`;
+    })();
     }
 
     // 生成代币符号
@@ -534,7 +548,7 @@ function updateTokenPriceSimilar() {
             if (checkResult.exists) {
                 console.error(`本地生成的符号 ${symbol} 已存在`);
                 return null;
-            }
+        }
             
             console.log(`本地生成代币符号: ${symbol}`);
             return symbol;
@@ -543,7 +557,7 @@ function updateTokenPriceSimilar() {
             return null;
         }
     }
-}
+    }
 
 // 处理文件上传
 async function handleFiles(files, fileType) {
@@ -691,8 +705,8 @@ async function handleFiles(files, fileType) {
                 }
                 
                 throw new Error(errorMessage);
-            }
-            
+    }
+
             // 解析成功响应
             const result = await response.json();
             console.log('上传响应:', result);
@@ -711,8 +725,8 @@ async function handleFiles(files, fileType) {
                 
                 if (!url) {
                     throw new Error('服务器返回的URL为空');
-                }
-                
+    }
+
                 // 添加到上传文件列表
                 if (isImage) {
                     uploadedImages.push({
@@ -736,8 +750,8 @@ async function handleFiles(files, fileType) {
             console.error(`上传文件失败:`, error);
             statusElement.textContent = `上传失败: ${error.message}`;
             failed++;
-        }
-        
+    }
+
         // 更新进度条
         const progress = Math.round(((completed + failed) / files.length) * 100);
         percentElement.textContent = progress.toString();
@@ -750,7 +764,7 @@ async function handleFiles(files, fileType) {
     } else if (completed > 0) {
         statusElement.textContent = `全部 ${completed} 个文件上传成功`;
     }
-    
+
     // 保存草稿
     saveDraft();
     
@@ -875,8 +889,8 @@ function loadDraft() {
             
             const input = form.elements[key];
             if (input) input.value = draft[key];
-            }
-        
+    }
+
         // 加载图片和文档
         if (draft.images) {
             uploadedImages = draft.images;
@@ -910,10 +924,10 @@ function loadDraft() {
 function validateAndSubmitForm() {
         const form = document.getElementById('assetForm');
     if (!form) return;
-    
+        
     // 基本字段验证
     const requiredFields = ['name', 'type', 'description', 'tokensymbol'];
-    
+        
     for (const field of requiredFields) {
         const input = form.elements[field];
         if (!input || !input.value.trim()) {
@@ -947,9 +961,9 @@ function validateAndSubmitForm() {
         if (!totalValueInput || !parseFloat(totalValueInput.value)) {
             showError(`Please fill in ${getFieldLabel('total_value')}`);
             return;
+            }
         }
-    }
-    
+        
     // TODO: 提交表单逻辑
     console.log('表单验证通过，准备提交');
     alert('表单验证通过，功能待实现');
@@ -977,7 +991,7 @@ function getCookieValue(name) {
     const parts = value.split(`; ${name}=`);
     if (parts.length === 2) return parts.pop().split(';').shift();
     return null;
-}
+    }
 
 // 检查并连接钱包
 async function checkAndConnectWallet() {
@@ -1021,7 +1035,7 @@ async function checkAndConnectWallet() {
             reject(error);
         }
     });
-}
+    }
 
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -1084,8 +1098,8 @@ function validateForm() {
             showError(`Please fill in ${getFieldLabel(field)}`);
             return false;
         }
-    }
-    
+            }
+            
     // 根据资产类型验证特定字段
     const assetType = form.elements['type'].value;
     
@@ -1104,8 +1118,8 @@ function validateForm() {
         if (!tokenSupplyInput || !parseInt(tokenSupplyInput.value)) {
             showError(`Please fill in ${getFieldLabel('token_supply')}`);
             return false;
-        }
-        
+            }
+            
         // 检查total_value_similar字段
         const totalValueInput = form.elements['total_value_similar'];
         if (!totalValueInput || !parseFloat(totalValueInput.value)) {
@@ -1129,8 +1143,8 @@ function showError(message) {
     } else {
         console.error('Error modal element not found');
         alert(message);
+        }
     }
-}
 
 // 显示成功信息
 function showSuccess(message) {
@@ -1251,7 +1265,7 @@ function closePreview() {
     if (previewFooter) {
         previewFooter.style.display = 'none';
     }
-}
+    }
 
 // 生成预览HTML内容
     function generatePreviewHTML(data) {
@@ -1440,7 +1454,7 @@ function closePreview() {
                             console.error('支付处理错误:', error);
                             showError(error.message || '支付处理错误');
                             disablePublishButtons(false);
-                        });
+            });
                     } else {
                         // 钱包连接失败
                         showError('请先连接钱包以继续');
@@ -1474,7 +1488,7 @@ async function processPayment() {
                 try {
                     await loadExternalScript('https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js');
                     console.log('solanaWeb3库加载成功');
-                    
+                
                     // 确保全局变量可用
                     if (typeof solanaWeb3 === 'undefined' && typeof solanaWeb3 !== 'undefined') {
                         window.solanaWeb3 = solanaWeb3;
@@ -1494,9 +1508,11 @@ async function processPayment() {
                 const configResponse = await fetch('/api/service/config/payment_settings');
                 if (configResponse.ok) {
                     const configData = await configResponse.json();
-                    platformAddress = configData.platform_fee_address || platformAddress;
-                    feeAmount = configData.creation_fee?.amount || feeAmount;
+                    // 使用资产创建收款地址，如果没有则使用平台收款地址
+                    platformAddress = configData.asset_creation_fee_address || configData.platform_fee_address || platformAddress;
+                    feeAmount = parseFloat(configData.creation_fee?.amount) || feeAmount;
                     console.log('从API获取支付配置成功:', configData);
+                    console.log(`使用收款地址: ${platformAddress}, 费用: ${feeAmount} USDC`);
                 }
             } catch (configError) {
                 console.warn('获取支付配置失败，使用默认值:', configError);
@@ -1530,16 +1546,16 @@ async function processPayment() {
                     platformAddress,
                     feeAmount
                 );
-                
+            
                 // 检查转账结果
                 if (!result.success) {
                     console.error('支付失败:', result.error);
                     throw new Error(`转账失败: ${result.error || '未知原因'}`);
-                }
-                
+            }
+            
                 console.log('支付成功，交易哈希:', result.txHash);
                 updateProgress(80, '支付成功，处理资产创建...');
-                
+            
                 // 处理资产创建
                 await handlePaymentSuccess(result.txHash, formData);
                 
@@ -1547,7 +1563,7 @@ async function processPayment() {
                 resolve(result);
             } catch (paymentError) {
                 console.error('支付失败:', paymentError);
-                hideLoadingState();
+            hideLoadingState();
                 showError(`支付失败: ${paymentError.message || '支付处理出错'}`);
                 throw new Error(`转账失败: ${paymentError.message || '支付处理出错'}`);
             }
@@ -1569,7 +1585,7 @@ function loadExternalScript(url) {
         script.onerror = () => reject(new Error(`无法加载脚本: ${url}`));
         document.head.appendChild(script);
     });
-}
+    }
 
 // 处理资产创建逻辑 - 付款后立即创建资产，不等待交易确认
 async function processAssetCreation(formData, txHash) {
@@ -1777,7 +1793,7 @@ function disablePublishButtons(disabled) {
                 button.classList.remove('disabled');
                 button.style.opacity = '';
                 button.style.pointerEvents = '';
-            }
+        }
         }
     });
     
@@ -1864,7 +1880,7 @@ function getAssetFormData() {
     
     // 获取资产类型
     const assetType = form.elements['type'].value;
-    
+        
     // 通用字段
     const formData = {
         asset_type: parseInt(assetType),
@@ -2012,7 +2028,7 @@ async function handlePaymentSuccess(txHash, formData) {
         showError(`资产创建过程出错: ${error.message || '未知错误'}`);
         updateProgress(0, '创建失败，请重试');
         enablePublishButtons(false);
-    }
+        }
 }
 
 // 轮询检查交易状态
@@ -2042,8 +2058,8 @@ async function _pollTransactionStatus(txHash, assetId, maxRetries = 12, retryInt
                         if (statusBadge) {
                             statusBadge.className = 'badge bg-success';
                             statusBadge.textContent = '已确认';
-                        }
-                        
+    }
+
                         // 更新提示文本
                         const infoText = swalContent.querySelector('p.text-muted');
                         if (infoText) {
