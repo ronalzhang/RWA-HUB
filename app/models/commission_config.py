@@ -112,6 +112,16 @@ class UserCommissionBalance(db.Model):
             raise ValueError('余额不足')
     
     @staticmethod
+    def freeze_balance(user_address, amount):
+        """冻结用户佣金余额"""
+        return UserCommissionBalance.update_balance(user_address, amount, 'freeze')
+    
+    @staticmethod
+    def unfreeze_balance(user_address, amount):
+        """解冻用户佣金余额"""
+        return UserCommissionBalance.update_balance(user_address, amount, 'unfreeze')
+    
+    @staticmethod
     def get_total_balance():
         """获取所有用户的总余额"""
         from sqlalchemy import func
