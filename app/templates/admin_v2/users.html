@@ -119,101 +119,164 @@
     
     <!-- 用户表格 -->
     <div class="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div class="min-w-full divide-y divide-gray-200">
-            <!-- 表头 -->
-            <div class="bg-gray-50">
-                <div class="grid grid-cols-20 gap-2 py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <div class="col-span-1">
-                        <input type="checkbox" x-model="selectAll" @change="toggleSelectAll()" 
-                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    </div>
-                    <div class="col-span-3">钱包地址/用户名</div>
-                    <div class="col-span-2">注册时间</div>
-                    <div class="col-span-1">交易次数</div>
-                    <div class="col-span-2">交易金额</div>
-                    <div class="col-span-2">交易佣金</div>
-                    <div class="col-span-2">分销佣金</div>
-                    <div class="col-span-1">下线数</div>
-                    <div class="col-span-1">资产数</div>
-                    <div class="col-span-2">Token数</div>
-                    <div class="col-span-1">状态</div>
-                    <div class="col-span-2 text-right">操作</div>
-                </div>
-            </div>
-            
-            <!-- 表格内容 -->
-            <div class="bg-white divide-y divide-gray-200">
-                <template x-if="loading">
-                    <div class="py-16 text-center text-gray-500">
-                        <i class="fas fa-spinner fa-spin text-2xl"></i>
-                        <p class="mt-2">加载用户数据中...</p>
-                    </div>
-                </template>
-                
-                <template x-if="!loading && users.length === 0">
-                    <div class="py-16 text-center text-gray-500">
-                        <i class="fas fa-user-slash text-4xl mb-3"></i>
-                        <p>没有找到匹配的用户</p>
-                        <button @click="resetFilters" class="mt-2 text-blue-500 hover:underline text-sm">
-                            清除筛选条件
-                        </button>
-                    </div>
-                </template>
-                
-                <template x-for="user in users" :key="user.wallet_address">
-                    <div class="grid grid-cols-20 gap-2 py-4 px-4 hover:bg-gray-50">
-                        <div class="col-span-1 flex items-center">
-                            <input type="checkbox" x-model="selectedUsers" :value="user.wallet_address" 
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <!-- 表头 -->
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                            <input type="checkbox" x-model="selectAll" @change="toggleSelectAll()" 
                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        </div>
-                        <div class="col-span-3 flex items-center">
-                            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 mr-3">
-                                <i class="fas" :class="user.username ? 'fa-user' : 'fa-wallet'"></i>
-                            </div>
-                            <div>
-                                <div class="font-medium text-gray-800" x-text="user.username || '未命名用户'"></div>
-                                <div class="text-xs text-gray-500 truncate" x-text="truncateAddress(user.wallet_address)"></div>
-                            </div>
-                        </div>
-                        <div class="col-span-2 flex items-center text-sm text-gray-500" x-text="formatDate(user.created_at)"></div>
-                        <div class="col-span-1 flex items-center text-sm" x-text="user.trade_count || 0"></div>
-                        <div class="col-span-2 flex items-center text-sm" x-text="formatCurrency(user.total_trade_amount || 0)"></div>
-                        <div class="col-span-2 flex items-center text-sm text-green-600" x-text="formatCurrency(user.total_commission_earned || 0)"></div>
-                        <div class="col-span-2 flex items-center text-sm text-purple-600" x-text="formatCurrency(user.referral_commission || 0)"></div>
-                        <div class="col-span-1 flex items-center text-sm" x-text="user.referral_count || 0"></div>
-                        <div class="col-span-1 flex items-center text-sm" x-text="user.assets_count || 0"></div>
-                        <div class="col-span-2 flex items-center text-sm" x-text="formatNumber(user.total_tokens || 0)"></div>
-                        <div class="col-span-1 flex items-center">
-                            <span x-show="user.is_distributor" class="px-1 py-1 text-xs rounded-full bg-purple-100 text-purple-800">
-                                分销商
-                            </span>
-                            <span x-show="user.is_blocked" class="px-1 py-1 text-xs rounded-full bg-red-100 text-red-800">
-                                已冻结
-                            </span>
-                            <span x-show="!user.is_distributor && !user.is_blocked" class="px-1 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
-                                普通
-                            </span>
-                        </div>
-                        <div class="col-span-2 flex justify-end items-center space-x-1">
-                            <button @click="viewUserDetails(user.wallet_address)" class="p-1 text-blue-600 hover:text-blue-800" title="查看详情">
-                                <i class="fas fa-info-circle"></i>
-                            </button>
-                            <button x-show="!user.is_distributor" @click="setAsDistributor(user.wallet_address)" 
-                                    class="p-1 text-purple-600 hover:text-purple-800" title="设为分销商">
-                                <i class="fas fa-user-tag"></i>
-                            </button>
-                            <button x-show="!user.is_blocked" @click="blockUser(user.wallet_address)" 
-                                    class="p-1 text-red-600 hover:text-red-800" title="冻结用户">
-                                <i class="fas fa-ban"></i>
-                            </button>
-                            <button x-show="user.is_blocked" @click="unblockUser(user.wallet_address)" 
-                                    class="p-1 text-green-600 hover:text-green-800" title="解冻用户">
-                                <i class="fas fa-unlock"></i>
-                            </button>
-                        </div>
-                    </div>
-                </template>
-            </div>
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-48">
+                            钱包地址/用户名
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-32">
+                            注册时间
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                            交易次数
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-28">
+                            交易金额
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-28">
+                            交易佣金
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-28">
+                            分销佣金
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                            下线数
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                            资产数
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-24">
+                            Token数
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                            状态
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                            操作
+                        </th>
+                    </tr>
+                </thead>
+                
+                <!-- 表格内容 -->
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="loading">
+                        <tr>
+                            <td colspan="12" class="px-6 py-16 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin text-2xl"></i>
+                                <p class="mt-2">加载用户数据中...</p>
+                            </td>
+                        </tr>
+                    </template>
+                    
+                    <template x-if="!loading && users.length === 0">
+                        <tr>
+                            <td colspan="12" class="px-6 py-16 text-center text-gray-500">
+                                <i class="fas fa-user-slash text-4xl mb-3"></i>
+                                <p>没有找到匹配的用户</p>
+                                <button @click="resetFilters" class="mt-2 text-blue-500 hover:underline text-sm">
+                                    清除筛选条件
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                    
+                    <template x-for="user in users" :key="user.wallet_address">
+                        <tr class="hover:bg-gray-50">
+                            <!-- 选择框 -->
+                            <td class="px-3 py-4 whitespace-nowrap">
+                                <input type="checkbox" x-model="selectedUsers" :value="user.wallet_address" 
+                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            </td>
+                            
+                            <!-- 钱包地址/用户名 -->
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 mr-3">
+                                        <i class="fas" :class="user.username ? 'fa-user' : 'fa-wallet'"></i>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="font-medium text-gray-800 truncate" x-text="user.username || '未命名用户'"></div>
+                                        <div class="text-xs text-gray-500 truncate" x-text="truncateAddress(user.wallet_address)"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            
+                            <!-- 注册时间 -->
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="formatDate(user.created_at)"></td>
+                            
+                            <!-- 交易次数 -->
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="user.trade_count || 0"></td>
+                            
+                            <!-- 交易金额 -->
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatCurrency(user.total_trade_amount || 0)"></td>
+                            
+                            <!-- 交易佣金 -->
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600" x-text="formatCurrency(user.total_commission_earned || 0)"></td>
+                            
+                            <!-- 分销佣金 -->
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-purple-600" x-text="formatCurrency(user.referral_commission || 0)"></td>
+                            
+                            <!-- 下线数 -->
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="user.referral_count || 0"></td>
+                            
+                            <!-- 资产数 -->
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="user.assets_count || 0"></td>
+                            
+                            <!-- Token数 -->
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatNumber(user.total_tokens || 0)"></td>
+                            
+                            <!-- 状态 -->
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span x-show="user.is_distributor" class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                                    分销商
+                                </span>
+                                <span x-show="user.is_blocked" class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                    已冻结
+                                </span>
+                                <span x-show="!user.is_distributor && !user.is_blocked" class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    普通
+                                </span>
+                            </td>
+                            
+                            <!-- 操作 -->
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <div class="flex justify-end items-center space-x-2">
+                                    <button @click="viewUserDetails(user.wallet_address)" 
+                                            class="text-blue-600 hover:text-blue-900 p-1 rounded" 
+                                            title="查看详情">
+                                        <i class="fas fa-info-circle"></i>
+                                    </button>
+                                    <button x-show="!user.is_distributor" 
+                                            @click="setAsDistributor(user.wallet_address)" 
+                                            class="text-purple-600 hover:text-purple-900 p-1 rounded" 
+                                            title="设为分销商">
+                                        <i class="fas fa-user-tag"></i>
+                                    </button>
+                                    <button x-show="!user.is_blocked" 
+                                            @click="blockUser(user.wallet_address)" 
+                                            class="text-red-600 hover:text-red-900 p-1 rounded" 
+                                            title="冻结用户">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                    <button x-show="user.is_blocked" 
+                                            @click="unblockUser(user.wallet_address)" 
+                                            class="text-green-600 hover:text-green-900 p-1 rounded" 
+                                            title="解冻用户">
+                                        <i class="fas fa-unlock"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
         </div>
         
         <!-- 分页 -->
