@@ -53,12 +53,11 @@ class SystemConfig(db.Model):
     __tablename__ = 'system_configs'
     
     id = Column(Integer, primary_key=True)
-    config_key = Column(String(50), unique=True, nullable=False)  # 与迁移文件保持一致
-    config_value = Column(Text, nullable=False)  # 与迁移文件保持一致
+    config_key = Column(String(50), unique=True, nullable=False)
+    config_value = Column(Text, nullable=False)
     description = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    updated_by = Column(String(80))  # 管理员钱包地址
     
     def __repr__(self):
         return f'<SystemConfig {self.config_key}>'
@@ -70,8 +69,7 @@ class SystemConfig(db.Model):
             'value': self.config_value,
             'description': self.description,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'updated_by': self.updated_by
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
     
     @classmethod
@@ -88,15 +86,12 @@ class SystemConfig(db.Model):
             config.config_value = value
             if description:
                 config.description = description
-            if updated_by:
-                config.updated_by = updated_by
             config.updated_at = datetime.utcnow()
         else:
             config = cls(
                 config_key=key,
                 config_value=value,
-                description=description,
-                updated_by=updated_by
+                description=description
             )
             db.session.add(config)
         db.session.commit()
