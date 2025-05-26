@@ -1,7 +1,7 @@
 """添加上链历史记录表
 
 Revision ID: add_onchain_history
-Revises: 98fa7c6d1e32
+Revises: add_asset_status_history
 Create Date: 2025-01-31 12:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'add_onchain_history'
-down_revision = '98fa7c6d1e32'
+down_revision = 'add_asset_status_history'
 branch_labels = None
 depends_on = None
 

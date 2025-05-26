@@ -1,7 +1,7 @@
 """add_asset_status_history
 
 Revision ID: add_asset_status_history
-Revises: add_deployment_tracking_fields
+Revises: 98fa7c6d1e32
 Create Date: 2025-05-17 00:05:00
 
 """
@@ -11,7 +11,7 @@ from datetime import datetime
 
 # revision identifiers, used by Alembic.
 revision = 'add_asset_status_history'
-down_revision = 'add_deployment_tracking_fields'
+down_revision = '98fa7c6d1e32'
 branch_labels = None
 depends_on = None
 
