@@ -133,7 +133,7 @@ def login():
 @admin_bp.route('/v2/login')
 def login_v2():
     """V2版本管理员登录页面"""
-    return render_template('admin/v2/login.html')
+    return render_template('admin_v2/login.html')
 
 
 @admin_bp.route('/api/check-auth')
