@@ -1169,6 +1169,50 @@ def get_dividend_total_api(asset_id):
     """资产分红总额API的别名路由（兼容前端其他API路径）"""
     return get_dividend_stats_api(asset_id)
 
+@api_bp.route('/assets/<string:token_symbol>/dividends/total')
+def get_asset_dividends_total(token_symbol):
+    """获取资产分红总额 - 兼容前端asset_detail.js调用的路径"""
+    try:
+        current_app.logger.info(f"请求资产分红总额: {token_symbol}")
+        from app.models.asset import Asset
+        from app.models.dividend import DividendRecord
+        
+        # 查找资产
+        asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+        if not asset:
+            current_app.logger.warning(f"找不到资产: {token_symbol}")
+            return jsonify({
+                'success': False,
+                'error': f'找不到资产: {token_symbol}',
+                'total_amount': 0
+            }), 404
+        
+        # 计算总分红金额
+        try:
+            # 尝试从DividendRecord表中计算总分红
+            total_amount = db.session.query(db.func.sum(DividendRecord.amount)).filter_by(asset_id=asset.id).scalar() or 0
+        except Exception as e:
+            current_app.logger.warning(f"无法从DividendRecord计算分红，使用默认值: {str(e)}")
+            # 如果分红表不存在或有问题，返回0
+            total_amount = 0
+        
+        current_app.logger.info(f"资产 {token_symbol} 的总分红金额: {total_amount}")
+        
+        return jsonify({
+            'success': True,
+            'total_amount': float(total_amount),
+            'asset_symbol': token_symbol,
+            'asset_name': asset.name
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"获取资产分红总额失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'total_amount': 0
+        }), 500
+
 @api_bp.route('/solana/execute_transfer_v2', methods=['POST'])
 def api_execute_transfer_v2():
     """使用服务器作为中转执行Solana转账交易"""
@@ -1453,4 +1497,39 @@ def record_payment():
         return jsonify({
             'success': False,
             'message': f"记录支付失败: {str(e)}"
+        }), 500
+
+@api_bp.route('/admin/fix_asset_total_values', methods=['POST'])
+def fix_asset_total_values():
+    """修复现有资产的total_value字段"""
+    try:
+        from app.models.asset import Asset
+        
+        # 查找所有total_value为null的资产
+        assets_to_fix = Asset.query.filter(Asset.total_value.is_(None)).all()
+        
+        fixed_count = 0
+        for asset in assets_to_fix:
+            if asset.token_price and asset.token_supply:
+                # 计算total_value = token_price * token_supply
+                asset.total_value = asset.token_price * asset.token_supply
+                fixed_count += 1
+        
+        # 提交更改
+        db.session.commit()
+        
+        current_app.logger.info(f"修复了 {fixed_count} 个资产的total_value字段")
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功修复了 {fixed_count} 个资产的total_value字段',
+            'fixed_count': fixed_count
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"修复资产total_value失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500
