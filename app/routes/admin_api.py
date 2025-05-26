@@ -3003,3 +3003,77 @@ def compat_admin_users():
     except Exception as e:
         current_app.logger.error(f"获取管理员列表失败: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+# 管理员用户管理兼容路由
+@admin_compat_routes_bp.route('/admins', methods=['GET'])
+@api_admin_required
+def compat_admin_users_list():
+    """获取管理员用户列表 - 兼容API (admin/v2/api路径)"""
+    try:
+        from app.models.admin import AdminUser
+        
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 20, type=int)
+        
+        # 获取管理员列表
+        query = AdminUser.query
+        total = query.count()
+        
+        admins = query.offset((page - 1) * limit).limit(limit).all()
+        
+        admin_list = []
+        for admin in admins:
+            admin_list.append({
+                'id': admin.id,
+                'wallet_address': admin.wallet_address,
+                'role': admin.role,
+                'permissions': admin.permissions,
+                'created_at': admin.created_at.isoformat(),
+                'last_login': admin.last_login.isoformat() if admin.last_login else None
+            })
+        
+        return jsonify({
+            'items': admin_list,
+            'total': total,
+            'page': page,
+            'limit': limit
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取管理员列表失败: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@admin_compat_routes_bp.route('/admins/<int:admin_id>', methods=['DELETE'])
+@api_admin_required
+def compat_delete_admin_user(admin_id):
+    """删除管理员用户 - 兼容API (admin/v2/api路径)"""
+    try:
+        from app.models.admin import AdminUser
+        
+        # 查找要删除的管理员
+        admin_to_delete = AdminUser.query.get_or_404(admin_id)
+        
+        # 检查是否是超级管理员
+        if admin_to_delete.role == 'super_admin':
+            # 检查是否还有其他超级管理员
+            other_super_admins = AdminUser.query.filter(
+                AdminUser.role == 'super_admin',
+                AdminUser.id != admin_id
+            ).count()
+            
+            if other_super_admins == 0:
+                return jsonify({'error': '不能删除最后一个超级管理员'}), 400
+        
+        # 删除管理员
+        db.session.delete(admin_to_delete)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '管理员删除成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"删除管理员失败: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
