@@ -206,7 +206,7 @@ def load_encrypted_key():
         if not encrypted_key or not encrypted_password:
             return jsonify({
                 'success': False,
-                'error': '未找到加密的私钥配置'
+                'error': '未找到加密的私钥配置，请先设置并加密私钥'
             })
         
         # 解密用户密码

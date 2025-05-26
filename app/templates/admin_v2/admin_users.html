@@ -144,12 +144,12 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">钱包地址</label>
-                        <input x-model="editingAdmin.wallet_address" type="text" readonly
+                        <input x-model="editingAdmin?.wallet_address" type="text" readonly
                                class="w-full border-gray-300 rounded-md shadow-sm bg-gray-100">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">管理员等级 *</label>
-                        <select x-model="editingAdmin.role" class="w-full border-gray-300 rounded-md shadow-sm">
+                        <select x-model="editingAdmin?.role" class="w-full border-gray-300 rounded-md shadow-sm">
                             <option value="moderator">审核员</option>
                             <option value="admin">管理员</option>
                             <option value="super_admin">超级管理员</option>
@@ -157,7 +157,7 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">角色描述</label>
-                        <input x-model="editingAdmin.description" type="text" 
+                        <input x-model="editingAdmin?.description" type="text" 
                                placeholder="例如：系统管理员" 
                                class="w-full border-gray-300 rounded-md shadow-sm">
                     </div>
@@ -193,7 +193,7 @@
             async loadAdminUsers() {
                 this.loading = true;
                 try {
-                    const response = await fetch('/api/admin/admins');
+                    const response = await fetch('/admin/api/admins');
                     if (!response.ok) throw new Error('加载管理员数据失败');
                     
                     this.adminUsers = await response.json();
@@ -229,7 +229,7 @@
                 }
                 
                 try {
-                    const response = await fetch('/api/admin_addresses', {
+                    const response = await fetch('/admin/api/admin_addresses', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(this.newAdmin)
@@ -249,7 +249,7 @@
             
             async updateAdmin() {
                 try {
-                    const response = await fetch(`/api/admin_addresses/${this.editingAdmin.wallet_address}`, {
+                    const response = await fetch(`/admin/api/admin_addresses/${this.editingAdmin.wallet_address}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -276,7 +276,7 @@
                 }
                 
                 try {
-                    const response = await fetch(`/api/admin_addresses/${admin.wallet_address}`, {
+                    const response = await fetch(`/admin/api/admin_addresses/${admin.wallet_address}`, {
                         method: 'DELETE'
                     });
                     
