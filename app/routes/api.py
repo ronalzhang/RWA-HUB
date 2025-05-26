@@ -177,12 +177,49 @@ def get_user_assets_query():
                 user = None 
         except Exception as e:
             current_app.logger.error(f'查询用户失败: {str(e)}')
-            # -- 修改：查询失败时也设置 user = None，进入交易记录查找 --
+            # -- 修改：查询失败时也设置 user = None，进入用户创建逻辑 --
             user = None 
             
-        # 如果找不到用户，尝试使用交易记录方式查询
+        # 如果找不到用户，自动创建用户记录
         if not user:
-            current_app.logger.info(f'未找到用户: {address}，尝试使用交易记录查询')
+            current_app.logger.info(f'未找到用户: {address}，自动创建用户记录')
+            try:
+                from app.models.commission_config import UserCommissionBalance
+                
+                # 创建新用户
+                user = User(
+                    eth_address=address if wallet_type.lower() == 'ethereum' else None,
+                    username=f'user_{address[:8]}',  # 使用地址前8位作为用户名
+                    role='user',
+                    is_distributor=True,  # 所有用户都是分销商
+                    created_at=datetime.utcnow()
+                )
+                
+                db.session.add(user)
+                db.session.flush()  # 获取用户ID
+                
+                # 为新用户创建佣金余额记录
+                commission_balance = UserCommissionBalance(
+                    user_id=user.id,
+                    total_earned=Decimal('0.00'),
+                    available_balance=Decimal('0.00'),
+                    withdrawn_amount=Decimal('0.00'),
+                    frozen_amount=Decimal('0.00')
+                )
+                db.session.add(commission_balance)
+                db.session.commit()
+                
+                current_app.logger.info(f'成功创建新用户: ID={user.id}, 地址={address}')
+                
+            except Exception as create_error:
+                current_app.logger.error(f'创建用户失败: {str(create_error)}')
+                db.session.rollback()
+                # 创建失败时，继续使用交易记录方式查询
+                user = None
+        
+        # 如果仍然没有用户（创建失败），尝试使用交易记录方式查询
+        if not user:
+            current_app.logger.info(f'用户创建失败或未找到用户: {address}，尝试使用交易记录查询')
         
             try:
                 # 根据地址类型处理
