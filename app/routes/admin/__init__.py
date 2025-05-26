@@ -140,16 +140,34 @@ def encrypt_private_key():
         os.environ['CRYPTO_PASSWORD'] = crypto_password
         
         try:
-            # 验证私钥格式
-            from app.utils.helpers import get_solana_keypair_from_env
+            # 直接验证私钥格式，不依赖环境变量
+            import base58
+            import base64
+            from app.utils.solana_compat.keypair import Keypair
             
-            # 临时设置环境变量进行验证
-            os.environ['TEMP_PRIVATE_KEY'] = private_key
-            result = get_solana_keypair_from_env('TEMP_PRIVATE_KEY')
-            del os.environ['TEMP_PRIVATE_KEY']
-            
-            if not result:
-                return jsonify({'success': False, 'error': '无效的私钥格式'}), 400
+            # 检测私钥格式并转换
+            try:
+                if len(private_key) == 128:  # 十六进制格式
+                    private_key_bytes = bytes.fromhex(private_key)
+                elif len(private_key) == 88:  # Base64格式
+                    private_key_bytes = base64.b64decode(private_key)
+                else:  # Base58格式
+                    private_key_bytes = base58.b58decode(private_key)
+                
+                # 如果是64字节，取前32字节作为seed
+                if len(private_key_bytes) == 64:
+                    seed = private_key_bytes[:32]
+                elif len(private_key_bytes) == 32:
+                    seed = private_key_bytes
+                else:
+                    return jsonify({'success': False, 'error': f'无效的私钥长度: {len(private_key_bytes)}字节，期望32或64字节'}), 400
+                
+                # 创建密钥对验证
+                keypair = Keypair.from_seed(seed)
+                wallet_address = str(keypair.public_key)
+                
+            except Exception as e:
+                return jsonify({'success': False, 'error': f'私钥格式错误: {str(e)}'}), 400
             
             # 加密私钥
             crypto_manager = get_crypto_manager()
@@ -170,12 +188,12 @@ def encrypt_private_key():
             os.environ['SOLANA_PRIVATE_KEY_ENCRYPTED'] = encrypted_key
             os.environ['CRYPTO_PASSWORD'] = crypto_password
             
-            current_app.logger.info(f"私钥已加密并保存，钱包地址: {result['public_key']}")
+            current_app.logger.info(f"私钥已加密并保存，钱包地址: {wallet_address}")
             
             return jsonify({
                 'success': True,
                 'encrypted_key': encrypted_key,
-                'wallet_address': result['public_key'],
+                'wallet_address': wallet_address,
                 'message': '私钥已加密并保存到系统配置'
             })
             
