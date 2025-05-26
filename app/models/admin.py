@@ -50,24 +50,26 @@ class AdminUser(db.Model):
 
 # 系统配置
 class SystemConfig(db.Model):
-    __tablename__ = 'system_config'
+    __tablename__ = 'system_configs'
     
     id = Column(Integer, primary_key=True)
-    key = Column(String(100), unique=True, nullable=False)
-    value = Column(Text, nullable=False)
+    config_key = Column(String(50), unique=True, nullable=False)  # 与迁移文件保持一致
+    config_value = Column(Text, nullable=False)  # 与迁移文件保持一致
     description = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by = Column(String(80))  # 管理员钱包地址
     
     def __repr__(self):
-        return f'<SystemConfig {self.key}>'
+        return f'<SystemConfig {self.config_key}>'
     
     def to_dict(self):
         return {
             'id': self.id,
-            'key': self.key,
-            'value': self.value,
+            'key': self.config_key,
+            'value': self.config_value,
             'description': self.description,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'updated_by': self.updated_by
         }
@@ -75,15 +77,15 @@ class SystemConfig(db.Model):
     @classmethod
     def get_value(cls, key, default=None):
         """获取配置值"""
-        config = cls.query.filter_by(key=key).first()
-        return config.value if config else default
+        config = cls.query.filter_by(config_key=key).first()
+        return config.config_value if config else default
     
     @classmethod
     def set_value(cls, key, value, description=None, updated_by=None):
         """设置配置值"""
-        config = cls.query.filter_by(key=key).first()
+        config = cls.query.filter_by(config_key=key).first()
         if config:
-            config.value = value
+            config.config_value = value
             if description:
                 config.description = description
             if updated_by:
@@ -91,8 +93,8 @@ class SystemConfig(db.Model):
             config.updated_at = datetime.utcnow()
         else:
             config = cls(
-                key=key,
-                value=value,
+                config_key=key,
+                config_value=value,
                 description=description,
                 updated_by=updated_by
             )
