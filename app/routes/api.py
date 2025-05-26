@@ -190,6 +190,7 @@ def get_user_assets_query():
                 user = User(
                     eth_address=address if wallet_type.lower() == 'ethereum' else None,
                     username=f'user_{address[:8]}',  # 使用地址前8位作为用户名
+                    email=f'{address[:8]}@wallet.generated',  # 生成一个临时邮箱
                     role='user',
                     is_distributor=True,  # 所有用户都是分销商
                     created_at=datetime.utcnow()
