@@ -1,14 +1,14 @@
 {% extends 'admin_v2/base.html' %}
 
-{% block page_title %}{{ _('System Settings') }}{% endblock %}
-{% block page_subtitle %}{{ _('Manage platform configuration, including payment settings and private key security.') }}{% endblock %}
+{% block page_title %}系统设置{% endblock %}
+{% block page_subtitle %}管理平台配置，包括支付设置和私钥安全管理。{% endblock %}
 
 {% block breadcrumb %}
 <li>
     <span class="mx-1 text-gray-500">/</span>
 </li>
 <li>
-    <span class="text-gray-500">{{ _('Settings') }}</span>
+    <span class="text-gray-500">设置</span>
 </li>
 {% endblock %}
 
@@ -17,7 +17,7 @@
     
     <!-- 系统配置 -->
     <div class="bg-white shadow rounded-lg p-6">
-        <h2 class="text-xl font-semibold text-gray-800 mb-6">{{ _('Payment Configuration') }}</h2>
+        <h2 class="text-xl font-semibold text-gray-800 mb-6">支付配置</h2>
 
         {# Display flashed messages #}
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -37,32 +37,32 @@
             <!-- 平台费率 -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    {{ _('Platform Fee (Basis Points)') }}
+                    平台费率（基点）
                 </label>
                 <input type="number" 
                        name="platform_fee_basis_points" 
                        value="{{ configs.get('PLATFORM_FEE_BASIS_POINTS', '250') }}"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                        min="0" max="10000">
-                <p class="text-sm text-gray-500 mt-1">1 basis point = 0.01%%, default is 250 (2.5%%)</p>
+                <p class="text-sm text-gray-500 mt-1">1基点 = 0.01%%，默认250（2.5%%）</p>
             </div>
 
             <!-- 平台收款地址 -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    {{ _('Platform Fee Address') }}
+                    平台收款地址
                 </label>
                 <input type="text" 
                        name="platform_fee_address" 
                        value="{{ configs.get('PLATFORM_FEE_ADDRESS', '') }}"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                       placeholder="Solana wallet address">
+                       placeholder="Solana钱包地址">
             </div>
 
             <!-- 资产创建费用 -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    {{ _('Asset Creation Fee (USDC)') }}
+                    资产创建费用（USDC）
                 </label>
                 <input type="number" 
                        name="asset_creation_fee_amount" 
@@ -74,19 +74,19 @@
             <!-- 资产创建收款地址 -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    {{ _('Asset Creation Fee Address') }}
+                    资产创建收款地址
                 </label>
                 <input type="text" 
                        name="asset_creation_fee_address" 
                        value="{{ configs.get('ASSET_CREATION_FEE_ADDRESS', '') }}"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                       placeholder="Solana wallet address">
+                       placeholder="Solana钱包地址">
             </div>
 
             <div class="flex justify-end">
                 <button type="submit" 
                         class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    {{ _('Save Settings') }}
+                    保存设置
                 </button>
             </div>
         </form>
@@ -94,7 +94,7 @@
 
     <!-- 私钥管理 -->
     <div class="bg-white shadow rounded-lg p-6">
-        <h2 class="text-xl font-semibold text-gray-800 mb-6">{{ _('Private Key Management') }}</h2>
+        <h2 class="text-xl font-semibold text-gray-800 mb-6">私钥管理</h2>
         
         <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
             <div class="flex">
@@ -104,9 +104,9 @@
                     </svg>
                 </div>
                 <div class="ml-3">
-                    <h3 class="text-sm font-medium text-yellow-800">{{ _('Security Notice') }}</h3>
+                    <h3 class="text-sm font-medium text-yellow-800">安全提醒</h3>
                     <div class="mt-2 text-sm text-yellow-700">
-                        <p>{{ _('Private keys are encrypted and stored securely. Never share your private keys with anyone.') }}</p>
+                        <p>私钥已加密存储，请勿与任何人分享您的私钥。</p>
                     </div>
                 </div>
             </div>
@@ -117,18 +117,18 @@
             
             <!-- 当前钱包状态 -->
             <div class="bg-gray-50 rounded-md p-4">
-                <h3 class="text-sm font-medium text-gray-700 mb-2">{{ _('Current Wallet Status') }}</h3>
+                <h3 class="text-sm font-medium text-gray-700 mb-2">当前钱包状态</h3>
                 <div x-data="{ walletInfo: null }" x-init="loadWalletInfo()">
-                    <div x-show="walletInfo">
+                    <div x-show="walletInfo && walletInfo.status === 'configured'">
                         <p class="text-sm text-gray-600">
-                            {{ _('Address') }}: <span x-text="walletInfo?.address" class="font-mono"></span>
+                            地址: <span x-text="walletInfo?.address" class="font-mono"></span>
                         </p>
                         <p class="text-sm text-gray-600">
-                            {{ _('Balance') }}: <span x-text="walletInfo?.balance" class="font-mono"></span> SOL
+                            余额: <span x-text="walletInfo?.balance" class="font-mono"></span> SOL
                         </p>
                     </div>
-                    <div x-show="!walletInfo" class="text-sm text-red-600">
-                        {{ _('No wallet configured or unable to load wallet information') }}
+                    <div x-show="!walletInfo || walletInfo.status !== 'configured'" class="text-sm text-red-600">
+                        未配置钱包或无法加载钱包信息
                     </div>
                 </div>
             </div>
@@ -136,42 +136,42 @@
             <!-- 加密密码 -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    {{ _('Encryption Password') }}
+                    加密密码
                 </label>
                 <input type="password" 
                        x-model="cryptoPassword"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                       placeholder="{{ _('Enter encryption password') }}">
-                <p class="text-sm text-gray-500 mt-1">{{ _('Required for encrypting/decrypting private keys') }}</p>
+                       placeholder="请输入加密密码">
+                <p class="text-sm text-gray-500 mt-1">用于加密/解密私钥</p>
             </div>
 
             <!-- 私钥输入 -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    {{ _('Private Key') }}
+                    私钥
                 </label>
                 <textarea x-model="privateKey"
                           rows="3"
                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="{{ _('Enter private key (Base58, Hex, or Base64 format)') }}"></textarea>
-                <p class="text-sm text-gray-500 mt-1">{{ _('Private key will be encrypted before storage') }}</p>
+                          placeholder="请输入私钥（支持Base58、十六进制或Base64格式）"></textarea>
+                <p class="text-sm text-gray-500 mt-1">私钥将在存储前进行加密</p>
             </div>
 
             <div class="flex justify-end space-x-3">
                 <button type="button" 
                         @click="testAPI()"
                         class="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
-                    {{ _('Test API') }}
+                    测试API
                 </button>
                 <button type="button" 
                         @click="testWalletConnection()"
                         class="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">
-                    {{ _('Test Connection') }}
+                    测试连接
                 </button>
                 <button type="button" 
                         @click="encryptPrivateKey()"
                         class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
-                    {{ _('Encrypt & Save Private Key') }}
+                    加密并保存私钥
                 </button>
             </div>
         </div>
@@ -186,18 +186,21 @@ function settingsManager() {
         privateKey: '',
         
         init() {
-            console.log('Settings manager initialized');
+            console.log('设置管理器已初始化');
             this.loadWalletInfo();
         },
         
         async loadWalletInfo() {
             try {
-                const response = await fetch('/api/admin/wallet-info');
+                const response = await fetch('/admin/api/wallet-info');
                 if (response.ok) {
                     this.walletInfo = await response.json();
+                    console.log('钱包信息已加载:', this.walletInfo);
+                } else {
+                    console.error('加载钱包信息失败，状态码:', response.status);
                 }
             } catch (error) {
-                console.error('Failed to load wallet info:', error);
+                console.error('加载钱包信息时出错:', error);
             }
         },
         
@@ -216,16 +219,16 @@ function settingsManager() {
                 });
                 
                 const result = await response.json();
-                alert('API Test Result: ' + JSON.stringify(result, null, 2));
+                alert('API测试结果: ' + JSON.stringify(result, null, 2));
                 
             } catch (error) {
-                alert('API Test Failed: ' + error.message);
+                alert('API测试失败: ' + error.message);
             }
         },
         
         async testWalletConnection() {
             try {
-                const response = await fetch('/api/admin/test-wallet', {
+                const response = await fetch('/admin/api/test-wallet', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -234,24 +237,24 @@ function settingsManager() {
                 
                 const result = await response.json();
                 if (result.success) {
-                    alert('Wallet connection successful!');
+                    alert('钱包连接测试成功!\n地址: ' + result.address);
                     this.loadWalletInfo();
                 } else {
-                    alert('Wallet connection failed: ' + result.error);
+                    alert('钱包连接测试失败: ' + result.error);
                 }
             } catch (error) {
-                alert('Connection test failed: ' + error.message);
+                alert('连接测试失败: ' + error.message);
             }
         },
         
         async encryptPrivateKey() {
             if (!this.privateKey) {
-                alert('Please enter a private key');
+                alert('请输入私钥');
                 return;
             }
             
             if (!this.cryptoPassword) {
-                alert('Please enter encryption password');
+                alert('请输入加密密码');
                 return;
             }
             
@@ -270,16 +273,16 @@ function settingsManager() {
                 
                 const result = await response.json();
                 if (result.success) {
-                    alert('Private key encrypted successfully!\nWallet Address: ' + result.wallet_address + '\nEncrypted Key: ' + result.encrypted_key.substring(0, 50) + '...');
+                    alert('私钥加密成功!\n钱包地址: ' + result.wallet_address + '\n加密密钥: ' + result.encrypted_key.substring(0, 50) + '...');
                     this.privateKey = '';
                     this.cryptoPassword = '';
                     this.loadWalletInfo();
                 } else {
-                    alert('Encryption failed: ' + result.error);
+                    alert('加密失败: ' + result.error);
                 }
                 
             } catch (error) {
-                alert('Encryption failed: ' + error.message);
+                alert('加密失败: ' + error.message);
             }
         }
     }

@@ -376,4 +376,72 @@ def test_api():
     })
 
 # 注意：dashboard、assets、users、trades等路由已在各自模块中定义
+# 避免重复定义导致路由冲突
+
+# 添加钱包相关API
+@admin_bp.route('/api/wallet-info', methods=['GET'])
+@api_admin_required
+def get_wallet_info():
+    """获取钱包信息API"""
+    try:
+        from app.utils.helpers import get_solana_keypair_from_env
+        
+        # 获取钱包信息
+        keypair_info = get_solana_keypair_from_env()
+        
+        if not keypair_info:
+            return jsonify({
+                'address': None,
+                'balance': 0,
+                'status': 'not_configured'
+            })
+        
+        # TODO: 这里可以添加余额查询逻辑
+        # 暂时返回模拟数据
+        return jsonify({
+            'address': keypair_info['public_key'],
+            'balance': '0.0',  # 实际应该查询Solana网络
+            'status': 'configured'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取钱包信息失败: {str(e)}")
+        return jsonify({
+            'address': None,
+            'balance': 0,
+            'status': 'error',
+            'error': str(e)
+        })
+
+@admin_bp.route('/api/test-wallet', methods=['POST'])
+@api_admin_required  
+def test_wallet_connection():
+    """测试钱包连接API"""
+    try:
+        from app.utils.helpers import get_solana_keypair_from_env
+        
+        # 测试钱包连接
+        keypair_info = get_solana_keypair_from_env()
+        
+        if not keypair_info:
+            return jsonify({
+                'success': False,
+                'error': '未配置钱包或私钥无效'
+            })
+        
+        # 如果能成功获取密钥对，说明连接正常
+        return jsonify({
+            'success': True,
+            'message': '钱包连接测试成功',
+            'address': keypair_info['public_key']
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"钱包连接测试失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'钱包连接测试失败: {str(e)}'
+        })
+
+# 注意：dashboard、assets、users、trades等路由已在各自模块中定义
 # 避免重复定义导致路由冲突 
