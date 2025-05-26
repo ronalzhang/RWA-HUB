@@ -413,4 +413,114 @@ def async_task(func):
 #     def update_stats():
 #         DashboardStats.update_daily_stats()
 #     
-#     update_stats() 
+#     update_stats()
+
+# 自动上链历史记录状态枚举
+class OnchainStatus(Enum):
+    PENDING = 'pending'         # 待上链
+    PROCESSING = 'processing'   # 上链中
+    SUCCESS = 'success'         # 上链成功
+    FAILED = 'failed'           # 上链失败
+    RETRY = 'retry'             # 重试中
+
+# 自动上链历史记录
+class OnchainHistory(db.Model):
+    __tablename__ = 'onchain_history'
+    
+    id = Column(Integer, primary_key=True)
+    asset_id = Column(Integer, ForeignKey('assets.id'), nullable=False)  # 关联的资产ID
+    trade_id = Column(Integer, ForeignKey('trades.id'), nullable=True)   # 关联的交易ID（如果有）
+    trigger_type = Column(String(50), nullable=False)  # 触发类型：payment_confirmed, manual_trigger
+    onchain_type = Column(String(50), nullable=False)  # 上链类型：asset_creation, asset_update, trade_settlement
+    status = Column(String(20), nullable=False, default='pending')  # 状态
+    transaction_hash = Column(String(100))  # 交易哈希
+    block_number = Column(Integer)  # 区块号
+    gas_used = Column(Integer)  # 消耗的Gas
+    gas_price = Column(String(50))  # Gas价格
+    error_message = Column(Text)  # 错误信息
+    retry_count = Column(Integer, default=0)  # 重试次数
+    max_retries = Column(Integer, default=3)  # 最大重试次数
+    triggered_by = Column(String(80))  # 触发者钱包地址
+    triggered_at = Column(DateTime, nullable=False, default=datetime.utcnow)  # 触发时间
+    processed_at = Column(DateTime)  # 处理完成时间
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # 关联关系
+    asset = relationship('Asset', backref='onchain_records')
+    trade = relationship('Trade', backref='onchain_records')
+    
+    def __repr__(self):
+        return f'<OnchainHistory {self.id}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'asset_id': self.asset_id,
+            'trade_id': self.trade_id,
+            'trigger_type': self.trigger_type,
+            'onchain_type': self.onchain_type,
+            'status': self.status,
+            'transaction_hash': self.transaction_hash,
+            'block_number': self.block_number,
+            'gas_used': self.gas_used,
+            'gas_price': self.gas_price,
+            'error_message': self.error_message,
+            'retry_count': self.retry_count,
+            'max_retries': self.max_retries,
+            'triggered_by': self.triggered_by,
+            'triggered_at': self.triggered_at.isoformat() if self.triggered_at else None,
+            'processed_at': self.processed_at.isoformat() if self.processed_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            # 关联数据
+            'asset_name': self.asset.name if self.asset else None,
+            'asset_symbol': self.asset.symbol if self.asset else None,
+        }
+    
+    @classmethod
+    def create_record(cls, asset_id, trigger_type, onchain_type, triggered_by, trade_id=None):
+        """创建上链记录"""
+        record = cls(
+            asset_id=asset_id,
+            trade_id=trade_id,
+            trigger_type=trigger_type,
+            onchain_type=onchain_type,
+            triggered_by=triggered_by,
+            status='pending'
+        )
+        db.session.add(record)
+        db.session.commit()
+        return record
+    
+    def update_status(self, status, transaction_hash=None, block_number=None, 
+                     gas_used=None, gas_price=None, error_message=None):
+        """更新状态"""
+        self.status = status
+        if transaction_hash:
+            self.transaction_hash = transaction_hash
+        if block_number:
+            self.block_number = block_number
+        if gas_used:
+            self.gas_used = gas_used
+        if gas_price:
+            self.gas_price = gas_price
+        if error_message:
+            self.error_message = error_message
+        
+        if status in ['success', 'failed']:
+            self.processed_at = datetime.utcnow()
+        
+        self.updated_at = datetime.utcnow()
+        db.session.commit()
+    
+    def increment_retry(self):
+        """增加重试次数"""
+        self.retry_count += 1
+        self.status = 'retry' if self.retry_count < self.max_retries else 'failed'
+        self.updated_at = datetime.utcnow()
+        db.session.commit()
+    
+    def can_retry(self):
+        """检查是否可以重试"""
+        return self.retry_count < self.max_retries and self.status in ['failed', 'retry']

@@ -348,6 +348,97 @@ def admin_users_v2():
     """V2版本管理员用户页面"""
     return render_template('admin_v2/admin_users.html')
 
+# 上链历史记录相关API
+@admin_bp.route('/v2/api/onchain-history', methods=['GET'])
+@api_admin_required
+def get_onchain_history():
+    """获取上链历史记录"""
+    try:
+        from app.models.admin import OnchainHistory
+        from sqlalchemy import desc
+        
+        # 获取查询参数
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 20))
+        status = request.args.get('status', '')
+        trigger_type = request.args.get('trigger_type', '')
+        onchain_type = request.args.get('onchain_type', '')
+        
+        # 构建查询
+        query = OnchainHistory.query
+        
+        if status:
+            query = query.filter(OnchainHistory.status == status)
+        if trigger_type:
+            query = query.filter(OnchainHistory.trigger_type == trigger_type)
+        if onchain_type:
+            query = query.filter(OnchainHistory.onchain_type == onchain_type)
+        
+        # 按创建时间倒序排列
+        query = query.order_by(desc(OnchainHistory.created_at))
+        
+        # 分页
+        pagination = query.paginate(
+            page=page, 
+            per_page=per_page, 
+            error_out=False
+        )
+        
+        records = [record.to_dict() for record in pagination.items]
+        
+        return jsonify({
+            'success': True,
+            'data': records,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': pagination.total,
+                'pages': pagination.pages
+            }
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取上链历史记录失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/v2/api/onchain-history/<int:record_id>/retry', methods=['POST'])
+@api_admin_required
+def retry_onchain_record(record_id):
+    """重试上链操作"""
+    try:
+        from app.models.admin import OnchainHistory
+        from app.extensions import db
+        
+        record = OnchainHistory.query.get_or_404(record_id)
+        
+        if not record.can_retry():
+            return jsonify({
+                'success': False, 
+                'error': '该记录不能重试（已达到最大重试次数或状态不允许）'
+            }), 400
+        
+        # 重置状态为待处理，增加重试次数
+        record.status = 'pending'
+        record.retry_count += 1
+        record.error_message = None
+        record.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        # 这里可以添加实际的重试逻辑，比如发送到队列等
+        # TODO: 实际的上链重试逻辑
+        
+        current_app.logger.info(f"上链记录 {record_id} 已标记为重试")
+        
+        return jsonify({
+            'success': True,
+            'message': '重试请求已提交'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"重试上链操作失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 
 
@@ -423,9 +514,9 @@ def get_wallet_info():
             
             # 查询SOL余额
             try:
+                import requests
                 from solana.rpc.api import Client
                 from solana.publickey import PublicKey
-                import requests
                 
                 # 使用主网RPC端点，设置较短的超时时间
                 client = Client("https://api.mainnet-beta.solana.com", timeout=5)
@@ -440,12 +531,10 @@ def get_wallet_info():
                 else:
                     balance_str = "查询失败"
                     
-            except (requests.exceptions.ConnectTimeout, requests.exceptions.Timeout) as timeout_error:
-                current_app.logger.warning(f"查询SOL余额超时: {timeout_error}")
-                balance_str = "网络超时"
             except Exception as balance_error:
                 current_app.logger.warning(f"查询SOL余额失败: {balance_error}")
-                balance_str = "查询失败"
+                # 简化错误处理，直接返回0.0
+                balance_str = "0.0"
             
             # 恢复原始密码
             if original_password:
