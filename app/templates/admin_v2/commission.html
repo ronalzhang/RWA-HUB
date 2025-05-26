@@ -585,12 +585,20 @@
             
             async loadStats() {
                 try {
-                    const response = await fetch('/api/admin/commission/stats');
+                    const response = await fetch('/admin/v2/api/commission/stats');
                     if (response.ok) {
-                        this.stats = await response.json();
+                        const data = await response.json();
+                        if (data.success) {
+                            this.stats = {
+                                total_commission: data.total_commission || 0,
+                                total_referrals: data.total_referrals || 0,
+                                pending_commission: data.pending_commission || 0,
+                                commission_rate: data.commission_rate || 0
+                            };
+                        }
                     }
                 } catch (error) {
-                    console.error('加载佣金统计失败:', error);
+                    console.error('加载统计数据失败:', error);
                 }
             },
             
@@ -605,16 +613,16 @@
                         ...this.recordFilters
                     });
                     
-                    const response = await fetch(`/api/admin/commission/records?${params}`);
-                    if (!response.ok) throw new Error('加载佣金记录失败');
-                    
-                    const data = await response.json();
-                    if (data.success) {
-                        this.records = data.data || [];
-                        this.recordPagination.total = data.pagination?.total || 0;
-                        this.recordPagination.pages = data.pagination?.pages || 0;
-                    } else {
-                        throw new Error(data.error || '加载失败');
+                    const response = await fetch(`/admin/v2/api/commission/records?${params}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success) {
+                            this.records = data.data || [];
+                            this.recordPagination.total = data.pagination?.total || 0;
+                            this.recordPagination.pages = data.pagination?.pages || 0;
+                        } else {
+                            throw new Error(data.error || '加载失败');
+                        }
                     }
                 } catch (error) {
                     console.error('加载佣金记录失败:', error);
@@ -627,7 +635,7 @@
             async loadReferrals() {
                 this.referralsLoading = true;
                 try {
-                    const response = await fetch('/api/admin/commission/referrals');
+                    const response = await fetch('/admin/v2/api/commission/referrals');
                     if (response.ok) {
                         const data = await response.json();
                         if (data.success) {
@@ -655,7 +663,7 @@
                         ...this.withdrawalFilters
                     });
                     
-                    const response = await fetch(`/api/admin/commission/withdrawals?${params}`);
+                    const response = await fetch(`/admin/v2/api/commission/withdrawals?${params}`);
                     if (!response.ok) throw new Error('加载取现记录失败');
                     
                     const data = await response.json();
@@ -678,7 +686,7 @@
                 if (!confirm(`确定要处理提现申请吗？\n用户地址: ${withdrawal.user_address}\n提现金额: ${this.formatCurrency(withdrawal.amount)}\n提现地址: ${withdrawal.to_address}`)) return;
                 
                 try {
-                    const response = await fetch(`/api/admin/commission/withdrawals/${withdrawal.id}/process`, {
+                    const response = await fetch(`/admin/v2/api/commission/withdrawals/${withdrawal.id}/process`, {
                         method: 'POST'
                     });
                     
@@ -705,7 +713,7 @@
                 if (!confirm(`确定要取消此提现申请吗？\n用户地址: ${withdrawal.user_address}\n提现金额: ${this.formatCurrency(withdrawal.amount)}\n取消原因: ${reason}`)) return;
                 
                 try {
-                    const response = await fetch(`/api/admin/commission/withdrawals/${withdrawal.id}/cancel`, {
+                    const response = await fetch(`/admin/v2/api/commission/withdrawals/${withdrawal.id}/cancel`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ reason: reason })
@@ -755,7 +763,7 @@
             
             async loadSettings() {
                 try {
-                    const response = await fetch('/api/admin/commission/settings');
+                    const response = await fetch('/admin/v2/api/commission/settings');
                     if (response.ok) {
                         const data = await response.json();
                         if (data.success) {
@@ -771,7 +779,7 @@
             
             async saveSettings() {
                 try {
-                    const response = await fetch('/api/admin/commission/settings', {
+                    const response = await fetch('/admin/v2/api/commission/settings', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(this.settings)
@@ -790,7 +798,7 @@
                 if (!confirm(`确定要发放佣金 ${this.formatCurrency(record.amount)} 给地址 ${record.recipient_address} 吗？`)) return;
                 
                 try {
-                    const response = await fetch(`/api/admin/commission/records/${record.id}/pay`, {
+                    const response = await fetch(`/admin/v2/api/commission/records/${record.id}/pay`, {
                         method: 'POST'
                     });
                     
@@ -825,7 +833,7 @@
             
             async exportRecords() {
                 try {
-                    const response = await fetch('/api/admin/commission/records/export');
+                    const response = await fetch('/admin/v2/api/commission/records/export');
                     if (!response.ok) throw new Error('导出失败');
                     
                     const blob = await response.blob();
