@@ -147,12 +147,20 @@ def encrypt_private_key():
             
             # 检测私钥格式并转换
             try:
-                if len(private_key) == 128:  # 十六进制格式
-                    private_key_bytes = bytes.fromhex(private_key)
-                elif len(private_key) == 88:  # Base64格式
-                    private_key_bytes = base64.b64decode(private_key)
-                else:  # Base58格式
+                # 优先尝试base58解码（Solana最常用格式）
+                try:
                     private_key_bytes = base58.b58decode(private_key)
+                    current_app.logger.info(f"成功使用Base58解码，长度: {len(private_key_bytes)}字节")
+                except:
+                    # 如果base58失败，尝试其他格式
+                    if len(private_key) == 128:  # 十六进制格式
+                        private_key_bytes = bytes.fromhex(private_key)
+                        current_app.logger.info(f"成功使用十六进制解码，长度: {len(private_key_bytes)}字节")
+                    elif len(private_key) == 88:  # Base64格式
+                        private_key_bytes = base64.b64decode(private_key)
+                        current_app.logger.info(f"成功使用Base64解码，长度: {len(private_key_bytes)}字节")
+                    else:
+                        raise ValueError(f"无法识别的私钥格式，长度: {len(private_key)}")
                 
                 # 处理不同长度的私钥
                 current_app.logger.info(f"私钥解码后长度: {len(private_key_bytes)}字节")
@@ -254,47 +262,49 @@ def load_encrypted_key():
             user_crypto = get_crypto_manager()
             private_key = user_crypto.decrypt_private_key(encrypted_key)
             
-            # 直接验证私钥格式，不依赖环境变量
+            # 解析私钥并生成地址
+            # 优先尝试base58解码（Solana最常用格式）
             try:
-                # 检测私钥格式并转换
+                private_key_bytes = base58.b58decode(private_key)
+                current_app.logger.info(f"加载API: 成功使用Base58解码，长度: {len(private_key_bytes)}字节")
+            except:
+                # 如果base58失败，尝试其他格式
                 if len(private_key) == 128:  # 十六进制格式
                     private_key_bytes = bytes.fromhex(private_key)
+                    current_app.logger.info(f"加载API: 成功使用十六进制解码，长度: {len(private_key_bytes)}字节")
                 elif len(private_key) == 88:  # Base64格式
                     private_key_bytes = base64.b64decode(private_key)
-                else:  # Base58格式
-                    private_key_bytes = base58.b58decode(private_key)
-                
-                # 处理不同长度的私钥
-                if len(private_key_bytes) == 64:
-                    # 标准64字节格式，前32字节是私钥
-                    seed = private_key_bytes[:32]
-                elif len(private_key_bytes) == 32:
-                    # 仅私钥
-                    seed = private_key_bytes
-                elif len(private_key_bytes) == 66:
-                    # 可能包含校验和，取前32字节作为私钥
-                    seed = private_key_bytes[:32]
+                    current_app.logger.info(f"加载API: 成功使用Base64解码，长度: {len(private_key_bytes)}字节")
                 else:
-                    raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}字节")
-                
-                # 创建密钥对验证
-                keypair = Keypair.from_seed(seed)
-                wallet_address = str(keypair.public_key)
-                
-            except Exception as e:
-                return jsonify({'success': False, 'error': f'私钥格式错误: {str(e)}'}), 400
+                    raise ValueError(f"无法识别的私钥格式，长度: {len(private_key)}")
             
-            current_app.logger.info(f"成功加载加密私钥，钱包地址: {wallet_address}")
+            # 处理不同长度的私钥
+            if len(private_key_bytes) == 64:
+                # 标准64字节格式，前32字节是私钥
+                seed = private_key_bytes[:32]
+            elif len(private_key_bytes) == 32:
+                # 仅私钥
+                seed = private_key_bytes
+            elif len(private_key_bytes) == 66:
+                # 可能包含校验和，取前32字节作为私钥
+                seed = private_key_bytes[:32]
+            else:
+                raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}字节")
             
-            return jsonify({
-                'success': True,
-                'wallet_address': wallet_address,
-                'message': '加密私钥已成功加载'
-            })
+            # 创建密钥对验证
+            keypair = Keypair.from_seed(seed)
+            wallet_address = str(keypair.public_key)
             
-        finally:
-            if original_password:
-                os.environ['CRYPTO_PASSWORD'] = original_password
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'私钥格式错误: {str(e)}'}), 400
+        
+        current_app.logger.info(f"成功加载加密私钥，钱包地址: {wallet_address}")
+        
+        return jsonify({
+            'success': True,
+            'wallet_address': wallet_address,
+            'message': '加密私钥已成功加载'
+        })
         
     except Exception as e:
         current_app.logger.error(f"加载加密私钥失败: {str(e)}")
@@ -545,12 +555,20 @@ def get_wallet_info():
             private_key = user_crypto.decrypt_private_key(encrypted_key)
             
             # 解析私钥并生成地址
-            if len(private_key) == 128:  # 十六进制格式
-                private_key_bytes = bytes.fromhex(private_key)
-            elif len(private_key) == 88:  # Base64格式
-                private_key_bytes = base64.b64decode(private_key)
-            else:  # Base58格式
+            # 优先尝试base58解码（Solana最常用格式）
+            try:
                 private_key_bytes = base58.b58decode(private_key)
+                current_app.logger.info(f"钱包信息API: 成功使用Base58解码，长度: {len(private_key_bytes)}字节")
+            except:
+                # 如果base58失败，尝试其他格式
+                if len(private_key) == 128:  # 十六进制格式
+                    private_key_bytes = bytes.fromhex(private_key)
+                    current_app.logger.info(f"钱包信息API: 成功使用十六进制解码，长度: {len(private_key_bytes)}字节")
+                elif len(private_key) == 88:  # Base64格式
+                    private_key_bytes = base64.b64decode(private_key)
+                    current_app.logger.info(f"钱包信息API: 成功使用Base64解码，长度: {len(private_key_bytes)}字节")
+                else:
+                    raise ValueError(f"无法识别的私钥格式，长度: {len(private_key)}")
             
             # 处理不同长度的私钥
             if len(private_key_bytes) == 64:
@@ -628,12 +646,20 @@ def test_wallet_connection():
             private_key = user_crypto.decrypt_private_key(encrypted_key)
             
             # 解析私钥并生成地址
-            if len(private_key) == 128:  # 十六进制格式
-                private_key_bytes = bytes.fromhex(private_key)
-            elif len(private_key) == 88:  # Base64格式
-                private_key_bytes = base64.b64decode(private_key)
-            else:  # Base58格式
+            # 优先尝试base58解码（Solana最常用格式）
+            try:
                 private_key_bytes = base58.b58decode(private_key)
+                current_app.logger.info(f"测试钱包API: 成功使用Base58解码，长度: {len(private_key_bytes)}字节")
+            except:
+                # 如果base58失败，尝试其他格式
+                if len(private_key) == 128:  # 十六进制格式
+                    private_key_bytes = bytes.fromhex(private_key)
+                    current_app.logger.info(f"测试钱包API: 成功使用十六进制解码，长度: {len(private_key_bytes)}字节")
+                elif len(private_key) == 88:  # Base64格式
+                    private_key_bytes = base64.b64decode(private_key)
+                    current_app.logger.info(f"测试钱包API: 成功使用Base64解码，长度: {len(private_key_bytes)}字节")
+                else:
+                    raise ValueError(f"无法识别的私钥格式，长度: {len(private_key)}")
             
             # 处理不同长度的私钥
             if len(private_key_bytes) == 64:
@@ -673,7 +699,7 @@ def test_wallet_connection():
         })
 
 # 注意：dashboard、assets、users、trades等路由已在各自模块中定义
-# 避免重复定义导致路由冲突
+# 避免重复定义导致路由冲突 
 
 # 添加管理员用户管理API
 @admin_bp.route('/api/admins', methods=['GET'])
