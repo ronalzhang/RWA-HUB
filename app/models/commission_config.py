@@ -122,6 +122,11 @@ class UserCommissionBalance(db.Model):
         return UserCommissionBalance.update_balance(user_address, amount, 'unfreeze')
     
     @staticmethod
+    def withdraw_balance(user_address, amount):
+        """提现用户佣金余额"""
+        return UserCommissionBalance.update_balance(user_address, amount, 'withdraw')
+    
+    @staticmethod
     def get_total_balance():
         """获取所有用户的总余额"""
         from sqlalchemy import func
