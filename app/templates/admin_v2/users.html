@@ -122,7 +122,7 @@
         <div class="min-w-full divide-y divide-gray-200">
             <!-- 表头 -->
             <div class="bg-gray-50">
-                <div class="grid grid-cols-12 gap-4 py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <div class="grid grid-cols-20 gap-2 py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <div class="col-span-1">
                         <input type="checkbox" x-model="selectAll" @change="toggleSelectAll()" 
                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
@@ -130,8 +130,13 @@
                     <div class="col-span-3">钱包地址/用户名</div>
                     <div class="col-span-2">注册时间</div>
                     <div class="col-span-1">交易次数</div>
-                    <div class="col-span-1">持有资产</div>
-                    <div class="col-span-2">状态</div>
+                    <div class="col-span-2">交易金额</div>
+                    <div class="col-span-2">交易佣金</div>
+                    <div class="col-span-2">分销佣金</div>
+                    <div class="col-span-1">下线数</div>
+                    <div class="col-span-1">资产数</div>
+                    <div class="col-span-2">Token数</div>
+                    <div class="col-span-1">状态</div>
                     <div class="col-span-2 text-right">操作</div>
                 </div>
             </div>
@@ -156,7 +161,7 @@
                 </template>
                 
                 <template x-for="user in users" :key="user.wallet_address">
-                    <div class="grid grid-cols-12 gap-4 py-4 px-4 hover:bg-gray-50">
+                    <div class="grid grid-cols-20 gap-2 py-4 px-4 hover:bg-gray-50">
                         <div class="col-span-1 flex items-center">
                             <input type="checkbox" x-model="selectedUsers" :value="user.wallet_address" 
                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
@@ -171,17 +176,22 @@
                             </div>
                         </div>
                         <div class="col-span-2 flex items-center text-sm text-gray-500" x-text="formatDate(user.created_at)"></div>
-                        <div class="col-span-1 flex items-center" x-text="user.trade_count || 0"></div>
-                        <div class="col-span-1 flex items-center" x-text="user.assets_count || 0"></div>
-                        <div class="col-span-2 flex items-center space-x-2">
-                            <span x-show="user.is_distributor" class="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800">
+                        <div class="col-span-1 flex items-center text-sm" x-text="user.trade_count || 0"></div>
+                        <div class="col-span-2 flex items-center text-sm" x-text="formatCurrency(user.total_trade_amount || 0)"></div>
+                        <div class="col-span-2 flex items-center text-sm text-green-600" x-text="formatCurrency(user.total_commission_earned || 0)"></div>
+                        <div class="col-span-2 flex items-center text-sm text-purple-600" x-text="formatCurrency(user.referral_commission || 0)"></div>
+                        <div class="col-span-1 flex items-center text-sm" x-text="user.referral_count || 0"></div>
+                        <div class="col-span-1 flex items-center text-sm" x-text="user.assets_count || 0"></div>
+                        <div class="col-span-2 flex items-center text-sm" x-text="formatNumber(user.total_tokens || 0)"></div>
+                        <div class="col-span-1 flex items-center">
+                            <span x-show="user.is_distributor" class="px-1 py-1 text-xs rounded-full bg-purple-100 text-purple-800">
                                 分销商
                             </span>
-                            <span x-show="user.is_blocked" class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
+                            <span x-show="user.is_blocked" class="px-1 py-1 text-xs rounded-full bg-red-100 text-red-800">
                                 已冻结
                             </span>
-                            <span x-show="!user.is_distributor && !user.is_blocked" class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
-                                普通用户
+                            <span x-show="!user.is_distributor && !user.is_blocked" class="px-1 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+                                普通
                             </span>
                         </div>
                         <div class="col-span-2 flex justify-end items-center space-x-1">
@@ -307,18 +317,38 @@
                         </div>
                         
                         <!-- 用户数据统计 -->
-                        <div class="grid grid-cols-3 gap-4 mb-6">
+                        <div class="grid grid-cols-2 gap-4 mb-6">
                             <div class="bg-gray-50 p-3 rounded">
                                 <p class="text-sm text-gray-500">交易次数</p>
                                 <p class="text-lg font-semibold" x-text="selectedUser?.trade_count || 0"></p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <p class="text-sm text-gray-500">交易总金额</p>
+                                <p class="text-lg font-semibold text-blue-600" x-text="formatCurrency(selectedUser?.total_trade_amount || 0) + ' USDC'"></p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <p class="text-sm text-gray-500">交易佣金</p>
+                                <p class="text-lg font-semibold text-green-600" x-text="formatCurrency(selectedUser?.total_commission_earned || 0) + ' USDC'"></p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <p class="text-sm text-gray-500">分销佣金</p>
+                                <p class="text-lg font-semibold text-purple-600" x-text="formatCurrency(selectedUser?.referral_commission || 0) + ' USDC'"></p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <p class="text-sm text-gray-500">下线账户数</p>
+                                <p class="text-lg font-semibold" x-text="selectedUser?.referral_count || 0"></p>
                             </div>
                             <div class="bg-gray-50 p-3 rounded">
                                 <p class="text-sm text-gray-500">持有资产</p>
                                 <p class="text-lg font-semibold" x-text="selectedUser?.assets_count || 0"></p>
                             </div>
                             <div class="bg-gray-50 p-3 rounded">
-                                <p class="text-sm text-gray-500">佣金收入</p>
-                                <p class="text-lg font-semibold" x-text="formatValue(selectedUser?.commission_total || 0)"></p>
+                                <p class="text-sm text-gray-500">Token总数</p>
+                                <p class="text-lg font-semibold" x-text="formatNumber(selectedUser?.total_tokens || 0)"></p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded">
+                                <p class="text-sm text-gray-500">可用余额</p>
+                                <p class="text-lg font-semibold text-orange-600" x-text="formatCurrency(selectedUser?.available_balance || 0) + ' USDC'"></p>
                             </div>
                         </div>
                         
@@ -594,6 +624,29 @@
                 return parseFloat(value || 0).toLocaleString('zh-CN', {
                     maximumFractionDigits: 2
                 });
+            },
+            
+            // 格式化货币
+            formatCurrency(value) {
+                const num = parseFloat(value || 0);
+                if (num === 0) return '0';
+                if (num < 0.01) return '<0.01';
+                return num.toLocaleString('zh-CN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            },
+            
+            // 格式化数字
+            formatNumber(value) {
+                const num = parseFloat(value || 0);
+                if (num === 0) return '0';
+                if (num >= 1000000) {
+                    return (num / 1000000).toFixed(1) + 'M';
+                } else if (num >= 1000) {
+                    return (num / 1000).toFixed(1) + 'K';
+                }
+                return num.toLocaleString('zh-CN');
             },
             
             // 计算显示页码

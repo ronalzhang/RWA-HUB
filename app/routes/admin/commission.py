@@ -68,6 +68,9 @@ def pay_commission_v2(record_id):
 def api_commission_stats():
     """佣金统计数据"""
     try:
+        # 导入User模型来统计推荐用户数
+        from app.models.user import User
+        
         # 总佣金统计
         total_amount = db.session.query(func.sum(CommissionRecord.amount)).scalar() or 0
         total_count = CommissionRecord.query.count()
@@ -96,9 +99,27 @@ def api_commission_stats():
             CommissionRecord.commission_type.like('referral_%')
         ).scalar() or 0
         
+        # 统计推荐用户总数（有推荐人的用户数量）
+        total_referrals = User.query.filter(User.referrer_address.isnot(None)).count()
+        
+        # 获取佣金率设置（从设置表获取，如果没有则使用默认值）
+        commission_rate = 5.0  # 默认佣金率
+        try:
+            commission_setting = CommissionSetting.query.filter_by(key='global_rate').first()
+            if commission_setting:
+                commission_rate = float(commission_setting.value)
+        except:
+            pass
+        
+        # 返回前端期望的数据格式
         return jsonify({
             'success': True,
-            'data': {
+            'total_commission': float(total_amount),
+            'total_referrals': total_referrals,
+            'pending_commission': float(pending_amount),
+            'commission_rate': commission_rate,
+            # 保留详细数据供其他用途
+            'details': {
                 'total': {
                     'amount': float(total_amount),
                     'count': total_count
@@ -219,35 +240,38 @@ def api_commission_records():
 def api_commission_settings():
     """佣金设置"""
     try:
-        # 返回默认的佣金设置
-        default_settings = [
-            {
-                'id': 1,
-                'asset_type_id': 1,
-                'asset_type_name': '房地产',
-                'commission_rate': 0.02,
-                'min_amount': 0,
-                'max_amount': None,
-                'is_active': True,
-                'created_at': datetime.utcnow().isoformat(),
-                'created_by': 'system'
-            },
-            {
-                'id': 2,
-                'asset_type_id': 2,
-                'asset_type_name': '股权',
-                'commission_rate': 0.015,
-                'min_amount': 0,
-                'max_amount': None,
-                'is_active': True,
-                'created_at': datetime.utcnow().isoformat(),
-                'created_by': 'system'
-            }
-        ]
+        # 获取佣金设置，如果不存在则返回默认值
+        settings = {}
+        
+        # 定义默认设置
+        default_settings = {
+            'global_rate': 5.0,
+            'min_amount': 1.0,
+            'referral_levels': 3,
+            'level1_rate': 5.0,
+            'level2_rate': 3.0,
+            'level3_rate': 1.0
+        }
+        
+        # 尝试从数据库获取设置
+        try:
+            for key, default_value in default_settings.items():
+                setting = CommissionSetting.query.filter_by(key=key).first()
+                if setting:
+                    # 根据类型转换值
+                    if key in ['referral_levels']:
+                        settings[key] = int(setting.value)
+                    else:
+                        settings[key] = float(setting.value)
+                else:
+                    settings[key] = default_value
+        except Exception as db_error:
+            current_app.logger.warning(f'从数据库获取佣金设置失败，使用默认值: {str(db_error)}')
+            settings = default_settings
         
         return jsonify({
             'success': True,
-            'data': default_settings
+            **settings  # 直接返回设置字段，不嵌套在data中
         })
         
     except Exception as e:
@@ -264,15 +288,57 @@ def api_update_commission_settings():
         if not data:
             return jsonify({'success': False, 'error': '缺少请求数据'}), 400
         
-        # 这里可以实现佣金设置的更新逻辑
-        # 由于涉及到复杂的业务逻辑，暂时返回成功
+        # 定义允许更新的设置字段
+        allowed_settings = [
+            'global_rate', 'min_amount', 'referral_levels',
+            'level1_rate', 'level2_rate', 'level3_rate'
+        ]
+        
+        # 验证和保存设置
+        updated_count = 0
+        for key in allowed_settings:
+            if key in data:
+                value = data[key]
+                
+                # 数据验证
+                if key in ['global_rate', 'level1_rate', 'level2_rate', 'level3_rate']:
+                    if not (0 <= float(value) <= 100):
+                        return jsonify({'success': False, 'error': f'{key} 必须在0-100之间'}), 400
+                elif key == 'min_amount':
+                    if float(value) < 0:
+                        return jsonify({'success': False, 'error': '最低佣金金额不能为负数'}), 400
+                elif key == 'referral_levels':
+                    if int(value) not in [1, 2, 3]:
+                        return jsonify({'success': False, 'error': '推荐等级必须是1、2或3'}), 400
+                
+                # 查找或创建设置记录
+                setting = CommissionSetting.query.filter_by(key=key).first()
+                if setting:
+                    setting.value = str(value)
+                    setting.updated_at = datetime.utcnow()
+                else:
+                    setting = CommissionSetting(
+                        key=key,
+                        value=str(value),
+                        description=f'佣金设置: {key}',
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                    db.session.add(setting)
+                
+                updated_count += 1
+        
+        if updated_count > 0:
+            db.session.commit()
+            current_app.logger.info(f'佣金设置更新成功，更新了 {updated_count} 个设置项')
         
         return jsonify({
             'success': True,
-            'message': '佣金设置更新成功'
+            'message': f'佣金设置更新成功，更新了 {updated_count} 个设置项'
         })
         
     except Exception as e:
+        db.session.rollback()
         current_app.logger.error(f'更新佣金设置失败: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -301,4 +367,50 @@ def api_pay_commission(record_id):
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f'发放佣金失败: {str(e)}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/api/admin/commission/referrals', methods=['GET'])
+@api_admin_required
+def api_commission_referrals():
+    """推荐关系列表"""
+    try:
+        from app.models.user import User
+        
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 20, type=int)
+        
+        # 查询有推荐关系的用户
+        query = User.query.filter(User.referrer_address.isnot(None))
+        
+        # 分页
+        total = query.count()
+        users = query.order_by(desc(User.created_at)) \
+            .offset((page - 1) * limit) \
+            .limit(limit) \
+            .all()
+        
+        # 格式化数据
+        referrals_list = []
+        for user in users:
+            referrals_list.append({
+                'id': user.id,
+                'user_address': user.eth_address or user.username,
+                'referrer_address': user.referrer_address,
+                'referral_level': 1,  # 默认一级推荐
+                'referral_code': None,  # 暂时没有推荐码
+                'joined_at': user.created_at.isoformat() if user.created_at else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'items': referrals_list,
+            'total': total,
+            'pages': (total + limit - 1) // limit,
+            'page': page,
+            'limit': limit
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取推荐关系失败: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500 

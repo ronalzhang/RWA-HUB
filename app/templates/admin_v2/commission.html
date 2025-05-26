@@ -423,9 +423,13 @@
                     if (!response.ok) throw new Error('加载佣金记录失败');
                     
                     const data = await response.json();
-                    this.records = data.items || [];
-                    this.recordPagination.total = data.total || 0;
-                    this.recordPagination.pages = data.pages || 0;
+                    if (data.success) {
+                        this.records = data.data || [];
+                        this.recordPagination.total = data.pagination?.total || 0;
+                        this.recordPagination.pages = data.pagination?.pages || 0;
+                    } else {
+                        throw new Error(data.error || '加载失败');
+                    }
                 } catch (error) {
                     console.error('加载佣金记录失败:', error);
                     alert('加载佣金记录失败: ' + error.message);
@@ -454,7 +458,11 @@
                     const response = await fetch('/api/admin/commission/settings');
                     if (response.ok) {
                         const data = await response.json();
-                        this.settings = { ...this.settings, ...data };
+                        if (data.success) {
+                            // 移除success字段，其余字段合并到settings
+                            const { success, ...settingsData } = data;
+                            this.settings = { ...this.settings, ...settingsData };
+                        }
                     }
                 } catch (error) {
                     console.error('加载佣金设置失败:', error);

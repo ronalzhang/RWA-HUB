@@ -11,6 +11,8 @@ from app.extensions import db
 from app.models.user import User
 from app.models.trade import Trade
 from app.models.asset import Asset
+from app.models.referral import CommissionRecord
+from app.models.commission_config import UserCommissionBalance
 
 
 @admin_bp.route('/users')
@@ -114,8 +116,33 @@ def get_users_list():
                 Trade.trader_address == user.eth_address
             ).count()
             
-            # 获取持有资产数
-            assets_count = Asset.query.filter_by(creator_address=user.eth_address).count()
+            # 获取交易总金额
+            total_trade_amount = db.session.query(func.sum(Trade.amount)).filter(
+                Trade.trader_address == user.eth_address
+            ).scalar() or 0
+            
+            # 获取交易总佣金（用户作为接收者的佣金）
+            total_commission_earned = db.session.query(func.sum(CommissionRecord.amount)).filter(
+                CommissionRecord.recipient_address == user.eth_address
+            ).scalar() or 0
+            
+            # 获取分销总佣金（推荐佣金）
+            referral_commission = db.session.query(func.sum(CommissionRecord.amount)).filter(
+                CommissionRecord.recipient_address == user.eth_address,
+                CommissionRecord.commission_type.in_(['referral_1', 'referral_2', 'referral_3'])
+            ).scalar() or 0
+            
+            # 获取下线账户数量
+            referral_count = User.query.filter_by(referrer_address=user.eth_address).count()
+            
+            # 获取持有资产数和token总数
+            user_assets = Asset.query.filter_by(creator_address=user.eth_address).all()
+            assets_count = len(user_assets)
+            total_tokens = sum(asset.total_supply or 0 for asset in user_assets)
+            
+            # 获取佣金余额信息
+            commission_balance = UserCommissionBalance.query.filter_by(user_address=user.eth_address).first()
+            available_balance = float(commission_balance.available_balance) if commission_balance else 0
             
             user_list.append({
                 'wallet_address': user.eth_address,
@@ -129,7 +156,13 @@ def get_users_list():
                 'is_blocked': bool(user.is_blocked),
                 'created_at': user.created_at.isoformat(),
                 'trade_count': trade_count,
-                'assets_count': assets_count,
+                'total_trade_amount': float(total_trade_amount),  # 交易总金额
+                'total_commission_earned': float(total_commission_earned),  # 交易总佣金
+                'referral_commission': float(referral_commission),  # 分销总佣金
+                'referral_count': referral_count,  # 下线账户数量
+                'assets_count': assets_count,  # 持有资产数
+                'total_tokens': float(total_tokens),  # 持有token总数
+                'available_balance': available_balance,  # 可用佣金余额
                 'referrer': user.referrer_address
             })
         
