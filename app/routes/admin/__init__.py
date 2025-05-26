@@ -261,5 +261,15 @@ def set_temp_env():
         current_app.logger.error(f"设置临时环境变量失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@admin_bp.route('/v2/api/test', methods=['GET', 'POST'])
+def test_api():
+    """测试API，不需要认证"""
+    return jsonify({
+        'success': True,
+        'message': 'API工作正常',
+        'method': request.method,
+        'data': request.get_json() if request.method == 'POST' else None
+    })
+
 # 注意：dashboard、assets、users、trades等路由已在各自模块中定义
 # 避免重复定义导致路由冲突 
