@@ -124,13 +124,13 @@ def get_users_list():
                 'role': user.role,  # 添加角色信息
                 'status': user.status,  # 添加状态信息
                 'is_admin': user.role in ['admin', 'super_admin'],  # 是否为管理员
-                'is_verified': bool(getattr(user, 'is_verified', False)),
-                'is_distributor': bool(getattr(user, 'is_distributor', False)),
-                'is_blocked': bool(getattr(user, 'is_blocked', False)),
+                'is_verified': bool(user.is_verified),
+                'is_distributor': bool(user.is_distributor),
+                'is_blocked': bool(user.is_blocked),
                 'created_at': user.created_at.isoformat(),
                 'trade_count': trade_count,
                 'assets_count': assets_count,
-                'referrer': getattr(user, 'referrer', None)
+                'referrer': user.referrer_address
             })
         
         return jsonify({
@@ -153,10 +153,10 @@ def get_user_stats():
         total_users = User.query.count()
         
         # 已认证用户数
-        verified_users = User.query.filter(getattr(User, 'is_verified', False) == True).count()
+        verified_users = User.query.filter(User.is_verified == True).count()
         
         # 分销商数量
-        distributors = User.query.filter(getattr(User, 'is_distributor', False) == True).count()
+        distributors = User.query.filter(User.is_distributor == True).count()
         
         # 今日新增用户
         today = datetime.utcnow().date()
@@ -182,10 +182,6 @@ def set_distributor(address):
         if not user:
             return jsonify({'error': '用户不存在'}), 404
         
-        # 检查is_distributor属性是否存在
-        if not hasattr(user, 'is_distributor'):
-            return jsonify({'error': '分销商功能尚未开启'}), 400
-        
         user.is_distributor = True
         db.session.commit()
         
@@ -204,10 +200,6 @@ def block_user(address):
         if not user:
             return jsonify({'error': '用户不存在'}), 404
         
-        # 检查is_blocked属性是否存在
-        if not hasattr(user, 'is_blocked'):
-            return jsonify({'error': '用户冻结功能尚未开启'}), 400
-        
         user.is_blocked = True
         db.session.commit()
         
@@ -225,10 +217,6 @@ def unblock_user(address):
         user = User.query.filter_by(eth_address=address).first()
         if not user:
             return jsonify({'error': '用户不存在'}), 404
-        
-        # 检查is_blocked属性是否存在
-        if not hasattr(user, 'is_blocked'):
-            return jsonify({'error': '用户冻结功能尚未开启'}), 400
         
         user.is_blocked = False
         db.session.commit()
@@ -280,9 +268,9 @@ def export_users():
                 user.username or '',
                 user.email or '',
                 user.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                '是' if getattr(user, 'is_verified', False) else '否',
-                '是' if getattr(user, 'is_distributor', False) else '否',
-                '是' if getattr(user, 'is_blocked', False) else '否'
+                '是' if user.is_verified else '否',
+                '是' if user.is_distributor else '否',
+                '是' if user.is_blocked else '否'
             ])
         
         # 设置响应头

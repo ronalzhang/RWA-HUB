@@ -41,6 +41,13 @@ class User(db.Model):
     status = db.Column(db.String(20), nullable=False, default=UserStatus.ACTIVE.value)
     settings = db.Column(db.Text, default='{}')  # JSON格式存储用户设置
     is_active = db.Column(db.Boolean, default=True)
+    
+    # 分销商相关字段
+    is_distributor = db.Column(db.Boolean, default=False)  # 是否为分销商
+    is_verified = db.Column(db.Boolean, default=False)     # 是否已认证
+    is_blocked = db.Column(db.Boolean, default=False)      # 是否被冻结
+    referrer_address = db.Column(db.String(64))            # 推荐人地址
+    
     last_login_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
     updated_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -105,6 +112,10 @@ class User(db.Model):
             'status': self.status,
             'settings': self.get_settings(),
             'is_active': self.is_active,
+            'is_distributor': self.is_distributor,
+            'is_verified': self.is_verified,
+            'is_blocked': self.is_blocked,
+            'referrer_address': self.referrer_address,
             'last_login_at': self.last_login_at.isoformat() if self.last_login_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
