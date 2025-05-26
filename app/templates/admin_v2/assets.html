@@ -69,228 +69,404 @@
 
     <!-- 资产管理主面板 -->
     <div class="bg-white rounded-lg shadow-sm mb-6">
-        <!-- 顶部操作栏 -->
-        <div class="px-6 py-4 border-b border-gray-200">
-            <div class="flex flex-wrap items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-700">资产列表</h3>
-            <div class="flex space-x-2">
-                    <button @click="refreshData()" 
-                            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm">
-                        <i class="fas fa-sync-alt mr-2"></i>刷新
+        <!-- 标签页导航 -->
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex space-x-8 px-6" aria-label="Tabs">
+                <button @click="activeTab = 'assets'" 
+                        :class="activeTab === 'assets' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                    <i class="fas fa-cubes mr-2"></i>资产列表
                 </button>
-                    <button @click="exportAssets()" 
-                            class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm">
-                        <i class="fas fa-download mr-2"></i>导出
+                <button @click="activeTab = 'dividends'" 
+                        :class="activeTab === 'dividends' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                    <i class="fas fa-coins mr-2"></i>分红列表
                 </button>
-                </div>
-            </div>
+            </nav>
         </div>
-        
-        <!-- 筛选条件 -->
-        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
-                    <select x-model="filters.status" @change="loadAssets()" 
-                            class="w-full border-gray-300 rounded-md shadow-sm">
-                        <option value="">全部状态</option>
-                        <option value="1">待审核</option>
-                        <option value="2">已通过</option>
-                        <option value="3">已拒绝</option>
-                    </select>
-                </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">资产类型</label>
-                    <select x-model="filters.type" @change="loadAssets()" 
-                            class="w-full border-gray-300 rounded-md shadow-sm">
-                    <option value="">全部类型</option>
-                        <option value="10">不动产</option>
-                        <option value="20">类不动产</option>
-                        <option value="30">工业地产</option>
-                        <option value="40">土地资产</option>
-                        <option value="50">证券资产</option>
-                        <option value="60">艺术品</option>
-                        <option value="70">收藏品</option>
-                </select>
-            </div>
-            <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">排序</label>
-                    <select x-model="filters.sort" @change="loadAssets()" 
-                            class="w-full border-gray-300 rounded-md shadow-sm">
-                        <option value="id">ID</option>
-                        <option value="created_at">创建时间</option>
-                        <option value="updated_at">更新时间</option>
-                        <option value="token_price">价格</option>
-                </select>
-            </div>
-            <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">排序方式</label>
-                    <select x-model="filters.order" @change="loadAssets()" 
-                            class="w-full border-gray-300 rounded-md shadow-sm">
-                        <option value="desc">降序</option>
-                        <option value="asc">升序</option>
-                    </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
-                    <input x-model="filters.keyword" @input.debounce.500ms="loadAssets()" 
-                           type="text" placeholder="搜索资产名称..." 
-                           class="w-full border-gray-300 rounded-md shadow-sm">
-                </div>
-            </div>
-        </div>
-        
-        <!-- 批量操作 -->
-        <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                    <input type="checkbox" x-model="selectAll" @change="toggleSelectAll()" 
-                           class="h-4 w-4 text-blue-600 border-gray-300 rounded">
-                    <span class="text-sm text-gray-600">全选</span>
-                    <span x-show="selectedAssets.length > 0" class="text-sm text-gray-500">
-                        （已选择 <span x-text="selectedAssets.length"></span> 项）
-                    </span>
-            </div>
-                <div class="flex space-x-2">
-                    <button x-show="selectedAssets.length > 0" @click="batchApprove()" 
-                            class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">
-                        <i class="fas fa-check mr-1"></i>批量通过
-                </button>
-                    <button x-show="selectedAssets.length > 0" @click="batchReject()" 
-                            class="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600">
-                        <i class="fas fa-times mr-1"></i>批量拒绝
-                </button>
-                    <button x-show="selectedAssets.length > 0" @click="batchDelete()" 
-                            class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">
-                        <i class="fas fa-trash mr-1"></i>批量删除
-                </button>
-            </div>
-        </div>
-    </div>
 
-    <!-- 资产表格 -->
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">选择</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">资产信息</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">价格</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    <!-- 加载状态 -->
-                    <template x-if="loading">
+        <!-- 资产列表标签页 -->
+        <div x-show="activeTab === 'assets'">
+            <!-- 顶部操作栏 -->
+            <div class="px-6 py-4 border-b border-gray-200">
+                <div class="flex flex-wrap items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-700">资产列表</h3>
+                    <div class="flex space-x-2">
+                        <button @click="refreshData()" 
+                                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm">
+                            <i class="fas fa-sync-alt mr-2"></i>刷新
+                        </button>
+                        <button @click="exportAssets()" 
+                                class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm">
+                            <i class="fas fa-download mr-2"></i>导出
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 筛选条件 -->
+            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                        <select x-model="filters.status" @change="loadAssets()" 
+                                class="w-full border-gray-300 rounded-md shadow-sm">
+                            <option value="">全部状态</option>
+                            <option value="1">待审核</option>
+                            <option value="2">已通过</option>
+                            <option value="3">已拒绝</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">资产类型</label>
+                        <select x-model="filters.type" @change="loadAssets()" 
+                                class="w-full border-gray-300 rounded-md shadow-sm">
+                            <option value="">全部类型</option>
+                            <option value="10">不动产</option>
+                            <option value="20">类不动产</option>
+                            <option value="30">工业地产</option>
+                            <option value="40">土地资产</option>
+                            <option value="50">证券资产</option>
+                            <option value="60">艺术品</option>
+                            <option value="70">收藏品</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">排序</label>
+                        <select x-model="filters.sort" @change="loadAssets()" 
+                                class="w-full border-gray-300 rounded-md shadow-sm">
+                            <option value="id">ID</option>
+                            <option value="created_at">创建时间</option>
+                            <option value="updated_at">更新时间</option>
+                            <option value="token_price">价格</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">排序方式</label>
+                        <select x-model="filters.order" @change="loadAssets()" 
+                                class="w-full border-gray-300 rounded-md shadow-sm">
+                            <option value="desc">降序</option>
+                            <option value="asc">升序</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
+                        <input x-model="filters.keyword" @input.debounce.500ms="loadAssets()" 
+                               type="text" placeholder="搜索资产名称..." 
+                               class="w-full border-gray-300 rounded-md shadow-sm">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 批量操作 -->
+            <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <input type="checkbox" x-model="selectAll" @change="toggleSelectAll()" 
+                               class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                        <span class="text-sm text-gray-600">全选</span>
+                        <span x-show="selectedAssets.length > 0" class="text-sm text-gray-500">
+                            （已选择 <span x-text="selectedAssets.length"></span> 项）
+                        </span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button x-show="selectedAssets.length > 0" @click="batchApprove()" 
+                                class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">
+                            <i class="fas fa-check mr-1"></i>批量通过
+                        </button>
+                        <button x-show="selectedAssets.length > 0" @click="batchReject()" 
+                                class="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600">
+                            <i class="fas fa-times mr-1"></i>批量拒绝
+                        </button>
+                        <button x-show="selectedAssets.length > 0" @click="batchDelete()" 
+                                class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">
+                            <i class="fas fa-trash mr-1"></i>批量删除
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 资产表格 -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
                         <tr>
-                            <td colspan="8" class="px-6 py-8 text-center text-gray-500">
-                                <i class="fas fa-spinner fa-spin mr-2"></i>加载资产数据中...
-                            </td>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">选择</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">资产信息</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">价格</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                         </tr>
-                </template>
-                
-                <!-- 无数据 -->
-                    <template x-if="!loading && assets.length === 0">
-                        <tr>
-                            <td colspan="8" class="px-6 py-8 text-center text-gray-500">
-                                <i class="fas fa-box-open text-2xl mb-2"></i>
-                                <p>暂无资产数据</p>
-                            </td>
-                        </tr>
-                </template>
-                
-                <!-- 资产数据 -->
-                    <template x-for="asset in assets" :key="asset.id">
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <input type="checkbox" x-model="selectedAssets" :value="asset.id" 
-                                       class="h-4 w-4 text-blue-600 border-gray-300 rounded">
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" x-text="asset.id"></td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="flex items-center">
-                                    <div class="flex-shrink-0 h-10 w-10">
-                                        <img x-show="asset.image" :src="asset.image" :alt="asset.name" 
-                                             class="h-10 w-10 rounded-full object-cover">
-                                        <div x-show="!asset.image" 
-                                             class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                    <i class="fas fa-image text-gray-400"></i>
-                                </div>
-                            </div>
-                                    <div class="ml-4">
-                                        <div class="text-sm font-medium">
-                                            <a :href="'/assets/' + asset.token_symbol" 
-                                               class="text-blue-600 hover:text-blue-800 hover:underline"
-                                               target="_blank"
-                                               x-text="asset.name"></a>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <!-- 加载状态 -->
+                        <template x-if="loading">
+                            <tr>
+                                <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>加载资产数据中...
+                                </td>
+                            </tr>
+                        </template>
+                        
+                        <!-- 无数据 -->
+                        <template x-if="!loading && assets.length === 0">
+                            <tr>
+                                <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                                    <i class="fas fa-box-open text-2xl mb-2"></i>
+                                    <p>暂无资产数据</p>
+                                </td>
+                            </tr>
+                        </template>
+                        
+                        <!-- 资产数据 -->
+                        <template x-for="asset in assets" :key="asset.id">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <input type="checkbox" x-model="selectedAssets" :value="asset.id" 
+                                           class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" x-text="asset.id"></td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 h-10 w-10">
+                                            <img x-show="asset.image" :src="asset.image" :alt="asset.name" 
+                                                 class="h-10 w-10 rounded-full object-cover">
+                                            <div x-show="!asset.image" 
+                                                 class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                                <i class="fas fa-image text-gray-400"></i>
+                                            </div>
                                         </div>
-                                        <div class="text-sm text-gray-500" x-text="asset.token_symbol"></div>
-                                </div>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full" 
-                                      :class="getTypeClass(asset.asset_type)" x-text="asset.asset_type_name"></span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatCurrency(asset.token_price || 0)"></td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full" 
-                                      :class="getStatusClass(asset.status)" x-text="asset.status_text"></span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDate(asset.created_at)"></td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <div class="flex space-x-2">
-                                    <button @click="viewAsset(asset)" 
-                                            class="text-blue-600 hover:text-blue-900" title="查看详情">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                                    <button x-show="asset.status === 1" @click="approveAsset(asset.id)" 
-                                            class="text-green-600 hover:text-green-900" title="通过">
-                                <i class="fas fa-check"></i>
-                            </button>
-                                    <button x-show="asset.status === 1" @click="rejectAsset(asset.id)" 
-                                            class="text-orange-600 hover:text-orange-900" title="拒绝">
-                                <i class="fas fa-times"></i>
-                            </button>
-                                    <button @click="deleteAsset(asset.id)" 
-                                            class="text-red-600 hover:text-red-900" title="删除">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                            </td>
-                        </tr>
-                </template>
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- 分页 -->
-        <div class="px-6 py-4 border-t border-gray-200">
-            <div class="flex items-center justify-between">
-                <div class="text-sm text-gray-700">
-                    显示 <span x-text="(pagination.page - 1) * pagination.limit + 1"></span> 到 
-                    <span x-text="Math.min(pagination.page * pagination.limit, pagination.total)"></span> 条，
-                    共 <span x-text="pagination.total"></span> 条记录
+                                        <div class="ml-4">
+                                            <div class="text-sm font-medium">
+                                                <a :href="'/assets/' + asset.token_symbol" 
+                                                   class="text-blue-600 hover:text-blue-800 hover:underline"
+                                                   target="_blank"
+                                                   x-text="asset.name"></a>
+                                            </div>
+                                            <div class="text-sm text-gray-500" x-text="asset.token_symbol"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full" 
+                                          :class="getTypeClass(asset.asset_type)" x-text="asset.asset_type_name"></span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatCurrency(asset.token_price || 0)"></td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full" 
+                                          :class="getStatusClass(asset.status)" x-text="asset.status_text"></span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDate(asset.created_at)"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <div class="flex space-x-2">
+                                        <button @click="viewAsset(asset)" 
+                                                class="text-blue-600 hover:text-blue-900" title="查看详情">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button x-show="asset.status === 1" @click="approveAsset(asset.id)" 
+                                                class="text-green-600 hover:text-green-900" title="通过">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        <button x-show="asset.status === 1" @click="rejectAsset(asset.id)" 
+                                                class="text-orange-600 hover:text-orange-900" title="拒绝">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                        <button @click="deleteAsset(asset.id)" 
+                                                class="text-red-600 hover:text-red-900" title="删除">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
             </div>
-                <div class="flex space-x-2">
-                    <button @click="loadAssets(1)" :disabled="pagination.page === 1" 
-                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">首页</button>
-                    <button @click="loadAssets(pagination.page - 1)" :disabled="pagination.page === 1" 
-                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">上一页</button>
-                    <button @click="loadAssets(pagination.page + 1)" :disabled="pagination.page >= pagination.pages" 
-                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">下一页</button>
-                    <button @click="loadAssets(pagination.pages)" :disabled="pagination.page >= pagination.pages" 
-                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">末页</button>
+        </div>
+
+        <!-- 分红列表标签页 -->
+        <div x-show="activeTab === 'dividends'">
+            <!-- 顶部操作栏 -->
+            <div class="px-6 py-4 border-b border-gray-200">
+                <div class="flex flex-wrap items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-700">分红列表</h3>
+                    <div class="flex space-x-2">
+                        <button @click="refreshDividends()" 
+                                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm">
+                            <i class="fas fa-sync-alt mr-2"></i>刷新
+                        </button>
+                        <button @click="exportDividends()" 
+                                class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm">
+                            <i class="fas fa-download mr-2"></i>导出
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 分红筛选条件 -->
+            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">资产</label>
+                        <select x-model="dividendFilters.asset_id" @change="loadDividends()" 
+                                class="w-full border-gray-300 rounded-md shadow-sm">
+                            <option value="">全部资产</option>
+                            <template x-for="asset in assets" :key="asset.id">
+                                <option :value="asset.id" x-text="asset.name + ' (' + asset.token_symbol + ')'"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                        <select x-model="dividendFilters.status" @change="loadDividends()" 
+                                class="w-full border-gray-300 rounded-md shadow-sm">
+                            <option value="">全部状态</option>
+                            <option value="pending">待发放</option>
+                            <option value="completed">已发放</option>
+                            <option value="failed">发放失败</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">排序</label>
+                        <select x-model="dividendFilters.sort" @change="loadDividends()" 
+                                class="w-full border-gray-300 rounded-md shadow-sm">
+                            <option value="created_at">创建时间</option>
+                            <option value="amount">分红金额</option>
+                            <option value="distribution_date">分红日期</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">排序方式</label>
+                        <select x-model="dividendFilters.order" @change="loadDividends()" 
+                                class="w-full border-gray-300 rounded-md shadow-sm">
+                            <option value="desc">降序</option>
+                            <option value="asc">升序</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分红表格 -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">资产信息</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分红金额</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">受益人数</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分红日期</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <!-- 加载状态 -->
+                        <template x-if="dividendLoading">
+                            <tr>
+                                <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>加载分红数据中...
+                                </td>
+                            </tr>
+                        </template>
+                        
+                        <!-- 无数据 -->
+                        <template x-if="!dividendLoading && dividends.length === 0">
+                            <tr>
+                                <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                                    <i class="fas fa-coins text-2xl mb-2"></i>
+                                    <p>暂无分红数据</p>
+                                </td>
+                            </tr>
+                        </template>
+                        
+                        <!-- 分红数据 -->
+                        <template x-for="dividend in dividends" :key="dividend.id">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" x-text="dividend.id"></td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 h-8 w-8">
+                                            <img x-show="dividend.asset_image" :src="dividend.asset_image" :alt="dividend.asset_name" 
+                                                 class="h-8 w-8 rounded-full object-cover">
+                                            <div x-show="!dividend.asset_image" 
+                                                 class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+                                                <i class="fas fa-coins text-gray-400 text-xs"></i>
+                                            </div>
+                                        </div>
+                                        <div class="ml-3">
+                                            <div class="text-sm font-medium text-gray-900" x-text="dividend.asset_name"></div>
+                                            <div class="text-sm text-gray-500" x-text="dividend.asset_symbol"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <span class="font-semibold text-green-600" x-text="formatCurrency(dividend.amount || dividend.total_amount || 0)"></span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="dividend.recipient_count || 0"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDate(dividend.distribution_date)"></td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full" 
+                                          :class="getDividendStatusClass(dividend.status)" x-text="getDividendStatusText(dividend.status)"></span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDate(dividend.created_at)"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <div class="flex space-x-2">
+                                        <button @click="viewDividend(dividend)" 
+                                                class="text-blue-600 hover:text-blue-900" title="查看详情">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button x-show="dividend.status === 'pending'" @click="processDividend(dividend.id)" 
+                                                class="text-green-600 hover:text-green-900" title="处理分红">
+                                            <i class="fas fa-play"></i>
+                                        </button>
+                                        <button @click="deleteDividend(dividend.id)" 
+                                                class="text-red-600 hover:text-red-900" title="删除">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分红分页 -->
+            <div x-show="activeTab === 'dividends' && dividends.length > 0" class="bg-white px-6 py-3 border-t border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div class="text-sm text-gray-700">
+                        显示第 <span x-text="(dividendPagination.page - 1) * dividendPagination.limit + 1"></span> 到 
+                        <span x-text="Math.min(dividendPagination.page * dividendPagination.limit, dividendPagination.total)"></span> 项，
+                        共 <span x-text="dividendPagination.total"></span> 项
+                    </div>
+                    <div class="flex space-x-2">
+                        <button @click="loadDividends(dividendPagination.page - 1)" 
+                                :disabled="dividendPagination.page <= 1"
+                                :class="dividendPagination.page <= 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'"
+                                class="px-3 py-1 text-white rounded text-sm">
+                            上一页
+                        </button>
+                        <span class="px-3 py-1 bg-gray-100 rounded text-sm">
+                            第 <span x-text="dividendPagination.page"></span> / <span x-text="dividendPagination.pages"></span> 页
+                        </span>
+                        <button @click="loadDividends(dividendPagination.page + 1)" 
+                                :disabled="dividendPagination.page >= dividendPagination.pages"
+                                :class="dividendPagination.page >= dividendPagination.pages ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'"
+                                class="px-3 py-1 text-white rounded text-sm">
+                            下一页
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- 资产详情模态框 -->
+    <!-- 资产详情模态框 -->
     <div x-show="showAssetModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto">
         <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
             <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="closeAssetModal()"></div>
@@ -300,64 +476,64 @@
                         <h3 class="text-lg font-semibold text-gray-900">资产详情</h3>
                         <button @click="closeAssetModal()" class="text-gray-400 hover:text-gray-600">
                             <i class="fas fa-times"></i>
-                    </button>
+                        </button>
+                    </div>
                 </div>
-            </div>
                 <div x-show="selectedAsset" class="px-6 py-4">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
                             <img x-show="selectedAsset?.image" :src="selectedAsset?.image" :alt="selectedAsset?.name" 
                                  class="w-full h-64 object-cover rounded-lg">
                             <div x-show="!selectedAsset?.image" 
                                  class="w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center">
                                 <i class="fas fa-image text-gray-400 text-4xl"></i>
-                                        </div>
-                                        </div>
+                            </div>
+                        </div>
                         <div class="space-y-4">
                             <div>
                                 <h4 class="text-lg font-semibold" x-text="selectedAsset?.name"></h4>
                                 <p class="text-gray-600" x-text="selectedAsset?.token_symbol"></p>
-                                            </div>
+                            </div>
                             <div class="grid grid-cols-2 gap-4 text-sm">
                                 <div>
                                     <span class="text-gray-500">资产类型：</span>
                                     <span x-text="selectedAsset?.asset_type_name"></span>
-                                        </div>
+                                </div>
                                 <div>
                                     <span class="text-gray-500">代币价格：</span>
                                     <span x-text="formatCurrency(selectedAsset?.token_price || 0)"></span>
-                                        </div>
+                                </div>
                                 <div>
                                     <span class="text-gray-500">总价值：</span>
                                     <span x-text="formatCurrency(selectedAsset?.total_value || 0)"></span>
-                                    </div>
-                                    <div>
+                                </div>
+                                <div>
                                     <span class="text-gray-500">代币供应量：</span>
                                     <span x-text="selectedAsset?.token_supply || 0"></span>
-                                            </div>
+                                </div>
                                 <div>
                                     <span class="text-gray-500">创建者：</span>
                                     <span x-text="formatAddress(selectedAsset?.creator_address)"></span>
-                                        </div>
+                                </div>
                                 <div>
                                     <span class="text-gray-500">状态：</span>
                                     <span x-text="selectedAsset?.status_text"></span>
-                                        </div>
-                                        </div>
+                                </div>
+                            </div>
                             <div x-show="selectedAsset?.location">
                                 <span class="text-gray-500">位置：</span>
                                 <span x-text="selectedAsset?.location"></span>
-                                    </div>
+                            </div>
                             <div x-show="selectedAsset?.area">
                                 <span class="text-gray-500">面积：</span>
                                 <span x-text="selectedAsset?.area + ' 平方米'"></span>
-                                </div>
+                            </div>
                             <div class="pt-4 border-t">
                                 <div class="flex space-x-2">
                                     <button x-show="selectedAsset?.status === 1" @click="approveAsset(selectedAsset?.id)"
                                             class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 mx-1">
                                         <i class="fas fa-check mr-1"></i>通过
-                                        </button>
+                                    </button>
                                     <button x-show="selectedAsset?.status === 1" @click="rejectAsset(selectedAsset?.id)"
                                             class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 mx-1">
                                         <i class="fas fa-times mr-1"></i>拒绝
@@ -365,10 +541,91 @@
                                     <button @click="deleteAsset(selectedAsset?.id)"
                                             class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 mx-1">
                                         <i class="fas fa-trash mr-1"></i>删除
-                                        </button>
-                                    </div>
+                                    </button>
                                 </div>
+                            </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分红详情模态框 -->
+    <div x-show="showDividendModal" x-cloak class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <!-- 模态框头部 -->
+                <div class="flex items-center justify-between pb-3 border-b">
+                    <h3 class="text-lg font-semibold text-gray-900">分红详情</h3>
+                    <button @click="closeDividendModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <!-- 分红详情内容 -->
+                <div x-show="selectedDividend" class="mt-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">分红ID</label>
+                            <p class="mt-1 text-sm text-gray-900" x-text="selectedDividend?.id"></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">资产名称</label>
+                            <p class="mt-1 text-sm text-gray-900" x-text="selectedDividend?.asset_name"></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">资产符号</label>
+                            <p class="mt-1 text-sm text-gray-900" x-text="selectedDividend?.asset_symbol"></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">分红金额</label>
+                            <p class="mt-1 text-sm text-gray-900 font-semibold text-green-600" 
+                               x-text="formatCurrency(selectedDividend?.amount || selectedDividend?.total_amount || 0)"></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">受益人数</label>
+                            <p class="mt-1 text-sm text-gray-900" x-text="selectedDividend?.recipient_count || 0"></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">分红日期</label>
+                            <p class="mt-1 text-sm text-gray-900" x-text="formatDate(selectedDividend?.distribution_date)"></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">状态</label>
+                            <span class="mt-1 px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full" 
+                                  :class="getDividendStatusClass(selectedDividend?.status)" 
+                                  x-text="getDividendStatusText(selectedDividend?.status)"></span>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">创建时间</label>
+                            <p class="mt-1 text-sm text-gray-900" x-text="formatDate(selectedDividend?.created_at)"></p>
+                        </div>
+                        <div x-show="selectedDividend?.distributor_address" class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700">分发地址</label>
+                            <p class="mt-1 text-sm text-gray-900 font-mono" x-text="selectedDividend?.distributor_address"></p>
+                        </div>
+                        <div x-show="selectedDividend?.description" class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700">描述</label>
+                            <p class="mt-1 text-sm text-gray-900" x-text="selectedDividend?.description"></p>
+                        </div>
+                    </div>
+                    
+                    <!-- 操作按钮 -->
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <button @click="closeDividendModal()" 
+                                class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
+                            关闭
+                        </button>
+                        <button x-show="selectedDividend?.status === 'pending' && selectedDividend?.id" 
+                                @click="processDividend(selectedDividend?.id)" 
+                                class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                            <i class="fas fa-play mr-2"></i>处理分红
+                        </button>
+                        <button @click="deleteDividend(selectedDividend?.id)" 
+                                class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                            <i class="fas fa-trash mr-2"></i>删除
+                        </button>
                     </div>
                 </div>
             </div>
@@ -389,6 +646,7 @@
             selectedAsset: null,
             selectAll: false,
             showAssetModal: false,
+            activeTab: 'assets',
             
             // 筛选和分页
             filters: {
@@ -399,6 +657,24 @@
                 order: 'desc'
             },
             pagination: {
+                page: 1,
+                limit: 10,
+                total: 0,
+                pages: 0
+            },
+            
+            // 分红相关数据
+            dividends: [],
+            dividendLoading: false,
+            selectedDividend: null,
+            showDividendModal: false,
+            dividendFilters: {
+                asset_id: '',
+                status: '',
+                sort: 'created_at',
+                order: 'desc'
+            },
+            dividendPagination: {
                 page: 1,
                 limit: 10,
                 total: 0,
@@ -431,6 +707,13 @@
                     this.loadStats(),
                     this.loadAssets()
                 ]);
+                
+                // 监听标签页切换
+                this.$watch('activeTab', (newTab) => {
+                    if (newTab === 'dividends' && this.dividends.length === 0) {
+                        this.loadDividends();
+                    }
+                });
             },
             
             // 加载统计数据
@@ -695,8 +978,135 @@
                     3: 'bg-red-100 text-red-800'         // 已拒绝
                 };
                 return classes[status] || 'bg-gray-100 text-gray-800';
-            }
+            },
+            
+            // 分红相关方法
+            
+            // 加载分红数据
+            async loadDividends(page = 1) {
+                this.dividendLoading = true;
+                try {
+                    const params = new URLSearchParams({
+                        page: page,
+                        limit: this.dividendPagination.limit,
+                        ...this.dividendFilters
+                    });
+                    
+                    const response = await this.authFetch(`/admin/v2/api/dividends?${params}`);
+                    if (!response.ok) throw new Error('加载分红数据失败');
+                    
+                    const data = await response.json();
+                    this.dividends = data.dividends || [];
+                    this.dividendPagination = {
+                        page: data.page || 1,
+                        limit: data.limit || 10,
+                        total: data.total || 0,
+                        pages: data.pages || 0
+                    };
+                } catch (error) {
+                    console.error('加载分红数据失败:', error);
+                    this.dividends = [];
+                } finally {
+                    this.dividendLoading = false;
                 }
+            },
+            
+            // 刷新分红数据
+            async refreshDividends() {
+                await this.loadDividends(this.dividendPagination.page);
+            },
+            
+            // 查看分红详情
+            viewDividend(dividend) {
+                this.selectedDividend = dividend;
+                this.showDividendModal = true;
+            },
+            
+            // 关闭分红详情模态框
+            closeDividendModal() {
+                this.showDividendModal = false;
+                this.selectedDividend = null;
+            },
+            
+            // 处理分红
+            async processDividend(dividendId) {
+                if (!confirm('确定要处理这个分红吗？')) return;
+                
+                try {
+                    const response = await this.authFetch(`/admin/v2/api/dividends/${dividendId}/process`, {
+                        method: 'POST'
+                    });
+                    
+                    if (!response.ok) throw new Error('处理分红失败');
+                    
+                    alert('分红处理成功');
+                    await this.refreshDividends();
+                    this.closeDividendModal();
+                } catch (error) {
+                    console.error('处理分红失败:', error);
+                    alert('处理分红失败: ' + error.message);
+                }
+            },
+            
+            // 删除分红
+            async deleteDividend(dividendId) {
+                if (!confirm('确定要删除这个分红记录吗？此操作无法撤销。')) return;
+                
+                try {
+                    const response = await this.authFetch(`/admin/v2/api/dividends/${dividendId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (!response.ok) throw new Error('删除分红失败');
+                    
+                    alert('分红删除成功');
+                    await this.refreshDividends();
+                    this.closeDividendModal();
+                } catch (error) {
+                    console.error('删除分红失败:', error);
+                    alert('删除分红失败: ' + error.message);
+                }
+            },
+            
+            // 导出分红数据
+            async exportDividends() {
+                try {
+                    const response = await this.authFetch('/admin/v2/api/dividends/export');
+                    if (!response.ok) throw new Error('导出失败');
+                    
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `dividends_${new Date().getTime()}.csv`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } catch (error) {
+                    console.error('导出失败:', error);
+                    alert('导出失败: ' + error.message);
+                }
+            },
+            
+            // 获取分红状态样式
+            getDividendStatusClass(status) {
+                const classes = {
+                    'pending': 'bg-yellow-100 text-yellow-800',    // 待发放
+                    'completed': 'bg-green-100 text-green-800',   // 已发放
+                    'failed': 'bg-red-100 text-red-800'           // 发放失败
+                };
+                return classes[status] || 'bg-gray-100 text-gray-800';
+            },
+            
+            // 获取分红状态文本
+            getDividendStatusText(status) {
+                const texts = {
+                    'pending': '待发放',
+                    'completed': '已发放',
+                    'failed': '发放失败'
+                };
+                return texts[status] || '未知状态';
             }
+        }
+    }
 </script>
 {% endblock %} 

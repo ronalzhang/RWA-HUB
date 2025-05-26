@@ -19,7 +19,7 @@ from app.models.asset import Asset, AssetStatus, AssetType
 from app.models.user import User
 from app.models.trade import Trade
 from app.models.commission import Commission
-from app.models.dividend import DividendRecord
+from app.models.dividend import DividendRecord, DividendDistribution
 
 # For signature verification
 from eth_account.messages import encode_defunct
@@ -3077,3 +3077,379 @@ def compat_delete_admin_user(admin_id):
         db.session.rollback()
         current_app.logger.error(f"删除管理员失败: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+# 分红管理API
+@admin_v2_bp.route('/dividends')
+@admin_required
+def get_dividends_list():
+    """获取分红列表"""
+    try:
+        from app.models.dividend import DividendRecord, Dividend
+        from app.models.asset import Asset
+        
+        # 获取查询参数
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        asset_id = request.args.get('asset_id', '')
+        status = request.args.get('status', '')
+        sort = request.args.get('sort', 'created_at')
+        order = request.args.get('order', 'desc')
+        
+        # 优先使用DividendRecord，如果没有数据则使用Dividend
+        query = DividendRecord.query.join(Asset, DividendRecord.asset_id == Asset.id)
+        
+        # 筛选条件
+        if asset_id:
+            query = query.filter(DividendRecord.asset_id == asset_id)
+        
+        # 排序
+        if hasattr(DividendRecord, sort):
+            order_by = getattr(DividendRecord, sort)
+            if order == 'desc':
+                order_by = order_by.desc()
+            query = query.order_by(order_by)
+        
+        # 分页
+        pagination = query.paginate(
+            page=page, 
+            per_page=limit, 
+            error_out=False
+        )
+        
+        # 格式化数据
+        dividends = []
+        for record in pagination.items:
+            dividend_data = record.to_dict()
+            # 添加资产信息
+            dividend_data['asset_name'] = record.asset.name if record.asset else '未知资产'
+            dividend_data['asset_symbol'] = record.asset.token_symbol if record.asset else '未知'
+            # 添加状态（基于是否有交易哈希）
+            dividend_data['status'] = 'completed' if record.transaction_hash else 'pending'
+            dividend_data['status_text'] = '已发放' if record.transaction_hash else '待发放'
+            dividends.append(dividend_data)
+        
+        # 如果DividendRecord没有数据，尝试从Dividend表获取
+        if not dividends and page == 1:
+            dividend_query = Dividend.query.join(Asset, Dividend.asset_id == Asset.id)
+            
+            if asset_id:
+                dividend_query = dividend_query.filter(Dividend.asset_id == asset_id)
+            if status:
+                dividend_query = dividend_query.filter(Dividend.status == status)
+                
+            dividend_pagination = dividend_query.paginate(
+                page=page, 
+                per_page=limit, 
+                error_out=False
+            )
+            
+            for dividend in dividend_pagination.items:
+                dividend_data = dividend.to_dict()
+                dividend_data['asset_name'] = dividend.asset.name if dividend.asset else '未知资产'
+                dividend_data['asset_symbol'] = dividend.asset.token_symbol if dividend.asset else '未知'
+                dividend_data['distributor_address'] = 'N/A'  # Dividend表没有这个字段
+                dividend_data['interval'] = 0  # Dividend表没有这个字段
+                dividend_data['status_text'] = {
+                    'pending': '待发放',
+                    'completed': '已发放',
+                    'failed': '发放失败'
+                }.get(dividend.status, dividend.status)
+                dividends.append(dividend_data)
+            
+            pagination = dividend_pagination
+        
+        return jsonify({
+            'success': True,
+            'dividends': dividends,
+            'page': pagination.page,
+            'pages': pagination.pages,
+            'total': pagination.total,
+            'limit': limit
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取分红列表失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'获取分红列表失败: {str(e)}'
+        }), 500
+
+@admin_v2_bp.route('/dividends/<int:dividend_id>')
+@admin_required
+def get_dividend_detail(dividend_id):
+    """获取分红详情"""
+    try:
+        from app.models.dividend import DividendRecord, DividendDistribution
+        
+        # 先尝试从DividendRecord获取
+        dividend = DividendRecord.query.get(dividend_id)
+        if not dividend:
+            return jsonify({
+                'success': False,
+                'message': '分红记录不存在'
+            }), 404
+        
+        # 获取分配记录
+        distributions = DividendDistribution.query.filter_by(
+            dividend_record_id=dividend_id
+        ).all()
+        
+        dividend_data = dividend.to_dict()
+        dividend_data['asset_name'] = dividend.asset.name if dividend.asset else '未知资产'
+        dividend_data['asset_symbol'] = dividend.asset.token_symbol if dividend.asset else '未知'
+        dividend_data['distributions'] = [dist.to_dict() for dist in distributions]
+        dividend_data['total_distributions'] = len(distributions)
+        dividend_data['claimed_count'] = len([d for d in distributions if d.status == 'claimed'])
+        dividend_data['status'] = 'completed' if dividend.transaction_hash else 'pending'
+        dividend_data['status_text'] = '已发放' if dividend.transaction_hash else '待发放'
+        
+        return jsonify({
+            'success': True,
+            'dividend': dividend_data
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取分红详情失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'获取分红详情失败: {str(e)}'
+        }), 500
+
+@admin_v2_bp.route('/dividends', methods=['POST'])
+@admin_required
+@permission_required('管理分红')
+@log_admin_operation('创建分红记录')
+def create_dividend():
+    """创建分红记录"""
+    try:
+        from app.models.dividend import DividendRecord
+        from app.models.asset import Asset
+        
+        data = request.get_json()
+        
+        # 验证必需字段
+        required_fields = ['asset_id', 'amount', 'distributor_address', 'interval']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'缺少必需字段: {field}'
+                }), 400
+        
+        # 验证资产是否存在
+        asset = Asset.query.get(data['asset_id'])
+        if not asset:
+            return jsonify({
+                'success': False,
+                'message': '资产不存在'
+            }), 400
+        
+        # 创建分红记录
+        dividend = DividendRecord.create(
+            asset_id=data['asset_id'],
+            amount=data['amount'],
+            distributor_address=data['distributor_address'],
+            interval=data['interval']
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': '分红记录创建成功',
+            'dividend': dividend.to_dict()
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"创建分红记录失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'创建分红记录失败: {str(e)}'
+        }), 500
+
+@admin_v2_bp.route('/dividends/<int:dividend_id>', methods=['DELETE'])
+@admin_required
+@permission_required('管理分红')
+@log_admin_operation('删除分红记录')
+def delete_dividend(dividend_id):
+    """删除分红记录"""
+    try:
+        from app.models.dividend import DividendRecord, DividendDistribution
+        
+        dividend = DividendRecord.query.get(dividend_id)
+        if not dividend:
+            return jsonify({
+                'success': False,
+                'message': '分红记录不存在'
+            }), 404
+        
+        # 删除相关的分配记录
+        DividendDistribution.query.filter_by(dividend_record_id=dividend_id).delete()
+        
+        # 删除分红记录
+        db.session.delete(dividend)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '分红记录删除成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"删除分红记录失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'删除分红记录失败: {str(e)}'
+        }), 500
+
+@admin_v2_bp.route('/dividends/stats')
+@admin_required
+def get_dividend_stats():
+    """获取分红统计数据"""
+    try:
+        from app.models.dividend import DividendRecord, DividendDistribution
+        from sqlalchemy import func
+        
+        # 总分红记录数
+        total_records = DividendRecord.query.count()
+        
+        # 总分红金额
+        total_amount = db.session.query(func.sum(DividendRecord.amount)).scalar() or 0
+        
+        # 总分配记录数
+        total_distributions = DividendDistribution.query.count()
+        
+        # 已领取分配数
+        claimed_distributions = DividendDistribution.query.filter_by(status='claimed').count()
+        
+        # 按资产统计
+        asset_stats = db.session.query(
+            DividendRecord.asset_id,
+            func.count(DividendRecord.id).label('record_count'),
+            func.sum(DividendRecord.amount).label('total_amount')
+        ).group_by(DividendRecord.asset_id).all()
+        
+        return jsonify({
+            'success': True,
+            'stats': {
+                'total_records': total_records,
+                'total_amount': float(total_amount),
+                'total_distributions': total_distributions,
+                'claimed_distributions': claimed_distributions,
+                'claim_rate': round(claimed_distributions / total_distributions * 100, 2) if total_distributions > 0 else 0,
+                'asset_stats': [
+                    {
+                        'asset_id': stat.asset_id,
+                        'record_count': stat.record_count,
+                        'total_amount': float(stat.total_amount)
+                    } for stat in asset_stats
+                ]
+            }
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取分红统计失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'获取分红统计失败: {str(e)}'
+        }), 500
+
+@admin_v2_bp.route('/dividends/export')
+@admin_required
+def export_dividends():
+    """导出分红数据"""
+    try:
+        from app.models.dividend import DividendRecord
+        from app.models.asset import Asset
+        from flask import make_response
+        import csv
+        import io
+        
+        # 获取所有分红数据
+        dividends = DividendRecord.query.all()
+        
+        # 创建CSV内容
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 写入表头
+        writer.writerow([
+            'ID', '资产名称', '资产符号', '分红金额', '分红日期', 
+            '受益人数', '状态', '创建时间', '更新时间'
+        ])
+        
+        # 写入数据
+        for dividend in dividends:
+            asset = Asset.query.get(dividend.asset_id)
+            writer.writerow([
+                dividend.id,
+                asset.name if asset else '未知资产',
+                asset.token_symbol if asset else '',
+                dividend.total_amount or 0,
+                dividend.distribution_date.strftime('%Y-%m-%d %H:%M:%S') if dividend.distribution_date else '',
+                dividend.recipient_count or 0,
+                {
+                    'pending': '待发放',
+                    'completed': '已发放',
+                    'failed': '发放失败'
+                }.get(dividend.status, dividend.status),
+                dividend.created_at.strftime('%Y-%m-%d %H:%M:%S') if dividend.created_at else '',
+                dividend.updated_at.strftime('%Y-%m-%d %H:%M:%S') if dividend.updated_at else ''
+            ])
+        
+        # 创建响应
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = f'attachment; filename=dividends_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        
+        return response
+        
+    except Exception as e:
+        current_app.logger.error(f"导出分红数据失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@admin_v2_bp.route('/dividends/<int:dividend_id>/process', methods=['POST'])
+@admin_required
+@permission_required('管理分红')
+@log_admin_operation('处理分红')
+def process_dividend(dividend_id):
+    """处理分红记录"""
+    try:
+        from app.models.dividend import DividendRecord
+        from datetime import datetime
+        
+        dividend = DividendRecord.query.get(dividend_id)
+        if not dividend:
+            return jsonify({
+                'success': False,
+                'message': '分红记录不存在'
+            }), 404
+        
+        if dividend.status != 'pending':
+            return jsonify({
+                'success': False,
+                'message': '只能处理待发放状态的分红记录'
+            }), 400
+        
+        # 更新分红状态为已发放
+        dividend.status = 'completed'
+        dividend.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '分红处理成功',
+            'dividend': dividend.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"处理分红失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'处理分红失败: {str(e)}'
+        }), 500
