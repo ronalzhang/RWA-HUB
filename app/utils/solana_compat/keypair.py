@@ -77,12 +77,23 @@ class Keypair:
                     encoding=serialization.Encoding.Raw,
                     format=serialization.PublicFormat.Raw
                 )
+                # 添加调试日志
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"使用Ed25519算法生成公钥: {base58.b58encode(public_key_bytes).decode()}")
                 return PublicKey(public_key_bytes)
             except Exception as e:
                 # 如果Ed25519失败，回退到哈希方法
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Ed25519算法失败，回退到哈希方法: {e}")
                 pass
         
         # 回退方法：使用多轮哈希来模拟Ed25519公钥生成
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning("使用哈希方法生成公钥（不准确）")
+        
         hash1 = hashlib.sha256(private_key).digest()
         hash2 = hashlib.sha256(hash1 + private_key).digest()
         
@@ -91,6 +102,7 @@ class Keypair:
         for i in range(32):
             public_key_bytes[i] = hash1[i] ^ hash2[i]
         
+        logger.info(f"哈希方法生成的公钥: {base58.b58encode(bytes(public_key_bytes)).decode()}")
         return PublicKey(bytes(public_key_bytes))
     
     def sign(self, message: bytes) -> bytes:
