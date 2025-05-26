@@ -65,6 +65,19 @@
                 </div>
             </div>
         </div>
+        
+        <!-- 总分红量统计 -->
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-orange-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-orange-100 mr-4">
+                    <i class="fas fa-coins text-orange-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-500">总分红量</h3>
+                    <p class="text-2xl font-bold" x-text="formatCurrency(stats.totalDividends || 0)"></p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 资产管理主面板 -->

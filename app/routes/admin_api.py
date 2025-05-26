@@ -3453,3 +3453,79 @@ def process_dividend(dividend_id):
             'success': False,
             'message': f'处理分红失败: {str(e)}'
         }), 500
+
+@admin_v2_bp.route('/assets/stats')
+@admin_required
+def get_assets_stats():
+    """获取资产统计数据"""
+    try:
+        from app.models.asset import Asset, AssetType
+        from app.models.dividend import DividendRecord, Dividend
+        from sqlalchemy import func
+        
+        # 统计数据 - 所有查询都只统计未删除的资产
+        total_assets = Asset.query.filter(Asset.deleted_at.is_(None)).count()
+        pending_assets = Asset.query.filter(Asset.status == 1, Asset.deleted_at.is_(None)).count()
+        approved_assets = Asset.query.filter(Asset.status == 2, Asset.deleted_at.is_(None)).count()
+        rejected_assets = Asset.query.filter(Asset.status == 3, Asset.deleted_at.is_(None)).count()
+        
+        # 总价值 (只统计已审核通过且未删除的资产)
+        total_value = db.session.query(func.sum(Asset.total_value)).filter(
+            Asset.status == 2, 
+            Asset.deleted_at.is_(None)
+        ).scalar() or 0
+        
+        # 计算总分红量
+        total_dividends = 0
+        try:
+            # 优先从DividendRecord表计算
+            dividend_sum = db.session.query(func.sum(DividendRecord.amount)).scalar()
+            if dividend_sum:
+                total_dividends = float(dividend_sum)
+            else:
+                # 如果DividendRecord表没有数据，从Dividend表计算
+                dividend_sum = db.session.query(func.sum(Dividend.amount)).scalar()
+                if dividend_sum:
+                    total_dividends = float(dividend_sum)
+        except Exception as e:
+            current_app.logger.warning(f"计算总分红量失败: {str(e)}")
+            total_dividends = 0
+        
+        # 资产类型分布 (只统计未删除的资产)
+        asset_types = {}
+        for asset_type in AssetType:
+            count = Asset.query.filter(
+                Asset.asset_type == asset_type.value,
+                Asset.deleted_at.is_(None)
+            ).count()
+            if count > 0:
+                asset_types[asset_type.name] = count
+        
+        # 状态分布
+        status_distribution = {
+            'pending': pending_assets,
+            'approved': approved_assets,
+            'rejected': rejected_assets
+        }
+        
+        # 返回统计数据
+        return jsonify({
+            'totalAssets': total_assets,
+            'totalValue': float(total_value),
+            'pendingAssets': pending_assets,
+            'totalDividends': total_dividends,  # 新增总分红量
+            'assetTypes': len(asset_types),
+            'type_distribution': asset_types,
+            'status_distribution': status_distribution
+        })
+    except Exception as e:
+        current_app.logger.error(f"获取资产统计失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'totalAssets': 0,
+            'totalValue': 0,
+            'pendingAssets': 0,
+            'totalDividends': 0,
+            'assetTypes': 0,
+            'type_distribution': {},
+            'status_distribution': {}
+        })
