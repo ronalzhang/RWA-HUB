@@ -224,17 +224,15 @@ function settingsManager() {
             }
             
             try {
-                // 先设置加密密码
-                const tempEnv = window.localStorage.getItem('temp_crypto_password');
-                window.localStorage.setItem('temp_crypto_password', this.cryptoPassword);
-                
                 const response = await fetch('/admin/v2/api/crypto/encrypt-key', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
                     },
                     body: JSON.stringify({
-                        private_key: this.privateKey
+                        private_key: this.privateKey,
+                        crypto_password: this.cryptoPassword
                     })
                 });
                 
@@ -248,12 +246,8 @@ function settingsManager() {
                     alert('Encryption failed: ' + result.error);
                 }
                 
-                // 清理临时密码
-                window.localStorage.removeItem('temp_crypto_password');
-                
             } catch (error) {
                 alert('Encryption failed: ' + error.message);
-                window.localStorage.removeItem('temp_crypto_password');
             }
         }
     }

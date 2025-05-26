@@ -124,31 +124,47 @@ def encrypt_private_key():
         
         data = request.get_json()
         private_key = data.get('private_key')
+        crypto_password = data.get('crypto_password')
         
         if not private_key:
             return jsonify({'success': False, 'error': '私钥不能为空'}), 400
         
-        # 验证私钥格式
-        from app.utils.helpers import get_solana_keypair_from_env
+        if not crypto_password:
+            return jsonify({'success': False, 'error': '加密密码不能为空'}), 400
+        
+        # 临时设置加密密码
         import os
+        original_password = os.environ.get('CRYPTO_PASSWORD')
+        os.environ['CRYPTO_PASSWORD'] = crypto_password
         
-        # 临时设置环境变量进行验证
-        os.environ['TEMP_PRIVATE_KEY'] = private_key
-        result = get_solana_keypair_from_env('TEMP_PRIVATE_KEY')
-        del os.environ['TEMP_PRIVATE_KEY']
-        
-        if not result:
-            return jsonify({'success': False, 'error': '无效的私钥格式'}), 400
-        
-        # 加密私钥
-        crypto_manager = get_crypto_manager()
-        encrypted_key = crypto_manager.encrypt_private_key(private_key)
-        
-        return jsonify({
-            'success': True,
-            'encrypted_key': encrypted_key,
-            'wallet_address': result['public_key']
-        })
+        try:
+            # 验证私钥格式
+            from app.utils.helpers import get_solana_keypair_from_env
+            
+            # 临时设置环境变量进行验证
+            os.environ['TEMP_PRIVATE_KEY'] = private_key
+            result = get_solana_keypair_from_env('TEMP_PRIVATE_KEY')
+            del os.environ['TEMP_PRIVATE_KEY']
+            
+            if not result:
+                return jsonify({'success': False, 'error': '无效的私钥格式'}), 400
+            
+            # 加密私钥
+            crypto_manager = get_crypto_manager()
+            encrypted_key = crypto_manager.encrypt_private_key(private_key)
+            
+            return jsonify({
+                'success': True,
+                'encrypted_key': encrypted_key,
+                'wallet_address': result['public_key']
+            })
+            
+        finally:
+            # 恢复原始密码
+            if original_password:
+                os.environ['CRYPTO_PASSWORD'] = original_password
+            elif 'CRYPTO_PASSWORD' in os.environ:
+                del os.environ['CRYPTO_PASSWORD']
         
     except Exception as e:
         current_app.logger.error(f"加密私钥失败: {str(e)}")
@@ -222,6 +238,28 @@ def test_settings():
         configs[key] = SystemConfig.get_value(key, '')
     
     return render_template('admin_v2/settings.html', configs=configs)
+
+@admin_bp.route('/api/set-temp-env', methods=['POST'])
+@api_admin_required
+def set_temp_env():
+    """设置临时环境变量"""
+    try:
+        data = request.get_json()
+        key = data.get('key')
+        value = data.get('value')
+        
+        if not key or not value:
+            return jsonify({'success': False, 'error': '缺少key或value'}), 400
+        
+        # 设置临时环境变量
+        import os
+        os.environ[key] = value
+        
+        return jsonify({'success': True, 'message': f'环境变量{key}已设置'})
+        
+    except Exception as e:
+        current_app.logger.error(f"设置临时环境变量失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # 注意：dashboard、assets、users、trades等路由已在各自模块中定义
 # 避免重复定义导致路由冲突 
