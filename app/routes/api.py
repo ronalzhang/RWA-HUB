@@ -201,7 +201,7 @@ def get_user_assets_query():
                 
                 # 为新用户创建佣金余额记录
                 commission_balance = UserCommissionBalance(
-                    user_id=user.id,
+                    user_address=address,
                     total_earned=Decimal('0.00'),
                     available_balance=Decimal('0.00'),
                     withdrawn_amount=Decimal('0.00'),
