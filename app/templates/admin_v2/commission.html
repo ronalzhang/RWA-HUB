@@ -86,6 +86,11 @@
                         class="py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap">
                     推荐关系
                 </button>
+                <button @click="switchTab('withdrawals')" 
+                        :class="{'border-blue-500 text-blue-600': activeTab === 'withdrawals', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'withdrawals'}"
+                        class="py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap">
+                    取现记录
+                </button>
             </nav>
         </div>
     </div>
@@ -355,6 +360,160 @@
                                         </table>
         </div>
     </div>
+
+    <!-- 取现记录 -->
+    <div x-show="activeTab === 'withdrawals'" class="bg-white rounded-lg shadow-sm" x-cloak>
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-700">取现记录</h3>
+                <div class="flex space-x-2">
+                    <button @click="refreshWithdrawals()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        <i class="fas fa-sync-alt mr-2"></i>刷新
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 筛选条件 -->
+        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                    <select x-model="withdrawalFilters.status" @change="loadWithdrawals()" class="w-full border-gray-300 rounded-md shadow-sm">
+                        <option value="">全部状态</option>
+                        <option value="pending">待处理</option>
+                        <option value="processing">处理中</option>
+                        <option value="completed">已完成</option>
+                        <option value="failed">失败</option>
+                        <option value="cancelled">已取消</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">时间范围</label>
+                    <select x-model="withdrawalFilters.time_range" @change="loadWithdrawals()" class="w-full border-gray-300 rounded-md shadow-sm">
+                        <option value="">全部时间</option>
+                        <option value="today">今天</option>
+                        <option value="week">本周</option>
+                        <option value="month">本月</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">搜索</label>
+                    <input x-model="withdrawalFilters.search" @input.debounce.500ms="loadWithdrawals()" 
+                           type="text" placeholder="搜索地址或交易哈希..." 
+                           class="w-full border-gray-300 rounded-md shadow-sm">
+                </div>
+                <div class="flex items-end">
+                    <button @click="loadWithdrawals()" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+                        <i class="fas fa-search mr-2"></i>搜索
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 取现记录表格 -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户地址</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">提现地址</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">金额</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">延迟时间</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">申请时间</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="withdrawalsLoading">
+                        <tr>
+                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>加载取现记录中...
+                            </td>
+                        </tr>
+                    </template>
+                    
+                    <template x-if="!withdrawalsLoading && withdrawals.length === 0">
+                        <tr>
+                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">暂无取现记录</td>
+                        </tr>
+                    </template>
+                    
+                    <template x-for="withdrawal in withdrawals" :key="withdrawal.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" x-text="withdrawal.id"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="withdrawal.user_address ? withdrawal.user_address.slice(0, 8) + '...' + withdrawal.user_address.slice(-6) : '-'"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900" x-text="withdrawal.to_address ? withdrawal.to_address.slice(0, 8) + '...' + withdrawal.to_address.slice(-6) : '-'"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatCurrency(withdrawal.amount || 0)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span :class="{
+                                    'bg-yellow-100 text-yellow-800': withdrawal.status === 'pending',
+                                    'bg-blue-100 text-blue-800': withdrawal.status === 'processing',
+                                    'bg-green-100 text-green-800': withdrawal.status === 'completed',
+                                    'bg-red-100 text-red-800': withdrawal.status === 'failed',
+                                    'bg-gray-100 text-gray-800': withdrawal.status === 'cancelled'
+                                }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
+                                    <span x-text="getWithdrawalStatusText(withdrawal.status)"></span>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <div x-show="withdrawal.status === 'pending' && withdrawal.remaining_delay_seconds > 0">
+                                    <span x-text="Math.ceil(withdrawal.remaining_delay_seconds / 60)"></span> 分钟
+                                </div>
+                                <div x-show="withdrawal.status === 'pending' && withdrawal.remaining_delay_seconds <= 0">
+                                    <span class="text-green-600">可处理</span>
+                                </div>
+                                <div x-show="withdrawal.status !== 'pending'">-</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDateTime(withdrawal.created_at)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button x-show="withdrawal.status === 'pending' && withdrawal.is_ready_to_process" 
+                                        @click="processWithdrawal(withdrawal)" 
+                                        class="text-green-600 hover:text-green-900 mr-2">
+                                    <i class="fas fa-check"></i> 处理
+                                </button>
+                                <button x-show="withdrawal.status === 'pending'" 
+                                        @click="cancelWithdrawal(withdrawal)" 
+                                        class="text-red-600 hover:text-red-900 mr-2">
+                                    <i class="fas fa-times"></i> 取消
+                                </button>
+                                <button @click="viewWithdrawal(withdrawal)" class="text-blue-600 hover:text-blue-900">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 分页 -->
+        <div class="px-6 py-4 border-t border-gray-200">
+            <div class="flex items-center justify-between">
+                <div class="text-sm text-gray-700">
+                    显示 <span x-text="(withdrawalPagination.page - 1) * withdrawalPagination.limit + 1"></span> 到 
+                    <span x-text="Math.min(withdrawalPagination.page * withdrawalPagination.limit, withdrawalPagination.total)"></span> 条，
+                    共 <span x-text="withdrawalPagination.total"></span> 条记录
+                </div>
+                <div class="flex space-x-2">
+                    <button @click="loadWithdrawals(1)" :disabled="withdrawalPagination.page === 1" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">首页</button>
+                    <button @click="loadWithdrawals(withdrawalPagination.page - 1)" :disabled="withdrawalPagination.page === 1" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">上一页</button>
+                    <button @click="loadWithdrawals(withdrawalPagination.page + 1)" :disabled="withdrawalPagination.page >= withdrawalPagination.pages" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">下一页</button>
+                    <button @click="loadWithdrawals(withdrawalPagination.pages)" :disabled="withdrawalPagination.page >= withdrawalPagination.pages" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">末页</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -366,6 +525,7 @@
             stats: {},
             records: [],
             referrals: [],
+            withdrawals: [],
             settings: {
                 global_rate: 5.0,
                 min_amount: 1.0,
@@ -376,13 +536,25 @@
             },
             recordsLoading: false,
             referralsLoading: false,
+            withdrawalsLoading: false,
         recordFilters: {
                 status: '',
             type: '',
                 time_range: '',
                 search: ''
         },
+            withdrawalFilters: {
+                status: '',
+                time_range: '',
+                search: ''
+            },
             recordPagination: {
+                page: 1,
+                limit: 10,
+                total: 0,
+                pages: 0
+            },
+            withdrawalPagination: {
                 page: 1,
                 limit: 10,
                 total: 0,
@@ -394,6 +566,7 @@
                     this.loadStats(),
                     this.loadRecords(),
                     this.loadReferrals(),
+                    this.loadWithdrawals(),
                     this.loadSettings()
                 ]);
             },
@@ -403,6 +576,10 @@
                 // 切换到推荐关系标签页时加载数据
                 if (tab === 'referrals' && this.referrals.length === 0) {
                     this.loadReferrals();
+                }
+                // 切换到取现记录标签页时加载数据
+                if (tab === 'withdrawals' && this.withdrawals.length === 0) {
+                    this.loadWithdrawals();
                 }
             },
             
@@ -454,7 +631,7 @@
                     if (response.ok) {
                         const data = await response.json();
                         if (data.success) {
-                            this.referrals = data.data || [];
+                            this.referrals = data.items || [];
                         } else {
                             throw new Error(data.error || '加载失败');
                         }
@@ -465,6 +642,115 @@
                 } finally {
                     this.referralsLoading = false;
                 }
+            },
+            
+            async loadWithdrawals(page = null) {
+                if (page) this.withdrawalPagination.page = page;
+                this.withdrawalsLoading = true;
+                
+                try {
+                    const params = new URLSearchParams({
+                        page: this.withdrawalPagination.page,
+                        limit: this.withdrawalPagination.limit,
+                        ...this.withdrawalFilters
+                    });
+                    
+                    const response = await fetch(`/api/admin/commission/withdrawals?${params}`);
+                    if (!response.ok) throw new Error('加载取现记录失败');
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        this.withdrawals = data.data || [];
+                        this.withdrawalPagination.total = data.pagination?.total || 0;
+                        this.withdrawalPagination.pages = data.pagination?.pages || 0;
+                    } else {
+                        throw new Error(data.error || '加载失败');
+                    }
+                } catch (error) {
+                    console.error('加载取现记录失败:', error);
+                    alert('加载取现记录失败: ' + error.message);
+                } finally {
+                    this.withdrawalsLoading = false;
+                }
+            },
+            
+            async processWithdrawal(withdrawal) {
+                if (!confirm(`确定要处理提现申请吗？\n用户地址: ${withdrawal.user_address}\n提现金额: ${this.formatCurrency(withdrawal.amount)}\n提现地址: ${withdrawal.to_address}`)) return;
+                
+                try {
+                    const response = await fetch(`/api/admin/commission/withdrawals/${withdrawal.id}/process`, {
+                        method: 'POST'
+                    });
+                    
+                    if (!response.ok) throw new Error('处理失败');
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert('提现处理成功！\n交易哈希: ' + data.tx_hash);
+                        await this.loadWithdrawals();
+                        await this.loadStats();
+                    } else {
+                        throw new Error(data.error || '处理失败');
+                    }
+                } catch (error) {
+                    console.error('处理提现失败:', error);
+                    alert('处理提现失败: ' + error.message);
+                }
+            },
+            
+            async cancelWithdrawal(withdrawal) {
+                const reason = prompt('请输入取消原因（可选）:', '管理员取消');
+                if (reason === null) return; // 用户点击了取消
+                
+                if (!confirm(`确定要取消此提现申请吗？\n用户地址: ${withdrawal.user_address}\n提现金额: ${this.formatCurrency(withdrawal.amount)}\n取消原因: ${reason}`)) return;
+                
+                try {
+                    const response = await fetch(`/api/admin/commission/withdrawals/${withdrawal.id}/cancel`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reason: reason })
+                    });
+                    
+                    if (!response.ok) throw new Error('取消失败');
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert('提现申请已取消，金额已退还到用户余额');
+                        await this.loadWithdrawals();
+                        await this.loadStats();
+                    } else {
+                        throw new Error(data.error || '取消失败');
+                    }
+                } catch (error) {
+                    console.error('取消提现失败:', error);
+                    alert('取消提现失败: ' + error.message);
+                }
+            },
+            
+            viewWithdrawal(withdrawal) {
+                // 显示提现记录详情
+                const details = [
+                    `提现ID: ${withdrawal.id}`,
+                    `用户地址: ${withdrawal.user_address}`,
+                    `提现地址: ${withdrawal.to_address}`,
+                    `提现金额: ${this.formatCurrency(withdrawal.amount)}`,
+                    `币种: ${withdrawal.currency || 'USDC'}`,
+                    `状态: ${this.getWithdrawalStatusText(withdrawal.status)}`,
+                    `延迟时间: ${withdrawal.delay_minutes} 分钟`,
+                    `申请时间: ${this.formatDateTime(withdrawal.created_at)}`,
+                    `预计处理时间: ${this.formatDateTime(withdrawal.process_at)}`,
+                    withdrawal.processed_at ? `实际处理时间: ${this.formatDateTime(withdrawal.processed_at)}` : '',
+                    withdrawal.tx_hash ? `交易哈希: ${withdrawal.tx_hash}` : '',
+                    withdrawal.note ? `用户备注: ${withdrawal.note}` : '',
+                    withdrawal.admin_note ? `管理员备注: ${withdrawal.admin_note}` : '',
+                    withdrawal.failure_reason ? `失败原因: ${withdrawal.failure_reason}` : ''
+                ].filter(Boolean);
+                
+                alert(details.join('\n'));
+            },
+            
+            async refreshWithdrawals() {
+                await this.loadWithdrawals();
             },
             
             async loadSettings() {
@@ -571,6 +857,17 @@
                     'pending': '待发放',
                     'paid': '已发放',
                     'failed': '发放失败'
+                };
+                return statusMap[status] || '未知';
+            },
+            
+            getWithdrawalStatusText(status) {
+                const statusMap = {
+                    'pending': '待处理',
+                    'processing': '处理中',
+                    'completed': '已完成',
+                    'failed': '失败',
+                    'cancelled': '已取消'
                 };
                 return statusMap[status] || '未知';
             }

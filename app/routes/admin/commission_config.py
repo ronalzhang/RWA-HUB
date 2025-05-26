@@ -129,6 +129,7 @@ def withdraw_commission():
         user_address = data.get('user_address')
         amount = float(data.get('amount', 0))
         to_address = data.get('to_address')  # 提现到的钱包地址
+        note = data.get('note', '')  # 用户备注
         
         if not user_address or not to_address or amount <= 0:
             return jsonify({'error': '参数错误'}), 400
@@ -138,20 +139,46 @@ def withdraw_commission():
         if amount < min_withdraw:
             return jsonify({'error': f'最低提现金额为 {min_withdraw} USDC'}), 400
         
-        # 更新余额
-        balance = UserCommissionBalance.update_balance(user_address, amount, 'withdraw')
+        # 获取提现延迟设置
+        withdraw_delay = CommissionConfig.get_config('withdraw_delay_minutes', 1)
         
-        # TODO: 这里需要实际的区块链转账逻辑
-        # 暂时只记录提现请求
+        # 检查用户余额
+        balance = UserCommissionBalance.get_balance(user_address)
+        if balance.available_balance < amount:
+            return jsonify({'error': '余额不足'}), 400
+        
+        # 冻结提现金额
+        UserCommissionBalance.update_balance(user_address, amount, 'freeze')
+        
+        # 创建提现记录
+        from app.models.commission_withdrawal import CommissionWithdrawal
+        withdrawal = CommissionWithdrawal(
+            user_address=user_address,
+            to_address=to_address,
+            amount=amount,
+            delay_minutes=withdraw_delay,
+            note=note
+        )
+        db.session.add(withdrawal)
+        db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': f'提现申请已提交，{amount} USDC 将转入 {to_address}',
-            'data': balance.to_dict()
+            'message': f'提现申请已提交，预计 {withdraw_delay} 分钟后处理',
+            'data': {
+                'withdrawal_id': withdrawal.id,
+                'amount': float(withdrawal.amount),
+                'to_address': withdrawal.to_address,
+                'delay_minutes': withdrawal.delay_minutes,
+                'process_at': withdrawal.process_at.isoformat() if withdrawal.process_at else None,
+                'remaining_seconds': withdrawal.remaining_delay_seconds
+            }
         })
         
     except ValueError as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        db.session.rollback()
         current_app.logger.error(f"提现失败: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500 

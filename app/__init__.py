@@ -216,7 +216,15 @@ def create_app(config_name='development'):
     
     return app
 
-# 在初始化时添加分销佣金设置
+    # 确保所有模型都被导入
+    with app.app_context():
+        # 导入所有模型以确保它们被注册到SQLAlchemy
+        from app.models.commission_withdrawal import CommissionWithdrawal
+        from app.models.referral import DistributionSetting
+        from app.models.commission_config import CommissionConfig, UserCommissionBalance
+        app.logger.info("所有模型已导入并注册")
+
+    # 在初始化时添加分销佣金设置
 @click.command('init-distribution')
 @with_appcontext
 def init_distribution_command():

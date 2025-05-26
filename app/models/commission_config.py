@@ -94,6 +94,49 @@ class UserCommissionBalance(db.Model):
         return balance
     
     @staticmethod
+    def add_balance(user_address, amount, currency='USDC'):
+        """添加用户佣金余额（简化版本，直接调用update_balance）"""
+        return UserCommissionBalance.update_balance(user_address, amount, 'add')
+    
+    @staticmethod
+    def subtract_balance(user_address, amount):
+        """减少用户佣金余额"""
+        balance = UserCommissionBalance.get_balance(user_address)
+        amount_decimal = Decimal(str(amount))
+        
+        if balance.available_balance >= amount_decimal:
+            balance.available_balance -= amount_decimal
+            db.session.commit()
+            return balance
+        else:
+            raise ValueError('余额不足')
+    
+    @staticmethod
+    def get_total_balance():
+        """获取所有用户的总余额"""
+        from sqlalchemy import func
+        result = db.session.query(
+            func.sum(UserCommissionBalance.total_earned).label('total_earned'),
+            func.sum(UserCommissionBalance.available_balance).label('available_balance'),
+            func.sum(UserCommissionBalance.withdrawn_amount).label('withdrawn_amount'),
+            func.sum(UserCommissionBalance.frozen_amount).label('frozen_amount')
+        ).first()
+        
+        return {
+            'total_earned': float(result.total_earned or 0),
+            'available_balance': float(result.available_balance or 0),
+            'withdrawn_amount': float(result.withdrawn_amount or 0),
+            'frozen_amount': float(result.frozen_amount or 0)
+        }
+    
+    @staticmethod
+    def get_user_count():
+        """获取有佣金记录的用户数量"""
+        return UserCommissionBalance.query.filter(
+            UserCommissionBalance.total_earned > 0
+        ).count()
+    
+    @staticmethod
     def update_balance(user_address, amount, operation='add'):
         """更新用户佣金余额"""
         balance = UserCommissionBalance.get_balance(user_address)

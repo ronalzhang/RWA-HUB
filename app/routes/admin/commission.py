@@ -1,6 +1,6 @@
 """
 佣金管理模块
-包含佣金记录查询、统计、设置等功能
+包含佣金记录查询、统计、设置、取现记录等功能
 """
 
 from flask import (
@@ -14,6 +14,8 @@ from sqlalchemy import desc, func, or_, and_
 from app import db
 from app.models.referral import CommissionRecord
 from app.models.admin import CommissionSetting
+from app.models.commission_withdrawal import CommissionWithdrawal
+from app.models.commission_config import UserCommissionBalance
 from . import admin_bp
 from .auth import api_admin_required, admin_page_required
 
@@ -55,11 +57,11 @@ def update_commission_settings_v2():
     return api_update_commission_settings()
 
 
-@admin_bp.route('/v2/api/commission/records/<int:record_id>/pay', methods=['POST'])
+@admin_bp.route('/v2/api/commission/withdrawals', methods=['GET'])
 @api_admin_required
-def pay_commission_v2(record_id):
-    """发放佣金 - V2兼容版本"""
-    return api_pay_commission(record_id)
+def commission_withdrawals_v2():
+    """获取取现记录列表 - V2兼容版本"""
+    return api_commission_withdrawals()
 
 
 # API路由
@@ -102,14 +104,12 @@ def api_commission_stats():
         # 统计推荐用户总数（有推荐人的用户数量）
         total_referrals = User.query.filter(User.referrer_address.isnot(None)).count()
         
-        # 获取佣金率设置（从设置表获取，如果没有则使用默认值）
-        commission_rate = 5.0  # 默认佣金率
-        try:
-            commission_setting = CommissionSetting.query.filter_by(key='global_rate').first()
-            if commission_setting:
-                commission_rate = float(commission_setting.value)
-        except:
-            pass
+        # 获取佣金率设置（从配置表获取，如果没有则使用默认值）
+        from app.models.commission_config import CommissionConfig
+        commission_rate = CommissionConfig.get_config('commission_global_rate', 5.0)
+        
+        # 获取提现统计
+        withdrawal_stats = CommissionWithdrawal.get_withdrawal_stats()
         
         # 返回前端期望的数据格式
         return jsonify({
@@ -142,7 +142,9 @@ def api_commission_stats():
                 'referral': {
                     'amount': float(referral_amount)
                 }
-            }
+            },
+            # 添加提现统计
+            'withdrawals': withdrawal_stats
         })
         
     except Exception as e:
@@ -323,30 +325,133 @@ def api_update_commission_settings():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/commission/records/<int:record_id>/pay', methods=['POST'])
+@admin_bp.route('/api/admin/commission/withdrawals', methods=['GET'])
 @api_admin_required
-def api_pay_commission(record_id):
-    """发放佣金"""
+def api_commission_withdrawals():
+    """取现记录列表"""
     try:
-        record = CommissionRecord.query.get_or_404(record_id)
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 20, type=int)
+        status = request.args.get('status', '')
+        search = request.args.get('search', '')
         
-        if record.status != 'pending':
-            return jsonify({'success': False, 'error': '只能发放待发放状态的佣金'}), 400
+        # 构建查询
+        query = CommissionWithdrawal.query
         
-        # 这里应该实现实际的佣金发放逻辑
-        # 暂时只更新状态为已发放
-        record.status = 'paid'
-        record.updated_at = datetime.utcnow()
-        db.session.commit()
+        # 状态筛选
+        if status:
+            query = query.filter(CommissionWithdrawal.status == status)
+        
+        # 搜索条件
+        if search:
+            query = query.filter(
+                or_(
+                    CommissionWithdrawal.user_address.ilike(f'%{search}%'),
+                    CommissionWithdrawal.to_address.ilike(f'%{search}%'),
+                    CommissionWithdrawal.tx_hash.ilike(f'%{search}%')
+                )
+            )
+        
+        # 分页
+        total = query.count()
+        withdrawals = query.order_by(desc(CommissionWithdrawal.created_at)) \
+            .offset((page - 1) * limit) \
+            .limit(limit) \
+            .all()
+        
+        # 格式化数据
+        withdrawals_list = []
+        for withdrawal in withdrawals:
+            data = withdrawal.to_dict()
+            # 添加剩余延迟时间
+            data['remaining_delay_seconds'] = withdrawal.remaining_delay_seconds
+            data['is_ready_to_process'] = withdrawal.is_ready_to_process
+            withdrawals_list.append(data)
         
         return jsonify({
             'success': True,
-            'message': '佣金发放成功'
+            'data': withdrawals_list,
+            'pagination': {
+                'page': page,
+                'limit': limit,
+                'total': total,
+                'pages': (total + limit - 1) // limit
+            }
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取取现记录失败: {str(e)}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/api/admin/commission/withdrawals/<int:withdrawal_id>/process', methods=['POST'])
+@api_admin_required
+def api_process_withdrawal(withdrawal_id):
+    """处理提现申请"""
+    try:
+        withdrawal = CommissionWithdrawal.query.get_or_404(withdrawal_id)
+        
+        if withdrawal.status != 'pending':
+            return jsonify({'success': False, 'error': '只能处理待处理状态的提现申请'}), 400
+        
+        if not withdrawal.is_ready_to_process:
+            return jsonify({
+                'success': False, 
+                'error': f'提现申请还需要等待 {withdrawal.remaining_delay_seconds} 秒'
+            }), 400
+        
+        # 标记为处理中
+        withdrawal.mark_processing()
+        
+        # TODO: 这里应该实现实际的区块链转账逻辑
+        # 暂时模拟处理成功
+        import uuid
+        mock_tx_hash = f"0x{uuid.uuid4().hex}"
+        withdrawal.mark_completed(mock_tx_hash, withdrawal.amount)
+        
+        return jsonify({
+            'success': True,
+            'message': '提现处理成功',
+            'tx_hash': mock_tx_hash
         })
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f'发放佣金失败: {str(e)}', exc_info=True)
+        current_app.logger.error(f'处理提现失败: {str(e)}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/api/admin/commission/withdrawals/<int:withdrawal_id>/cancel', methods=['POST'])
+@api_admin_required
+def api_cancel_withdrawal(withdrawal_id):
+    """取消提现申请"""
+    try:
+        data = request.get_json() or {}
+        reason = data.get('reason', '管理员取消')
+        
+        withdrawal = CommissionWithdrawal.query.get_or_404(withdrawal_id)
+        
+        if withdrawal.status not in ['pending', 'processing']:
+            return jsonify({'success': False, 'error': '只能取消待处理或处理中的提现申请'}), 400
+        
+        # 如果是取消，需要退还余额
+        if withdrawal.status == 'pending':
+            UserCommissionBalance.update_balance(
+                withdrawal.user_address, 
+                withdrawal.amount, 
+                'unfreeze'  # 解冻金额
+            )
+        
+        withdrawal.cancel(reason)
+        
+        return jsonify({
+            'success': True,
+            'message': '提现申请已取消，金额已退还到用户余额'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'取消提现失败: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

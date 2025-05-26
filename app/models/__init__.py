@@ -26,6 +26,10 @@ from .referral import UserReferral as NewUserReferral, CommissionRecord, Distrib
 # 兼容旧版本
 from .commission import Commission
 
+# 导入佣金系统模型
+from .commission_config import CommissionConfig, UserCommissionBalance
+from .commission_withdrawal import CommissionWithdrawal
+
 # 导出所有模型
 __all__ = [
     'db', 'Asset', 'AssetType', 'AssetStatus', 'AssetStatusHistory', 'DividendRecord', 'Dividend', 
@@ -33,5 +37,5 @@ __all__ = [
     'Commission', 'AdminUser', 'SystemConfig', 'CommissionSetting',
     'DistributionLevel', 'UserReferral', 'CommissionRecord', 'AdminOperationLog',
     'DashboardStats', 'ShortLink', 'Transaction', 'TransactionType', 'TransactionStatus',
-    'Holding'
+    'Holding', 'CommissionConfig', 'UserCommissionBalance', 'CommissionWithdrawal'
 ]
