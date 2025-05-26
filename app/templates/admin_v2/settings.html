@@ -265,7 +265,7 @@ function settingsManager() {
                 
                 const result = await response.json();
                 if (result.success) {
-                    alert('Private key encrypted successfully!\\nWallet Address: ' + result.wallet_address + '\\nEncrypted Key: ' + result.encrypted_key.substring(0, 50) + '...');
+                    alert('Private key encrypted successfully!\nWallet Address: ' + result.wallet_address + '\nEncrypted Key: ' + result.encrypted_key.substring(0, 50) + '...');
                     this.privateKey = '';
                     this.cryptoPassword = '';
                     this.loadWalletInfo();
