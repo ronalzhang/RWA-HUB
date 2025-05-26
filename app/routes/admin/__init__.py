@@ -5,7 +5,7 @@
 - 优化代码结构和可维护性
 """
 
-from flask import Blueprint, render_template, redirect, url_for
+from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify, current_app
 
 # 创建蓝图
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -66,7 +66,131 @@ def commission_v2():
 @admin_page_required
 def settings_v2():
     """V2版本系统设置页面"""
-    return render_template('admin_v2/settings.html')
+    from app.models.admin import SystemConfig
+    
+    # 获取所有配置
+    configs = {}
+    config_keys = [
+        'PLATFORM_FEE_BASIS_POINTS',
+        'PLATFORM_FEE_ADDRESS', 
+        'PURCHASE_CONTRACT_ADDRESS',
+        'ASSET_CREATION_FEE_AMOUNT',
+        'ASSET_CREATION_FEE_ADDRESS'
+    ]
+    
+    for key in config_keys:
+        configs[key] = SystemConfig.get_value(key, '')
+    
+    return render_template('admin_v2/settings.html', configs=configs)
+
+@admin_bp.route('/v2/settings', methods=['POST'])
+@admin_page_required
+def update_settings_v2():
+    """更新系统设置"""
+    from app.models.admin import SystemConfig
+    from flask import request, flash, redirect, url_for
+    
+    try:
+        # 获取管理员地址
+        admin_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address') or session.get('eth_address')
+        
+        # 更新配置
+        config_updates = {
+            'PLATFORM_FEE_BASIS_POINTS': request.form.get('platform_fee_basis_points'),
+            'PLATFORM_FEE_ADDRESS': request.form.get('platform_fee_address'),
+            'PURCHASE_CONTRACT_ADDRESS': request.form.get('purchase_contract_address'),
+            'ASSET_CREATION_FEE_AMOUNT': request.form.get('asset_creation_fee_amount'),
+            'ASSET_CREATION_FEE_ADDRESS': request.form.get('asset_creation_fee_address')
+        }
+        
+        for key, value in config_updates.items():
+            if value is not None:
+                SystemConfig.set_value(key, value, f'Updated by admin {admin_address}', admin_address)
+        
+        flash('系统设置已成功更新', 'success')
+        
+    except Exception as e:
+        flash(f'更新设置失败: {str(e)}', 'error')
+        current_app.logger.error(f"更新系统设置失败: {str(e)}")
+    
+    return redirect(url_for('admin.settings_v2'))
+
+@admin_bp.route('/v2/api/crypto/encrypt-key', methods=['POST'])
+@api_admin_required
+def encrypt_private_key():
+    """加密私钥API"""
+    try:
+        from app.utils.crypto_manager import get_crypto_manager
+        
+        data = request.get_json()
+        private_key = data.get('private_key')
+        
+        if not private_key:
+            return jsonify({'success': False, 'error': '私钥不能为空'}), 400
+        
+        # 验证私钥格式
+        from app.utils.helpers import get_solana_keypair_from_env
+        import os
+        
+        # 临时设置环境变量进行验证
+        os.environ['TEMP_PRIVATE_KEY'] = private_key
+        result = get_solana_keypair_from_env('TEMP_PRIVATE_KEY')
+        del os.environ['TEMP_PRIVATE_KEY']
+        
+        if not result:
+            return jsonify({'success': False, 'error': '无效的私钥格式'}), 400
+        
+        # 加密私钥
+        crypto_manager = get_crypto_manager()
+        encrypted_key = crypto_manager.encrypt_private_key(private_key)
+        
+        return jsonify({
+            'success': True,
+            'encrypted_key': encrypted_key,
+            'wallet_address': result['public_key']
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"加密私钥失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/v2/api/crypto/test-key', methods=['POST'])
+@api_admin_required
+def test_encrypted_key():
+    """测试加密私钥API"""
+    try:
+        from app.utils.crypto_manager import get_crypto_manager
+        
+        data = request.get_json()
+        encrypted_key = data.get('encrypted_key')
+        
+        if not encrypted_key:
+            return jsonify({'success': False, 'error': '加密私钥不能为空'}), 400
+        
+        # 解密并验证
+        crypto_manager = get_crypto_manager()
+        decrypted_key = crypto_manager.decrypt_private_key(encrypted_key)
+        
+        # 验证解密后的私钥
+        from app.utils.helpers import get_solana_keypair_from_env
+        import os
+        
+        os.environ['TEMP_PRIVATE_KEY'] = decrypted_key
+        result = get_solana_keypair_from_env('TEMP_PRIVATE_KEY')
+        del os.environ['TEMP_PRIVATE_KEY']
+        
+        if not result:
+            return jsonify({'success': False, 'error': '解密后的私钥无效'}), 400
+        
+        return jsonify({
+            'success': True,
+            'wallet_address': result['public_key'],
+            'message': '私钥解密和验证成功'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"测试加密私钥失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/v2/admin-users')
 @admin_page_required

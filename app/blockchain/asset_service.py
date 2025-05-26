@@ -23,6 +23,7 @@ from app.utils.transaction_helpers import record_fee_transaction
 from app.utils.solana_compat.rpc.api import Client
 from app.utils.solana_compat.publickey import PublicKey
 from app.blockchain.ethereum import get_usdc_balance, get_eth_balance, send_usdc, deploy_asset_contract, create_purchase_transaction
+from app.utils.helpers import get_solana_keypair_from_env
 
 logger = logging.getLogger(__name__)
 
@@ -71,28 +72,15 @@ class AssetService:
         if solana_client:
             self.solana_client = solana_client
         else:
-            # 检查是否有私钥配置
-            private_key = os.environ.get('SOLANA_SERVICE_WALLET_PRIVATE_KEY')
-            if not private_key:
-                # 兼容旧版本使用的私钥环境变量
-                private_key = os.environ.get('SOLANA_PRIVATE_KEY')
-                if private_key:
-                    logger.info("使用SOLANA_PRIVATE_KEY环境变量初始化Solana客户端（为向后兼容）")
-            
-            if private_key:
-                logger.info("使用配置的私钥初始化Solana客户端")
-                self.solana_client = SolanaClient(private_key=private_key)
+            # 使用新的加密私钥系统
+            wallet_info = get_solana_keypair_from_env()
+            if wallet_info and 'private_key' in wallet_info:
+                logger.info("使用加密私钥系统初始化Solana客户端")
+                self.solana_client = SolanaClient(private_key=wallet_info['private_key'])
                 return
                 
-            # 检查是否有助记词配置（已废弃，仅保留向后兼容）    
-            mnemonic = os.environ.get('SOLANA_SERVICE_WALLET_MNEMONIC')
-            if mnemonic:
-                logger.warning("使用助记词初始化Solana客户端，此方法已废弃，建议使用私钥")
-                self.solana_client = SolanaClient(mnemonic=mnemonic)
-                return
-                
-            # 如果没有找到私钥或助记词，使用只读模式
-            logger.warning("未找到钱包私钥或助记词，回退到只读模式")
+            # 如果没有找到私钥，使用只读模式
+            logger.warning("未找到钱包私钥，回退到只读模式")
             user_wallet = "HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd"
             logger.info(f"使用钱包地址（只读模式）: {user_wallet}")
             self.solana_client = SolanaClient(wallet_address=user_wallet)
@@ -447,25 +435,15 @@ class AssetService:
         try:
             logger.info("开始检查服务钱包状态")
             
-            # 检查是否有私钥配置
-            private_key = os.environ.get('SOLANA_SERVICE_WALLET_PRIVATE_KEY')
-            if not private_key:
-                # 兼容旧版本使用的私钥环境变量
-                private_key = os.environ.get('SOLANA_PRIVATE_KEY')
-                if private_key:
-                    logger.info("使用SOLANA_PRIVATE_KEY环境变量获取钱包状态（为向后兼容）")
-            
-            if private_key:
-                solana_client = SolanaClient(private_key=private_key)
+            # 使用新的加密私钥系统
+            wallet_info = get_solana_keypair_from_env()
+            if wallet_info and 'private_key' in wallet_info:
+                logger.info("使用加密私钥系统获取钱包状态")
+                solana_client = SolanaClient(private_key=wallet_info['private_key'])
             else:
-                # 检查是否有助记词配置（已废弃，仅向后兼容）
-                mnemonic = os.environ.get('SOLANA_SERVICE_WALLET_MNEMONIC')
-                if mnemonic:
-                    logger.warning("使用助记词获取钱包状态，此方法已废弃，建议使用私钥")
-                    solana_client = SolanaClient(mnemonic=mnemonic)
-                else:
-                    # 如果没有私钥或助记词，使用只读模式
-                    solana_client = SolanaClient(wallet_address="HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd")
+                # 如果没有私钥，使用只读模式
+                logger.warning("未找到钱包私钥，使用只读模式")
+                solana_client = SolanaClient(wallet_address="HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd")
             
             # 检查客户端是否成功初始化了公钥
             if not solana_client.public_key:
@@ -476,7 +454,7 @@ class AssetService:
                     'wallet_initialized': False,
                     'needs_setup': True,
                     'network': solana_client.endpoint,
-                    'env_vars_found': [k for k in os.environ.keys() if k.startswith('SOLANA_')]
+                    'env_vars_found': [k for k in os.environ.keys() if k.startswith('SOLANA_') or k.startswith('CRYPTO_')]
                 }
             
             # 尝试获取余额
