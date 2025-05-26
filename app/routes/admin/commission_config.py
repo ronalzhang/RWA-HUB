@@ -5,13 +5,13 @@
 from flask import Blueprint, request, jsonify, current_app
 from app.models import db
 from app.models.commission_config import CommissionConfig, UserCommissionBalance
-from app.utils.auth import admin_required
+from .auth import api_admin_required
 from datetime import datetime
 
 commission_config_bp = Blueprint('commission_config', __name__)
 
 @commission_config_bp.route('/api/admin/commission/config', methods=['GET'])
-@admin_required
+@api_admin_required
 def get_commission_config():
     """获取佣金配置"""
     try:
@@ -49,7 +49,7 @@ def get_commission_config():
         return jsonify({'error': str(e)}), 500
 
 @commission_config_bp.route('/api/admin/commission/config', methods=['POST'])
-@admin_required
+@api_admin_required
 def update_commission_config():
     """更新佣金配置"""
     try:
