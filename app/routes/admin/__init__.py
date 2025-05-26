@@ -198,5 +198,10 @@ def admin_users_v2():
     """V2版本管理员用户页面"""
     return render_template('admin_v2/admin_users.html')
 
+@admin_bp.route('/test')
+def test_route():
+    """测试路由，不需要认证"""
+    return "Admin routes are working!"
+
 # 注意：dashboard、assets、users、trades等路由已在各自模块中定义
 # 避免重复定义导致路由冲突 
