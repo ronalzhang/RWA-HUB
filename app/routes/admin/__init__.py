@@ -203,5 +203,25 @@ def test_route():
     """测试路由，不需要认证"""
     return "Admin routes are working!"
 
+@admin_bp.route('/test-settings')
+def test_settings():
+    """测试设置页面，不需要认证"""
+    from app.models.admin import SystemConfig
+    
+    # 获取所有配置
+    configs = {}
+    config_keys = [
+        'PLATFORM_FEE_BASIS_POINTS',
+        'PLATFORM_FEE_ADDRESS', 
+        'PURCHASE_CONTRACT_ADDRESS',
+        'ASSET_CREATION_FEE_AMOUNT',
+        'ASSET_CREATION_FEE_ADDRESS'
+    ]
+    
+    for key in config_keys:
+        configs[key] = SystemConfig.get_value(key, '')
+    
+    return render_template('admin_v2/settings.html', configs=configs)
+
 # 注意：dashboard、assets、users、trades等路由已在各自模块中定义
 # 避免重复定义导致路由冲突 
