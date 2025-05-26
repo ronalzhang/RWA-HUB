@@ -71,17 +71,17 @@
     <div class="bg-white rounded-lg shadow-sm mb-6">
         <div class="border-b border-gray-200">
             <nav class="-mb-px flex space-x-8">
-                <button @click="activeTab = 'records'" 
+                <button @click="switchTab('records')" 
                         :class="{'border-blue-500 text-blue-600': activeTab === 'records', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'records'}"
                         class="py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap">
                     佣金记录
                 </button>
-                <button @click="activeTab = 'settings'" 
+                <button @click="switchTab('settings')" 
                         :class="{'border-blue-500 text-blue-600': activeTab === 'settings', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'settings'}"
                         class="py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap">
                     佣金设置
                 </button>
-                <button @click="activeTab = 'referrals'" 
+                <button @click="switchTab('referrals')" 
                         :class="{'border-blue-500 text-blue-600': activeTab === 'referrals', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'referrals'}"
                         class="py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap">
                     推荐关系
@@ -393,8 +393,17 @@
                 await Promise.all([
                     this.loadStats(),
                     this.loadRecords(),
+                    this.loadReferrals(),
                     this.loadSettings()
                 ]);
+            },
+            
+            switchTab(tab) {
+                this.activeTab = tab;
+                // 切换到推荐关系标签页时加载数据
+                if (tab === 'referrals' && this.referrals.length === 0) {
+                    this.loadReferrals();
+                }
             },
             
             async loadStats() {
@@ -444,10 +453,15 @@
                     const response = await fetch('/api/admin/commission/referrals');
                     if (response.ok) {
                         const data = await response.json();
-                        this.referrals = data.items || [];
+                        if (data.success) {
+                            this.referrals = data.data || [];
+                        } else {
+                            throw new Error(data.error || '加载失败');
+                        }
                     }
                 } catch (error) {
                     console.error('加载推荐关系失败:', error);
+                    alert('加载推荐关系失败: ' + error.message);
                 } finally {
                     this.referralsLoading = false;
                 }
