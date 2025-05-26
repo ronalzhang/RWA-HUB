@@ -317,3 +317,45 @@ def check_solana_transaction():
         logger.error(f"检查交易状态失败: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({'success': False, 'message': f'检查交易状态失败: {str(e)}'}), 500 
+
+@service_bp.route('/user/register_wallet', methods=['POST'])
+def register_wallet_user():
+    """
+    钱包连接时自动注册/更新用户信息
+    
+    POST数据:
+        address: 钱包地址
+        wallet_type: 钱包类型
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '未提供数据'
+            }), 400
+        
+        address = data.get('address')
+        wallet_type = data.get('wallet_type', 'ethereum')
+        
+        if not address:
+            return jsonify({
+                'success': False,
+                'error': '未提供钱包地址'
+            }), 400
+        
+        # 调用AssetService注册用户
+        user_info = AssetService.register_wallet_user(address, wallet_type)
+        
+        return jsonify({
+            'success': True,
+            'user': user_info,
+            'message': '用户注册/更新成功'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"注册钱包用户出错: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500 

@@ -3521,6 +3521,14 @@ checkIfReturningFromWalletApp(walletType) {
             
             console.log(`[afterSuccessfulConnection] 钱包状态已保存到localStorage`);
             
+            // 自动注册/更新用户信息到数据库
+            try {
+                await this.registerWalletUser(address, walletType);
+            } catch (registerError) {
+                console.warn('[afterSuccessfulConnection] 用户注册失败:', registerError);
+                // 用户注册失败不应该影响钱包连接状态
+            }
+            
             // 获取余额和分佣余额
             try {
                 await this.refreshAllBalances();
@@ -3686,6 +3694,47 @@ checkIfReturningFromWalletApp(walletType) {
             
         } catch (error) {
             console.error('显示重试选项失败:', error);
+        }
+    },
+
+    /**
+     * 自动注册/更新用户信息到数据库
+     * @param {string} address - 钱包地址
+     * @param {string} walletType - 钱包类型
+     * @returns {Promise<Object>} 用户信息
+     */
+    async registerWalletUser(address, walletType) {
+        try {
+            console.log(`[registerWalletUser] 注册用户: ${address}, 钱包类型: ${walletType}`);
+            
+            const response = await fetch('/api/service/user/register_wallet', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Wallet-Address': address,
+                    'X-Wallet-Type': walletType
+                },
+                body: JSON.stringify({
+                    address: address,
+                    wallet_type: walletType
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`注册用户API响应错误: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            if (data.success) {
+                console.log(`[registerWalletUser] 用户注册成功:`, data.user);
+                return data.user;
+            } else {
+                throw new Error(data.error || '用户注册失败');
+            }
+            
+        } catch (error) {
+            console.error('[registerWalletUser] 注册用户失败:', error);
+            throw error;
         }
     },
 }

@@ -871,3 +871,90 @@ class AssetService:
         except Exception as e:
             logger.error(f"获取Solana USDC余额失败: {str(e)}", exc_info=True)
             return 0.0 
+
+    @staticmethod
+    def register_wallet_user(wallet_address, wallet_type='ethereum'):
+        """
+        钱包连接时自动注册/更新用户信息
+        
+        Args:
+            wallet_address: 钱包地址
+            wallet_type: 钱包类型 ('ethereum', 'phantom', 'solana')
+        
+        Returns:
+            dict: 用户信息
+        """
+        try:
+            from app.models import User, db
+            from datetime import datetime
+            
+            # 标准化钱包地址
+            wallet_address = wallet_address.strip()
+            
+            # 根据钱包类型设置相应的地址字段
+            if wallet_type in ['phantom', 'solana']:
+                # Solana钱包
+                user = User.query.filter_by(solana_address=wallet_address).first()
+                
+                if not user:
+                    # 创建新用户
+                    user = User(
+                        solana_address=wallet_address,
+                        wallet_type=wallet_type,
+                        created_at=datetime.utcnow(),
+                        last_login=datetime.utcnow(),
+                        is_active=True
+                    )
+                    db.session.add(user)
+                    current_app.logger.info(f"创建新Solana用户: {wallet_address}")
+                else:
+                    # 更新现有用户
+                    user.last_login = datetime.utcnow()
+                    user.wallet_type = wallet_type
+                    user.is_active = True
+                    current_app.logger.info(f"更新现有Solana用户: {wallet_address}")
+                    
+            else:
+                # 以太坊钱包
+                user = User.query.filter_by(eth_address=wallet_address).first()
+                
+                if not user:
+                    # 创建新用户
+                    user = User(
+                        eth_address=wallet_address,
+                        wallet_type=wallet_type,
+                        created_at=datetime.utcnow(),
+                        last_login=datetime.utcnow(),
+                        is_active=True
+                    )
+                    db.session.add(user)
+                    current_app.logger.info(f"创建新以太坊用户: {wallet_address}")
+                else:
+                    # 更新现有用户
+                    user.last_login = datetime.utcnow()
+                    user.wallet_type = wallet_type
+                    user.is_active = True
+                    current_app.logger.info(f"更新现有以太坊用户: {wallet_address}")
+            
+            # 提交数据库更改
+            db.session.commit()
+            
+            # 返回用户信息
+            return {
+                'id': user.id,
+                'eth_address': user.eth_address,
+                'solana_address': user.solana_address,
+                'wallet_type': user.wallet_type,
+                'created_at': user.created_at.isoformat() if user.created_at else None,
+                'last_login': user.last_login.isoformat() if user.last_login else None,
+                'is_active': user.is_active
+            }
+            
+        except Exception as e:
+            current_app.logger.error(f"注册钱包用户失败: {str(e)}")
+            # 回滚数据库更改
+            try:
+                db.session.rollback()
+            except:
+                pass
+            raise e 
