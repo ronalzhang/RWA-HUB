@@ -260,6 +260,74 @@ def set_temp_env():
         current_app.logger.error(f"设置临时环境变量失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@admin_bp.route('/test-encrypt')
+def test_encrypt():
+    """加密测试页面"""
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Encryption Test</title>
+    </head>
+    <body>
+        <h1>Private Key Encryption Test</h1>
+        <div>
+            <label>Encryption Password:</label><br>
+            <input type="password" id="password" value="test123456"><br><br>
+            
+            <label>Private Key (128 hex chars):</label><br>
+            <textarea id="privateKey" rows="3" cols="80">0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef</textarea><br><br>
+            
+            <button onclick="encryptKey()">Encrypt Private Key</button><br><br>
+            
+            <div id="result"></div>
+        </div>
+        
+        <script>
+        async function encryptKey() {
+            const password = document.getElementById('password').value;
+            const privateKey = document.getElementById('privateKey').value;
+            
+            if (!password || !privateKey) {
+                alert('Please enter both password and private key');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/admin/v2/api/crypto/encrypt-key', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        private_key: privateKey,
+                        crypto_password: password
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('result').innerHTML = 
+                        '<h3>Success!</h3>' +
+                        '<p><strong>Wallet Address:</strong> ' + result.wallet_address + '</p>' +
+                        '<p><strong>Encrypted Key:</strong></p>' +
+                        '<textarea rows="5" cols="80" readonly>' + result.encrypted_key + '</textarea>';
+                } else {
+                    document.getElementById('result').innerHTML = 
+                        '<h3 style="color: red;">Error:</h3>' +
+                        '<p>' + result.error + '</p>';
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    '<h3 style="color: red;">Error:</h3>' +
+                    '<p>' + error.message + '</p>';
+            }
+        }
+        </script>
+    </body>
+    </html>
+    '''
+
 @admin_bp.route('/test-simple')
 def test_simple():
     """简单的测试页面"""
