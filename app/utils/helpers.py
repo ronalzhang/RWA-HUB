@@ -3,8 +3,9 @@ import os
 import base64
 import base58
 from typing import Optional, Union, Dict, Any
-from solana.keypair import Keypair
-from solana.publickey import PublicKey
+
+# 使用兼容层而不是直接导入solana库
+from app.utils.solana_compat.keypair import Keypair
 
 # 添加加密管理器导入
 try:
