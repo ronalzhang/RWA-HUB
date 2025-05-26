@@ -898,10 +898,16 @@ class AssetService:
                 user = User.query.filter_by(solana_address=wallet_address).first()
                 
                 if not user:
+                    # 生成唯一的用户名和邮箱
+                    import time
+                    timestamp = int(time.time())
+                    username = f"user_{wallet_address[:8]}_{timestamp}"
+                    email = f"{wallet_address[:8]}_{timestamp}@phantom.wallet"
+                    
                     # 创建新用户
                     user = User(
-                        username=f"user_{wallet_address[:8]}",
-                        email=f"{wallet_address[:8]}@phantom.wallet",
+                        username=username,
+                        email=email,
                         solana_address=wallet_address,
                         wallet_type=wallet_type,
                         created_at=datetime.utcnow(),
@@ -922,10 +928,16 @@ class AssetService:
                 user = User.query.filter_by(eth_address=wallet_address).first()
                 
                 if not user:
+                    # 生成唯一的用户名和邮箱
+                    import time
+                    timestamp = int(time.time())
+                    username = f"user_{wallet_address[:8]}_{timestamp}"
+                    email = f"{wallet_address[:8]}_{timestamp}@ethereum.wallet"
+                    
                     # 创建新用户
                     user = User(
-                        username=f"user_{wallet_address[:8]}",
-                        email=f"{wallet_address[:8]}@ethereum.wallet",
+                        username=username,
+                        email=email,
                         eth_address=wallet_address,
                         wallet_type=wallet_type,
                         created_at=datetime.utcnow(),
