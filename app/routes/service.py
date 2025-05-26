@@ -173,21 +173,32 @@ def wallet_commission_balance():
 def get_payment_settings():
     """获取支付设置"""
     try:
-        # 从配置中获取支付设置
-        platform_fee_address = current_app.config.get('PLATFORM_FEE_ADDRESS', 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd')
+        from app.models.admin import SystemConfig
+        
+        # 从数据库获取最新的支付设置，如果没有则使用默认值
+        platform_fee_address = SystemConfig.get_value('PLATFORM_FEE_ADDRESS', 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd')
+        asset_creation_fee_address = SystemConfig.get_value('ASSET_CREATION_FEE_ADDRESS', platform_fee_address)
+        asset_creation_fee_amount = SystemConfig.get_value('ASSET_CREATION_FEE_AMOUNT', '0.02')
+        platform_fee_basis_points = SystemConfig.get_value('PLATFORM_FEE_BASIS_POINTS', '350')
+        
+        # USDC mint地址通常不会变，从配置获取
         usdc_mint = current_app.config.get('SOLANA_USDC_MINT', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')
         
-        # 默认创建资产费用设置
+        # 构建支付设置
         settings = {
             'platform_fee_address': platform_fee_address,
+            'asset_creation_fee_address': asset_creation_fee_address,
             'usdc_mint': usdc_mint,
             'creation_fee': {
-                'amount': '0.01',
+                'amount': asset_creation_fee_amount,
                 'token': 'USDC'
             },
+            'platform_fee_basis_points': int(platform_fee_basis_points),
+            'platform_fee_percent': float(platform_fee_basis_points) / 100,  # 转换为百分比
             'currency': 'USDC'
         }
         
+        current_app.logger.info(f"返回支付设置: {settings}")
         return jsonify(settings)
     except Exception as e:
         logger.error(f"获取支付设置失败: {str(e)}")
