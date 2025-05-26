@@ -154,13 +154,21 @@ def encrypt_private_key():
                 else:  # Base58格式
                     private_key_bytes = base58.b58decode(private_key)
                 
-                # 如果是64字节，取前32字节作为seed
+                # 处理不同长度的私钥
+                current_app.logger.info(f"私钥解码后长度: {len(private_key_bytes)}字节")
+                
                 if len(private_key_bytes) == 64:
+                    # 标准64字节格式，前32字节是私钥
                     seed = private_key_bytes[:32]
                 elif len(private_key_bytes) == 32:
+                    # 仅私钥
                     seed = private_key_bytes
+                elif len(private_key_bytes) == 66:
+                    # 可能包含校验和，取前32字节作为私钥
+                    seed = private_key_bytes[:32]
+                    current_app.logger.info("检测到66字节私钥，可能包含校验和，使用前32字节")
                 else:
-                    return jsonify({'success': False, 'error': f'无效的私钥长度: {len(private_key_bytes)}字节，期望32或64字节'}), 400
+                    return jsonify({'success': False, 'error': f'无效的私钥长度: {len(private_key_bytes)}字节，期望32、64或66字节'}), 400
                 
                 # 创建密钥对验证
                 keypair = Keypair.from_seed(seed)
