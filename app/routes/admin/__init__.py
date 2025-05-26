@@ -116,7 +116,6 @@ def update_settings_v2():
     return redirect(url_for('admin.settings_v2'))
 
 @admin_bp.route('/v2/api/crypto/encrypt-key', methods=['POST'])
-@api_admin_required
 def encrypt_private_key():
     """加密私钥API"""
     try:
