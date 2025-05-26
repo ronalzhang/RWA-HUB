@@ -42,8 +42,8 @@ class User(db.Model):
     settings = db.Column(db.Text, default='{}')  # JSON格式存储用户设置
     is_active = db.Column(db.Boolean, default=True)
     
-    # 分销商相关字段
-    is_distributor = db.Column(db.Boolean, default=False)  # 是否为分销商
+    # 分销商相关字段（所有用户都是分销商）
+    is_distributor = db.Column(db.Boolean, default=True)   # 所有用户都是分销商
     is_verified = db.Column(db.Boolean, default=False)     # 是否已认证
     is_blocked = db.Column(db.Boolean, default=False)      # 是否被冻结
     referrer_address = db.Column(db.String(64))            # 推荐人地址

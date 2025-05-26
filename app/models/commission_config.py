@@ -1,0 +1,123 @@
+"""
+佣金配置模型
+管理分佣规则、分享设置等配置信息
+"""
+from datetime import datetime
+from app.extensions import db
+import json
+
+class CommissionConfig(db.Model):
+    """佣金配置表"""
+    __tablename__ = 'commission_config'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    config_key = db.Column(db.String(100), unique=True, nullable=False)  # 配置键
+    config_value = db.Column(db.Text, nullable=False)                    # 配置值(JSON格式)
+    description = db.Column(db.String(255))                              # 配置描述
+    is_active = db.Column(db.Boolean, default=True)                      # 是否启用
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def get_value(self):
+        """获取配置值"""
+        try:
+            return json.loads(self.config_value)
+        except:
+            return self.config_value
+    
+    def set_value(self, value):
+        """设置配置值"""
+        if isinstance(value, (dict, list)):
+            self.config_value = json.dumps(value, ensure_ascii=False)
+        else:
+            self.config_value = str(value)
+    
+    @staticmethod
+    def get_config(key, default=None):
+        """获取配置"""
+        config = CommissionConfig.query.filter_by(config_key=key, is_active=True).first()
+        if config:
+            return config.get_value()
+        return default
+    
+    @staticmethod
+    def set_config(key, value, description=None):
+        """设置配置"""
+        config = CommissionConfig.query.filter_by(config_key=key).first()
+        if not config:
+            config = CommissionConfig(config_key=key)
+            if description:
+                config.description = description
+            db.session.add(config)
+        
+        config.set_value(value)
+        config.updated_at = datetime.utcnow()
+        db.session.commit()
+        return config
+
+class UserCommissionBalance(db.Model):
+    """用户佣金余额表"""
+    __tablename__ = 'user_commission_balance'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_address = db.Column(db.String(64), unique=True, nullable=False)  # 用户地址
+    total_earned = db.Column(db.Numeric(20, 8), default=0)                # 总收益
+    available_balance = db.Column(db.Numeric(20, 8), default=0)           # 可用余额
+    withdrawn_amount = db.Column(db.Numeric(20, 8), default=0)            # 已提现金额
+    frozen_amount = db.Column(db.Numeric(20, 8), default=0)               # 冻结金额
+    currency = db.Column(db.String(10), default='USDC')                   # 币种
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'user_address': self.user_address,
+            'total_earned': float(self.total_earned),
+            'available_balance': float(self.available_balance),
+            'withdrawn_amount': float(self.withdrawn_amount),
+            'frozen_amount': float(self.frozen_amount),
+            'currency': self.currency,
+            'last_updated': self.last_updated.isoformat() if self.last_updated else None
+        }
+    
+    @staticmethod
+    def get_balance(user_address):
+        """获取用户佣金余额"""
+        balance = UserCommissionBalance.query.filter_by(user_address=user_address).first()
+        if not balance:
+            # 创建新的余额记录
+            balance = UserCommissionBalance(user_address=user_address)
+            db.session.add(balance)
+            db.session.commit()
+        return balance
+    
+    @staticmethod
+    def update_balance(user_address, amount, operation='add'):
+        """更新用户佣金余额"""
+        balance = UserCommissionBalance.get_balance(user_address)
+        
+        if operation == 'add':
+            balance.total_earned += amount
+            balance.available_balance += amount
+        elif operation == 'withdraw':
+            if balance.available_balance >= amount:
+                balance.available_balance -= amount
+                balance.withdrawn_amount += amount
+            else:
+                raise ValueError('余额不足')
+        elif operation == 'freeze':
+            if balance.available_balance >= amount:
+                balance.available_balance -= amount
+                balance.frozen_amount += amount
+            else:
+                raise ValueError('余额不足')
+        elif operation == 'unfreeze':
+            if balance.frozen_amount >= amount:
+                balance.frozen_amount -= amount
+                balance.available_balance += amount
+            else:
+                raise ValueError('冻结金额不足')
+        
+        db.session.commit()
+        return balance 
