@@ -59,16 +59,27 @@ def api_admin_required(f):
     def decorated_function(*args, **kwargs):
         current_app.logger.debug(f"Admin compat API access attempt: {request.path}")
         
-        # 从请求头中获取管理员钱包地址
-        wallet_address = request.headers.get('X-Wallet-Address') # 改为通用名称
-        
-        if not wallet_address and session.get('admin_verified') and session.get('admin_wallet_address'):
+        # 优先检查session中的安全验证状态
+        if session.get('admin_verified') and session.get('admin_wallet_address'):
             wallet_address = session.get('admin_wallet_address')
-            current_app.logger.info(f"使用session中的管理员地址: {wallet_address}")
-        
-        if not wallet_address:
-            wallet_address = request.cookies.get('wallet_address') # 改为通用名称
+            admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
             
+            if admin_user:
+                g.wallet_address = wallet_address
+                g.admin = admin_user
+                current_app.logger.info(f"Admin compat API access GRANTED via session for {wallet_address}")
+                return f(*args, **kwargs)
+        
+        # 从多个来源获取管理员钱包地址
+        wallet_address = (
+            request.headers.get('X-Wallet-Address') or
+            request.headers.get('X-Eth-Address') or
+            request.cookies.get('wallet_address') or
+            request.cookies.get('eth_address') or
+            request.args.get('eth_address') or
+            request.args.get('wallet_address')
+        )
+        
         if not wallet_address:
             current_app.logger.warning("Admin compat API missing wallet address")
             return jsonify({"error": "缺少管理员钱包地址"}), 401
