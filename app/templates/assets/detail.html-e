@@ -3357,7 +3357,7 @@ async function transferUSDC(fromAddress, toAddress, amount) {
         console.log(`转账明细: 总金额=${amount}, 平台费=${platformFee}, 实际支付=${actualPayment}`);
         
         // 平台手续费地址 - 应该由后端提供或配置
-        const platformAddress = "{{ platform_fee_address|default('HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd') }}";
+                        const platformAddress = "{{ platform_fee_address|default('EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4') }}";
         
         // 1. 转账平台费用
         console.log(`转账平台费用: ${platformFee} USDC 到 ${platformAddress}`);

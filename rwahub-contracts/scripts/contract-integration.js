@@ -10,7 +10,7 @@ const RWA_DIVIDEND_PROGRAM_ID = new PublicKey('rwaHubDividendXXXXXXXXXXXXXXXXXXX
 const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 
 // 平台手续费地址
-const PLATFORM_FEE_ADDRESS = new PublicKey('HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd');
+const PLATFORM_FEE_ADDRESS = new PublicKey('EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4');
 
 // 连接到Solana网络
 const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');

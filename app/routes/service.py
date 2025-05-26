@@ -176,7 +176,7 @@ def get_payment_settings():
         from app.models.admin import SystemConfig
         
         # 从数据库获取最新的支付设置，如果没有则使用默认值
-        platform_fee_address = SystemConfig.get_value('PLATFORM_FEE_ADDRESS', 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd')
+        platform_fee_address = SystemConfig.get_value('PLATFORM_FEE_ADDRESS', 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4')
         asset_creation_fee_address = SystemConfig.get_value('ASSET_CREATION_FEE_ADDRESS', platform_fee_address)
         asset_creation_fee_amount = SystemConfig.get_value('ASSET_CREATION_FEE_AMOUNT', '0.02')
         platform_fee_basis_points = SystemConfig.get_value('PLATFORM_FEE_BASIS_POINTS', '350')

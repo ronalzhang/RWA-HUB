@@ -1290,7 +1290,7 @@
     <!-- 设置全局JS变量 -->
     <script nonce="{{ nonce|default('') }}">
         window.SOLANA_NETWORK_URL = "{{ config.get('SOLANA_NETWORK_URL', 'https://api.mainnet-beta.solana.com') }}";
-        window.PLATFORM_FEE_WALLET_ADDRESS = "{{ config.get('PLATFORM_FEE_ADDRESS', 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd') }}";
+        window.PLATFORM_FEE_WALLET_ADDRESS = "{{ config.get('PLATFORM_FEE_ADDRESS', 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4') }}";
         window.USDC_MINT_ADDRESS = "{{ config.get('SOLANA_USDC_MINT', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') }}";
         window.RWA_TRADE_PROGRAM_ID = "{{ config.get('SOLANA_PROGRAM_ID', 'rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX') }}"; // 获取合约程序ID
         console.log('全局Solana配置已设置:', {

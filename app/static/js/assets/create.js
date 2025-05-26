@@ -1500,7 +1500,7 @@ async function processPayment() {
             }
             
             // 配置平台收款地址和费用（固定值，简化测试）
-            let platformAddress = 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd';
+            let platformAddress = 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4';
             let feeAmount = 0.01; // 固定0.01 USDC的低费用用于测试
             
             try {

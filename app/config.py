@@ -36,7 +36,7 @@ class Config:
             'level': 2,
             'permissions': ['审核', '编辑', '查看统计']
         },
-        'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd': {
+        'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4': {
             'role': 'super_admin',
             'name': 'SOL超级管理员',
             'level': 1,
@@ -66,7 +66,7 @@ class Config:
     SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')
     SOLANA_PROGRAM_ID = os.environ.get('SOLANA_PROGRAM_ID')
     SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT')
-    PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', 'HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd')
+    PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4')
     PLATFORM_FEE_RATE = float(os.environ.get('PLATFORM_FEE_RATE', 0.035))  # 3.5%平台费率
     PLATFORM_FEE_BASIS_POINTS = int(os.environ.get('PLATFORM_FEE_BASIS_POINTS', 350))  # 3.5%平台费率，以基点表示
     

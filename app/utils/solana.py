@@ -34,7 +34,7 @@ SOLANA_RPC_URL = os.environ.get("SOLANA_RPC_URL", "https://api.devnet.solana.com
 # 使用一个有效的测试程序 ID
 USDC_MINT = os.environ.get("SOLANA_USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
 PROGRAM_ID = os.environ.get("SOLANA_PROGRAM_ID", "9AcvoQmz22KRcMhkLkeSkKs8W7ru6oae8GHcxrS83fKz")
-PLATFORM_FEE_ADDRESS = os.environ.get("PLATFORM_FEE_ADDRESS", "HnPZkg9FpHjovNNZ8Au1MyLjYPbW9KsK87ACPCh1SvSd")
+PLATFORM_FEE_ADDRESS = os.environ.get("PLATFORM_FEE_ADDRESS", "EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4")
 
 # 指令类型枚举
 INSTRUCTION_INITIALIZE_ASSET = 0

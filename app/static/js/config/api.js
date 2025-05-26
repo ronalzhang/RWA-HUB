@@ -8,7 +8,7 @@ const API_ENDPOINTS = {
     GET_ASSET_DIVIDEND: (assetId) => `/api/assets/${assetId}/dividend`
 };
 
-// 合约配置
+// 合约配置 - 动态配置，将从API获取最新值
 const CONTRACT_CONFIG = {
     // 交易合约地址
     TRADE_CONTRACT_ADDRESS: '0x8B3f5393Bca6164D605E74381b61D0c283f6fe6C',
@@ -16,8 +16,11 @@ const CONTRACT_CONFIG = {
     // USDC代币合约地址（Solana Devnet）
     USDC_CONTRACT_ADDRESS: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
     
-    // 平台钱包地址
-    PLATFORM_WALLET: 'EeYfRdpGtdTM9pLDrXFq39C2SKYD9SQkijw7keUKJtLR',
+    // 平台钱包地址 - 将从API动态获取
+    PLATFORM_WALLET: null,
+    
+    // 资产创建收款地址 - 将从API动态获取
+    ASSET_CREATION_WALLET: null,
     
     // 网络配置
     NETWORK: {
@@ -25,12 +28,55 @@ const CONTRACT_CONFIG = {
         SOLANA_CLUSTER: 'devnet'
     },
     
-    // 费用配置
+    // 费用配置 - 将从API动态获取
     FEES: {
         PLATFORM_FEE_PERCENT: 3.5,  // 平台手续费比例
-        DIVIDEND_FEE_PERCENT: 1.0   // 分红手续费比例
+        DIVIDEND_FEE_PERCENT: 1.0,   // 分红手续费比例
+        ASSET_CREATION_FEE: 0.02     // 资产创建费用
     }
 };
+
+// 动态加载配置的函数
+async function loadDynamicConfig() {
+    try {
+        const response = await fetch('/api/service/config/payment_settings');
+        if (response.ok) {
+            const settings = await response.json();
+            
+            // 更新动态配置
+            CONTRACT_CONFIG.PLATFORM_WALLET = settings.platform_fee_address;
+            CONTRACT_CONFIG.ASSET_CREATION_WALLET = settings.asset_creation_fee_address;
+            CONTRACT_CONFIG.USDC_CONTRACT_ADDRESS = settings.usdc_mint;
+            CONTRACT_CONFIG.FEES.PLATFORM_FEE_PERCENT = settings.platform_fee_percent;
+            CONTRACT_CONFIG.FEES.ASSET_CREATION_FEE = parseFloat(settings.creation_fee.amount);
+            
+            console.log('动态配置加载成功:', CONTRACT_CONFIG);
+            return true;
+        } else {
+            console.warn('无法获取动态配置，使用默认值');
+            return false;
+        }
+    } catch (error) {
+        console.error('加载动态配置失败:', error);
+        return false;
+    }
+}
+
+// 获取配置的辅助函数
+function getConfig(key, defaultValue = null) {
+    const keys = key.split('.');
+    let value = CONTRACT_CONFIG;
+    
+    for (const k of keys) {
+        if (value && typeof value === 'object' && k in value) {
+            value = value[k];
+        } else {
+            return defaultValue;
+        }
+    }
+    
+    return value !== null ? value : defaultValue;
+}
 
 // API基础配置
 const API_CONFIG = {
@@ -164,5 +210,7 @@ export {
     API_VALIDATION,
     API_RESPONSE_FORMAT,
     TradeContractABI,
-    USDC_ABI
+    USDC_ABI,
+    loadDynamicConfig,
+    getConfig
 }; 
