@@ -540,7 +540,8 @@ def get_admin_users():
         
         # 检查数据库连接
         from app.extensions import db
-        db.session.execute('SELECT 1')
+        from sqlalchemy import text
+        db.session.execute(text('SELECT 1'))
         current_app.logger.info("数据库连接正常")
         
         # 检查AdminUser模型
