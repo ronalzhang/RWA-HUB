@@ -70,9 +70,9 @@ def register_blueprints(app):
     
     # 临时注释掉冲突的蓝图，等重构完成后再启用
     # app.register_blueprint(admin_solana_bp)
-    # app.register_blueprint(admin_v2_bp)           
+    app.register_blueprint(admin_v2_bp)           # 启用V2 API蓝图以支持新的认证系统
     app.register_blueprint(admin_compat_bp)        # 启用兼容路由以支持前端API调用
-    # app.register_blueprint(admin_compat_routes_bp)
+    app.register_blueprint(admin_compat_routes_bp) # 启用兼容路由以支持前端页面API调用
     
     # 注册全局处理器
     register_global_handlers(app)
