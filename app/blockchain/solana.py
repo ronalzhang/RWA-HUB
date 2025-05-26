@@ -144,7 +144,7 @@ class SolanaClient:
                             # 如果是64字节，取前32字节
                             if len(private_key_bytes) == 64:
                                 private_key_bytes = private_key_bytes[:32]
-                                auth_method = "env_private_key_base64"
+                            auth_method = "env_private_key_base64"
                         else:
                             logger.error(f"不支持的私钥类型: {key_type}")
                             private_key_bytes = None
