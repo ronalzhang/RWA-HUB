@@ -962,7 +962,7 @@
             adminNavLink.href = newHref;
             // 只在开发环境或调试模式下输出日志
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.DEBUG_MODE) {
-                console.log('已更新管理员入口链接:', adminNavLink.href);
+            console.log('已更新管理员入口链接:', adminNavLink.href);
             }
         }
     }
@@ -980,44 +980,44 @@
     
     <!-- 钱包下拉菜单初始化脚本 -->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            AOS.init();
-            
-            // 禁用Bootstrap的自动dropdown行为
-            if (window.jQuery && window.bootstrap) {
-                setTimeout(function() {
-                    try {
-                        // 确保钱包按钮不使用Bootstrap的dropdown行为
-                        const walletBtn = document.getElementById('walletBtn');
-                        if (walletBtn) {
-                            // 移除任何Bootstrap dropdown相关属性
-                            walletBtn.removeAttribute('data-bs-toggle');
-                            walletBtn.classList.remove('dropdown-toggle');
-                            
-                            // 确保钱包按钮有点击事件
-                            walletBtn.onclick = function(event) {
+            document.addEventListener('DOMContentLoaded', function() {
+                AOS.init();
+                
+                // 禁用Bootstrap的自动dropdown行为
+                if (window.jQuery && window.bootstrap) {
+                    setTimeout(function() {
+                        try {
+                            // 确保钱包按钮不使用Bootstrap的dropdown行为
+                            const walletBtn = document.getElementById('walletBtn');
+                            if (walletBtn) {
+                                // 移除任何Bootstrap dropdown相关属性
+                                walletBtn.removeAttribute('data-bs-toggle');
+                                walletBtn.classList.remove('dropdown-toggle');
+                                
+                                // 确保钱包按钮有点击事件
+                                walletBtn.onclick = function(event) {
                                 console.log('钱包按钮被点击');
-                                checkWalletConnection(event);
-                                return false;
-                            };
-                            
+                                    checkWalletConnection(event);
+                                    return false;
+                                };
+                                
                             console.log('钱包按钮事件已重新绑定');
-                        }
-                        
-                        // 只对非钱包按钮初始化Bootstrap下拉菜单
-                        var dropdownElementList = [].slice.call(
-                            document.querySelectorAll('.dropdown-toggle:not(#walletBtn)')
-                        );
-                        dropdownElementList.map(function (dropdownToggleEl) {
-                            return new bootstrap.Dropdown(dropdownToggleEl);
-                        });
+                            }
+                            
+                            // 只对非钱包按钮初始化Bootstrap下拉菜单
+                            var dropdownElementList = [].slice.call(
+                                document.querySelectorAll('.dropdown-toggle:not(#walletBtn)')
+                            );
+                            dropdownElementList.map(function (dropdownToggleEl) {
+                                return new bootstrap.Dropdown(dropdownToggleEl);
+                            });
                         console.log('除钱包按钮外的下拉菜单初始化完成');
-                    } catch (err) {
+                        } catch (err) {
                         console.error('初始化下拉菜单失败:', err);
-                    }
-                }, 300); // 缩短延迟时间
-            }
-        });
+                        }
+                    }, 300); // 缩短延迟时间
+                }
+            });
     </script>
     
     <!-- 检查钱包连接状态并决定行为 -->
@@ -1255,7 +1255,7 @@
             once: true
         });
     </script>
-    
+
     <!-- 语言切换 -->
     <script>
     function changeLanguage(lang) {
@@ -1286,7 +1286,7 @@
             }, 100);
         });
     </script>
-    
+
     <!-- 设置全局JS变量 -->
     <script nonce="{{ nonce|default('') }}">
         window.SOLANA_NETWORK_URL = "{{ config.get('SOLANA_NETWORK_URL', 'https://api.mainnet-beta.solana.com') }}";

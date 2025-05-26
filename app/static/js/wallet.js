@@ -1473,7 +1473,7 @@ const walletState = {
                     ];
                     
                     multiSigners.forEach(signer => {
-                        keys.push({ pubkey: signer, isSigner: true, isWritable: false });
+                            keys.push({ pubkey: signer, isSigner: true, isWritable: false });
                     });
                     
                     // 构建指令数据
@@ -2937,11 +2937,11 @@ checkIfReturningFromWalletApp(walletType) {
             if (!window.solana || !window.solana.isConnected) {
                 throw new Error('Solana钱包未连接，请先连接钱包');
             }
-            
+
             if (tokenSymbol !== 'USDC') {
                 throw new Error(`不支持的代币: ${tokenSymbol}`);
             }
-            
+
             // 3. 使用标准的Solana主网USDC地址
             const USDC_MINT = new window.solanaWeb3.PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
             const TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -2951,7 +2951,7 @@ checkIfReturningFromWalletApp(walletType) {
             const toPubkey = new window.solanaWeb3.PublicKey(to);
             
             console.log('[transferSolanaToken] 公钥对象创建完成');
-            
+
             // 4. 计算ATA地址
             const fromTokenAccount = await window.spl_token.getAssociatedTokenAddress(
                 USDC_MINT,     // mint
@@ -2963,12 +2963,12 @@ checkIfReturningFromWalletApp(walletType) {
                 toPubkey,      // owner
                 false          // allowOwnerOffCurve
             );
-            
+
             console.log('[transferSolanaToken] ATA地址计算完成:', {
                 from: fromTokenAccount.toString(),
                 to: toTokenAccount.toString()
             });
-            
+
             // 5. 使用代理API获取最新区块哈希
             console.log('[transferSolanaToken] 使用代理API获取区块哈希...');
             const blockhashResponse = await fetch("/api/solana/get_latest_blockhash");
@@ -2984,22 +2984,22 @@ checkIfReturningFromWalletApp(walletType) {
                 lastValidBlockHeight: blockhashData.lastValidBlockHeight
             };
             console.log('[transferSolanaToken] 获取最新区块哈希:', latestBlockhash.blockhash);
-            
+
             // 7. 创建交易
             const transaction = new window.solanaWeb3.Transaction();
             transaction.recentBlockhash = latestBlockhash.blockhash;
             transaction.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
             transaction.feePayer = fromPubkey;
-            
+
             // 8. 将转账金额转换为最小单位（USDC有6位小数）
             const decimals = 6; // USDC有6位小数
             const transferAmount = BigInt(Math.round(amount * Math.pow(10, decimals)));
-            
+
             console.log('[transferSolanaToken] 转账金额转换:', {
                 原始金额: amount,
                 最小单位: transferAmount
             });
-            
+
             // 9. 简化：直接创建转账指令，假设ATA账户已存在
             console.log('[transferSolanaToken] 创建转账指令...');
             
@@ -3012,9 +3012,9 @@ checkIfReturningFromWalletApp(walletType) {
             );
             
             transaction.add(transferInstruction);
-            
+
             console.log('[transferSolanaToken] 交易指令已添加');
-            
+
             // 11. 使用钱包签名交易
             console.log('[transferSolanaToken] 请求钱包签名...');
             const signedTransaction = await window.solana.signTransaction(transaction);
@@ -3025,7 +3025,7 @@ checkIfReturningFromWalletApp(walletType) {
             const base64Tx = btoa(String.fromCharCode(...serializedTx));
             
             console.log('[transferSolanaToken] 交易序列化完成，长度:', base64Tx.length);
-            
+
             // 13. 使用代理API发送交易
             console.log('[transferSolanaToken] 使用代理API发送交易...');
             const requestBody = {
@@ -3041,27 +3041,27 @@ checkIfReturningFromWalletApp(walletType) {
             
             const sendResponse = await fetch("/api/solana/submit_transaction", {
                 method: "POST",
-                headers: {
+                        headers: {
                     "Content-Type": "application/json"
-                },
+                        },
                 body: JSON.stringify(requestBody)
             });
             
             console.log('[transferSolanaToken] API响应状态:', sendResponse.status);
-            
-            if (!sendResponse.ok) {
+
+                    if (!sendResponse.ok) {
                 const errorText = await sendResponse.text();
                 console.error('[transferSolanaToken] API错误响应:', errorText);
                 throw new Error("发送交易失败: " + sendResponse.statusText + " - " + errorText);
-            }
-            
-            const sendData = await sendResponse.json();
+                    }
+
+                    const sendData = await sendResponse.json();
             console.log('[transferSolanaToken] API响应数据:', sendData);
             
             if (!sendData.success) {
                 throw new Error("发送交易失败: " + sendData.error);
-            }
-            
+                    }
+
             const txSignature = sendData.signature;
             
             console.log('[transferSolanaToken] 交易已发送，签名:', txSignature);
@@ -3095,9 +3095,9 @@ checkIfReturningFromWalletApp(walletType) {
             if (!confirmed) {
                 throw new Error('交易确认超时，请稍后检查交易状态');
             }
-            
+
             console.log('[transferSolanaToken] 交易已确认，签名:', txSignature);
-            
+
             // 14. 返回成功结果
             return {
                 success: true,
@@ -3371,7 +3371,7 @@ checkIfReturningFromWalletApp(walletType) {
             // 获取余额和分佣余额
             try {
                 await this.getWalletBalance();
-                await this.getCommissionBalance();
+            await this.getCommissionBalance();
             } catch (balanceError) {
                 console.warn('[afterSuccessfulConnection] 获取余额失败:', balanceError);
                 // 余额获取失败不应该影响连接状态
@@ -3573,7 +3573,7 @@ function recoverWalletStateFromStorage() {
             return false;
     } catch (error) {
         console.error('从localStorage恢复钱包状态失败:', error);
-        return false;
+            return false;
         }
 }
 

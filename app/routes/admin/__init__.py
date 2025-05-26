@@ -150,20 +150,16 @@ def encrypt_private_key():
                 # 优先尝试base58解码（Solana最常用格式）
                 try:
                     private_key_bytes = base58.b58decode(private_key)
-                    current_app.logger.info(f"成功使用Base58解码，长度: {len(private_key_bytes)}字节")
                 except:
                     # 如果base58失败，尝试其他格式
                     if len(private_key) == 128:  # 十六进制格式
                         private_key_bytes = bytes.fromhex(private_key)
-                        current_app.logger.info(f"成功使用十六进制解码，长度: {len(private_key_bytes)}字节")
                     elif len(private_key) == 88:  # Base64格式
                         private_key_bytes = base64.b64decode(private_key)
-                        current_app.logger.info(f"成功使用Base64解码，长度: {len(private_key_bytes)}字节")
                     else:
                         raise ValueError(f"无法识别的私钥格式，长度: {len(private_key)}")
                 
                 # 处理不同长度的私钥
-                current_app.logger.info(f"私钥解码后长度: {len(private_key_bytes)}字节")
                 
                 if len(private_key_bytes) == 64:
                     # 标准64字节格式，前32字节是私钥
@@ -174,7 +170,6 @@ def encrypt_private_key():
                 elif len(private_key_bytes) == 66:
                     # 可能包含校验和，取前32字节作为私钥
                     seed = private_key_bytes[:32]
-                    current_app.logger.info("检测到66字节私钥，可能包含校验和，使用前32字节")
                 else:
                     return jsonify({'success': False, 'error': f'无效的私钥长度: {len(private_key_bytes)}字节，期望32、64或66字节'}), 400
                 
@@ -266,15 +261,12 @@ def load_encrypted_key():
             # 优先尝试base58解码（Solana最常用格式）
             try:
                 private_key_bytes = base58.b58decode(private_key)
-                current_app.logger.info(f"加载API: 成功使用Base58解码，长度: {len(private_key_bytes)}字节")
             except:
                 # 如果base58失败，尝试其他格式
                 if len(private_key) == 128:  # 十六进制格式
                     private_key_bytes = bytes.fromhex(private_key)
-                    current_app.logger.info(f"加载API: 成功使用十六进制解码，长度: {len(private_key_bytes)}字节")
                 elif len(private_key) == 88:  # Base64格式
                     private_key_bytes = base64.b64decode(private_key)
-                    current_app.logger.info(f"加载API: 成功使用Base64解码，长度: {len(private_key_bytes)}字节")
                 else:
                     raise ValueError(f"无法识别的私钥格式，长度: {len(private_key)}")
             
@@ -354,166 +346,13 @@ def admin_users_v2():
     """V2版本管理员用户页面"""
     return render_template('admin_v2/admin_users.html')
 
-@admin_bp.route('/test')
-def test_route():
-    """测试路由，不需要认证"""
-    return "Admin routes are working!"
 
-@admin_bp.route('/test-settings')
-def test_settings():
-    """测试设置页面，不需要认证"""
-    from app.models.admin import SystemConfig
-    
-    # 获取所有配置
-    configs = {}
-    config_keys = [
-        'PLATFORM_FEE_BASIS_POINTS',
-        'PLATFORM_FEE_ADDRESS', 
-        'PURCHASE_CONTRACT_ADDRESS',
-        'ASSET_CREATION_FEE_AMOUNT',
-        'ASSET_CREATION_FEE_ADDRESS'
-    ]
-    
-    for key in config_keys:
-        configs[key] = SystemConfig.get_value(key, '')
-    
-    return render_template('admin_v2/settings.html', configs=configs)
 
-@admin_bp.route('/api/set-temp-env', methods=['POST'])
-@api_admin_required
-def set_temp_env():
-    """设置临时环境变量"""
-    try:
-        data = request.get_json()
-        key = data.get('key')
-        value = data.get('value')
-        
-        if not key or not value:
-            return jsonify({'success': False, 'error': '缺少key或value'}), 400
-        
-        # 设置临时环境变量
-        import os
-        os.environ[key] = value
-        
-        return jsonify({'success': True, 'message': f'环境变量{key}已设置'})
-        
-    except Exception as e:
-        current_app.logger.error(f"设置临时环境变量失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
 
-@admin_bp.route('/test-encrypt')
-def test_encrypt():
-    """加密测试页面"""
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Encryption Test</title>
-    </head>
-    <body>
-        <h1>Private Key Encryption Test</h1>
-        <div>
-            <label>Encryption Password:</label><br>
-            <input type="password" id="password" value="test123456"><br><br>
-            
-            <label>Private Key (128 hex chars):</label><br>
-            <textarea id="privateKey" rows="3" cols="80">0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef</textarea><br><br>
-            
-            <button onclick="encryptKey()">Encrypt Private Key</button><br><br>
-            
-            <div id="result"></div>
-        </div>
-        
-        <script>
-        async function encryptKey() {
-            const password = document.getElementById('password').value;
-            const privateKey = document.getElementById('privateKey').value;
-            
-            if (!password || !privateKey) {
-                alert('Please enter both password and private key');
-                return;
-            }
-            
-            try {
-                const response = await fetch('/admin/v2/api/crypto/encrypt-key', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        private_key: privateKey,
-                        crypto_password: password
-                    })
-                });
-                
-                const result = await response.json();
-                if (result.success) {
-                    document.getElementById('result').innerHTML = 
-                        '<h3>Success!</h3>' +
-                        '<p><strong>Wallet Address:</strong> ' + result.wallet_address + '</p>' +
-                        '<p><strong>Encrypted Key:</strong></p>' +
-                        '<textarea rows="5" cols="80" readonly>' + result.encrypted_key + '</textarea>';
-                } else {
-                    document.getElementById('result').innerHTML = 
-                        '<h3 style="color: red;">Error:</h3>' +
-                        '<p>' + result.error + '</p>';
-                }
-            } catch (error) {
-                document.getElementById('result').innerHTML = 
-                    '<h3 style="color: red;">Error:</h3>' +
-                    '<p>' + error.message + '</p>';
-            }
-        }
-        </script>
-    </body>
-    </html>
-    '''
 
-@admin_bp.route('/test-simple')
-def test_simple():
-    """简单的测试页面"""
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>API Test</title>
-    </head>
-    <body>
-        <h1>API Test Page</h1>
-        <button onclick="testAPI()">Test API</button>
-        <div id="result"></div>
-        
-        <script>
-        async function testAPI() {
-            try {
-                const response = await fetch('/admin/v2/api/test', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({test: 'data'})
-                });
-                
-                const result = await response.json();
-                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
-            } catch (error) {
-                document.getElementById('result').innerHTML = 'Error: ' + error.message;
-            }
-        }
-        </script>
-    </body>
-    </html>
-    '''
 
-@admin_bp.route('/v2/api/test', methods=['GET', 'POST'])
-def test_api():
-    """测试API，不需要认证"""
-    return jsonify({
-        'success': True,
-        'message': 'API工作正常',
-        'method': request.method,
-        'data': request.get_json() if request.method == 'POST' else None
-    })
+
+
 
 # 注意：dashboard、assets、users、trades等路由已在各自模块中定义
 # 避免重复定义导致路由冲突
@@ -558,15 +397,12 @@ def get_wallet_info():
             # 优先尝试base58解码（Solana最常用格式）
             try:
                 private_key_bytes = base58.b58decode(private_key)
-                current_app.logger.info(f"钱包信息API: 成功使用Base58解码，长度: {len(private_key_bytes)}字节")
             except:
                 # 如果base58失败，尝试其他格式
                 if len(private_key) == 128:  # 十六进制格式
                     private_key_bytes = bytes.fromhex(private_key)
-                    current_app.logger.info(f"钱包信息API: 成功使用十六进制解码，长度: {len(private_key_bytes)}字节")
                 elif len(private_key) == 88:  # Base64格式
                     private_key_bytes = base64.b64decode(private_key)
-                    current_app.logger.info(f"钱包信息API: 成功使用Base64解码，长度: {len(private_key_bytes)}字节")
                 else:
                     raise ValueError(f"无法识别的私钥格式，长度: {len(private_key)}")
             
@@ -649,15 +485,12 @@ def test_wallet_connection():
             # 优先尝试base58解码（Solana最常用格式）
             try:
                 private_key_bytes = base58.b58decode(private_key)
-                current_app.logger.info(f"测试钱包API: 成功使用Base58解码，长度: {len(private_key_bytes)}字节")
             except:
                 # 如果base58失败，尝试其他格式
                 if len(private_key) == 128:  # 十六进制格式
                     private_key_bytes = bytes.fromhex(private_key)
-                    current_app.logger.info(f"测试钱包API: 成功使用十六进制解码，长度: {len(private_key_bytes)}字节")
                 elif len(private_key) == 88:  # Base64格式
                     private_key_bytes = base64.b64decode(private_key)
-                    current_app.logger.info(f"测试钱包API: 成功使用Base64解码，长度: {len(private_key_bytes)}字节")
                 else:
                     raise ValueError(f"无法识别的私钥格式，长度: {len(private_key)}")
             
