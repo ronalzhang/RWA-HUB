@@ -10,11 +10,15 @@ class Keypair:
         if keypair_bytes is None:
             raise ValueError("必须提供有效的私钥，不允许使用默认私钥")
         else:
-            if len(keypair_bytes) != 64:
-                raise ValueError(f"Invalid keypair length: {len(keypair_bytes)}")
-            self._secret = keypair_bytes[:32]
+            # 支持32字节（仅私钥）或64字节（私钥+公钥）
+            if len(keypair_bytes) == 32:
+                self._secret = keypair_bytes
+            elif len(keypair_bytes) == 64:
+                self._secret = keypair_bytes[:32]
+            else:
+                raise ValueError(f"Invalid keypair length: {len(keypair_bytes)}, expected 32 or 64")
         
-        # 前32字节是私钥，后32字节是公钥
+        # 生成公钥
         self._public_key = PublicKey(self._secret)
     
     @staticmethod
@@ -36,7 +40,9 @@ class Keypair:
     @staticmethod
     def from_seed(seed: bytes) -> "Keypair":
         """Generate a keypair from a 32 byte seed."""
-        return Keypair.from_secret_key(seed)
+        if len(seed) != 32:
+            raise ValueError(f"Invalid seed length: {len(seed)}, expected 32")
+        return Keypair(seed)
     
     @property
     def public_key(self) -> PublicKey:
