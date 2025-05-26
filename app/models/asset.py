@@ -257,14 +257,13 @@ class Asset(db.Model):
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None,
             'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else None,
             'images': self.images,
-            'documents': self.documents
+            'documents': self.documents,
+            'total_value': self.total_value  # 确保所有资产类型都包含total_value字段
         }
 
         # 根据资产类型添加特定字段
         if self.asset_type == AssetType.REAL_ESTATE.value:
             data['area'] = self.area
-        elif self.asset_type == AssetType.SECURITIES.value:
-            data['total_value'] = self.total_value
 
         return data
 
