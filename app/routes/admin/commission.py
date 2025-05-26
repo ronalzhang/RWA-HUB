@@ -240,8 +240,7 @@ def api_commission_records():
 def api_commission_settings():
     """佣金设置"""
     try:
-        # 获取佣金设置，如果不存在则返回默认值
-        settings = {}
+        from app.models.commission_config import CommissionConfig
         
         # 定义默认设置
         default_settings = {
@@ -253,21 +252,11 @@ def api_commission_settings():
             'level3_rate': 1.0
         }
         
-        # 尝试从数据库获取设置
-        try:
-            for key, default_value in default_settings.items():
-                setting = CommissionSetting.query.filter_by(key=key).first()
-                if setting:
-                    # 根据类型转换值
-                    if key in ['referral_levels']:
-                        settings[key] = int(setting.value)
-                    else:
-                        settings[key] = float(setting.value)
-                else:
-                    settings[key] = default_value
-        except Exception as db_error:
-            current_app.logger.warning(f'从数据库获取佣金设置失败，使用默认值: {str(db_error)}')
-            settings = default_settings
+        # 从数据库获取设置
+        settings = {}
+        for key, default_value in default_settings.items():
+            value = CommissionConfig.get_config(f'commission_{key}', default_value)
+            settings[key] = value
         
         return jsonify({
             'success': True,
@@ -284,6 +273,8 @@ def api_commission_settings():
 def api_update_commission_settings():
     """更新佣金设置"""
     try:
+        from app.models.commission_config import CommissionConfig
+        
         data = request.get_json()
         if not data:
             return jsonify({'success': False, 'error': '缺少请求数据'}), 400
@@ -311,25 +302,15 @@ def api_update_commission_settings():
                     if int(value) not in [1, 2, 3]:
                         return jsonify({'success': False, 'error': '推荐等级必须是1、2或3'}), 400
                 
-                # 查找或创建设置记录
-                setting = CommissionSetting.query.filter_by(key=key).first()
-                if setting:
-                    setting.value = str(value)
-                    setting.updated_at = datetime.utcnow()
-                else:
-                    setting = CommissionSetting(
-                        key=key,
-                        value=str(value),
-                        description=f'佣金设置: {key}',
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow()
-                    )
-                    db.session.add(setting)
-                
+                # 保存设置到数据库
+                CommissionConfig.set_config(
+                    f'commission_{key}', 
+                    value, 
+                    f'佣金设置: {key}'
+                )
                 updated_count += 1
         
         if updated_count > 0:
-            db.session.commit()
             current_app.logger.info(f'佣金设置更新成功，更新了 {updated_count} 个设置项')
         
         return jsonify({
@@ -338,7 +319,6 @@ def api_update_commission_settings():
         })
         
     except Exception as e:
-        db.session.rollback()
         current_app.logger.error(f'更新佣金设置失败: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
