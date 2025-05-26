@@ -3,6 +3,7 @@
 管理分佣规则、分享设置等配置信息
 """
 from datetime import datetime
+from decimal import Decimal
 from app.extensions import db
 import json
 
@@ -98,24 +99,27 @@ class UserCommissionBalance(db.Model):
         balance = UserCommissionBalance.get_balance(user_address)
         
         if operation == 'add':
-            balance.total_earned += amount
-            balance.available_balance += amount
+            balance.total_earned += Decimal(str(amount))
+            balance.available_balance += Decimal(str(amount))
         elif operation == 'withdraw':
-            if balance.available_balance >= amount:
-                balance.available_balance -= amount
-                balance.withdrawn_amount += amount
+            amount_decimal = Decimal(str(amount))
+            if balance.available_balance >= amount_decimal:
+                balance.available_balance -= amount_decimal
+                balance.withdrawn_amount += amount_decimal
             else:
                 raise ValueError('余额不足')
         elif operation == 'freeze':
-            if balance.available_balance >= amount:
-                balance.available_balance -= amount
-                balance.frozen_amount += amount
+            amount_decimal = Decimal(str(amount))
+            if balance.available_balance >= amount_decimal:
+                balance.available_balance -= amount_decimal
+                balance.frozen_amount += amount_decimal
             else:
                 raise ValueError('余额不足')
         elif operation == 'unfreeze':
-            if balance.frozen_amount >= amount:
-                balance.frozen_amount -= amount
-                balance.available_balance += amount
+            amount_decimal = Decimal(str(amount))
+            if balance.frozen_amount >= amount_decimal:
+                balance.frozen_amount -= amount_decimal
+                balance.available_balance += amount_decimal
             else:
                 raise ValueError('冻结金额不足')
         
