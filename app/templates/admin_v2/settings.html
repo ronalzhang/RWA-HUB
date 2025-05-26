@@ -159,6 +159,11 @@
 
             <div class="flex justify-end space-x-3">
                 <button type="button" 
+                        @click="loadEncryptedKey()"
+                        class="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    加载已保存的私钥
+                </button>
+                <button type="button" 
                         @click="testAPI()"
                         class="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
                     测试API
@@ -247,6 +252,29 @@ function settingsManager() {
             }
         },
         
+        async loadEncryptedKey() {
+            try {
+                const response = await fetch('/admin/v2/api/crypto/load-encrypted-key', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('已保存的私钥加载成功!\n钱包地址: ' + result.wallet_address);
+                    this.loadWalletInfo();
+                } else {
+                    alert('加载失败: ' + result.error);
+                }
+                
+            } catch (error) {
+                alert('加载失败: ' + error.message);
+            }
+        },
+        
         async encryptPrivateKey() {
             if (!this.privateKey) {
                 alert('请输入私钥');
@@ -273,7 +301,7 @@ function settingsManager() {
                 
                 const result = await response.json();
                 if (result.success) {
-                    alert('私钥加密成功!\n钱包地址: ' + result.wallet_address + '\n加密密钥: ' + result.encrypted_key.substring(0, 50) + '...');
+                    alert('私钥加密并保存成功!\n钱包地址: ' + result.wallet_address + '\n' + result.message);
                     this.privateKey = '';
                     this.cryptoPassword = '';
                     this.loadWalletInfo();

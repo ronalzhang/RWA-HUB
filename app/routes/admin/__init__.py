@@ -6,6 +6,7 @@
 """
 
 from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify, current_app, session
+from datetime import datetime
 
 # 创建蓝图
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -121,6 +122,7 @@ def encrypt_private_key():
     """加密私钥API"""
     try:
         from app.utils.crypto_manager import get_crypto_manager
+        from app.models.admin import SystemConfig
         
         data = request.get_json()
         private_key = data.get('private_key')
@@ -153,21 +155,102 @@ def encrypt_private_key():
             crypto_manager = get_crypto_manager()
             encrypted_key = crypto_manager.encrypt_private_key(private_key)
             
+            # 保存加密后的私钥到系统配置
+            SystemConfig.set_value('SOLANA_PRIVATE_KEY_ENCRYPTED', encrypted_key, '管理员通过界面设置')
+            
+            # 保存加密密码到系统配置（注意：这里需要进一步加密）
+            # 为了安全，我们使用一个固定的系统密钥来加密用户的加密密码
+            system_crypto = get_crypto_manager()
+            # 临时设置系统密钥
+            os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+            encrypted_password = system_crypto.encrypt_private_key(crypto_password)
+            SystemConfig.set_value('CRYPTO_PASSWORD_ENCRYPTED', encrypted_password, '系统加密的用户密码')
+            
+            # 设置环境变量以便立即生效
+            os.environ['SOLANA_PRIVATE_KEY_ENCRYPTED'] = encrypted_key
+            os.environ['CRYPTO_PASSWORD'] = crypto_password
+            
+            current_app.logger.info(f"私钥已加密并保存，钱包地址: {result['public_key']}")
+            
             return jsonify({
                 'success': True,
                 'encrypted_key': encrypted_key,
-                'wallet_address': result['public_key']
+                'wallet_address': result['public_key'],
+                'message': '私钥已加密并保存到系统配置'
             })
             
         finally:
             # 恢复原始密码
             if original_password:
                 os.environ['CRYPTO_PASSWORD'] = original_password
-            elif 'CRYPTO_PASSWORD' in os.environ:
-                del os.environ['CRYPTO_PASSWORD']
+            elif 'CRYPTO_PASSWORD' in os.environ and crypto_password != os.environ.get('CRYPTO_PASSWORD'):
+                # 如果不是刚设置的密码，则删除
+                pass
         
     except Exception as e:
         current_app.logger.error(f"加密私钥失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/v2/api/crypto/load-encrypted-key', methods=['POST'])
+@api_admin_required
+def load_encrypted_key():
+    """从系统配置加载加密私钥"""
+    try:
+        from app.models.admin import SystemConfig
+        from app.utils.crypto_manager import get_crypto_manager
+        
+        # 获取加密的私钥和密码
+        encrypted_key = SystemConfig.get_value('SOLANA_PRIVATE_KEY_ENCRYPTED')
+        encrypted_password = SystemConfig.get_value('CRYPTO_PASSWORD_ENCRYPTED')
+        
+        if not encrypted_key or not encrypted_password:
+            return jsonify({
+                'success': False,
+                'error': '未找到加密的私钥配置'
+            })
+        
+        # 解密用户密码
+        import os
+        original_password = os.environ.get('CRYPTO_PASSWORD')
+        os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+        
+        try:
+            system_crypto = get_crypto_manager()
+            crypto_password = system_crypto.decrypt_private_key(encrypted_password)
+            
+            # 设置解密密码
+            os.environ['CRYPTO_PASSWORD'] = crypto_password
+            
+            # 验证私钥
+            user_crypto = get_crypto_manager()
+            private_key = user_crypto.decrypt_private_key(encrypted_key)
+            
+            # 验证私钥格式
+            from app.utils.helpers import get_solana_keypair_from_env
+            os.environ['TEMP_PRIVATE_KEY'] = private_key
+            result = get_solana_keypair_from_env('TEMP_PRIVATE_KEY')
+            del os.environ['TEMP_PRIVATE_KEY']
+            
+            if not result:
+                return jsonify({'success': False, 'error': '解密后的私钥无效'})
+            
+            # 设置环境变量
+            os.environ['SOLANA_PRIVATE_KEY_ENCRYPTED'] = encrypted_key
+            
+            current_app.logger.info(f"成功加载加密私钥，钱包地址: {result['public_key']}")
+            
+            return jsonify({
+                'success': True,
+                'wallet_address': result['public_key'],
+                'message': '加密私钥已成功加载'
+            })
+            
+        finally:
+            if original_password:
+                os.environ['CRYPTO_PASSWORD'] = original_password
+        
+    except Exception as e:
+        current_app.logger.error(f"加载加密私钥失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/v2/api/crypto/test-key', methods=['POST'])
@@ -444,4 +527,145 @@ def test_wallet_connection():
         })
 
 # 注意：dashboard、assets、users、trades等路由已在各自模块中定义
-# 避免重复定义导致路由冲突 
+# 避免重复定义导致路由冲突
+
+# 添加管理员用户管理API
+@admin_bp.route('/api/admins', methods=['GET'])
+@api_admin_required
+def get_admin_users():
+    """获取管理员用户列表"""
+    try:
+        from app.models.admin import AdminUser
+        
+        admins = AdminUser.query.all()
+        admin_list = []
+        
+        for admin in admins:
+            admin_list.append({
+                'id': admin.id,
+                'wallet_address': admin.wallet_address,
+                'username': admin.username,
+                'role': admin.role,
+                'created_at': admin.created_at.isoformat() if admin.created_at else None,
+                'last_login': admin.last_login.isoformat() if admin.last_login else None
+            })
+        
+        return jsonify(admin_list)
+        
+    except Exception as e:
+        current_app.logger.error(f"获取管理员列表失败: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/api/admin_addresses', methods=['POST'])
+@api_admin_required
+def add_admin_user():
+    """添加管理员用户"""
+    try:
+        from app.models.admin import AdminUser
+        
+        data = request.get_json()
+        wallet_address = data.get('wallet_address')
+        role = data.get('role', 'admin')
+        description = data.get('description', '')
+        
+        if not wallet_address:
+            return jsonify({'error': '钱包地址不能为空'}), 400
+        
+        # 检查地址是否已存在
+        existing_admin = AdminUser.query.filter_by(wallet_address=wallet_address).first()
+        if existing_admin:
+            return jsonify({'error': '该钱包地址已是管理员'}), 400
+        
+        # 创建新管理员
+        new_admin = AdminUser(
+            wallet_address=wallet_address,
+            role=role,
+            username=description or f'管理员_{wallet_address[:8]}'
+        )
+        
+        db.session.add(new_admin)
+        db.session.commit()
+        
+        current_app.logger.info(f"新增管理员: {wallet_address}, 角色: {role}")
+        
+        return jsonify({
+            'success': True,
+            'message': '管理员添加成功',
+            'admin': {
+                'id': new_admin.id,
+                'wallet_address': new_admin.wallet_address,
+                'role': new_admin.role,
+                'created_at': new_admin.created_at.isoformat()
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"添加管理员失败: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/api/admin_addresses/<wallet_address>', methods=['PUT'])
+@api_admin_required
+def update_admin_user(wallet_address):
+    """更新管理员用户"""
+    try:
+        from app.models.admin import AdminUser
+        
+        admin = AdminUser.query.filter_by(wallet_address=wallet_address).first()
+        if not admin:
+            return jsonify({'error': '管理员不存在'}), 404
+        
+        data = request.get_json()
+        
+        if 'role' in data:
+            admin.role = data['role']
+        
+        if 'description' in data:
+            admin.username = data['description']
+        
+        admin.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        current_app.logger.info(f"更新管理员: {wallet_address}")
+        
+        return jsonify({
+            'success': True,
+            'message': '管理员更新成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"更新管理员失败: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/api/admin_addresses/<wallet_address>', methods=['DELETE'])
+@api_admin_required
+def delete_admin_user(wallet_address):
+    """删除管理员用户"""
+    try:
+        from app.models.admin import AdminUser
+        
+        admin = AdminUser.query.filter_by(wallet_address=wallet_address).first()
+        if not admin:
+            return jsonify({'error': '管理员不存在'}), 404
+        
+        # 防止删除最后一个超级管理员
+        if admin.role == 'super_admin':
+            super_admin_count = AdminUser.query.filter_by(role='super_admin').count()
+            if super_admin_count <= 1:
+                return jsonify({'error': '不能删除最后一个超级管理员'}), 400
+        
+        db.session.delete(admin)
+        db.session.commit()
+        
+        current_app.logger.info(f"删除管理员: {wallet_address}")
+        
+        return jsonify({
+            'success': True,
+            'message': '管理员删除成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"删除管理员失败: {str(e)}")
+        return jsonify({'error': str(e)}), 500 
