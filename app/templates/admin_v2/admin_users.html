@@ -206,6 +206,25 @@ function adminUsersManager() {
         // 其他状态
         currentAdminId: null,
         
+        // 获取URL参数中的钱包地址
+        getWalletAddress() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('eth_address');
+        },
+        
+        // 创建带认证头的fetch请求
+        authFetch(url, options = {}) {
+            const walletAddress = this.getWalletAddress();
+            return fetch(url, {
+                ...options,
+                headers: {
+                    'X-Wallet-Address': walletAddress,
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            });
+        },
+        
         // 初始化
         init() {
             console.log('管理员用户管理器已初始化');
@@ -218,7 +237,7 @@ function adminUsersManager() {
             this.errorMessage = '';
             
             try {
-                const response = await fetch('/admin/api/admins');
+                const response = await this.authFetch('/admin/api/admins');
                 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
@@ -295,9 +314,8 @@ function adminUsersManager() {
             }
             
             try {
-                const response = await fetch('/admin/api/admin_addresses', {
+                const response = await this.authFetch('/admin/api/admin_addresses', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(this.newAdmin)
                 });
                 
@@ -325,9 +343,8 @@ function adminUsersManager() {
             }
             
             try {
-                const response = await fetch(`/admin/api/admin_addresses/${this.editingAdmin.wallet_address}`, {
+                const response = await this.authFetch(`/admin/api/admin_addresses/${this.editingAdmin.wallet_address}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         role: this.editingAdmin.role,
                         description: this.editingAdmin.description
@@ -359,7 +376,7 @@ function adminUsersManager() {
             }
             
             try {
-                const response = await fetch(`/admin/api/admin_addresses/${admin.wallet_address}`, {
+                const response = await this.authFetch(`/admin/api/admin_addresses/${admin.wallet_address}`, {
                     method: 'DELETE'
                 });
                 

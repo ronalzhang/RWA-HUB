@@ -535,7 +535,25 @@ def test_wallet_connection():
 def get_admin_users():
     """获取管理员用户列表"""
     try:
+        # 先测试基础功能
+        current_app.logger.info("开始获取管理员列表")
+        
+        # 检查数据库连接
+        from app.extensions import db
+        db.session.execute('SELECT 1')
+        current_app.logger.info("数据库连接正常")
+        
+        # 检查AdminUser模型
         from app.models.admin import AdminUser
+        current_app.logger.info("AdminUser模型导入成功")
+        
+        # 检查表是否存在
+        try:
+            admin_count = AdminUser.query.count()
+            current_app.logger.info(f"AdminUser表存在，当前有{admin_count}条记录")
+        except Exception as table_error:
+            current_app.logger.error(f"AdminUser表访问失败: {str(table_error)}")
+            return jsonify({'error': f'数据库表访问失败: {str(table_error)}'}), 500
         
         admins = AdminUser.query.all()
         admin_list = []
@@ -550,10 +568,11 @@ def get_admin_users():
                 'last_login': admin.last_login.isoformat() if admin.last_login else None
             })
         
+        current_app.logger.info(f"成功获取{len(admin_list)}个管理员")
         return jsonify(admin_list)
         
     except Exception as e:
-        current_app.logger.error(f"获取管理员列表失败: {str(e)}")
+        current_app.logger.error(f"获取管理员列表失败: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @admin_bp.route('/api/admin_addresses', methods=['POST'])
@@ -561,21 +580,37 @@ def get_admin_users():
 def add_admin_user():
     """添加管理员用户"""
     try:
-        from app.models.admin import AdminUser
-        from app.extensions import db
+        current_app.logger.info("开始添加管理员用户")
         
+        # 检查请求数据
         data = request.get_json()
+        current_app.logger.info(f"接收到数据: {data}")
+        
+        if not data:
+            return jsonify({'error': '请求数据为空'}), 400
+        
         wallet_address = data.get('wallet_address')
         role = data.get('role', 'admin')
         description = data.get('description', '')
         
+        current_app.logger.info(f"解析数据 - 地址: {wallet_address}, 角色: {role}, 描述: {description}")
+        
         if not wallet_address:
             return jsonify({'error': '钱包地址不能为空'}), 400
+        
+        # 检查数据库连接
+        from app.extensions import db
+        from app.models.admin import AdminUser
+        
+        current_app.logger.info("开始检查地址是否已存在")
         
         # 检查地址是否已存在
         existing_admin = AdminUser.query.filter_by(wallet_address=wallet_address).first()
         if existing_admin:
+            current_app.logger.warning(f"地址已存在: {wallet_address}")
             return jsonify({'error': '该钱包地址已是管理员'}), 400
+        
+        current_app.logger.info("开始创建新管理员")
         
         # 创建新管理员
         new_admin = AdminUser(
@@ -584,10 +619,12 @@ def add_admin_user():
             username=description or f'管理员_{wallet_address[:8]}'
         )
         
+        current_app.logger.info("开始保存到数据库")
+        
         db.session.add(new_admin)
         db.session.commit()
         
-        current_app.logger.info(f"新增管理员: {wallet_address}, 角色: {role}")
+        current_app.logger.info(f"新增管理员成功: {wallet_address}, 角色: {role}")
         
         return jsonify({
             'success': True,
@@ -601,8 +638,12 @@ def add_admin_user():
         })
         
     except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"添加管理员失败: {str(e)}")
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except:
+            pass
+        current_app.logger.error(f"添加管理员失败: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @admin_bp.route('/api/admin_addresses/<wallet_address>', methods=['PUT'])

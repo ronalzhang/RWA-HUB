@@ -190,6 +190,25 @@ function settingsManager() {
         cryptoPassword: '',
         privateKey: '',
         
+        // 获取URL参数中的钱包地址
+        getWalletAddress() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('eth_address');
+        },
+        
+        // 创建带认证头的fetch请求
+        authFetch(url, options = {}) {
+            const walletAddress = this.getWalletAddress();
+            return fetch(url, {
+                ...options,
+                headers: {
+                    'X-Wallet-Address': walletAddress,
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            });
+        },
+        
         init() {
             console.log('设置管理器已初始化');
             this.loadWalletInfo();
@@ -197,7 +216,7 @@ function settingsManager() {
         
         async loadWalletInfo() {
             try {
-                const response = await fetch('/admin/api/wallet-info');
+                const response = await this.authFetch('/admin/api/wallet-info');
                 if (response.ok) {
                     this.walletInfo = await response.json();
                     console.log('钱包信息已加载:', this.walletInfo);
@@ -211,10 +230,9 @@ function settingsManager() {
         
         async testAPI() {
             try {
-                const response = await fetch('/admin/v2/api/test', {
+                const response = await this.authFetch('/admin/v2/api/test', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
                     },
                     body: JSON.stringify({
@@ -233,11 +251,8 @@ function settingsManager() {
         
         async testWalletConnection() {
             try {
-                const response = await fetch('/admin/api/test-wallet', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
+                const response = await this.authFetch('/admin/api/test-wallet', {
+                    method: 'POST'
                 });
                 
                 const result = await response.json();
@@ -254,10 +269,9 @@ function settingsManager() {
         
         async loadEncryptedKey() {
             try {
-                const response = await fetch('/admin/v2/api/crypto/load-encrypted-key', {
+                const response = await this.authFetch('/admin/v2/api/crypto/load-encrypted-key', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
                     }
                 });
@@ -287,10 +301,9 @@ function settingsManager() {
             }
             
             try {
-                const response = await fetch('/admin/v2/api/crypto/encrypt-key', {
+                const response = await this.authFetch('/admin/v2/api/crypto/encrypt-key', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
                     },
                     body: JSON.stringify({
