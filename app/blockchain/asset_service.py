@@ -898,11 +898,9 @@ class AssetService:
                 user = User.query.filter_by(solana_address=wallet_address).first()
                 
                 if not user:
-                    # 生成唯一的用户名和邮箱
-                    import time
-                    timestamp = int(time.time())
-                    username = f"user_{wallet_address[:8]}_{timestamp}"
-                    email = f"{wallet_address[:8]}_{timestamp}@phantom.wallet"
+                    # 使用钱包地址生成简单的用户名和邮箱（无需时间戳，因为钱包地址本身就是唯一的）
+                    username = f"solana_{wallet_address[:8]}"
+                    email = f"{wallet_address}@solana.wallet"
                     
                     # 创建新用户
                     user = User(
@@ -917,7 +915,7 @@ class AssetService:
                     db.session.add(user)
                     current_app.logger.info(f"创建新Solana用户: {wallet_address}")
                 else:
-                    # 更新现有用户
+                    # 更新现有用户（同一钱包地址的重复连接）
                     user.last_login_at = datetime.utcnow()
                     user.wallet_type = wallet_type
                     user.is_active = True
@@ -928,11 +926,9 @@ class AssetService:
                 user = User.query.filter_by(eth_address=wallet_address).first()
                 
                 if not user:
-                    # 生成唯一的用户名和邮箱
-                    import time
-                    timestamp = int(time.time())
-                    username = f"user_{wallet_address[:8]}_{timestamp}"
-                    email = f"{wallet_address[:8]}_{timestamp}@ethereum.wallet"
+                    # 使用钱包地址生成简单的用户名和邮箱（无需时间戳，因为钱包地址本身就是唯一的）
+                    username = f"eth_{wallet_address[:8]}"
+                    email = f"{wallet_address}@ethereum.wallet"
                     
                     # 创建新用户
                     user = User(
@@ -947,7 +943,7 @@ class AssetService:
                     db.session.add(user)
                     current_app.logger.info(f"创建新以太坊用户: {wallet_address}")
                 else:
-                    # 更新现有用户
+                    # 更新现有用户（同一钱包地址的重复连接）
                     user.last_login_at = datetime.utcnow()
                     user.wallet_type = wallet_type
                     user.is_active = True
