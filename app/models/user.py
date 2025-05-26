@@ -36,6 +36,8 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
     eth_address = db.Column(db.String(64), unique=True)
+    solana_address = db.Column(db.String(64), unique=True)  # Solana钱包地址
+    wallet_type = db.Column(db.String(20), default='ethereum')  # 钱包类型
     nonce = db.Column(db.String(100))
     role = db.Column(db.String(20), nullable=False, default=UserRole.USER.value)
     status = db.Column(db.String(20), nullable=False, default=UserStatus.ACTIVE.value)
@@ -108,6 +110,8 @@ class User(db.Model):
             'username': self.username,
             'email': self.email,
             'eth_address': self.eth_address,
+            'solana_address': self.solana_address,
+            'wallet_type': self.wallet_type,
             'role': self.role,
             'status': self.status,
             'settings': self.get_settings(),
