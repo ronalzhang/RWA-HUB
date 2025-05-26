@@ -121,6 +121,9 @@ def get_users_list():
                 'wallet_address': user.eth_address,
                 'username': user.username,
                 'email': user.email,
+                'role': user.role,  # 添加角色信息
+                'status': user.status,  # 添加状态信息
+                'is_admin': user.role in ['admin', 'super_admin'],  # 是否为管理员
                 'is_verified': bool(getattr(user, 'is_verified', False)),
                 'is_distributor': bool(getattr(user, 'is_distributor', False)),
                 'is_blocked': bool(getattr(user, 'is_blocked', False)),
