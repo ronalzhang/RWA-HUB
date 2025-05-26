@@ -169,6 +169,52 @@ def wallet_commission_balance():
             'error': str(e)
         }), 500
 
+@service_bp.route('/wallet/usdc_balance')
+def wallet_usdc_balance():
+    """
+    获取钱包的USDC余额（服务器代理方式）
+    
+    Query参数:
+        address: 钱包地址
+        network: 网络类型 (ethereum/solana)
+    """
+    address = request.args.get('address')
+    network = request.args.get('network', 'ethereum')
+    
+    if not address:
+        return jsonify({
+            'success': False,
+            'error': '未提供钱包地址'
+        }), 400
+    
+    try:
+        # 使用服务器代理获取USDC余额
+        if network == 'ethereum':
+            balance = AssetService.get_ethereum_usdc_balance(address)
+        elif network == 'solana':
+            balance = AssetService.get_solana_usdc_balance(address)
+        else:
+            return jsonify({
+                'success': False,
+                'error': '不支持的网络类型'
+            }), 400
+        
+        return jsonify({
+            'success': True,
+            'balance': str(balance),
+            'symbol': 'USDC',
+            'network': network,
+            'cached_at': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取USDC余额出错: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'balance': '0'  # 出错时返回0余额
+        }), 200  # 返回200状态码，避免前端报错
+
 @service_bp.route('/config/payment_settings', methods=['GET'])
 def get_payment_settings():
     """获取支付设置"""

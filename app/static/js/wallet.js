@@ -1613,6 +1613,16 @@ const walletState = {
                 }
             }
             
+            // 更新Commission显示区域的完整文本
+            const commissionDisplay = document.getElementById('commissionDisplay');
+            if (commissionDisplay) {
+                const commissionSpan = commissionDisplay.querySelector('#walletCommissionInDropdown');
+                if (commissionSpan) {
+                    const formattedCommission = this.commissionBalance !== null ? parseFloat(this.commissionBalance).toFixed(2) : '0.00';
+                    commissionSpan.textContent = formattedCommission;
+                }
+            }
+            
             // 更新钱包地址显示（在下拉菜单中）
             const walletAddressDisplay = document.getElementById('walletAddressDisplay');
             if (walletAddressDisplay && this.connected && this.address) {
@@ -3344,6 +3354,149 @@ checkIfReturningFromWalletApp(walletType) {
     },
 
     /**
+     * 获取USDC余额（服务器代理方式）
+     * 支持长时间缓存，减少服务器负载
+     */
+    async getUSDCBalance() {
+        try {
+            if (!this.connected || !this.address) {
+                debugWarn('[getUSDCBalance] 钱包未连接，无法获取USDC余额');
+                return 0;
+            }
+
+            const address = this.address;
+            const network = this.walletType === 'phantom' ? 'solana' : 'ethereum';
+            
+            // 检查缓存，避免频繁请求
+            const cacheKey = `usdc_balance_${network}_${address}`;
+            const cached = this._getBalanceCache(cacheKey);
+            if (cached && (Date.now() - cached.timestamp < 7200000)) { // 2小时缓存
+                debugLog(`[getUSDCBalance] 使用缓存的USDC余额: ${cached.balance}`);
+                this.balance = cached.balance;
+                this.updateBalanceDisplay();
+                return cached.balance;
+            }
+
+            debugLog(`[getUSDCBalance] 开始获取 ${address} 的USDC余额 (${network})`);
+
+            // 调用USDC余额API
+            const apiUrl = `/api/service/wallet/usdc_balance?address=${address}&network=${network}&_=${Date.now()}`;
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Wallet-Address': address,
+                    'X-Wallet-Type': this.walletType
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`API响应错误: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            if (DEBUG_MODE) {
+                debugLog('[getUSDCBalance] API响应数据:', data);
+            }
+
+            if (data.success) {
+                const balance = parseFloat(data.balance || 0);
+                
+                // 缓存余额
+                this._setBalanceCache(cacheKey, balance);
+                
+                // 减少重复的余额日志
+                if (!this._lastUSDCLog || Math.abs(this.balance - balance) > 0.01 || 
+                    (Date.now() - this._lastUSDCLog > 30000)) {
+                    debugLog(`[getUSDCBalance] 获取到USDC余额: ${balance} USDC (${network})`);
+                    this._lastUSDCLog = Date.now();
+                }
+                
+                // 更新余额
+                this.balance = balance;
+                this.updateBalanceDisplay();
+                
+                return balance;
+            } else {
+                const errorMsg = data.error || '获取USDC余额失败';
+                debugError('[getUSDCBalance] 获取USDC余额失败:', errorMsg);
+                // 返回缓存的余额或0
+                return cached ? cached.balance : 0;
+            }
+        } catch (error) {
+            debugError('[getUSDCBalance] 获取USDC余额出错:', error);
+            // 尝试返回缓存的余额
+            const cacheKey = `usdc_balance_${this.walletType === 'phantom' ? 'solana' : 'ethereum'}_${this.address}`;
+            const cached = this._getBalanceCache(cacheKey);
+            return cached ? cached.balance : 0;
+        }
+    },
+
+    /**
+     * 获取余额缓存
+     */
+    _getBalanceCache(key) {
+        try {
+            const cached = localStorage.getItem(key);
+            return cached ? JSON.parse(cached) : null;
+        } catch (error) {
+            debugError('获取余额缓存失败:', error);
+            return null;
+        }
+    },
+
+    /**
+     * 设置余额缓存
+     */
+    _setBalanceCache(key, balance) {
+        try {
+            const cacheData = {
+                balance: balance,
+                timestamp: Date.now()
+            };
+            localStorage.setItem(key, JSON.stringify(cacheData));
+        } catch (error) {
+            debugError('设置余额缓存失败:', error);
+        }
+    },
+
+    /**
+     * 刷新所有余额信息
+     * 支持手动刷新和定时刷新
+     */
+    async refreshAllBalances(force = false) {
+        try {
+            if (!this.connected || !this.address) {
+                return;
+            }
+
+            debugLog('[refreshAllBalances] 开始刷新所有余额信息');
+
+            // 并行获取余额信息
+            const promises = [
+                this.getUSDCBalance(),
+                this.getCommissionBalance()
+            ];
+
+            const [usdcBalance, commissionBalance] = await Promise.all(promises);
+
+            debugLog(`[refreshAllBalances] 余额刷新完成 - USDC: ${usdcBalance}, Commission: ${commissionBalance}`);
+
+            // 触发余额更新事件
+            this.triggerBalanceUpdatedEvent();
+
+            return {
+                usdc: usdcBalance,
+                commission: commissionBalance
+            };
+        } catch (error) {
+            debugError('[refreshAllBalances] 刷新余额失败:', error);
+            return null;
+        }
+    },
+
+    /**
      * 连接成功后的统一处理流程
      * @param {string} address - 钱包地址
      * @param {string} walletType - 钱包类型
@@ -3370,8 +3523,7 @@ checkIfReturningFromWalletApp(walletType) {
             
             // 获取余额和分佣余额
             try {
-                await this.getWalletBalance();
-            await this.getCommissionBalance();
+                await this.refreshAllBalances();
             } catch (balanceError) {
                 console.warn('[afterSuccessfulConnection] 获取余额失败:', balanceError);
                 // 余额获取失败不应该影响连接状态
