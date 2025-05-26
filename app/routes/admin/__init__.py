@@ -562,6 +562,7 @@ def add_admin_user():
     """添加管理员用户"""
     try:
         from app.models.admin import AdminUser
+        from app.extensions import db
         
         data = request.get_json()
         wallet_address = data.get('wallet_address')
@@ -610,6 +611,7 @@ def update_admin_user(wallet_address):
     """更新管理员用户"""
     try:
         from app.models.admin import AdminUser
+        from app.extensions import db
         
         admin = AdminUser.query.filter_by(wallet_address=wallet_address).first()
         if not admin:
@@ -644,6 +646,7 @@ def delete_admin_user(wallet_address):
     """删除管理员用户"""
     try:
         from app.models.admin import AdminUser
+        from app.extensions import db
         
         admin = AdminUser.query.filter_by(wallet_address=wallet_address).first()
         if not admin:
