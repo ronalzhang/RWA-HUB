@@ -222,7 +222,12 @@
                                 </div>
                             </div>
                                     <div class="ml-4">
-                                        <div class="text-sm font-medium text-gray-900" x-text="asset.name"></div>
+                                        <div class="text-sm font-medium">
+                                            <a :href="'/assets/' + asset.token_symbol" 
+                                               class="text-blue-600 hover:text-blue-800 hover:underline"
+                                               target="_blank"
+                                               x-text="asset.name"></a>
+                                        </div>
                                         <div class="text-sm text-gray-500" x-text="asset.token_symbol"></div>
                                 </div>
                                 </div>

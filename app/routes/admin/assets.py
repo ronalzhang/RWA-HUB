@@ -578,19 +578,37 @@ def api_assets_stats():
         approved_assets = Asset.query.filter(Asset.status == 2, Asset.deleted_at.is_(None)).count()
         rejected_assets = Asset.query.filter(Asset.status == 3, Asset.deleted_at.is_(None)).count()
         
+        # 计算总价值 (只统计已审核通过且未删除的资产)
+        total_value = db.session.query(func.sum(Asset.total_value)).filter(
+            Asset.status == 2, 
+            Asset.deleted_at.is_(None)
+        ).scalar() or 0
+        
+        # 计算资产类型数量
+        asset_types_count = db.session.query(Asset.asset_type).filter(
+            Asset.deleted_at.is_(None)
+        ).distinct().count()
+        
+        # 返回前端期望的数据格式
         return jsonify({
-            'success': True,
-            'data': {
-                'total': total_assets,
-                'pending': pending_assets,
-                'approved': approved_assets,
-                'rejected': rejected_assets
-            }
+            'totalAssets': total_assets,
+            'totalValue': float(total_value),
+            'pendingAssets': pending_assets,
+            'assetTypes': asset_types_count,
+            'approvedAssets': approved_assets,
+            'rejectedAssets': rejected_assets
         })
         
     except Exception as e:
         current_app.logger.error(f'获取资产统计失败: {str(e)}')
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({
+            'totalAssets': 0,
+            'totalValue': 0,
+            'pendingAssets': 0,
+            'assetTypes': 0,
+            'approvedAssets': 0,
+            'rejectedAssets': 0
+        }), 500
 
 
 @admin_bp.route('/api/assets/export', methods=['GET'])
