@@ -3,6 +3,7 @@ import os
 import base64
 import base58
 from typing import Optional, Union, Dict, Any
+··
 
 # 使用兼容层而不是直接导入solana库
 from app.utils.solana_compat.keypair import Keypair
@@ -87,13 +88,19 @@ def get_solana_keypair_from_env(var_name: str = "SOLANA_PRIVATE_KEY") -> Optiona
         else:  # Base58格式
             private_key_bytes = base58.b58decode(private_key_str)
         
-        # 如果是64字节，取前32字节作为seed
+        # 处理不同长度的私钥
         if len(private_key_bytes) == 64:
+            # 标准64字节格式，前32字节是私钥
             seed = private_key_bytes[:32]
         elif len(private_key_bytes) == 32:
+            # 仅私钥
             seed = private_key_bytes
+        elif len(private_key_bytes) == 66:
+            # 可能包含校验和，取前32字节作为私钥
+            seed = private_key_bytes[:32]
+            logger.info("检测到66字节私钥，可能包含校验和，使用前32字节")
         else:
-            raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}")
+            raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}，期望32、64或66字节")
         
         # 创建密钥对
         keypair = Keypair.from_seed(seed)
