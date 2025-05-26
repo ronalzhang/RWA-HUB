@@ -24,302 +24,187 @@
             {% if messages %}
                 <div class="mb-4">
                 {% for category, message in messages %}
-                    <div class="p-4 rounded-md {{ 'bg-red-100 text-red-700' if category == 'error' else 'bg-green-100 text-green-700' }}" role="alert">
-                        <p class="font-medium">{{ message }}</p>
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} mb-2">
+                        {{ message }}
                     </div>
                 {% endfor %}
                 </div>
             {% endif %}
         {% endwith %}
 
-        <form method="POST" action="{{ url_for('admin.update_settings_v2') }}">
-            {{ csrf_token() }}
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {# --- Asset Purchase Settings --- #}
-                <div>
-                    <h3 class="text-lg font-medium text-gray-700 mb-4 border-b pb-2">{{ _('Asset Purchase Settings') }}</h3>
-                    
-                    <div class="mb-4">
-                        <label for="platform_fee_basis_points" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Platform Fee Rate (Basis Points)') }}</label>
-                        <input type="number" id="platform_fee_basis_points" name="platform_fee_basis_points" min="0" max="10000" step="1"
-                               value="{{ configs.PLATFORM_FEE_BASIS_POINTS }}" required 
-                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                               placeholder="e.g., 350 for 3.5%">
-                        <p class="mt-1 text-xs text-gray-500">{{ _('Percentage points (out of 10000) charged on asset purchases. 350 = 3.5%') }}</p>
-                    </div>
-
-                    <div class="mb-4">
-                        <label for="platform_fee_address" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Platform Fee Address (Solana)') }}</label>
-                        <input type="text" id="platform_fee_address" name="platform_fee_address" 
-                               value="{{ configs.PLATFORM_FEE_ADDRESS }}" required 
-                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                               placeholder="Solana address for receiving purchase fees">
-                    </div>
-
-                    <div class="mb-4">
-                        <label for="purchase_contract_address" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Purchase Smart Contract Address (Solana)') }}</label>
-                        <input type="text" id="purchase_contract_address" name="purchase_contract_address" 
-                               value="{{ configs.PURCHASE_CONTRACT_ADDRESS }}" required
-                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                               placeholder="Solana address of the purchase/escrow contract">
-                    </div>
-                </div>
-
-                {# --- Asset Creation Settings --- #}
-                <div>
-                    <h3 class="text-lg font-medium text-gray-700 mb-4 border-b pb-2">{{ _('Asset Creation Settings') }}</h3>
-
-                    <div class="mb-4">
-                        <label for="asset_creation_fee_amount" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Asset Creation Fee Amount (USDC)') }}</label>
-                        <input type="number" id="asset_creation_fee_amount" name="asset_creation_fee_amount" min="0" step="0.000001" 
-                               value="{{ configs.ASSET_CREATION_FEE_AMOUNT }}" required
-                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                               placeholder="e.g., 1.0">
-                         <p class="mt-1 text-xs text-gray-500">{{ _('Fee charged in USDC for creating a new asset.') }}</p>
-                   </div>
-
-                    <div class="mb-4">
-                        <label for="asset_creation_fee_address" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Asset Creation Fee Address (Solana)') }}</label>
-                        <input type="text" id="asset_creation_fee_address" name="asset_creation_fee_address" 
-                               value="{{ configs.ASSET_CREATION_FEE_ADDRESS }}" required
-                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                               placeholder="Solana address for receiving asset creation fees">
-                    </div>
-                </div>
+        <form method="POST" action="{{ url_for('admin.update_settings_v2') }}" class="space-y-4">
+            
+            <!-- 平台费率 -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ _('Platform Fee (Basis Points)') }}
+                </label>
+                <input type="number" 
+                       name="platform_fee_basis_points" 
+                       value="{{ configs.get('PLATFORM_FEE_BASIS_POINTS', '250') }}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       min="0" max="10000">
+                <p class="text-sm text-gray-500 mt-1">{{ _('1 basis point = 0.01%, default is 250 (2.5%)') }}</p>
             </div>
 
-            <div class="mt-8 pt-5 border-t border-gray-200">
-                <div class="flex justify-end">
-                    <button type="submit" 
-                            class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        {{ _('Save Settings') }}
-                    </button>
-                </div>
+            <!-- 平台收款地址 -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ _('Platform Fee Address') }}
+                </label>
+                <input type="text" 
+                       name="platform_fee_address" 
+                       value="{{ configs.get('PLATFORM_FEE_ADDRESS', '') }}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="Solana wallet address">
+            </div>
+
+            <!-- 资产创建费用 -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ _('Asset Creation Fee (USDC)') }}
+                </label>
+                <input type="number" 
+                       name="asset_creation_fee_amount" 
+                       value="{{ configs.get('ASSET_CREATION_FEE_AMOUNT', '100') }}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       min="0" step="0.01">
+            </div>
+
+            <!-- 资产创建收款地址 -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ _('Asset Creation Fee Address') }}
+                </label>
+                <input type="text" 
+                       name="asset_creation_fee_address" 
+                       value="{{ configs.get('ASSET_CREATION_FEE_ADDRESS', '') }}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="Solana wallet address">
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" 
+                        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    {{ _('Save Settings') }}
+                </button>
             </div>
         </form>
     </div>
 
-    <!-- 私钥安全管理 -->
+    <!-- 私钥管理 -->
     <div class="bg-white shadow rounded-lg p-6">
-        <h2 class="text-xl font-semibold text-gray-800 mb-6">🔐 私钥安全管理</h2>
+        <h2 class="text-xl font-semibold text-gray-800 mb-6">{{ _('Private Key Management') }}</h2>
         
         <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
             <div class="flex">
                 <div class="flex-shrink-0">
-                    <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                    <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
                 </div>
                 <div class="ml-3">
-                    <h3 class="text-sm font-medium text-yellow-800">安全提醒</h3>
+                    <h3 class="text-sm font-medium text-yellow-800">{{ _('Security Notice') }}</h3>
                     <div class="mt-2 text-sm text-yellow-700">
-                        <ul class="list-disc pl-5 space-y-1">
-                            <li>私钥将使用强加密算法进行保护</li>
-                            <li>请确保已设置 CRYPTO_PASSWORD 环境变量</li>
-                            <li>加密后的私钥可以安全地存储在服务器上</li>
-                            <li>请妥善保管加密密码，丢失将无法恢复私钥</li>
-                        </ul>
+                        <p>{{ _('Private keys are encrypted and stored securely. Never share your private keys with anyone.') }}</p>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 私钥加密工具 -->
-        <div class="space-y-6">
-            <div>
-                <h3 class="text-lg font-medium text-gray-700 mb-4">私钥加密工具</h3>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- 加密私钥 -->
-                    <div class="space-y-4">
-                        <h4 class="font-medium text-gray-700">1. 加密新私钥</h4>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">输入私钥</label>
-                            <textarea x-model="privateKey" 
-                                    placeholder="输入Base58、十六进制或Base64格式的私钥"
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                    rows="3"></textarea>
-                        </div>
-                        
-                        <button @click="encryptPrivateKey()" 
-                                :disabled="!privateKey || encrypting"
-                                class="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400">
-                            <span x-show="!encrypting">🔒 加密私钥</span>
-                            <span x-show="encrypting">加密中...</span>
-                        </button>
-                        
-                        <div x-show="encryptedKey" class="space-y-2">
-                            <label class="block text-sm font-medium text-gray-700">加密后的私钥</label>
-                            <textarea x-model="encryptedKey" readonly
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm"
-                                    rows="4"></textarea>
-                            <div x-show="walletAddress" class="text-sm text-gray-600">
-                                <strong>对应钱包地址:</strong> <span x-text="walletAddress"></span>
-                            </div>
-                            <button @click="copyToClipboard(encryptedKey)" 
-                                    class="text-sm bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600">
-                                📋 复制加密私钥
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- 测试加密私钥 -->
-                    <div class="space-y-4">
-                        <h4 class="font-medium text-gray-700">2. 测试加密私钥</h4>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">加密的私钥</label>
-                            <textarea x-model="testEncryptedKey" 
-                                    placeholder="输入要测试的加密私钥"
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                    rows="3"></textarea>
-                        </div>
-                        
-                        <button @click="testEncryptedKey()" 
-                                :disabled="!testEncryptedKey || testing"
-                                class="w-full bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:bg-gray-400">
-                            <span x-show="!testing">🔓 测试解密</span>
-                            <span x-show="testing">测试中...</span>
-                        </button>
-                        
-                        <div x-show="testResult" class="space-y-2">
-                            <div :class="testSuccess ? 'text-green-600' : 'text-red-600'" class="text-sm font-medium">
-                                <span x-text="testMessage"></span>
-                            </div>
-                            <div x-show="testWalletAddress" class="text-sm text-gray-600">
-                                <strong>解密后钱包地址:</strong> <span x-text="testWalletAddress"></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <form method="POST" action="{{ url_for('admin.update_private_key_v2') }}" class="space-y-4">
             
-            <!-- 部署说明 -->
-            <div class="border-t pt-6">
-                <h3 class="text-lg font-medium text-gray-700 mb-4">服务器部署说明</h3>
-                
-                <div class="bg-gray-50 rounded-md p-4">
-                    <h4 class="font-medium text-gray-700 mb-2">环境变量设置</h4>
-                    <pre class="text-sm text-gray-600 bg-gray-100 p-3 rounded overflow-x-auto"><code># 1. 设置加密密码（必需）
-export CRYPTO_PASSWORD='your_very_strong_password_here'
-
-# 2. 设置加密的私钥（推荐）
-export SOLANA_PRIVATE_KEY_ENCRYPTED='your_encrypted_private_key_here'
-
-# 3. 删除明文私钥（如果存在）
-unset SOLANA_PRIVATE_KEY</code></pre>
-                    
-                    <div class="mt-4 text-sm text-gray-600">
-                        <p><strong>注意事项：</strong></p>
-                        <ul class="list-disc pl-5 space-y-1 mt-2">
-                            <li>CRYPTO_PASSWORD 应该是一个强密码，建议使用密钥管理系统存储</li>
-                            <li>加密私钥可以安全地存储在配置文件中</li>
-                            <li>系统会优先使用加密私钥，如果不可用则回退到明文私钥</li>
-                            <li>建议定期轮换加密密码和私钥</li>
-                        </ul>
+            <!-- 当前钱包状态 -->
+            <div class="bg-gray-50 rounded-md p-4">
+                <h3 class="text-sm font-medium text-gray-700 mb-2">{{ _('Current Wallet Status') }}</h3>
+                <div x-data="{ walletInfo: null }" x-init="loadWalletInfo()">
+                    <div x-show="walletInfo">
+                        <p class="text-sm text-gray-600">
+                            {{ _('Address') }}: <span x-text="walletInfo?.address" class="font-mono"></span>
+                        </p>
+                        <p class="text-sm text-gray-600">
+                            {{ _('Balance') }}: <span x-text="walletInfo?.balance" class="font-mono"></span> SOL
+                        </p>
+                    </div>
+                    <div x-show="!walletInfo" class="text-sm text-red-600">
+                        {{ _('No wallet configured or unable to load wallet information') }}
                     </div>
                 </div>
             </div>
-        </div>
+
+            <!-- 加密密码 -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ _('Encryption Password') }}
+                </label>
+                <input type="password" 
+                       name="crypto_password" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="{{ _('Enter encryption password') }}">
+                <p class="text-sm text-gray-500 mt-1">{{ _('Required for encrypting/decrypting private keys') }}</p>
+            </div>
+
+            <!-- 私钥输入 -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ _('Private Key') }}
+                </label>
+                <textarea name="private_key" 
+                          rows="3"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="{{ _('Enter private key (Base58, Hex, or Base64 format)') }}"></textarea>
+                <p class="text-sm text-gray-500 mt-1">{{ _('Private key will be encrypted before storage') }}</p>
+            </div>
+
+            <div class="flex justify-end space-x-3">
+                <button type="button" 
+                        @click="testWalletConnection()"
+                        class="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                    {{ _('Test Connection') }}
+                </button>
+                <button type="submit" 
+                        class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
+                    {{ _('Update Private Key') }}
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
 <script>
 function settingsManager() {
     return {
-        privateKey: '',
-        encryptedKey: '',
-        walletAddress: '',
-        encrypting: false,
+        walletInfo: null,
         
-        testEncryptedKey: '',
-        testResult: false,
-        testSuccess: false,
-        testMessage: '',
-        testWalletAddress: '',
-        testing: false,
-        
-        async encryptPrivateKey() {
-            if (!this.privateKey.trim()) {
-                alert('请输入私钥');
-                return;
-            }
-            
-            this.encrypting = true;
+        async loadWalletInfo() {
             try {
-                const response = await fetch('/admin/v2/api/crypto/encrypt-key', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        private_key: this.privateKey.trim()
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    this.encryptedKey = data.encrypted_key;
-                    this.walletAddress = data.wallet_address;
-                    alert('私钥加密成功！');
-                } else {
-                    alert('加密失败: ' + data.error);
+                const response = await fetch('/api/admin/wallet-info');
+                if (response.ok) {
+                    this.walletInfo = await response.json();
                 }
             } catch (error) {
-                console.error('加密私钥失败:', error);
-                alert('加密失败: ' + error.message);
-            } finally {
-                this.encrypting = false;
+                console.error('Failed to load wallet info:', error);
             }
         },
         
-        async testEncryptedKey() {
-            if (!this.testEncryptedKey.trim()) {
-                alert('请输入要测试的加密私钥');
-                return;
-            }
-            
-            this.testing = true;
-            this.testResult = false;
-            
+        async testWalletConnection() {
             try {
-                const response = await fetch('/admin/v2/api/crypto/test-key', {
+                const response = await fetch('/api/admin/test-wallet', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        encrypted_key: this.testEncryptedKey.trim()
-                    })
+                    }
                 });
                 
-                const data = await response.json();
-                
-                this.testResult = true;
-                this.testSuccess = data.success;
-                this.testMessage = data.success ? data.message : data.error;
-                this.testWalletAddress = data.wallet_address || '';
-                
+                const result = await response.json();
+                if (result.success) {
+                    alert('{{ _("Wallet connection successful!") }}');
+                    this.loadWalletInfo();
+                } else {
+                    alert('{{ _("Wallet connection failed:") }} ' + result.error);
+                }
             } catch (error) {
-                console.error('测试加密私钥失败:', error);
-                this.testResult = true;
-                this.testSuccess = false;
-                this.testMessage = '测试失败: ' + error.message;
-                this.testWalletAddress = '';
-            } finally {
-                this.testing = false;
-            }
-        },
-        
-        async copyToClipboard(text) {
-            try {
-                await navigator.clipboard.writeText(text);
-                alert('已复制到剪贴板');
-            } catch (error) {
-                console.error('复制失败:', error);
-                alert('复制失败，请手动复制');
+                alert('{{ _("Connection test failed:") }} ' + error.message);
             }
         }
     }
