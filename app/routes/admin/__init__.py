@@ -224,6 +224,9 @@ def load_encrypted_key():
     try:
         from app.models.admin import SystemConfig
         from app.utils.crypto_manager import get_crypto_manager
+        from app.utils.solana_compat.keypair import Keypair
+        import base58
+        import base64
         
         # 获取加密的私钥和密码
         encrypted_key = SystemConfig.get_value('SOLANA_PRIVATE_KEY_ENCRYPTED')
@@ -251,23 +254,41 @@ def load_encrypted_key():
             user_crypto = get_crypto_manager()
             private_key = user_crypto.decrypt_private_key(encrypted_key)
             
-            # 验证私钥格式
-            from app.utils.helpers import get_solana_keypair_from_env
-            os.environ['TEMP_PRIVATE_KEY'] = private_key
-            result = get_solana_keypair_from_env('TEMP_PRIVATE_KEY')
-            del os.environ['TEMP_PRIVATE_KEY']
+            # 直接验证私钥格式，不依赖环境变量
+            try:
+                # 检测私钥格式并转换
+                if len(private_key) == 128:  # 十六进制格式
+                    private_key_bytes = bytes.fromhex(private_key)
+                elif len(private_key) == 88:  # Base64格式
+                    private_key_bytes = base64.b64decode(private_key)
+                else:  # Base58格式
+                    private_key_bytes = base58.b58decode(private_key)
+                
+                # 处理不同长度的私钥
+                if len(private_key_bytes) == 64:
+                    # 标准64字节格式，前32字节是私钥
+                    seed = private_key_bytes[:32]
+                elif len(private_key_bytes) == 32:
+                    # 仅私钥
+                    seed = private_key_bytes
+                elif len(private_key_bytes) == 66:
+                    # 可能包含校验和，取前32字节作为私钥
+                    seed = private_key_bytes[:32]
+                else:
+                    raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}字节")
+                
+                # 创建密钥对验证
+                keypair = Keypair.from_seed(seed)
+                wallet_address = str(keypair.public_key)
+                
+            except Exception as e:
+                return jsonify({'success': False, 'error': f'私钥格式错误: {str(e)}'}), 400
             
-            if not result:
-                return jsonify({'success': False, 'error': '解密后的私钥无效'})
-            
-            # 设置环境变量
-            os.environ['SOLANA_PRIVATE_KEY_ENCRYPTED'] = encrypted_key
-            
-            current_app.logger.info(f"成功加载加密私钥，钱包地址: {result['public_key']}")
+            current_app.logger.info(f"成功加载加密私钥，钱包地址: {wallet_address}")
             
             return jsonify({
                 'success': True,
-                'wallet_address': result['public_key'],
+                'wallet_address': wallet_address,
                 'message': '加密私钥已成功加载'
             })
             
@@ -493,25 +514,75 @@ def test_api():
 def get_wallet_info():
     """获取钱包信息API"""
     try:
-        from app.utils.helpers import get_solana_keypair_from_env
+        from app.models.admin import SystemConfig
+        from app.utils.crypto_manager import get_crypto_manager
+        from app.utils.solana_compat.keypair import Keypair
+        import base58
+        import base64
         
-        # 获取钱包信息
-        keypair_info = get_solana_keypair_from_env()
+        # 尝试从数据库获取加密的私钥
+        encrypted_key = SystemConfig.get_value('SOLANA_PRIVATE_KEY_ENCRYPTED')
+        encrypted_password = SystemConfig.get_value('CRYPTO_PASSWORD_ENCRYPTED')
         
-        if not keypair_info:
+        if not encrypted_key or not encrypted_password:
             return jsonify({
                 'address': None,
                 'balance': 0,
                 'status': 'not_configured'
             })
         
-        # TODO: 这里可以添加余额查询逻辑
-        # 暂时返回模拟数据
-        return jsonify({
-            'address': keypair_info['public_key'],
-            'balance': '0.0',  # 实际应该查询Solana网络
-            'status': 'configured'
-        })
+        try:
+            # 解密私钥
+            import os
+            original_password = os.environ.get('CRYPTO_PASSWORD')
+            os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+            
+            system_crypto = get_crypto_manager()
+            crypto_password = system_crypto.decrypt_private_key(encrypted_password)
+            
+            os.environ['CRYPTO_PASSWORD'] = crypto_password
+            user_crypto = get_crypto_manager()
+            private_key = user_crypto.decrypt_private_key(encrypted_key)
+            
+            # 解析私钥并生成地址
+            if len(private_key) == 128:  # 十六进制格式
+                private_key_bytes = bytes.fromhex(private_key)
+            elif len(private_key) == 88:  # Base64格式
+                private_key_bytes = base64.b64decode(private_key)
+            else:  # Base58格式
+                private_key_bytes = base58.b58decode(private_key)
+            
+            # 处理不同长度的私钥
+            if len(private_key_bytes) == 64:
+                seed = private_key_bytes[:32]
+            elif len(private_key_bytes) == 32:
+                seed = private_key_bytes
+            elif len(private_key_bytes) == 66:
+                seed = private_key_bytes[:32]
+            else:
+                raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}字节")
+            
+            keypair = Keypair.from_seed(seed)
+            wallet_address = str(keypair.public_key)
+            
+            # 恢复原始密码
+            if original_password:
+                os.environ['CRYPTO_PASSWORD'] = original_password
+            
+            return jsonify({
+                'address': wallet_address,
+                'balance': '0.0',  # 实际应该查询Solana网络
+                'status': 'configured'
+            })
+            
+        except Exception as decrypt_error:
+            current_app.logger.error(f"解密私钥失败: {decrypt_error}")
+            return jsonify({
+                'address': None,
+                'balance': 0,
+                'status': 'error',
+                'error': f'解密失败: {str(decrypt_error)}'
+            })
         
     except Exception as e:
         current_app.logger.error(f"获取钱包信息失败: {str(e)}")
@@ -527,23 +598,72 @@ def get_wallet_info():
 def test_wallet_connection():
     """测试钱包连接API"""
     try:
-        from app.utils.helpers import get_solana_keypair_from_env
+        from app.models.admin import SystemConfig
+        from app.utils.crypto_manager import get_crypto_manager
+        from app.utils.solana_compat.keypair import Keypair
+        import base58
+        import base64
         
-        # 测试钱包连接
-        keypair_info = get_solana_keypair_from_env()
+        # 尝试从数据库获取加密的私钥
+        encrypted_key = SystemConfig.get_value('SOLANA_PRIVATE_KEY_ENCRYPTED')
+        encrypted_password = SystemConfig.get_value('CRYPTO_PASSWORD_ENCRYPTED')
         
-        if not keypair_info:
+        if not encrypted_key or not encrypted_password:
             return jsonify({
                 'success': False,
                 'error': '未配置钱包或私钥无效'
             })
         
-        # 如果能成功获取密钥对，说明连接正常
-        return jsonify({
-            'success': True,
-            'message': '钱包连接测试成功',
-            'address': keypair_info['public_key']
-        })
+        try:
+            # 解密私钥
+            import os
+            original_password = os.environ.get('CRYPTO_PASSWORD')
+            os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+            
+            system_crypto = get_crypto_manager()
+            crypto_password = system_crypto.decrypt_private_key(encrypted_password)
+            
+            os.environ['CRYPTO_PASSWORD'] = crypto_password
+            user_crypto = get_crypto_manager()
+            private_key = user_crypto.decrypt_private_key(encrypted_key)
+            
+            # 解析私钥并生成地址
+            if len(private_key) == 128:  # 十六进制格式
+                private_key_bytes = bytes.fromhex(private_key)
+            elif len(private_key) == 88:  # Base64格式
+                private_key_bytes = base64.b64decode(private_key)
+            else:  # Base58格式
+                private_key_bytes = base58.b58decode(private_key)
+            
+            # 处理不同长度的私钥
+            if len(private_key_bytes) == 64:
+                seed = private_key_bytes[:32]
+            elif len(private_key_bytes) == 32:
+                seed = private_key_bytes
+            elif len(private_key_bytes) == 66:
+                seed = private_key_bytes[:32]
+            else:
+                raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}字节")
+            
+            keypair = Keypair.from_seed(seed)
+            wallet_address = str(keypair.public_key)
+            
+            # 恢复原始密码
+            if original_password:
+                os.environ['CRYPTO_PASSWORD'] = original_password
+            
+            return jsonify({
+                'success': True,
+                'message': '钱包连接测试成功',
+                'address': wallet_address
+            })
+            
+        except Exception as decrypt_error:
+            current_app.logger.error(f"解密私钥失败: {decrypt_error}")
+            return jsonify({
+                'success': False,
+                'error': f'解密失败: {str(decrypt_error)}'
+            })
         
     except Exception as e:
         current_app.logger.error(f"钱包连接测试失败: {str(e)}")
