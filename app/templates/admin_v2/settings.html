@@ -44,7 +44,7 @@
                        value="{{ configs.get('PLATFORM_FEE_BASIS_POINTS', '250') }}"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                        min="0" max="10000">
-                <p class="text-sm text-gray-500 mt-1">{{ _('1 basis point = 0.01%, default is 250 (2.5%)') }}</p>
+                <p class="text-sm text-gray-500 mt-1">1 basis point = 0.01%%, default is 250 (2.5%%)</p>
             </div>
 
             <!-- 平台收款地址 -->
@@ -198,13 +198,13 @@ function settingsManager() {
                 
                 const result = await response.json();
                 if (result.success) {
-                    alert('{{ _("Wallet connection successful!") }}');
+                    alert('Wallet connection successful!');
                     this.loadWalletInfo();
                 } else {
-                    alert('{{ _("Wallet connection failed:") }} ' + result.error);
+                    alert('Wallet connection failed: ' + result.error);
                 }
             } catch (error) {
-                alert('{{ _("Connection test failed:") }} ' + error.message);
+                alert('Connection test failed: ' + error.message);
             }
         }
     }
