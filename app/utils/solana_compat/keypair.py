@@ -8,8 +8,7 @@ class Keypair:
     def __init__(self, keypair_bytes: Optional[bytes] = None):
         """Initialize from keypair bytes."""
         if keypair_bytes is None:
-            # 生成随机密钥对（简化实现）
-            self._secret = bytes([1] * 32)
+            raise ValueError("必须提供有效的私钥，不允许使用默认私钥")
         else:
             if len(keypair_bytes) != 64:
                 raise ValueError(f"Invalid keypair length: {len(keypair_bytes)}")
