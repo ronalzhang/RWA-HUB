@@ -140,7 +140,7 @@ class SolanaClient:
                                 private_key_bytes = private_key_bytes[:32]
                             auth_method = "env_private_key_hex"
                         elif key_type == 'base64':
-                                private_key_bytes = base64.b64decode(private_key_str)
+                            private_key_bytes = base64.b64decode(private_key_str)
                             # 如果是64字节，取前32字节
                             if len(private_key_bytes) == 64:
                                 private_key_bytes = private_key_bytes[:32]
