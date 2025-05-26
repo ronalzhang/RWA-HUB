@@ -72,7 +72,7 @@ def get_users_list():
         # 搜索条件
         if search:
             query = query.filter(or_(
-                User.wallet_address.ilike(f'%{search}%'),
+                User.eth_address.ilike(f'%{search}%'),
                 User.username.ilike(f'%{search}%'),
                 User.email.ilike(f'%{search}%')
             ))
@@ -109,17 +109,16 @@ def get_users_list():
         # 格式化响应数据
         user_list = []
         for user in users:
-            # 获取交易次数
-            trade_count = Trade.query.filter(or_(
-                Trade.buyer_address == user.wallet_address,
-                Trade.seller_address == user.wallet_address
-            )).count()
+            # 获取交易次数（使用正确的字段名）
+            trade_count = Trade.query.filter(
+                Trade.trader_address == user.eth_address
+            ).count()
             
             # 获取持有资产数
-            assets_count = Asset.query.filter_by(creator_address=user.wallet_address).count()
+            assets_count = Asset.query.filter_by(creator_address=user.eth_address).count()
             
             user_list.append({
-                'wallet_address': user.wallet_address,
+                'wallet_address': user.eth_address,
                 'username': user.username,
                 'email': user.email,
                 'is_verified': bool(getattr(user, 'is_verified', False)),
@@ -176,7 +175,7 @@ def get_user_stats():
 def set_distributor(address):
     """设置用户为分销商"""
     try:
-        user = User.query.filter_by(wallet_address=address).first()
+        user = User.query.filter_by(eth_address=address).first()
         if not user:
             return jsonify({'error': '用户不存在'}), 404
         
@@ -198,7 +197,7 @@ def set_distributor(address):
 def block_user(address):
     """冻结用户"""
     try:
-        user = User.query.filter_by(wallet_address=address).first()
+        user = User.query.filter_by(eth_address=address).first()
         if not user:
             return jsonify({'error': '用户不存在'}), 404
         
@@ -220,7 +219,7 @@ def block_user(address):
 def unblock_user(address):
     """解冻用户"""
     try:
-        user = User.query.filter_by(wallet_address=address).first()
+        user = User.query.filter_by(eth_address=address).first()
         if not user:
             return jsonify({'error': '用户不存在'}), 404
         
@@ -256,7 +255,7 @@ def export_users():
         # 应用筛选条件
         if search:
             query = query.filter(or_(
-                User.wallet_address.ilike(f'%{search}%'),
+                User.eth_address.ilike(f'%{search}%'),
                 User.username.ilike(f'%{search}%'),
                 User.email.ilike(f'%{search}%')
             ))
@@ -274,7 +273,7 @@ def export_users():
         # 写入用户数据
         for user in users:
             writer.writerow([
-                user.wallet_address,
+                user.eth_address,
                 user.username or '',
                 user.email or '',
                 user.created_at.strftime('%Y-%m-%d %H:%M:%S'),
