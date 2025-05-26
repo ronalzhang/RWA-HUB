@@ -2256,18 +2256,44 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 分享资产功能
         function shareAsset() {
-            // 检查用户是否已连接钱包
-            if (!window.walletState || !window.walletState.isConnected || !window.walletState.address) {
+            // 检查用户是否已连接钱包 - 使用多种方法检查
+            let address = null;
+            
+            // 方法1: 检查window.walletState
+            if (window.walletState && window.walletState.isConnected && window.walletState.address) {
+                address = window.walletState.address;
+            }
+            
+            // 方法2: 检查全局变量
+            if (!address && window.currentWalletAddress) {
+                address = window.currentWalletAddress;
+            }
+            
+            // 方法3: 检查localStorage
+            if (!address) {
+                address = localStorage.getItem('walletAddress') || localStorage.getItem('connectedWallet');
+            }
+            
+            // 方法4: 检查cookie
+            if (!address) {
+                address = getCookie('eth_address') || getCookie('wallet_address');
+            }
+            
+            // 方法5: 检查页面中的用户地址
+            if (!address && typeof getCurrentUserAddress === 'function') {
+                address = getCurrentUserAddress();
+            }
+            
+            if (!address) {
                 alert('{{ _("Please connect your wallet first to generate your exclusive sharing link") }}');
                 // 调用全局钱包连接函数
                 if (typeof toggleWalletMenu === 'function') {
                     toggleWalletMenu();
+                } else if (typeof connectWallet === 'function') {
+                    connectWallet();
                 }
                 return;
             }
-            
-            // 获取当前用户的钱包地址
-            const address = window.walletState.address;
             
             // 从服务器获取分享文案，如果失败则使用默认文案
             fetch('/api/share-messages/random')
@@ -2515,14 +2541,14 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <!-- 分红管理按钮 - 管理员和资产所有者可见 -->
         <div class="d-flex align-items-center gap-2">
-            <button class="btn btn-outline-success" id="shareAssetBtn" onclick="shareAsset()">
-                <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
-            </button>
             {% if is_admin_user or is_owner %}
             <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary" id="dividendManagementBtn" data-token-symbol="{{ asset.token_symbol }}" style="display: none;">
                 <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
             </a>
             {% endif %}
+            <button class="btn btn-outline-success" id="shareAssetBtn" onclick="shareAsset()">
+                <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
+            </button>
         </div>
     </div>
     
@@ -2542,12 +2568,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 {% endif %}
             </div>
             <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-outline-success d-md-none d-block" id="shareAssetBtnMobile" onclick="shareAsset()">
-                    <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
-                </button>
-                <button class="btn btn-outline-success d-none d-md-block d-lg-none" id="shareAssetBtnMedium" onclick="shareAsset()">
-                    <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
-                </button>
                 {% if is_admin_user or is_owner %}
                 <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-sm btn-outline-primary d-md-none d-block" id="dividendManagementBtnMobile" data-token-symbol="{{ asset.token_symbol }}" style="display: none;">
                     <i class="fas fa-coins me-2"></i>{{ _('Dividend') }}
@@ -2556,6 +2576,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
                 </a>
                 {% endif %}
+                <button class="btn btn-sm btn-outline-success d-md-none d-block" id="shareAssetBtnMobile" onclick="shareAsset()">
+                    <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
+                </button>
+                <button class="btn btn-outline-success d-none d-md-block d-lg-none" id="shareAssetBtnMedium" onclick="shareAsset()">
+                    <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
+                </button>
             </div>
         </div>
     </div>
