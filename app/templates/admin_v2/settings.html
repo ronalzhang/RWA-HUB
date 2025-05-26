@@ -159,6 +159,11 @@
 
             <div class="flex justify-end space-x-3">
                 <button type="button" 
+                        @click="testAPI()"
+                        class="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    {{ _('Test API') }}
+                </button>
+                <button type="button" 
                         @click="testWalletConnection()"
                         class="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">
                     {{ _('Test Connection') }}
@@ -188,6 +193,28 @@ function settingsManager() {
                 }
             } catch (error) {
                 console.error('Failed to load wallet info:', error);
+            }
+        },
+        
+        async testAPI() {
+            try {
+                const response = await fetch('/admin/v2/api/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        test: 'data',
+                        timestamp: new Date().toISOString()
+                    })
+                });
+                
+                const result = await response.json();
+                alert('API Test Result: ' + JSON.stringify(result, null, 2));
+                
+            } catch (error) {
+                alert('API Test Failed: ' + error.message);
             }
         },
         
