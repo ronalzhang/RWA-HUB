@@ -887,6 +887,7 @@ class AssetService:
         try:
             from app.models import User, db
             from datetime import datetime
+            from flask import current_app
             
             # 标准化钱包地址
             wallet_address = wallet_address.strip()
@@ -899,17 +900,19 @@ class AssetService:
                 if not user:
                     # 创建新用户
                     user = User(
+                        username=f"user_{wallet_address[:8]}",
+                        email=f"{wallet_address[:8]}@phantom.wallet",
                         solana_address=wallet_address,
                         wallet_type=wallet_type,
                         created_at=datetime.utcnow(),
-                        last_login=datetime.utcnow(),
+                        last_login_at=datetime.utcnow(),
                         is_active=True
                     )
                     db.session.add(user)
                     current_app.logger.info(f"创建新Solana用户: {wallet_address}")
                 else:
                     # 更新现有用户
-                    user.last_login = datetime.utcnow()
+                    user.last_login_at = datetime.utcnow()
                     user.wallet_type = wallet_type
                     user.is_active = True
                     current_app.logger.info(f"更新现有Solana用户: {wallet_address}")
@@ -921,17 +924,19 @@ class AssetService:
                 if not user:
                     # 创建新用户
                     user = User(
+                        username=f"user_{wallet_address[:8]}",
+                        email=f"{wallet_address[:8]}@ethereum.wallet",
                         eth_address=wallet_address,
                         wallet_type=wallet_type,
                         created_at=datetime.utcnow(),
-                        last_login=datetime.utcnow(),
+                        last_login_at=datetime.utcnow(),
                         is_active=True
                     )
                     db.session.add(user)
                     current_app.logger.info(f"创建新以太坊用户: {wallet_address}")
                 else:
                     # 更新现有用户
-                    user.last_login = datetime.utcnow()
+                    user.last_login_at = datetime.utcnow()
                     user.wallet_type = wallet_type
                     user.is_active = True
                     current_app.logger.info(f"更新现有以太坊用户: {wallet_address}")
@@ -942,11 +947,13 @@ class AssetService:
             # 返回用户信息
             return {
                 'id': user.id,
+                'username': user.username,
+                'email': user.email,
                 'eth_address': user.eth_address,
                 'solana_address': user.solana_address,
                 'wallet_type': user.wallet_type,
                 'created_at': user.created_at.isoformat() if user.created_at else None,
-                'last_login': user.last_login.isoformat() if user.last_login else None,
+                'last_login_at': user.last_login_at.isoformat() if user.last_login_at else None,
                 'is_active': user.is_active
             }
             
