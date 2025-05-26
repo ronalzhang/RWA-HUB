@@ -1499,23 +1499,31 @@ async function processPayment() {
                 }
             }
             
-            // 配置平台收款地址和费用（固定值，简化测试）
-            let platformAddress = 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4';
-            let feeAmount = 0.01; // 固定0.01 USDC的低费用用于测试
+            // 从API获取支付配置（不使用硬编码地址）
+            let platformAddress = null;
+            let feeAmount = null;
             
             try {
-                // 尝试从API获取最新的支付配置
+                // 从API获取最新的支付配置
                 const configResponse = await fetch('/api/service/config/payment_settings');
-                if (configResponse.ok) {
-                    const configData = await configResponse.json();
-                    // 使用资产创建收款地址，如果没有则使用平台收款地址
-                    platformAddress = configData.asset_creation_fee_address || configData.platform_fee_address || platformAddress;
-                    feeAmount = parseFloat(configData.creation_fee?.amount) || feeAmount;
-                    console.log('从API获取支付配置成功:', configData);
-                    console.log(`使用收款地址: ${platformAddress}, 费用: ${feeAmount} USDC`);
+                if (!configResponse.ok) {
+                    throw new Error(`获取支付配置失败: HTTP ${configResponse.status}`);
                 }
+                
+                const configData = await configResponse.json();
+                // 使用资产创建收款地址，如果没有则使用平台收款地址
+                platformAddress = configData.asset_creation_fee_address || configData.platform_fee_address;
+                feeAmount = parseFloat(configData.creation_fee?.amount);
+                
+                if (!platformAddress || !feeAmount) {
+                    throw new Error('API返回的支付配置不完整');
+                }
+                
+                console.log('从API获取支付配置成功:', configData);
+                console.log(`使用收款地址: ${platformAddress}, 费用: ${feeAmount} USDC`);
             } catch (configError) {
-                console.warn('获取支付配置失败，使用默认值:', configError);
+                console.error('获取支付配置失败:', configError);
+                throw new Error(`无法获取支付配置: ${configError.message}`);
             }
             
             console.log(`准备支付 ${feeAmount} USDC 到 ${platformAddress}`);

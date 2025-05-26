@@ -34,7 +34,8 @@ SOLANA_RPC_URL = os.environ.get("SOLANA_RPC_URL", "https://api.devnet.solana.com
 # 使用一个有效的测试程序 ID
 USDC_MINT = os.environ.get("SOLANA_USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
 PROGRAM_ID = os.environ.get("SOLANA_PROGRAM_ID", "9AcvoQmz22KRcMhkLkeSkKs8W7ru6oae8GHcxrS83fKz")
-PLATFORM_FEE_ADDRESS = os.environ.get("PLATFORM_FEE_ADDRESS", "EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4")
+# 平台费用地址现在通过ConfigManager动态获取，不再使用硬编码
+# PLATFORM_FEE_ADDRESS = os.environ.get("PLATFORM_FEE_ADDRESS", "EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4")
 
 # 指令类型枚举
 INSTRUCTION_INITIALIZE_ASSET = 0
@@ -58,7 +59,10 @@ class SolanaClient:
         
         self.program_id = PublicKey(PROGRAM_ID)
         self.usdc_mint = PublicKey(USDC_MINT)
-        self.platform_fee_address = PublicKey(PLATFORM_FEE_ADDRESS)
+        # 动态获取平台费用地址
+        from app.utils.config_manager import ConfigManager
+        platform_fee_addr = ConfigManager.get_platform_fee_address()
+        self.platform_fee_address = PublicKey(platform_fee_addr)
     
     def _init_client(self):
         """初始化Solana RPC客户端，尝试多个节点"""

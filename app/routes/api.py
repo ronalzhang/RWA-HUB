@@ -848,7 +848,8 @@ def prepare_purchase():
         
         # 从系统配置获取平台收款地址
         from app.models.admin import SystemConfig
-        platform_address = SystemConfig.get_value('PLATFORM_FEE_ADDRESS', 'EmjrXAuA6m6YxAcXhiLSFcQEFSrxmGbXuK4nvUVs5Po7')
+        from app.utils.config_manager import ConfigManager
+        platform_address = ConfigManager.get_platform_fee_address()
         
         # 生成交易ID
         import uuid

@@ -24,18 +24,6 @@ class Config:
     
     # 管理员配置
     ADMIN_CONFIG = {
-        '0x6394993426DBA3b654eF0052698Fe9E0B6A98870': {
-            'role': 'super_admin',
-            'name': '超级管理员',
-            'level': 1,
-            'permissions': ['审核', '编辑', '删除', '发布公告', '管理用户', '查看统计']
-        },
-        '0x124e5B8A4E6c68eC66e181E0B54817b12D879c57': {
-            'role': '副管理员',
-            'name': '副管理员',
-            'level': 2,
-            'permissions': ['审核', '编辑', '查看统计']
-        },
         'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4': {
             'role': 'super_admin',
             'name': 'SOL超级管理员',
@@ -66,7 +54,8 @@ class Config:
     SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')
     SOLANA_PROGRAM_ID = os.environ.get('SOLANA_PROGRAM_ID')
     SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT')
-    PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4')
+    # 平台费用地址现在通过ConfigManager动态获取，不再使用硬编码
+    # PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4')
     PLATFORM_FEE_RATE = float(os.environ.get('PLATFORM_FEE_RATE', 0.035))  # 3.5%平台费率
     PLATFORM_FEE_BASIS_POINTS = int(os.environ.get('PLATFORM_FEE_BASIS_POINTS', 350))  # 3.5%平台费率，以基点表示
     

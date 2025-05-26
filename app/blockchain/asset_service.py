@@ -81,7 +81,8 @@ class AssetService:
                 
             # 如果没有找到私钥，使用只读模式
             logger.warning("未找到钱包私钥，回退到只读模式")
-            user_wallet = "EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4"
+            from app.utils.config_manager import ConfigManager
+            user_wallet = ConfigManager.get_platform_fee_address()
             logger.info(f"使用钱包地址（只读模式）: {user_wallet}")
             self.solana_client = SolanaClient(wallet_address=user_wallet)
         
@@ -443,7 +444,8 @@ class AssetService:
             else:
                 # 如果没有私钥，使用只读模式
                 logger.warning("未找到钱包私钥，使用只读模式")
-                solana_client = SolanaClient(wallet_address="EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4")
+                from app.utils.config_manager import ConfigManager
+            solana_client = SolanaClient(wallet_address=ConfigManager.get_platform_fee_address())
             
             # 检查客户端是否成功初始化了公钥
             if not solana_client.public_key:

@@ -21,6 +21,7 @@ import requests
 import re
 import mimetypes
 from app.config import Config
+from app.utils.config_manager import ConfigManager
 import traceback
 import uuid
 import time
@@ -210,7 +211,7 @@ def asset_detail_by_symbol(token_symbol):
             'is_admin_user': is_admin_user,
             'current_user_address': current_user_address,
             'total_dividends': total_dividends,
-            'platform_fee_address': Config.PLATFORM_FEE_ADDRESS,
+            'platform_fee_address': ConfigManager.get_platform_fee_address(),
             'PLATFORM_FEE_RATE': getattr(Config, 'PLATFORM_FEE_RATE', 0.035)
         }
         current_app.logger.info(f'[DETAIL_PAGE_CONTEXT] Context keys: {list(context.keys())}')
