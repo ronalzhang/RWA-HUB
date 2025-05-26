@@ -112,7 +112,8 @@
             </div>
         </div>
 
-        <form method="POST" action="{{ url_for('admin.update_private_key_v2') }}" class="space-y-4">
+        <!-- 私钥管理表单 -->
+        <div class="space-y-4">
             
             <!-- 当前钱包状态 -->
             <div class="bg-gray-50 rounded-md p-4">
@@ -138,7 +139,7 @@
                     {{ _('Encryption Password') }}
                 </label>
                 <input type="password" 
-                       name="crypto_password" 
+                       x-model="cryptoPassword"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                        placeholder="{{ _('Enter encryption password') }}">
                 <p class="text-sm text-gray-500 mt-1">{{ _('Required for encrypting/decrypting private keys') }}</p>
@@ -149,7 +150,7 @@
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     {{ _('Private Key') }}
                 </label>
-                <textarea name="private_key" 
+                <textarea x-model="privateKey"
                           rows="3"
                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           placeholder="{{ _('Enter private key (Base58, Hex, or Base64 format)') }}"></textarea>
@@ -162,12 +163,13 @@
                         class="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">
                     {{ _('Test Connection') }}
                 </button>
-                <button type="submit" 
+                <button type="button" 
+                        @click="encryptPrivateKey()"
                         class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
-                    {{ _('Update Private Key') }}
+                    {{ _('Encrypt & Save Private Key') }}
                 </button>
             </div>
-        </form>
+        </div>
     </div>
 </div>
 
@@ -175,6 +177,8 @@
 function settingsManager() {
     return {
         walletInfo: null,
+        cryptoPassword: '',
+        privateKey: '',
         
         async loadWalletInfo() {
             try {
@@ -205,6 +209,51 @@ function settingsManager() {
                 }
             } catch (error) {
                 alert('Connection test failed: ' + error.message);
+            }
+        },
+        
+        async encryptPrivateKey() {
+            if (!this.privateKey) {
+                alert('Please enter a private key');
+                return;
+            }
+            
+            if (!this.cryptoPassword) {
+                alert('Please enter encryption password');
+                return;
+            }
+            
+            try {
+                // 先设置加密密码
+                const tempEnv = window.localStorage.getItem('temp_crypto_password');
+                window.localStorage.setItem('temp_crypto_password', this.cryptoPassword);
+                
+                const response = await fetch('/admin/v2/api/crypto/encrypt-key', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        private_key: this.privateKey
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('Private key encrypted successfully!\\nWallet Address: ' + result.wallet_address + '\\nEncrypted Key: ' + result.encrypted_key.substring(0, 50) + '...');
+                    this.privateKey = '';
+                    this.cryptoPassword = '';
+                    this.loadWalletInfo();
+                } else {
+                    alert('Encryption failed: ' + result.error);
+                }
+                
+                // 清理临时密码
+                window.localStorage.removeItem('temp_crypto_password');
+                
+            } catch (error) {
+                alert('Encryption failed: ' + error.message);
+                window.localStorage.removeItem('temp_crypto_password');
             }
         }
     }

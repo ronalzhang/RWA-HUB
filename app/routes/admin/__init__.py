@@ -5,7 +5,7 @@
 - 优化代码结构和可维护性
 """
 
-from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify, current_app
+from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify, current_app, session
 
 # 创建蓝图
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -88,11 +88,11 @@ def settings_v2():
 def update_settings_v2():
     """更新系统设置"""
     from app.models.admin import SystemConfig
-    from flask import request, flash, redirect, url_for
+    from flask import request, flash, redirect, url_for, g
     
     try:
         # 获取管理员地址
-        admin_address = request.headers.get('X-Eth-Address') or request.cookies.get('eth_address') or session.get('eth_address')
+        admin_address = getattr(g, 'eth_address', None) or session.get('admin_wallet_address')
         
         # 更新配置
         config_updates = {
@@ -105,7 +105,7 @@ def update_settings_v2():
         
         for key, value in config_updates.items():
             if value is not None:
-                SystemConfig.set_value(key, value, f'Updated by admin {admin_address}', admin_address)
+                SystemConfig.set_value(key, value, f'Updated by admin {admin_address}')
         
         flash('系统设置已成功更新', 'success')
         
