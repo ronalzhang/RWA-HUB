@@ -261,6 +261,42 @@ def set_temp_env():
         current_app.logger.error(f"设置临时环境变量失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@admin_bp.route('/test-simple')
+def test_simple():
+    """简单的测试页面"""
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>API Test</title>
+    </head>
+    <body>
+        <h1>API Test Page</h1>
+        <button onclick="testAPI()">Test API</button>
+        <div id="result"></div>
+        
+        <script>
+        async function testAPI() {
+            try {
+                const response = await fetch('/admin/v2/api/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({test: 'data'})
+                });
+                
+                const result = await response.json();
+                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('result').innerHTML = 'Error: ' + error.message;
+            }
+        }
+        </script>
+    </body>
+    </html>
+    '''
+
 @admin_bp.route('/v2/api/test', methods=['GET', 'POST'])
 def test_api():
     """测试API，不需要认证"""
