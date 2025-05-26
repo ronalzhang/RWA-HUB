@@ -227,3 +227,20 @@ app/routes/service.py.temp
 !update_asset_onchain.py
 !deploy_tools.sh
 archive/
+
+# 安全敏感文件
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*private*
+*secret*
+*password*
+deployer-keypair.json
+wallet-keypair.json
+
+# 加密相关
+*.encrypted
+crypto_keys/
+secrets/

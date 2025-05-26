@@ -2,7 +2,17 @@ import logging
 import os
 import base64
 import base58
-from typing import Optional
+from typing import Optional, Union, Dict, Any
+from solana.keypair import Keypair
+from solana.publickey import PublicKey
+
+# 添加加密管理器导入
+try:
+    from .crypto_manager import get_decrypted_private_key, get_crypto_manager
+    CRYPTO_AVAILABLE = True
+except ImportError:
+    CRYPTO_AVAILABLE = False
+    logging.warning("加密管理器不可用，将使用明文私钥")
 
 logger = logging.getLogger(__name__)
 
@@ -32,63 +42,67 @@ def check_response(response, label="API"):
 
 def get_solana_keypair_from_env(var_name: str = "SOLANA_PRIVATE_KEY") -> Optional[dict]:
     """
-    从环境变量获取Solana私钥
+    从环境变量获取Solana密钥对，支持加密和明文私钥
+    
+    优先级：
+    1. 加密私钥 (SOLANA_PRIVATE_KEY_ENCRYPTED)
+    2. 明文私钥 (SOLANA_PRIVATE_KEY)
     
     Args:
         var_name: 环境变量名称
         
     Returns:
-        dict: 包含私钥信息的字典，格式为 {'value': private_key_string, 'type': 'base58|base64|hex'}
-              如果找不到则返回None
+        包含private_key和public_key的字典，如果失败返回None
     """
-    private_key = os.environ.get(var_name)
-    if not private_key:
-        logger.error(f"环境变量 {var_name} 未设置")
+    logger = logging.getLogger(__name__)
+    
+    # 首先尝试获取加密的私钥
+    if CRYPTO_AVAILABLE:
+        try:
+            private_key_str = get_decrypted_private_key('SOLANA_PRIVATE_KEY_ENCRYPTED')
+            logger.info("成功从加密存储获取私钥")
+        except Exception as e:
+            logger.info(f"无法从加密存储获取私钥: {e}")
+            private_key_str = None
+    else:
+        private_key_str = None
+    
+    # 如果加密私钥不可用，尝试明文私钥（向后兼容）
+    if not private_key_str:
+        private_key_str = os.environ.get(var_name)
+        if private_key_str:
+            logger.warning("使用明文私钥（不安全），建议迁移到加密存储")
+    
+    if not private_key_str:
+        logger.error("未找到Solana私钥")
         return None
     
-    # 检测私钥格式并返回原始字符串
-    private_key = private_key.strip()
-    
-    # 检测是否为Base58格式（Solana标准格式，通常88个字符）
-    if len(private_key) == 88:
-        try:
-            # 验证Base58解码是否成功且长度正确
-            decoded = base58.b58decode(private_key)
-            if len(decoded) == 64:  # Solana私钥应该是64字节（包含公钥部分）
-                logger.info(f"检测到Base58格式的Solana私钥")
-                return {'value': private_key, 'type': 'base58'}
-        except Exception as e:
-            logger.warning(f"Base58格式验证失败: {str(e)}")
-    
-    # 检测是否为十六进制格式（128个字符）
-    elif len(private_key) == 128:
-        try:
-            # 验证十六进制解码
-            decoded = bytes.fromhex(private_key)
-            if len(decoded) == 64:
-                logger.info(f"检测到十六进制格式的Solana私钥")
-                return {'value': private_key, 'type': 'hex'}
-        except Exception as e:
-            logger.warning(f"十六进制格式验证失败: {str(e)}")
-    
-    # 检测是否为Base64格式
-    elif len(private_key) in [86, 87, 88]:  # Base64编码的64字节数据
-        try:
-            decoded = base64.b64decode(private_key)
-            if len(decoded) == 64:
-                logger.info(f"检测到Base64格式的Solana私钥")
-                return {'value': private_key, 'type': 'base64'}
-        except Exception as e:
-            logger.warning(f"Base64格式验证失败: {str(e)}")
-    
-    # 如果都不匹配，尝试作为Base58处理（最常见的格式）
     try:
-        decoded = base58.b58decode(private_key)
-        if len(decoded) == 64:
-            logger.info(f"使用Base58成功解码私钥（长度: {len(private_key)}）")
-            return {'value': private_key, 'type': 'base58'}
+        # 检测私钥格式并转换
+        if len(private_key_str) == 128:  # 十六进制格式
+            private_key_bytes = bytes.fromhex(private_key_str)
+        elif len(private_key_str) == 88:  # Base64格式
+            private_key_bytes = base64.b64decode(private_key_str)
+        else:  # Base58格式
+            private_key_bytes = base58.b58decode(private_key_str)
+        
+        # 如果是64字节，取前32字节作为seed
+        if len(private_key_bytes) == 64:
+            seed = private_key_bytes[:32]
+        elif len(private_key_bytes) == 32:
+            seed = private_key_bytes
+        else:
+            raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}")
+        
+        # 创建密钥对
+        keypair = Keypair.from_seed(seed)
+        
+        return {
+            'private_key': base58.b58encode(seed).decode(),
+            'public_key': str(keypair.public_key),
+            'keypair': keypair
+        }
+        
     except Exception as e:
-        logger.warning(f"Base58解码失败: {str(e)}")
-    
-    logger.error(f"无法识别私钥格式，长度: {len(private_key)}，支持的格式：base58(88字符), hex(128字符), base64(86-88字符)")
-    return None 
+        logger.error(f"解析Solana私钥失败: {e}")
+        return None 
