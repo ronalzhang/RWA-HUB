@@ -475,7 +475,7 @@ class OnchainHistory(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             # 关联数据
             'asset_name': self.asset.name if self.asset else None,
-            'asset_symbol': self.asset.symbol if self.asset else None,
+            'asset_symbol': self.asset.token_symbol if self.asset else None,
         }
     
     @classmethod
