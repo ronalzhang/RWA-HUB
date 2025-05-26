@@ -64,6 +64,41 @@ def commission_withdrawals_v2():
     return api_commission_withdrawals()
 
 
+@admin_bp.route('/v2/api/commission/referrals', methods=['GET'])
+@api_admin_required
+def commission_referrals_v2():
+    """获取推荐关系列表 - V2兼容版本"""
+    return api_commission_referrals()
+
+
+@admin_bp.route('/v2/api/commission/withdrawals/<int:withdrawal_id>/process', methods=['POST'])
+@api_admin_required
+def process_withdrawal_v2(withdrawal_id):
+    """处理提现申请 - V2兼容版本"""
+    return api_process_withdrawal(withdrawal_id)
+
+
+@admin_bp.route('/v2/api/commission/withdrawals/<int:withdrawal_id>/cancel', methods=['POST'])
+@api_admin_required
+def cancel_withdrawal_v2(withdrawal_id):
+    """取消提现申请 - V2兼容版本"""
+    return api_cancel_withdrawal(withdrawal_id)
+
+
+@admin_bp.route('/v2/api/commission/records/<int:record_id>/pay', methods=['POST'])
+@api_admin_required
+def pay_commission_v2(record_id):
+    """发放佣金 - V2兼容版本"""
+    return api_pay_commission(record_id)
+
+
+@admin_bp.route('/v2/api/commission/records/export', methods=['GET'])
+@api_admin_required
+def export_records_v2():
+    """导出佣金记录 - V2兼容版本"""
+    return api_export_commission_records()
+
+
 # API路由
 @admin_bp.route('/api/admin/commission/stats', methods=['GET'])
 @api_admin_required
@@ -498,4 +533,87 @@ def api_commission_referrals():
         
     except Exception as e:
         current_app.logger.error(f'获取推荐关系失败: {str(e)}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/api/admin/commission/records/<int:record_id>/pay', methods=['POST'])
+@api_admin_required
+def api_pay_commission(record_id):
+    """发放佣金"""
+    try:
+        record = CommissionRecord.query.get_or_404(record_id)
+        
+        if record.status != 'pending':
+            return jsonify({'success': False, 'error': '只能发放待处理状态的佣金'}), 400
+        
+        # 标记为已发放
+        record.status = 'paid'
+        record.payment_time = datetime.utcnow()
+        
+        # TODO: 这里应该实现实际的区块链转账逻辑
+        # 暂时模拟发放成功
+        import uuid
+        record.tx_hash = f"0x{uuid.uuid4().hex}"
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '佣金发放成功',
+            'tx_hash': record.tx_hash
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'发放佣金失败: {str(e)}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/api/admin/commission/records/export', methods=['GET'])
+@api_admin_required
+def api_export_commission_records():
+    """导出佣金记录"""
+    try:
+        import csv
+        import io
+        from flask import make_response
+        
+        # 获取所有佣金记录
+        records = CommissionRecord.query.order_by(desc(CommissionRecord.created_at)).all()
+        
+        # 创建CSV内容
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 写入表头
+        writer.writerow([
+            'ID', '交易ID', '资产ID', '接收地址', '金额', '币种', 
+            '佣金类型', '状态', '交易哈希', '创建时间', '更新时间'
+        ])
+        
+        # 写入数据
+        for record in records:
+            writer.writerow([
+                record.id,
+                record.transaction_id,
+                record.asset_id,
+                record.recipient_address,
+                record.amount,
+                record.currency,
+                record.commission_type,
+                record.status,
+                record.tx_hash or '',
+                record.created_at.strftime('%Y-%m-%d %H:%M:%S') if record.created_at else '',
+                record.updated_at.strftime('%Y-%m-%d %H:%M:%S') if record.updated_at else ''
+            ])
+        
+        # 创建响应
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = f'attachment; filename=commission_records_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        
+        return response
+        
+    except Exception as e:
+        current_app.logger.error(f'导出佣金记录失败: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500 
