@@ -118,18 +118,16 @@
             <!-- 当前钱包状态 -->
             <div class="bg-gray-50 rounded-md p-4">
                 <h3 class="text-sm font-medium text-gray-700 mb-2">当前钱包状态</h3>
-                <div x-data="{ walletInfo: null }" x-init="loadWalletInfo()">
-                    <div x-show="walletInfo && walletInfo.status === 'configured'">
-                        <p class="text-sm text-gray-600">
-                            地址: <span x-text="walletInfo?.address" class="font-mono"></span>
-                        </p>
-                        <p class="text-sm text-gray-600">
-                            余额: <span x-text="walletInfo?.balance" class="font-mono"></span> SOL
-                        </p>
-                    </div>
-                    <div x-show="!walletInfo || walletInfo.status !== 'configured'" class="text-sm text-red-600">
-                        未配置钱包或无法加载钱包信息
-                    </div>
+                <div x-show="walletInfo && walletInfo.status === 'configured'">
+                    <p class="text-sm text-gray-600">
+                        地址: <span x-text="walletInfo?.address" class="font-mono"></span>
+                    </p>
+                    <p class="text-sm text-gray-600">
+                        余额: <span x-text="walletInfo?.balance" class="font-mono"></span> SOL
+                    </p>
+                </div>
+                <div x-show="!walletInfo || walletInfo.status !== 'configured'" class="text-sm text-red-600">
+                    未配置钱包或无法加载钱包信息
                 </div>
             </div>
 
@@ -278,7 +276,11 @@ function settingsManager() {
                 
                 const result = await response.json();
                 if (result.success) {
-                    alert('已保存的私钥加载成功!\n钱包地址: ' + result.wallet_address);
+                    // 填充表单
+                    this.privateKey = result.private_key || '';
+                    this.cryptoPassword = result.crypto_password || '';
+                    
+                    alert('已保存的私钥加载成功!\n钱包地址: ' + result.wallet_address + '\n私钥和密码已填充到表单中');
                     this.loadWalletInfo();
                 } else {
                     alert('加载失败: ' + result.error);

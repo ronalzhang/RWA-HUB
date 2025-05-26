@@ -295,6 +295,8 @@ def load_encrypted_key():
         return jsonify({
             'success': True,
             'wallet_address': wallet_address,
+            'private_key': private_key,  # 返回解密后的私钥供前端填充表单
+            'crypto_password': crypto_password,  # 返回解密后的密码供前端填充表单
             'message': '加密私钥已成功加载'
         })
         
@@ -419,13 +421,39 @@ def get_wallet_info():
             keypair = Keypair.from_seed(seed)
             wallet_address = str(keypair.public_key)
             
+            # 查询SOL余额
+            try:
+                from solana.rpc.api import Client
+                from solana.publickey import PublicKey
+                import requests
+                
+                # 使用主网RPC端点，设置较短的超时时间
+                client = Client("https://api.mainnet-beta.solana.com", timeout=5)
+                public_key = PublicKey(wallet_address)
+                
+                # 获取余额（以lamports为单位）
+                balance_response = client.get_balance(public_key)
+                if balance_response.value is not None:
+                    # 转换为SOL（1 SOL = 1,000,000,000 lamports）
+                    balance_sol = balance_response.value / 1_000_000_000
+                    balance_str = f"{balance_sol:.9f}"
+                else:
+                    balance_str = "查询失败"
+                    
+            except (requests.exceptions.ConnectTimeout, requests.exceptions.Timeout) as timeout_error:
+                current_app.logger.warning(f"查询SOL余额超时: {timeout_error}")
+                balance_str = "网络超时"
+            except Exception as balance_error:
+                current_app.logger.warning(f"查询SOL余额失败: {balance_error}")
+                balance_str = "查询失败"
+            
             # 恢复原始密码
             if original_password:
                 os.environ['CRYPTO_PASSWORD'] = original_password
             
             return jsonify({
                 'address': wallet_address,
-                'balance': '0.0',  # 实际应该查询Solana网络
+                'balance': balance_str,
                 'status': 'configured'
             })
             
