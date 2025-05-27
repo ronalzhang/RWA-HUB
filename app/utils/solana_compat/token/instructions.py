@@ -245,13 +245,16 @@ class Token:
                 mint_solana = SolanaPublicKey.from_string(str(self.pubkey))
                 mint_authority_solana = SolanaPublicKey.from_string(str(mint_authority))
                 
+                # 导入正确的TOKEN_PROGRAM_ID
+                from spl.token.constants import TOKEN_PROGRAM_ID as SPL_TOKEN_PROGRAM_ID
+                
                 # 添加铸造指令
                 mint_to_params = MintToParams(
                     amount=amount,
                     dest=dest_solana,
                     mint=mint_solana,
                     mint_authority=mint_authority_solana,
-                    program_id=TOKEN_PROGRAM_ID
+                    program_id=SPL_TOKEN_PROGRAM_ID
                 )
                 mint_ix = mint_to(mint_to_params)
                 transaction.add(mint_ix)
