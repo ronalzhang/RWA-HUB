@@ -487,11 +487,12 @@ def auto_monitor_pending_payments():
         
         with flask_app.app_context():
             try:
-                # 0. 查找PAYMENT_PROCESSING状态的资产，触发支付确认监控
+                # 0. 查找PAYMENT_PROCESSING状态的资产，触发支付确认监控（排除已删除的资产）
                 payment_processing_assets = Asset.query.filter(
                     Asset.status == AssetStatus.PAYMENT_PROCESSING.value,
                     Asset.payment_tx_hash != None,
-                    Asset.payment_confirmed != True
+                    Asset.payment_confirmed != True,
+                    Asset.deleted_at.is_(None)  # 排除已删除的资产
                 ).limit(20).all()
                 
                 if payment_processing_assets:
@@ -507,12 +508,13 @@ def auto_monitor_pending_payments():
                 else:
                     logger.debug("没有找到支付处理中的资产。")
                 
-                # 1. 查找已支付确认但未上链的资产
+                # 1. 查找已支付确认但未上链的资产（排除已删除的资产）
                 confirmed_assets = Asset.query.filter(
                     Asset.payment_confirmed == True,
                     Asset.token_address == None,
                     Asset.deployment_in_progress != True,
-                    Asset.status == AssetStatus.CONFIRMED.value
+                    Asset.status == AssetStatus.CONFIRMED.value,
+                    Asset.deleted_at.is_(None)  # 排除已删除的资产
                 ).limit(10).all()
                 
                 if confirmed_assets:
@@ -591,12 +593,13 @@ def auto_monitor_pending_payments():
                         asset.error_message = f"部署超时（{time_diff}秒），已清理标记"
                         db.session.commit()
                 
-                # 3. 检查部署失败的资产，如果失败时间超过30分钟，尝试重新部署
+                # 3. 检查部署失败的资产，如果失败时间超过30分钟，尝试重新部署（排除已删除的资产）
                 failed_assets = Asset.query.filter(
                     Asset.status == AssetStatus.DEPLOYMENT_FAILED.value,
                     Asset.payment_confirmed == True,
                     Asset.token_address == None,
-                    Asset.deployment_in_progress != True
+                    Asset.deployment_in_progress != True,
+                    Asset.deleted_at.is_(None)  # 排除已删除的资产
                 ).limit(5).all()  # 限制重试数量
                 
                 for asset in failed_assets:
