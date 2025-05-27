@@ -304,8 +304,25 @@ class Token:
                     else:
                         raise ValueError(f"不支持的私钥长度: {len(payer.secret_key)}")
                     
-                    # 签名交易
-                    transaction.sign(payer_solana_keypair)
+                    # 转换mint_authority为solders.keypair.Keypair（如果是Keypair对象）
+                    if hasattr(mint_authority, 'secret_key'):
+                        # mint_authority是Keypair对象，需要转换为solders.keypair.Keypair
+                        if len(mint_authority.secret_key) == 64:
+                            mint_authority_solana_keypair = Keypair.from_bytes(mint_authority.secret_key)
+                        elif len(mint_authority.secret_key) == 32:
+                            public_key_bytes = base58.b58decode(str(mint_authority.public_key))
+                            full_keypair_bytes = mint_authority.secret_key + public_key_bytes
+                            mint_authority_solana_keypair = Keypair.from_bytes(full_keypair_bytes)
+                        else:
+                            raise ValueError(f"不支持的mint_authority私钥长度: {len(mint_authority.secret_key)}")
+                        
+                        # 签名交易 - 需要payer和mint_authority两个签名
+                        logger.info(f"使用两个签名者签名交易: payer({payer_solana_keypair.pubkey()}) 和 mint_authority({mint_authority_solana_keypair.pubkey()})")
+                        transaction.sign(payer_solana_keypair, mint_authority_solana_keypair)
+                    else:
+                        # mint_authority不是Keypair对象，只用payer签名
+                        logger.info(f"只使用payer签名交易: {payer_solana_keypair.pubkey()}")
+                        transaction.sign(payer_solana_keypair)
                     
                     # 发送交易
                     result = client.send_transaction(transaction)
