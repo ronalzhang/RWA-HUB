@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from app import create_app
 from app.models import Asset
 from app.extensions import db
-from app.tasks import process_asset_onchain
+from app.services.asset_service import AssetService
 import logging
 
 # 设置日志
@@ -41,12 +41,13 @@ def trigger_asset_29_onchain():
             
             # 手动调用上链处理函数
             logger.info("🔄 开始执行上链处理...")
-            result = process_asset_onchain(asset.id, trigger_type="manual_test")
+            service = AssetService()
+            result = service.deploy_asset_to_blockchain(asset.id)
             
-            if result:
-                logger.info("✅ 上链处理完成！")
+            if result.get('success'):
+                logger.info(f"✅ 上链处理完成！代币地址: {result.get('token_address')}")
             else:
-                logger.warning("⚠️ 上链处理返回False，可能有问题")
+                logger.warning(f"⚠️ 上链处理失败: {result.get('error')}")
                 
             # 重新查询资产状态
             db.session.refresh(asset)
