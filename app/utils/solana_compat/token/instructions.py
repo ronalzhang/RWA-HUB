@@ -134,25 +134,26 @@ class Token:
                 transaction.recent_blockhash = recent_blockhash_response.value.blockhash
                 
                 # 将自定义Keypair转换为solders.keypair.Keypair
-                # 确保私钥是64字节长度（32字节私钥 + 32字节公钥）
-                secret_key_bytes = payer.secret_key
-                if len(secret_key_bytes) == 32:
-                    # 如果只有32字节，需要添加公钥部分
-                    # 将PublicKey对象转换为字节
-                    public_key_str = str(payer.public_key)
-                    public_key_bytes = base58.b58decode(public_key_str)[:32]  # 取前32字节
-                    full_keypair_bytes = secret_key_bytes + public_key_bytes
+                # 注意：Keypair.from_bytes()期望64字节（32字节私钥 + 32字节公钥）
+                if len(payer.secret_key) == 64:
+                    # 如果已经是64字节，直接使用
+                    payer_solana_keypair = Keypair.from_bytes(payer.secret_key)
+                elif len(payer.secret_key) == 32:
+                    # 如果是32字节，需要添加公钥部分
+                    public_key_bytes = base58.b58decode(str(payer.public_key))
+                    full_keypair_bytes = payer.secret_key + public_key_bytes
+                    payer_solana_keypair = Keypair.from_bytes(full_keypair_bytes)
                 else:
-                    full_keypair_bytes = secret_key_bytes
+                    raise ValueError(f"不支持的私钥长度: {len(payer.secret_key)}")
                 
-                payer_solana_keypair = Keypair.from_bytes(full_keypair_bytes)
+                logger.info(f"成功创建payer keypair，公钥: {payer_solana_keypair.pubkey()}")
                 
                 # 签名交易
                 transaction.sign(payer_solana_keypair, mint_keypair)
                 
                 # 发送交易
                 logger.info("发送SPL代币创建交易...")
-                result = client.send_transaction(transaction, payer_solana_keypair, mint_keypair)
+                result = client.send_transaction(transaction)
                 
                 if result.value:
                     tx_hash = result.value
