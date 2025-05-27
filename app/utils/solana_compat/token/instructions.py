@@ -94,10 +94,12 @@ class Token:
                 
                 logger.info(f"生成的mint地址: {mint_pubkey}")
                 
-                # 获取最小租金豁免余额 - 使用固定值82字节的Mint账户大小
-                mint_rent_response = client.get_minimum_balance_for_rent_exemption(82)
+                # 获取最小租金豁免余额 - 使用正确的Mint账户大小
+                # 标准SPL Token Mint账户大小是82字节
+                MINT_SIZE = 82
+                mint_rent_response = client.get_minimum_balance_for_rent_exemption(MINT_SIZE)
                 mint_rent = mint_rent_response.value
-                logger.info(f"Mint账户租金豁免余额: {mint_rent} lamports")
+                logger.info(f"Mint账户租金豁免余额: {mint_rent} lamports (账户大小: {MINT_SIZE} 字节)")
                 
                 # 创建交易
                 transaction = SolanaTransaction()
@@ -107,12 +109,15 @@ class Token:
                 mint_authority_solana = SolanaPublicKey.from_string(str(mint_authority))
                 
                 # 添加创建账户指令
+                # 确保mint_pubkey是正确的类型
+                mint_pubkey_solana = mint_pubkey  # mint_keypair.pubkey()已经是SolanaPublicKey类型
+                
                 create_account_ix = create_account(
                     CreateAccountParams(
                         from_pubkey=from_pubkey_solana,
-                        to_pubkey=mint_pubkey,
+                        to_pubkey=mint_pubkey_solana,
                         lamports=mint_rent,
-                        space=82,  # Mint账户大小
+                        space=MINT_SIZE,  # 使用正确的Mint账户大小
                         owner=SPL_TOKEN_PROGRAM_ID
                     )
                 )
@@ -121,7 +126,7 @@ class Token:
                 # 添加初始化mint指令
                 init_mint_params = InitializeMintParams(
                     decimals=decimals,
-                    mint=mint_pubkey,
+                    mint=mint_pubkey_solana,
                     mint_authority=mint_authority_solana,
                     freeze_authority=mint_authority_solana,
                     program_id=SPL_TOKEN_PROGRAM_ID
@@ -171,7 +176,7 @@ class Token:
                     
                     # 创建Token实例并设置mint地址
                     token = cls(conn, program_id)
-                    token.pubkey = mint_pubkey
+                    token.pubkey = mint_pubkey_solana
                     
                     return token
                 else:
