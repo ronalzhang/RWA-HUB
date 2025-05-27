@@ -3010,7 +3010,36 @@ checkIfReturningFromWalletApp(walletType) {
                 最小单位: transferAmount
             });
 
-            // 9. 简化：直接创建转账指令，假设ATA账户已存在
+            // 9. 检查目标ATA是否存在，如果不存在则创建
+            console.log('[transferSolanaToken] 检查目标ATA是否存在...');
+            
+            // 使用代理API检查目标ATA是否存在
+            const checkAtaResponse = await fetch(`/api/solana/check_ata_exists?address=${toTokenAccount.toString()}`);
+            if (!checkAtaResponse.ok) {
+                throw new Error("检查ATA状态失败: " + checkAtaResponse.statusText);
+            }
+            const ataData = await checkAtaResponse.json();
+            
+            if (!ataData.success) {
+                throw new Error("检查ATA状态失败: " + ataData.error);
+            }
+            
+            // 如果目标ATA不存在，添加创建指令
+            if (!ataData.exists) {
+                console.log('[transferSolanaToken] 目标ATA不存在，添加创建指令...');
+                const createAtaInstruction = window.spl_token.createAssociatedTokenAccountInstruction(
+                    fromPubkey,          // payer
+                    toTokenAccount,      // associatedToken
+                    toPubkey,            // owner
+                    USDC_MINT           // mint
+                );
+                transaction.add(createAtaInstruction);
+                console.log('[transferSolanaToken] ATA创建指令已添加');
+            } else {
+                console.log('[transferSolanaToken] 目标ATA已存在，无需创建');
+            }
+            
+            // 10. 创建转账指令
             console.log('[transferSolanaToken] 创建转账指令...');
             
             // 使用标准的SPL Token转账指令

@@ -688,55 +688,65 @@ def check_ata_exists():
     检查关联代币账户是否存在
     
     参数:
+    - address: ATA地址 (直接检查这个地址是否存在)
+    或者
     - owner: 钱包公钥
     - mint: 代币Mint地址
     """
     try:
+        # 支持两种方式：直接传ATA地址，或者传owner+mint
+        ata_address = request.args.get('address')
         owner = request.args.get('owner')
         mint = request.args.get('mint')
         
-        if not owner or not mint:
-            return jsonify({"success": False, "error": "缺少必要参数"}), 400
-        
-        logger.info(f"检查ATA存在性 - 所有者: {owner}, 代币: {mint}")
-        
-        # 获取特定代币的账户
-        try:
-            # 获取所有代币账户并过滤
-            response = get_token_accounts()
+        if ata_address:
+            # 直接检查ATA地址是否存在
+            logger.info(f"检查ATA地址是否存在: {ata_address}")
             
-            # 如果get_token_accounts返回的是Response对象，直接返回
-            if isinstance(response, Response):
-                return response
+            # 使用getAccountInfo检查账户是否存在
+            result = make_rpc_request(
+                "getAccountInfo",
+                [ata_address, {"encoding": "base64"}]
+            )
             
-            # 否则可能是内部调用，手动获取数据
-            data = request.args.copy()
-            data["owner"] = owner
-            data["mint"] = mint
-            with current_app.test_request_context(f'/api/solana/get_token_accounts?owner={owner}&mint={mint}'):
-                response = get_token_accounts()
+            if result["success"]:
+                account_info = result["result"]["value"]
+                exists = account_info is not None
                 
-            return response
-        
-        except Exception as e:
-            logger.exception(f"检查ATA存在性时调用get_token_accounts发生异常: {str(e)}")
-            # 不抛出错误，而是返回账户不存在
+                return jsonify({
+                    "success": True,
+                    "exists": exists,
+                    "address": ata_address,
+                    "account_info": account_info if exists else None
+                })
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": result["error"]
+                }), 400
+                
+        elif owner and mint:
+            # 通过owner和mint计算ATA地址并检查
+            logger.info(f"检查ATA存在性 - 所有者: {owner}, 代币: {mint}")
+            
+            # 这里需要计算ATA地址，但由于我们在前端已经计算了，
+            # 建议前端直接传address参数
             return jsonify({
-                "success": True,
-                "accounts": [],
-                "exists": False,
-                "message": "获取账户信息失败，账户可能不存在"
-            })
+                "success": False,
+                "error": "请使用address参数直接传递ATA地址"
+            }), 400
+        else:
+            return jsonify({
+                "success": False,
+                "error": "缺少必要参数：需要address或者(owner+mint)"
+            }), 400
     
     except Exception as e:
         logger.exception(f"检查ATA存在性时发生异常: {str(e)}")
-        # 不抛出错误，而是返回账户不存在
         return jsonify({
-            "success": True,
-            "accounts": [],
-            "exists": False,
-            "message": f"处理请求时出错: {str(e)}"
-        })
+            "success": False,
+            "error": f"处理请求时出错: {str(e)}"
+        }), 500
 
 @solana_api.route('/transactions', methods=['GET'])
 def get_transactions():
