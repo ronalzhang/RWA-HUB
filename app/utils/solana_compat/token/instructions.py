@@ -273,7 +273,9 @@ class Token:
                                     logger.error(f"❌ 关联代币账户创建失败: {result}")
                                     raise Exception(f"创建关联代币账户失败: {result}")
                             except Exception as e2:
-                                logger.error(f"使用显式签名者创建关联代币账户仍然失败: {str(e2)}")
+                                logger.error(f"使用显式签名者创建关联代币账户仍然失败: {str(e2)}", exc_info=True)
+                                logger.error(f"异常类型: {type(e2).__name__}")
+                                logger.error(f"异常详情: {repr(e2)}")
                                 raise
                         else:
                             logger.error(f"创建关联代币账户时出错: {str(e)}")
