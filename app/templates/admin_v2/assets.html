@@ -267,7 +267,7 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatCurrency(asset.token_price || 0)"></td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full" 
-                                          :class="getStatusClass(asset.status)" x-text="asset.status_text"></span>
+                                          :class="getStatusClass(asset.status)" x-text="getStatusText(asset.status)"></span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDate(asset.created_at)"></td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
