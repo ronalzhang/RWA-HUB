@@ -1183,6 +1183,19 @@
                 };
                 return classes[status] || 'bg-gray-100 text-gray-800';
             },
+
+            getStatusText(status) {
+                const texts = {
+                    1: '待审核',
+                    2: '已通过',
+                    3: '已拒绝',
+                    5: '支付已确认',
+                    6: '支付失败',
+                    7: '部署失败',
+                    8: '支付处理中'
+                };
+                return texts[status] || '未知状态';
+            },
             
             // 分红相关方法
             
