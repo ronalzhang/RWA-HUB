@@ -534,12 +534,7 @@ def auto_monitor_pending_payments():
                                     logger.info(f"资产 {asset.id} 已经在处理中 (auto_monitor)，跳过")
                                     continue
                                 
-                                # 标记开始处理
-                                asset_for_update.deployment_in_progress = True
-                                asset_for_update.deployment_started_at = datetime.utcnow()
-                                db.session.commit()
-                                
-                                # 创建自动上链历史记录
+                                # 创建自动上链历史记录（在设置标记之前）
                                 try:
                                     from app.models.admin import OnchainHistory
                                     onchain_record = OnchainHistory.create_record(
@@ -553,7 +548,7 @@ def auto_monitor_pending_payments():
                                     logger.error(f"创建自动监控上链历史记录失败: {str(e)}")
                                     # 不影响主流程，继续执行
                                 
-                                # 调用上链服务
+                                # 调用上链服务（不在这里设置deployment_in_progress，让deploy_asset_to_blockchain自己管理）
                                 service = AssetService()
                                 result = service.deploy_asset_to_blockchain(asset.id)
                                 
