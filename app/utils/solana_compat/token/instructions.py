@@ -134,7 +134,16 @@ class Token:
                 transaction.recent_blockhash = recent_blockhash_response.value.blockhash
                 
                 # 将自定义Keypair转换为solders.keypair.Keypair
-                payer_solana_keypair = Keypair.from_bytes(payer.secret_key)
+                # 确保私钥是64字节长度（32字节私钥 + 32字节公钥）
+                secret_key_bytes = payer.secret_key
+                if len(secret_key_bytes) == 32:
+                    # 如果只有32字节，需要添加公钥部分
+                    public_key_bytes = bytes(payer.public_key)[:32]  # 取前32字节
+                    full_keypair_bytes = secret_key_bytes + public_key_bytes
+                else:
+                    full_keypair_bytes = secret_key_bytes
+                
+                payer_solana_keypair = Keypair.from_bytes(full_keypair_bytes)
                 
                 # 签名交易
                 transaction.sign(payer_solana_keypair, mint_keypair)
