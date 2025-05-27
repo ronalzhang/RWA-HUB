@@ -121,38 +121,18 @@ class SolanaClient:
                 logger.info("尝试从环境变量获取私钥")
                 private_key_bytes = None  # 初始化为None
                 wallet_info = get_solana_keypair_from_env()
-                if wallet_info and 'value' in wallet_info:
+                if wallet_info and 'private_key' in wallet_info:
                     try:
-                        private_key_str = wallet_info['value']
-                        key_type = wallet_info.get('type', 'base58')
+                        # get_solana_keypair_from_env已经返回了base58编码的私钥
+                        private_key_str = wallet_info['private_key']
+                        private_key_bytes = base58.b58decode(private_key_str)
                         
-                        # 根据检测到的格式进行解码
-                        if key_type == 'base58':
-                            private_key_bytes = base58.b58decode(private_key_str)
-                            # Solana私钥是64字节，但只需要前32字节作为seed
-                            if len(private_key_bytes) == 64:
-                                private_key_bytes = private_key_bytes[:32]
-                            auth_method = "env_private_key_base58"
-                        elif key_type == 'hex':
-                            private_key_bytes = bytes.fromhex(private_key_str)
-                            # 如果是64字节，取前32字节
-                            if len(private_key_bytes) == 64:
-                                private_key_bytes = private_key_bytes[:32]
-                            auth_method = "env_private_key_hex"
-                        elif key_type == 'base64':
-                            private_key_bytes = base64.b64decode(private_key_str)
-                            # 如果是64字节，取前32字节
-                            if len(private_key_bytes) == 64:
-                                private_key_bytes = private_key_bytes[:32]
-                            auth_method = "env_private_key_base64"
-                        else:
-                            logger.error(f"不支持的私钥类型: {key_type}")
-                            private_key_bytes = None
-                            
-                        # 验证私钥长度
-                        if private_key_bytes and len(private_key_bytes) != 32:
+                        # 验证私钥长度（应该是32字节的seed）
+                        if len(private_key_bytes) != 32:
                             logger.error(f"私钥长度错误: {len(private_key_bytes)}，期望32字节")
                             private_key_bytes = None
+                        else:
+                            auth_method = "env_private_key_from_helpers"
                             
                     except Exception as e:
                         logger.error(f"处理环境变量私钥失败: {e}")
@@ -164,7 +144,7 @@ class SolanaClient:
         # 创建keypair和客户端
         if private_key_bytes:
             try:
-                self.keypair = Keypair.from_secret_key(private_key_bytes)
+                self.keypair = Keypair.from_seed(private_key_bytes)
                 self.public_key = self.keypair.public_key
                 logger.info(f"Solana服务钱包初始化成功 - 验证方式: {auth_method}")
                 logger.info(f"Solana服务钱包地址: {self.public_key}")
