@@ -129,8 +129,11 @@ class Transaction:
         import base64
         
         # 创建一个交易结构
+        if not self.recent_blockhash:
+            raise RuntimeError("Transaction recentBlockhash required for serialization")
+            
         transaction = {
-            "recentBlockhash": self.recent_blockhash or "simulated_blockhash", 
+            "recentBlockhash": self.recent_blockhash, 
             "feePayer": str(self.fee_payer) if self.fee_payer else None,
             "instructions": []
         }
@@ -180,7 +183,7 @@ class Transaction:
                 "numReadonlySignedAccounts": 0,
                 "numReadonlyUnsignedAccounts": 1
             },
-            "recentBlockhash": self.recent_blockhash or "simulated_blockhash",
+            "recentBlockhash": self.recent_blockhash,
             "instructions": []
         }
         
@@ -219,5 +222,6 @@ class Transaction:
         # 这里是简化的实现
         transaction = Transaction()
         # 假设我们能解析出区块哈希
-        transaction.set_recent_blockhash("simulated_blockhash_from_bytes")
+        # 在实际实现中应该从字节数据中解析真实的区块哈希
+        # transaction.set_recent_blockhash("parsed_blockhash_from_bytes")
         return transaction 

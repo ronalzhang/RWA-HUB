@@ -528,8 +528,18 @@ def prepare_transaction(user_address, asset_id, token_symbol, amount, price, tra
         # 将指令数据序列化
         instruction_bytes = json.dumps(instruction_data).encode('utf-8')
         
-        # 设置最近的区块哈希
-        transaction.set_recent_blockhash("simulated_blockhash_for_dev")
+        # 获取最新的区块哈希
+        try:
+            recent_blockhash = solana_connection.get_latest_blockhash()
+            if recent_blockhash and 'result' in recent_blockhash:
+                blockhash = recent_blockhash['result']['value']['blockhash']
+                transaction.set_recent_blockhash(blockhash)
+                logger.info(f"使用真实区块哈希: {blockhash}")
+            else:
+                raise Exception("无法获取最新区块哈希")
+        except Exception as e:
+            logger.error(f"获取区块哈希失败: {str(e)}")
+            raise Exception(f"无法获取Solana区块哈希: {str(e)}")
         
         # 直接返回base58编码的交易消息
         import base58
