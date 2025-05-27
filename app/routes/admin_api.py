@@ -2966,6 +2966,27 @@ def compat_assets_detail(asset_id):
     from app.routes.admin.assets import api_get_asset
     return api_get_asset(asset_id)
 
+@admin_compat_bp.route('/v2/assets/batch-delete', methods=['POST'])
+@api_admin_required
+def compat_batch_delete_assets():
+    """批量删除资产 - 兼容API"""
+    from app.routes.admin.assets import api_batch_delete_assets
+    return api_batch_delete_assets()
+
+@admin_compat_bp.route('/v2/assets/batch-approve', methods=['POST'])
+@api_admin_required
+def compat_batch_approve_assets():
+    """批量审核通过资产 - 兼容API"""
+    from app.routes.admin.assets import api_batch_approve_assets
+    return api_batch_approve_assets()
+
+@admin_compat_bp.route('/v2/assets/batch-reject', methods=['POST'])
+@api_admin_required
+def compat_batch_reject_assets():
+    """批量审核拒绝资产 - 兼容API"""
+    from app.routes.admin.assets import api_batch_reject_assets
+    return api_batch_reject_assets()
+
 @admin_compat_bp.route('/admins', methods=['GET'])
 @api_admin_required
 def compat_admin_users():
