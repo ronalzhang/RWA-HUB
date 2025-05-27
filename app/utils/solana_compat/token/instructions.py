@@ -152,7 +152,7 @@ class Token:
                 
                 # 发送交易
                 logger.info("发送SPL代币创建交易...")
-                result = client.send_transaction(transaction, [payer_solana_keypair, mint_keypair])
+                result = client.send_transaction(transaction, payer_solana_keypair, mint_keypair)
                 
                 if result.value:
                     tx_hash = result.value
