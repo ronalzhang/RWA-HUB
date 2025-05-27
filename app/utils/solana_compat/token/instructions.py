@@ -133,8 +133,11 @@ class Token:
                 recent_blockhash_response = client.get_latest_blockhash()
                 transaction.recent_blockhash = recent_blockhash_response.value.blockhash
                 
+                # 将自定义Keypair转换为solders.keypair.Keypair
+                payer_solana_keypair = Keypair.from_bytes(payer.secret_key)
+                
                 # 签名交易
-                transaction.sign(payer, mint_keypair)
+                transaction.sign(payer_solana_keypair, mint_keypair)
                 
                 # 发送交易
                 logger.info("发送SPL代币创建交易...")
