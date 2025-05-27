@@ -158,17 +158,48 @@ class Token:
                 transaction.sign(payer_solana_keypair, mint_keypair)
                 logger.info(f"交易签名完成，签名数量: {len(transaction.signatures)}")
                 
-                # 发送交易
+                # 发送交易 - 添加重试机制
                 logger.info("发送SPL代币创建交易...")
-                # 尝试使用不同的发送方法
-                try:
-                    result = client.send_transaction(transaction)
-                except Exception as e:
-                    if "not enough signers" in str(e):
-                        logger.info("尝试使用显式签名者发送交易...")
-                        result = client.send_transaction(transaction, payer_solana_keypair, mint_keypair)
-                    else:
-                        raise
+                import time
+                max_retries = 3
+                retry_delay = 2
+                
+                for attempt in range(max_retries):
+                    try:
+                        if attempt > 0:
+                            logger.info(f"第 {attempt + 1} 次尝试发送SPL代币创建交易...")
+                            time.sleep(retry_delay * attempt)
+                            # 重新获取最新的blockhash
+                            recent_blockhash_response = client.get_latest_blockhash()
+                            transaction.recent_blockhash = recent_blockhash_response.value.blockhash
+                            logger.info(f"重新获取blockhash: {recent_blockhash_response.value.blockhash}")
+                        
+                        # 尝试使用不同的发送方法
+                        try:
+                            result = client.send_transaction(transaction)
+                            break  # 成功则跳出重试循环
+                        except Exception as e:
+                            if "not enough signers" in str(e):
+                                logger.info("尝试使用显式签名者发送交易...")
+                                result = client.send_transaction(transaction, payer_solana_keypair, mint_keypair)
+                                break  # 成功则跳出重试循环
+                            else:
+                                raise
+                    except Exception as e:
+                        if "Blockhash not found" in str(e):
+                            logger.warning(f"遇到Blockhash not found错误，第 {attempt + 1} 次重试...")
+                            if attempt == max_retries - 1:
+                                logger.error(f"重试 {max_retries} 次后仍然失败: {str(e)}")
+                                raise
+                        elif "429" in str(e) or "Too Many Requests" in str(e):
+                            logger.warning(f"遇到429错误，第 {attempt + 1} 次重试...")
+                            if attempt == max_retries - 1:
+                                logger.error(f"重试 {max_retries} 次后仍然失败: {str(e)}")
+                                raise
+                        else:
+                            logger.error(f"发送SPL代币创建交易时出错: {str(e)}")
+                            if attempt == max_retries - 1:
+                                raise
                 
                 if result.value:
                     tx_hash = result.value
@@ -280,6 +311,10 @@ class Token:
                             if attempt > 0:
                                 logger.info(f"第 {attempt + 1} 次尝试创建关联代币账户...")
                                 time.sleep(retry_delay * attempt)  # 递增延迟
+                                # 重新获取最新的blockhash
+                                recent_blockhash_response = client.get_latest_blockhash()
+                                transaction.recent_blockhash = recent_blockhash_response.value.blockhash
+                                logger.info(f"重新获取blockhash: {recent_blockhash_response.value.blockhash}")
                             
                             result = client.send_transaction(transaction)
                             if result.value:
