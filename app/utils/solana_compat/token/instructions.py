@@ -138,7 +138,9 @@ class Token:
                 secret_key_bytes = payer.secret_key
                 if len(secret_key_bytes) == 32:
                     # 如果只有32字节，需要添加公钥部分
-                    public_key_bytes = bytes(payer.public_key)[:32]  # 取前32字节
+                    # 将PublicKey对象转换为字节
+                    public_key_str = str(payer.public_key)
+                    public_key_bytes = base58.b58decode(public_key_str)[:32]  # 取前32字节
                     full_keypair_bytes = secret_key_bytes + public_key_bytes
                 else:
                     full_keypair_bytes = secret_key_bytes
