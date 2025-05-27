@@ -247,9 +247,25 @@ class Token:
                 transaction = SolanaTransaction()
                 
                 # 转换参数为solana-py格式
-                dest_solana = SolanaPublicKey.from_string(str(dest))
-                mint_solana = SolanaPublicKey.from_string(str(self.pubkey))
-                mint_authority_solana = SolanaPublicKey.from_string(str(mint_authority))
+                logger.info(f"转换参数类型 - dest: {type(dest)}, self.pubkey: {type(self.pubkey)}, mint_authority: {type(mint_authority)}")
+                
+                # 安全转换PublicKey对象
+                if hasattr(dest, '__str__'):
+                    dest_solana = SolanaPublicKey.from_string(str(dest))
+                else:
+                    dest_solana = dest  # 如果已经是正确类型
+                    
+                if hasattr(self.pubkey, '__str__'):
+                    mint_solana = SolanaPublicKey.from_string(str(self.pubkey))
+                else:
+                    mint_solana = self.pubkey  # 如果已经是正确类型
+                    
+                if hasattr(mint_authority, '__str__'):
+                    mint_authority_solana = SolanaPublicKey.from_string(str(mint_authority))
+                else:
+                    mint_authority_solana = mint_authority  # 如果已经是正确类型
+                    
+                logger.info(f"转换后类型 - dest_solana: {type(dest_solana)}, mint_solana: {type(mint_solana)}, mint_authority_solana: {type(mint_authority_solana)}")
                 
                 # 导入正确的TOKEN_PROGRAM_ID
                 from spl.token.constants import TOKEN_PROGRAM_ID as SPL_TOKEN_PROGRAM_ID
