@@ -33,13 +33,8 @@ def check_wallet_balance():
         print(f"💰 SOL余额: {sol_balance} SOL")
         print(f"💰 余额(lamports): {lamports} lamports")
         
-        # 检查是否足够上链
-        min_balance = 0.1
-        if sol_balance >= min_balance:
-            print(f"✅ 余额充足，可以进行上链操作 (>= {min_balance} SOL)")
-        else:
-            print(f"❌ 余额不足，需要至少 {min_balance} SOL 进行上链操作")
-            print(f"💡 需要充值: {min_balance - sol_balance:.6f} SOL")
+        # 显示余额信息，不进行阈值检查
+        print(f"💡 余额信息: {sol_balance} SOL - 将直接尝试上链操作，让真实网络决定是否成功")
         
         # 尝试获取USDC余额（如果有的话）
         print(f"\n🔍 检查USDC余额...")

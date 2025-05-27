@@ -482,8 +482,8 @@ class AssetService:
                     'balance_error': True
                 }
             
-            threshold = float(os.environ.get('SOLANA_BALANCE_THRESHOLD', 0.1))
-            is_sufficient = balance is not None and balance >= threshold
+            threshold = 0.0  # 移除阈值限制
+            is_sufficient = True  # 总是认为余额充足，让真实网络决定
             
             # 检查是否处于只读模式
             readonly = getattr(solana_client, 'readonly_mode', False)

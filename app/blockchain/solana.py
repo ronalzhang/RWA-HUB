@@ -369,16 +369,15 @@ class SolanaClient:
         logger.error("所有Solana RPC节点都无法获取余额")
         return None
             
-    def check_balance_sufficient(self, threshold=0.1):
-        """检查服务钱包余额是否充足"""
+    def check_balance_sufficient(self, threshold=0.0):
+        """检查服务钱包余额是否充足 - 已移除阈值限制，直接尝试执行"""
         balance = self.get_balance()
         if balance is None:
-            return False
+            logger.warning("无法获取余额，但仍将尝试执行操作")
+            return True  # 让真实网络决定是否成功
             
-        is_sufficient = balance >= threshold
-        if not is_sufficient:
-            logger.warning(f"SOL余额不足! 当前: {balance} SOL, 阈值: {threshold} SOL")
-        return is_sufficient
+        logger.info(f"当前SOL余额: {balance} SOL - 将直接尝试执行操作")
+        return True  # 移除所有阈值限制，让真实网络反馈
         
     def create_spl_token(self, asset_name, token_symbol, token_supply, decimals=9):
         """
@@ -459,12 +458,9 @@ class SolanaClient:
         try:
             logger.info(f"开始部署资产到Solana: ID={asset.id}, 名称={asset.name}")
             
-            # 检查余额是否充足
-            if not self.check_balance_sufficient():
-                return {
-                    'success': False,
-                    'error': '服务钱包SOL余额不足'
-                }
+            # 记录当前余额但不阻止执行
+            balance = self.get_balance()
+            logger.info(f"开始部署资产，当前SOL余额: {balance} SOL - 直接尝试执行")
                 
             # 创建代币
             token_result = self.create_spl_token(

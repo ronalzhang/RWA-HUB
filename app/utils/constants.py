@@ -3,7 +3,7 @@
 """
 
 # 区块链相关常量
-MIN_SOL_BALANCE = 0.1  # 服务钱包最低SOL余额
+MIN_SOL_BALANCE = 0.0  # 移除最低SOL余额限制，让真实网络决定
 MIN_ETH_BALANCE = 0.01  # 服务钱包最低ETH余额
 MIN_USDC_BALANCE = 10   # 服务钱包最低USDC余额
 
