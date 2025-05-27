@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from app import create_app
 from app.models import Asset
 from app.extensions import db
-from app.services.asset_service import AssetService
+from app.blockchain.asset_service import AssetService
 import logging
 
 # 设置日志
