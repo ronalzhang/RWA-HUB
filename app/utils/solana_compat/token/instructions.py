@@ -330,8 +330,19 @@ class Token:
                         logger.info(f"只使用payer签名交易: {payer_solana_keypair.pubkey()}")
                         transaction.sign(payer_solana_keypair)
                     
-                    # 发送交易
-                    result = client.send_transaction(transaction)
+                    # 发送交易 - 需要提供签名者
+                    try:
+                        result = client.send_transaction(transaction)
+                    except Exception as e:
+                        if "not enough signers" in str(e):
+                            logger.info("尝试使用显式签名者发送mint_to交易...")
+                            # 对于mint_to交易，需要提供mint_authority作为签名者
+                            if hasattr(mint_authority, 'secret_key'):
+                                result = client.send_transaction(transaction, mint_authority_solana_keypair)
+                            else:
+                                result = client.send_transaction(transaction, payer_solana_keypair)
+                        else:
+                            raise
                     
                     if result.value:
                         tx_hash = result.value
