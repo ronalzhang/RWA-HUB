@@ -194,8 +194,8 @@ class Token:
             logger.error(f"创建真实SPL代币铸造失败: {str(e)}")
             raise
     
-    def create_account(self, owner: PublicKey) -> PublicKey:
-        """创建代币账户 - 真实实现"""
+    def create_account(self, owner: PublicKey, payer=None) -> PublicKey:
+        """创建代币账户 - 真实实现，实际在链上创建账户"""
         try:
             logger.info(f"为所有者 {owner} 创建真实代币账户")
             
@@ -204,6 +204,7 @@ class Token:
                 from spl.token.instructions import create_associated_token_account, get_associated_token_address
                 from solana.transaction import Transaction as SolanaTransaction
                 from solders.pubkey import Pubkey as SolanaPublicKey
+                from solders.keypair import Keypair
                 
                 # 转换PublicKey对象为solana-py格式
                 owner_solana = SolanaPublicKey.from_string(str(owner))
@@ -211,8 +212,62 @@ class Token:
                 
                 # 获取关联代币账户地址
                 associated_account = get_associated_token_address(owner_solana, mint_solana)
+                logger.info(f"计算的关联代币账户地址: {associated_account}")
                 
-                logger.info(f"✅ 使用真实的solana-py库创建关联代币账户: {associated_account}")
+                # 如果提供了payer，实际在链上创建账户
+                if payer:
+                    logger.info("开始在链上创建关联代币账户...")
+                    
+                    # 创建RPC客户端
+                    solana_endpoint = os.environ.get("SOLANA_NETWORK_URL", "https://api.mainnet-beta.solana.com")
+                    client = Client(solana_endpoint)
+                    
+                    # 转换payer为solana-py格式
+                    payer_solana = SolanaPublicKey.from_string(str(payer.public_key))
+                    
+                    # 创建交易
+                    transaction = SolanaTransaction()
+                    
+                    # 添加创建关联代币账户指令
+                    create_ata_ix = create_associated_token_account(
+                        payer=payer_solana,
+                        owner=owner_solana,
+                        mint=mint_solana
+                    )
+                    transaction.add(create_ata_ix)
+                    
+                    # 获取最新区块哈希
+                    recent_blockhash_response = client.get_latest_blockhash()
+                    transaction.recent_blockhash = recent_blockhash_response.value.blockhash
+                    
+                    # 转换payer为solders.keypair.Keypair
+                    if len(payer.secret_key) == 64:
+                        payer_solana_keypair = Keypair.from_bytes(payer.secret_key)
+                    elif len(payer.secret_key) == 32:
+                        public_key_bytes = base58.b58decode(str(payer.public_key))
+                        full_keypair_bytes = payer.secret_key + public_key_bytes
+                        payer_solana_keypair = Keypair.from_bytes(full_keypair_bytes)
+                    else:
+                        raise ValueError(f"不支持的私钥长度: {len(payer.secret_key)}")
+                    
+                    # 签名并发送交易
+                    transaction.sign(payer_solana_keypair)
+                    
+                    try:
+                        result = client.send_transaction(transaction)
+                        if result.value:
+                            logger.info(f"✅ 关联代币账户创建成功！交易哈希: {result.value}")
+                        else:
+                            logger.error(f"❌ 关联代币账户创建失败: {result}")
+                            raise Exception(f"创建关联代币账户失败: {result}")
+                    except Exception as e:
+                        if "already in use" in str(e) or "already exists" in str(e):
+                            logger.info("关联代币账户已存在，跳过创建")
+                        else:
+                            logger.error(f"创建关联代币账户时出错: {str(e)}")
+                            raise
+                
+                logger.info(f"✅ 关联代币账户地址: {associated_account}")
                 return associated_account
                 
             except ImportError:

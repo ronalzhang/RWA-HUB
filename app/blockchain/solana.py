@@ -414,7 +414,7 @@ class SolanaClient:
             logger.info(f"SPL代币创建成功: {token.pubkey}")
             
             # 创建代币账户
-            token_account = token.create_account(owner=self.public_key)
+            token_account = token.create_account(owner=self.public_key, payer=self.keypair)
             logger.info(f"代币账户创建成功: {token_account}")
             
             # 发行代币
