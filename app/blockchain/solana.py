@@ -422,7 +422,8 @@ class SolanaClient:
             mint_tx = token.mint_to(
                 dest=token_account,
                 mint_authority=self.keypair,
-                amount=int(mint_amount)
+                amount=int(mint_amount),
+                payer=self.keypair
             )
             
             logger.info(f"代币mint成功，交易ID: {mint_tx}")

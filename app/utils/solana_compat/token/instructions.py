@@ -220,8 +220,8 @@ class Token:
             logger.error(f"创建真实代币账户失败: {str(e)}")
             raise
     
-    def mint_to(self, dest, mint_authority, amount):
-        """铸造代币到指定账户 - 真实实现"""
+    def mint_to(self, dest, mint_authority, amount, payer=None):
+        """铸造代币到指定账户 - 完整实现"""
         try:
             logger.info(f"铸造 {amount} 代币到账户 {dest}")
             
@@ -230,6 +230,7 @@ class Token:
                 from spl.token.instructions import mint_to, MintToParams
                 from solana.transaction import Transaction as SolanaTransaction
                 from solders.pubkey import Pubkey as SolanaPublicKey
+                from solders.keypair import Keypair
                 
                 logger.info("✅ 使用真实的solana-py库进行代币铸造")
                 
@@ -265,10 +266,37 @@ class Token:
                 
                 logger.info(f"代币铸造交易已准备，mint: {self.pubkey}, dest: {dest}, amount: {amount}")
                 
-                # 实际上我们应该签名并发送这个交易，但为了简化，先返回成功
-                # TODO: 实现完整的mint_to交易签名和发送
-                logger.info("✅ 代币铸造交易准备完成（简化实现）")
-                return "mint_to_transaction_prepared"
+                # 如果提供了payer，进行完整的签名和发送
+                if payer:
+                    logger.info("开始签名并发送代币铸造交易...")
+                    
+                    # 转换payer为solders.keypair.Keypair
+                    if len(payer.secret_key) == 64:
+                        payer_solana_keypair = Keypair.from_bytes(payer.secret_key)
+                    elif len(payer.secret_key) == 32:
+                        public_key_bytes = base58.b58decode(str(payer.public_key))
+                        full_keypair_bytes = payer.secret_key + public_key_bytes
+                        payer_solana_keypair = Keypair.from_bytes(full_keypair_bytes)
+                    else:
+                        raise ValueError(f"不支持的私钥长度: {len(payer.secret_key)}")
+                    
+                    # 签名交易
+                    transaction.sign(payer_solana_keypair)
+                    
+                    # 发送交易
+                    result = client.send_transaction(transaction)
+                    
+                    if result.value:
+                        tx_hash = result.value
+                        logger.info(f"✅ 代币铸造成功！交易哈希: {tx_hash}")
+                        return tx_hash
+                    else:
+                        logger.error(f"❌ 代币铸造失败: {result}")
+                        raise Exception(f"铸造交易发送失败: {result}")
+                else:
+                    # 如果没有提供payer，只返回准备好的交易
+                    logger.info("✅ 代币铸造交易准备完成（需要外部签名）")
+                    return transaction
                 
             except ImportError:
                 raise NotImplementedError(
