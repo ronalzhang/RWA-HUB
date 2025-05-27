@@ -316,9 +316,15 @@ class Token:
                         else:
                             raise ValueError(f"不支持的mint_authority私钥长度: {len(mint_authority.secret_key)}")
                         
-                        # 签名交易 - 需要payer和mint_authority两个签名
-                        logger.info(f"使用两个签名者签名交易: payer({payer_solana_keypair.pubkey()}) 和 mint_authority({mint_authority_solana_keypair.pubkey()})")
-                        transaction.sign(payer_solana_keypair, mint_authority_solana_keypair)
+                        # 检查payer和mint_authority是否是同一个账户
+                        if str(payer_solana_keypair.pubkey()) == str(mint_authority_solana_keypair.pubkey()):
+                            # 如果是同一个账户，只签名一次
+                            logger.info(f"payer和mint_authority是同一个账户，只签名一次: {payer_solana_keypair.pubkey()}")
+                            transaction.sign(payer_solana_keypair)
+                        else:
+                            # 如果是不同账户，需要两个签名
+                            logger.info(f"使用两个不同签名者签名交易: payer({payer_solana_keypair.pubkey()}) 和 mint_authority({mint_authority_solana_keypair.pubkey()})")
+                            transaction.sign(payer_solana_keypair, mint_authority_solana_keypair)
                     else:
                         # mint_authority不是Keypair对象，只用payer签名
                         logger.info(f"只使用payer签名交易: {payer_solana_keypair.pubkey()}")
