@@ -189,8 +189,12 @@ class Token:
                 from solana.transaction import Transaction as SolanaTransaction
                 from solders.pubkey import Pubkey as SolanaPublicKey
                 
+                # 转换PublicKey对象为solana-py格式
+                owner_solana = SolanaPublicKey.from_string(str(owner))
+                mint_solana = SolanaPublicKey.from_string(str(self.pubkey))
+                
                 # 获取关联代币账户地址
-                associated_account = get_associated_token_address(owner, self.pubkey)
+                associated_account = get_associated_token_address(owner_solana, mint_solana)
                 
                 logger.info(f"✅ 使用真实的solana-py库创建关联代币账户: {associated_account}")
                 return associated_account
