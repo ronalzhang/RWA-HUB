@@ -439,6 +439,105 @@ def retry_onchain_record(record_id):
         current_app.logger.error(f"重试上链操作失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@admin_bp.route('/v2/api/onchain-history/export', methods=['GET'])
+@api_admin_required
+def export_onchain_history():
+    """导出上链历史记录"""
+    try:
+        from app.models.admin import OnchainHistory
+        from flask import make_response
+        import csv
+        import io
+        
+        # 获取筛选参数
+        status = request.args.get('status', '')
+        trigger_type = request.args.get('trigger_type', '')
+        onchain_type = request.args.get('onchain_type', '')
+        
+        # 构建查询
+        query = OnchainHistory.query
+        
+        if status:
+            query = query.filter(OnchainHistory.status == status)
+        if trigger_type:
+            query = query.filter(OnchainHistory.trigger_type == trigger_type)
+        if onchain_type:
+            query = query.filter(OnchainHistory.onchain_type == onchain_type)
+        
+        # 按创建时间倒序排列
+        records = query.order_by(OnchainHistory.created_at.desc()).all()
+        
+        # 创建CSV内容
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 写入表头
+        writer.writerow([
+            'ID', '资产ID', '资产名称', '资产符号', '交易ID', '触发类型', 
+            '上链类型', '状态', '交易哈希', '区块号', 'Gas消耗', 'Gas价格',
+            '重试次数', '最大重试次数', '触发者', '触发时间', '处理完成时间',
+            '错误信息', '创建时间', '更新时间'
+        ])
+        
+        # 写入数据
+        for record in records:
+            # 状态文本映射
+            status_text = {
+                'pending': '待上链',
+                'processing': '上链中',
+                'success': '上链成功',
+                'failed': '上链失败',
+                'retry': '重试中'
+            }.get(record.status, record.status)
+            
+            # 触发类型文本映射
+            trigger_text = {
+                'payment_confirmed': '支付确认',
+                'manual_trigger': '手动触发'
+            }.get(record.trigger_type, record.trigger_type)
+            
+            # 上链类型文本映射
+            onchain_text = {
+                'asset_creation': '资产创建',
+                'asset_update': '资产更新',
+                'trade_settlement': '交易结算'
+            }.get(record.onchain_type, record.onchain_type)
+            
+            writer.writerow([
+                record.id,
+                record.asset_id,
+                record.asset_name if hasattr(record, 'asset_name') else (record.asset.name if record.asset else 'N/A'),
+                record.asset_symbol if hasattr(record, 'asset_symbol') else (record.asset.token_symbol if record.asset else 'N/A'),
+                record.trade_id or '',
+                trigger_text,
+                onchain_text,
+                status_text,
+                record.transaction_hash or '',
+                record.block_number or '',
+                record.gas_used or '',
+                record.gas_price or '',
+                record.retry_count,
+                record.max_retries,
+                record.triggered_by or '',
+                record.triggered_at.strftime('%Y-%m-%d %H:%M:%S') if record.triggered_at else '',
+                record.processed_at.strftime('%Y-%m-%d %H:%M:%S') if record.processed_at else '',
+                record.error_message or '',
+                record.created_at.strftime('%Y-%m-%d %H:%M:%S') if record.created_at else '',
+                record.updated_at.strftime('%Y-%m-%d %H:%M:%S') if record.updated_at else ''
+            ])
+        
+        # 创建响应
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = f'attachment; filename=onchain_history_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.csv'
+        
+        return response
+        
+    except Exception as e:
+        current_app.logger.error(f"导出上链历史记录失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 
 
