@@ -229,12 +229,17 @@ class Token:
                 # 创建交易
                 transaction = SolanaTransaction()
                 
+                # 转换参数为solana-py格式
+                dest_solana = SolanaPublicKey.from_string(str(dest))
+                mint_solana = SolanaPublicKey.from_string(str(self.pubkey))
+                mint_authority_solana = SolanaPublicKey.from_string(str(mint_authority))
+                
                 # 添加铸造指令
                 mint_to_params = MintToParams(
                     amount=amount,
-                    dest=dest,
-                    mint=self.pubkey,
-                    mint_authority=mint_authority,
+                    dest=dest_solana,
+                    mint=mint_solana,
+                    mint_authority=mint_authority_solana,
                     program_id=TOKEN_PROGRAM_ID
                 )
                 mint_ix = mint_to(mint_to_params)
