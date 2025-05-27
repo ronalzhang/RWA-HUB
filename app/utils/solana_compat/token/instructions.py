@@ -105,7 +105,7 @@ class Token:
                 # 添加创建账户指令
                 create_account_ix = create_account(
                     CreateAccountParams(
-                        from_pubkey=payer.pubkey(),
+                        from_pubkey=payer.public_key,
                         new_account_pubkey=mint_pubkey,
                         lamports=mint_rent,
                         space=82,  # Mint账户大小
