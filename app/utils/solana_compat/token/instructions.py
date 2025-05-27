@@ -110,10 +110,10 @@ class Token:
                 create_account_ix = create_account(
                     CreateAccountParams(
                         from_pubkey=from_pubkey_solana,
-                        new_account_pubkey=mint_pubkey,
+                        to_pubkey=mint_pubkey,
                         lamports=mint_rent,
                         space=82,  # Mint账户大小
-                        program_id=SPL_TOKEN_PROGRAM_ID
+                        owner=SPL_TOKEN_PROGRAM_ID
                     )
                 )
                 transaction.add(create_account_ix)
