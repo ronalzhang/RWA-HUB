@@ -64,9 +64,7 @@ class SolanaClient:
         self.config = load_config()
         endpoint_url = endpoint_url or os.environ.get("SOLANA_NETWORK_URL", "https://api.mainnet-beta.solana.com")
         
-        # 设置mock_mode标志，确保从环境变量读取
-        self.mock_mode = os.environ.get('SOLANA_MOCK_MODE', 'false').lower() == 'true'
-        logger.info(f"Solana客户端模拟模式: {'开启' if self.mock_mode else '关闭'}")
+        # 只使用真实网络模式
 
         self.client = SolanaRpcClient(endpoint_url)
         self.endpoint = endpoint_url
@@ -352,11 +350,7 @@ class SolanaClient:
         if not self.public_key:
             raise ValueError("未初始化钱包公钥，无法查询余额")
             
-        # 如果是模拟模式，返回模拟数据
-        if self.mock_mode:
-            logger.info(f"模拟模式：返回模拟的SOL余额 0.148")
-            return 0.148
-            
+
         # 首先尝试主节点
         try:
             logger.info(f"正在获取钱包 {self.public_key} 的SOL余额...")
@@ -417,29 +411,7 @@ class SolanaClient:
         Returns:
             dict: 包含代币地址和mint交易ID的字典
         """
-        if self.mock_mode:
-            import base58
-            import hashlib
-            import time
-            
-            # 使用资产名称和时间戳生成一个伪随机的代币地址
-            seed = f"{asset_name}_{token_symbol}_{int(time.time())}".encode()
-            hash_bytes = hashlib.sha256(seed).digest()[:32]
-            token_address = "So" + base58.b58encode(hash_bytes).decode()[:40]
-            
-            # 生成一个伪随机的交易ID
-            tx_hash = base58.b58encode(hashlib.sha256(f"{token_address}_{int(time.time())}".encode()).digest()).decode()
-            
-            logger.info(f"模拟模式：创建SPL代币 {token_symbol}，地址: {token_address}")
-            return {
-                "success": True,
-                "token_address": token_address,
-                "tx_hash": tx_hash,
-                "decimals": decimals,
-                "token_supply": token_supply,
-                "mock": True
-            }
-            
+
         if not self.keypair:
             if self.readonly_mode:
                 raise ValueError("钱包处于只读模式，无法创建代币。只读模式仅支持查询操作，不支持交易操作。")

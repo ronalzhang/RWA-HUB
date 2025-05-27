@@ -146,50 +146,7 @@ class AssetService:
                 # --- 开始实际部署 --- 
                 logger.info(f"开始将资产部署到区块链: AssetID={asset_id}, Name={asset.name}")
                 
-                # 模拟模式处理 (保持不变)
-                if getattr(self.solana_client, 'mock_mode', False):
-                    logger.info(f"模拟模式：部署资产 {asset.name} 到区块链")
-                    
-                    # 生成模拟的token地址和交易hash
-                    seed = f"{asset.name}_{asset.token_symbol}_{int(time.time())}".encode()
-                    hash_bytes = hashlib.sha256(seed).digest()[:32]
-                    token_address = "So" + base58.b58encode(hash_bytes).decode()[:40]
-                    tx_hash = base58.b58encode(hashlib.sha256(f"{token_address}_{int(time.time())}".encode()).digest()).decode()
-                    
-                    # 更新资产信息
-                    asset.token_address = token_address
-                    asset.deployment_tx_hash = tx_hash
-                    asset.status = AssetStatus.ON_CHAIN.value
-                    asset.deployment_time = datetime.utcnow()
-                    
-                    # 构建blockchain_details
-                    blockchain_details = {
-                        "network": "solana_mainnet",
-                        "token_type": "spl",
-                        "decimals": 9,
-                        "deployment_time": datetime.now().isoformat(),
-                        "creator": str(self.solana_client.public_key),
-                        "supply": asset.token_supply,
-                        "mock_mode": True
-                    }
-                    
-                    # 如果数据库有blockchain_details字段，则设置
-                    if hasattr(asset, 'blockchain_details'):
-                        asset.blockchain_details = json.dumps(blockchain_details)
-                    
-                    # 清除上链进行中标记并保存到数据库
-                    asset.deployment_in_progress = False
-                    db.session.commit()
-                    
-                    logger.info(f"模拟模式：成功部署资产 {asset.name} 到区块链，token地址: {token_address}")
-                    return {
-                        "success": True,
-                        "message": "资产成功部署到区块链（模拟模式）",
-                        "token_address": token_address,
-                        "tx_hash": tx_hash,
-                        "mock": True
-                    }
-                
+
                 # 检查服务钱包余额 (保持不变)
                 if not self.solana_client.check_balance_sufficient():
                     raise ValueError("服务钱包SOL余额不足，无法创建代币")
