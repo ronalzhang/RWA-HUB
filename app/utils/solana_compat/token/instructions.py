@@ -90,7 +90,7 @@ class Token:
                 
                 # 生成新的mint keypair
                 mint_keypair = Keypair()
-                mint_pubkey = mint_keypair.pubkey
+                mint_pubkey = mint_keypair.pubkey()
                 
                 logger.info(f"生成的mint地址: {mint_pubkey}")
                 
@@ -105,7 +105,7 @@ class Token:
                 # 添加创建账户指令
                 create_account_ix = create_account(
                     CreateAccountParams(
-                        from_pubkey=payer.pubkey,
+                        from_pubkey=payer.pubkey(),
                         new_account_pubkey=mint_pubkey,
                         lamports=mint_rent,
                         space=82,  # Mint账户大小
