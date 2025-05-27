@@ -76,7 +76,7 @@ class Token:
                 from solana.rpc.api import Client
                 from solders.keypair import Keypair
                 from solders.pubkey import Pubkey as SolanaPublicKey
-                from spl.token.instructions import initialize_mint, mint_to as spl_mint_to
+                from spl.token.instructions import initialize_mint, mint_to as spl_mint_to, InitializeMintParams
                 from spl.token.constants import TOKEN_PROGRAM_ID as SPL_TOKEN_PROGRAM_ID
                 from solders.transaction import Transaction as SolanaTransaction
                 from solders.system_program import create_account, CreateAccountParams
@@ -90,7 +90,7 @@ class Token:
                 
                 # 生成新的mint keypair
                 mint_keypair = Keypair()
-                mint_pubkey = mint_keypair.public_key
+                mint_pubkey = mint_keypair.pubkey
                 
                 logger.info(f"生成的mint地址: {mint_pubkey}")
                 
@@ -105,7 +105,7 @@ class Token:
                 # 添加创建账户指令
                 create_account_ix = create_account(
                     CreateAccountParams(
-                        from_pubkey=payer.public_key,
+                        from_pubkey=payer.pubkey,
                         new_account_pubkey=mint_pubkey,
                         lamports=mint_rent,
                         space=82,  # Mint账户大小
@@ -115,14 +115,14 @@ class Token:
                 transaction.add(create_account_ix)
                 
                 # 添加初始化mint指令
-                init_mint_ix = initialize_mint(
-                    {
-                        'mint': mint_pubkey,
-                        'decimals': decimals,
-                        'mint_authority': mint_authority,
-                        'freeze_authority': mint_authority
-                    }
+                init_mint_params = InitializeMintParams(
+                    decimals=decimals,
+                    mint=mint_pubkey,
+                    mint_authority=mint_authority,
+                    freeze_authority=mint_authority,
+                    program_id=SPL_TOKEN_PROGRAM_ID
                 )
+                init_mint_ix = initialize_mint(init_mint_params)
                 transaction.add(init_mint_ix)
                 
                 # 获取最新区块哈希
@@ -194,7 +194,7 @@ class Token:
             
             try:
                 from solana.rpc.api import Client
-                from spl.token.instructions import mint_to
+                from spl.token.instructions import mint_to, MintToParams
                 from solders.transaction import Transaction as SolanaTransaction
                 from solders.pubkey import Pubkey as SolanaPublicKey
                 
@@ -208,14 +208,14 @@ class Token:
                 transaction = SolanaTransaction()
                 
                 # 添加铸造指令
-                mint_ix = mint_to(
-                    {
-                        'mint': self.pubkey,
-                        'dest': dest,
-                        'mint_authority': mint_authority,
-                        'amount': amount
-                    }
+                mint_to_params = MintToParams(
+                    amount=amount,
+                    dest=dest,
+                    mint=self.pubkey,
+                    mint_authority=mint_authority,
+                    program_id=TOKEN_PROGRAM_ID
                 )
+                mint_ix = mint_to(mint_to_params)
                 transaction.add(mint_ix)
                 
                 # 获取最新区块哈希
@@ -249,7 +249,7 @@ class Token:
         """转账代币 - 真实实现"""
         try:
             from solana.rpc.api import Client
-            from spl.token.instructions import transfer
+            from spl.token.instructions import transfer, TransferParams
             from solders.transaction import Transaction as SolanaTransaction
             
             logger.info(f"✅ 使用真实的solana-py库进行代币转账")
@@ -258,14 +258,14 @@ class Token:
             transaction = SolanaTransaction()
             
             # 添加转账指令
-            transfer_ix = transfer(
-                {
-                    'source': source,
-                    'dest': dest,
-                    'owner': owner,
-                    'amount': amount
-                }
+            transfer_params = TransferParams(
+                amount=amount,
+                dest=dest,
+                owner=owner,
+                source=source,
+                program_id=program_id
             )
+            transfer_ix = transfer(transfer_params)
             transaction.add(transfer_ix)
             
             return transaction
