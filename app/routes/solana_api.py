@@ -274,7 +274,37 @@ def after_request(response):
 @solana_api.route('/health', methods=['GET'])
 def health_check():
     """API健康检查"""
-    return jsonify({"status": "ok", "timestamp": datetime.now().isoformat()})
+    try:
+        # 检查Solana网络连接
+        best_node = get_best_node()
+        
+        # 尝试获取健康状态
+        result = make_rpc_request("getHealth", [], best_node)
+        
+        if result["success"]:
+            return jsonify({
+                "success": True,
+                "status": "ok", 
+                "timestamp": datetime.now().isoformat(),
+                "node": best_node,
+                "solana_health": result.get("result", "ok")
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "status": "error",
+                "timestamp": datetime.now().isoformat(),
+                "node": best_node,
+                "error": result.get("error", "Solana网络连接异常")
+            })
+    except Exception as e:
+        logger.error(f"健康检查失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "status": "error",
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e)
+        })
 
 @solana_api.route('/submit_transaction', methods=['POST'])
 def submit_transaction():

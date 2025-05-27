@@ -1533,3 +1533,18 @@ def fix_asset_total_values():
             'success': False,
             'error': str(e)
         }), 500
+
+@api_bp.route('/payment/config', methods=['GET'])
+def get_payment_config():
+    """获取支付配置 - 兼容路由"""
+    try:
+        from app.utils.config_manager import ConfigManager
+        
+        # 使用统一的配置管理器获取支付设置
+        settings = ConfigManager.get_payment_settings()
+        
+        current_app.logger.info(f"返回支付设置: {settings}")
+        return jsonify(settings)
+    except Exception as e:
+        logger.error(f"获取支付设置失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'获取支付设置失败: {str(e)}'}), 500
