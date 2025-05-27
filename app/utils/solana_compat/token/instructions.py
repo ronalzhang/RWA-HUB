@@ -263,6 +263,18 @@ class Token:
                     except Exception as e:
                         if "already in use" in str(e) or "already exists" in str(e):
                             logger.info("关联代币账户已存在，跳过创建")
+                        elif "not enough signers" in str(e):
+                            logger.info("尝试使用显式签名者发送关联代币账户创建交易...")
+                            try:
+                                result = client.send_transaction(transaction, payer_solana_keypair)
+                                if result.value:
+                                    logger.info(f"✅ 关联代币账户创建成功！交易哈希: {result.value}")
+                                else:
+                                    logger.error(f"❌ 关联代币账户创建失败: {result}")
+                                    raise Exception(f"创建关联代币账户失败: {result}")
+                            except Exception as e2:
+                                logger.error(f"使用显式签名者创建关联代币账户仍然失败: {str(e2)}")
+                                raise
                         else:
                             logger.error(f"创建关联代币账户时出错: {str(e)}")
                             raise
