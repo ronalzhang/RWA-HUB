@@ -82,9 +82,7 @@ def get_solana_keypair_from_env(var_name: str = "SOLANA_PRIVATE_KEY") -> Optiona
         # 检测私钥格式并转换
         if len(private_key_str) == 128:  # 十六进制格式
             private_key_bytes = bytes.fromhex(private_key_str)
-        elif len(private_key_str) == 88:  # Base64格式
-            private_key_bytes = base64.b64decode(private_key_str)
-        else:  # Base58格式
+        else:  # Base58格式（包括88字符长度）
             private_key_bytes = base58.b58decode(private_key_str)
         
         # 处理不同长度的私钥
