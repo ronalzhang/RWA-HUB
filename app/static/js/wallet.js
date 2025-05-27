@@ -3058,9 +3058,8 @@ checkIfReturningFromWalletApp(walletType) {
                     fromPubkey,                    // payer
                     toTokenAccount,                // associatedToken
                     toPubkey,                      // owner
-                    USDC_MINT,                     // mint
-                    TOKEN_PROGRAM_ID,              // programId
-                    ASSOCIATED_TOKEN_PROGRAM_ID    // associatedTokenProgramId
+                    USDC_MINT                      // mint
+                    // 注意：不再传递额外的programId参数，函数内部会使用默认值
                 );
                 transaction.add(createAtaInstruction);
                 console.log('[transferSolanaToken] ATA创建指令已添加');
@@ -3076,9 +3075,8 @@ checkIfReturningFromWalletApp(walletType) {
                 fromTokenAccount,    // source
                 toTokenAccount,      // destination  
                 fromPubkey,          // owner
-                transferAmount,      // amount
-                [],                  // multiSigners
-                TOKEN_PROGRAM_ID     // programId
+                transferAmount       // amount
+                // 注意：不再传递额外的参数，函数内部会使用默认值
             );
             
             transaction.add(transferInstruction);
