@@ -220,6 +220,25 @@ class AssetService:
                     db.session.commit()
                     logger.info(f"资产成功上链: AssetID={asset_id}, TokenAddress={token_address}, Status=ON_CHAIN")
                     
+                    # 更新上链历史记录为成功
+                    try:
+                        from app.models.admin import OnchainHistory
+                        latest_record = OnchainHistory.query.filter_by(
+                            asset_id=asset_id,
+                            trigger_type='payment_confirmed',
+                            onchain_type='asset_creation'
+                        ).order_by(OnchainHistory.created_at.desc()).first()
+                        
+                        if latest_record:
+                            latest_record.update_status(
+                                status='success',
+                                transaction_hash=tx_hash,
+                                block_number=details.get('block_number')
+                            )
+                            logger.info(f"已更新上链历史记录 {latest_record.id} 为成功状态")
+                    except Exception as e:
+                        logger.error(f"更新上链历史记录失败: {str(e)}")
+                    
                     return {
                         'success': True,
                         'asset_id': asset_id,
@@ -238,6 +257,24 @@ class AssetService:
                     # 清除上链进行中标记
                     asset.deployment_in_progress = False
                     db.session.commit()
+                    
+                    # 更新上链历史记录为失败
+                    try:
+                        from app.models.admin import OnchainHistory
+                        latest_record = OnchainHistory.query.filter_by(
+                            asset_id=asset_id,
+                            trigger_type='payment_confirmed',
+                            onchain_type='asset_creation'
+                        ).order_by(OnchainHistory.created_at.desc()).first()
+                        
+                        if latest_record:
+                            latest_record.update_status(
+                                status='failed',
+                                error_message=error_message
+                            )
+                            logger.info(f"已更新上链历史记录 {latest_record.id} 为失败状态")
+                    except Exception as e:
+                        logger.error(f"更新上链历史记录失败: {str(e)}")
                     
                     return {
                         'success': False,
@@ -400,7 +437,21 @@ class AssetService:
             asset.status = AssetStatus.CONFIRMED.value
             db.session.commit()
             logger.info(f"资产 {asset_id} 支付已确认，状态更新为 CONFIRMED")
-                
+            
+            # 创建自动上链历史记录
+            try:
+                from app.models.admin import OnchainHistory
+                onchain_record = OnchainHistory.create_record(
+                    asset_id=asset_id,
+                    trigger_type='payment_confirmed',
+                    onchain_type='asset_creation',
+                    triggered_by=payment_info.get('wallet_address', 'system')
+                )
+                logger.info(f"已创建上链历史记录: {onchain_record.id}")
+            except Exception as e:
+                logger.error(f"创建上链历史记录失败: {str(e)}")
+                # 不影响主流程，继续执行
+            
             # 触发上链流程
             logger.info(f"开始为资产 {asset_id} 触发上链流程...")
             deploy_result = self.deploy_asset_to_blockchain(asset_id)

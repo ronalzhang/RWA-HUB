@@ -30,10 +30,10 @@ import struct
 from app.utils.helpers import check_response
 
 # 配置信息
-SOLANA_RPC_URL = os.environ.get("SOLANA_RPC_URL", "https://api.devnet.solana.com")
-# 使用一个有效的测试程序 ID
+SOLANA_RPC_URL = os.environ.get("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
+# 使用生产环境的USDC mint地址
 USDC_MINT = os.environ.get("SOLANA_USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
-PROGRAM_ID = os.environ.get("SOLANA_PROGRAM_ID", "9AcvoQmz22KRcMhkLkeSkKs8W7ru6oae8GHcxrS83fKz")
+PROGRAM_ID = os.environ.get("SOLANA_PROGRAM_ID", "2TsURTNQXyqHLB2bfbzFME7HkSMLWueYPjqXBBy2u1wP")
 # 平台费用地址现在通过ConfigManager动态获取，不再使用硬编码
 # PLATFORM_FEE_ADDRESS = os.environ.get("PLATFORM_FEE_ADDRESS", "EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4")
 

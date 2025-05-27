@@ -1,6 +1,6 @@
 [provider]
-cluster = "devnet"
+cluster = "mainnet-beta"
 wallet = "program-keypair.json"
 
-[programs.devnet]
+[programs.mainnet-beta]
 rwa_hub = "2TsURTNQXyqHLB2bfbzFME7HkSMLWueYPjqXBBy2u1wP" 
