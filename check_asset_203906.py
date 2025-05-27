@@ -37,7 +37,12 @@ def check_and_reset_asset():
             print(f"支付确认: {asset.payment_confirmed}")
             print(f"支付确认时间: {asset.payment_confirmed_at}")
             print(f"部署进行中: {asset.deployment_in_progress}")
-            print(f"部署时间: {asset.deployment_time}")
+            if hasattr(asset, 'deployment_started_at'):
+                print(f"部署开始时间: {asset.deployment_started_at}")
+            if hasattr(asset, 'created_at'):
+                print(f"创建时间: {asset.created_at}")
+            if hasattr(asset, 'updated_at'):
+                print(f"更新时间: {asset.updated_at}")
             
             # 检查区块链详情
             if asset.blockchain_details:
@@ -65,7 +70,8 @@ def check_and_reset_asset():
             # 1. 清除上链相关字段
             asset.token_address = None
             asset.deployment_tx_hash = None
-            asset.deployment_time = None
+            if hasattr(asset, 'deployment_time'):
+                asset.deployment_time = None
             asset.deployment_in_progress = False
             asset.deployment_started_at = None
             
