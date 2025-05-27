@@ -1007,6 +1007,8 @@ def create_asset_api():
                 token_supply=data.get('token_supply'),
                 token_price=data.get('token_price'),
                 remaining_supply=data.get('token_supply'),  # 初始剩余供应量等于总供应量
+                total_value=data.get('total_value'),  # 添加 total_value 字段
+                area=data.get('area'),  # 添加 area 字段（不动产需要）
                 images=json.dumps(images) if images else None,
                 documents=json.dumps(documents) if documents else None,
                 annual_revenue=data.get('annual_revenue', 1),

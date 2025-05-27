@@ -1940,7 +1940,7 @@ async function handlePaymentSuccess(txHash, formData) {
         updateProgress(85, '支付已确认，正在创建资产...');
         
         // 重新生成Token Symbol，避免重复使用
-        const assetType = formData.type || '20';
+        const assetType = formData.asset_type || '20';
         console.log('重新生成Token Symbol，资产类型:', assetType);
         const newTokenSymbol = await generateTokenSymbol(assetType);
         
