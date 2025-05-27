@@ -102,10 +102,14 @@ class Token:
                 # 创建交易
                 transaction = SolanaTransaction()
                 
+                # 转换PublicKey对象为solana-py格式
+                from_pubkey_solana = SolanaPublicKey.from_string(str(payer.public_key))
+                mint_authority_solana = SolanaPublicKey.from_string(str(mint_authority))
+                
                 # 添加创建账户指令
                 create_account_ix = create_account(
                     CreateAccountParams(
-                        from_pubkey=payer.public_key,
+                        from_pubkey=from_pubkey_solana,
                         new_account_pubkey=mint_pubkey,
                         lamports=mint_rent,
                         space=82,  # Mint账户大小
@@ -118,8 +122,8 @@ class Token:
                 init_mint_params = InitializeMintParams(
                     decimals=decimals,
                     mint=mint_pubkey,
-                    mint_authority=mint_authority,
-                    freeze_authority=mint_authority,
+                    mint_authority=mint_authority_solana,
+                    freeze_authority=mint_authority_solana,
                     program_id=SPL_TOKEN_PROGRAM_ID
                 )
                 init_mint_ix = initialize_mint(init_mint_params)
