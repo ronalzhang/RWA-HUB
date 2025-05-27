@@ -5,11 +5,10 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-import asyncio
 from app.blockchain.solana import SolanaClient
 from app.utils.helpers import get_solana_keypair_from_env
 
-async def check_wallet_balance():
+def check_wallet_balance():
     """检查钱包真实余额"""
     
     print("🔍 检查钱包真实余额...")
@@ -28,8 +27,8 @@ async def check_wallet_balance():
     
     try:
         # 获取SOL余额
-        sol_balance = await client.get_balance(wallet_address)
-        lamports = int(sol_balance * 1e9)
+        sol_balance = client.get_balance()
+        lamports = int(sol_balance * 1e9) if sol_balance else 0
         
         print(f"💰 SOL余额: {sol_balance} SOL")
         print(f"💰 余额(lamports): {lamports} lamports")
@@ -48,7 +47,7 @@ async def check_wallet_balance():
         usdc_mint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
         
         try:
-            usdc_balance = await client.get_token_balance(wallet_address, usdc_mint)
+            usdc_balance = client.get_token_balance(wallet_address, usdc_mint)
             if usdc_balance is not None:
                 print(f"💰 USDC余额: {usdc_balance} USDC")
             else:
@@ -60,4 +59,4 @@ async def check_wallet_balance():
         print(f"❌ 获取余额失败: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(check_wallet_balance()) 
+    check_wallet_balance() 
