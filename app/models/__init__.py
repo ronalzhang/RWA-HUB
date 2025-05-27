@@ -17,7 +17,7 @@ from .holding import Holding
 from .admin import (
     AdminUser, SystemConfig, CommissionSetting, 
     DistributionLevel, UserReferral, AdminOperationLog,
-    DashboardStats
+    DashboardStats, OnchainHistory, OnchainStatus
 )
 
 # 导入新的分销模型
@@ -36,6 +36,6 @@ __all__ = [
     'Trade', 'TradeType', 'TradeStatus', 'User', 'UserRole', 'UserStatus', 
     'Commission', 'AdminUser', 'SystemConfig', 'CommissionSetting',
     'DistributionLevel', 'UserReferral', 'CommissionRecord', 'AdminOperationLog',
-    'DashboardStats', 'ShortLink', 'Transaction', 'TransactionType', 'TransactionStatus',
+    'DashboardStats', 'OnchainHistory', 'OnchainStatus', 'ShortLink', 'Transaction', 'TransactionType', 'TransactionStatus',
     'Holding', 'CommissionConfig', 'UserCommissionBalance', 'CommissionWithdrawal'
 ]
