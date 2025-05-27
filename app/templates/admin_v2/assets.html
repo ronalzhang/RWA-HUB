@@ -121,6 +121,10 @@
                             <option value="1">待审核</option>
                             <option value="2">已通过</option>
                             <option value="3">已拒绝</option>
+                            <option value="5">支付已确认</option>
+                            <option value="6">支付失败</option>
+                            <option value="7">部署失败</option>
+                            <option value="8">支付处理中</option>
                         </select>
                     </div>
                     <div>
@@ -1170,8 +1174,12 @@
             getStatusClass(status) {
                 const classes = {
                     1: 'bg-yellow-100 text-yellow-800',  // 待审核
-                    2: 'bg-green-100 text-green-800',    // 已通过
-                    3: 'bg-red-100 text-red-800'         // 已拒绝
+                    2: 'bg-green-100 text-green-800',    // 已通过/已上链
+                    3: 'bg-red-100 text-red-800',        // 已拒绝
+                    5: 'bg-blue-100 text-blue-800',      // 支付已确认
+                    6: 'bg-red-100 text-red-800',        // 支付失败
+                    7: 'bg-orange-100 text-orange-800',  // 部署失败
+                    8: 'bg-purple-100 text-purple-800'   // 支付处理中
                 };
                 return classes[status] || 'bg-gray-100 text-gray-800';
             },
