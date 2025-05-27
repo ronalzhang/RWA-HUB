@@ -78,7 +78,7 @@ class Token:
                 from solders.pubkey import Pubkey as SolanaPublicKey
                 from spl.token.instructions import initialize_mint, mint_to as spl_mint_to, InitializeMintParams
                 from spl.token.constants import TOKEN_PROGRAM_ID as SPL_TOKEN_PROGRAM_ID
-                from solders.transaction import Transaction as SolanaTransaction
+                from solana.transaction import Transaction as SolanaTransaction
                 from solders.system_program import create_account, CreateAccountParams
                 from solana.rpc.commitment import Confirmed
                 import solana.rpc.types as rpc_types
@@ -168,7 +168,7 @@ class Token:
             try:
                 from solana.rpc.api import Client
                 from spl.token.instructions import create_associated_token_account, get_associated_token_address
-                from solders.transaction import Transaction as SolanaTransaction
+                from solana.transaction import Transaction as SolanaTransaction
                 from solders.pubkey import Pubkey as SolanaPublicKey
                 
                 # 获取关联代币账户地址
@@ -195,7 +195,7 @@ class Token:
             try:
                 from solana.rpc.api import Client
                 from spl.token.instructions import mint_to, MintToParams
-                from solders.transaction import Transaction as SolanaTransaction
+                from solana.transaction import Transaction as SolanaTransaction
                 from solders.pubkey import Pubkey as SolanaPublicKey
                 
                 logger.info("✅ 使用真实的solana-py库进行代币铸造")
@@ -250,7 +250,7 @@ class Token:
         try:
             from solana.rpc.api import Client
             from spl.token.instructions import transfer, TransferParams
-            from solders.transaction import Transaction as SolanaTransaction
+            from solana.transaction import Transaction as SolanaTransaction
             
             logger.info(f"✅ 使用真实的solana-py库进行代币转账")
             
