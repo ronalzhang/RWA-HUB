@@ -31,7 +31,7 @@ def set_asset_29_status():
             logger.error("未找到资产ID=29")
             return False
         
-        logger.info(f"找到资产29: {asset.name} (RH-{asset.rh_id})")
+        logger.info(f"找到资产29: {asset.name}")
         logger.info(f"当前状态: {asset.status}")
         
         # 设置状态为5（支付已确认）
@@ -55,7 +55,6 @@ def set_asset_29_status():
         
         logger.info(f"✅ 资产29状态已设置为5（支付已确认）")
         logger.info(f"资产名称: {asset.name}")
-        logger.info(f"RH ID: RH-{asset.rh_id}")
         logger.info(f"状态: {asset.status}")
         logger.info(f"Token地址: {asset.token_address}")
         logger.info(f"部署交易哈希: {asset.deployment_tx_hash}")
@@ -105,7 +104,7 @@ def check_auto_onchain_conditions():
         
         logger.info(f"符合上链条件的资产数量: {len(pending_assets)}")
         for asset in pending_assets:
-            logger.info(f"  - 资产ID={asset.id}, 名称={asset.name}, RH-{asset.rh_id}")
+            logger.info(f"  - 资产ID={asset.id}, 名称={asset.name}")
         
         return True
         
