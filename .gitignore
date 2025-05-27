@@ -244,3 +244,79 @@ wallet-keypair.json
 *.encrypted
 crypto_keys/
 secrets/
+
+# === 安全敏感文件 ===
+# SSL证书和私钥
+*.pem
+*.crt
+*.key
+*.p12
+*.pfx
+
+# 各种密钥文件
+*keypair*
+*private*
+*secret*
+*mnemonic*
+
+# 环境配置
+.env*
+!.env.example
+
+# 数据库文件
+*.db
+*.sqlite*
+*.db.backup
+
+# 临时和测试文件
+test_*.py
+check_*.py
+debug_*.py
+fix_*.py
+cleanup_*.py
+setup_*.py
+verify_*.py
+monitor_*.py
+calculate_*.py
+emergency_*.py
+generate_*.py
+security_*.py
+
+# 文档和说明文件
+*.md
+!README.md
+docs/
+*.doc
+*.docx
+*.pdf
+
+# PM2和部署配置
+ecosystem.config.*
+
+# 备份文件
+*.backup
+*.bak
+*.old
+backup/
+backups/
+
+# 上传和临时文件
+uploads/
+temp/
+tmp/
+*.tmp
+
+# IDE和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+logs/
+app.log*
