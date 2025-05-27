@@ -3054,13 +3054,24 @@ checkIfReturningFromWalletApp(walletType) {
             // 如果目标ATA不存在，添加创建指令
             if (!ataData.exists) {
                 console.log('[transferSolanaToken] 目标ATA不存在，添加创建指令...');
-                const createAtaInstruction = window.spl_token.createAssociatedTokenAccountInstruction(
-                    fromPubkey,                    // payer
-                    toTokenAccount,                // associatedToken
-                    toPubkey,                      // owner
-                    USDC_MINT                      // mint
-                    // 注意：不再传递额外的programId参数，函数内部会使用默认值
-                );
+                
+                // 手动创建ATA指令，避免函数调用问题
+                const keys = [
+                    { pubkey: fromPubkey, isSigner: true, isWritable: true },
+                    { pubkey: toTokenAccount, isSigner: false, isWritable: true },
+                    { pubkey: toPubkey, isSigner: false, isWritable: false },
+                    { pubkey: USDC_MINT, isSigner: false, isWritable: false },
+                    { pubkey: window.solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false },
+                    { pubkey: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'), isSigner: false, isWritable: false },
+                    { pubkey: window.solanaWeb3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+                ];
+                
+                const createAtaInstruction = new window.solanaWeb3.TransactionInstruction({
+                    keys,
+                    programId: new window.solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'),
+                    data: new Uint8Array(0),
+                });
+                
                 transaction.add(createAtaInstruction);
                 console.log('[transferSolanaToken] ATA创建指令已添加');
             } else {
@@ -3070,14 +3081,34 @@ checkIfReturningFromWalletApp(walletType) {
             // 10. 创建转账指令
             console.log('[transferSolanaToken] 创建转账指令...');
             
-            // 使用标准的SPL Token转账指令
-            const transferInstruction = window.spl_token.createTransferInstruction(
-                fromTokenAccount,    // source
-                toTokenAccount,      // destination  
-                fromPubkey,          // owner
-                transferAmount       // amount
-                // 注意：不再传递额外的参数，函数内部会使用默认值
-            );
+            // 手动创建转账指令，避免函数调用问题
+            const keys = [
+                { pubkey: fromTokenAccount, isSigner: false, isWritable: true },
+                { pubkey: toTokenAccount, isSigner: false, isWritable: true },
+                { pubkey: fromPubkey, isSigner: true, isWritable: false },
+            ];
+            
+            // 构建指令数据
+            const data = new Uint8Array(9);
+            data[0] = 3; // Transfer instruction discriminator
+            
+            // 将金额编码为Little Endian 64位整数
+            const amountValue = Number(transferAmount);
+            const amountBytes = new Uint8Array(8);
+            let tempAmount = amountValue;
+            
+            for (let i = 0; i < 8; i++) {
+                amountBytes[i] = tempAmount & 0xff;
+                tempAmount = Math.floor(tempAmount / 256);
+            }
+            
+            data.set(amountBytes, 1);
+            
+            const transferInstruction = new window.solanaWeb3.TransactionInstruction({
+                keys,
+                programId: new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+                data,
+            });
             
             transaction.add(transferInstruction);
 
