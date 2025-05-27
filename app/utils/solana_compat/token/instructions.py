@@ -76,7 +76,8 @@ class Token:
                 from solana.rpc.api import Client
                 from solana.keypair import Keypair
                 from solana.publickey import PublicKey as SolanaPublicKey
-                from spl.token.instructions import create_mint, MintLayout
+                from spl.token.instructions import initialize_mint, mint_to as spl_mint_to
+                from spl.token.constants import TOKEN_PROGRAM_ID as SPL_TOKEN_PROGRAM_ID
                 from solana.transaction import Transaction as SolanaTransaction
                 from solana.system_program import create_account, CreateAccountParams
                 from solana.rpc.commitment import Confirmed
@@ -93,9 +94,10 @@ class Token:
                 
                 logger.info(f"生成的mint地址: {mint_pubkey}")
                 
-                # 获取最小租金豁免余额
-                mint_rent = client.get_minimum_balance_for_rent_exemption(MintLayout.sizeof())
-                logger.info(f"Mint账户租金豁免余额: {mint_rent['result']} lamports")
+                # 获取最小租金豁免余额 - 使用固定值82字节的Mint账户大小
+                mint_rent_response = client.get_minimum_balance_for_rent_exemption(82)
+                mint_rent = mint_rent_response.value
+                logger.info(f"Mint账户租金豁免余额: {mint_rent} lamports")
                 
                 # 创建交易
                 transaction = SolanaTransaction()
@@ -105,26 +107,27 @@ class Token:
                     CreateAccountParams(
                         from_pubkey=payer.public_key,
                         new_account_pubkey=mint_pubkey,
-                        lamports=mint_rent['result'],
-                        space=MintLayout.sizeof(),
-                        program_id=program_id
+                        lamports=mint_rent,
+                        space=82,  # Mint账户大小
+                        program_id=SPL_TOKEN_PROGRAM_ID
                     )
                 )
                 transaction.add(create_account_ix)
                 
                 # 添加初始化mint指令
-                init_mint_ix = create_mint(
-                    program_id=program_id,
-                    mint=mint_pubkey,
-                    decimals=decimals,
-                    mint_authority=mint_authority,
-                    freeze_authority=mint_authority
+                init_mint_ix = initialize_mint(
+                    {
+                        'mint': mint_pubkey,
+                        'decimals': decimals,
+                        'mint_authority': mint_authority,
+                        'freeze_authority': mint_authority
+                    }
                 )
                 transaction.add(init_mint_ix)
                 
                 # 获取最新区块哈希
-                recent_blockhash = client.get_recent_blockhash()
-                transaction.recent_blockhash = recent_blockhash['result']['value']['blockhash']
+                recent_blockhash_response = client.get_latest_blockhash()
+                transaction.recent_blockhash = recent_blockhash_response.value.blockhash
                 
                 # 签名交易
                 transaction.sign(payer, mint_keypair)
@@ -133,8 +136,8 @@ class Token:
                 logger.info("发送SPL代币创建交易...")
                 result = client.send_transaction(transaction, payer, mint_keypair)
                 
-                if result['result']:
-                    tx_hash = result['result']
+                if result.value:
+                    tx_hash = result.value
                     logger.info(f"✅ SPL代币创建成功！交易哈希: {tx_hash}")
                     
                     # 创建Token实例并设置mint地址
@@ -164,7 +167,7 @@ class Token:
             
             try:
                 from solana.rpc.api import Client
-                from spl.token.instructions import create_associated_token_account
+                from spl.token.instructions import create_associated_token_account, get_associated_token_address
                 from solana.transaction import Transaction as SolanaTransaction
                 from solana.publickey import PublicKey as SolanaPublicKey
                 
@@ -206,17 +209,18 @@ class Token:
                 
                 # 添加铸造指令
                 mint_ix = mint_to(
-                    program_id=self.program_id,
-                    mint=self.pubkey,
-                    dest=dest,
-                    mint_authority=mint_authority,
-                    amount=amount
+                    {
+                        'mint': self.pubkey,
+                        'dest': dest,
+                        'mint_authority': mint_authority,
+                        'amount': amount
+                    }
                 )
                 transaction.add(mint_ix)
                 
                 # 获取最新区块哈希
-                recent_blockhash = client.get_recent_blockhash()
-                transaction.recent_blockhash = recent_blockhash['result']['value']['blockhash']
+                recent_blockhash_response = client.get_latest_blockhash()
+                transaction.recent_blockhash = recent_blockhash_response.value.blockhash
                 
                 logger.info(f"代币铸造交易已准备，mint: {self.pubkey}, dest: {dest}, amount: {amount}")
                 
@@ -249,7 +253,22 @@ class Token:
             from solana.transaction import Transaction as SolanaTransaction
             
             logger.info(f"✅ 使用真实的solana-py库进行代币转账")
-            return SolanaTransaction()
+            
+            # 创建交易
+            transaction = SolanaTransaction()
+            
+            # 添加转账指令
+            transfer_ix = transfer(
+                {
+                    'source': source,
+                    'dest': dest,
+                    'owner': owner,
+                    'amount': amount
+                }
+            )
+            transaction.add(transfer_ix)
+            
+            return transaction
             
         except ImportError:
             raise NotImplementedError("真实的代币转账需要solana-py库")
