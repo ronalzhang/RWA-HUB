@@ -260,7 +260,10 @@ class Token:
                 else:
                     mint_solana = self.pubkey  # 如果已经是正确类型
                     
-                if hasattr(mint_authority, '__str__'):
+                if hasattr(mint_authority, 'public_key'):
+                    # 如果是Keypair对象，获取其公钥
+                    mint_authority_solana = SolanaPublicKey.from_string(str(mint_authority.public_key))
+                elif hasattr(mint_authority, '__str__'):
                     mint_authority_solana = SolanaPublicKey.from_string(str(mint_authority))
                 else:
                     mint_authority_solana = mint_authority  # 如果已经是正确类型
