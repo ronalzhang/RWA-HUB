@@ -1442,29 +1442,53 @@ const walletState = {
                 },
                 
                 // 简化的创建ATA指令函数 - 现在主要用于兼容性
-                createAssociatedTokenAccountInstruction: function(payer, associatedToken, owner, mint, programId = this.TOKEN_PROGRAM_ID, associatedTokenProgramId = this.ASSOCIATED_TOKEN_PROGRAM_ID) {
+                createAssociatedTokenAccountInstruction: function(payer, associatedToken, owner, mint, programId = null, associatedTokenProgramId = null) {
+                    // 确保使用正确的程序ID
+                    const tokenProgramId = programId || this.TOKEN_PROGRAM_ID;
+                    const ataProgramId = associatedTokenProgramId || this.ASSOCIATED_TOKEN_PROGRAM_ID;
+                    
+                    console.log('[createAssociatedTokenAccountInstruction] 创建ATA指令');
+                    console.log('  payer:', payer.toString());
+                    console.log('  associatedToken:', associatedToken.toString());
+                    console.log('  owner:', owner.toString());
+                    console.log('  mint:', mint.toString());
+                    console.log('  tokenProgramId:', tokenProgramId.toString());
+                    console.log('  ataProgramId:', ataProgramId.toString());
+                    
                     const keys = [
                         { pubkey: payer, isSigner: true, isWritable: true },
                         { pubkey: associatedToken, isSigner: false, isWritable: true },
                         { pubkey: owner, isSigner: false, isWritable: false },
                         { pubkey: mint, isSigner: false, isWritable: false },
                         { pubkey: window.solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false },
-                        { pubkey: programId, isSigner: false, isWritable: false },
+                        { pubkey: tokenProgramId, isSigner: false, isWritable: false },
                         { pubkey: window.solanaWeb3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
                     ];
                     
                     const data = new Uint8Array(0);
                     
-                    return new window.solanaWeb3.TransactionInstruction({
+                    const instruction = new window.solanaWeb3.TransactionInstruction({
                         keys,
-                        programId: associatedTokenProgramId,
+                        programId: ataProgramId,
                         data,
                     });
+                    
+                    console.log('[createAssociatedTokenAccountInstruction] ATA指令创建完成，programId:', instruction.programId.toString());
+                    return instruction;
                 },
                 
                 // 简化的转账指令函数 - 现在主要用于兼容性，实际使用手动构建的版本
-                createTransferInstruction: function(source, destination, owner, amount, multiSigners = [], programId = this.TOKEN_PROGRAM_ID) {
-                    console.warn('[createTransferInstruction] 使用兼容性函数，建议使用手动构建的指令');
+                createTransferInstruction: function(source, destination, owner, amount, multiSigners = [], programId = null) {
+                    console.log('[createTransferInstruction] 创建转账指令');
+                    
+                    // 确保使用正确的程序ID
+                    const tokenProgramId = programId || this.TOKEN_PROGRAM_ID;
+                    
+                    console.log('  source:', source.toString());
+                    console.log('  destination:', destination.toString());
+                    console.log('  owner:', owner.toString());
+                    console.log('  amount:', amount.toString());
+                    console.log('  tokenProgramId:', tokenProgramId.toString());
                     
                     const keys = [
                         { pubkey: source, isSigner: false, isWritable: true },
@@ -1492,11 +1516,14 @@ const walletState = {
                     
                     data.set(amountBytes, 1);
                     
-                    return new window.solanaWeb3.TransactionInstruction({
+                    const instruction = new window.solanaWeb3.TransactionInstruction({
                         keys,
-                        programId,
+                        programId: tokenProgramId,
                         data,
                     });
+                    
+                    console.log('[createTransferInstruction] 转账指令创建完成，programId:', instruction.programId.toString());
+                    return instruction;
                 }
             };
             
@@ -3028,10 +3055,12 @@ checkIfReturningFromWalletApp(walletType) {
             if (!ataData.exists) {
                 console.log('[transferSolanaToken] 目标ATA不存在，添加创建指令...');
                 const createAtaInstruction = window.spl_token.createAssociatedTokenAccountInstruction(
-                    fromPubkey,          // payer
-                    toTokenAccount,      // associatedToken
-                    toPubkey,            // owner
-                    USDC_MINT           // mint
+                    fromPubkey,                    // payer
+                    toTokenAccount,                // associatedToken
+                    toPubkey,                      // owner
+                    USDC_MINT,                     // mint
+                    TOKEN_PROGRAM_ID,              // programId
+                    ASSOCIATED_TOKEN_PROGRAM_ID    // associatedTokenProgramId
                 );
                 transaction.add(createAtaInstruction);
                 console.log('[transferSolanaToken] ATA创建指令已添加');
@@ -3047,7 +3076,9 @@ checkIfReturningFromWalletApp(walletType) {
                 fromTokenAccount,    // source
                 toTokenAccount,      // destination  
                 fromPubkey,          // owner
-                transferAmount       // amount
+                transferAmount,      // amount
+                [],                  // multiSigners
+                TOKEN_PROGRAM_ID     // programId
             );
             
             transaction.add(transferInstruction);
