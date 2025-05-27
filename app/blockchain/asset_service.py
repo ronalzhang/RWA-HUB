@@ -180,9 +180,9 @@ class AssetService:
                     # 更新上链历史记录为成功
                     try:
                         from app.models.admin import OnchainHistory
+                        # 查找最新的上链记录（不限制触发类型）
                         latest_record = OnchainHistory.query.filter_by(
                             asset_id=asset_id,
-                            trigger_type='payment_confirmed',
                             onchain_type='asset_creation'
                         ).order_by(OnchainHistory.created_at.desc()).first()
                         
@@ -192,7 +192,9 @@ class AssetService:
                                 transaction_hash=tx_hash,
                                 block_number=details.get('block_number')
                             )
-                            logger.info(f"已更新上链历史记录 {latest_record.id} 为成功状态")
+                            logger.info(f"已更新上链历史记录 {latest_record.id} 为成功状态 (触发类型: {latest_record.trigger_type})")
+                        else:
+                            logger.warning(f"未找到资产 {asset_id} 的上链历史记录")
                     except Exception as e:
                         logger.error(f"更新上链历史记录失败: {str(e)}")
                     
@@ -218,9 +220,9 @@ class AssetService:
                     # 更新上链历史记录为失败
                     try:
                         from app.models.admin import OnchainHistory
+                        # 查找最新的上链记录（不限制触发类型）
                         latest_record = OnchainHistory.query.filter_by(
                             asset_id=asset_id,
-                            trigger_type='payment_confirmed',
                             onchain_type='asset_creation'
                         ).order_by(OnchainHistory.created_at.desc()).first()
                         
@@ -229,7 +231,9 @@ class AssetService:
                                 status='failed',
                                 error_message=error_message
                             )
-                            logger.info(f"已更新上链历史记录 {latest_record.id} 为失败状态")
+                            logger.info(f"已更新上链历史记录 {latest_record.id} 为失败状态 (触发类型: {latest_record.trigger_type})")
+                        else:
+                            logger.warning(f"未找到资产 {asset_id} 的上链历史记录")
                     except Exception as e:
                         logger.error(f"更新上链历史记录失败: {str(e)}")
                     

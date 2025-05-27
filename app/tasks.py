@@ -539,6 +539,20 @@ def auto_monitor_pending_payments():
                                 asset_for_update.deployment_started_at = datetime.utcnow()
                                 db.session.commit()
                                 
+                                # 创建自动上链历史记录
+                                try:
+                                    from app.models.admin import OnchainHistory
+                                    onchain_record = OnchainHistory.create_record(
+                                        asset_id=asset.id,
+                                        trigger_type='auto_monitor',
+                                        onchain_type='asset_creation',
+                                        triggered_by='system'
+                                    )
+                                    logger.info(f"已创建自动监控上链历史记录: {onchain_record.id}")
+                                except Exception as e:
+                                    logger.error(f"创建自动监控上链历史记录失败: {str(e)}")
+                                    # 不影响主流程，继续执行
+                                
                                 # 调用上链服务
                                 service = AssetService()
                                 result = service.deploy_asset_to_blockchain(asset.id)
