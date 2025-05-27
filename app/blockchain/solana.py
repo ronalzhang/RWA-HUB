@@ -83,6 +83,7 @@ class SolanaClient:
                 # 继续执行其他初始化步骤
 
         # 私钥处理逻辑
+        private_key_bytes = None  # 初始化变量
         try:
             # 1. 直接使用参数中提供的私钥
             if private_key:
@@ -118,6 +119,7 @@ class SolanaClient:
             # 3. 尝试从环境变量获取
             else:
                 logger.info("尝试从环境变量获取私钥")
+                private_key_bytes = None  # 初始化为None
                 wallet_info = get_solana_keypair_from_env()
                 if wallet_info and 'value' in wallet_info:
                     try:
