@@ -46,7 +46,7 @@ def check_asset_29_status():
                 logger.info(f"      交易哈希: {history.transaction_hash}")
                 logger.info(f"      错误信息: {history.error_message}")
                 logger.info(f"      触发类型: {history.trigger_type}")
-                logger.info(f"      网络费用: {history.network_fee}")
+                logger.info(f"      网络费用: {getattr(history, 'network_fee', 'N/A')}")
                 logger.info("")
             
             # 检查钱包余额
