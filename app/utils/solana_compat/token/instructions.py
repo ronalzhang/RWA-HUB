@@ -363,7 +363,9 @@ class Token:
                 )
             
         except Exception as e:
-            logger.error(f"铸造真实代币失败: {str(e)}")
+            logger.error(f"铸造真实代币失败: {str(e)}", exc_info=True)
+            logger.error(f"异常类型: {type(e).__name__}")
+            logger.error(f"异常详情: {repr(e)}")
             raise
     
     def transfer(
