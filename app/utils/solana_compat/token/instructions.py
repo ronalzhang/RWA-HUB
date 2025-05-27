@@ -218,9 +218,26 @@ class Token:
                 if payer:
                     logger.info("开始在链上创建关联代币账户...")
                     
-                    # 创建RPC客户端
-                    solana_endpoint = os.environ.get("SOLANA_NETWORK_URL", "https://api.mainnet-beta.solana.com")
-                    client = Client(solana_endpoint)
+                    # 创建RPC客户端 - 使用备用节点避免429错误
+                    backup_endpoints = [
+                        "https://api.mainnet-beta.solana.com",
+                        "https://solana-api.projectserum.com",
+                        "https://rpc.ankr.com/solana",
+                        "https://solana.public-rpc.com"
+                    ]
+                    
+                    client = None
+                    for endpoint in backup_endpoints:
+                        try:
+                            client = Client(endpoint)
+                            logger.info(f"使用Solana端点: {endpoint}")
+                            break
+                        except Exception as e:
+                            logger.warning(f"端点 {endpoint} 连接失败: {str(e)}")
+                            continue
+                    
+                    if not client:
+                        raise Exception("所有Solana RPC端点都无法连接")
                     
                     # 转换payer为solana-py格式
                     payer_solana = SolanaPublicKey.from_string(str(payer.public_key))
@@ -253,33 +270,55 @@ class Token:
                     # 签名并发送交易
                     transaction.sign(payer_solana_keypair)
                     
-                    try:
-                        result = client.send_transaction(transaction)
-                        if result.value:
-                            logger.info(f"✅ 关联代币账户创建成功！交易哈希: {result.value}")
-                        else:
-                            logger.error(f"❌ 关联代币账户创建失败: {result}")
-                            raise Exception(f"创建关联代币账户失败: {result}")
-                    except Exception as e:
-                        if "already in use" in str(e) or "already exists" in str(e):
-                            logger.info("关联代币账户已存在，跳过创建")
-                        elif "not enough signers" in str(e):
-                            logger.info("尝试使用显式签名者发送关联代币账户创建交易...")
-                            try:
-                                result = client.send_transaction(transaction, payer_solana_keypair)
-                                if result.value:
-                                    logger.info(f"✅ 关联代币账户创建成功！交易哈希: {result.value}")
-                                else:
-                                    logger.error(f"❌ 关联代币账户创建失败: {result}")
+                    # 添加重试机制
+                    import time
+                    max_retries = 3
+                    retry_delay = 2
+                    
+                    for attempt in range(max_retries):
+                        try:
+                            if attempt > 0:
+                                logger.info(f"第 {attempt + 1} 次尝试创建关联代币账户...")
+                                time.sleep(retry_delay * attempt)  # 递增延迟
+                            
+                            result = client.send_transaction(transaction)
+                            if result.value:
+                                logger.info(f"✅ 关联代币账户创建成功！交易哈希: {result.value}")
+                                break
+                            else:
+                                logger.error(f"❌ 关联代币账户创建失败: {result}")
+                                if attempt == max_retries - 1:
                                     raise Exception(f"创建关联代币账户失败: {result}")
-                            except Exception as e2:
-                                logger.error(f"使用显式签名者创建关联代币账户仍然失败: {str(e2)}", exc_info=True)
-                                logger.error(f"异常类型: {type(e2).__name__}")
-                                logger.error(f"异常详情: {repr(e2)}")
-                                raise
-                        else:
-                            logger.error(f"创建关联代币账户时出错: {str(e)}")
-                            raise
+                        except Exception as e:
+                            if "already in use" in str(e) or "already exists" in str(e):
+                                logger.info("关联代币账户已存在，跳过创建")
+                                break
+                            elif "not enough signers" in str(e):
+                                logger.info("尝试使用显式签名者发送关联代币账户创建交易...")
+                                try:
+                                    result = client.send_transaction(transaction, payer_solana_keypair)
+                                    if result.value:
+                                        logger.info(f"✅ 关联代币账户创建成功！交易哈希: {result.value}")
+                                        break
+                                    else:
+                                        logger.error(f"❌ 关联代币账户创建失败: {result}")
+                                        if attempt == max_retries - 1:
+                                            raise Exception(f"创建关联代币账户失败: {result}")
+                                except Exception as e2:
+                                    logger.error(f"使用显式签名者创建关联代币账户仍然失败: {str(e2)}", exc_info=True)
+                                    logger.error(f"异常类型: {type(e2).__name__}")
+                                    logger.error(f"异常详情: {repr(e2)}")
+                                    if attempt == max_retries - 1:
+                                        raise
+                            elif "429" in str(e) or "Too Many Requests" in str(e):
+                                logger.warning(f"遇到429错误，第 {attempt + 1} 次重试...")
+                                if attempt == max_retries - 1:
+                                    logger.error(f"重试 {max_retries} 次后仍然失败: {str(e)}")
+                                    raise
+                            else:
+                                logger.error(f"创建关联代币账户时出错: {str(e)}")
+                                if attempt == max_retries - 1:
+                                    raise
                 
                 logger.info(f"✅ 关联代币账户地址: {associated_account}")
                 return associated_account
