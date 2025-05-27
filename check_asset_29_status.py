@@ -31,8 +31,8 @@ def check_asset_29_status():
             logger.info(f"   ID: {asset.id}")
             logger.info(f"   名称: {asset.name}")
             logger.info(f"   状态: {asset.status}")
-            logger.info(f"   网络: {asset.network}")
-            logger.info(f"   代币地址: {asset.token_address}")
+            logger.info(f"   区块链: {getattr(asset, 'blockchain', 'N/A')}")
+            logger.info(f"   代币地址: {getattr(asset, 'token_address', 'N/A')}")
             logger.info(f"   创建时间: {asset.created_at}")
             logger.info(f"   更新时间: {asset.updated_at}")
             
