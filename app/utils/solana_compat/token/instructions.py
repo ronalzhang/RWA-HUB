@@ -148,12 +148,22 @@ class Token:
                 
                 logger.info(f"成功创建payer keypair，公钥: {payer_solana_keypair.pubkey()}")
                 
-                # 签名交易
+                # 签名交易 - 确保所有必要的签名者都签名
+                logger.info(f"开始签名交易，签名者: payer({payer_solana_keypair.pubkey()}), mint({mint_keypair.pubkey()})")
                 transaction.sign(payer_solana_keypair, mint_keypair)
+                logger.info(f"交易签名完成，签名数量: {len(transaction.signatures)}")
                 
                 # 发送交易
                 logger.info("发送SPL代币创建交易...")
-                result = client.send_transaction(transaction)
+                # 尝试使用不同的发送方法
+                try:
+                    result = client.send_transaction(transaction)
+                except Exception as e:
+                    if "not enough signers" in str(e):
+                        logger.info("尝试使用显式签名者发送交易...")
+                        result = client.send_transaction(transaction, payer_solana_keypair, mint_keypair)
+                    else:
+                        raise
                 
                 if result.value:
                     tx_hash = result.value
