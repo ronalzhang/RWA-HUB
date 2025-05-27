@@ -311,51 +311,36 @@ def list_assets(filter_status=None):
         if 'session' in locals() and not in_app_environment:
             session.close()
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="更新资产的链上信息")
-    
-    # 创建子命令解析器
-    subparsers = parser.add_subparsers(dest='command', help='子命令')
-    
-    # 更新资产命令
-    update_parser = subparsers.add_parser('update', help='更新资产的链上信息')
-    update_parser.add_argument("--token", "-t", required=True, help="资产的代币符号")
-    update_parser.add_argument("--contract", "-c", required=True, help="合约地址")
-    update_parser.add_argument("--tx-hash", help="部署交易的哈希值")
-    update_parser.add_argument("--status", default="active", choices=["active", "inactive", "pending"],
-                              help="资产状态 (默认: active)")
-    
-    # 列出资产命令
-    list_parser = subparsers.add_parser('list', help='列出资产')
-    list_parser.add_argument("--status", choices=["active", "inactive", "pending"],
-                            help="按状态筛选资产")
-    
-    args = parser.parse_args()
-    
-    if args.command == 'update':
-        try:
-            asset = update_asset_onchain(
-                token_symbol=args.token,
-                contract_address=args.contract,
-                tx_hash=args.tx_hash,
-                status=args.status
-            )
+def fix_asset_onchain_issue():
+    app = create_app()
+    with app.app_context():
+        print('=== 最终修复资产上链问题 ===\n')
+        
+        # 获取所有Payment Confirmed状态的资产
+        assets = Asset.query.filter_by(status=5).all()
+        print(f'找到 {len(assets)} 个Payment Confirmed状态的资产')
+        
+        for asset in assets:
+            print(f'资产 {asset.id}: {asset.asset_id}')
+            print(f'  - deployment_in_progress: {asset.deployment_in_progress}')
+            print(f'  - deployment_started_at: {asset.deployment_started_at}')
+            print(f'  - token_address: {asset.token_address}')
             
-            if asset:
-                display_updated_asset(asset)
-                print("\n资产链上信息更新成功! 要查询此资产信息，可以运行:")
-                print(f"rwa-tool query_asset {asset.token_symbol}")
-                sys.exit(0)
-            else:
-                sys.exit(1)
-        except Exception as e:
-            logger.error(f"更新资产时出错: {str(e)}")
-            sys.exit(1)
-    
-    elif args.command == 'list':
-        list_assets(args.status)
-        sys.exit(0)
-    
-    else:
-        parser.print_help()
-        sys.exit(1) 
+            # 强制清理所有上链相关字段
+            asset.deployment_in_progress = False
+            asset.deployment_started_at = None
+            asset.deployment_tx_hash = None
+            
+            print(f'  ✓ 已清理资产 {asset.id} 的上链状态')
+        
+        # 提交更改
+        db.session.commit()
+        print(f'\n✓ 已清理所有 {len(assets)} 个资产的上链状态')
+        print('\n请重启应用以使更改生效：')
+        print('pm2 restart rwa-hub')
+        
+        return len(assets)
+
+if __name__ == "__main__":
+    count = fix_asset_onchain_issue()
+    print(f'\n=== 修复完成，共处理 {count} 个资产 ===') 
