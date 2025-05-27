@@ -103,14 +103,14 @@ class AssetService:
             if not asset:
                 raise ValueError(f"未找到ID为{asset_id}的资产")
                 
-            # 检查是否已在处理中
-# YOLO_DISABLED:             if asset.deployment_in_progress:
-# YOLO_DISABLED:                 logger.warning(f"资产已在其他进程中上链处理中: AssetID={asset_id}, 处理开始时间: {asset.deployment_started_at}")
-# YOLO_DISABLED:                 return {
-# YOLO_DISABLED:                     "success": False,
-# YOLO_DISABLED:                     "error": "资产已经在上链处理中，请勿重复操作",
-# YOLO_DISABLED:                     "in_progress": True
-# YOLO_DISABLED:                 }
+            # 检查是否已在处理中 - 重要安全检查，防止重复上链
+            if asset.deployment_in_progress:
+                logger.warning(f"资产已在其他进程中上链处理中: AssetID={asset_id}, 处理开始时间: {asset.deployment_started_at}")
+                return {
+                    "success": False,
+                    "error": "资产已经在上链处理中，请勿重复操作",
+                    "in_progress": True
+                }
                 
             # 检查资产状态 - 应该是在 CONFIRMED 状态才能上链
             if asset.status != AssetStatus.CONFIRMED.value:
