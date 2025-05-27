@@ -1620,11 +1620,11 @@ async function processAssetCreation(formData, txHash) {
         
         updateProgress(70, '{{ _("Preparing asset data...") }}');
         
-        // 构建请求数据，初始状态设置为 PENDING(1)
+        // 构建请求数据，支付成功后设置为 PAYMENT_PROCESSING(8)
         // 确保包含支付交易信息
         const requestData = {
             ...formData,
-            status: 1, // PENDING 状态
+            status: 8, // PAYMENT_PROCESSING 状态 - 支付已提交，等待确认
             payment_tx_hash: Array.isArray(txHash) ? 
                 txHash.map(byte => byte.toString(16).padStart(2, '0')).join('') : // 字节数组转十六进制字符串
                 txHash, // 如果已经是字符串，直接使用

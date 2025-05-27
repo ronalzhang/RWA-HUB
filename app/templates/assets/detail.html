@@ -2533,10 +2533,18 @@ document.addEventListener('DOMContentLoaded', function() {
             <h2 class="mb-0">{{ asset.name }}</h2>
             {% if asset.status == 1 or (asset.status is defined and asset.status is string and 'PENDING' in asset.status) %}
             <span class="badge bg-warning">{{ _('Pending Review') }}</span>
+            {% elif asset.status == 8 %}
+            <span class="badge bg-info">{{ _('Payment Confirming') }}</span>
+            {% elif asset.status == 5 %}
+            <span class="badge bg-primary">{{ _('Payment Confirmed') }}</span>
             {% elif asset.status == 2 or (asset.status is defined and asset.status is string and 'APPROVED' in asset.status) %}
             <span class="badge bg-success">{{ _('On Chain') }}</span>
             {% elif asset.status == 3 or (asset.status is defined and asset.status is string and 'REJECTED' in asset.status) %}
             <span class="badge bg-danger">{{ _('Rejected') }}</span>
+            {% elif asset.status == 6 %}
+            <span class="badge bg-danger">{{ _('Payment Failed') }}</span>
+            {% elif asset.status == 7 %}
+            <span class="badge bg-warning">{{ _('Deployment Failed') }}</span>
             {% endif %}
         </div>
         <!-- 分红管理按钮 - 管理员和资产所有者可见 -->
@@ -2561,10 +2569,18 @@ document.addEventListener('DOMContentLoaded', function() {
             <div>
                 {% if asset.status == 1 or (asset.status is defined and asset.status is string and 'PENDING' in asset.status) %}
                 <span class="badge bg-warning">{{ _('Pending Review') }}</span>
+                {% elif asset.status == 8 %}
+                <span class="badge bg-info">{{ _('Payment Confirming') }}</span>
+                {% elif asset.status == 5 %}
+                <span class="badge bg-primary">{{ _('Payment Confirmed') }}</span>
                 {% elif asset.status == 2 or (asset.status is defined and asset.status is string and 'APPROVED' in asset.status) %}
                 <span class="badge bg-success">{{ _('On Chain') }}</span>
                 {% elif asset.status == 3 or (asset.status is defined and asset.status is string and 'REJECTED' in asset.status) %}
                 <span class="badge bg-danger">{{ _('Rejected') }}</span>
+                {% elif asset.status == 6 %}
+                <span class="badge bg-danger">{{ _('Payment Failed') }}</span>
+                {% elif asset.status == 7 %}
+                <span class="badge bg-warning">{{ _('Deployment Failed') }}</span>
                 {% endif %}
             </div>
             <div class="d-flex gap-2">
@@ -2640,10 +2656,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span class="badge bg-primary me-1">{{ asset.token_symbol }}</span>
                         {% if asset.status == 1 %}
                         <span class="badge bg-warning">{{ _('Pending Review') }}</span>
+                        {% elif asset.status == 8 %}
+                        <span class="badge bg-info">{{ _('Payment Confirming') }}</span>
+                        {% elif asset.status == 5 %}
+                        <span class="badge bg-primary">{{ _('Payment Confirmed') }}</span>
                         {% elif asset.status == 2 %}
                         <span class="badge bg-success">{{ _('On Chain') }}</span>
                         {% elif asset.status == 3 %}
                         <span class="badge bg-danger">{{ _('Rejected') }}</span>
+                        {% elif asset.status == 6 %}
+                        <span class="badge bg-danger">{{ _('Payment Failed') }}</span>
+                        {% elif asset.status == 7 %}
+                        <span class="badge bg-warning">{{ _('Deployment Failed') }}</span>
             {% endif %}
         </div>
                 </div>

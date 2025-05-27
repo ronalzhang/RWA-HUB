@@ -20,7 +20,7 @@ class AssetType(enum.Enum):
     OTHER = 99              # 其他资产
 
 class AssetStatus(enum.Enum):
-    PENDING = 1    # 待审核
+    PENDING = 1    # 待审核/待支付
     APPROVED = 2  # 已通过
     REJECTED = 3  # 已拒绝
     DELETED = 4    # 已删除
@@ -29,6 +29,7 @@ class AssetStatus(enum.Enum):
     CONFIRMED = 5  # 支付已确认，准备上链
     PAYMENT_FAILED = 6  # 支付失败
     DEPLOYMENT_FAILED = 7  # 部署上链失败
+    PAYMENT_PROCESSING = 8  # 支付处理中（新增）
     DRAFT = 3  # 草稿状态
 
 class Asset(db.Model):
@@ -89,7 +90,7 @@ class Asset(db.Model):
         CheckConstraint('annual_revenue > 0', name='ck_annual_revenue_positive'),  # 年收益必须大于0
         CheckConstraint('area > 0', name='ck_area_positive'),  # 面积必须大于0
         CheckConstraint('total_value > 0', name='ck_total_value_positive'),  # 总价值必须大于0
-        CheckConstraint('status IN (1, 2, 3, 4, 5, 6, 7)', name='ck_status_valid'),  # 状态必须在有效范围内
+        CheckConstraint('status IN (1, 2, 3, 4, 5, 6, 7, 8)', name='ck_status_valid'),  # 状态必须在有效范围内
     )
 
     @validates('asset_type')

@@ -212,9 +212,9 @@ def monitor_creation_payment(asset_id, tx_hash, max_retries=30, retry_interval=1
                         logger.error(f"未找到资产: AssetID={asset_id}")
                         return
                         
-                    # 如果资产已经不是PENDING状态，或已支付确认，或已上链，则不处理
-                    if asset.status != AssetStatus.PENDING.value:
-                        logger.info(f"资产 {asset_id} 已不是PENDING状态 (当前: {asset.status})，跳过支付确认")
+                    # 如果资产已经不是PENDING或PAYMENT_PROCESSING状态，或已支付确认，或已上链，则不处理
+                    if asset.status not in [AssetStatus.PENDING.value, AssetStatus.PAYMENT_PROCESSING.value]:
+                        logger.info(f"资产 {asset_id} 已不是PENDING或PAYMENT_PROCESSING状态 (当前: {asset.status})，跳过支付确认")
                         return
                         
                     if asset.payment_confirmed:
@@ -487,6 +487,26 @@ def auto_monitor_pending_payments():
         
         with flask_app.app_context():
             try:
+                # 0. 查找PAYMENT_PROCESSING状态的资产，触发支付确认监控
+                payment_processing_assets = Asset.query.filter(
+                    Asset.status == AssetStatus.PAYMENT_PROCESSING.value,
+                    Asset.payment_tx_hash != None,
+                    Asset.payment_confirmed != True
+                ).limit(20).all()
+                
+                if payment_processing_assets:
+                    logger.info(f"找到 {len(payment_processing_assets)} 个支付处理中的资产，开始监控支付确认...")
+                    
+                    for asset in payment_processing_assets:
+                        try:
+                            logger.info(f"触发资产 {asset.id} 的支付确认监控 (TxHash: {asset.payment_tx_hash})")
+                            # 触发支付确认监控任务
+                            monitor_creation_payment_task.delay(asset.id, asset.payment_tx_hash)
+                        except Exception as e:
+                            logger.error(f"触发资产 {asset.id} 支付确认监控失败: {str(e)}")
+                else:
+                    logger.debug("没有找到支付处理中的资产。")
+                
                 # 1. 查找已支付确认但未上链的资产
                 confirmed_assets = Asset.query.filter(
                     Asset.payment_confirmed == True,
