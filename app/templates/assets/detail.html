@@ -2322,7 +2322,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">分享这个资产</h5>
+                                <h5 class="modal-title">分享RWA资产</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
@@ -2340,30 +2340,30 @@ document.addEventListener('DOMContentLoaded', function() {
                                     
                                     <div class="commission-info mb-3">
                                         <div class="d-flex align-items-center">
-                                            <strong>多级分销收益（永久有效）</strong>
+                                            <strong>分享收益计划（长期有效）</strong>
                                             <span class="info-icon ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<div class='text-start'>
-                                                <p class='mb-1'>您分享链接的收益说明：</p>
+                                                <p class='mb-1'>您分享RWA资产的收益说明：</p>
                                                 <ul class='ps-3 mb-0'>
-                                                    <li>直接推荐好友购买：您获得30%佣金</li>
-                                                    <li>好友推荐他人购买：您获得15%佣金</li>
-                                                    <li>二级好友再推荐：您仍获得5%佣金</li>
+                                                    <li>好友通过您的链接投资：您获得交易费用30%的回馈</li>
+                                                    <li>二级好友投资：您获得15%的持续收益</li>
+                                                    <li>三级好友投资：您仍可获得5%的收益</li>
                                                 </ul>
-                                                <p class='mt-1 mb-0 small'>例：好友通过您的链接购买10,000USDC资产，交易佣金250USDC，您立即获得75USDC！</p>
+                                                <p class='mt-1 mb-0 small'>例：好友通过您的链接投资10,000USDC的RWA资产，平台服务费250USDC，您可获得75USDC回馈！</p>
                                             </div>">
                                                 <i class="fas fa-info-circle text-primary"></i>
                                             </span>
                                         </div>
                                         <div class="commission-tiers mt-2 d-flex justify-content-around text-center">
                                             <div class="tier">
-                                                <div class="tier-label">一级</div>
+                                                <div class="tier-label">直接分享</div>
                                                 <div class="tier-value">30%</div>
                                             </div>
                                             <div class="tier">
-                                                <div class="tier-label">二级</div>
+                                                <div class="tier-label">二级收益</div>
                                                 <div class="tier-value">15%</div>
                                             </div>
                                             <div class="tier">
-                                                <div class="tier-label">三级</div>
+                                                <div class="tier-label">三级收益</div>
                                                 <div class="tier-value">5%</div>
                                             </div>
                                         </div>
@@ -2377,7 +2377,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 <i class="fas fa-copy"></i>
                                             </button>
                                         </div>
-                                        <small class="form-text text-muted">此链接已加密您的钱包地址，保护您的隐私</small>
+                                        <small class="form-text text-muted">此链接已绑定您的钱包地址，分享收益将自动归属到您的账户</small>
                                     </div>
                                     <div class="d-flex gap-2 mt-4">
                                         <button class="btn btn-success flex-grow-1" onclick="copyToClipboard('shareLink')">
@@ -2509,14 +2509,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 分享到WhatsApp
         function shareViaWhatsApp() {
-            const shareText = `查看这个有趣的资产: ${document.getElementById('shareLink').value}`;
+            const shareText = `🚀 发现了一个优质的RWA资产！真实世界资产代币化，透明安全，快来看看: ${document.getElementById('shareLink').value}`;
             window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
         }
         
         // 分享到Twitter
         function shareViaTwitter() {
             const assetName = "{{ asset.name }}";
-            const shareText = `我发现了一个很棒的资产 ${assetName}，感兴趣的朋友可以来看看: `;
+            const shareText = `💎 投资新趋势：${assetName} - 真实世界资产代币化投资机会！区块链技术让传统资产投资更透明、更便捷 🌟`;
             window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(document.getElementById('shareLink').value)}`, '_blank');
         }
     </script>
