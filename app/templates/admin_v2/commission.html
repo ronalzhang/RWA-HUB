@@ -679,7 +679,7 @@
                                 <div class="flex items-center">
                                     <div class="flex-shrink-0 h-10 w-10">
                                         <div class="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center">
-                                            <span class="text-sm font-medium text-white" x-text="referral.username.charAt(0).toUpperCase()"></span>
+                                            <span class="text-sm font-medium text-white" x-text="referral.username ? referral.username.charAt(0).toUpperCase() : '?'"></span>
                                         </div>
                                     </div>
                                     <div class="ml-4">
@@ -691,13 +691,13 @@
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                                                     ETH
                                                 </span>
-                                                <span class="ml-1 text-gray-600" x-text="referral.eth_address.slice(0, 8) + '...' + referral.eth_address.slice(-4)"></span>
+                                                <span class="ml-1 text-gray-600" x-text="referral.eth_address ? referral.eth_address.slice(0, 8) + '...' + referral.eth_address.slice(-4) : '-'"></span>
                                             </div>
                                             <div x-show="referral.solana_address" class="text-xs">
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
                                                     SOL
                                                 </span>
-                                                <span class="ml-1 text-gray-600" x-text="referral.solana_address.slice(0, 8) + '...' + referral.solana_address.slice(-4)"></span>
+                                                <span class="ml-1 text-gray-600" x-text="referral.solana_address ? referral.solana_address.slice(0, 8) + '...' + referral.solana_address.slice(-4) : '-'"></span>
                                             </div>
                                         </div>
                                     </div>
@@ -716,7 +716,7 @@
                                         </span>
                                     </div>
                                     <div class="text-xs text-gray-500">
-                                        推荐人: <span x-text="referral.referrer_address.slice(0, 10) + '...' + referral.referrer_address.slice(-4)"></span>
+                                        推荐人: <span x-text="referral.referrer_address ? referral.referrer_address.slice(0, 10) + '...' + referral.referrer_address.slice(-4) : '-'"></span>
                                     </div>
                                 </div>
                                 <div x-show="!referral.referrer_address">
