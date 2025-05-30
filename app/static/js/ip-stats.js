@@ -14,6 +14,25 @@ class IPStatsManager {
         this.loadInitialData();
     }
 
+    // 获取钱包地址的方法（与dashboard.html中的方法一致）
+    getWalletAddress() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('eth_address');
+    }
+
+    // 创建带认证头的fetch请求（与dashboard.html中的方法一致）
+    authFetch(url, options = {}) {
+        const walletAddress = this.getWalletAddress();
+        return fetch(url, {
+            ...options,
+            headers: {
+                'X-Wallet-Address': walletAddress,
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+
     bindEvents() {
         // 标签页切换事件
         document.querySelectorAll('.ip-stats-tab').forEach(tab => {
@@ -67,7 +86,7 @@ class IPStatsManager {
 
     async loadSummaryStats() {
         try {
-            const response = await fetch('/admin/api/ip-stats/summary');
+            const response = await this.authFetch('/admin/api/ip-stats/summary');
             const result = await response.json();
 
             if (result.success) {
@@ -113,7 +132,7 @@ class IPStatsManager {
         this.showLoading(period);
 
         try {
-            const response = await fetch(`/admin/api/ip-stats/${period}`);
+            const response = await this.authFetch(`/admin/api/ip-stats/${period}`);
             const result = await response.json();
 
             if (result.success) {
@@ -292,7 +311,7 @@ class IPStatsManager {
 
     async exportData() {
         try {
-            const response = await fetch(`/admin/api/ip-stats/${this.currentPeriod}`);
+            const response = await this.authFetch(`/admin/api/ip-stats/${this.currentPeriod}`);
             const result = await response.json();
 
             if (result.success) {
