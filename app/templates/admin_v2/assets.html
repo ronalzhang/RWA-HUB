@@ -976,13 +976,6 @@
                     this.pagination.total = data.total || 0;
                     this.pagination.pages = data.pages || 0;
                     
-                    // 调试：输出第一个资产的数据结构
-                    if (this.assets.length > 0) {
-                        console.log('第一个资产数据:', this.assets[0]);
-                        console.log('图片路径:', this.assets[0].image);
-                        console.log('资产类型名称:', this.assets[0].asset_type_name);
-                    }
-                    
                     // 重置选择状态
                         this.selectedAssets = [];
                     this.selectAll = false;

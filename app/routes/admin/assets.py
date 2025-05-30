@@ -664,7 +664,7 @@ def api_export_assets():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/dividends', methods=['GET'])
+@admin_api_bp.route('/dividends', methods=['GET'])
 @api_admin_required
 def api_get_dividends():
     """获取分红列表"""
@@ -707,7 +707,7 @@ def api_get_dividends():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/dividends/<int:dividend_id>/process', methods=['POST'])
+@admin_api_bp.route('/dividends/<int:dividend_id>/process', methods=['POST'])
 @api_admin_required
 def api_process_dividend(dividend_id):
     """处理分红"""
@@ -718,7 +718,7 @@ def api_process_dividend(dividend_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/dividends/<int:dividend_id>', methods=['DELETE'])
+@admin_api_bp.route('/dividends/<int:dividend_id>', methods=['DELETE'])
 @api_admin_required
 def api_delete_dividend(dividend_id):
     """删除分红"""
@@ -729,7 +729,7 @@ def api_delete_dividend(dividend_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/dividends/export', methods=['GET'])
+@admin_api_bp.route('/dividends/export', methods=['GET'])
 @api_admin_required
 def api_export_dividends():
     """导出分红数据"""
