@@ -1643,12 +1643,24 @@ def get_share_config():
     try:
         from app.models.commission_config import CommissionConfig
         
+        # 获取佣金配置
+        commission_rate = CommissionConfig.get_config('commission_rate', 20.0)
+        commission_rules = CommissionConfig.get_config('commission_rules', {})
+        max_referral_levels = CommissionConfig.get_config('max_referral_levels', 999)
+        enable_multi_level = CommissionConfig.get_config('enable_multi_level', True)
+        
         config = {
-            'share_button_text': CommissionConfig.get_config('share_button_text', '🚀 分享赚佣金'),
-            'share_description': CommissionConfig.get_config('share_description', '分享此项目给好友，好友购买后您将获得35%佣金奖励'),
-            'share_success_message': CommissionConfig.get_config('share_success_message', '🎉 分享链接已复制！快去邀请好友赚取35%佣金吧！'),
-            'commission_rate': CommissionConfig.get_config('commission_rate', 35.0),
-            'commission_description': CommissionConfig.get_config('commission_description', '推荐好友享受35%佣金奖励')
+            'share_button_text': CommissionConfig.get_config('share_button_text', '🚀 分享RWA资产'),
+            'share_description': CommissionConfig.get_config('share_description', f'分享此RWA资产给好友，享受{commission_rate}%分享收益'),
+            'share_success_message': CommissionConfig.get_config('share_success_message', f'🎉 分享链接已复制！快去邀请好友赚取{commission_rate}%收益吧！'),
+            'commission_rate': commission_rate,
+            'commission_description': CommissionConfig.get_config('commission_description', f'推荐好友享受{commission_rate}%收益回馈'),
+            'commission_rules': commission_rules,
+            'max_referral_levels': max_referral_levels,
+            'enable_multi_level': enable_multi_level,
+            'is_unlimited_levels': max_referral_levels >= 999,
+            'commission_model': 'unlimited' if max_referral_levels >= 999 else 'limited',
+            'model_description': f'无限层级分销，每级上贡{commission_rate}%' if max_referral_levels >= 999 else f'{max_referral_levels}级分销，每级{commission_rate}%'
         }
         
         return jsonify({

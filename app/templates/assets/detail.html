@@ -2295,27 +2295,105 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // 从服务器获取分享文案，如果失败则使用默认文案
-            fetch('/api/share-messages/random')
-                .then(response => response.json())
-                .catch(error => {
-                    console.error('{{ _("Failed to get sharing message") }}:', error);
-                    // 使用默认文案
-                    return {
-                        success: true,
-                        message: "{{ _('📈 Share to earn commission! Invite friends to invest, and you can get up to 30%% promotion commission! The link is exclusively yours, lifetime commission benefits, the more friends, the more rewards!') }}"
-                    };
-                })
-                .then(data => {
-                    const shareMessage = data.message || "{{ _('🔥 Share great opportunities! Invite friends to invest in this quality asset and witness wealth growth together!') }}";
-                    
-                    // 生成分享链接模态框
-                    showShareModal(address, shareMessage);
-                });
+            // 同时获取分享文案和分享配置
+            Promise.all([
+                fetch('/api/share-messages/random'),
+                fetch('/api/share-config')
+            ])
+            .then(([messageResponse, configResponse]) => Promise.all([
+                messageResponse.json().catch(error => ({
+                    success: true,
+                    message: "🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，透明度高、收益稳定。通过我的专属链接投资，我们都能获得长期收益！"
+                })),
+                configResponse.json().catch(error => ({
+                    success: true,
+                    data: {
+                        commission_rate: 20,
+                        is_unlimited_levels: true,
+                        model_description: '无限层级分销，每级上贡20%'
+                    }
+                }))
+            ]))
+            .then(([messageData, configData]) => {
+                const shareMessage = messageData.message || "🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，透明度高、收益稳定。";
+                const shareConfig = configData.success ? configData.data : {
+                    commission_rate: 20,
+                    is_unlimited_levels: true,
+                    model_description: '无限层级分销，每级上贡20%'
+                };
+                
+                // 生成分享链接模态框
+                showShareModal(address, shareMessage, shareConfig);
+            })
+            .catch(error => {
+                console.error('获取分享数据失败:', error);
+                // 使用默认数据
+                const defaultMessage = "🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，透明度高、收益稳定。";
+                const defaultConfig = {
+                    commission_rate: 20,
+                    is_unlimited_levels: true,
+                    model_description: '无限层级分销，每级上贡20%'
+                };
+                showShareModal(address, defaultMessage, defaultConfig);
+            });
         }
         
         // 显示分享模态框
-        function showShareModal(address, shareMessage) {
+        function showShareModal(address, shareMessage, shareConfig = null) {
+            // 如果没有传入配置，使用默认配置
+            if (!shareConfig) {
+                shareConfig = {
+                    commission_rate: 20,
+                    is_unlimited_levels: true,
+                    model_description: '无限层级分销，每级上贡20%'
+                };
+            }
+            
+            // 根据配置生成不同的层级显示
+            const commissionTiersHtml = shareConfig.is_unlimited_levels ? 
+                `<div class="commission-tiers mt-2 text-center">
+                    <div class="tier">
+                        <div class="tier-label">无限层级</div>
+                        <div class="tier-value">${shareConfig.commission_rate}%</div>
+                        <div class="tier-desc">每级上贡</div>
+                    </div>
+                </div>` :
+                `<div class="commission-tiers mt-2 d-flex justify-content-around text-center">
+                    <div class="tier">
+                        <div class="tier-label">直接分享</div>
+                        <div class="tier-value">${shareConfig.commission_rate}%</div>
+                    </div>
+                    <div class="tier">
+                        <div class="tier-label">二级收益</div>
+                        <div class="tier-value">${Math.round(shareConfig.commission_rate * 0.7)}%</div>
+                    </div>
+                    <div class="tier">
+                        <div class="tier-label">三级收益</div>
+                        <div class="tier-value">${Math.round(shareConfig.commission_rate * 0.5)}%</div>
+                    </div>
+                </div>`;
+            
+            // 根据配置生成不同的说明内容
+            const tooltipContent = shareConfig.is_unlimited_levels ?
+                `<div class='text-start'>
+                    <p class='mb-1'>无限层级分销收益说明：</p>
+                    <ul class='ps-3 mb-0'>
+                        <li>好友通过您的链接投资：您获得交易费用${shareConfig.commission_rate}%的回馈</li>
+                        <li>无限层级：每个下级的收益，您都可获得${shareConfig.commission_rate}%</li>
+                        <li>持续收益：团队越大，收益越多，无上限</li>
+                    </ul>
+                    <p class='mt-1 mb-0 small'>例：团队成员投资10,000USDC，平台服务费250USDC，您直接获得${Math.round(250 * shareConfig.commission_rate / 100)}USDC回馈！</p>
+                </div>` :
+                `<div class='text-start'>
+                    <p class='mb-1'>您分享RWA资产的收益说明：</p>
+                    <ul class='ps-3 mb-0'>
+                        <li>好友通过您的链接投资：您获得交易费用${shareConfig.commission_rate}%的回馈</li>
+                        <li>二级好友投资：您获得${Math.round(shareConfig.commission_rate * 0.7)}%的持续收益</li>
+                        <li>三级好友投资：您仍可获得${Math.round(shareConfig.commission_rate * 0.5)}%的收益</li>
+                    </ul>
+                    <p class='mt-1 mb-0 small'>例：好友通过您的链接投资10,000USDC的RWA资产，平台服务费250USDC，您可获得${Math.round(250 * shareConfig.commission_rate / 100)}USDC回馈！</p>
+                </div>`;
+            
             // 生成分享链接模态框
             const modalHtml = `
                 <div class="modal fade" id="shareModal" tabindex="-1" aria-hidden="true">
@@ -2341,32 +2419,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="commission-info mb-3">
                                         <div class="d-flex align-items-center">
                                             <strong>分享收益计划（长期有效）</strong>
-                                            <span class="info-icon ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<div class='text-start'>
-                                                <p class='mb-1'>您分享RWA资产的收益说明：</p>
-                                                <ul class='ps-3 mb-0'>
-                                                    <li>好友通过您的链接投资：您获得交易费用30%的回馈</li>
-                                                    <li>二级好友投资：您获得15%的持续收益</li>
-                                                    <li>三级好友投资：您仍可获得5%的收益</li>
-                                                </ul>
-                                                <p class='mt-1 mb-0 small'>例：好友通过您的链接投资10,000USDC的RWA资产，平台服务费250USDC，您可获得75USDC回馈！</p>
-                                            </div>">
+                                            <span class="info-icon ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="${tooltipContent}">
                                                 <i class="fas fa-info-circle text-primary"></i>
                                             </span>
                                         </div>
-                                        <div class="commission-tiers mt-2 d-flex justify-content-around text-center">
-                                            <div class="tier">
-                                                <div class="tier-label">直接分享</div>
-                                                <div class="tier-value">30%</div>
-                                            </div>
-                                            <div class="tier">
-                                                <div class="tier-label">二级收益</div>
-                                                <div class="tier-value">15%</div>
-                                            </div>
-                                            <div class="tier">
-                                                <div class="tier-label">三级收益</div>
-                                                <div class="tier-value">5%</div>
-                                            </div>
-                                        </div>
+                                        ${commissionTiersHtml}
                                     </div>
                                     
                                     <div class="mb-3">
@@ -2400,10 +2457,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             `;
             
-            // 添加模态框到页面
-            if (!document.getElementById('shareModal')) {
-                document.body.insertAdjacentHTML('beforeend', modalHtml);
+            // 添加模态框到页面 - 先移除已存在的模态框
+            const existingModal = document.getElementById('shareModal');
+            if (existingModal) {
+                existingModal.remove();
             }
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
             
             // 显示模态框
             const modal = new bootstrap.Modal(document.getElementById('shareModal'));
