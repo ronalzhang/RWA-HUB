@@ -25,26 +25,34 @@
     margin-left: 8px;
 }
 
-/* 总体统计卡片 */
+/* 总体统计卡片 - 优化两行布局 */
 .summary-stats {
-    padding: 20px;
+    padding: 24px;
     background: #f9fafb;
     border-bottom: 1px solid #e5e7eb;
 }
 
 .summary-stats .row {
-    margin: 0;
+    margin: 0 -8px;
+}
+
+.summary-stats .col-md-4,
+.summary-stats .col-sm-6 {
+    padding: 0 8px;
 }
 
 .stat-card {
     background: white;
     border-radius: 8px;
-    padding: 16px;
+    padding: 20px;
     text-align: center;
     border: 1px solid #e5e7eb;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     transition: all 0.2s ease;
-    margin-bottom: 8px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .stat-card:hover {
@@ -64,7 +72,7 @@
 
 .stat-card h4 {
     color: #111827;
-    font-size: 1.5rem;
+    font-size: 1.75rem;
     font-weight: 700;
     margin: 0;
 }
@@ -77,62 +85,83 @@
     color: #ef4444 !important;
 }
 
-/* 标签页样式 */
-.ip-stats-tabs {
+/* 图表区域布局 */
+.chart-section {
     background: white;
-    border-bottom: 1px solid #e5e7eb;
-    padding: 0;
+    padding: 24px;
 }
 
-.ip-stats-tabs .nav-tabs {
-    border-bottom: none;
-    padding: 0 20px;
-    background: transparent;
+.chart-container-wrapper {
+    position: relative;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.ip-stats-tabs .nav-link {
-    background: transparent;
+/* 右上角导航样式 */
+.chart-nav {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    z-index: 10;
+}
+
+.chart-nav .btn-group {
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+}
+
+.chart-nav .btn {
     border: none;
-    color: #6b7280;
-    padding: 16px 24px;
-    transition: all 0.2s ease;
-    border-radius: 0;
-    border-bottom: 3px solid transparent;
-    font-weight: 500;
-}
-
-.ip-stats-tabs .nav-link:hover {
-    color: #3b82f6;
-    background: #f8fafc;
-    border-bottom-color: #bfdbfe;
-}
-
-.ip-stats-tabs .nav-link.active {
-    color: #3b82f6;
     background: white;
-    border-bottom-color: #3b82f6;
+    color: #6b7280;
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 6px 12px;
+    transition: all 0.2s ease;
+}
+
+.chart-nav .btn:hover {
+    background: #f8fafc;
+    color: #3b82f6;
+}
+
+.chart-nav .btn.active {
+    background: #3b82f6;
+    color: white;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.chart-nav .btn:first-child {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+
+.chart-nav .btn:last-child {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
 }
 
 /* 图表内容区域 */
-.tab-content {
-    background: white;
-    padding: 0;
+.chart-content {
+    padding: 24px;
+    padding-top: 60px; /* 为右上角导航留出空间 */
 }
 
 .ip-stats-content {
-    padding: 24px;
-    min-height: 450px;
+    min-height: 400px;
 }
 
 /* 图表容器 */
 .chart-container {
     background: white;
-    border-radius: 8px;
-    padding: 20px;
+    border-radius: 4px;
+    padding: 16px;
     height: 400px;
     position: relative;
-    border: 1px solid #f3f4f6;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .chart-container canvas {
@@ -223,24 +252,31 @@
     
     .stat-card {
         margin-bottom: 12px;
-        padding: 12px;
+        padding: 16px;
     }
     
     .stat-card h4 {
-        font-size: 1.25rem;
+        font-size: 1.5rem;
     }
     
-    .ip-stats-tabs .nav-tabs {
-        padding: 0 12px;
-    }
-    
-    .ip-stats-tabs .nav-link {
-        padding: 12px 16px;
-        font-size: 0.875rem;
-    }
-    
-    .ip-stats-content {
+    .chart-section {
         padding: 16px;
+    }
+    
+    .chart-nav {
+        position: static;
+        margin-bottom: 16px;
+        text-align: center;
+    }
+    
+    .chart-nav .btn {
+        font-size: 0.75rem;
+        padding: 5px 8px;
+    }
+    
+    .chart-content {
+        padding: 16px;
+        padding-top: 16px;
     }
     
     .chart-container {
@@ -250,12 +286,14 @@
 }
 
 @media (max-width: 576px) {
-    .summary-stats .col-md-2 {
-        margin-bottom: 8px;
+    .summary-stats .col-md-4 {
+        flex: 0 0 100%;
+        max-width: 100%;
+        margin-bottom: 12px;
     }
     
     .stat-card h4 {
-        font-size: 1.125rem;
+        font-size: 1.25rem;
     }
     
     .chart-container {
@@ -263,9 +301,9 @@
         padding: 10px;
     }
     
-    .ip-stats-tabs .nav-link {
-        padding: 10px 12px;
-        font-size: 0.8rem;
+    .chart-nav .btn {
+        font-size: 0.7rem;
+        padding: 4px 6px;
     }
 }
 

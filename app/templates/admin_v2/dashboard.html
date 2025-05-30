@@ -203,40 +203,45 @@
                 </div>
             </div>
 
-            <!-- 总体统计卡片 -->
-            <div class="summary-stats mb-4">
-                <div class="row">
-                    <div class="col-md-2">
+            <!-- 总体统计卡片 - 分两行显示 -->
+            <div class="summary-stats">
+                <!-- 第一行：3个统计卡片 -->
+                <div class="row mb-3">
+                    <div class="col-md-4 col-sm-6 mb-3">
                         <div class="stat-card">
                             <h6>总访问次数</h6>
                             <h4 id="total-visits">-</h4>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-4 col-sm-6 mb-3">
                         <div class="stat-card">
                             <h6>独立IP数</h6>
                             <h4 id="total-unique-ips">-</h4>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-4 col-sm-6 mb-3">
                         <div class="stat-card">
                             <h6>今日访问</h6>
                             <h4 id="today-visits">-</h4>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                </div>
+                
+                <!-- 第二行：3个统计卡片 -->
+                <div class="row">
+                    <div class="col-md-4 col-sm-6 mb-3">
                         <div class="stat-card">
                             <h6>今日独立IP</h6>
                             <h4 id="today-unique-ips">-</h4>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-4 col-sm-6 mb-3">
                         <div class="stat-card">
                             <h6>昨日访问</h6>
                             <h4 id="yesterday-visits">-</h4>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-4 col-sm-6 mb-3">
                         <div class="stat-card">
                             <h6>增长率</h6>
                             <h4 id="growth-rate" class="growth-rate">-</h4>
@@ -245,51 +250,49 @@
                 </div>
             </div>
 
-            <!-- 标签页导航 -->
-            <div class="ip-stats-tabs">
-                <ul class="nav nav-tabs">
-                    <li class="nav-item">
-                        <a class="nav-link ip-stats-tab active" data-period="hourly" href="#">24小时趋势</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link ip-stats-tab" data-period="daily" href="#">7天趋势</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link ip-stats-tab" data-period="monthly" href="#">月度趋势</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link ip-stats-tab" data-period="all-time" href="#">历史趋势</a>
-                    </li>
-                </ul>
-            </div>
-
             <!-- 图表内容区域 -->
-            <div class="tab-content">
-                <!-- 24小时统计 -->
-                <div id="ip-stats-hourly" class="ip-stats-content" style="display: block;">
-                    <div class="chart-container">
-                        <canvas id="chart-hourly"></canvas>
+            <div class="chart-section">
+                <!-- 图表容器带右上角导航 -->
+                <div class="chart-container-wrapper">
+                    <!-- 趋势选择导航 - 移到右上角 -->
+                    <div class="chart-nav">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-primary ip-stats-tab active" data-period="hourly">24小时</button>
+                            <button type="button" class="btn btn-outline-primary ip-stats-tab" data-period="daily">7天</button>
+                            <button type="button" class="btn btn-outline-primary ip-stats-tab" data-period="monthly">月度</button>
+                            <button type="button" class="btn btn-outline-primary ip-stats-tab" data-period="all-time">历史</button>
+                        </div>
                     </div>
-                </div>
 
-                <!-- 每周统计 -->
-                <div id="ip-stats-daily" class="ip-stats-content" style="display: none;">
-                    <div class="chart-container">
-                        <canvas id="chart-daily"></canvas>
-                    </div>
-                </div>
+                    <!-- 图表内容 -->
+                    <div class="chart-content">
+                        <!-- 24小时统计 -->
+                        <div id="ip-stats-hourly" class="ip-stats-content" style="display: block;">
+                            <div class="chart-container">
+                                <canvas id="chart-hourly"></canvas>
+                            </div>
+                        </div>
 
-                <!-- 每年统计 -->
-                <div id="ip-stats-monthly" class="ip-stats-content" style="display: none;">
-                    <div class="chart-container">
-                        <canvas id="chart-monthly"></canvas>
-                    </div>
-                </div>
+                        <!-- 7天统计 -->
+                        <div id="ip-stats-daily" class="ip-stats-content" style="display: none;">
+                            <div class="chart-container">
+                                <canvas id="chart-daily"></canvas>
+                            </div>
+                        </div>
 
-                <!-- 全部时间统计 -->
-                <div id="ip-stats-all-time" class="ip-stats-content" style="display: none;">
-                    <div class="chart-container">
-                        <canvas id="chart-all-time"></canvas>
+                        <!-- 月度统计 -->
+                        <div id="ip-stats-monthly" class="ip-stats-content" style="display: none;">
+                            <div class="chart-container">
+                                <canvas id="chart-monthly"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- 历史统计 -->
+                        <div id="ip-stats-all-time" class="ip-stats-content" style="display: none;">
+                            <div class="chart-container">
+                                <canvas id="chart-all-time"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

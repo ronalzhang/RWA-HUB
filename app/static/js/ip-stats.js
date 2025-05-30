@@ -34,7 +34,7 @@ class IPStatsManager {
     }
 
     bindEvents() {
-        // 标签页切换事件
+        // 标签页切换事件 - 适配新的按钮结构
         document.querySelectorAll('.ip-stats-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -61,17 +61,23 @@ class IPStatsManager {
     }
 
     switchTab(period) {
-        // 更新标签页状态
+        // 更新按钮状态
         document.querySelectorAll('.ip-stats-tab').forEach(tab => {
             tab.classList.remove('active');
         });
-        document.querySelector(`[data-period="${period}"]`).classList.add('active');
+        const activeTab = document.querySelector(`[data-period="${period}"]`);
+        if (activeTab) {
+            activeTab.classList.add('active');
+        }
 
         // 更新内容区域
         document.querySelectorAll('.ip-stats-content').forEach(content => {
             content.style.display = 'none';
         });
-        document.getElementById(`ip-stats-${period}`).style.display = 'block';
+        const activeContent = document.getElementById(`ip-stats-${period}`);
+        if (activeContent) {
+            activeContent.style.display = 'block';
+        }
 
         this.currentPeriod = period;
         this.loadData(period);
