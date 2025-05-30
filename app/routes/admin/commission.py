@@ -295,6 +295,7 @@ def api_commission_settings():
             'min_withdraw_amount': CommissionConfig.get_config('min_withdraw_amount', 10.0),
             'withdraw_fee_rate': CommissionConfig.get_config('withdraw_fee_rate', 0.0),
             'withdraw_description': CommissionConfig.get_config('withdraw_description', '💎 最低提现10 USDC，零手续费，秒到账！随时提现，自由支配！'),
+            'withdrawal_delay_minutes': CommissionConfig.get_config('withdrawal_delay_minutes', 1),
             
             # 佣金计算规则
             'commission_rules': CommissionConfig.get_config('commission_rules', {
@@ -336,25 +337,30 @@ def api_update_commission_settings():
         for key, value in data.items():
             if key in ['commission_rate', 'commission_description', 'share_button_text', 
                       'share_description', 'share_success_message', 'min_withdraw_amount', 
-                      'withdraw_fee_rate', 'withdraw_description', 'commission_rules',
-                      'max_referral_levels', 'enable_multi_level', 'platform_referrer_address',
-                      'enable_platform_referrer']:
+                      'withdraw_fee_rate', 'withdraw_description', 'withdrawal_delay_minutes',
+                      'commission_rules', 'max_referral_levels', 'enable_multi_level', 
+                      'platform_referrer_address', 'enable_platform_referrer']:
                 
                 CommissionConfig.set_config(key, value)
         
-        # 特殊处理：如果设置了平台推荐人地址，自动将现有无推荐人的用户设置为平台的下线
-        if 'platform_referrer_address' in data and data['platform_referrer_address']:
+        # 特殊处理：如果设置了平台推荐人地址且启用了功能，自动将现有无推荐人的用户设置为平台的下线
+        if ('platform_referrer_address' in data and data['platform_referrer_address'] and 
+            data.get('enable_platform_referrer', True)):
+            
             platform_address = data['platform_referrer_address'].strip()
             if platform_address:
                 try:
                     from app.models.user import User
                     from app.extensions import db
                     
-                    # 查找所有没有推荐人的用户（排除平台地址本身）
+                    # 查找所有没有推荐人的活跃用户（排除平台地址本身）
                     users_without_referrer = User.query.filter(
                         User.referrer_address.is_(None),
-                        User.eth_address != platform_address,
-                        User.solana_address != platform_address
+                        User.is_active == True,
+                        and_(
+                            User.eth_address != platform_address,
+                            User.solana_address != platform_address
+                        )
                     ).all()
                     
                     updated_count = 0
@@ -365,8 +371,17 @@ def api_update_commission_settings():
                     db.session.commit()
                     current_app.logger.info(f"已将 {updated_count} 个无推荐人用户设置为平台下线")
                     
+                    return jsonify({
+                        'success': True, 
+                        'message': f'佣金设置更新成功！已将 {updated_count} 个无推荐人用户设置为平台下线'
+                    })
+                    
                 except Exception as e:
                     current_app.logger.error(f"批量更新用户推荐关系失败: {str(e)}")
+                    return jsonify({
+                        'success': True, 
+                        'message': '佣金设置更新成功，但自动设置平台推荐关系时出现错误，请手动处理'
+                    })
         
         return jsonify({'success': True, 'message': '佣金设置更新成功'})
         
@@ -799,4 +814,68 @@ def api_export_commission_records():
         
     except Exception as e:
         current_app.logger.error(f'导出佣金记录失败: {str(e)}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_api_bp.route('/commission/platform-referrer/batch-update', methods=['POST'])
+@api_admin_required
+def api_batch_update_platform_referrer():
+    """手动批量更新平台推荐人关系"""
+    try:
+        from app.models.commission_config import CommissionConfig
+        from app.models.user import User
+        from app.extensions import db
+        
+        # 获取平台推荐人地址
+        platform_address = CommissionConfig.get_config('platform_referrer_address', '')
+        enable_platform_referrer = CommissionConfig.get_config('enable_platform_referrer', True)
+        
+        if not platform_address or not enable_platform_referrer:
+            return jsonify({
+                'success': False, 
+                'error': '请先在佣金设置中配置并启用平台推荐人功能'
+            }), 400
+        
+        # 查找所有没有推荐人的活跃用户（排除平台地址本身）
+        users_without_referrer = User.query.filter(
+            User.referrer_address.is_(None),
+            User.is_active == True,
+            and_(
+                User.eth_address != platform_address,
+                User.solana_address != platform_address
+            )
+        ).all()
+        
+        updated_count = 0
+        user_details = []
+        
+        for user in users_without_referrer:
+            user.referrer_address = platform_address
+            updated_count += 1
+            
+            user_details.append({
+                'id': user.id,
+                'username': user.username,
+                'eth_address': user.eth_address,
+                'solana_address': user.solana_address,
+                'created_at': user.created_at.isoformat() if user.created_at else None
+            })
+        
+        db.session.commit()
+        
+        current_app.logger.info(f"手动批量更新：已将 {updated_count} 个无推荐人用户设置为平台下线")
+        
+        return jsonify({
+            'success': True,
+            'message': f'批量更新成功！已将 {updated_count} 个无推荐人用户设置为平台下线',
+            'data': {
+                'updated_count': updated_count,
+                'platform_address': platform_address,
+                'user_details': user_details[:10]  # 只返回前10个用户详情避免数据过大
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'批量更新平台推荐人关系失败: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500 

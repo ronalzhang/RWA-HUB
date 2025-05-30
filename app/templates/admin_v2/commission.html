@@ -386,6 +386,32 @@
                         <p class="text-xs text-gray-500 mt-1">建议设为0%，零手续费更吸引用户</p>
                     </div>
                     
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            🤖 自动处理延迟时间 (分钟)
+                            <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <input x-model="settings.withdrawal_delay_minutes" type="number" step="1" min="1" max="60"
+                                   class="w-full border-gray-300 rounded-md shadow-sm pr-16">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                <span class="text-gray-500 text-sm">分钟</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">系统延迟处理提现申请的时间，1分钟为全自动</p>
+                    </div>
+                    
+                    <div class="md:col-span-1">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <h5 class="text-sm font-semibold text-blue-700 mb-1">⚡ 自动化说明</h5>
+                            <div class="text-xs text-blue-600 space-y-1">
+                                <p>• <strong>1分钟</strong>：全自动化，零人工干预</p>
+                                <p>• <strong>5-10分钟</strong>：平衡安全性与效率</p>
+                                <p>• <strong>30分钟以上</strong>：高安全要求场景</p>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-2">提现说明文案</label>
                         <textarea x-model="settings.withdraw_description" rows="2" 
@@ -560,6 +586,9 @@
                     <button @click="refreshReferrals()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
                         <i class="fas fa-sync-alt mr-2"></i>刷新
                     </button>
+                    <button @click="batchUpdatePlatformReferrer()" class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">
+                        <i class="fas fa-crown mr-2"></i>批量设为平台下线
+                    </button>
                 </div>
             </div>
             <p class="text-sm text-gray-500 mt-1">显示所有用户的推荐关系和下级统计信息</p>
@@ -622,19 +651,16 @@
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户信息</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">钱包地址</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">推荐人</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">下级数量</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">钱包类型</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">加入时间</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后登录</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">推荐关系</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">下级用户</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态 & 时间</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     <template x-if="referralsLoading">
                         <tr>
-                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">
                                 <i class="fas fa-spinner fa-spin mr-2"></i>加载用户数据中...
                             </td>
                         </tr>
@@ -642,71 +668,116 @@
                     
                     <template x-if="!referralsLoading && referrals.length === 0">
                         <tr>
-                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">暂无用户数据</td>
+                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">暂无用户数据</td>
                         </tr>
                     </template>
                     
                     <template x-for="referral in referrals" :key="referral.id">
                         <tr class="hover:bg-gray-50">
+                            <!-- 用户信息 -->
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center">
-                                    <div>
+                                    <div class="flex-shrink-0 h-10 w-10">
+                                        <div class="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center">
+                                            <span class="text-sm font-medium text-white" x-text="referral.username.charAt(0).toUpperCase()"></span>
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
                                         <div class="text-sm font-medium text-gray-900" x-text="referral.username"></div>
-                                        <div class="text-sm text-gray-500" x-text="'ID: ' + referral.id"></div>
+                                        <div class="text-xs text-gray-500" x-text="'ID: ' + referral.id"></div>
+                                        <!-- 钱包地址 -->
+                                        <div class="mt-1 space-y-1">
+                                            <div x-show="referral.eth_address" class="text-xs">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                    ETH
+                                                </span>
+                                                <span class="ml-1 text-gray-600" x-text="referral.eth_address.slice(0, 8) + '...' + referral.eth_address.slice(-4)"></span>
+                                            </div>
+                                            <div x-show="referral.solana_address" class="text-xs">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                                    SOL
+                                                </span>
+                                                <span class="ml-1 text-gray-600" x-text="referral.solana_address.slice(0, 8) + '...' + referral.solana_address.slice(-4)"></span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900">
-                                    <div x-show="referral.eth_address" class="text-xs text-blue-600">
-                                        ETH: <span x-text="referral.eth_address ? referral.eth_address.slice(0, 8) + '...' + referral.eth_address.slice(-6) : '-'"></span>
-                                    </div>
-                                    <div x-show="referral.solana_address" class="text-xs text-purple-600">
-                                        SOL: <span x-text="referral.solana_address ? referral.solana_address.slice(0, 8) + '...' + referral.solana_address.slice(-6) : '-'"></span>
-                                    </div>
-                                </div>
-                            </td>
+                            
+                            <!-- 推荐关系 -->
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div x-show="referral.referrer_address">
-                                    <span :class="{
-                                        'bg-orange-100 text-orange-800': referral.referrer_type === 'platform',
-                                        'bg-blue-100 text-blue-800': referral.referrer_type === 'normal'
-                                    }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
-                                        <span x-text="referral.referrer_type === 'platform' ? '🏆 平台' : '👤 用户'"></span>
-                                    </span>
-                                    <div class="text-xs text-gray-500 mt-1" x-text="referral.referrer_address ? referral.referrer_address.slice(0, 12) + '...' : '-'"></div>
+                                    <div class="flex items-center mb-1">
+                                        <span :class="{
+                                            'bg-orange-100 text-orange-800 border-orange-200': referral.referrer_type === 'platform',
+                                            'bg-green-100 text-green-800 border-green-200': referral.referrer_type === 'normal'
+                                        }" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border">
+                                            <span x-text="referral.referrer_type === 'platform' ? '🏆 平台下线' : '👤 普通推荐'"></span>
+                                        </span>
+                                    </div>
+                                    <div class="text-xs text-gray-500">
+                                        推荐人: <span x-text="referral.referrer_address.slice(0, 10) + '...' + referral.referrer_address.slice(-4)"></span>
+                                    </div>
                                 </div>
                                 <div x-show="!referral.referrer_address">
-                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
                                         ❌ 无推荐人
                                     </span>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <span :class="{
+                            
+                            <!-- 下级用户 -->
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <div class="text-2xl font-bold" :class="{
                                     'text-green-600': referral.downline_count > 0,
                                     'text-gray-400': referral.downline_count === 0
-                                }" x-text="referral.downline_count + ' 人'"></span>
+                                }" x-text="referral.downline_count"></div>
+                                <div class="text-xs text-gray-500">个下级</div>
+                                <div x-show="referral.downline_count > 0" class="mt-1">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                        💰 有收益
+                                    </span>
+                                </div>
                             </td>
+                            
+                            <!-- 状态 & 时间 -->
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span :class="{
-                                    'bg-blue-100 text-blue-800': referral.wallet_type === 'ethereum',
-                                    'bg-purple-100 text-purple-800': referral.wallet_type === 'solana',
-                                    'bg-gray-100 text-gray-800': referral.wallet_type === 'other'
-                                }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
-                                    <span x-text="referral.wallet_type === 'ethereum' ? 'ETH' : (referral.wallet_type === 'solana' ? 'SOL' : '其他')"></span>
-                                </span>
+                                <!-- 账户状态 -->
+                                <div class="mb-2">
+                                    <span :class="{
+                                        'bg-green-100 text-green-800 border-green-200': referral.is_active,
+                                        'bg-red-100 text-red-800 border-red-200': !referral.is_active
+                                    }" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border">
+                                        <span x-text="referral.is_active ? '✅ 活跃' : '❌ 禁用'"></span>
+                                    </span>
+                                </div>
+                                <!-- 时间信息 -->
+                                <div class="text-xs text-gray-500 space-y-1">
+                                    <div>
+                                        <span class="font-medium">加入:</span>
+                                        <span x-text="formatDate(referral.joined_at)"></span>
+                                    </div>
+                                    <div x-show="referral.last_login_at">
+                                        <span class="font-medium">登录:</span>
+                                        <span x-text="formatDate(referral.last_login_at)"></span>
+                                    </div>
+                                </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span :class="{
-                                    'bg-green-100 text-green-800': referral.is_active,
-                                    'bg-red-100 text-red-800': !referral.is_active
-                                }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
-                                    <span x-text="referral.is_active ? '✅ 活跃' : '❌ 禁用'"></span>
-                                </span>
+                            
+                            <!-- 操作 -->
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div class="flex space-x-2">
+                                    <button @click="viewUserDetail(referral)" 
+                                            class="text-blue-600 hover:text-blue-900 px-2 py-1 rounded text-xs bg-blue-50 hover:bg-blue-100">
+                                        <i class="fas fa-eye"></i> 详情
+                                    </button>
+                                    <button x-show="!referral.referrer_address" 
+                                            @click="setPlatformReferrer(referral)"
+                                            class="text-orange-600 hover:text-orange-900 px-2 py-1 rounded text-xs bg-orange-50 hover:bg-orange-100">
+                                        <i class="fas fa-crown"></i> 设为平台下线
+                                    </button>
+                                </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDateTime(referral.joined_at)"></td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDateTime(referral.last_login_at)"></td>
                         </tr>
                     </template>
                 </tbody>
@@ -1127,6 +1198,7 @@
                 min_withdraw_amount: 10.0,
                 withdraw_fee_rate: 0.0,
                 withdraw_description: '💎 最低提现10 USDC，零手续费，秒到账！随时提现，自由支配！',
+                withdrawal_delay_minutes: 1,
                 max_referral_levels: 2,
                 enable_multi_level: true,
                 platform_referrer_address: '',
@@ -1299,6 +1371,74 @@
             
             async refreshReferrals() {
                 await this.loadReferrals();
+            },
+            
+            async batchUpdatePlatformReferrer() {
+                if (!confirm('确定要将所有无推荐人的用户设置为平台下线吗？\n\n这将自动设置他们的推荐人为平台地址，此操作不可撤销。')) return;
+                
+                try {
+                    const response = await fetch('/api/admin/commission/platform-referrer/batch-update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    if (!response.ok) throw new Error('批量更新失败');
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(`批量更新成功！\n\n${data.message}\n\n更新了 ${data.data.updated_count} 个用户的推荐关系`);
+                        await this.loadReferrals();
+                        await this.loadStats();
+                    } else {
+                        throw new Error(data.error || '批量更新失败');
+                    }
+                } catch (error) {
+                    console.error('批量更新平台推荐人失败:', error);
+                    alert('批量更新失败: ' + error.message);
+                }
+            },
+            
+            async setPlatformReferrer(referral) {
+                if (!this.settings.platform_referrer_address) {
+                    alert('请先在佣金设置中配置平台推荐人地址');
+                    return;
+                }
+                
+                if (!confirm(`确定要将用户 ${referral.username} 设置为平台下线吗？\n\n用户ID: ${referral.id}\n当前推荐人: 无\n将设置为: 平台推荐人`)) return;
+                
+                try {
+                    // 这里可以调用单独的API，现在先用批量更新
+                    await this.batchUpdatePlatformReferrer();
+                } catch (error) {
+                    console.error('设置平台推荐人失败:', error);
+                    alert('设置失败: ' + error.message);
+                }
+            },
+            
+            viewUserDetail(referral) {
+                // 显示用户详细信息
+                const details = [
+                    `用户详情`,
+                    `━━━━━━━━━━━━━━━━━━━━━━`,
+                    `👤 用户名: ${referral.username}`,
+                    `🆔 用户ID: ${referral.id}`,
+                    ``,
+                    `💰 钱包信息:`,
+                    referral.eth_address ? `🔹 以太坊: ${referral.eth_address}` : '',
+                    referral.solana_address ? `🔹 Solana: ${referral.solana_address}` : '',
+                    ``,
+                    `👥 推荐关系:`,
+                    referral.referrer_address ? `🔹 推荐人: ${referral.referrer_address}` : '🔹 推荐人: 无',
+                    `🔹 推荐类型: ${referral.referrer_type === 'platform' ? '🏆 平台下线' : (referral.referrer_type === 'normal' ? '👤 普通推荐' : '❌ 无推荐')}`,
+                    `🔹 下级用户: ${referral.downline_count} 人`,
+                    ``,
+                    `📊 账户状态:`,
+                    `🔹 状态: ${referral.is_active ? '✅ 活跃' : '❌ 禁用'}`,
+                    `🔹 加入时间: ${this.formatDateTime(referral.joined_at)}`,
+                    referral.last_login_at ? `🔹 最后登录: ${this.formatDateTime(referral.last_login_at)}` : ''
+                ].filter(Boolean);
+                
+                alert(details.join('\n'));
             },
             
             async loadWithdrawals(page = null) {
@@ -1564,6 +1704,24 @@
                 const date = new Date(dateString);
                 return date.toLocaleDateString('zh-CN') + ' ' + 
                        date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            },
+            
+            formatDate(dateString) {
+                if (!dateString) return '-';
+                const date = new Date(dateString);
+                const now = new Date();
+                const diffTime = Math.abs(now - date);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                if (diffDays === 1) {
+                    return '今天';
+                } else if (diffDays === 2) {
+                    return '昨天';
+                } else if (diffDays <= 7) {
+                    return `${diffDays - 1}天前`;
+                } else {
+                    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+                }
             },
             
             getStatusText(status) {
