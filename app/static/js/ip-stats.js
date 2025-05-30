@@ -153,28 +153,38 @@ class IPStatsManager {
 
     renderChart(period, data) {
         const canvasId = `chart-${period}`;
-        const canvas = document.getElementById(canvasId);
+        let canvas = document.getElementById(canvasId);
         if (!canvas) {
             console.warn(`Canvas ${canvasId} not found`);
             return;
         }
 
-        // 销毁现有图表 - 更安全的销毁方式
+        // 彻底销毁现有图表
         if (this.charts[period]) {
             try {
                 this.charts[period].destroy();
                 this.charts[period] = null;
+                delete this.charts[period];
             } catch (e) {
                 console.warn('销毁图表时出错:', e);
             }
         }
 
-        // 清理canvas上下文
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // 获取容器
+        const container = canvas.parentElement;
         
-        // 重置canvas属性
-        canvas.width = canvas.width;
+        // 完全重新创建canvas元素
+        const newCanvas = document.createElement('canvas');
+        newCanvas.id = canvasId;
+        newCanvas.style.maxHeight = '100%';
+        newCanvas.style.maxWidth = '100%';
+        
+        // 替换旧canvas
+        container.removeChild(canvas);
+        container.appendChild(newCanvas);
+        
+        // 获取新的canvas上下文
+        const ctx = newCanvas.getContext('2d');
         
         // 创建新图表
         try {
@@ -186,20 +196,28 @@ class IPStatsManager {
                         {
                             label: '访问次数',
                             data: data.visit_data,
-                            borderColor: '#007bff',
-                            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
                             borderWidth: 2,
                             fill: true,
-                            tension: 0.4
+                            tension: 0.4,
+                            pointBackgroundColor: '#3b82f6',
+                            pointBorderColor: '#3b82f6',
+                            pointRadius: 4,
+                            pointHoverRadius: 6
                         },
                         {
                             label: '独立IP',
                             data: data.unique_ip_data,
-                            borderColor: '#28a745',
-                            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
                             borderWidth: 2,
                             fill: true,
-                            tension: 0.4
+                            tension: 0.4,
+                            pointBackgroundColor: '#10b981',
+                            pointBorderColor: '#10b981',
+                            pointRadius: 4,
+                            pointHoverRadius: 6
                         }
                     ]
                 },
@@ -211,21 +229,43 @@ class IPStatsManager {
                             display: true,
                             text: data.period || '访问统计',
                             font: {
-                                size: 16
+                                size: 16,
+                                weight: 'bold'
+                            },
+                            color: '#374151',
+                            padding: {
+                                bottom: 20
                             }
                         },
                         legend: {
                             display: true,
-                            position: 'top'
+                            position: 'top',
+                            labels: {
+                                color: '#6b7280',
+                                usePointStyle: true,
+                                padding: 20
+                            }
                         }
                     },
                     scales: {
+                        x: {
+                            ticks: {
+                                color: '#6b7280'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
                         y: {
                             beginAtZero: true,
                             ticks: {
+                                color: '#6b7280',
                                 callback: function(value) {
                                     return value.toLocaleString();
                                 }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
                             }
                         }
                     },
@@ -241,6 +281,8 @@ class IPStatsManager {
                     }
                 }
             });
+            
+            console.log(`图表 ${period} 创建成功`);
         } catch (error) {
             console.error('创建图表失败:', error);
             this.showError(period, '图表创建失败: ' + error.message);

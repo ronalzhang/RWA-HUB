@@ -1,32 +1,35 @@
 /* IP访问统计模块样式 */
 .ip-stats-container {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 12px;
-    padding: 20px;
-    color: white;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
 }
 
 .ip-stats-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
     color: white;
     padding: 20px;
-    border-bottom: 1px solid #e9ecef;
+    border-bottom: none;
 }
 
 .ip-stats-header h4 {
     color: white;
     margin: 0;
     font-weight: 600;
+    font-size: 18px;
 }
 
 .ip-stats-header .btn {
-    margin-left: 10px;
+    margin-left: 8px;
 }
 
 /* 总体统计卡片 */
 .summary-stats {
-    margin: 20px 0;
+    padding: 20px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
 }
 
 .summary-stats .row {
@@ -34,107 +37,123 @@
 }
 
 .stat-card {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
+    background: white;
     border-radius: 8px;
-    padding: 15px;
+    padding: 16px;
     text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    transition: all 0.3s ease;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+    margin-bottom: 8px;
 }
 
 .stat-card:hover {
-    background: rgba(255, 255, 255, 0.15);
-    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+    border-color: #3b82f6;
 }
 
 .stat-card h6 {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 12px;
+    color: #6b7280;
+    font-size: 0.75rem;
     margin-bottom: 8px;
     font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .stat-card h4 {
-    color: white;
-    font-size: 24px;
+    color: #111827;
+    font-size: 1.5rem;
     font-weight: 700;
     margin: 0;
 }
 
 .growth-rate.positive {
-    color: #4ade80 !important;
+    color: #10b981 !important;
 }
 
 .growth-rate.negative {
-    color: #f87171 !important;
+    color: #ef4444 !important;
 }
 
 /* 标签页样式 */
 .ip-stats-tabs {
     background: white;
-    border-bottom: 1px solid #e9ecef;
-    padding: 0 20px;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0;
 }
 
 .ip-stats-tabs .nav-tabs {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    border-bottom: none;
+    padding: 0 20px;
     background: transparent;
 }
 
 .ip-stats-tabs .nav-link {
     background: transparent;
     border: none;
-    color: rgba(255, 255, 255, 0.8);
-    padding: 12px 20px;
-    transition: all 0.3s ease;
-    border-radius: 8px 8px 0 0;
+    color: #6b7280;
+    padding: 16px 24px;
+    transition: all 0.2s ease;
+    border-radius: 0;
+    border-bottom: 3px solid transparent;
+    font-weight: 500;
 }
 
 .ip-stats-tabs .nav-link:hover {
-    color: white;
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
+    color: #3b82f6;
+    background: #f8fafc;
+    border-bottom-color: #bfdbfe;
 }
 
 .ip-stats-tabs .nav-link.active {
-    color: white;
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    border-bottom: 2px solid #4ade80;
+    color: #3b82f6;
+    background: white;
+    border-bottom-color: #3b82f6;
 }
 
-/* 内容区域 */
+/* 图表内容区域 */
+.tab-content {
+    background: white;
+    padding: 0;
+}
+
 .ip-stats-content {
-    padding: 20px;
-    min-height: 400px;
-}
-
-.ip-stats-content.active {
-    display: block;
+    padding: 24px;
+    min-height: 450px;
 }
 
 /* 图表容器 */
 .chart-container {
-    background: rgba(255, 255, 255, 0.95);
+    background: white;
     border-radius: 8px;
     padding: 20px;
     height: 400px;
     position: relative;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    border: 1px solid #f3f4f6;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .chart-container canvas {
-    border-radius: 6px;
+    border-radius: 4px;
 }
 
-/* 周期统计 */
-.period-stats {
-    margin-top: 20px;
+/* 按钮样式 */
+.btn-outline-light {
+    border-color: rgba(255, 255, 255, 0.4);
+    color: white;
+    background: transparent;
+    transition: all 0.2s ease;
+    font-weight: 500;
+    font-size: 0.875rem;
 }
 
-.period-stats .stat-card {
-    border-left: 4px solid #007bff;
+.btn-outline-light:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.6);
+    color: white;
+    transform: translateY(-1px);
 }
 
 /* 加载状态 */
@@ -143,77 +162,110 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(255, 255, 255, 0.95);
+    background: white;
     border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    padding: 24px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
     z-index: 10;
+    text-align: center;
 }
 
 .spinner-border {
     width: 2rem;
     height: 2rem;
+    border-color: #3b82f6;
+    border-right-color: transparent;
+}
+
+.loading-indicator p {
+    margin-top: 12px;
+    margin-bottom: 0;
+    color: #6b7280;
+    font-size: 0.875rem;
 }
 
 /* 错误状态 */
+.alert-danger {
+    background-color: #fef2f2;
+    border-color: #fecaca;
+    color: #dc2626;
+    border-radius: 8px;
+    margin-top: 20px;
+    border-left: 4px solid #dc2626;
+}
+
 .error-message {
     text-align: center;
     padding: 40px;
-    color: #6c757d;
+    color: #6b7280;
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
     .ip-stats-header {
-        padding: 15px;
+        padding: 16px;
         text-align: center;
     }
     
+    .ip-stats-header h4 {
+        font-size: 16px;
+        margin-bottom: 12px;
+    }
+    
     .ip-stats-header .btn {
-        margin: 5px;
-        display: block;
-        width: 100%;
+        margin: 4px;
+        font-size: 0.8rem;
     }
     
     .summary-stats {
-        padding: 15px;
+        padding: 16px;
     }
     
     .stat-card {
-        margin-bottom: 10px;
+        margin-bottom: 12px;
+        padding: 12px;
     }
     
-    .ip-stats-tabs {
-        padding: 0 10px;
+    .stat-card h4 {
+        font-size: 1.25rem;
+    }
+    
+    .ip-stats-tabs .nav-tabs {
+        padding: 0 12px;
     }
     
     .ip-stats-tabs .nav-link {
-        padding: 8px 12px;
-        font-size: 14px;
+        padding: 12px 16px;
+        font-size: 0.875rem;
     }
     
     .ip-stats-content {
-        padding: 15px;
+        padding: 16px;
     }
     
     .chart-container {
         height: 300px;
-        padding: 15px;
+        padding: 12px;
     }
 }
 
 @media (max-width: 576px) {
+    .summary-stats .col-md-2 {
+        margin-bottom: 8px;
+    }
+    
     .stat-card h4 {
-        font-size: 20px;
+        font-size: 1.125rem;
     }
     
     .chart-container {
-        height: 250px;
+        height: 280px;
+        padding: 10px;
     }
     
     .ip-stats-tabs .nav-link {
-        padding: 8px 12px;
-        font-size: 14px;
+        padding: 10px 12px;
+        font-size: 0.8rem;
     }
 }
 
@@ -221,7 +273,7 @@
 @keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(8px);
     }
     to {
         opacity: 1;
@@ -230,37 +282,19 @@
 }
 
 .ip-stats-content {
-    animation: fadeIn 0.5s ease-out;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.stat-card {
+    animation: fadeIn 0.4s ease-out;
 }
 
 /* 工具提示样式 */
 .tooltip-inner {
     max-width: 300px;
     text-align: left;
-}
-
-/* 按钮样式优化 */
-.btn-outline-primary {
-    border-width: 2px;
-    font-weight: 500;
-}
-
-.btn-outline-success {
-    border-width: 2px;
-    font-weight: 500;
-}
-
-.btn-outline-light {
-    border-color: rgba(255, 255, 255, 0.3);
-    color: white;
-    background: transparent;
-    transition: all 0.3s ease;
-}
-
-.btn-outline-light:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.5);
-    color: white;
+    background: #1f2937;
+    border-radius: 6px;
 }
 
 /* 表格样式（如果需要显示详细数据） */
@@ -272,45 +306,43 @@
     background: white;
     border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
 }
 
 .ip-stats-table .table th {
-    background: #f8f9fa;
+    background: #f9fafb;
     border-top: none;
     font-weight: 600;
-    color: #495057;
+    color: #374151;
+    font-size: 0.875rem;
 }
 
 .ip-stats-table .table td {
     vertical-align: middle;
+    color: #6b7280;
 }
 
 /* 空状态样式 */
 .empty-state {
     text-align: center;
     padding: 60px 20px;
-    color: #6c757d;
+    color: #9ca3af;
 }
 
 .empty-state i {
     font-size: 3rem;
     margin-bottom: 20px;
     opacity: 0.5;
+    color: #d1d5db;
 }
 
 .empty-state h5 {
     margin-bottom: 10px;
+    color: #6b7280;
 }
 
 .empty-state p {
     margin-bottom: 0;
-}
-
-.alert-danger {
-    background-color: rgba(248, 113, 113, 0.9);
-    border-color: rgba(248, 113, 113, 0.3);
-    color: white;
-    border-radius: 8px;
-    margin-top: 20px;
+    color: #9ca3af;
 } 
