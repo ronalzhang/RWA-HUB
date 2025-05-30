@@ -5,6 +5,99 @@
 {% block page_title %}佣金管理{% endblock %}
 {% block page_subtitle %}管理平台佣金设置和记录{% endblock %}
 
+{% block extra_head %}
+<style>
+    /* 修复开关样式兼容性 */
+    .toggle-switch {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        cursor: pointer;
+    }
+    
+    .toggle-switch input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+    
+    .toggle-track {
+        width: 3rem; /* 48px */
+        height: 1.5rem; /* 24px */
+        background-color: #d1d5db; /* gray-300 */
+        border-radius: 9999px;
+        position: relative;
+        transition: background-color 0.2s ease-in-out;
+    }
+    
+    .toggle-track.active {
+        background-color: #f97316; /* orange-500 */
+    }
+    
+    .toggle-thumb {
+        width: 1.25rem; /* 20px */
+        height: 1.25rem; /* 20px */
+        background-color: white;
+        border-radius: 50%;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        position: absolute;
+        top: 0.125rem; /* 2px */
+        left: 0.125rem; /* 2px */
+        transition: transform 0.2s ease-in-out;
+    }
+    
+    .toggle-thumb.active {
+        transform: translateX(1.5rem); /* 24px */
+    }
+    
+    /* 修复按钮样式 */
+    .btn-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem 1rem;
+        background-color: #3b82f6; /* blue-500 */
+        color: white;
+        font-size: 0.875rem; /* text-sm */
+        font-weight: 500;
+        border-radius: 0.5rem; /* rounded-lg */
+        border: 1px solid transparent;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        transition: background-color 0.2s ease-in-out;
+        text-decoration: none;
+    }
+    
+    .btn-primary:hover {
+        background-color: #2563eb; /* blue-600 */
+    }
+    
+    .btn-orange {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem 1rem;
+        background-color: #f97316; /* orange-500 */
+        color: white;
+        font-size: 0.875rem; /* text-sm */
+        font-weight: 500;
+        border-radius: 0.5rem; /* rounded-lg */
+        border: 1px solid transparent;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        transition: background-color 0.2s ease-in-out;
+        text-decoration: none;
+    }
+    
+    .btn-orange:hover {
+        background-color: #ea580c; /* orange-600 */
+    }
+    
+    /* 确保图标和文字对齐 */
+    .btn-primary i, .btn-orange i {
+        margin-right: 0.5rem;
+    }
+</style>
+{% endblock %}
+
 {% block breadcrumb %}
 <li aria-current="page">
     <div class="flex items-center">
@@ -262,7 +355,7 @@
                     <h4 class="text-lg font-semibold text-gray-700">核心分销规则</h4>
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">
                             推荐佣金率 (%)
@@ -284,9 +377,9 @@
                                placeholder="💰 推荐好友即享35%超高佣金，人人都是赚钱达人！"
                                class="w-full border-gray-300 rounded-md shadow-sm">
                         <p class="text-xs text-gray-500 mt-1">前端展示的佣金功能描述，支持emoji</p>
-                    </div>
-                    
-                    <div>
+        </div>
+
+        <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">多级分销</label>
                         <div class="flex items-center space-x-4">
                             <label class="flex items-center">
@@ -296,9 +389,9 @@
                             </label>
                         </div>
                         <p class="text-xs text-gray-500 mt-1">开启后下级的佣金收益也会给您分成35%</p>
-                    </div>
-                    
-                    <div>
+    </div>
+
+                                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">最大分销层级</label>
                         <select x-model="settings.max_referral_levels" class="w-full border-gray-300 rounded-md shadow-sm">
                             <option value="1">1级（只有直接推荐）</option>
@@ -310,9 +403,9 @@
                         </select>
                         <p class="text-xs text-gray-500 mt-1">每增加一级，佣金按35%递减传递给上级</p>
                     </div>
-                </div>
-            </div>
-
+                                    </div>
+                                </div>
+                                
             <!-- 分享功能配置 -->
             <div class="border border-gray-200 rounded-lg p-6">
                 <div class="flex items-center mb-4">
@@ -329,16 +422,16 @@
                                placeholder="🚀 分享赚大钱"
                                class="w-full border-gray-300 rounded-md shadow-sm">
                         <p class="text-xs text-gray-500 mt-1">分享按钮显示的文字，建议简短有力</p>
-                    </div>
-                    
+                                </div>
+                                
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">分享成功提示</label>
                         <input x-model="settings.share_success_message" type="text" 
                                placeholder="🎉 分享链接已复制！快去邀请好友赚取35%佣金吧！"
                                class="w-full border-gray-300 rounded-md shadow-sm">
                         <p class="text-xs text-gray-500 mt-1">分享成功后显示的消息，鼓励用户行动</p>
-                    </div>
-                    
+    </div>
+
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-2">分享说明文案</label>
                         <textarea x-model="settings.share_description" rows="2" 
@@ -359,7 +452,7 @@
                 </div>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
+                                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">
                             最低提现金额 (USDC)
                             <span class="text-red-500">*</span>
@@ -439,16 +532,18 @@
                                 <label class="block text-lg font-semibold text-gray-800">🏆 启用平台推荐人功能</label>
                                 <p class="text-sm text-gray-600 mt-1">开启后，所有无推荐人的用户将自动成为平台的下线，确保平台从每笔交易获得35%收益</p>
                             </div>
-                            <div class="flex items-center">
-                                <span class="mr-3 text-sm font-medium" :class="{
+                            <div class="flex items-center space-x-3">
+                                <span class="text-sm font-medium" :class="{
                                     'text-green-600': settings.enable_platform_referrer,
                                     'text-gray-500': !settings.enable_platform_referrer
                                 }" x-text="settings.enable_platform_referrer ? '✅ 已启用' : '❌ 已禁用'"></span>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" 
-                                           x-model="settings.enable_platform_referrer" 
-                                           class="sr-only peer">
-                                    <div class="w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-orange-500"></div>
+                                
+                                <!-- 使用自定义开关样式 -->
+                                <label class="toggle-switch">
+                                    <input type="checkbox" x-model="settings.enable_platform_referrer">
+                                    <div class="toggle-track" :class="{'active': settings.enable_platform_referrer}">
+                                        <div class="toggle-thumb" :class="{'active': settings.enable_platform_referrer}"></div>
+                                    </div>
                                 </label>
                             </div>
                         </div>
@@ -523,7 +618,7 @@
                                placeholder="🔥 直接推荐佣金：好友购买金额的35%立即到账"
                                class="w-full border-gray-300 rounded-md shadow-sm">
                         <p class="text-xs text-gray-500 mt-1">一级推荐的佣金计算和到账说明</p>
-                    </div>
+                                    </div>
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">多级推荐佣金说明</label>
@@ -531,7 +626,7 @@
                                placeholder="💰 多级推荐佣金：下级佣金收益的35%持续躺赚"
                                class="w-full border-gray-300 rounded-md shadow-sm">
                         <p class="text-xs text-gray-500 mt-1">二级及以上推荐的佣金说明</p>
-                    </div>
+                                    </div>
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">结算时间说明</label>
@@ -539,8 +634,8 @@
                                placeholder="⚡ 佣金实时到账，随时提现，秒速变现"
                                class="w-full border-gray-300 rounded-md shadow-sm">
                         <p class="text-xs text-gray-500 mt-1">佣金到账和结算时间的描述</p>
-                    </div>
-                    
+                                </div>
+                                
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">计价货币</label>
                         <select x-model="settings.commission_rules.currency" class="w-full border-gray-300 rounded-md shadow-sm">
@@ -575,30 +670,34 @@
                     <button @click="resetSettings()" class="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600">
                         <i class="fas fa-undo mr-2"></i>重置
                     </button>
-                    <button @click="saveSettings()" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">
+                <button @click="saveSettings()" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">
                         <i class="fas fa-save mr-2"></i>保存配置
-                    </button>
+                </button>
                 </div>
-            </div>
-        </div>
-    </div>
-
+                                    </div>
+                                    </div>
+                                </div>
+                                
     <!-- 推荐关系 -->
     <div x-show="activeTab === 'referrals'" class="bg-white rounded-lg shadow-sm" x-cloak>
         <div class="px-6 py-4 border-b border-gray-200">
             <div class="flex justify-between items-center">
                 <h3 class="text-lg font-semibold text-gray-700">用户推荐关系</h3>
-                <div class="flex space-x-3">
-                    <button @click="refreshReferrals()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
-                        <i class="fas fa-sync-alt mr-2"></i>刷新
+                <div class="flex items-center space-x-3">
+                    <!-- 刷新按钮 -->
+                    <button @click="refreshReferrals()" class="btn-primary">
+                        <i class="fas fa-sync-alt"></i>
+                        <span>刷新</span>
                     </button>
-                    <button @click="batchUpdatePlatformReferrer()" 
-                            class="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors font-medium shadow-md">
-                        <i class="fas fa-crown mr-2"></i>批量设为平台下线
+                    
+                    <!-- 批量处理按钮 -->
+                    <button @click="batchUpdatePlatformReferrer()" class="btn-orange">
+                        <i class="fas fa-crown"></i>
+                        <span>批量设为平台下线</span>
                     </button>
                 </div>
             </div>
-            <p class="text-sm text-gray-500 mt-1">显示所有用户的推荐关系和下级统计信息</p>
+            <p class="text-sm text-gray-500 mt-2">显示所有用户的推荐关系和下级统计信息</p>
         </div>
         
         <!-- 平台推荐人功能状态 -->
@@ -705,25 +804,25 @@
                     </select>
                 </div>
             </div>
-        </div>
+                                </div>
                                 
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
+                                        <table class="min-w-full divide-y divide-gray-200">
+                                            <thead class="bg-gray-50">
+                                                <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户信息</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">推荐关系</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">下级用户</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态 & 时间</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white divide-y divide-gray-200">
                     <template x-if="referralsLoading">
                         <tr>
                             <td colspan="5" class="px-6 py-4 text-center text-gray-500">
                                 <i class="fas fa-spinner fa-spin mr-2"></i>加载用户数据中...
-                            </td>
+                                                    </td>
                         </tr>
                     </template>
                     
@@ -769,12 +868,12 @@
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div x-show="referral.referrer_address">
                                     <div class="flex items-center mb-1">
-                                        <span :class="{
+                                <span :class="{
                                             'bg-orange-100 text-orange-800 border-orange-200': referral.referrer_type === 'platform',
                                             'bg-green-100 text-green-800 border-green-200': referral.referrer_type === 'normal'
                                         }" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border">
                                             <span x-text="referral.referrer_type === 'platform' ? '🏆 平台下线' : '👤 普通推荐'"></span>
-                                        </span>
+                                </span>
                                     </div>
                                     <div class="text-xs text-gray-500">
                                         推荐人: <span x-text="referral.referrer_address ? referral.referrer_address.slice(0, 10) + '...' + referral.referrer_address.slice(-4) : '-'"></span>
@@ -785,7 +884,7 @@
                                         ❌ 无推荐人
                                     </span>
                                 </div>
-                            </td>
+                                                    </td>
                             
                             <!-- 下级用户 -->
                             <td class="px-6 py-4 whitespace-nowrap text-center">
@@ -839,10 +938,10 @@
                                     </button>
                                 </div>
                             </td>
-                        </tr>
+                                                </tr>
                     </template>
-                </tbody>
-            </table>
+                                            </tbody>
+                                        </table>
         </div>
 
         <!-- 分页 -->
@@ -1286,12 +1385,12 @@
             },
             
             // 数据过滤和分页
-            recordFilters: {
+        recordFilters: {
                 status: '',
-                type: '',
+            type: '',
                 time_range: '',
                 search: ''
-            },
+        },
             referralFilters: {
                 search: '',
                 referrer_type: '',
@@ -1334,11 +1433,11 @@
                     });
                     
                     // 并行加载其他数据
-                    await Promise.all([
-                        this.loadStats(),
-                        this.loadRecords(),
+                await Promise.all([
+                    this.loadStats(),
+                    this.loadRecords(),
                         this.refreshAutomationStatus()
-                    ]);
+                ]);
                 } catch (error) {
                     console.error('加载佣金数据失败:', error);
                 }
@@ -1352,7 +1451,7 @@
                     this.loadSettings().then(() => {
                         // 如果推荐关系数据为空则加载
                         if (this.referrals.length === 0) {
-                            this.loadReferrals();
+                    this.loadReferrals();
                         }
                     });
                 }
@@ -1769,7 +1868,7 @@
                 } catch (error) {
                     console.error('发放佣金失败:', error);
                     alert('发放佣金失败: ' + error.message);
-                }
+            }
             },
             
             viewRecord(record) {
