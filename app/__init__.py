@@ -156,6 +156,11 @@ def create_app(config_name='development'):
         app.logger.error("存储初始化失败，应用可能无法正常工作")
         raise RuntimeError("存储初始化失败")
     
+    # 初始化IP访问追踪中间件
+    from app.middleware.ip_tracker import ip_tracker
+    ip_tracker.init_app(app)
+    app.logger.info("IP访问追踪中间件已初始化")
+    
     # 注册蓝图
     from app.routes import register_blueprints
     register_blueprints(app)

@@ -30,6 +30,9 @@ from .commission import Commission
 from .commission_config import CommissionConfig, UserCommissionBalance
 from .commission_withdrawal import CommissionWithdrawal
 
+# 导入IP访问统计模型
+from .ip_visit import IPVisit
+
 # 导出所有模型
 __all__ = [
     'db', 'Asset', 'AssetType', 'AssetStatus', 'AssetStatusHistory', 'DividendRecord', 'Dividend', 
@@ -37,5 +40,5 @@ __all__ = [
     'Commission', 'AdminUser', 'SystemConfig', 'CommissionSetting',
     'DistributionLevel', 'UserReferral', 'CommissionRecord', 'AdminOperationLog',
     'DashboardStats', 'OnchainHistory', 'OnchainStatus', 'ShortLink', 'Transaction', 'TransactionType', 'TransactionStatus',
-    'Holding', 'CommissionConfig', 'UserCommissionBalance', 'CommissionWithdrawal'
+    'Holding', 'CommissionConfig', 'UserCommissionBalance', 'CommissionWithdrawal', 'IPVisit'
 ]

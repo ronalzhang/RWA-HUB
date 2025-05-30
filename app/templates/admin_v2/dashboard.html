@@ -5,6 +5,11 @@
 {% block page_title %}仪表盘{% endblock %}
 {% block page_subtitle %}系统核心数据概览{% endblock %}
 
+{% block extra_head %}
+<!-- IP统计模块样式 -->
+<link href="{{ url_for('static', filename='css/ip-stats.css') }}" rel="stylesheet">
+{% endblock %}
+
 {% block breadcrumb %}
 <li aria-current="page">
     <div class="flex items-center">
@@ -180,6 +185,118 @@
         </div>
     </div>
     
+    <!-- IP访问统计模块 -->
+    <div class="mb-6">
+        <div id="ip-stats-container" class="ip-stats-container">
+            <!-- 模块头部 -->
+            <div class="ip-stats-header">
+                <div class="flex justify-between items-center">
+                    <h4><i class="fas fa-chart-line mr-2"></i>网站访问统计</h4>
+                    <div>
+                        <button id="refreshIPStats" class="btn btn-outline-light btn-sm">
+                            <i class="fas fa-sync-alt"></i> 刷新
+                        </button>
+                        <button id="exportIPStats" class="btn btn-outline-light btn-sm">
+                            <i class="fas fa-download"></i> 导出
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 总体统计 -->
+            <div class="summary-stats">
+                <div class="row">
+                    <div class="col-md-2">
+                        <div class="stat-card">
+                            <h6>总访问次数</h6>
+                            <h4 id="total-visits">-</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="stat-card">
+                            <h6>独立IP数</h6>
+                            <h4 id="total-unique-ips">-</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="stat-card">
+                            <h6>今日访问</h6>
+                            <h4 id="today-visits">-</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="stat-card">
+                            <h6>今日独立IP</h6>
+                            <h4 id="today-unique-ips">-</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="stat-card">
+                            <h6>昨日访问</h6>
+                            <h4 id="yesterday-visits">-</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="stat-card">
+                            <h6>增长率</h6>
+                            <h4 id="growth-rate" class="growth-rate">-</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 标签页导航 -->
+            <div class="ip-stats-tabs">
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link ip-stats-tab active" data-period="hourly" href="#">24小时</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link ip-stats-tab" data-period="daily" href="#">每周</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link ip-stats-tab" data-period="monthly" href="#">每年</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link ip-stats-tab" data-period="all-time" href="#">全部时间</a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 24小时统计 -->
+            <div id="ip-stats-hourly" class="ip-stats-content" style="display: block;">
+                <div class="chart-container">
+                    <canvas id="chart-hourly"></canvas>
+                </div>
+                <div class="period-stats"></div>
+            </div>
+
+            <!-- 每周统计 -->
+            <div id="ip-stats-daily" class="ip-stats-content" style="display: none;">
+                <div class="chart-container">
+                    <canvas id="chart-daily"></canvas>
+                </div>
+                <div class="period-stats"></div>
+            </div>
+
+            <!-- 每年统计 -->
+            <div id="ip-stats-monthly" class="ip-stats-content" style="display: none;">
+                <div class="chart-container">
+                    <canvas id="chart-monthly"></canvas>
+                </div>
+                <div class="period-stats"></div>
+            </div>
+
+            <!-- 全部时间统计 -->
+            <div id="ip-stats-all-time" class="ip-stats-content" style="display: none;">
+                <div class="chart-container">
+                    <canvas id="chart-all-time"></canvas>
+                </div>
+                <div class="period-stats"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- 底部操作按钮 -->
     <div class="flex justify-end">
         <button 
@@ -410,5 +527,14 @@
             }
         }
     }
+</script>
+
+<!-- IP统计模块脚本 -->
+<script src="{{ url_for('static', filename='js/ip-stats.js') }}"></script>
+<script>
+    // 初始化IP统计模块
+    document.addEventListener('DOMContentLoaded', function() {
+        new IPStatsManager();
+    });
 </script>
 {% endblock %} 

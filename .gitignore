@@ -412,7 +412,7 @@ ipython_config.py
 #   However, in case of collaboration, if having platform-specific dependencies or dependencies
 #   having no cross-platform support, pipenv may install dependencies that don't work, or not
 #   install all needed dependencies.
-#Pipfile.lock
+Pipfile.lock
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow
 __pypackages__/
@@ -495,7 +495,6 @@ config.local.py
 # 密钥和证书文件
 *.key
 *.pem
-!vincent.pem  # 保留本地SSH密钥，但不提交到仓库
 *.crt
 *.p12
 *.pfx
@@ -549,6 +548,15 @@ contracts/typechain/
 cache/
 artifacts/
 
-# 忽略所有.pem文件，但保留本地vincent.pem
 *.pem
-!vincent.pem
+# 安全加固 - 敏感文件
+*.pem
+*.key
+*private*
+.env
+*.log
+deployer-keypair.json
+instance/
+logs/
+security_*.log
+*_backup*
