@@ -34,11 +34,15 @@
 
 .summary-stats .row {
     margin: 0 -8px;
+    display: flex;
+    flex-wrap: wrap;
 }
 
 .summary-stats .col-md-4,
 .summary-stats .col-sm-6 {
     padding: 0 8px;
+    flex: 0 0 33.333333%;
+    max-width: 33.333333%;
 }
 
 .stat-card {
@@ -53,6 +57,7 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
+    margin-bottom: 16px;
 }
 
 .stat-card:hover {
@@ -250,6 +255,12 @@
         padding: 16px;
     }
     
+    .summary-stats .col-md-4,
+    .summary-stats .col-sm-6 {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+    
     .stat-card {
         margin-bottom: 12px;
         padding: 16px;
@@ -286,7 +297,8 @@
 }
 
 @media (max-width: 576px) {
-    .summary-stats .col-md-4 {
+    .summary-stats .col-md-4,
+    .summary-stats .col-sm-6 {
         flex: 0 0 100%;
         max-width: 100%;
         margin-bottom: 12px;
