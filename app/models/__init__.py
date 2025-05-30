@@ -13,7 +13,7 @@ from .shortlink import ShortLink
 from .transaction import Transaction, TransactionType, TransactionStatus
 from .holding import Holding
 
-# 从admin.py导入管理相关模型（删除CommissionRecord）
+# 从admin.py导入管理相关模型
 from .admin import (
     AdminUser, SystemConfig, CommissionSetting, 
     DistributionLevel, UserReferral, AdminOperationLog,
@@ -33,6 +33,9 @@ from .commission_withdrawal import CommissionWithdrawal
 # 导入IP访问统计模型
 from .ip_visit import IPVisit
 
+# 导入新的模型
+from .share_message import ShareMessage
+
 # 导出所有模型
 __all__ = [
     'db', 'Asset', 'AssetType', 'AssetStatus', 'AssetStatusHistory', 'DividendRecord', 'Dividend', 
@@ -40,5 +43,6 @@ __all__ = [
     'Commission', 'AdminUser', 'SystemConfig', 'CommissionSetting',
     'DistributionLevel', 'UserReferral', 'CommissionRecord', 'AdminOperationLog',
     'DashboardStats', 'OnchainHistory', 'OnchainStatus', 'ShortLink', 'Transaction', 'TransactionType', 'TransactionStatus',
-    'Holding', 'CommissionConfig', 'UserCommissionBalance', 'CommissionWithdrawal', 'IPVisit'
+    'Holding', 'CommissionConfig', 'UserCommissionBalance', 'CommissionWithdrawal', 'IPVisit',
+    'ShareMessage'
 ]

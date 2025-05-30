@@ -1548,3 +1548,114 @@ def get_payment_config():
     except Exception as e:
         logger.error(f"获取支付设置失败: {str(e)}")
         return jsonify({'success': False, 'message': f'获取支付设置失败: {str(e)}'}), 500
+
+@api_bp.route('/share-messages/random', methods=['GET'])
+def get_random_share_message():
+    """获取随机分享消息"""
+    try:
+        from app.models.share_message import ShareMessage
+        import random
+        import os
+        
+        # 优先从数据库获取
+        random_message_obj = ShareMessage.get_random_message()
+        if random_message_obj:
+            return jsonify({
+                'success': True,
+                'message': random_message_obj.content
+            })
+        
+        # 如果数据库为空，尝试从JSON文件读取
+        share_messages_file = os.path.join(current_app.static_folder, 'data', 'share_messages.json')
+        
+        if os.path.exists(share_messages_file):
+            with open(share_messages_file, 'r', encoding='utf-8') as f:
+                import json
+                messages = json.load(f)
+                
+            if messages:
+                random_message = random.choice(messages)
+                return jsonify({
+                    'success': True,
+                    'message': random_message
+                })
+        
+        # 如果文件也不存在，返回默认消息
+        default_message = "📈 分享赚佣金！邀请好友投资，您可获得高达30%的推广佣金！链接由您独享，佣金终身受益，朋友越多，收益越丰厚！"
+        return jsonify({
+            'success': True,
+            'message': default_message
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取分享消息失败: {str(e)}", exc_info=True)
+        # 返回默认消息
+        return jsonify({
+            'success': True,
+            'message': "📈 分享赚佣金！邀请好友投资，您可获得高达30%的推广佣金！链接由您独享，佣金终身受益，朋友越多，收益越丰厚！"
+        })
+
+@api_bp.route('/shortlink/create', methods=['POST'])
+def create_shortlink():
+    """创建短链接"""
+    try:
+        from app.models.shortlink import ShortLink
+        from flask import url_for
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '缺少请求数据'}), 400
+            
+        original_url = data.get('url')
+        expires_days = data.get('expires_days', 365)
+        
+        if not original_url:
+            return jsonify({'success': False, 'error': '缺少原始URL'}), 400
+        
+        # 获取创建者钱包地址
+        creator_address = request.headers.get('X-Eth-Address')
+        
+        # 创建短链接
+        short_link = ShortLink.create_short_link(
+            original_url=original_url,
+            creator_address=creator_address,
+            expires_days=expires_days
+        )
+        
+        # 生成完整的短链接URL
+        short_url = url_for('main.shortlink_redirect', code=short_link.code, _external=True)
+        
+        return jsonify({
+            'success': True,
+            'short_url': short_url,
+            'code': short_link.code,
+            'original_url': original_url,
+            'expires_at': short_link.expires_at.isoformat() if short_link.expires_at else None
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"创建短链接失败: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': f'创建短链接失败: {str(e)}'}), 500
+
+@api_bp.route('/share-config', methods=['GET'])
+def get_share_config():
+    """获取分享配置（前端调用）"""
+    try:
+        from app.models.commission_config import CommissionConfig
+        
+        config = {
+            'share_button_text': CommissionConfig.get_config('share_button_text', '🚀 分享赚佣金'),
+            'share_description': CommissionConfig.get_config('share_description', '分享此项目给好友，好友购买后您将获得35%佣金奖励'),
+            'share_success_message': CommissionConfig.get_config('share_success_message', '🎉 分享链接已复制！快去邀请好友赚取35%佣金吧！'),
+            'commission_rate': CommissionConfig.get_config('commission_rate', 35.0),
+            'commission_description': CommissionConfig.get_config('commission_description', '推荐好友享受35%佣金奖励')
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': config
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取分享配置失败: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500

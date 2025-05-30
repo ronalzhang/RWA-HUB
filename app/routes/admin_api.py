@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, g, current_app, session
+from flask import Blueprint, jsonify, request, g, current_app, session, url_for
 from app.extensions import db
 from datetime import datetime, timedelta
 from sqlalchemy import func, text, or_, desc
@@ -20,6 +20,8 @@ from app.models.user import User
 from app.models.trade import Trade
 from app.models.commission import Commission
 from app.models.dividend import DividendRecord, DividendDistribution
+from app.models.share_message import ShareMessage
+from app.models.shortlink import ShortLink
 
 # For signature verification
 from eth_account.messages import encode_defunct
@@ -3550,3 +3552,194 @@ def get_assets_stats():
             'type_distribution': {},
             'status_distribution': {}
         })
+
+# ================== 分享消息管理相关API ==================
+
+@admin_v2_bp.route('/share-messages', methods=['GET'])
+@admin_required
+def get_share_messages():
+    """获取分享消息列表"""
+    try:
+        from app.models.share_message import ShareMessage
+        
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        
+        query = ShareMessage.query.order_by(ShareMessage.created_at.desc())
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        messages = []
+        for msg in pagination.items:
+            messages.append(msg.to_dict())
+        
+        return jsonify({
+            'success': True,
+            'data': messages,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': pagination.total,
+                'pages': pagination.pages
+            }
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取分享消息列表失败: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_v2_bp.route('/share-messages', methods=['POST'])
+@admin_required
+def create_share_message():
+    """创建分享消息"""
+    try:
+        from app.models.share_message import ShareMessage
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '缺少请求数据'}), 400
+        
+        content = data.get('content', '').strip()
+        if not content:
+            return jsonify({'success': False, 'error': '分享消息内容不能为空'}), 400
+        
+        weight = data.get('weight', 1)
+        if weight < 1:
+            weight = 1
+        
+        is_active = data.get('is_active', True)
+        
+        message = ShareMessage(
+            content=content,
+            weight=weight,
+            is_active=is_active
+        )
+        
+        db.session.add(message)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '分享消息创建成功',
+            'data': message.to_dict()
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"创建分享消息失败: {str(e)}", exc_info=True)
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_v2_bp.route('/share-messages/<int:message_id>', methods=['PUT'])
+@admin_required
+def update_share_message(message_id):
+    """更新分享消息"""
+    try:
+        from app.models.share_message import ShareMessage
+        
+        message = ShareMessage.query.get_or_404(message_id)
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '缺少请求数据'}), 400
+        
+        content = data.get('content', '').strip()
+        if content:
+            message.content = content
+        
+        if 'weight' in data:
+            weight = data.get('weight', 1)
+            if weight < 1:
+                weight = 1
+            message.weight = weight
+        
+        if 'is_active' in data:
+            message.is_active = data.get('is_active', True)
+        
+        message.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '分享消息更新成功',
+            'data': message.to_dict()
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"更新分享消息失败: {str(e)}", exc_info=True)
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_v2_bp.route('/share-messages/<int:message_id>', methods=['DELETE'])
+@admin_required
+def delete_share_message(message_id):
+    """删除分享消息"""
+    try:
+        from app.models.share_message import ShareMessage
+        
+        message = ShareMessage.query.get_or_404(message_id)
+        
+        db.session.delete(message)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '分享消息删除成功'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"删除分享消息失败: {str(e)}", exc_info=True)
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_v2_bp.route('/share-messages/init-default', methods=['POST'])
+@admin_required
+def init_default_share_messages():
+    """初始化默认分享消息"""
+    try:
+        from app.models.share_message import ShareMessage
+        
+        ShareMessage.init_default_messages()
+        
+        return jsonify({
+            'success': True,
+            'message': '默认分享消息初始化成功'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"初始化默认分享消息失败: {str(e)}", exc_info=True)
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_v2_bp.route('/shortlinks', methods=['GET'])
+@admin_required
+def get_shortlinks():
+    """获取短链接列表"""
+    try:
+        from app.models.shortlink import ShortLink
+        
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        
+        query = ShortLink.query.order_by(ShortLink.created_at.desc())
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        links = []
+        for link in pagination.items:
+            link_dict = link.to_dict()
+            link_dict['short_url'] = url_for('main.shortlink_redirect', code=link.code, _external=True)
+            link_dict['is_expired'] = link.is_expired()
+            links.append(link_dict)
+        
+        return jsonify({
+            'success': True,
+            'data': links,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': pagination.total,
+                'pages': pagination.pages
+            }
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取短链接列表失败: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
