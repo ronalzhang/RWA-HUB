@@ -582,11 +582,17 @@
         <div class="px-6 py-4 border-b border-gray-200">
             <div class="flex justify-between items-center">
                 <h3 class="text-lg font-semibold text-gray-700">用户推荐关系</h3>
-                <div class="flex space-x-2">
-                    <button @click="refreshReferrals()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                <div class="flex space-x-3">
+                    <button @click="refreshReferrals()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
                         <i class="fas fa-sync-alt mr-2"></i>刷新
                     </button>
-                    <button @click="batchUpdatePlatformReferrer()" class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">
+                    <button @click="batchUpdatePlatformReferrer()" 
+                            class="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors font-medium shadow-md"
+                            :disabled="!settings.enable_platform_referrer || !settings.platform_referrer_address"
+                            :class="{
+                                'opacity-50 cursor-not-allowed': !settings.enable_platform_referrer || !settings.platform_referrer_address,
+                                'animate-pulse': settings.enable_platform_referrer && settings.platform_referrer_address
+                            }">
                         <i class="fas fa-crown mr-2"></i>批量设为平台下线
                     </button>
                 </div>
@@ -598,14 +604,24 @@
         <div class="px-6 py-4 bg-gradient-to-r from-green-50 to-blue-50 border-b border-gray-200">
             <div class="flex items-center justify-between">
                 <div class="flex items-center">
-                    <div class="p-2 bg-green-500 rounded-lg mr-3">
+                    <div class="p-2 rounded-lg mr-3" :class="{
+                        'bg-green-500': settings.enable_platform_referrer && settings.platform_referrer_address,
+                        'bg-red-500': !settings.enable_platform_referrer || !settings.platform_referrer_address
+                    }">
                         <i class="fas fa-robot text-white"></i>
                     </div>
                     <div>
-                        <h4 class="text-sm font-semibold text-green-700">🤖 自动推荐人功能</h4>
-                        <p class="text-xs text-green-600">
+                        <h4 class="text-sm font-semibold" :class="{
+                            'text-green-700': settings.enable_platform_referrer && settings.platform_referrer_address,
+                            'text-red-700': !settings.enable_platform_referrer || !settings.platform_referrer_address
+                        }">🤖 自动推荐人功能</h4>
+                        <p class="text-xs" :class="{
+                            'text-green-600': settings.enable_platform_referrer && settings.platform_referrer_address,
+                            'text-red-600': !settings.enable_platform_referrer || !settings.platform_referrer_address
+                        }">
                             <span x-show="settings.enable_platform_referrer && settings.platform_referrer_address">
-                                ✅ 已启用 - 所有新用户连接钱包时自动设置为平台下线 (<span x-text="settings.platform_referrer_address ? settings.platform_referrer_address.slice(0, 10) + '...' : '未配置'"></span>)
+                                ✅ 已启用 - 所有新用户连接钱包时自动设置为平台下线
+                                <span class="font-mono text-xs">(<span x-text="settings.platform_referrer_address ? settings.platform_referrer_address.slice(0, 10) + '...' + settings.platform_referrer_address.slice(-4) : '未配置'"></span>)</span>
                             </span>
                             <span x-show="!settings.enable_platform_referrer || !settings.platform_referrer_address">
                                 ❌ 未启用 - 请在"佣金设置"页面配置平台推荐人功能
@@ -616,6 +632,9 @@
                 <div class="text-xs text-gray-500">
                     <div>🔄 新用户首次连接钱包时自动生效</div>
                     <div>📊 现有用户可使用批量处理按钮</div>
+                    <div class="mt-1 font-mono text-xs" x-show="settings.platform_referrer_address">
+                        平台地址: <span x-text="settings.platform_referrer_address"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1290,21 +1309,36 @@
             referralStats: null,
             
             async loadCommissionData() {
-                await Promise.all([
-                    this.loadStats(),
-                    this.loadRecords(),
-                    this.loadReferrals(),
-                    this.loadWithdrawals(),
-                    this.loadSettings(),
-                    this.refreshAutomationStatus()
-                ]);
+                try {
+                    // 首先加载设置，因为其他功能依赖设置数据
+                    await this.loadSettings();
+                    console.log('设置加载完成:', {
+                        enable_platform_referrer: this.settings.enable_platform_referrer,
+                        platform_referrer_address: this.settings.platform_referrer_address
+                    });
+                    
+                    // 并行加载其他数据
+                    await Promise.all([
+                        this.loadStats(),
+                        this.loadRecords(),
+                        this.refreshAutomationStatus()
+                    ]);
+                } catch (error) {
+                    console.error('加载佣金数据失败:', error);
+                }
             },
             
             switchTab(tab) {
                 this.activeTab = tab;
-                // 切换到推荐关系标签页时加载数据
-                if (tab === 'referrals' && this.referrals.length === 0) {
-                    this.loadReferrals();
+                // 切换到推荐关系标签页时加载数据和设置
+                if (tab === 'referrals') {
+                    // 确保设置数据已加载
+                    this.loadSettings().then(() => {
+                        // 如果推荐关系数据为空则加载
+                        if (this.referrals.length === 0) {
+                            this.loadReferrals();
+                        }
+                    });
                 }
                 // 切换到取现记录标签页时加载数据
                 if (tab === 'withdrawals' && this.withdrawals.length === 0) {
