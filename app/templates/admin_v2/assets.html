@@ -947,7 +947,7 @@
             // 加载统计数据
             async loadStats() {
                 try {
-                    const response = await this.authFetch('/api/admin/v2/assets/stats');
+                    const response = await this.authFetch('/api/admin/assets/stats');
                     if (response.ok) {
                         this.stats = await response.json();
                 }
@@ -968,13 +968,20 @@
                         ...this.filters
                     });
                     
-                    const response = await this.authFetch(`/api/admin/v2/assets?${params}`);
+                    const response = await this.authFetch(`/api/admin/assets?${params}`);
                     if (!response.ok) throw new Error('加载资产失败');
                     
                     const data = await response.json();
                     this.assets = data.items || [];
                     this.pagination.total = data.total || 0;
                     this.pagination.pages = data.pages || 0;
+                    
+                    // 调试：输出第一个资产的数据结构
+                    if (this.assets.length > 0) {
+                        console.log('第一个资产数据:', this.assets[0]);
+                        console.log('图片路径:', this.assets[0].image);
+                        console.log('资产类型名称:', this.assets[0].asset_type_name);
+                    }
                     
                     // 重置选择状态
                         this.selectedAssets = [];
@@ -1019,7 +1026,7 @@
                 if (!confirm('确定要通过这个资产的审核吗？')) return;
                 
                 try {
-                    const response = await this.authFetch(`/api/admin/v2/assets/${assetId}/approve`, {
+                    const response = await this.authFetch(`/api/admin/assets/${assetId}/approve`, {
                         method: 'POST'
                     });
                     
@@ -1040,7 +1047,7 @@
                 if (!reason) return;
                 
                 try {
-                    const response = await this.authFetch(`/api/admin/v2/assets/${assetId}/reject`, {
+                    const response = await this.authFetch(`/api/admin/assets/${assetId}/reject`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ reason })
@@ -1062,7 +1069,7 @@
                 if (!confirm('确定要删除这个资产吗？此操作无法撤销。')) return;
                 
                 try {
-                    const response = await this.authFetch(`/api/admin/v2/assets/${assetId}`, {
+                    const response = await this.authFetch(`/api/admin/assets/${assetId}`, {
                         method: 'DELETE'
                     });
                     
@@ -1083,7 +1090,7 @@
                 if (!confirm(`确定要通过 ${this.selectedAssets.length} 个资产的审核吗？`)) return;
                 
                 try {
-                    const response = await this.authFetch('/api/admin/v2/assets/batch-approve', {
+                    const response = await this.authFetch('/api/admin/assets/batch-approve', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ asset_ids: this.selectedAssets })
@@ -1106,7 +1113,7 @@
                 if (!reason) return;
                 
                 try {
-                    const response = await this.authFetch('/api/admin/v2/assets/batch-reject', {
+                    const response = await this.authFetch('/api/admin/assets/batch-reject', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
@@ -1131,7 +1138,7 @@
                 if (!confirm(`确定要删除 ${this.selectedAssets.length} 个资产吗？此操作无法撤销。`)) return;
                 
                 try {
-                    const response = await this.authFetch('/api/admin/v2/assets/batch-delete', {
+                    const response = await this.authFetch('/api/admin/assets/batch-delete', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ asset_ids: this.selectedAssets })
@@ -1151,7 +1158,7 @@
             // 导出资产数据
             async exportAssets() {
                 try {
-                    const response = await this.authFetch('/api/admin/v2/assets/export');
+                    const response = await this.authFetch('/api/admin/assets/export');
                     if (!response.ok) throw new Error('导出失败');
                     
                     const blob = await response.blob();
@@ -1250,7 +1257,7 @@
                         ...this.dividendFilters
                     });
                     
-                    const response = await this.authFetch(`/api/admin/v2/dividends?${params}`);
+                    const response = await this.authFetch(`/api/admin/dividends?${params}`);
                     if (!response.ok) throw new Error('加载分红数据失败');
                     
                     const data = await response.json();
@@ -1291,7 +1298,7 @@
                 if (!confirm('确定要处理这个分红吗？')) return;
                 
                 try {
-                    const response = await this.authFetch(`/api/admin/v2/dividends/${dividendId}/process`, {
+                    const response = await this.authFetch(`/api/admin/dividends/${dividendId}/process`, {
                         method: 'POST'
                     });
                     
@@ -1311,7 +1318,7 @@
                 if (!confirm('确定要删除这个分红记录吗？此操作无法撤销。')) return;
                 
                 try {
-                    const response = await this.authFetch(`/api/admin/v2/dividends/${dividendId}`, {
+                    const response = await this.authFetch(`/api/admin/dividends/${dividendId}`, {
                         method: 'DELETE'
                     });
                     
@@ -1329,7 +1336,7 @@
             // 导出分红数据
             async exportDividends() {
                 try {
-                    const response = await this.authFetch('/api/admin/v2/dividends/export');
+                    const response = await this.authFetch('/api/admin/dividends/export');
                     if (!response.ok) throw new Error('导出失败');
                     
                     const blob = await response.blob();

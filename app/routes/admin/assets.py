@@ -5,7 +5,7 @@
 
 from flask import (
     render_template, request, jsonify, current_app, 
-    send_file, make_response
+    send_file, make_response, Response
 )
 from datetime import datetime
 import csv
@@ -661,4 +661,93 @@ def api_export_assets():
         
     except Exception as e:
         current_app.logger.error(f'导出资产数据失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/api/dividends', methods=['GET'])
+@api_admin_required
+def api_get_dividends():
+    """获取分红列表"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        limit = min(request.args.get('limit', 10, type=int), 100)
+        asset_id = request.args.get('asset_id')
+        status = request.args.get('status')
+        sort = request.args.get('sort', 'created_at')
+        order = request.args.get('order', 'desc')
+        
+        # 构建查询
+        query = db.session.query(
+            text('''
+            SELECT 
+                1 as id,
+                '示例分红' as asset_name,
+                'DEMO' as asset_symbol,
+                100.0 as amount,
+                0 as recipient_count,
+                NOW() as distribution_date,
+                'pending' as status,
+                NOW() as created_at
+            WHERE 1=0
+            ''')
+        )
+        
+        # 由于目前没有实际的分红表，返回空结果
+        return jsonify({
+            'success': True,
+            'dividends': [],
+            'page': page,
+            'limit': limit,
+            'total': 0,
+            'pages': 0
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取分红列表失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/api/dividends/<int:dividend_id>/process', methods=['POST'])
+@api_admin_required
+def api_process_dividend(dividend_id):
+    """处理分红"""
+    try:
+        return jsonify({'success': True, 'message': '分红处理功能暂未实现'})
+    except Exception as e:
+        current_app.logger.error(f'处理分红失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/api/dividends/<int:dividend_id>', methods=['DELETE'])
+@api_admin_required
+def api_delete_dividend(dividend_id):
+    """删除分红"""
+    try:
+        return jsonify({'success': True, 'message': '分红删除功能暂未实现'})
+    except Exception as e:
+        current_app.logger.error(f'删除分红失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/api/dividends/export', methods=['GET'])
+@api_admin_required
+def api_export_dividends():
+    """导出分红数据"""
+    try:
+        import csv
+        import io
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['ID', '资产名称', '分红金额', '状态', '创建时间'])
+        
+        response = Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': 'attachment; filename=dividends.csv'}
+        )
+        return response
+        
+    except Exception as e:
+        current_app.logger.error(f'导出分红数据失败: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500 
