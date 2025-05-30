@@ -3,6 +3,7 @@ from app.models import IPVisit
 from app.extensions import db
 import logging
 from datetime import datetime
+import pytz
 
 logger = logging.getLogger(__name__)
 
@@ -76,13 +77,17 @@ class IPTracker:
             referer = request.headers.get('Referer', '')
             path = request.path
             
+            # 获取中国时区的当前时间
+            china_tz = pytz.timezone('Asia/Shanghai')
+            current_time = datetime.now(china_tz).replace(tzinfo=None)  # 移除时区信息以匹配数据库字段
+            
             # 创建访问记录
             visit = IPVisit(
                 ip_address=ip_address,
                 user_agent=user_agent[:1000] if user_agent else None,  # 限制长度
                 referer=referer[:500] if referer else None,  # 限制长度
                 path=path[:500] if path else None,  # 限制长度
-                timestamp=datetime.utcnow()
+                timestamp=current_time
             )
             
             # 保存到数据库
