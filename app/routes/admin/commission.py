@@ -353,18 +353,22 @@ def api_update_commission_settings():
                     from app.models.user import User
                     from app.extensions import db
                     
-                    # 查找所有没有推荐人的活跃用户（排除平台地址本身）
-                    users_without_referrer = User.query.filter(
+                    # 查找所有没有推荐人的活跃用户
+                    all_users_without_referrer = User.query.filter(
                         User.referrer_address.is_(None),
-                        User.is_active == True,
-                        and_(
-                            User.eth_address != platform_address,
-                            User.solana_address != platform_address
-                        )
+                        User.is_active == True
                     ).all()
                     
+                    # 过滤掉平台地址本身（避免自己推荐自己）
+                    users_to_update = []
+                    for user in all_users_without_referrer:
+                        # 检查是否是平台地址本身
+                        if (user.eth_address != platform_address and 
+                            user.solana_address != platform_address):
+                            users_to_update.append(user)
+                    
                     updated_count = 0
-                    for user in users_without_referrer:
+                    for user in users_to_update:
                         user.referrer_address = platform_address
                         updated_count += 1
                     
@@ -836,20 +840,24 @@ def api_batch_update_platform_referrer():
                 'error': '请先在佣金设置中配置并启用平台推荐人功能'
             }), 400
         
-        # 查找所有没有推荐人的活跃用户（排除平台地址本身）
-        users_without_referrer = User.query.filter(
+        # 查找所有没有推荐人的活跃用户
+        all_users_without_referrer = User.query.filter(
             User.referrer_address.is_(None),
-            User.is_active == True,
-            and_(
-                User.eth_address != platform_address,
-                User.solana_address != platform_address
-            )
+            User.is_active == True
         ).all()
+        
+        # 过滤掉平台地址本身（避免自己推荐自己）
+        users_to_update = []
+        for user in all_users_without_referrer:
+            # 检查是否是平台地址本身
+            if (user.eth_address != platform_address and 
+                user.solana_address != platform_address):
+                users_to_update.append(user)
         
         updated_count = 0
         user_details = []
         
-        for user in users_without_referrer:
+        for user in users_to_update:
             user.referrer_address = platform_address
             updated_count += 1
             
