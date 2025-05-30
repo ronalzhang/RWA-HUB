@@ -137,7 +137,7 @@ class IPStatsManager {
 
             if (result.success) {
                 this.renderChart(period, result.data);
-                this.updatePeriodStats(period, result.data);
+                console.log(`${period}数据加载成功:`, result.data);
             } else {
                 console.error(`加载${period}数据失败:`, result.error);
                 this.showError(period, result.error);
@@ -154,109 +154,96 @@ class IPStatsManager {
     renderChart(period, data) {
         const canvasId = `chart-${period}`;
         const canvas = document.getElementById(canvasId);
-        if (!canvas) return;
-
-        // 销毁现有图表
-        if (this.charts[period]) {
-            this.charts[period].destroy();
+        if (!canvas) {
+            console.warn(`Canvas ${canvasId} not found`);
+            return;
         }
 
+        // 销毁现有图表 - 更安全的销毁方式
+        if (this.charts[period]) {
+            try {
+                this.charts[period].destroy();
+                this.charts[period] = null;
+            } catch (e) {
+                console.warn('销毁图表时出错:', e);
+            }
+        }
+
+        // 清理canvas上下文
         const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        this.charts[period] = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.labels,
-                datasets: [
-                    {
-                        label: '访问次数',
-                        data: data.visit_data,
-                        borderColor: '#007bff',
-                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4
-                    },
-                    {
-                        label: '独立IP',
-                        data: data.unique_ip_data,
-                        borderColor: '#28a745',
-                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: data.period || '访问统计'
-                    },
-                    legend: {
-                        display: true,
-                        position: 'top'
-                    }
+        // 重置canvas属性
+        canvas.width = canvas.width;
+        
+        // 创建新图表
+        try {
+            this.charts[period] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [
+                        {
+                            label: '访问次数',
+                            data: data.visit_data,
+                            borderColor: '#007bff',
+                            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: '独立IP',
+                            data: data.unique_ip_data,
+                            borderColor: '#28a745',
+                            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return value.toLocaleString();
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: data.period || '访问统计',
+                            font: {
+                                size: 16
+                            }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                }
                             }
                         }
-                    }
-                },
-                interaction: {
-                    intersect: false,
-                    mode: 'index'
-                },
-                elements: {
-                    point: {
-                        radius: 3,
-                        hoverRadius: 6
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    elements: {
+                        point: {
+                            radius: 3,
+                            hoverRadius: 6
+                        }
                     }
                 }
-            }
-        });
-    }
-
-    updatePeriodStats(period, data) {
-        // 更新周期统计信息
-        const statsContainer = document.querySelector(`#ip-stats-${period} .period-stats`);
-        if (statsContainer) {
-            statsContainer.innerHTML = `
-                <div class="row">
-                    <div class="col-md-3">
-                        <div class="stat-card">
-                            <h6>总访问次数</h6>
-                            <h4>${this.formatNumber(data.total_visits)}</h4>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card">
-                            <h6>独立IP数</h6>
-                            <h4>${this.formatNumber(data.total_unique_ips)}</h4>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card">
-                            <h6>平均访问/IP</h6>
-                            <h4>${data.total_unique_ips > 0 ? (data.total_visits / data.total_unique_ips).toFixed(1) : '0'}</h4>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card">
-                            <h6>统计周期</h6>
-                            <h6>${data.period}</h6>
-                        </div>
-                    </div>
-                </div>
-            `;
+            });
+        } catch (error) {
+            console.error('创建图表失败:', error);
+            this.showError(period, '图表创建失败: ' + error.message);
         }
     }
 

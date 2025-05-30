@@ -203,8 +203,8 @@
                 </div>
             </div>
 
-            <!-- 总体统计 -->
-            <div class="summary-stats">
+            <!-- 总体统计卡片 -->
+            <div class="summary-stats mb-4">
                 <div class="row">
                     <div class="col-md-2">
                         <div class="stat-card">
@@ -249,50 +249,49 @@
             <div class="ip-stats-tabs">
                 <ul class="nav nav-tabs">
                     <li class="nav-item">
-                        <a class="nav-link ip-stats-tab active" data-period="hourly" href="#">24小时</a>
+                        <a class="nav-link ip-stats-tab active" data-period="hourly" href="#">24小时趋势</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link ip-stats-tab" data-period="daily" href="#">每周</a>
+                        <a class="nav-link ip-stats-tab" data-period="daily" href="#">7天趋势</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link ip-stats-tab" data-period="monthly" href="#">每年</a>
+                        <a class="nav-link ip-stats-tab" data-period="monthly" href="#">月度趋势</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link ip-stats-tab" data-period="all-time" href="#">全部时间</a>
+                        <a class="nav-link ip-stats-tab" data-period="all-time" href="#">历史趋势</a>
                     </li>
                 </ul>
             </div>
 
-            <!-- 24小时统计 -->
-            <div id="ip-stats-hourly" class="ip-stats-content" style="display: block;">
-                <div class="chart-container">
-                    <canvas id="chart-hourly"></canvas>
+            <!-- 图表内容区域 -->
+            <div class="tab-content">
+                <!-- 24小时统计 -->
+                <div id="ip-stats-hourly" class="ip-stats-content" style="display: block;">
+                    <div class="chart-container">
+                        <canvas id="chart-hourly"></canvas>
+                    </div>
                 </div>
-                <div class="period-stats"></div>
-            </div>
 
-            <!-- 每周统计 -->
-            <div id="ip-stats-daily" class="ip-stats-content" style="display: none;">
-                <div class="chart-container">
-                    <canvas id="chart-daily"></canvas>
+                <!-- 每周统计 -->
+                <div id="ip-stats-daily" class="ip-stats-content" style="display: none;">
+                    <div class="chart-container">
+                        <canvas id="chart-daily"></canvas>
+                    </div>
                 </div>
-                <div class="period-stats"></div>
-            </div>
 
-            <!-- 每年统计 -->
-            <div id="ip-stats-monthly" class="ip-stats-content" style="display: none;">
-                <div class="chart-container">
-                    <canvas id="chart-monthly"></canvas>
+                <!-- 每年统计 -->
+                <div id="ip-stats-monthly" class="ip-stats-content" style="display: none;">
+                    <div class="chart-container">
+                        <canvas id="chart-monthly"></canvas>
+                    </div>
                 </div>
-                <div class="period-stats"></div>
-            </div>
 
-            <!-- 全部时间统计 -->
-            <div id="ip-stats-all-time" class="ip-stats-content" style="display: none;">
-                <div class="chart-container">
-                    <canvas id="chart-all-time"></canvas>
+                <!-- 全部时间统计 -->
+                <div id="ip-stats-all-time" class="ip-stats-content" style="display: none;">
+                    <div class="chart-container">
+                        <canvas id="chart-all-time"></canvas>
+                    </div>
                 </div>
-                <div class="period-stats"></div>
             </div>
         </div>
     </div>
