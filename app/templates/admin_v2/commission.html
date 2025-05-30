@@ -434,17 +434,23 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- 启用平台推荐人功能 -->
                     <div class="md:col-span-2">
-                        <div class="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div class="flex items-center justify-between p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-orange-200 rounded-lg">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">启用平台推荐人功能</label>
-                                <p class="text-xs text-gray-500 mt-1">开启后，所有无推荐人的用户将自动成为平台的下线</p>
+                                <label class="block text-lg font-semibold text-gray-800">🏆 启用平台推荐人功能</label>
+                                <p class="text-sm text-gray-600 mt-1">开启后，所有无推荐人的用户将自动成为平台的下线，确保平台从每笔交易获得35%收益</p>
                             </div>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" 
-                                       x-model="settings.enable_platform_referrer" 
-                                       class="sr-only peer">
-                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                            </label>
+                            <div class="flex items-center">
+                                <span class="mr-3 text-sm font-medium" :class="{
+                                    'text-green-600': settings.enable_platform_referrer,
+                                    'text-gray-500': !settings.enable_platform_referrer
+                                }" x-text="settings.enable_platform_referrer ? '✅ 已启用' : '❌ 已禁用'"></span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" 
+                                           x-model="settings.enable_platform_referrer" 
+                                           class="sr-only peer">
+                                    <div class="w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-orange-500"></div>
+                                </label>
+                            </div>
                         </div>
                     </div>
                     
@@ -587,12 +593,7 @@
                         <i class="fas fa-sync-alt mr-2"></i>刷新
                     </button>
                     <button @click="batchUpdatePlatformReferrer()" 
-                            class="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors font-medium shadow-md"
-                            :disabled="!settings.enable_platform_referrer || !settings.platform_referrer_address"
-                            :class="{
-                                'opacity-50 cursor-not-allowed': !settings.enable_platform_referrer || !settings.platform_referrer_address,
-                                'animate-pulse': settings.enable_platform_referrer && settings.platform_referrer_address
-                            }">
+                            class="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors font-medium shadow-md">
                         <i class="fas fa-crown mr-2"></i>批量设为平台下线
                     </button>
                 </div>
@@ -601,39 +602,54 @@
         </div>
         
         <!-- 平台推荐人功能状态 -->
-        <div class="px-6 py-4 bg-gradient-to-r from-green-50 to-blue-50 border-b border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200" :class="{
+            'bg-gradient-to-r from-green-50 to-emerald-50': settings.enable_platform_referrer && settings.platform_referrer_address,
+            'bg-gradient-to-r from-red-50 to-pink-50': !settings.enable_platform_referrer || !settings.platform_referrer_address
+        }">
             <div class="flex items-center justify-between">
                 <div class="flex items-center">
-                    <div class="p-2 rounded-lg mr-3" :class="{
+                    <div class="p-3 rounded-lg mr-4" :class="{
                         'bg-green-500': settings.enable_platform_referrer && settings.platform_referrer_address,
                         'bg-red-500': !settings.enable_platform_referrer || !settings.platform_referrer_address
                     }">
-                        <i class="fas fa-robot text-white"></i>
+                        <i class="fas fa-robot text-white text-lg"></i>
                     </div>
                     <div>
-                        <h4 class="text-sm font-semibold" :class="{
+                        <h4 class="text-lg font-semibold" :class="{
                             'text-green-700': settings.enable_platform_referrer && settings.platform_referrer_address,
                             'text-red-700': !settings.enable_platform_referrer || !settings.platform_referrer_address
                         }">🤖 自动推荐人功能</h4>
-                        <p class="text-xs" :class="{
+                        <p class="text-sm mt-1" :class="{
                             'text-green-600': settings.enable_platform_referrer && settings.platform_referrer_address,
                             'text-red-600': !settings.enable_platform_referrer || !settings.platform_referrer_address
                         }">
                             <span x-show="settings.enable_platform_referrer && settings.platform_referrer_address">
-                                ✅ 已启用 - 所有新用户连接钱包时自动设置为平台下线
-                                <span class="font-mono text-xs">(<span x-text="settings.platform_referrer_address ? settings.platform_referrer_address.slice(0, 10) + '...' + settings.platform_referrer_address.slice(-4) : '未配置'"></span>)</span>
+                                ✅ <strong>已启用</strong> - 新用户连接钱包时自动设置为平台下线
                             </span>
                             <span x-show="!settings.enable_platform_referrer || !settings.platform_referrer_address">
-                                ❌ 未启用 - 请在"佣金设置"页面配置平台推荐人功能
+                                ❌ <strong>未启用</strong> - 请在"佣金设置"页面配置平台推荐人功能
                             </span>
                         </p>
+                        <div class="mt-2 text-xs font-mono" x-show="settings.platform_referrer_address" :class="{
+                            'text-green-500': settings.enable_platform_referrer,
+                            'text-gray-500': !settings.enable_platform_referrer
+                        }">
+                            平台地址: <span x-text="settings.platform_referrer_address"></span>
+                        </div>
                     </div>
                 </div>
-                <div class="text-xs text-gray-500">
-                    <div>🔄 新用户首次连接钱包时自动生效</div>
-                    <div>📊 现有用户可使用批量处理按钮</div>
-                    <div class="mt-1 font-mono text-xs" x-show="settings.platform_referrer_address">
-                        平台地址: <span x-text="settings.platform_referrer_address"></span>
+                <div class="text-right">
+                    <div class="space-y-1 text-xs text-gray-600">
+                        <div>🔄 <strong>新用户</strong>：首次连接钱包时自动生效</div>
+                        <div>📊 <strong>现有用户</strong>：可使用右侧批量处理按钮</div>
+                        <div class="mt-2">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium" :class="{
+                                'bg-green-100 text-green-800': settings.enable_platform_referrer && settings.platform_referrer_address,
+                                'bg-red-100 text-red-800': !settings.enable_platform_referrer || !settings.platform_referrer_address
+                            }">
+                                <span x-text="settings.enable_platform_referrer && settings.platform_referrer_address ? '功能正常运行' : '需要配置启用'"></span>
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1434,7 +1450,18 @@
             },
             
             async batchUpdatePlatformReferrer() {
-                if (!confirm('确定要将所有无推荐人的用户设置为平台下线吗？\n\n这将自动设置他们的推荐人为平台地址，此操作不可撤销。')) return;
+                // 检查平台推荐人配置
+                if (!this.settings.enable_platform_referrer) {
+                    alert('⚠️ 平台推荐人功能未启用\n\n请先在"佣金设置"页面开启"启用平台推荐人功能"开关');
+                    return;
+                }
+                
+                if (!this.settings.platform_referrer_address) {
+                    alert('⚠️ 平台推荐人地址未配置\n\n请先在"佣金设置"页面配置"平台推荐人地址"');
+                    return;
+                }
+                
+                if (!confirm('🏆 批量设置平台推荐人\n\n确定要将所有无推荐人的用户设置为平台下线吗？\n\n✅ 设置后这些用户的推荐人将变为平台地址\n💰 平台将获得他们所有交易的35%佣金\n🔒 此操作不可撤销\n\n点击"确定"继续')) return;
                 
                 try {
                     const response = await fetch('/api/admin/commission/platform-referrer/batch-update', {
@@ -1446,7 +1473,18 @@
                     
                     const data = await response.json();
                     if (data.success) {
-                        alert(`批量更新成功！\n\n${data.message}\n\n更新了 ${data.data.updated_count} 个用户的推荐关系`);
+                        const message = [
+                            '🎉 批量更新成功！',
+                            '',
+                            `📊 处理结果：`,
+                            `• 更新用户数：${data.data.updated_count} 个`,
+                            `• 平台地址：${data.data.platform_address}`,
+                            `• 更新时间：${new Date().toLocaleString('zh-CN')}`,
+                            '',
+                            '💰 这些用户现在是平台的下线，',
+                            '   所有交易都将为平台产生35%佣金收益！'
+                        ];
+                        alert(message.join('\n'));
                         await this.loadReferrals();
                         await this.loadStats();
                     } else {
@@ -1454,7 +1492,7 @@
                     }
                 } catch (error) {
                     console.error('批量更新平台推荐人失败:', error);
-                    alert('批量更新失败: ' + error.message);
+                    alert('❌ 批量更新失败\n\n错误信息: ' + error.message + '\n\n请检查网络连接或联系技术支持');
                 }
             },
             
