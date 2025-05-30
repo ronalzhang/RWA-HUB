@@ -554,56 +554,184 @@
     <!-- 推荐关系 -->
     <div x-show="activeTab === 'referrals'" class="bg-white rounded-lg shadow-sm" x-cloak>
         <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-700">推荐关系</h3>
-                                </div>
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-700">用户推荐关系</h3>
+                <div class="flex space-x-2">
+                    <button @click="refreshReferrals()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        <i class="fas fa-sync-alt mr-2"></i>刷新
+                    </button>
+                </div>
+            </div>
+            <p class="text-sm text-gray-500 mt-1">显示所有用户的推荐关系和下级统计信息</p>
+        </div>
+        
+        <!-- 统计信息 -->
+        <div x-show="referralStats" class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div class="text-center">
+                    <div class="font-semibold text-blue-600" x-text="referralStats?.total_users || 0"></div>
+                    <div class="text-gray-500">总用户数</div>
+                </div>
+                <div class="text-center">
+                    <div class="font-semibold text-green-600" x-text="referralStats?.users_with_referrer || 0"></div>
+                    <div class="text-gray-500">有推荐人</div>
+                </div>
+                <div class="text-center">
+                    <div class="font-semibold text-purple-600" x-text="referralStats?.platform_users || 0"></div>
+                    <div class="text-gray-500">平台下线</div>
+                </div>
+                <div class="text-center">
+                    <div class="font-semibold text-orange-600" x-text="referralStats?.orphan_users || 0"></div>
+                    <div class="text-gray-500">无推荐人</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 搜索筛选 -->
+        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">搜索用户</label>
+                    <input x-model="referralFilters.search" @input.debounce.500ms="loadReferrals()" 
+                           type="text" placeholder="搜索用户名或地址..." 
+                           class="w-full border-gray-300 rounded-md shadow-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">推荐人类型</label>
+                    <select x-model="referralFilters.referrer_type" @change="loadReferrals()" class="w-full border-gray-300 rounded-md shadow-sm">
+                        <option value="">全部类型</option>
+                        <option value="platform">平台下线</option>
+                        <option value="normal">普通推荐</option>
+                        <option value="none">无推荐人</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">钱包类型</label>
+                    <select x-model="referralFilters.wallet_type" @change="loadReferrals()" class="w-full border-gray-300 rounded-md shadow-sm">
+                        <option value="">全部钱包</option>
+                        <option value="ethereum">以太坊</option>
+                        <option value="solana">Solana</option>
+                        <option value="other">其他</option>
+                    </select>
+                </div>
+            </div>
+        </div>
                                 
         <div class="overflow-x-auto">
-                                        <table class="min-w-full divide-y divide-gray-200">
-                                            <thead class="bg-gray-50">
-                                                <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户地址</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">推荐人地址</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">推荐等级</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">推荐码</th>
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户信息</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">钱包地址</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">推荐人</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">下级数量</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">钱包类型</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">加入时间</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="bg-white divide-y divide-gray-200">
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后登录</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
                     <template x-if="referralsLoading">
                         <tr>
-                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">
-                                <i class="fas fa-spinner fa-spin mr-2"></i>加载推荐关系中...
-                                                    </td>
+                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>加载用户数据中...
+                            </td>
                         </tr>
                     </template>
                     
                     <template x-if="!referralsLoading && referrals.length === 0">
                         <tr>
-                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">暂无推荐关系</td>
+                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">暂无用户数据</td>
                         </tr>
                     </template>
                     
                     <template x-for="referral in referrals" :key="referral.id">
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" 
-                                x-text="referral.user_address ? referral.user_address.slice(0, 8) + '...' + referral.user_address.slice(-6) : '-'"></td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" 
-                                x-text="referral.referrer_address ? referral.referrer_address.slice(0, 8) + '...' + referral.referrer_address.slice(-6) : '-'"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div>
+                                        <div class="text-sm font-medium text-gray-900" x-text="referral.username"></div>
+                                        <div class="text-sm text-gray-500" x-text="'ID: ' + referral.id"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">
+                                    <div x-show="referral.eth_address" class="text-xs text-blue-600">
+                                        ETH: <span x-text="referral.eth_address ? referral.eth_address.slice(0, 8) + '...' + referral.eth_address.slice(-6) : '-'"></span>
+                                    </div>
+                                    <div x-show="referral.solana_address" class="text-xs text-purple-600">
+                                        SOL: <span x-text="referral.solana_address ? referral.solana_address.slice(0, 8) + '...' + referral.solana_address.slice(-6) : '-'"></span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div x-show="referral.referrer_address">
+                                    <span :class="{
+                                        'bg-orange-100 text-orange-800': referral.referrer_type === 'platform',
+                                        'bg-blue-100 text-blue-800': referral.referrer_type === 'normal'
+                                    }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
+                                        <span x-text="referral.referrer_type === 'platform' ? '🏆 平台' : '👤 用户'"></span>
+                                    </span>
+                                    <div class="text-xs text-gray-500 mt-1" x-text="referral.referrer_address ? referral.referrer_address.slice(0, 12) + '...' : '-'"></div>
+                                </div>
+                                <div x-show="!referral.referrer_address">
+                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        ❌ 无推荐人
+                                    </span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <span :class="{
+                                    'text-green-600': referral.downline_count > 0,
+                                    'text-gray-400': referral.downline_count === 0
+                                }" x-text="referral.downline_count + ' 人'"></span>
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span :class="{
-                                    'bg-green-100 text-green-800': referral.referral_level === 1,
-                                    'bg-blue-100 text-blue-800': referral.referral_level === 2,
-                                    'bg-purple-100 text-purple-800': referral.referral_level === 3
+                                    'bg-blue-100 text-blue-800': referral.wallet_type === 'ethereum',
+                                    'bg-purple-100 text-purple-800': referral.wallet_type === 'solana',
+                                    'bg-gray-100 text-gray-800': referral.wallet_type === 'other'
                                 }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
-                                    <span x-text="'L' + referral.referral_level"></span>
+                                    <span x-text="referral.wallet_type === 'ethereum' ? 'ETH' : (referral.wallet_type === 'solana' ? 'SOL' : '其他')"></span>
                                 </span>
-                                                    </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="referral.referral_code || '-'"></td>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span :class="{
+                                    'bg-green-100 text-green-800': referral.is_active,
+                                    'bg-red-100 text-red-800': !referral.is_active
+                                }" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
+                                    <span x-text="referral.is_active ? '✅ 活跃' : '❌ 禁用'"></span>
+                                </span>
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDateTime(referral.joined_at)"></td>
-                                                </tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="formatDateTime(referral.last_login_at)"></td>
+                        </tr>
                     </template>
-                                            </tbody>
-                                        </table>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 分页 -->
+        <div class="px-6 py-4 border-t border-gray-200">
+            <div class="flex items-center justify-between">
+                <div class="text-sm text-gray-700">
+                    显示 <span x-text="(referralPagination.page - 1) * referralPagination.limit + 1"></span> 到 
+                    <span x-text="Math.min(referralPagination.page * referralPagination.limit, referralPagination.total)"></span> 条，
+                    共 <span x-text="referralPagination.total"></span> 条记录
+                </div>
+                <div class="flex space-x-2">
+                    <button @click="loadReferrals(1)" :disabled="referralPagination.page === 1" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">首页</button>
+                    <button @click="loadReferrals(referralPagination.page - 1)" :disabled="referralPagination.page === 1" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">上一页</button>
+                    <button @click="loadReferrals(referralPagination.page + 1)" :disabled="referralPagination.page >= referralPagination.pages" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">下一页</button>
+                    <button @click="loadReferrals(referralPagination.pages)" :disabled="referralPagination.page >= referralPagination.pages" 
+                            class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">末页</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -763,11 +891,35 @@
 
     <!-- 自动化系统 -->
     <div x-show="activeTab === 'automation'" class="space-y-6" x-cloak>
+        <!-- 功能说明 -->
+        <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <div class="p-3 bg-blue-500 rounded-lg">
+                        <i class="fas fa-robot text-white text-xl"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-blue-700">🤖 全自动化分销系统说明</h3>
+                    <div class="mt-2 text-sm text-blue-600 space-y-2">
+                        <p><strong>💰 自动佣金计算</strong>：系统实时计算用户的35%无限级分销佣金，无需人工干预</p>
+                        <p><strong>⚡ 自动提现处理</strong>：用户申请提现后，系统延迟1分钟自动处理，零人工成本</p>
+                        <p><strong>🏆 平台自动归属</strong>：所有无推荐人用户自动成为平台下线，确保平台收益</p>
+                        <p><strong>🔄 实时监控</strong>：系统24小时运行，实时监控待处理取现和系统状态</p>
+                        <p><strong>📊 智能统计</strong>：自动统计用户推荐关系、佣金收益和取现记录</p>
+                    </div>
+                    <div class="mt-3 p-3 bg-white rounded border border-blue-200">
+                        <p class="text-xs text-blue-800"><strong>🎯 核心价值</strong>：完全无人参与的分销系统，让您专注业务发展，佣金管理全部自动化处理！</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 系统状态概览 -->
         <div class="bg-white rounded-lg shadow-sm">
             <div class="px-6 py-4 border-b border-gray-200">
                 <div class="flex justify-between items-center">
-                    <h3 class="text-lg font-semibold text-gray-700">🤖 全自动化分销系统</h3>
+                    <h3 class="text-lg font-semibold text-gray-700">🤖 系统运行状态</h3>
                     <div class="flex items-center space-x-2">
                         <div class="flex items-center">
                             <div class="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
@@ -775,7 +927,7 @@
                         </div>
                     </div>
                 </div>
-                <p class="text-sm text-gray-500 mt-1">完全无人参与的佣金计算、取现处理和分销管理系统</p>
+                <p class="text-sm text-gray-500 mt-1">全自动化佣金计算、取现处理和分销管理系统</p>
             </div>
 
             <div class="p-6">
@@ -1007,6 +1159,11 @@
                 time_range: '',
                 search: ''
             },
+            referralFilters: {
+                search: '',
+                referrer_type: '',
+                wallet_type: ''
+            },
             withdrawalFilters: {
                 status: '',
                 time_range: '',
@@ -1018,12 +1175,21 @@
                 total: 0,
                 pages: 0
             },
+            referralPagination: {
+                page: 1,
+                limit: 50,
+                total: 0,
+                pages: 0
+            },
             withdrawalPagination: {
                 page: 1,
                 limit: 10,
                 total: 0,
                 pages: 0
             },
+            
+            // 推荐关系统计
+            referralStats: null,
             
             async loadCommissionData() {
                 await Promise.all([
@@ -1101,14 +1267,24 @@
                 }
             },
             
-            async loadReferrals() {
+            async loadReferrals(page = null) {
+                if (page) this.referralPagination.page = page;
                 this.referralsLoading = true;
                 try {
-                    const response = await fetch('/api/admin/commission/referrals');
+                    const params = new URLSearchParams({
+                        page: this.referralPagination.page,
+                        limit: this.referralPagination.limit,
+                        ...this.referralFilters
+                    });
+                    
+                    const response = await fetch(`/api/admin/commission/referrals?${params}`);
                     if (response.ok) {
                         const data = await response.json();
                         if (data.success) {
                             this.referrals = data.items || [];
+                            this.referralPagination.total = data.total || 0;
+                            this.referralPagination.pages = data.pages || 0;
+                            this.referralStats = data.statistics || null;
                         } else {
                             throw new Error(data.error || '加载失败');
                         }
@@ -1119,6 +1295,10 @@
                 } finally {
                     this.referralsLoading = false;
                 }
+            },
+            
+            async refreshReferrals() {
+                await this.loadReferrals();
             },
             
             async loadWithdrawals(page = null) {
@@ -1432,13 +1612,16 @@
             
             async runAutomation() {
                 try {
-                    const response = await fetch('/api/admin/commission/automation/run');
+                    const response = await fetch('/api/admin/commission/automation/run', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
                     if (!response.ok) throw new Error('运行自动化失败');
                     
                     const data = await response.json();
                     if (data.success) {
                         alert('自动化运行成功！');
-                        await this.loadAutomationStatus();
+                        await this.refreshAutomationStatus();
                     } else {
                         throw new Error(data.error || '运行自动化失败');
                     }
@@ -1461,7 +1644,7 @@
                     }
                 } catch (error) {
                     console.error('刷新自动化状态失败:', error);
-                    alert('刷新自动化状态失败: ' + error.message);
+                    // 不显示错误弹窗，避免干扰用户
                 }
             }
         }

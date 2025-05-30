@@ -621,15 +621,29 @@ def api_create_withdrawal():
 @admin_api_bp.route('/commission/referrals', methods=['GET'])
 @api_admin_required
 def api_commission_referrals():
-    """推荐关系列表"""
+    """推荐关系列表 - 显示所有用户的推荐关系信息"""
     try:
         from app.models.user import User
+        from app.models.commission_config import CommissionConfig
+        from sqlalchemy import func
         
         page = request.args.get('page', 1, type=int)
-        limit = request.args.get('limit', 20, type=int)
+        limit = request.args.get('limit', 50, type=int)  # 增加每页显示数量
+        search = request.args.get('search', '')
         
-        # 查询有推荐关系的用户
-        query = User.query.filter(User.referrer_address.isnot(None))
+        # 查询所有用户（不只是有推荐关系的）
+        query = User.query.filter(User.is_active == True)
+        
+        # 搜索条件
+        if search:
+            query = query.filter(
+                or_(
+                    User.username.ilike(f'%{search}%'),
+                    User.eth_address.ilike(f'%{search}%'),
+                    User.solana_address.ilike(f'%{search}%'),
+                    User.referrer_address.ilike(f'%{search}%')
+                )
+            )
         
         # 分页
         total = query.count()
@@ -638,17 +652,52 @@ def api_commission_referrals():
             .limit(limit) \
             .all()
         
+        # 获取平台推荐人地址
+        platform_referrer_address = CommissionConfig.get_config('platform_referrer_address', '')
+        
         # 格式化数据
         referrals_list = []
         for user in users:
+            # 获取主要钱包地址
+            main_address = user.eth_address or user.solana_address or f"user_{user.id}"
+            
+            # 统计下级用户数量
+            downline_count = User.query.filter_by(referrer_address=main_address).count()
+            
+            # 判断推荐人类型
+            referrer_type = 'normal'
+            if user.referrer_address == platform_referrer_address:
+                referrer_type = 'platform'
+            elif not user.referrer_address:
+                referrer_type = 'none'
+            
+            # 计算推荐层级（简化版本，这里只显示直接推荐）
+            referral_level = 1 if user.referrer_address else 0
+            
+            # 钱包类型
+            wallet_type = 'ethereum' if user.eth_address else ('solana' if user.solana_address else 'other')
+            
             referrals_list.append({
                 'id': user.id,
-                'user_address': user.eth_address or user.username,
+                'username': user.username,
+                'user_address': main_address,
+                'eth_address': user.eth_address,
+                'solana_address': user.solana_address,
+                'wallet_type': wallet_type,
                 'referrer_address': user.referrer_address,
-                'referral_level': 1,  # 默认一级推荐
-                'referral_code': None,  # 暂时没有推荐码
-                'joined_at': user.created_at.isoformat() if user.created_at else None
+                'referrer_type': referrer_type,
+                'downline_count': downline_count,
+                'referral_level': referral_level,
+                'is_active': user.is_active,
+                'joined_at': user.created_at.isoformat() if user.created_at else None,
+                'last_login_at': user.last_login_at.isoformat() if user.last_login_at else None
             })
+        
+        # 统计总体数据
+        total_users = User.query.filter(User.is_active == True).count()
+        users_with_referrer = User.query.filter(User.referrer_address.isnot(None)).count()
+        platform_users = User.query.filter_by(referrer_address=platform_referrer_address).count() if platform_referrer_address else 0
+        orphan_users = User.query.filter(User.referrer_address.is_(None)).count()
         
         return jsonify({
             'success': True,
@@ -656,7 +705,13 @@ def api_commission_referrals():
             'total': total,
             'pages': (total + limit - 1) // limit,
             'page': page,
-            'limit': limit
+            'limit': limit,
+            'statistics': {
+                'total_users': total_users,
+                'users_with_referrer': users_with_referrer,
+                'platform_users': platform_users,
+                'orphan_users': orphan_users
+            }
         })
         
     except Exception as e:
