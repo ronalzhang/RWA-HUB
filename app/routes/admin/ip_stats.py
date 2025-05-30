@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from app.services.ip_stats_service import IPStatsService
-from app.utils.decorators import admin_required
+from .auth import api_admin_required
 import logging
 
 logger = logging.getLogger(__name__)
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 ip_stats_bp = Blueprint('ip_stats', __name__, url_prefix='/admin/api/ip-stats')
 
 @ip_stats_bp.route('/summary', methods=['GET'])
-@admin_required
+@api_admin_required
 def get_summary_stats():
     """获取IP访问总体统计"""
     try:
@@ -26,7 +26,7 @@ def get_summary_stats():
         }), 500
 
 @ip_stats_bp.route('/hourly', methods=['GET'])
-@admin_required
+@api_admin_required
 def get_hourly_stats():
     """获取24小时内每小时的访问统计"""
     try:
@@ -50,7 +50,7 @@ def get_hourly_stats():
         }), 500
 
 @ip_stats_bp.route('/daily', methods=['GET'])
-@admin_required
+@api_admin_required
 def get_daily_stats():
     """获取每日访问统计"""
     try:
@@ -72,7 +72,7 @@ def get_daily_stats():
         }), 500
 
 @ip_stats_bp.route('/monthly', methods=['GET'])
-@admin_required
+@api_admin_required
 def get_monthly_stats():
     """获取每月访问统计"""
     try:
@@ -94,7 +94,7 @@ def get_monthly_stats():
         }), 500
 
 @ip_stats_bp.route('/all-time', methods=['GET'])
-@admin_required
+@api_admin_required
 def get_all_time_stats():
     """获取全部时间访问统计"""
     try:
@@ -111,7 +111,7 @@ def get_all_time_stats():
         }), 500
 
 @ip_stats_bp.route('/top-ips', methods=['GET'])
-@admin_required
+@api_admin_required
 def get_top_ips():
     """获取访问次数最多的IP地址"""
     try:
@@ -166,7 +166,7 @@ def get_top_ips():
         }), 500
 
 @ip_stats_bp.route('/recent-visits', methods=['GET'])
-@admin_required
+@api_admin_required
 def get_recent_visits():
     """获取最近的访问记录"""
     try:
