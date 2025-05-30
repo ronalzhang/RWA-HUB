@@ -6,6 +6,9 @@ from datetime import datetime
 from decimal import Decimal
 from app.extensions import db
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CommissionConfig(db.Model):
     """佣金配置表"""
@@ -55,6 +58,51 @@ class CommissionConfig(db.Model):
         config.updated_at = datetime.utcnow()
         db.session.commit()
         return config
+
+    @staticmethod
+    def initialize_default_configs():
+        """初始化默认配置"""
+        default_configs = [
+            ('commission_rate', 35.0, '默认佣金率35%'),
+            ('commission_description', '💰 推荐好友即享35%超高佣金，人人都是赚钱达人！', '佣金功能描述'),
+            ('share_button_text', '🚀 分享赚大钱', '分享按钮文案'),
+            ('share_description', '🎯 推荐好友购买项目，您立即获得35%现金奖励！多级分销，收益无上限！', '分享功能说明'),
+            ('share_success_message', '🎉 分享链接已复制！快去邀请好友赚取35%佣金吧！', '分享成功提示'),
+            ('min_withdraw_amount', 10.0, '最低提现金额'),
+            ('withdraw_fee_rate', 0.0, '提现手续费率0%'),
+            ('withdraw_description', '💎 最低提现10 USDC，零手续费，秒到账！随时提现，自由支配！', '提现功能说明'),
+            ('max_referral_levels', 999, '最大分销层级，999表示无限级'),
+            ('enable_multi_level', True, '是否启用多级分销'),
+            ('withdrawal_delay_minutes', 1, '取现延迟时间（分钟）'),
+            ('platform_referrer_address', '', '平台推荐人地址，所有无推荐人的用户自动归属于此地址'),
+            ('enable_platform_referrer', True, '是否启用平台推荐人功能，开启后所有无推荐人用户都归属平台'),
+            ('commission_rules', {
+                'direct_commission': '🔥 直接推荐佣金：好友购买金额的35%立即到账',
+                'indirect_commission': '💰 多级推荐佣金：下级佣金收益的35%持续躺赚',
+                'settlement_time': '⚡ 佣金实时到账，随时提现，秒速变现',
+                'currency': 'USDC',
+                'platform_earnings': '🏆 平台收益：所有无推荐人用户的35%佣金归平台所有'
+            }, '佣金计算规则说明')
+        ]
+        
+        try:
+            for key, value, description in default_configs:
+                existing = CommissionConfig.query.filter_by(config_key=key).first()
+                if not existing:
+                    config = CommissionConfig(
+                        config_key=key,
+                        config_value=value,
+                        description=description
+                    )
+                    db.session.add(config)
+            
+            db.session.commit()
+            logger.info("默认佣金配置初始化完成")
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"初始化默认配置失败: {str(e)}")
+            raise
 
 class UserCommissionBalance(db.Model):
     """用户佣金余额表"""

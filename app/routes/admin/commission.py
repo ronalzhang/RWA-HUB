@@ -307,6 +307,10 @@ def api_commission_settings():
             # 分销层级设置
             'max_referral_levels': CommissionConfig.get_config('max_referral_levels', 2),
             'enable_multi_level': CommissionConfig.get_config('enable_multi_level', True),
+            
+            # 平台推荐人设置
+            'platform_referrer_address': CommissionConfig.get_config('platform_referrer_address', ''),
+            'enable_platform_referrer': CommissionConfig.get_config('enable_platform_referrer', True),
         }
         
         return jsonify({
@@ -322,80 +326,52 @@ def api_commission_settings():
 @admin_api_bp.route('/commission/settings', methods=['POST'])
 @api_admin_required
 def api_update_commission_settings():
-    """更新佣金设置 - 基于35%分销体系"""
+    """更新佣金设置"""
     try:
         from app.models.commission_config import CommissionConfig
         
         data = request.get_json()
-        if not data:
-            return jsonify({'success': False, 'error': '缺少请求数据'}), 400
         
-        # 定义允许更新的配置项
-        config_mappings = {
-            'commission_rate': ('commission_rate', float, 0, 100),
-            'commission_description': ('commission_description', str, None, None),
-            'share_button_text': ('share_button_text', str, None, None),
-            'share_description': ('share_description', str, None, None), 
-            'share_success_message': ('share_success_message', str, None, None),
-            'min_withdraw_amount': ('min_withdraw_amount', float, 0, None),
-            'withdraw_fee_rate': ('withdraw_fee_rate', float, 0, 100),
-            'withdraw_description': ('withdraw_description', str, None, None),
-            'max_referral_levels': ('max_referral_levels', int, 1, 999),  # 支持无限层级（用999表示）
-            'enable_multi_level': ('enable_multi_level', bool, None, None),
-        }
-        
-        updated_count = 0
-        
-        # 验证和保存设置
-        for field, (config_key, data_type, min_val, max_val) in config_mappings.items():
-            if field in data:
-                value = data[field]
+        # 更新所有配置
+        for key, value in data.items():
+            if key in ['commission_rate', 'commission_description', 'share_button_text', 
+                      'share_description', 'share_success_message', 'min_withdraw_amount', 
+                      'withdraw_fee_rate', 'withdraw_description', 'commission_rules',
+                      'max_referral_levels', 'enable_multi_level', 'platform_referrer_address',
+                      'enable_platform_referrer']:
                 
+                CommissionConfig.set_config(key, value)
+        
+        # 特殊处理：如果设置了平台推荐人地址，自动将现有无推荐人的用户设置为平台的下线
+        if 'platform_referrer_address' in data and data['platform_referrer_address']:
+            platform_address = data['platform_referrer_address'].strip()
+            if platform_address:
                 try:
-                    # 类型转换
-                    if data_type == float:
-                        value = float(value)
-                    elif data_type == int:
-                        value = int(value)
-                    elif data_type == bool:
-                        value = bool(value)
-                    elif data_type == str:
-                        value = str(value).strip()
-                        if not value:
-                            continue
+                    from app.models.user import User
+                    from app.extensions import db
                     
-                    # 范围验证
-                    if min_val is not None and value < min_val:
-                        return jsonify({'success': False, 'error': f'{field} 值不能小于 {min_val}'}), 400
-                    if max_val is not None and value > max_val:
-                        return jsonify({'success': False, 'error': f'{field} 值不能大于 {max_val}'}), 400
+                    # 查找所有没有推荐人的用户（排除平台地址本身）
+                    users_without_referrer = User.query.filter(
+                        User.referrer_address.is_(None),
+                        User.eth_address != platform_address,
+                        User.solana_address != platform_address
+                    ).all()
                     
-                    # 保存配置
-                    CommissionConfig.set_config(config_key, value, f'佣金设置: {field}')
-                    updated_count += 1
+                    updated_count = 0
+                    for user in users_without_referrer:
+                        user.referrer_address = platform_address
+                        updated_count += 1
                     
-                except (ValueError, TypeError) as e:
-                    return jsonify({'success': False, 'error': f'{field} 格式错误: {str(e)}'}), 400
+                    db.session.commit()
+                    current_app.logger.info(f"已将 {updated_count} 个无推荐人用户设置为平台下线")
+                    
+                except Exception as e:
+                    current_app.logger.error(f"批量更新用户推荐关系失败: {str(e)}")
         
-        # 处理复杂对象：commission_rules
-        if 'commission_rules' in data:
-            rules = data['commission_rules']
-            if isinstance(rules, dict):
-                CommissionConfig.set_config('commission_rules', rules, '佣金计算规则')
-                updated_count += 1
-        
-        if updated_count > 0:
-            current_app.logger.info(f'佣金设置更新成功，更新了 {updated_count} 个配置项')
-            return jsonify({
-                'success': True,
-                'message': f'成功更新 {updated_count} 个配置项',
-                'updated_count': updated_count
-            })
-        else:
-            return jsonify({'success': False, 'error': '没有有效的配置项需要更新'}), 400
+        return jsonify({'success': True, 'message': '佣金设置更新成功'})
         
     except Exception as e:
-        current_app.logger.error(f'更新佣金设置失败: {str(e)}', exc_info=True)
+        current_app.logger.error(f"更新佣金设置失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -461,33 +437,29 @@ def api_commission_withdrawals():
 @admin_api_bp.route('/commission/withdrawals/<int:withdrawal_id>/process', methods=['POST'])
 @api_admin_required
 def api_process_withdrawal(withdrawal_id):
-    """处理提现申请"""
+    """处理提现申请 - 现在为自动化系统，仅作为手动触发器"""
     try:
+        from app.services.auto_commission_service import AutoCommissionService
+        
         withdrawal = CommissionWithdrawal.query.get_or_404(withdrawal_id)
         
         if withdrawal.status != 'pending':
             return jsonify({'success': False, 'error': '只能处理待处理状态的提现申请'}), 400
         
-        if not withdrawal.is_ready_to_process:
+        # 使用自动化服务处理
+        success = AutoCommissionService._process_single_withdrawal(withdrawal)
+        
+        if success:
             return jsonify({
-                'success': False, 
-                'error': f'提现申请还需要等待 {withdrawal.remaining_delay_seconds} 秒'
-            }), 400
-        
-        # 标记为处理中
-        withdrawal.mark_processing()
-        
-        # TODO: 这里应该实现实际的区块链转账逻辑
-        # 暂时模拟处理成功
-        import uuid
-        mock_tx_hash = f"0x{uuid.uuid4().hex}"
-        withdrawal.mark_completed(mock_tx_hash, withdrawal.amount)
-        
-        return jsonify({
-            'success': True,
-            'message': '提现处理成功',
-            'tx_hash': mock_tx_hash
-        })
+                'success': True,
+                'message': '提现处理成功（自动化处理）',
+                'tx_hash': withdrawal.tx_hash
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': '自动化处理失败，请查看取现记录状态'
+            })
         
     except Exception as e:
         db.session.rollback()
@@ -498,8 +470,10 @@ def api_process_withdrawal(withdrawal_id):
 @admin_api_bp.route('/commission/withdrawals/<int:withdrawal_id>/cancel', methods=['POST'])
 @api_admin_required
 def api_cancel_withdrawal(withdrawal_id):
-    """取消提现申请"""
+    """取消提现申请 - 仍保留管理员取消功能"""
     try:
+        from app.models.commission_config import UserCommissionBalance
+        
         data = request.get_json() or {}
         reason = data.get('reason', '管理员取消')
         
@@ -510,11 +484,15 @@ def api_cancel_withdrawal(withdrawal_id):
         
         # 如果是取消，需要退还余额
         if withdrawal.status == 'pending':
-            UserCommissionBalance.update_balance(
-                withdrawal.user_address, 
-                withdrawal.amount, 
-                'unfreeze'  # 解冻金额
-            )
+            user_balance = UserCommissionBalance.query.filter_by(
+                user_address=withdrawal.user_address
+            ).first()
+            
+            if user_balance and user_balance.frozen_balance >= withdrawal.amount:
+                # 从冻结余额退还到可用余额
+                user_balance.frozen_balance -= withdrawal.amount
+                user_balance.available_balance += withdrawal.amount
+                db.session.commit()
         
         withdrawal.cancel(reason)
         
@@ -526,6 +504,117 @@ def api_cancel_withdrawal(withdrawal_id):
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f'取消提现失败: {str(e)}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_api_bp.route('/commission/automation/run', methods=['POST'])
+@api_admin_required
+def api_run_automation():
+    """手动运行自动化周期"""
+    try:
+        from app.services.auto_commission_service import AutoCommissionService
+        
+        result = AutoCommissionService.run_automation_cycle()
+        
+        return jsonify({
+            'success': True,
+            'message': '自动化周期执行完成',
+            'data': result
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'运行自动化周期失败: {str(e)}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_api_bp.route('/commission/automation/status', methods=['GET'])
+@api_admin_required
+def api_automation_status():
+    """获取自动化系统状态"""
+    try:
+        from app.services.auto_commission_service import AutoCommissionService
+        from app.models.commission_config import CommissionConfig
+        
+        # 获取待处理的取现数量
+        pending_withdrawals = CommissionWithdrawal.get_pending_withdrawals()
+        ready_to_process = CommissionWithdrawal.get_ready_to_process()
+        
+        # 获取自动化配置
+        automation_config = {
+            'withdrawal_delay_minutes': CommissionConfig.get_config('withdrawal_delay_minutes', 1),
+            'min_withdraw_amount': CommissionConfig.get_config('min_withdraw_amount', 10.0),
+            'commission_rate': CommissionConfig.get_config('commission_rate', 35.0),
+            'max_referral_levels': CommissionConfig.get_config('max_referral_levels', 999),
+            'enable_multi_level': CommissionConfig.get_config('enable_multi_level', True)
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'automation_enabled': True,
+                'pending_withdrawals_count': len(pending_withdrawals),
+                'ready_to_process_count': len(ready_to_process),
+                'automation_config': automation_config,
+                'system_status': 'active'
+            }
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取自动化状态失败: {str(e)}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_api_bp.route('/commission/user/<string:user_address>/summary', methods=['GET'])
+@api_admin_required
+def api_user_commission_summary(user_address):
+    """获取用户佣金详细摘要"""
+    try:
+        from app.services.auto_commission_service import AutoCommissionService
+        
+        summary = AutoCommissionService.get_commission_summary(user_address)
+        
+        return jsonify({
+            'success': True,
+            'data': summary
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取用户佣金摘要失败: {str(e)}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_api_bp.route('/commission/create_withdrawal', methods=['POST'])
+@api_admin_required  
+def api_create_withdrawal():
+    """管理员代用户创建取现申请"""
+    try:
+        from app.services.auto_commission_service import AutoCommissionService
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '缺少请求数据'}), 400
+        
+        user_address = data.get('user_address')
+        to_address = data.get('to_address')
+        amount = data.get('amount')
+        currency = data.get('currency', 'USDC')
+        
+        if not all([user_address, to_address, amount]):
+            return jsonify({'success': False, 'error': '缺少必要参数'}), 400
+        
+        try:
+            amount = float(amount)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': '金额格式错误'}), 400
+        
+        result = AutoCommissionService.create_auto_withdrawal(
+            user_address, to_address, amount, currency
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        current_app.logger.error(f'创建取现申请失败: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

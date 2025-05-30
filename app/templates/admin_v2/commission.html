@@ -89,7 +89,12 @@
                 <button @click="switchTab('withdrawals')" 
                         :class="{'border-blue-500 text-blue-600': activeTab === 'withdrawals', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'withdrawals'}"
                         class="py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap">
-                    取现记录
+                    自动取现
+                </button>
+                <button @click="switchTab('automation')" 
+                        :class="{'border-blue-500 text-blue-600': activeTab === 'automation', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'automation'}"
+                        class="py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap">
+                    🤖 自动化系统
                 </button>
             </nav>
         </div>
@@ -391,6 +396,85 @@
                 </div>
             </div>
 
+            <!-- 平台推荐人设置 -->
+            <div class="border border-gray-200 rounded-lg p-6">
+                <div class="flex items-center mb-4">
+                    <div class="p-2 bg-orange-100 rounded-lg mr-3">
+                        <i class="fas fa-crown text-orange-600"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-700">🏆 平台推荐人设置</h4>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 启用平台推荐人功能 -->
+                    <div class="md:col-span-2">
+                        <div class="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">启用平台推荐人功能</label>
+                                <p class="text-xs text-gray-500 mt-1">开启后，所有无推荐人的用户将自动成为平台的下线</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" 
+                                       x-model="settings.enable_platform_referrer" 
+                                       class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- 平台推荐人地址 -->
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            平台推荐人地址 <span class="text-red-500">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            x-model="settings.platform_referrer_address"
+                            placeholder="请输入平台收益钱包地址（支持以太坊和Solana地址）"
+                            class="w-full border-gray-300 rounded-md shadow-sm"
+                            :disabled="!settings.enable_platform_referrer">
+                        <p class="text-xs text-gray-500 mt-1">此地址将收到所有无推荐人用户产生的35%佣金</p>
+                    </div>
+                    
+                    <!-- 平台收益说明 -->
+                    <div class="md:col-span-2">
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <h3 class="text-sm font-medium text-green-800">💰 平台收益机制</h3>
+                                    <div class="mt-2 text-sm text-green-700">
+                                        <ul class="list-disc pl-5 space-y-1">
+                                            <li><strong>自动归属</strong>：所有直接访问网站并连接钱包的用户（无推荐人）将自动成为平台的下线</li>
+                                            <li><strong>直接收益</strong>：平台将获得这些用户所有交易的35%佣金</li>
+                                            <li><strong>间接收益</strong>：如果这些用户又推荐了其他人，平台还将获得推荐佣金的35%</li>
+                                            <li><strong>持续收益</strong>：形成完整的平台盈利体系，确保每笔交易都有平台收益</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 收益示例 -->
+                    <div class="md:col-span-2">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h5 class="text-sm font-semibold text-blue-700 mb-2">📊 平台收益示例</h5>
+                            <div class="text-xs text-blue-600 space-y-1">
+                                <p>• <strong>用户A直接访问</strong>：A购买100 USDC资产，平台获得35 USDC</p>
+                                <p>• <strong>用户A推荐B</strong>：B购买100 USDC，A获得35 USDC，平台获得A的佣金35%=12.25 USDC</p>
+                                <p>• <strong>用户B推荐C</strong>：C购买100 USDC，B获得35 USDC，A获得12.25 USDC，平台获得4.29 USDC</p>
+                                <p class="font-semibold text-blue-800">💎 平台从每个无推荐人用户的完整分销网络中持续获得收益！</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 佣金计算规则说明 -->
             <div class="border border-gray-200 rounded-lg p-6">
                 <div class="flex items-center mb-4">
@@ -676,6 +760,200 @@
             </div>
         </div>
     </div>
+
+    <!-- 自动化系统 -->
+    <div x-show="activeTab === 'automation'" class="space-y-6" x-cloak>
+        <!-- 系统状态概览 -->
+        <div class="bg-white rounded-lg shadow-sm">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-700">🤖 全自动化分销系统</h3>
+                    <div class="flex items-center space-x-2">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                            <span class="text-sm text-green-600">系统运行中</span>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-500 mt-1">完全无人参与的佣金计算、取现处理和分销管理系统</p>
+            </div>
+
+            <div class="p-6">
+                <!-- 系统状态指标 -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-blue-500 rounded-lg mr-3">
+                                <i class="fas fa-robot text-white"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-blue-700">自动化状态</h4>
+                                <p class="text-lg font-bold text-blue-800" x-text="automationStatus.system_status || 'active'"></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-yellow-500 rounded-lg mr-3">
+                                <i class="fas fa-clock text-white"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-yellow-700">待处理取现</h4>
+                                <p class="text-lg font-bold text-yellow-800" x-text="automationStatus.pending_withdrawals_count || 0"></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-green-500 rounded-lg mr-3">
+                                <i class="fas fa-check-circle text-white"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-green-700">可立即处理</h4>
+                                <p class="text-lg font-bold text-green-800" x-text="automationStatus.ready_to_process_count || 0"></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-purple-500 rounded-lg mr-3">
+                                <i class="fas fa-infinity text-white"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-purple-700">分销层级</h4>
+                                <p class="text-lg font-bold text-purple-800" x-text="automationStatus.automation_config?.max_referral_levels === 999 ? '∞ 无限级' : (automationStatus.automation_config?.max_referral_levels || 2) + '级'"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 自动化配置展示 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <h4 class="text-lg font-semibold text-gray-700 mb-3">
+                            <i class="fas fa-cogs text-blue-500 mr-2"></i>系统配置
+                        </h4>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">佣金率</span>
+                                <span class="font-medium" x-text="(automationStatus.automation_config?.commission_rate || 35) + '%'"></span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">取现延迟</span>
+                                <span class="font-medium" x-text="(automationStatus.automation_config?.withdrawal_delay_minutes || 1) + ' 分钟'"></span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">最低取现金额</span>
+                                <span class="font-medium" x-text="'$' + (automationStatus.automation_config?.min_withdraw_amount || 10)"></span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">多级分销</span>
+                                <span class="font-medium" x-text="automationStatus.automation_config?.enable_multi_level ? '✅ 已启用' : '❌ 已禁用'"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <h4 class="text-lg font-semibold text-gray-700 mb-3">
+                            <i class="fas fa-calculator text-green-500 mr-2"></i>无限级分销算法
+                        </h4>
+                        <div class="text-sm text-gray-600 space-y-2">
+                            <div>🎯 <strong>A推荐B</strong>：B购买100U → A得35U</div>
+                            <div>💰 <strong>B推荐C</strong>：C购买100U → B得35U，A得35×35%=12.25U</div>
+                            <div>🚀 <strong>C推荐D</strong>：D购买100U → C得35U，B得12.25U，A得4.29U</div>
+                            <div class="text-blue-600 font-medium">✨ 依此类推，每级向上传递35%，形成无限级收益网络！</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 手动操作区域 -->
+                <div class="border-t border-gray-200 pt-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-lg font-semibold text-gray-700">
+                            <i class="fas fa-play-circle text-purple-500 mr-2"></i>手动操作
+                        </h4>
+                        <div class="text-sm text-gray-500">
+                            系统每分钟自动运行，您也可以手动触发
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button @click="runAutomation()" 
+                                class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors">
+                            <i class="fas fa-robot mr-2"></i>运行自动化周期
+                        </button>
+                        
+                        <button @click="refreshAutomationStatus()" 
+                                class="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-colors">
+                            <i class="fas fa-sync-alt mr-2"></i>刷新系统状态
+                        </button>
+                        
+                        <button @click="showCreateWithdrawal = true" 
+                                class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors">
+                            <i class="fas fa-plus mr-2"></i>代理创建取现
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 创建取现申请弹窗 -->
+        <div x-show="showCreateWithdrawal" 
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50"
+             style="display: none;">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">代理创建取现申请</h3>
+                    <button @click="showCreateWithdrawal = false" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <form @submit.prevent="createWithdrawal()">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">用户地址</label>
+                            <input x-model="withdrawalForm.user_address" type="text" required
+                                   placeholder="0x..."
+                                   class="w-full border-gray-300 rounded-md shadow-sm">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">提现到地址</label>
+                            <input x-model="withdrawalForm.to_address" type="text" required
+                                   placeholder="0x..."
+                                   class="w-full border-gray-300 rounded-md shadow-sm">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">提现金额</label>
+                            <div class="relative">
+                                <input x-model="withdrawalForm.amount" type="number" step="0.01" min="0.01" required
+                                       class="w-full border-gray-300 rounded-md shadow-sm pr-16">
+                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                    <span class="text-gray-500 text-sm">USDC</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" @click="showCreateWithdrawal = false"
+                                    class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
+                                取消
+                            </button>
+                            <button type="submit"
+                                    class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                                创建申请
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -689,39 +967,46 @@
             referrals: [],
             withdrawals: [],
             settings: {
-                // 核心分销设置
                 commission_rate: 35.0,
                 commission_description: '💰 推荐好友即享35%超高佣金，人人都是赚钱达人！',
-                enable_multi_level: true,
-                max_referral_levels: 2,
-                
-                // 分享功能设置
                 share_button_text: '🚀 分享赚大钱',
                 share_description: '🎯 推荐好友购买项目，您立即获得35%现金奖励！多级分销，收益无上限！',
                 share_success_message: '🎉 分享链接已复制！快去邀请好友赚取35%佣金吧！',
-                
-                // 提现配置
                 min_withdraw_amount: 10.0,
                 withdraw_fee_rate: 0.0,
                 withdraw_description: '💎 最低提现10 USDC，零手续费，秒到账！随时提现，自由支配！',
-                
-                // 佣金计算规则
+                max_referral_levels: 2,
+                enable_multi_level: true,
+                platform_referrer_address: '',
+                enable_platform_referrer: true,
                 commission_rules: {
-                    direct_commission: '直接推荐佣金：好友购买金额的35%立即到账',
-                    indirect_commission: '多级推荐佣金：下级佣金收益的35%持续躺赚',
+                    direct_commission: '🔥 直接推荐佣金：好友购买金额的35%立即到账',
+                    indirect_commission: '💰 多级推荐佣金：下级佣金收益的35%持续躺赚',
                     settlement_time: '⚡ 佣金实时到账，随时提现，秒速变现',
-                    currency: 'USDC'
+                    currency: 'USDC',
+                    platform_earnings: '🏆 平台收益：所有无推荐人用户的35%佣金归平台所有'
                 }
             },
             recordsLoading: false,
             referralsLoading: false,
             withdrawalsLoading: false,
-        recordFilters: {
+            
+            // 自动化系统相关
+            automationStatus: {},
+            showCreateWithdrawal: false,
+            withdrawalForm: {
+                user_address: '',
+                to_address: '',
+                amount: ''
+            },
+            
+            // 数据过滤和分页
+            recordFilters: {
                 status: '',
-            type: '',
+                type: '',
                 time_range: '',
                 search: ''
-        },
+            },
             withdrawalFilters: {
                 status: '',
                 time_range: '',
@@ -746,7 +1031,8 @@
                     this.loadRecords(),
                     this.loadReferrals(),
                     this.loadWithdrawals(),
-                    this.loadSettings()
+                    this.loadSettings(),
+                    this.refreshAutomationStatus()
                 ]);
             },
             
@@ -759,6 +1045,10 @@
                 // 切换到取现记录标签页时加载数据
                 if (tab === 'withdrawals' && this.withdrawals.length === 0) {
                     this.loadWithdrawals();
+                }
+                // 切换到自动化标签页时加载状态
+                if (tab === 'automation') {
+                    this.refreshAutomationStatus();
                 }
             },
             
@@ -1019,10 +1309,11 @@
                     
                     // 佣金计算规则
                     commission_rules: {
-                        direct_commission: '直接推荐佣金：好友购买金额的35%立即到账',
-                        indirect_commission: '多级推荐佣金：下级佣金收益的35%持续躺赚',
+                        direct_commission: '🔥 直接推荐佣金：好友购买金额的35%立即到账',
+                        indirect_commission: '💰 多级推荐佣金：下级佣金收益的35%持续躺赚',
                         settlement_time: '⚡ 佣金实时到账，随时提现，秒速变现',
-                        currency: 'USDC'
+                        currency: 'USDC',
+                        platform_earnings: '🏆 平台收益：所有无推荐人用户的35%佣金归平台所有'
                     }
                 };
                 
@@ -1046,7 +1337,7 @@
                 } catch (error) {
                     console.error('发放佣金失败:', error);
                     alert('发放佣金失败: ' + error.message);
-            }
+                }
             },
             
             viewRecord(record) {
@@ -1113,6 +1404,65 @@
                     'cancelled': '已取消'
                 };
                 return statusMap[status] || '未知';
+            },
+            
+            async createWithdrawal() {
+                try {
+                    const response = await fetch('/api/admin/commission/create_withdrawal', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.withdrawalForm)
+                    });
+                    
+                    if (!response.ok) throw new Error('创建取现申请失败');
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert('取现申请创建成功！');
+                        await this.loadWithdrawals();
+                        this.showCreateWithdrawal = false;
+                    } else {
+                        throw new Error(data.error || '创建取现申请失败');
+                    }
+                } catch (error) {
+                    console.error('创建取现申请失败:', error);
+                    alert('创建取现申请失败: ' + error.message);
+                }
+            },
+            
+            async runAutomation() {
+                try {
+                    const response = await fetch('/api/admin/commission/automation/run');
+                    if (!response.ok) throw new Error('运行自动化失败');
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert('自动化运行成功！');
+                        await this.loadAutomationStatus();
+                    } else {
+                        throw new Error(data.error || '运行自动化失败');
+                    }
+                } catch (error) {
+                    console.error('运行自动化失败:', error);
+                    alert('运行自动化失败: ' + error.message);
+                }
+            },
+            
+            async refreshAutomationStatus() {
+                try {
+                    const response = await fetch('/api/admin/commission/automation/status');
+                    if (!response.ok) throw new Error('刷新自动化状态失败');
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        this.automationStatus = data.data || {};
+                    } else {
+                        throw new Error(data.error || '刷新自动化状态失败');
+                    }
+                } catch (error) {
+                    console.error('刷新自动化状态失败:', error);
+                    alert('刷新自动化状态失败: ' + error.message);
+                }
             }
         }
     }

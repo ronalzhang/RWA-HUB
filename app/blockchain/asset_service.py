@@ -736,16 +736,164 @@ class AssetService:
             return [] 
 
     @staticmethod
-    def get_commission_balance(wallet_address):
+    def calculate_unlimited_commission(wallet_address, max_levels=999):
         """
-        获取用户的交易总佣金
-        计算逻辑：用户作为上线收到下线的交易金额+下线的下线上贡的佣金总金额的总和的35%
+        计算无限级分销佣金
+        上级得到的佣金 = 下级直接购买金额的35% + 下级得到的所有佣金收入的35%
         
         Args:
             wallet_address: 钱包地址
+            max_levels: 最大层级数，999表示无限级
             
         Returns:
-            float: 交易总佣金
+            dict: {
+                'total_commission': 总佣金,
+                'direct_commission': 直接推荐佣金,
+                'indirect_commission': 间接推荐佣金,
+                'level_details': 各层级详情
+            }
+        """
+        try:
+            from app.models.commission_config import CommissionConfig
+            
+            # 获取佣金率配置
+            commission_rate = CommissionConfig.get_config('commission_rate', 35.0) / 100.0
+            
+            logger.info(f"开始计算钱包 {wallet_address} 的无限级分销佣金")
+            
+            total_direct_commission = 0.0      # 直接推荐佣金总额
+            total_indirect_commission = 0.0    # 间接推荐佣金总额
+            level_details = []                 # 各层级详情
+            
+            # 递归计算上级推荐佣金
+            current_user_address = wallet_address
+            current_level = 1
+            
+            while current_level <= max_levels and current_user_address:
+                # 获取当前用户的推荐人
+                current_user = User.query.filter(
+                    (User.eth_address == current_user_address) | 
+                    (User.solana_address == current_user_address)
+                ).first()
+                
+                if not current_user or not current_user.referrer_address:
+                    break
+                
+                referrer_address = current_user.referrer_address
+                
+                # 检查是否是平台推荐人地址
+                platform_referrer_address = CommissionConfig.get_config('platform_referrer_address', '')
+                is_platform_referrer = (platform_referrer_address and referrer_address == platform_referrer_address)
+                
+                # 获取推荐人信息
+                referrer = User.query.filter(
+                    (User.eth_address == referrer_address) | 
+                    (User.solana_address == referrer_address) |
+                    (User.referrer_address == referrer_address)  # 支持平台地址
+                ).first()
+                
+                # 计算本级佣金
+                level_commission = base_amount * (commission_rate ** current_level)
+                
+                level_detail = {
+                    'level': current_level,
+                    'referrer_address': referrer_address,
+                    'referrer_name': referrer.username if referrer else ('平台账户' if is_platform_referrer else '未知用户'),
+                    'commission_amount': float(level_commission),
+                    'is_platform': is_platform_referrer
+                }
+                level_details.append(level_detail)
+                
+                # 累加到相应的佣金类型
+                if current_level == 1:
+                    total_direct_commission += level_commission
+                else:
+                    total_indirect_commission += level_commission
+                
+                # 如果是平台推荐人，记录日志
+                if is_platform_referrer:
+                    logger.info(f"平台获得第{current_level}级佣金: {level_commission:.6f} USDC (来自用户 {wallet_address})")
+                
+                # 准备下一级
+                current_user_address = referrer_address
+                current_level += 1
+            
+            total_commission = total_direct_commission + total_indirect_commission
+            
+            result = {
+                'total_commission': total_commission,
+                'direct_commission': total_direct_commission,
+                'indirect_commission': total_indirect_commission,
+                'level_details': level_details,
+                'commission_rate': commission_rate * 100,
+                'calculation_time': datetime.utcnow().isoformat()
+            }
+            
+            logger.info(f"钱包 {wallet_address} 佣金计算完成:")
+            logger.info(f"  - 直接推荐佣金: {total_direct_commission}")
+            logger.info(f"  - 间接推荐佣金: {total_indirect_commission}")
+            logger.info(f"  - 总佣金: {total_commission}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"计算无限级分销佣金失败: {str(e)}", exc_info=True)
+            return {
+                'total_commission': 0.0,
+                'direct_commission': 0.0,
+                'indirect_commission': 0.0,
+                'level_details': {},
+                'error': str(e)
+            }
+    
+    @staticmethod
+    def update_commission_balance(wallet_address):
+        """
+        更新用户佣金余额到数据库
+        使用新的无限级分销计算逻辑
+        """
+        try:
+            from app.models.commission_config import UserCommissionBalance
+            
+            # 使用新的计算逻辑
+            commission_data = AssetService.calculate_unlimited_commission(wallet_address)
+            total_commission = commission_data['total_commission']
+            
+            # 更新或创建佣金余额记录
+            commission_balance = UserCommissionBalance.query.filter_by(
+                user_address=wallet_address
+            ).first()
+            
+            if commission_balance:
+                # 更新现有记录
+                commission_balance.total_earned = total_commission
+                commission_balance.available_balance = total_commission - commission_balance.frozen_balance
+                commission_balance.last_updated = datetime.utcnow()
+            else:
+                # 创建新记录
+                commission_balance = UserCommissionBalance(
+                    user_address=wallet_address,
+                    total_earned=total_commission,
+                    available_balance=total_commission,
+                    frozen_balance=0.0,
+                    withdrawn_amount=0.0
+                )
+                db.session.add(commission_balance)
+            
+            db.session.commit()
+            
+            logger.info(f"更新用户 {wallet_address} 佣金余额: {total_commission}")
+            return commission_balance
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"更新佣金余额失败: {str(e)}", exc_info=True)
+            return None
+
+    @staticmethod
+    def get_commission_balance(wallet_address):
+        """
+        获取用户的交易总佣金（使用新的无限级分销逻辑）
         """
         try:
             logger.info(f"开始计算钱包 {wallet_address} 的交易总佣金")
@@ -760,45 +908,14 @@ class AssetService:
                 logger.info(f"从UserCommissionBalance表获取到可用余额: {available_balance}")
                 return available_balance
             
-            # 如果UserCommissionBalance表中没有记录，计算交易总佣金
-            user = User.query.filter_by(eth_address=wallet_address).first()
-            if not user:
-                logger.warning(f"未找到钱包地址 {wallet_address} 对应的用户")
-                return 0.0
+            # 如果没有缓存记录，使用新算法计算
+            commission_data = AssetService.calculate_unlimited_commission(wallet_address)
+            total_commission = commission_data['total_commission']
             
-            total_transaction_amount = 0.0
+            # 更新缓存
+            AssetService.update_commission_balance(wallet_address)
             
-            # 1. 计算用户作为上线收到下线的交易金额
-            # 查找所有以该用户为推荐人的下线用户
-            downline_users = User.query.filter_by(referrer_address=wallet_address).all()
-            
-            for downline_user in downline_users:
-                # 计算下线用户的交易金额
-                downline_trades = Trade.query.filter_by(buyer_address=downline_user.eth_address).all()
-                for trade in downline_trades:
-                    if trade.status == 'completed':
-                        total_transaction_amount += float(trade.amount or 0)
-                        logger.debug(f"下线 {downline_user.eth_address} 交易金额: {trade.amount}")
-            
-            # 2. 计算下线的下线上贡的佣金总金额
-            # 查找二级下线用户
-            for downline_user in downline_users:
-                second_level_users = User.query.filter_by(referrer_address=downline_user.eth_address).all()
-                for second_level_user in second_level_users:
-                    # 计算二级下线的交易金额
-                    second_level_trades = Trade.query.filter_by(buyer_address=second_level_user.eth_address).all()
-                    for trade in second_level_trades:
-                        if trade.status == 'completed':
-                            total_transaction_amount += float(trade.amount or 0)
-                            logger.debug(f"二级下线 {second_level_user.eth_address} 交易金额: {trade.amount}")
-            
-            # 3. 计算35%的佣金
-            commission_rate = 0.35  # 35%
-            total_commission = total_transaction_amount * commission_rate
-            
-            logger.info(f"钱包 {wallet_address} 的交易总金额: {total_transaction_amount}")
-            logger.info(f"钱包 {wallet_address} 的交易总佣金(35%): {total_commission}")
-            
+            logger.info(f"钱包 {wallet_address} 的交易总佣金: {total_commission}")
             return total_commission
             
         except Exception as e:
@@ -900,9 +1017,14 @@ class AssetService:
             from app.models import User, db
             from datetime import datetime
             from flask import current_app
+            from app.models.commission_config import CommissionConfig
             
             # 标准化钱包地址
             wallet_address = wallet_address.strip()
+            
+            # 检查是否启用平台推荐人功能
+            enable_platform_referrer = CommissionConfig.get_config('enable_platform_referrer', True)
+            platform_referrer_address = CommissionConfig.get_config('platform_referrer_address', '')
             
             # 根据钱包类型设置相应的地址字段
             if wallet_type in ['phantom', 'solana']:
@@ -924,6 +1046,12 @@ class AssetService:
                         last_login_at=datetime.utcnow(),
                         is_active=True
                     )
+                    
+                    # 自动设置平台推荐人（如果启用且配置了平台地址）
+                    if enable_platform_referrer and platform_referrer_address and platform_referrer_address != wallet_address:
+                        user.referrer_address = platform_referrer_address
+                        current_app.logger.info(f"新Solana用户 {wallet_address} 自动设置平台推荐人: {platform_referrer_address}")
+                    
                     db.session.add(user)
                     current_app.logger.info(f"创建新Solana用户: {wallet_address}")
                 else:
@@ -931,6 +1059,13 @@ class AssetService:
                     user.last_login_at = datetime.utcnow()
                     user.wallet_type = wallet_type
                     user.is_active = True
+                    
+                    # 如果用户还没有推荐人，且启用了平台推荐人功能，自动设置
+                    if (not user.referrer_address and enable_platform_referrer and 
+                        platform_referrer_address and platform_referrer_address != wallet_address):
+                        user.referrer_address = platform_referrer_address
+                        current_app.logger.info(f"现有Solana用户 {wallet_address} 自动设置平台推荐人: {platform_referrer_address}")
+                    
                     current_app.logger.info(f"更新现有Solana用户: {wallet_address}")
                     
             else:
@@ -952,6 +1087,12 @@ class AssetService:
                         last_login_at=datetime.utcnow(),
                         is_active=True
                     )
+                    
+                    # 自动设置平台推荐人（如果启用且配置了平台地址）
+                    if enable_platform_referrer and platform_referrer_address and platform_referrer_address != wallet_address:
+                        user.referrer_address = platform_referrer_address
+                        current_app.logger.info(f"新以太坊用户 {wallet_address} 自动设置平台推荐人: {platform_referrer_address}")
+                    
                     db.session.add(user)
                     current_app.logger.info(f"创建新以太坊用户: {wallet_address}")
                 else:
@@ -959,6 +1100,13 @@ class AssetService:
                     user.last_login_at = datetime.utcnow()
                     user.wallet_type = wallet_type
                     user.is_active = True
+                    
+                    # 如果用户还没有推荐人，且启用了平台推荐人功能，自动设置
+                    if (not user.referrer_address and enable_platform_referrer and 
+                        platform_referrer_address and platform_referrer_address != wallet_address):
+                        user.referrer_address = platform_referrer_address
+                        current_app.logger.info(f"现有以太坊用户 {wallet_address} 自动设置平台推荐人: {platform_referrer_address}")
+                    
                     current_app.logger.info(f"更新现有以太坊用户: {wallet_address}")
             
             # 提交数据库更改
@@ -972,6 +1120,7 @@ class AssetService:
                 'eth_address': user.eth_address,
                 'solana_address': user.solana_address,
                 'wallet_type': user.wallet_type,
+                'referrer_address': user.referrer_address,  # 添加推荐人地址到返回信息
                 'created_at': user.created_at.isoformat() if user.created_at else None,
                 'last_login_at': user.last_login_at.isoformat() if user.last_login_at else None,
                 'is_active': user.is_active
