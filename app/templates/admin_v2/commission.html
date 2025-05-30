@@ -61,7 +61,7 @@
                 </div>
                 <div>
                     <h3 class="text-lg font-semibold text-gray-500">佣金率</h3>
-                    <p class="text-2xl font-bold" x-text="(stats.commission_rate || 0) + '%'"></p>
+                    <p class="text-2xl font-bold" x-text="(settings.commission_rate || 35) + '%'"></p>
                 </div>
             </div>
         </div>
@@ -243,68 +243,216 @@
     <!-- 佣金设置 -->
     <div x-show="activeTab === 'settings'" class="bg-white rounded-lg shadow-sm" x-cloak>
         <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-700">佣金设置</h3>
+            <h3 class="text-lg font-semibold text-gray-700">35%分销体系配置</h3>
+            <p class="text-sm text-gray-500 mt-1">配置推荐佣金、分享功能和提现规则</p>
         </div>
 
-        <div class="px-6 py-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="space-y-4">
-                    <h4 class="text-md font-semibold text-gray-700">基础设置</h4>
+        <div class="px-6 py-6 space-y-8">
+            <!-- 核心分销设置 -->
+            <div class="border border-gray-200 rounded-lg p-6">
+                <div class="flex items-center mb-4">
+                    <div class="p-2 bg-blue-100 rounded-lg mr-3">
+                        <i class="fas fa-percentage text-blue-600"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-700">核心分销规则</h4>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            推荐佣金率 (%)
+                            <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <input x-model="settings.commission_rate" type="number" step="0.1" min="0" max="100"
+                                   class="w-full border-gray-300 rounded-md shadow-sm pr-12">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                <span class="text-gray-500 text-sm">%</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">好友购买后您获得的佣金比例</p>
+                    </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">全局佣金率 (%)</label>
-                        <input x-model="settings.global_rate" type="number" step="0.01" min="0" max="100"
+                        <label class="block text-sm font-medium text-gray-700 mb-2">分销描述文案</label>
+                        <input x-model="settings.commission_description" type="text" 
+                               placeholder="推荐好友享受35%佣金奖励"
                                class="w-full border-gray-300 rounded-md shadow-sm">
-                        <p class="text-xs text-gray-500 mt-1">适用于所有资产类型的默认佣金率</p>
-        </div>
-
-        <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">最低佣金金额 (USDC)</label>
-                        <input x-model="settings.min_amount" type="number" step="0.01" min="0"
-                               class="w-full border-gray-300 rounded-md shadow-sm">
-    </div>
-
-                                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">推荐等级</label>
-                        <select x-model="settings.referral_levels" class="w-full border-gray-300 rounded-md shadow-sm">
-                            <option value="1">一级推荐</option>
-                            <option value="2">二级推荐</option>
-                            <option value="3">三级推荐</option>
+                        <p class="text-xs text-gray-500 mt-1">前端展示的佣金功能描述</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">多级分销</label>
+                        <div class="flex items-center space-x-4">
+                            <label class="flex items-center">
+                                <input x-model="settings.enable_multi_level" type="checkbox" 
+                                       class="rounded border-gray-300 text-blue-600 shadow-sm">
+                                <span class="ml-2 text-sm text-gray-700">启用多级分销</span>
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">是否开启间接推荐佣金（下级佣金的35%）</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">最大分销层级</label>
+                        <select x-model="settings.max_referral_levels" class="w-full border-gray-300 rounded-md shadow-sm">
+                            <option value="1">1级（只有直接推荐）</option>
+                            <option value="2">2级（直接+间接推荐）</option>
+                            <option value="3">3级（三级分销）</option>
+                            <option value="5">5级（五级分销）</option>
                         </select>
-                                    </div>
-                                </div>
-                                
-                <div class="space-y-4">
-                    <h4 class="text-md font-semibold text-gray-700">分级佣金率</h4>
+                        <p class="text-xs text-gray-500 mt-1">推荐关系的最大层级深度</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分享功能配置 -->
+            <div class="border border-gray-200 rounded-lg p-6">
+                <div class="flex items-center mb-4">
+                    <div class="p-2 bg-green-100 rounded-lg mr-3">
+                        <i class="fas fa-share-alt text-green-600"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-700">分享功能配置</h4>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">分享按钮文案</label>
+                        <input x-model="settings.share_button_text" type="text" 
+                               placeholder="分享赚佣金"
+                               class="w-full border-gray-300 rounded-md shadow-sm">
+                        <p class="text-xs text-gray-500 mt-1">分享按钮显示的文字</p>
+                    </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">一级推荐佣金率 (%)</label>
-                        <input x-model="settings.level1_rate" type="number" step="0.01" min="0" max="100"
+                        <label class="block text-sm font-medium text-gray-700 mb-2">分享成功提示</label>
+                        <input x-model="settings.share_success_message" type="text" 
+                               placeholder="分享链接已复制，快去邀请好友吧！"
                                class="w-full border-gray-300 rounded-md shadow-sm">
-                                </div>
-                                
+                        <p class="text-xs text-gray-500 mt-1">分享成功后显示的消息</p>
+                    </div>
+                    
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">分享说明文案</label>
+                        <textarea x-model="settings.share_description" rows="2" 
+                                  placeholder="分享此项目给好友，好友购买后您将获得35%佣金奖励"
+                                  class="w-full border-gray-300 rounded-md shadow-sm"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">分享功能的详细说明</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 提现配置 -->
+            <div class="border border-gray-200 rounded-lg p-6">
+                <div class="flex items-center mb-4">
+                    <div class="p-2 bg-purple-100 rounded-lg mr-3">
+                        <i class="fas fa-wallet text-purple-600"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-700">提现配置</h4>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">二级推荐佣金率 (%)</label>
-                        <input x-model="settings.level2_rate" type="number" step="0.01" min="0" max="100"
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            最低提现金额 (USDC)
+                            <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <input x-model="settings.min_withdraw_amount" type="number" step="0.01" min="0"
+                                   class="w-full border-gray-300 rounded-md shadow-sm pr-16">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                <span class="text-gray-500 text-sm">USDC</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">用户提现的最低金额限制</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">提现手续费率 (%)</label>
+                        <div class="relative">
+                            <input x-model="settings.withdraw_fee_rate" type="number" step="0.01" min="0" max="100"
+                                   class="w-full border-gray-300 rounded-md shadow-sm pr-12">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                <span class="text-gray-500 text-sm">%</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">提现时收取的手续费比例（0表示免费）</p>
+                    </div>
+                    
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">提现说明文案</label>
+                        <textarea x-model="settings.withdraw_description" rows="2" 
+                                  placeholder="最低提现金额10 USDC，提现将转入您的钱包地址"
+                                  class="w-full border-gray-300 rounded-md shadow-sm"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">提现功能的说明文字</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 佣金计算规则说明 -->
+            <div class="border border-gray-200 rounded-lg p-6">
+                <div class="flex items-center mb-4">
+                    <div class="p-2 bg-yellow-100 rounded-lg mr-3">
+                        <i class="fas fa-calculator text-yellow-600"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-700">佣金计算规则</h4>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">直接推荐佣金说明</label>
+                        <input x-model="settings.commission_rules.direct_commission" type="text" 
+                               placeholder="直接推荐佣金：好友购买金额的35%"
                                class="w-full border-gray-300 rounded-md shadow-sm">
+                        <p class="text-xs text-gray-500 mt-1">直接推荐佣金的计算说明</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">间接推荐佣金说明</label>
+                        <input x-model="settings.commission_rules.indirect_commission" type="text" 
+                               placeholder="间接推荐佣金：下级佣金收益的35%"
+                               class="w-full border-gray-300 rounded-md shadow-sm">
+                        <p class="text-xs text-gray-500 mt-1">间接推荐佣金的计算说明</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">结算时间说明</label>
+                        <input x-model="settings.commission_rules.settlement_time" type="text" 
+                               placeholder="佣金实时到账，可随时提现"
+                               class="w-full border-gray-300 rounded-md shadow-sm">
+                        <p class="text-xs text-gray-500 mt-1">佣金到账和结算时间说明</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">计价货币</label>
+                        <select x-model="settings.commission_rules.currency" class="w-full border-gray-300 rounded-md shadow-sm">
+                            <option value="USDC">USDC</option>
+                            <option value="USDT">USDT</option>
+                            <option value="USD">USD</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">佣金的计价和支付货币</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 保存按钮 -->
+            <div class="flex justify-between items-center pt-6 border-t border-gray-200">
+                <div class="text-sm text-gray-500">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    配置修改后将立即生效，影响新的推荐和佣金计算
+                </div>
+                <div class="flex space-x-3">
+                    <button @click="resetSettings()" class="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600">
+                        <i class="fas fa-undo mr-2"></i>重置
+                    </button>
+                    <button @click="saveSettings()" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">
+                        <i class="fas fa-save mr-2"></i>保存配置
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
-                                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">三级推荐佣金率 (%)</label>
-                        <input x-model="settings.level3_rate" type="number" step="0.01" min="0" max="100"
-                               class="w-full border-gray-300 rounded-md shadow-sm">
-                                    </div>
-                                    </div>
-                                </div>
-                                
-            <div class="mt-6 flex justify-end">
-                <button @click="saveSettings()" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">
-                    <i class="fas fa-save mr-2"></i>保存设置
-                </button>
-                                    </div>
-                                    </div>
-                                </div>
-                                
     <!-- 推荐关系 -->
     <div x-show="activeTab === 'referrals'" class="bg-white rounded-lg shadow-sm" x-cloak>
         <div class="px-6 py-4 border-b border-gray-200">
@@ -527,12 +675,29 @@
             referrals: [],
             withdrawals: [],
             settings: {
-                global_rate: 5.0,
-                min_amount: 1.0,
-                referral_levels: 3,
-                level1_rate: 5.0,
-                level2_rate: 3.0,
-                level3_rate: 1.0
+                // 核心分销设置
+                commission_rate: 35.0,
+                commission_description: '推荐好友享受35%佣金奖励',
+                enable_multi_level: true,
+                max_referral_levels: 2,
+                
+                // 分享功能设置
+                share_button_text: '分享赚佣金',
+                share_description: '分享此项目给好友，好友购买后您将获得35%佣金奖励',
+                share_success_message: '分享链接已复制，快去邀请好友吧！',
+                
+                // 提现配置
+                min_withdraw_amount: 10.0,
+                withdraw_fee_rate: 0.0,
+                withdraw_description: '最低提现金额10 USDC，提现将转入您的钱包地址',
+                
+                // 佣金计算规则
+                commission_rules: {
+                    direct_commission: '直接推荐佣金：好友购买金额的35%',
+                    indirect_commission: '间接推荐佣金：下级佣金收益的35%',
+                    settlement_time: '佣金实时到账，可随时提现',
+                    currency: 'USDC'
+                }
             },
             recordsLoading: false,
             referralsLoading: false,
@@ -585,7 +750,7 @@
             
             async loadStats() {
                 try {
-                    const response = await fetch('/admin/v2/api/commission/stats');
+                    const response = await fetch('/api/admin/commission/stats');
                     if (response.ok) {
                         const data = await response.json();
                         if (data.success) {
@@ -613,7 +778,7 @@
                         ...this.recordFilters
                     });
                     
-                    const response = await fetch(`/admin/v2/api/commission/records?${params}`);
+                    const response = await fetch(`/api/admin/commission/records?${params}`);
                     if (response.ok) {
                         const data = await response.json();
                         if (data.success) {
@@ -635,7 +800,7 @@
             async loadReferrals() {
                 this.referralsLoading = true;
                 try {
-                    const response = await fetch('/admin/v2/api/commission/referrals');
+                    const response = await fetch('/api/admin/commission/referrals');
                     if (response.ok) {
                         const data = await response.json();
                         if (data.success) {
@@ -663,7 +828,7 @@
                         ...this.withdrawalFilters
                     });
                     
-                    const response = await fetch(`/admin/v2/api/commission/withdrawals?${params}`);
+                    const response = await fetch(`/api/admin/commission/withdrawals?${params}`);
                     if (!response.ok) throw new Error('加载取现记录失败');
                     
                     const data = await response.json();
@@ -686,7 +851,7 @@
                 if (!confirm(`确定要处理提现申请吗？\n用户地址: ${withdrawal.user_address}\n提现金额: ${this.formatCurrency(withdrawal.amount)}\n提现地址: ${withdrawal.to_address}`)) return;
                 
                 try {
-                    const response = await fetch(`/admin/v2/api/commission/withdrawals/${withdrawal.id}/process`, {
+                    const response = await fetch(`/api/admin/commission/withdrawals/${withdrawal.id}/process`, {
                         method: 'POST'
                     });
                     
@@ -713,7 +878,7 @@
                 if (!confirm(`确定要取消此提现申请吗？\n用户地址: ${withdrawal.user_address}\n提现金额: ${this.formatCurrency(withdrawal.amount)}\n取消原因: ${reason}`)) return;
                 
                 try {
-                    const response = await fetch(`/admin/v2/api/commission/withdrawals/${withdrawal.id}/cancel`, {
+                    const response = await fetch(`/api/admin/commission/withdrawals/${withdrawal.id}/cancel`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ reason: reason })
@@ -763,23 +928,39 @@
             
             async loadSettings() {
                 try {
-                    const response = await fetch('/admin/v2/api/commission/settings');
+                    const response = await fetch('/api/admin/commission/settings');
                     if (response.ok) {
                         const data = await response.json();
-                        if (data.success) {
-                            // 移除success字段，其余字段合并到settings
-                            const { success, ...settingsData } = data;
-                            this.settings = { ...this.settings, ...settingsData };
+                        if (data.success && data.data) {
+                            // 合并返回的配置数据，保持默认值作为后备
+                            this.settings = { ...this.settings, ...data.data };
+                            
+                            // 确保commission_rules是对象
+                            if (data.data.commission_rules && typeof data.data.commission_rules === 'object') {
+                                this.settings.commission_rules = { ...this.settings.commission_rules, ...data.data.commission_rules };
+                            }
                         }
                     }
                 } catch (error) {
                     console.error('加载佣金设置失败:', error);
+                    alert('加载佣金设置失败: ' + error.message);
                 }
             },
             
             async saveSettings() {
                 try {
-                    const response = await fetch('/admin/v2/api/commission/settings', {
+                    // 验证必填项
+                    if (!this.settings.commission_rate || this.settings.commission_rate < 0 || this.settings.commission_rate > 100) {
+                        alert('请输入有效的佣金率（0-100%）');
+                        return;
+                    }
+                    
+                    if (!this.settings.min_withdraw_amount || this.settings.min_withdraw_amount < 0) {
+                        alert('请输入有效的最低提现金额');
+                        return;
+                    }
+                    
+                    const response = await fetch('/api/admin/commission/settings', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(this.settings)
@@ -787,18 +968,58 @@
                     
                     if (!response.ok) throw new Error('保存失败');
                     
-                    alert('佣金设置保存成功');
+                    const result = await response.json();
+                    if (result.success) {
+                        alert(`配置保存成功！\n${result.message || '更新了佣金设置'}`);
+                        // 重新加载统计数据以反映新的佣金率
+                        await this.loadStats();
+                    } else {
+                        throw new Error(result.error || '保存失败');
+                    }
                 } catch (error) {
                     console.error('保存佣金设置失败:', error);
                     alert('保存佣金设置失败: ' + error.message);
                 }
             },
             
+            resetSettings() {
+                if (!confirm('确定要重置所有配置到默认值吗？这将清除所有自定义设置。')) return;
+                
+                // 重置为默认值
+                this.settings = {
+                    // 核心分销设置
+                    commission_rate: 35.0,
+                    commission_description: '推荐好友享受35%佣金奖励',
+                    enable_multi_level: true,
+                    max_referral_levels: 2,
+                    
+                    // 分享功能设置
+                    share_button_text: '分享赚佣金',
+                    share_description: '分享此项目给好友，好友购买后您将获得35%佣金奖励',
+                    share_success_message: '分享链接已复制，快去邀请好友吧！',
+                    
+                    // 提现配置
+                    min_withdraw_amount: 10.0,
+                    withdraw_fee_rate: 0.0,
+                    withdraw_description: '最低提现金额10 USDC，提现将转入您的钱包地址',
+                    
+                    // 佣金计算规则
+                    commission_rules: {
+                        direct_commission: '直接推荐佣金：好友购买金额的35%',
+                        indirect_commission: '间接推荐佣金：下级佣金收益的35%',
+                        settlement_time: '佣金实时到账，可随时提现',
+                        currency: 'USDC'
+                    }
+                };
+                
+                alert('配置已重置为默认值，请点击"保存配置"来应用更改。');
+            },
+            
             async payCommission(record) {
                 if (!confirm(`确定要发放佣金 ${this.formatCurrency(record.amount)} 给地址 ${record.recipient_address} 吗？`)) return;
                 
                 try {
-                    const response = await fetch(`/admin/v2/api/commission/records/${record.id}/pay`, {
+                    const response = await fetch(`/api/admin/commission/records/${record.id}/pay`, {
                         method: 'POST'
                     });
                     
@@ -833,7 +1054,7 @@
             
             async exportRecords() {
                 try {
-                    const response = await fetch('/admin/v2/api/commission/records/export');
+                    const response = await fetch('/api/admin/commission/records/export');
                     if (!response.ok) throw new Error('导出失败');
                     
                     const blob = await response.blob();

@@ -275,29 +275,42 @@ def api_commission_records():
 @admin_bp.route('/api/admin/commission/settings', methods=['GET'])
 @api_admin_required
 def api_commission_settings():
-    """佣金设置"""
+    """佣金设置 - 基于35%分销体系"""
     try:
         from app.models.commission_config import CommissionConfig
         
-        # 定义默认设置
-        default_settings = {
-            'global_rate': 5.0,
-            'min_amount': 1.0,
-            'referral_levels': 3,
-            'level1_rate': 5.0,
-            'level2_rate': 3.0,
-            'level3_rate': 1.0
+        # 获取35%分销系统的真实配置
+        settings = {
+            # 核心分销设置
+            'commission_rate': CommissionConfig.get_config('commission_rate', 35.0),
+            'commission_description': CommissionConfig.get_config('commission_description', '推荐好友享受35%佣金奖励'),
+            
+            # 分享功能设置  
+            'share_button_text': CommissionConfig.get_config('share_button_text', '分享赚佣金'),
+            'share_description': CommissionConfig.get_config('share_description', '分享此项目给好友，好友购买后您将获得35%佣金奖励'),
+            'share_success_message': CommissionConfig.get_config('share_success_message', '分享链接已复制，快去邀请好友吧！'),
+            
+            # 提现配置
+            'min_withdraw_amount': CommissionConfig.get_config('min_withdraw_amount', 10.0),
+            'withdraw_fee_rate': CommissionConfig.get_config('withdraw_fee_rate', 0.0),
+            'withdraw_description': CommissionConfig.get_config('withdraw_description', '最低提现金额10 USDC，提现将转入您的钱包地址'),
+            
+            # 佣金计算规则
+            'commission_rules': CommissionConfig.get_config('commission_rules', {
+                'direct_commission': '直接推荐佣金：好友购买金额的35%',
+                'indirect_commission': '间接推荐佣金：下级佣金收益的35%', 
+                'settlement_time': '佣金实时到账，可随时提现',
+                'currency': 'USDC'
+            }),
+            
+            # 分销层级设置
+            'max_referral_levels': CommissionConfig.get_config('max_referral_levels', 2),
+            'enable_multi_level': CommissionConfig.get_config('enable_multi_level', True),
         }
-        
-        # 从数据库获取设置
-        settings = {}
-        for key, default_value in default_settings.items():
-            value = CommissionConfig.get_config(f'commission_{key}', default_value)
-            settings[key] = value
         
         return jsonify({
             'success': True,
-            **settings  # 直接返回设置字段，不嵌套在data中
+            'data': settings
         })
         
     except Exception as e:
@@ -308,7 +321,7 @@ def api_commission_settings():
 @admin_bp.route('/api/admin/commission/settings', methods=['POST'])
 @api_admin_required
 def api_update_commission_settings():
-    """更新佣金设置"""
+    """更新佣金设置 - 基于35%分销体系"""
     try:
         from app.models.commission_config import CommissionConfig
         
@@ -316,44 +329,69 @@ def api_update_commission_settings():
         if not data:
             return jsonify({'success': False, 'error': '缺少请求数据'}), 400
         
-        # 定义允许更新的设置字段
-        allowed_settings = [
-            'global_rate', 'min_amount', 'referral_levels',
-            'level1_rate', 'level2_rate', 'level3_rate'
-        ]
+        # 定义允许更新的配置项
+        config_mappings = {
+            'commission_rate': ('commission_rate', float, 0, 100),
+            'commission_description': ('commission_description', str, None, None),
+            'share_button_text': ('share_button_text', str, None, None),
+            'share_description': ('share_description', str, None, None), 
+            'share_success_message': ('share_success_message', str, None, None),
+            'min_withdraw_amount': ('min_withdraw_amount', float, 0, None),
+            'withdraw_fee_rate': ('withdraw_fee_rate', float, 0, 100),
+            'withdraw_description': ('withdraw_description', str, None, None),
+            'max_referral_levels': ('max_referral_levels', int, 1, 5),
+            'enable_multi_level': ('enable_multi_level', bool, None, None),
+        }
+        
+        updated_count = 0
         
         # 验证和保存设置
-        updated_count = 0
-        for key in allowed_settings:
-            if key in data:
-                value = data[key]
+        for field, (config_key, data_type, min_val, max_val) in config_mappings.items():
+            if field in data:
+                value = data[field]
                 
-                # 数据验证
-                if key in ['global_rate', 'level1_rate', 'level2_rate', 'level3_rate']:
-                    if not (0 <= float(value) <= 100):
-                        return jsonify({'success': False, 'error': f'{key} 必须在0-100之间'}), 400
-                elif key == 'min_amount':
-                    if float(value) < 0:
-                        return jsonify({'success': False, 'error': '最低佣金金额不能为负数'}), 400
-                elif key == 'referral_levels':
-                    if int(value) not in [1, 2, 3]:
-                        return jsonify({'success': False, 'error': '推荐等级必须是1、2或3'}), 400
-                
-                # 保存设置到数据库
-                CommissionConfig.set_config(
-                    f'commission_{key}', 
-                    value, 
-                    f'佣金设置: {key}'
-                )
+                try:
+                    # 类型转换
+                    if data_type == float:
+                        value = float(value)
+                    elif data_type == int:
+                        value = int(value)
+                    elif data_type == bool:
+                        value = bool(value)
+                    elif data_type == str:
+                        value = str(value).strip()
+                        if not value:
+                            continue
+                    
+                    # 范围验证
+                    if min_val is not None and value < min_val:
+                        return jsonify({'success': False, 'error': f'{field} 值不能小于 {min_val}'}), 400
+                    if max_val is not None and value > max_val:
+                        return jsonify({'success': False, 'error': f'{field} 值不能大于 {max_val}'}), 400
+                    
+                    # 保存配置
+                    CommissionConfig.set_config(config_key, value, f'佣金设置: {field}')
+                    updated_count += 1
+                    
+                except (ValueError, TypeError) as e:
+                    return jsonify({'success': False, 'error': f'{field} 格式错误: {str(e)}'}), 400
+        
+        # 处理复杂对象：commission_rules
+        if 'commission_rules' in data:
+            rules = data['commission_rules']
+            if isinstance(rules, dict):
+                CommissionConfig.set_config('commission_rules', rules, '佣金计算规则')
                 updated_count += 1
         
         if updated_count > 0:
-            current_app.logger.info(f'佣金设置更新成功，更新了 {updated_count} 个设置项')
-        
-        return jsonify({
-            'success': True,
-            'message': f'佣金设置更新成功，更新了 {updated_count} 个设置项'
-        })
+            current_app.logger.info(f'佣金设置更新成功，更新了 {updated_count} 个配置项')
+            return jsonify({
+                'success': True,
+                'message': f'成功更新 {updated_count} 个配置项',
+                'updated_count': updated_count
+            })
+        else:
+            return jsonify({'success': False, 'error': '没有有效的配置项需要更新'}), 400
         
     except Exception as e:
         current_app.logger.error(f'更新佣金设置失败: {str(e)}', exc_info=True)
