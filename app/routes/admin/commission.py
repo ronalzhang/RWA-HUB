@@ -17,6 +17,7 @@ from app.models.admin import CommissionSetting
 from app.models.commission_withdrawal import CommissionWithdrawal
 from app.models.commission_config import UserCommissionBalance
 from . import admin_bp
+from . import admin_api_bp
 from .auth import api_admin_required, admin_page_required
 
 
@@ -99,8 +100,8 @@ def export_records_v2():
     return api_export_commission_records()
 
 
-# API路由
-@admin_bp.route('/api/admin/commission/stats', methods=['GET'])
+# API路由 - 使用admin_api_bp蓝图（前缀：/api/admin）
+@admin_api_bp.route('/commission/stats', methods=['GET'])
 @api_admin_required
 def api_commission_stats():
     """佣金统计数据"""
@@ -141,7 +142,7 @@ def api_commission_stats():
         
         # 获取佣金率设置（从配置表获取，如果没有则使用默认值）
         from app.models.commission_config import CommissionConfig
-        commission_rate = CommissionConfig.get_config('commission_global_rate', 5.0)
+        commission_rate = CommissionConfig.get_config('commission_rate', 35.0)
         
         # 获取提现统计
         withdrawal_stats = CommissionWithdrawal.get_withdrawal_stats()
@@ -187,7 +188,7 @@ def api_commission_stats():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/commission/records', methods=['GET'])
+@admin_api_bp.route('/commission/records', methods=['GET'])
 @api_admin_required
 def api_commission_records():
     """佣金记录列表"""
@@ -272,7 +273,7 @@ def api_commission_records():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/commission/settings', methods=['GET'])
+@admin_api_bp.route('/commission/settings', methods=['GET'])
 @api_admin_required
 def api_commission_settings():
     """佣金设置 - 基于35%分销体系"""
@@ -283,23 +284,23 @@ def api_commission_settings():
         settings = {
             # 核心分销设置
             'commission_rate': CommissionConfig.get_config('commission_rate', 35.0),
-            'commission_description': CommissionConfig.get_config('commission_description', '推荐好友享受35%佣金奖励'),
+            'commission_description': CommissionConfig.get_config('commission_description', '💰 推荐好友即享35%超高佣金，人人都是赚钱达人！'),
             
             # 分享功能设置  
-            'share_button_text': CommissionConfig.get_config('share_button_text', '分享赚佣金'),
-            'share_description': CommissionConfig.get_config('share_description', '分享此项目给好友，好友购买后您将获得35%佣金奖励'),
-            'share_success_message': CommissionConfig.get_config('share_success_message', '分享链接已复制，快去邀请好友吧！'),
+            'share_button_text': CommissionConfig.get_config('share_button_text', '🚀 分享赚大钱'),
+            'share_description': CommissionConfig.get_config('share_description', '🎯 推荐好友购买项目，您立即获得35%现金奖励！多级分销，收益无上限！'),
+            'share_success_message': CommissionConfig.get_config('share_success_message', '🎉 分享链接已复制！快去邀请好友赚取35%佣金吧！'),
             
             # 提现配置
             'min_withdraw_amount': CommissionConfig.get_config('min_withdraw_amount', 10.0),
             'withdraw_fee_rate': CommissionConfig.get_config('withdraw_fee_rate', 0.0),
-            'withdraw_description': CommissionConfig.get_config('withdraw_description', '最低提现金额10 USDC，提现将转入您的钱包地址'),
+            'withdraw_description': CommissionConfig.get_config('withdraw_description', '💎 最低提现10 USDC，零手续费，秒到账！随时提现，自由支配！'),
             
             # 佣金计算规则
             'commission_rules': CommissionConfig.get_config('commission_rules', {
-                'direct_commission': '直接推荐佣金：好友购买金额的35%',
-                'indirect_commission': '间接推荐佣金：下级佣金收益的35%', 
-                'settlement_time': '佣金实时到账，可随时提现',
+                'direct_commission': '🔥 直接推荐佣金：好友购买金额的35%立即到账',
+                'indirect_commission': '💰 多级推荐佣金：下级佣金收益的35%持续躺赚', 
+                'settlement_time': '⚡ 佣金实时到账，随时提现，秒速变现',
                 'currency': 'USDC'
             }),
             
@@ -318,7 +319,7 @@ def api_commission_settings():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/commission/settings', methods=['POST'])
+@admin_api_bp.route('/commission/settings', methods=['POST'])
 @api_admin_required
 def api_update_commission_settings():
     """更新佣金设置 - 基于35%分销体系"""
@@ -339,7 +340,7 @@ def api_update_commission_settings():
             'min_withdraw_amount': ('min_withdraw_amount', float, 0, None),
             'withdraw_fee_rate': ('withdraw_fee_rate', float, 0, 100),
             'withdraw_description': ('withdraw_description', str, None, None),
-            'max_referral_levels': ('max_referral_levels', int, 1, 5),
+            'max_referral_levels': ('max_referral_levels', int, 1, 999),  # 支持无限层级（用999表示）
             'enable_multi_level': ('enable_multi_level', bool, None, None),
         }
         
@@ -398,7 +399,7 @@ def api_update_commission_settings():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/commission/withdrawals', methods=['GET'])
+@admin_api_bp.route('/commission/withdrawals', methods=['GET'])
 @api_admin_required
 def api_commission_withdrawals():
     """取现记录列表"""
@@ -457,7 +458,7 @@ def api_commission_withdrawals():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/commission/withdrawals/<int:withdrawal_id>/process', methods=['POST'])
+@admin_api_bp.route('/commission/withdrawals/<int:withdrawal_id>/process', methods=['POST'])
 @api_admin_required
 def api_process_withdrawal(withdrawal_id):
     """处理提现申请"""
@@ -494,7 +495,7 @@ def api_process_withdrawal(withdrawal_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/commission/withdrawals/<int:withdrawal_id>/cancel', methods=['POST'])
+@admin_api_bp.route('/commission/withdrawals/<int:withdrawal_id>/cancel', methods=['POST'])
 @api_admin_required
 def api_cancel_withdrawal(withdrawal_id):
     """取消提现申请"""
@@ -528,7 +529,7 @@ def api_cancel_withdrawal(withdrawal_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/commission/referrals', methods=['GET'])
+@admin_api_bp.route('/commission/referrals', methods=['GET'])
 @api_admin_required
 def api_commission_referrals():
     """推荐关系列表"""
@@ -574,7 +575,7 @@ def api_commission_referrals():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/commission/records/<int:record_id>/pay', methods=['POST'])
+@admin_api_bp.route('/commission/records/<int:record_id>/pay', methods=['POST'])
 @api_admin_required
 def api_pay_commission(record_id):
     """发放佣金"""
@@ -607,7 +608,7 @@ def api_pay_commission(record_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/admin/commission/records/export', methods=['GET'])
+@admin_api_bp.route('/commission/records/export', methods=['GET'])
 @api_admin_required
 def api_export_commission_records():
     """导出佣金记录"""

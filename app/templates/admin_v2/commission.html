@@ -276,9 +276,9 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">分销描述文案</label>
                         <input x-model="settings.commission_description" type="text" 
-                               placeholder="推荐好友享受35%佣金奖励"
+                               placeholder="💰 推荐好友即享35%超高佣金，人人都是赚钱达人！"
                                class="w-full border-gray-300 rounded-md shadow-sm">
-                        <p class="text-xs text-gray-500 mt-1">前端展示的佣金功能描述</p>
+                        <p class="text-xs text-gray-500 mt-1">前端展示的佣金功能描述，支持emoji</p>
                     </div>
                     
                     <div>
@@ -290,7 +290,7 @@
                                 <span class="ml-2 text-sm text-gray-700">启用多级分销</span>
                             </label>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">是否开启间接推荐佣金（下级佣金的35%）</p>
+                        <p class="text-xs text-gray-500 mt-1">开启后下级的佣金收益也会给您分成35%</p>
                     </div>
                     
                     <div>
@@ -300,8 +300,10 @@
                             <option value="2">2级（直接+间接推荐）</option>
                             <option value="3">3级（三级分销）</option>
                             <option value="5">5级（五级分销）</option>
+                            <option value="10">10级（十级分销）</option>
+                            <option value="999">∞ 无限级（所有下线都上贡）</option>
                         </select>
-                        <p class="text-xs text-gray-500 mt-1">推荐关系的最大层级深度</p>
+                        <p class="text-xs text-gray-500 mt-1">每增加一级，佣金按35%递减传递给上级</p>
                     </div>
                 </div>
             </div>
@@ -319,25 +321,25 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">分享按钮文案</label>
                         <input x-model="settings.share_button_text" type="text" 
-                               placeholder="分享赚佣金"
+                               placeholder="🚀 分享赚大钱"
                                class="w-full border-gray-300 rounded-md shadow-sm">
-                        <p class="text-xs text-gray-500 mt-1">分享按钮显示的文字</p>
+                        <p class="text-xs text-gray-500 mt-1">分享按钮显示的文字，建议简短有力</p>
                     </div>
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">分享成功提示</label>
                         <input x-model="settings.share_success_message" type="text" 
-                               placeholder="分享链接已复制，快去邀请好友吧！"
+                               placeholder="🎉 分享链接已复制！快去邀请好友赚取35%佣金吧！"
                                class="w-full border-gray-300 rounded-md shadow-sm">
-                        <p class="text-xs text-gray-500 mt-1">分享成功后显示的消息</p>
+                        <p class="text-xs text-gray-500 mt-1">分享成功后显示的消息，鼓励用户行动</p>
                     </div>
                     
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-2">分享说明文案</label>
                         <textarea x-model="settings.share_description" rows="2" 
-                                  placeholder="分享此项目给好友，好友购买后您将获得35%佣金奖励"
+                                  placeholder="🎯 推荐好友购买项目，您立即获得35%现金奖励！多级分销，收益无上限！"
                                   class="w-full border-gray-300 rounded-md shadow-sm"></textarea>
-                        <p class="text-xs text-gray-500 mt-1">分享功能的详细说明</p>
+                        <p class="text-xs text-gray-500 mt-1">分享功能的详细说明，突出高收益和简单性</p>
                     </div>
                 </div>
             </div>
@@ -364,7 +366,7 @@
                                 <span class="text-gray-500 text-sm">USDC</span>
                             </div>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">用户提现的最低金额限制</p>
+                        <p class="text-xs text-gray-500 mt-1">门槛越低，用户提现意愿越强</p>
                     </div>
                     
                     <div>
@@ -376,15 +378,15 @@
                                 <span class="text-gray-500 text-sm">%</span>
                             </div>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">提现时收取的手续费比例（0表示免费）</p>
+                        <p class="text-xs text-gray-500 mt-1">建议设为0%，零手续费更吸引用户</p>
                     </div>
                     
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-2">提现说明文案</label>
                         <textarea x-model="settings.withdraw_description" rows="2" 
-                                  placeholder="最低提现金额10 USDC，提现将转入您的钱包地址"
+                                  placeholder="💎 最低提现10 USDC，零手续费，秒到账！随时提现，自由支配！"
                                   class="w-full border-gray-300 rounded-md shadow-sm"></textarea>
-                        <p class="text-xs text-gray-500 mt-1">提现功能的说明文字</p>
+                        <p class="text-xs text-gray-500 mt-1">突出快速、免费、便捷的提现体验</p>
                     </div>
                 </div>
             </div>
@@ -402,35 +404,47 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">直接推荐佣金说明</label>
                         <input x-model="settings.commission_rules.direct_commission" type="text" 
-                               placeholder="直接推荐佣金：好友购买金额的35%"
+                               placeholder="🔥 直接推荐佣金：好友购买金额的35%立即到账"
                                class="w-full border-gray-300 rounded-md shadow-sm">
-                        <p class="text-xs text-gray-500 mt-1">直接推荐佣金的计算说明</p>
+                        <p class="text-xs text-gray-500 mt-1">一级推荐的佣金计算和到账说明</p>
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">间接推荐佣金说明</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">多级推荐佣金说明</label>
                         <input x-model="settings.commission_rules.indirect_commission" type="text" 
-                               placeholder="间接推荐佣金：下级佣金收益的35%"
+                               placeholder="💰 多级推荐佣金：下级佣金收益的35%持续躺赚"
                                class="w-full border-gray-300 rounded-md shadow-sm">
-                        <p class="text-xs text-gray-500 mt-1">间接推荐佣金的计算说明</p>
+                        <p class="text-xs text-gray-500 mt-1">二级及以上推荐的佣金说明</p>
                     </div>
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">结算时间说明</label>
                         <input x-model="settings.commission_rules.settlement_time" type="text" 
-                               placeholder="佣金实时到账，可随时提现"
+                               placeholder="⚡ 佣金实时到账，随时提现，秒速变现"
                                class="w-full border-gray-300 rounded-md shadow-sm">
-                        <p class="text-xs text-gray-500 mt-1">佣金到账和结算时间说明</p>
+                        <p class="text-xs text-gray-500 mt-1">佣金到账和结算时间的描述</p>
                     </div>
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">计价货币</label>
                         <select x-model="settings.commission_rules.currency" class="w-full border-gray-300 rounded-md shadow-sm">
-                            <option value="USDC">USDC</option>
-                            <option value="USDT">USDT</option>
-                            <option value="USD">USD</option>
+                            <option value="USDC">USDC（美元稳定币）</option>
+                            <option value="USDT">USDT（泰达币）</option>
+                            <option value="USD">USD（美元）</option>
                         </select>
-                        <p class="text-xs text-gray-500 mt-1">佣金的计价和支付货币</p>
+                        <p class="text-xs text-gray-500 mt-1">佣金的计价和支付货币单位</p>
+                    </div>
+                    
+                    <div class="md:col-span-2">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h5 class="text-sm font-semibold text-blue-700 mb-2">🚀 无限级分销说明</h5>
+                            <div class="text-xs text-blue-600 space-y-1">
+                                <p>• <strong>直接推荐</strong>：A推荐B，B购买100 USDC，A获得35 USDC</p>
+                                <p>• <strong>二级推荐</strong>：B推荐C，C购买100 USDC，B获得35 USDC，A获得35×35%=12.25 USDC</p>
+                                <p>• <strong>三级推荐</strong>：C推荐D，D购买100 USDC，C获得35 USDC，B获得12.25 USDC，A获得4.29 USDC</p>
+                                <p>• <strong>依此类推</strong>：每级向上传递35%，形成无限级分销网络！</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -677,25 +691,25 @@
             settings: {
                 // 核心分销设置
                 commission_rate: 35.0,
-                commission_description: '推荐好友享受35%佣金奖励',
+                commission_description: '💰 推荐好友即享35%超高佣金，人人都是赚钱达人！',
                 enable_multi_level: true,
                 max_referral_levels: 2,
                 
                 // 分享功能设置
-                share_button_text: '分享赚佣金',
-                share_description: '分享此项目给好友，好友购买后您将获得35%佣金奖励',
-                share_success_message: '分享链接已复制，快去邀请好友吧！',
+                share_button_text: '🚀 分享赚大钱',
+                share_description: '🎯 推荐好友购买项目，您立即获得35%现金奖励！多级分销，收益无上限！',
+                share_success_message: '🎉 分享链接已复制！快去邀请好友赚取35%佣金吧！',
                 
                 // 提现配置
                 min_withdraw_amount: 10.0,
                 withdraw_fee_rate: 0.0,
-                withdraw_description: '最低提现金额10 USDC，提现将转入您的钱包地址',
+                withdraw_description: '💎 最低提现10 USDC，零手续费，秒到账！随时提现，自由支配！',
                 
                 // 佣金计算规则
                 commission_rules: {
-                    direct_commission: '直接推荐佣金：好友购买金额的35%',
-                    indirect_commission: '间接推荐佣金：下级佣金收益的35%',
-                    settlement_time: '佣金实时到账，可随时提现',
+                    direct_commission: '直接推荐佣金：好友购买金额的35%立即到账',
+                    indirect_commission: '多级推荐佣金：下级佣金收益的35%持续躺赚',
+                    settlement_time: '⚡ 佣金实时到账，随时提现，秒速变现',
                     currency: 'USDC'
                 }
             },
@@ -989,25 +1003,25 @@
                 this.settings = {
                     // 核心分销设置
                     commission_rate: 35.0,
-                    commission_description: '推荐好友享受35%佣金奖励',
+                    commission_description: '💰 推荐好友即享35%超高佣金，人人都是赚钱达人！',
                     enable_multi_level: true,
                     max_referral_levels: 2,
                     
                     // 分享功能设置
-                    share_button_text: '分享赚佣金',
-                    share_description: '分享此项目给好友，好友购买后您将获得35%佣金奖励',
-                    share_success_message: '分享链接已复制，快去邀请好友吧！',
+                    share_button_text: '🚀 分享赚大钱',
+                    share_description: '🎯 推荐好友购买项目，您立即获得35%现金奖励！多级分销，收益无上限！',
+                    share_success_message: '🎉 分享链接已复制！快去邀请好友赚取35%佣金吧！',
                     
                     // 提现配置
                     min_withdraw_amount: 10.0,
                     withdraw_fee_rate: 0.0,
-                    withdraw_description: '最低提现金额10 USDC，提现将转入您的钱包地址',
+                    withdraw_description: '💎 最低提现10 USDC，零手续费，秒到账！随时提现，自由支配！',
                     
                     // 佣金计算规则
                     commission_rules: {
-                        direct_commission: '直接推荐佣金：好友购买金额的35%',
-                        indirect_commission: '间接推荐佣金：下级佣金收益的35%',
-                        settlement_time: '佣金实时到账，可随时提现',
+                        direct_commission: '直接推荐佣金：好友购买金额的35%立即到账',
+                        indirect_commission: '多级推荐佣金：下级佣金收益的35%持续躺赚',
+                        settlement_time: '⚡ 佣金实时到账，随时提现，秒速变现',
                         currency: 'USDC'
                     }
                 };
