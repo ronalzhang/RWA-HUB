@@ -1,0 +1,668 @@
+{% extends "admin_v2/base.html" %}
+
+{% block title %}分享消息管理{% endblock %}
+
+{% block extra_head %}
+<!-- Bootstrap CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<!-- Toastr CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Toastr JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15) !important;
+}
+
+.border-left-primary {
+    border-left: 0.25rem solid #4e73df !important;
+}
+
+.border-left-success {
+    border-left: 0.25rem solid #1cc88a !important;
+}
+
+.border-left-info {
+    border-left: 0.25rem solid #36b9cc !important;
+}
+
+.border-left-warning {
+    border-left: 0.25rem solid #f6c23e !important;
+}
+
+.text-gray-800 {
+    color: #5a5c69 !important;
+}
+
+.text-gray-300 {
+    color: #dddfeb !important;
+}
+
+.text-xs {
+    font-size: 0.75rem;
+}
+
+.font-weight-bold {
+    font-weight: 700 !important;
+}
+
+.text-uppercase {
+    text-transform: uppercase !important;
+}
+
+.shadow {
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15) !important;
+}
+
+.message-content {
+    max-width: 400px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .message-content {
+        max-width: 200px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">分享消息管理</h1>
+            <p class="text-muted">管理系统中的分享消息文案，用户分享资产时将随机展示这些消息</p>
+        </div>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createMessageModal">
+            <i class="fas fa-plus"></i> 添加分享消息
+        </button>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                总消息数</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalMessages">0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-comments fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                激活消息</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="activeMessages">0</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">最新添加</div>
+                            <div class="h6 mb-0 font-weight-bold text-gray-800" id="latestMessage">-</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                随机展示</div>
+                            <div class="h6 mb-0 font-weight-bold text-gray-800">权重算法</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-random fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分享消息列表 -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">分享消息列表</h6>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-info" onclick="initDefaultMessages()">
+                    <i class="fas fa-database"></i> 初始化默认消息
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="refreshMessages()">
+                    <i class="fas fa-sync-alt"></i> 刷新
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="messagesTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>消息内容</th>
+                            <th>权重</th>
+                            <th>状态</th>
+                            <th>创建时间</th>
+                            <th>更新时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="messagesTableBody">
+                        <tr>
+                            <td colspan="7" class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">加载中...</span>
+                                </div>
+                                <p class="mt-2">正在加载分享消息...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 分页 -->
+            <nav aria-label="分享消息分页">
+                <ul class="pagination justify-content-center" id="messagesPagination">
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- 创建分享消息模态框 -->
+<div class="modal fade" id="createMessageModal" tabindex="-1" aria-labelledby="createMessageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createMessageModalLabel">
+                    <i class="fas fa-plus-circle text-primary"></i> 添加分享消息
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createMessageForm">
+                    <div class="mb-3">
+                        <label for="createMessageContent" class="form-label">消息内容 <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="createMessageContent" name="content" rows="4" 
+                                maxlength="500" placeholder="请输入分享消息内容，支持emoji表情"></textarea>
+                        <div class="form-text">
+                            <span id="createMessageCount">0</span>/500 字符
+                            <span class="ms-3 text-info">
+                                <i class="fas fa-lightbulb"></i> 
+                                建议使用吸引人的文案，包含收益信息和邀请语
+                            </span>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="createMessageWeight" class="form-label">权重</label>
+                                <select class="form-select" id="createMessageWeight" name="weight">
+                                    <option value="1">1 - 低</option>
+                                    <option value="2">2</option>
+                                    <option value="3" selected>3 - 中</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5 - 高</option>
+                                </select>
+                                <div class="form-text">权重越高，展示概率越大</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="createMessageStatus" class="form-label">状态</label>
+                                <select class="form-select" id="createMessageStatus" name="is_active">
+                                    <option value="true" selected>激活</option>
+                                    <option value="false">禁用</option>
+                                </select>
+                                <div class="form-text">只有激活的消息才会被展示</div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="createMessage()">
+                    <i class="fas fa-save"></i> 保存
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑分享消息模态框 -->
+<div class="modal fade" id="editMessageModal" tabindex="-1" aria-labelledby="editMessageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editMessageModalLabel">
+                    <i class="fas fa-edit text-warning"></i> 编辑分享消息
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editMessageForm">
+                    <input type="hidden" id="editMessageId" name="id">
+                    <div class="mb-3">
+                        <label for="editMessageContent" class="form-label">消息内容 <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="editMessageContent" name="content" rows="4" 
+                                maxlength="500" placeholder="请输入分享消息内容，支持emoji表情"></textarea>
+                        <div class="form-text">
+                            <span id="editMessageCount">0</span>/500 字符
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editMessageWeight" class="form-label">权重</label>
+                                <select class="form-select" id="editMessageWeight" name="weight">
+                                    <option value="1">1 - 低</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3 - 中</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5 - 高</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editMessageStatus" class="form-label">状态</label>
+                                <select class="form-select" id="editMessageStatus" name="is_active">
+                                    <option value="true">激活</option>
+                                    <option value="false">禁用</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-warning" onclick="updateMessage()">
+                    <i class="fas fa-save"></i> 更新
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let messagesData = [];
+let currentPage = 1;
+let totalPages = 1;
+
+// 页面加载完成后初始化
+$(document).ready(function() {
+    loadMessages();
+    
+    // 字符计数
+    $('#createMessageContent').on('input', function() {
+        const count = $(this).val().length;
+        $('#createMessageCount').text(count);
+        if (count > 450) {
+            $('#createMessageCount').addClass('text-warning');
+        } else {
+            $('#createMessageCount').removeClass('text-warning');
+        }
+    });
+    
+    $('#editMessageContent').on('input', function() {
+        const count = $(this).val().length;
+        $('#editMessageCount').text(count);
+        if (count > 450) {
+            $('#editMessageCount').addClass('text-warning');
+        } else {
+            $('#editMessageCount').removeClass('text-warning');
+        }
+    });
+});
+
+// 加载分享消息列表
+function loadMessages(page = 1) {
+    currentPage = page;
+    
+    $.ajax({
+        url: '/api/admin/v2/share-messages',
+        method: 'GET',
+        data: { page: page, per_page: 10 },
+        success: function(response) {
+            if (response.success) {
+                messagesData = response.data;
+                totalPages = response.pagination.pages;
+                renderMessages();
+                renderPagination();
+                updateStats();
+            } else {
+                showError('加载分享消息失败: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            showError('加载分享消息失败: ' + (xhr.responseJSON?.error || '网络错误'));
+        }
+    });
+}
+
+// 渲染分享消息表格
+function renderMessages() {
+    const tbody = $('#messagesTableBody');
+    tbody.empty();
+    
+    if (messagesData.length === 0) {
+        tbody.append(`
+            <tr>
+                <td colspan="7" class="text-center py-4">
+                    <div class="text-muted">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <p>暂无分享消息</p>
+                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createMessageModal">
+                            添加第一个分享消息
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `);
+        return;
+    }
+    
+    messagesData.forEach(message => {
+        const statusBadge = message.is_active 
+            ? '<span class="badge bg-success">激活</span>'
+            : '<span class="badge bg-secondary">禁用</span>';
+            
+        const weightBadge = getWeightBadge(message.weight);
+        
+        // 截断过长的内容
+        const content = message.content.length > 80 
+            ? message.content.substring(0, 80) + '...'
+            : message.content;
+            
+        const row = `
+            <tr>
+                <td>${message.id}</td>
+                <td>
+                    <div class="message-content" title="${escapeHtml(message.content)}">
+                        ${escapeHtml(content)}
+                    </div>
+                </td>
+                <td>${weightBadge}</td>
+                <td>${statusBadge}</td>
+                <td>${formatDateTime(message.created_at)}</td>
+                <td>${message.updated_at ? formatDateTime(message.updated_at) : '-'}</td>
+                <td>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-outline-warning" onclick="editMessage(${message.id})" title="编辑">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteMessage(${message.id}, '${escapeHtml(message.content.substring(0, 20))}')" title="删除">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+        tbody.append(row);
+    });
+}
+
+// 获取权重徽章
+function getWeightBadge(weight) {
+    if (weight <= 2) return `<span class="badge bg-secondary">${weight}</span>`;
+    if (weight <= 3) return `<span class="badge bg-info">${weight}</span>`;
+    if (weight <= 4) return `<span class="badge bg-warning">${weight}</span>`;
+    return `<span class="badge bg-success">${weight}</span>`;
+}
+
+// 渲染分页
+function renderPagination() {
+    const pagination = $('#messagesPagination');
+    pagination.empty();
+    
+    if (totalPages <= 1) return;
+    
+    // 上一页
+    if (currentPage > 1) {
+        pagination.append(`
+            <li class="page-item">
+                <a class="page-link" href="#" onclick="loadMessages(${currentPage - 1})">上一页</a>
+            </li>
+        `);
+    }
+    
+    // 页码
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === currentPage) {
+            pagination.append(`<li class="page-item active"><span class="page-link">${i}</span></li>`);
+        } else {
+            pagination.append(`<li class="page-item"><a class="page-link" href="#" onclick="loadMessages(${i})">${i}</a></li>`);
+        }
+    }
+    
+    // 下一页
+    if (currentPage < totalPages) {
+        pagination.append(`
+            <li class="page-item">
+                <a class="page-link" href="#" onclick="loadMessages(${currentPage + 1})">下一页</a>
+            </li>
+        `);
+    }
+}
+
+// 更新统计信息
+function updateStats() {
+    const total = messagesData.length;
+    const active = messagesData.filter(m => m.is_active).length;
+    const latest = messagesData.length > 0 ? messagesData[0].created_at : null;
+    
+    $('#totalMessages').text(total);
+    $('#activeMessages').text(active);
+    $('#latestMessage').text(latest ? formatDateTime(latest) : '-');
+}
+
+// 创建分享消息
+function createMessage() {
+    const formData = {
+        content: $('#createMessageContent').val().trim(),
+        weight: parseInt($('#createMessageWeight').val()),
+        is_active: $('#createMessageStatus').val() === 'true'
+    };
+    
+    if (!formData.content) {
+        showError('请输入消息内容');
+        return;
+    }
+    
+    if (formData.content.length > 500) {
+        showError('消息内容不能超过500个字符');
+        return;
+    }
+    
+    $.ajax({
+        url: '/api/admin/v2/share-messages',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(formData),
+        success: function(response) {
+            if (response.success) {
+                showSuccess('分享消息创建成功');
+                $('#createMessageModal').modal('hide');
+                $('#createMessageForm')[0].reset();
+                $('#createMessageCount').text('0');
+                loadMessages(1); // 重新加载第一页
+            } else {
+                showError('创建失败: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            showError('创建失败: ' + (xhr.responseJSON?.error || '网络错误'));
+        }
+    });
+}
+
+// 编辑分享消息
+function editMessage(messageId) {
+    const message = messagesData.find(m => m.id === messageId);
+    if (!message) {
+        showError('找不到要编辑的消息');
+        return;
+    }
+    
+    $('#editMessageId').val(message.id);
+    $('#editMessageContent').val(message.content);
+    $('#editMessageWeight').val(message.weight);
+    $('#editMessageStatus').val(message.is_active.toString());
+    $('#editMessageCount').text(message.content.length);
+    
+    $('#editMessageModal').modal('show');
+}
+
+// 更新分享消息
+function updateMessage() {
+    const messageId = $('#editMessageId').val();
+    const formData = {
+        content: $('#editMessageContent').val().trim(),
+        weight: parseInt($('#editMessageWeight').val()),
+        is_active: $('#editMessageStatus').val() === 'true'
+    };
+    
+    if (!formData.content) {
+        showError('请输入消息内容');
+        return;
+    }
+    
+    if (formData.content.length > 500) {
+        showError('消息内容不能超过500个字符');
+        return;
+    }
+    
+    $.ajax({
+        url: `/api/admin/v2/share-messages/${messageId}`,
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify(formData),
+        success: function(response) {
+            if (response.success) {
+                showSuccess('分享消息更新成功');
+                $('#editMessageModal').modal('hide');
+                loadMessages(currentPage);
+            } else {
+                showError('更新失败: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            showError('更新失败: ' + (xhr.responseJSON?.error || '网络错误'));
+        }
+    });
+}
+
+// 删除分享消息
+function deleteMessage(messageId, messagePreview) {
+    if (!confirm(`确定要删除这条分享消息吗？\n\n"${messagePreview}..."\n\n此操作不可恢复！`)) {
+        return;
+    }
+    
+    $.ajax({
+        url: `/api/admin/v2/share-messages/${messageId}`,
+        method: 'DELETE',
+        success: function(response) {
+            if (response.success) {
+                showSuccess('分享消息删除成功');
+                loadMessages(currentPage);
+            } else {
+                showError('删除失败: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            showError('删除失败: ' + (xhr.responseJSON?.error || '网络错误'));
+        }
+    });
+}
+
+// 初始化默认分享消息
+function initDefaultMessages() {
+    if (!confirm('确定要初始化默认分享消息吗？\n\n这将会添加一些预设的分享消息模板。')) {
+        return;
+    }
+    
+    $.ajax({
+        url: '/api/admin/v2/share-messages/init-default',
+        method: 'POST',
+        success: function(response) {
+            if (response.success) {
+                showSuccess('默认分享消息初始化成功');
+                loadMessages(1);
+            } else {
+                showError('初始化失败: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            showError('初始化失败: ' + (xhr.responseJSON?.error || '网络错误'));
+        }
+    });
+}
+
+// 刷新消息列表
+function refreshMessages() {
+    loadMessages(currentPage);
+}
+
+// 工具函数
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatDateTime(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleString('zh-CN');
+}
+
+function showSuccess(message) {
+    toastr.success(message);
+}
+
+function showError(message) {
+    toastr.error(message);
+}
+</script>
+{% endblock %} 

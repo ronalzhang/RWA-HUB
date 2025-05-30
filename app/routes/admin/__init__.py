@@ -63,6 +63,12 @@ def commission_v2():
     """V2版本佣金管理页面"""
     return render_template('admin_v2/commission.html')
 
+@admin_bp.route('/v2/share-messages')
+@admin_page_required
+def share_messages_v2():
+    """V2版本分享消息管理页面"""
+    return render_template('admin_v2/share_messages.html')
+
 @admin_bp.route('/v2/settings')
 @admin_page_required
 def settings_v2():

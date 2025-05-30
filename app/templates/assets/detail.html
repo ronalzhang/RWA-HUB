@@ -2352,10 +2352,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // 根据配置生成不同的层级显示
             const commissionTiersHtml = shareConfig.is_unlimited_levels ? 
                 `<div class="commission-tiers mt-2 text-center">
-                    <div class="tier">
-                        <div class="tier-label">无限层级</div>
+                    <div class="tier unlimited-tier">
+                        <div class="tier-icon">♾️</div>
+                        <div class="tier-label">持续收益</div>
                         <div class="tier-value">${shareConfig.commission_rate}%</div>
-                        <div class="tier-desc">每级上贡</div>
+                        <div class="tier-desc">团队分成</div>
                     </div>
                 </div>` :
                 `<div class="commission-tiers mt-2 d-flex justify-content-around text-center">
@@ -2376,13 +2377,13 @@ document.addEventListener('DOMContentLoaded', function() {
             // 根据配置生成不同的说明内容
             const tooltipContent = shareConfig.is_unlimited_levels ?
                 `<div class='text-start'>
-                    <p class='mb-1'>无限层级分销收益说明：</p>
+                    <p class='mb-1'><strong>🚀 智能分润体系</strong></p>
                     <ul class='ps-3 mb-0'>
-                        <li>好友通过您的链接投资：您获得交易费用${shareConfig.commission_rate}%的回馈</li>
-                        <li>无限层级：每个下级的收益，您都可获得${shareConfig.commission_rate}%</li>
-                        <li>持续收益：团队越大，收益越多，无上限</li>
+                        <li><strong>直推收益</strong>：好友投资即获${shareConfig.commission_rate}%平台服务费分成</li>
+                        <li><strong>团队收益</strong>：下级成员每笔收益的${shareConfig.commission_rate}%持续分成</li>
+                        <li><strong>复利增长</strong>：团队规模越大，被动收入越高</li>
                     </ul>
-                    <p class='mt-1 mb-0 small'>例：团队成员投资10,000USDC，平台服务费250USDC，您直接获得${Math.round(250 * shareConfig.commission_rate / 100)}USDC回馈！</p>
+                    <p class='mt-2 mb-0 small text-success'>💡 示例：团队成员投资10,000USDC，您直接获得${Math.round(250 * shareConfig.commission_rate / 100)}USDC分成！</p>
                 </div>` :
                 `<div class='text-start'>
                     <p class='mb-1'>您分享RWA资产的收益说明：</p>
@@ -2397,10 +2398,13 @@ document.addEventListener('DOMContentLoaded', function() {
             // 生成分享链接模态框
             const modalHtml = `
                 <div class="modal fade" id="shareModal" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog">
+                    <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">分享RWA资产</h5>
+                            <div class="modal-header border-0">
+                                <h5 class="modal-title d-flex align-items-center">
+                                    <i class="fas fa-share-alt text-primary me-2"></i>
+                                    分享RWA资产
+                                </h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
@@ -2408,33 +2412,43 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="spinner-border text-primary" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
-                                    <p class="mt-2">正在生成安全的分享链接...</p>
+                                    <p class="mt-2">正在生成您的专属分享链接...</p>
                                 </div>
                                 
                                 <div id="shareContent" style="display:none;">
-                                    <div class="share-message">
-                                        ${shareMessage}
+                                    <div class="share-message mb-3 p-3 bg-light rounded">
+                                        <i class="fas fa-quote-left text-muted"></i>
+                                        <span class="ms-2">${shareMessage}</span>
                                     </div>
                                     
-                                    <div class="commission-info mb-3">
-                                        <div class="d-flex align-items-center">
-                                            <strong>分享收益计划（长期有效）</strong>
+                                    <div class="commission-info mb-4">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <strong class="text-primary">💰 分享奖励计划</strong>
+                                            <span class="badge bg-success ms-2">长期有效</span>
                                             <span class="info-icon ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="${tooltipContent}">
                                                 <i class="fas fa-info-circle text-primary"></i>
                                             </span>
                                         </div>
                                         ${commissionTiersHtml}
+                                        <div class="mt-2 text-center">
+                                            <small class="text-muted">
+                                                ${shareConfig.is_unlimited_levels ? '🎯 建立您的投资社群，享受源源不断的被动收入' : '💫 推荐越多好友，收益越丰厚'}
+                                            </small>
+                                        </div>
                                     </div>
                                     
                                     <div class="mb-3">
-                                        <label class="form-label">您的专属分享链接:</label>
+                                        <label class="form-label fw-bold">🔗 您的专属邀请链接</label>
                                         <div class="input-group">
                                             <input type="text" class="form-control" id="shareLink" readonly>
-                                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('shareLink')">
+                                            <button class="btn btn-outline-primary" type="button" onclick="copyToClipboard('shareLink')">
                                                 <i class="fas fa-copy"></i>
                                             </button>
                                         </div>
-                                        <small class="form-text text-muted">此链接已绑定您的钱包地址，分享收益将自动归属到您的账户</small>
+                                        <small class="form-text text-muted">
+                                            <i class="fas fa-shield-alt me-1"></i>
+                                            链接已绑定您的钱包地址，收益将自动归属到您的账户
+                                        </small>
                                     </div>
                                     <div class="d-flex gap-2 mt-4">
                                         <button class="btn btn-success flex-grow-1" onclick="copyToClipboard('shareLink')">
