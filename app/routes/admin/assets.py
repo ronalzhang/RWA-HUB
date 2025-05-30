@@ -19,114 +19,113 @@ from . import admin_bp, admin_api_bp
 from .auth import api_admin_required, admin_page_required
 
 
+# 资产类型映射
+ASSET_TYPE_NAMES = {
+    1: '房地产',
+    2: '股权', 
+    3: '债券',
+    4: '商品',
+    5: '其他',
+    10: '不动产',
+    20: '商业地产',
+    30: '工业地产',
+    40: '土地资产',
+    50: '证券资产',
+    60: '艺术品',
+    70: '收藏品'
+}
+
+# 状态文本映射
+STATUS_TEXTS = {
+    1: '待审核',
+    2: '已通过',
+    3: '已拒绝',
+    5: '已支付',
+    6: '支付失败',
+    7: '部署失败',
+    8: '支付处理中'
+}
+
+
+def get_asset_type_name(asset_type):
+    """获取资产类型名称"""
+    return ASSET_TYPE_NAMES.get(asset_type, '其他')
+
+
+def get_status_text(status):
+    """获取状态文本"""
+    return STATUS_TEXTS.get(status, '未知状态')
+
+
+def format_asset_data(asset):
+    """格式化单个资产数据"""
+    # 获取封面图片
+    cover_image = '/static/images/placeholder.jpg'
+    if asset.images and len(asset.images) > 0:
+        cover_image = asset.images[0]
+    
+    return {
+        'id': asset.id,
+        'name': asset.name,
+        'token_symbol': asset.token_symbol,
+        'asset_type': asset.asset_type,
+        'asset_type_name': get_asset_type_name(asset.asset_type),
+        'location': asset.location,
+        'area': float(asset.area) if asset.area else 0,
+        'token_price': float(asset.token_price) if asset.token_price else 0,
+        'annual_revenue': float(asset.annual_revenue) if asset.annual_revenue else 0,
+        'total_value': float(asset.total_value) if asset.total_value else 0,
+        'token_supply': asset.token_supply,
+        'creator_address': asset.creator_address,
+        'status': asset.status,
+        'status_text': get_status_text(asset.status),
+        'token_address': asset.token_address,
+        'image': cover_image,
+        'images': asset.images if asset.images else [],
+        'description': asset.description,
+        'created_at': asset.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        'updated_at': asset.updated_at.strftime('%Y-%m-%d %H:%M:%S') if asset.updated_at else None
+    }
+
+
+# ================================
 # 页面路由
+# ================================
+
 @admin_bp.route('/assets')
-@admin_page_required
+@admin_page_required  
 def assets_page():
     """资产管理页面"""
     return render_template('admin_v2/assets.html')
 
 
-# V2版本路由（兼容前端调用）
-@admin_bp.route('/v2/api/assets', methods=['GET'])
-@api_admin_required
-def assets_list_v2():
-    """获取资产列表 - V2兼容版本"""
-    return api_assets()
+# ================================
+# API路由 - 资产管理
+# ================================
 
-
-@admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['GET'])
-@api_admin_required
-def asset_detail_v2(asset_id):
-    """获取资产详情 - V2兼容版本"""
-    return api_get_asset(asset_id)
-
-
-@admin_bp.route('/v2/api/assets/<int:asset_id>', methods=['DELETE'])
-@api_admin_required
-def delete_asset_v2(asset_id):
-    """删除资产 - V2兼容版本"""
-    return api_delete_asset(asset_id)
-
-
-@admin_bp.route('/v2/api/assets/<int:asset_id>/approve', methods=['POST'])
-@api_admin_required
-def approve_asset_v2(asset_id):
-    """审核通过资产 - V2兼容版本"""
-    return api_approve_asset(asset_id)
-
-
-@admin_bp.route('/v2/api/assets/<int:asset_id>/reject', methods=['POST'])
-@api_admin_required
-def reject_asset_v2(asset_id):
-    """审核拒绝资产 - V2兼容版本"""
-    return api_reject_asset(asset_id)
-
-
-@admin_bp.route('/v2/api/assets/batch-approve', methods=['POST'])
-@api_admin_required
-def batch_approve_assets_v2():
-    """批量审核通过 - V2兼容版本"""
-    return api_batch_approve_assets()
-
-
-@admin_bp.route('/v2/api/assets/batch-reject', methods=['POST'])
-@api_admin_required
-def batch_reject_assets_v2():
-    """批量审核拒绝 - V2兼容版本"""
-    return api_batch_reject_assets()
-
-
-@admin_bp.route('/v2/api/assets/batch-delete', methods=['POST'])
-@api_admin_required
-def batch_delete_assets_v2():
-    """批量删除 - V2兼容版本"""
-    return api_batch_delete_assets()
-
-
-@admin_bp.route('/v2/api/assets/stats', methods=['GET'])
-@api_admin_required
-def assets_stats_v2():
-    """获取资产统计 - V2兼容版本"""
-    return api_assets_stats()
-
-
-@admin_bp.route('/v2/api/assets/export', methods=['GET'])
-@api_admin_required
-def export_assets_v2():
-    """导出资产数据 - V2兼容版本"""
-    return api_export_assets()
-
-
-# API路由
-@admin_bp.route('/api/assets', methods=['GET'])
+@admin_api_bp.route('/assets', methods=['GET'])
 @api_admin_required
 def api_assets():
     """资产列表API"""
     try:
         page = request.args.get('page', 1, type=int)
-        # 兼容前端的limit参数
-        limit = request.args.get('limit', 20, type=int)
-        per_page = request.args.get('per_page', limit, type=int)
+        limit = min(request.args.get('limit', 20, type=int), 100)
         
-        # 兼容前端的keyword参数
+        # 搜索参数
         search = request.args.get('search', '')
         keyword = request.args.get('keyword', '')
         if keyword:
             search = keyword
             
+        # 筛选参数
         status = request.args.get('status', '', type=str)
-        # 兼容前端的type参数
-        asset_type = request.args.get('asset_type', '', type=str)
-        type_param = request.args.get('type', '')
-        if type_param:
-            asset_type = type_param
-            
-        # 获取排序参数
+        asset_type = request.args.get('asset_type', '', type=str) or request.args.get('type', '')
+        
+        # 排序参数
         sort_field = request.args.get('sort', 'id')
         sort_order = request.args.get('order', 'desc')
         
-        # 查询资产列表 - 排除已删除的资产（deleted_at不为空）
+        # 构建查询
         query = Asset.query.filter(Asset.deleted_at.is_(None))
         
         # 搜索条件
@@ -154,93 +153,26 @@ def api_assets():
                 pass
         
         # 排序处理
-        if sort_field == 'id':
-            order_column = Asset.id
-        elif sort_field == 'name':
-            order_column = Asset.name
-        elif sort_field == 'created_at':
-            order_column = Asset.created_at
-        elif sort_field == 'updated_at':
-            order_column = Asset.updated_at
-        elif sort_field == 'token_price':
-            order_column = Asset.token_price
-        elif sort_field == 'total_value':
-            order_column = Asset.total_value
-        else:
-            order_column = Asset.id
-            
+        sort_columns = {
+            'id': Asset.id,
+            'name': Asset.name,
+            'created_at': Asset.created_at,
+            'updated_at': Asset.updated_at,
+            'token_price': Asset.token_price,
+            'total_value': Asset.total_value
+        }
+        
+        order_column = sort_columns.get(sort_field, Asset.id)
         if sort_order.lower() == 'asc':
             query = query.order_by(order_column.asc())
         else:
             query = query.order_by(order_column.desc())
         
         # 分页
-        pagination = query.paginate(
-            page=page, per_page=per_page, error_out=False
-        )
+        pagination = query.paginate(page=page, per_page=limit, error_out=False)
         
-        assets = []
-        for asset in pagination.items:
-            # 获取资产类型名称
-            asset_type_name = '其他'
-            try:
-                if asset.asset_type == 1:
-                    asset_type_name = '房地产'
-                elif asset.asset_type == 2:
-                    asset_type_name = '股权'
-                elif asset.asset_type == 3:
-                    asset_type_name = '债券'
-                elif asset.asset_type == 4:
-                    asset_type_name = '商品'
-                elif asset.asset_type == 5:
-                    asset_type_name = '其他'
-                elif asset.asset_type == 10:
-                    asset_type_name = '不动产'
-                elif asset.asset_type == 20:
-                    asset_type_name = '商业地产'
-                elif asset.asset_type == 30:
-                    asset_type_name = '工业地产'
-                elif asset.asset_type == 40:
-                    asset_type_name = '土地资产'
-                elif asset.asset_type == 50:
-                    asset_type_name = '证券资产'
-                elif asset.asset_type == 60:
-                    asset_type_name = '艺术品'
-                elif asset.asset_type == 70:
-                    asset_type_name = '收藏品'
-                else:
-                    asset_type_name = '其他'
-            except:
-                asset_type_name = '其他'
-            
-            # 获取封面图片
-            cover_image = '/static/images/placeholder.jpg'
-            if asset.images and len(asset.images) > 0:
-                cover_image = asset.images[0]
-            
-            assets.append({
-                'id': asset.id,
-                'name': asset.name,
-                'token_symbol': asset.token_symbol,
-                'asset_type': asset.asset_type,
-                'asset_type_name': asset_type_name,
-                'location': asset.location,
-                'token_price': float(asset.token_price) if asset.token_price else 0,
-                'total_value': float(asset.total_value) if asset.total_value else 0,
-                'token_supply': asset.token_supply,
-                'creator_address': asset.creator_address,
-                'status': asset.status,
-                'status_text': {
-                    1: '待审核',
-                    2: '已通过',
-                    3: '已拒绝',
-                    4: '已删除'
-                }.get(asset.status, '未知状态'),
-                'token_address': asset.token_address,
-                'image': cover_image,
-                'created_at': asset.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                'updated_at': asset.updated_at.strftime('%Y-%m-%d %H:%M:%S') if asset.updated_at else None
-            })
+        # 格式化数据
+        assets = [format_asset_data(asset) for asset in pagination.items]
         
         return jsonify({
             'success': True,
@@ -248,7 +180,7 @@ def api_assets():
             'total': pagination.total,
             'page': page,
             'pages': pagination.pages,
-            'per_page': per_page,
+            'per_page': limit,
             'has_prev': pagination.has_prev,
             'has_next': pagination.has_next
         })
@@ -258,7 +190,7 @@ def api_assets():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/assets/<int:asset_id>', methods=['GET'])
+@admin_api_bp.route('/assets/<int:asset_id>', methods=['GET'])
 @api_admin_required
 def api_get_asset(asset_id):
     """获取单个资产详情"""
@@ -267,109 +199,40 @@ def api_get_asset(asset_id):
         if not asset:
             return jsonify({'success': False, 'error': '资产不存在或已被删除'}), 404
         
-        # 获取资产类型名称
-        asset_type_name = '其他'
-        try:
-            if asset.asset_type == 1:
-                asset_type_name = '房地产'
-            elif asset.asset_type == 2:
-                asset_type_name = '股权'
-            elif asset.asset_type == 3:
-                asset_type_name = '债券'
-            elif asset.asset_type == 4:
-                asset_type_name = '商品'
-            elif asset.asset_type == 5:
-                asset_type_name = '其他'
-            elif asset.asset_type == 10:
-                asset_type_name = '不动产'
-            elif asset.asset_type == 20:
-                asset_type_name = '商业地产'
-            elif asset.asset_type == 30:
-                asset_type_name = '工业地产'
-            elif asset.asset_type == 40:
-                asset_type_name = '土地资产'
-            elif asset.asset_type == 50:
-                asset_type_name = '证券资产'
-            elif asset.asset_type == 60:
-                asset_type_name = '艺术品'
-            elif asset.asset_type == 70:
-                asset_type_name = '收藏品'
-            else:
-                asset_type_name = '其他'
-        except:
-            asset_type_name = '其他'
-        
-        cover_image = '/static/images/placeholder.jpg'
-        if asset.images and len(asset.images) > 0:
-            cover_image = asset.images[0]
-        
-        asset_data = {
-            'id': asset.id,
-            'name': asset.name,
-            'description': asset.description,
-            'token_symbol': asset.token_symbol,
-            'asset_type': asset.asset_type,
-            'asset_type_name': asset_type_name,
-            'location': asset.location,
-            'area': float(asset.area) if asset.area else 0,
-            'token_price': float(asset.token_price) if asset.token_price else 0,
-            'annual_revenue': float(asset.annual_revenue) if asset.annual_revenue else 0,
-            'total_value': float(asset.total_value) if asset.total_value else 0,
-            'token_supply': asset.token_supply,
-            'creator_address': asset.creator_address,
-            'status': asset.status,
-            'status_text': {
-                1: '待审核',
-                2: '已通过', 
-                3: '已拒绝',
-                4: '已删除'
-            }.get(asset.status, '未知状态'),
-            'token_address': asset.token_address,
-            'image': cover_image,
-            'images': asset.images if asset.images else [],
-            'created_at': asset.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'updated_at': asset.updated_at.strftime('%Y-%m-%d %H:%M:%S') if asset.updated_at else None
-        }
-        
-        return jsonify({'success': True, 'data': asset_data})
+        return jsonify({'success': True, 'data': format_asset_data(asset)})
         
     except Exception as e:
         current_app.logger.error(f'获取资产详情失败: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/assets/<int:asset_id>', methods=['DELETE'])
+@admin_api_bp.route('/assets/<int:asset_id>', methods=['DELETE'])
 @api_admin_required
 def api_delete_asset(asset_id):
     """删除资产（软删除）"""
     try:
-        with current_app.app_context():
-            # 首先检查资产是否存在
-            asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
-            if not asset:
-                return jsonify({'success': False, 'error': '资产不存在或已被删除'}), 404
-            
-            # 使用原生SQL执行软删除
-            sql = text("UPDATE assets SET deleted_at = NOW() WHERE id = :asset_id AND deleted_at IS NULL")
-            result = db.session.execute(sql, {'asset_id': asset_id})
-            
-            if result.rowcount > 0:
-                db.session.commit()
-                current_app.logger.info(f'资产已软删除: {asset_id}')
-                return jsonify({'success': True, 'message': '资产已删除'})
-            else:
-                return jsonify({'success': False, 'error': '删除失败，资产可能已被删除'}), 400
+        asset = Asset.query.filter(Asset.id == asset_id, Asset.deleted_at.is_(None)).first()
+        if not asset:
+            return jsonify({'success': False, 'error': '资产不存在或已被删除'}), 404
+        
+        # 使用原生SQL执行软删除
+        sql = text("UPDATE assets SET deleted_at = NOW() WHERE id = :asset_id AND deleted_at IS NULL")
+        result = db.session.execute(sql, {'asset_id': asset_id})
+        
+        if result.rowcount > 0:
+            db.session.commit()
+            current_app.logger.info(f'资产已软删除: {asset_id}')
+            return jsonify({'success': True, 'message': '资产已删除'})
+        else:
+            return jsonify({'success': False, 'error': '删除失败，资产可能已被删除'}), 400
         
     except Exception as e:
-        try:
-            db.session.rollback()
-        except:
-            pass
+        db.session.rollback()
         current_app.logger.error(f'删除资产失败: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/assets/<int:asset_id>/approve', methods=['POST'])
+@admin_api_bp.route('/assets/<int:asset_id>/approve', methods=['POST'])
 @api_admin_required
 def api_approve_asset(asset_id):
     """审核通过资产"""
@@ -393,7 +256,7 @@ def api_approve_asset(asset_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/assets/<int:asset_id>/reject', methods=['POST'])
+@admin_api_bp.route('/assets/<int:asset_id>/reject', methods=['POST'])
 @api_admin_required
 def api_reject_asset(asset_id):
     """审核拒绝资产"""
@@ -422,7 +285,7 @@ def api_reject_asset(asset_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/assets/batch-approve', methods=['POST'])
+@admin_api_bp.route('/assets/batch-approve', methods=['POST'])
 @api_admin_required
 def api_batch_approve_assets():
     """批量审核通过资产"""
@@ -441,14 +304,12 @@ def api_batch_approve_assets():
         except (ValueError, TypeError):
             return jsonify({'success': False, 'error': '无效的资产ID格式'}), 400
         
-        # 使用原生SQL执行批量审核通过
-        from sqlalchemy import text
+        # 批量审核通过
         sql = text("UPDATE assets SET status = 2 WHERE id = ANY(:asset_ids) AND status = 1 AND deleted_at IS NULL")
         result = db.session.execute(sql, {'asset_ids': asset_ids})
         
         success_count = result.rowcount
         failed_count = len(asset_ids) - success_count
-        
         db.session.commit()
         
         return jsonify({
@@ -460,15 +321,12 @@ def api_batch_approve_assets():
         })
         
     except Exception as e:
-        try:
-            db.session.rollback()
-        except:
-            pass
+        db.session.rollback()
         current_app.logger.error(f'批量审核失败: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/assets/batch-reject', methods=['POST'])
+@admin_api_bp.route('/assets/batch-reject', methods=['POST'])
 @api_admin_required
 def api_batch_reject_assets():
     """批量审核拒绝资产"""
@@ -489,14 +347,12 @@ def api_batch_reject_assets():
         except (ValueError, TypeError):
             return jsonify({'success': False, 'error': '无效的资产ID格式'}), 400
         
-        # 使用原生SQL执行批量审核拒绝
-        from sqlalchemy import text
+        # 批量审核拒绝
         sql = text("UPDATE assets SET status = 3 WHERE id = ANY(:asset_ids) AND status = 1 AND deleted_at IS NULL")
         result = db.session.execute(sql, {'asset_ids': asset_ids})
         
         success_count = result.rowcount
         failed_count = len(asset_ids) - success_count
-        
         db.session.commit()
         
         return jsonify({
@@ -508,15 +364,12 @@ def api_batch_reject_assets():
         })
         
     except Exception as e:
-        try:
-            db.session.rollback()
-        except:
-            pass
+        db.session.rollback()
         current_app.logger.error(f'批量拒绝失败: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/assets/batch-delete', methods=['POST'])
+@admin_api_bp.route('/assets/batch-delete', methods=['POST'])
 @api_admin_required
 def api_batch_delete_assets():
     """批量删除资产（软删除）"""
@@ -535,20 +388,12 @@ def api_batch_delete_assets():
         except (ValueError, TypeError):
             return jsonify({'success': False, 'error': '无效的资产ID格式'}), 400
         
-        # 使用原生SQL执行批量软删除
-        from sqlalchemy import text
-        
-        # 先检查有多少资产存在且未被删除
-        check_sql = text("SELECT COUNT(*) FROM assets WHERE id = ANY(:asset_ids) AND deleted_at IS NULL")
-        exist_count = db.session.execute(check_sql, {'asset_ids': asset_ids}).scalar()
-        
-        # 执行批量软删除
+        # 批量软删除
         sql = text("UPDATE assets SET deleted_at = NOW() WHERE id = ANY(:asset_ids) AND deleted_at IS NULL")
         result = db.session.execute(sql, {'asset_ids': asset_ids})
         
         success_count = result.rowcount
         failed_count = len(asset_ids) - success_count
-        
         db.session.commit()
         
         return jsonify({
@@ -560,15 +405,12 @@ def api_batch_delete_assets():
         })
         
     except Exception as e:
-        try:
-            db.session.rollback()
-        except:
-            pass
+        db.session.rollback()
         current_app.logger.error(f'批量删除失败: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_bp.route('/api/assets/stats', methods=['GET'])
+@admin_api_bp.route('/assets/stats', methods=['GET'])
 @api_admin_required
 def api_assets_stats():
     """资产统计数据"""
@@ -589,7 +431,6 @@ def api_assets_stats():
             Asset.deleted_at.is_(None)
         ).distinct().count()
         
-        # 返回前端期望的数据格式
         return jsonify({
             'totalAssets': total_assets,
             'totalValue': float(total_value),
@@ -611,7 +452,7 @@ def api_assets_stats():
         }), 500
 
 
-@admin_bp.route('/api/assets/export', methods=['GET'])
+@admin_api_bp.route('/assets/export', methods=['GET'])
 @api_admin_required
 def api_export_assets():
     """导出资产数据为CSV"""
@@ -630,23 +471,17 @@ def api_export_assets():
         
         # 写入数据行
         for asset in assets:
-            status_text = {
-                1: '待审核',
-                2: '已通过',
-                3: '已拒绝'
-            }.get(asset.status, '未知状态')
-            
             writer.writerow([
                 asset.id,
                 asset.name,
                 asset.token_symbol,
-                asset.asset_type,
+                get_asset_type_name(asset.asset_type),
                 asset.location,
                 float(asset.token_price) if asset.token_price else 0,
                 float(asset.total_value) if asset.total_value else 0,
                 asset.token_supply,
                 asset.creator_address,
-                status_text,
+                get_status_text(asset.status),
                 asset.created_at.strftime('%Y-%m-%d %H:%M:%S'),
                 asset.updated_at.strftime('%Y-%m-%d %H:%M:%S') if asset.updated_at else ''
             ])
@@ -664,6 +499,10 @@ def api_export_assets():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+# ================================
+# API路由 - 分红管理  
+# ================================
+
 @admin_api_bp.route('/dividends', methods=['GET'])
 @api_admin_required
 def api_get_dividends():
@@ -675,22 +514,6 @@ def api_get_dividends():
         status = request.args.get('status')
         sort = request.args.get('sort', 'created_at')
         order = request.args.get('order', 'desc')
-        
-        # 构建查询
-        query = db.session.query(
-            text('''
-            SELECT 
-                1 as id,
-                '示例分红' as asset_name,
-                'DEMO' as asset_symbol,
-                100.0 as amount,
-                0 as recipient_count,
-                NOW() as distribution_date,
-                'pending' as status,
-                NOW() as created_at
-            WHERE 1=0
-            ''')
-        )
         
         # 由于目前没有实际的分红表，返回空结果
         return jsonify({
@@ -734,9 +557,6 @@ def api_delete_dividend(dividend_id):
 def api_export_dividends():
     """导出分红数据"""
     try:
-        import csv
-        import io
-        
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(['ID', '资产名称', '分红金额', '状态', '创建时间'])
