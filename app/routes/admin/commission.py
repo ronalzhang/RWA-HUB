@@ -10,6 +10,7 @@ from flask import (
 from datetime import datetime, timedelta
 import csv
 import io
+import json
 from sqlalchemy import desc, func, or_, and_
 from app import db
 from app.models.referral import CommissionRecord
@@ -273,125 +274,132 @@ def api_commission_records():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@admin_api_bp.route('/commission/settings', methods=['GET'])
+@admin_api_bp.route('/commission/settings', methods=['GET', 'POST'])
 @api_admin_required
 def api_commission_settings():
-    """佣金设置 - 基于35%分销体系"""
-    try:
-        from app.models.commission_config import CommissionConfig
-        
-        # 获取35%分销系统的真实配置
-        settings = {
-            # 核心分销设置
-            'commission_rate': CommissionConfig.get_config('commission_rate', 35.0),
-            'commission_description': CommissionConfig.get_config('commission_description', '💰 推荐好友即享35%超高佣金，人人都是赚钱达人！'),
+    """佣金设置管理"""
+    if request.method == 'GET':
+        try:
+            from app.models.commission_config import CommissionConfig
             
-            # 分享功能设置  
-            'share_button_text': CommissionConfig.get_config('share_button_text', '🚀 分享赚大钱'),
-            'share_description': CommissionConfig.get_config('share_description', '🎯 推荐好友购买项目，您立即获得35%现金奖励！多级分销，收益无上限！'),
-            'share_success_message': CommissionConfig.get_config('share_success_message', '🎉 分享链接已复制！快去邀请好友赚取35%佣金吧！'),
+            settings = {}
+            # 获取所有配置
+            for key in ['commission_rate', 'commission_description', 'share_button_text', 
+                       'share_description', 'share_success_message', 'min_withdraw_amount',
+                       'withdraw_fee_rate', 'withdraw_description', 'withdrawal_delay_minutes',
+                       'max_referral_levels', 'enable_multi_level', 'platform_referrer_address',
+                       'enable_platform_referrer']:
+                settings[key] = CommissionConfig.get_config(key, None)
             
-            # 提现配置
-            'min_withdraw_amount': CommissionConfig.get_config('min_withdraw_amount', 10.0),
-            'withdraw_fee_rate': CommissionConfig.get_config('withdraw_fee_rate', 0.0),
-            'withdraw_description': CommissionConfig.get_config('withdraw_description', '💎 最低提现10 USDC，零手续费，秒到账！随时提现，自由支配！'),
-            'withdrawal_delay_minutes': CommissionConfig.get_config('withdrawal_delay_minutes', 1),
-            
-            # 佣金计算规则
-            'commission_rules': CommissionConfig.get_config('commission_rules', {
-                'direct_commission': '🔥 直接推荐佣金：好友购买金额的35%立即到账',
-                'indirect_commission': '💰 多级推荐佣金：下级佣金收益的35%持续躺赚', 
-                'settlement_time': '⚡ 佣金实时到账，随时提现，秒速变现',
-                'currency': 'USDC'
-            }),
-            
-            # 分销层级设置
-            'max_referral_levels': CommissionConfig.get_config('max_referral_levels', 2),
-            'enable_multi_level': CommissionConfig.get_config('enable_multi_level', True),
-            
-            # 平台推荐人设置
-            'platform_referrer_address': CommissionConfig.get_config('platform_referrer_address', ''),
-            'enable_platform_referrer': CommissionConfig.get_config('enable_platform_referrer', True),
-        }
-        
-        return jsonify({
-            'success': True,
-            'data': settings
-        })
-        
-    except Exception as e:
-        current_app.logger.error(f'获取佣金设置失败: {str(e)}', exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@admin_api_bp.route('/commission/settings', methods=['POST'])
-@api_admin_required
-def api_update_commission_settings():
-    """更新佣金设置"""
-    try:
-        from app.models.commission_config import CommissionConfig
-        
-        data = request.get_json()
-        
-        # 更新所有配置
-        for key, value in data.items():
-            if key in ['commission_rate', 'commission_description', 'share_button_text', 
-                      'share_description', 'share_success_message', 'min_withdraw_amount', 
-                      'withdraw_fee_rate', 'withdraw_description', 'withdrawal_delay_minutes',
-                      'commission_rules', 'max_referral_levels', 'enable_multi_level', 
-                      'platform_referrer_address', 'enable_platform_referrer']:
-                
-                CommissionConfig.set_config(key, value)
-        
-        # 特殊处理：如果设置了平台推荐人地址且启用了功能，自动将现有无推荐人的用户设置为平台的下线
-        if ('platform_referrer_address' in data and data['platform_referrer_address'] and 
-            data.get('enable_platform_referrer', True)):
-            
-            platform_address = data['platform_referrer_address'].strip()
-            if platform_address:
+            # 获取佣金计算规则
+            commission_rules = CommissionConfig.get_config('commission_rules', {})
+            if isinstance(commission_rules, str):
+                import json
                 try:
-                    from app.models.user import User
-                    from app.extensions import db
-                    
-                    # 查找所有没有推荐人的活跃用户
-                    all_users_without_referrer = User.query.filter(
-                        User.referrer_address.is_(None),
-                        User.is_active == True
-                    ).all()
-                    
-                    # 过滤掉平台地址本身（避免自己推荐自己）
-                    users_to_update = []
-                    for user in all_users_without_referrer:
-                        # 检查是否是平台地址本身
-                        if (user.eth_address != platform_address and 
-                            user.solana_address != platform_address):
-                            users_to_update.append(user)
-                    
-                    updated_count = 0
-                    for user in users_to_update:
-                        user.referrer_address = platform_address
-                        updated_count += 1
-                    
-                    db.session.commit()
-                    current_app.logger.info(f"已将 {updated_count} 个无推荐人用户设置为平台下线")
-                    
-                    return jsonify({
-                        'success': True, 
-                        'message': f'佣金设置更新成功！已将 {updated_count} 个无推荐人用户设置为平台下线'
-                    })
-                    
-                except Exception as e:
-                    current_app.logger.error(f"批量更新用户推荐关系失败: {str(e)}")
-                    return jsonify({
-                        'success': True, 
-                        'message': '佣金设置更新成功，但自动设置平台推荐关系时出现错误，请手动处理'
-                    })
-        
-        return jsonify({'success': True, 'message': '佣金设置更新成功'})
-        
-    except Exception as e:
-        current_app.logger.error(f"更新佣金设置失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+                    commission_rules = json.loads(commission_rules)
+                except:
+                    commission_rules = {}
+            settings['commission_rules'] = commission_rules
+            
+            return jsonify({'success': True, 'data': settings})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    
+    else:  # POST
+        try:
+            from app.models.commission_config import CommissionConfig
+            from app.extensions import db
+            
+            data = request.get_json()
+            if not data:
+                return jsonify({'success': False, 'error': '无效的请求数据'})
+            
+            # 🔍 检测平台推荐人地址是否变更
+            old_platform_address = CommissionConfig.get_config('platform_referrer_address', '')
+            new_platform_address = data.get('platform_referrer_address', '').strip()
+            address_changed = False
+            
+            if (old_platform_address and new_platform_address and 
+                old_platform_address != new_platform_address):
+                address_changed = True
+                
+                # 获取使用旧地址的用户数量
+                from app.models.user import User
+                old_address_users_count = User.query.filter_by(
+                    referrer_address=old_platform_address, 
+                    is_active=True
+                ).count()
+            
+            # 保存所有配置
+            for key, value in data.items():
+                if key == 'commission_rules' and isinstance(value, dict):
+                    import json
+                    CommissionConfig.set_config(key, json.dumps(value))
+                else:
+                    CommissionConfig.set_config(key, value)
+            
+            db.session.commit()
+            
+            # 🎯 自动处理平台推荐人逻辑（新用户自动设置）
+            response_data = {
+                'success': True,
+                'message': '佣金设置保存成功'
+            }
+            
+            # 如果平台地址发生变更，返回变更信息
+            if address_changed:
+                response_data.update({
+                    'address_changed': True,
+                    'old_address': old_platform_address,
+                    'new_address': new_platform_address,
+                    'old_address_users_count': old_address_users_count,
+                    'message': f'佣金设置保存成功！检测到平台推荐人地址已更换，有 {old_address_users_count} 个用户仍使用旧地址。'
+                })
+            
+            # 特殊处理：如果设置了平台推荐人地址且启用了功能，自动将现有无推荐人的用户设置为平台的下线
+            if ('platform_referrer_address' in data and data['platform_referrer_address'] and 
+                data.get('enable_platform_referrer', True)):
+                
+                platform_address = data['platform_referrer_address'].strip()
+                if platform_address:
+                    try:
+                        from app.models.user import User
+                        from app.extensions import db
+                        
+                        # 查找所有没有推荐人的活跃用户
+                        all_users_without_referrer = User.query.filter(
+                            User.referrer_address.is_(None),
+                            User.is_active == True
+                        ).all()
+                        
+                        # 过滤掉平台地址本身（避免自己推荐自己）
+                        users_to_update = []
+                        for user in all_users_without_referrer:
+                            # 检查用户不是平台地址本身
+                            if (user.eth_address != platform_address and 
+                                user.solana_address != platform_address):
+                                users_to_update.append(user)
+                        
+                        # 批量更新推荐人
+                        if users_to_update:
+                            for user in users_to_update:
+                                user.referrer_address = platform_address
+                            
+                            db.session.commit()
+                            
+                            response_data['auto_assigned_count'] = len(users_to_update)
+                            if 'message' in response_data:
+                                response_data['message'] += f' 同时自动将 {len(users_to_update)} 个无推荐人用户设置为平台下线。'
+                        
+                    except Exception as e:
+                        current_app.logger.error(f"自动设置平台推荐人失败: {e}")
+                        # 不影响主要的设置保存流程
+            
+            return jsonify(response_data)
+            
+        except Exception as e:
+            current_app.logger.error(f"保存佣金设置失败: {e}")
+            return jsonify({'success': False, 'error': str(e)})
 
 
 @admin_api_bp.route('/commission/withdrawals', methods=['GET'])
@@ -953,4 +961,191 @@ def api_set_user_platform_referrer(user_id):
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f'设置用户平台推荐人关系失败: {str(e)}', exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500 
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_api_bp.route('/commission/platform-referrer/migrate-old-address', methods=['POST'])
+@api_admin_required
+def api_migrate_old_platform_address():
+    """批量更新旧平台推荐人地址到新地址"""
+    try:
+        from app.models.commission_config import CommissionConfig
+        from app.models.user import User
+        from app.extensions import db
+        import json
+        from datetime import datetime
+        
+        data = request.get_json() or {}
+        old_address = data.get('old_address', '').strip()
+        new_address = data.get('new_address', '').strip()
+        
+        if not old_address or not new_address:
+            return jsonify({
+                'success': False, 
+                'error': '请提供有效的旧地址和新地址'
+            }), 400
+            
+        if old_address == new_address:
+            return jsonify({
+                'success': False, 
+                'error': '新旧地址不能相同'
+            }), 400
+        
+        # 获取当前平台推荐人地址确认
+        current_platform_address = CommissionConfig.get_config('platform_referrer_address', '')
+        if new_address != current_platform_address:
+            return jsonify({
+                'success': False, 
+                'error': '新地址必须与当前配置的平台推荐人地址一致'
+            }), 400
+        
+        # 查找所有使用旧平台地址的用户
+        users_with_old_address = User.query.filter(
+            User.referrer_address == old_address,
+            User.is_active == True
+        ).all()
+        
+        if not users_with_old_address:
+            return jsonify({
+                'success': False, 
+                'error': f'没有找到使用地址 {old_address[:10]}... 的用户'
+            }), 404
+        
+        # 执行批量更新
+        updated_count = 0
+        for user in users_with_old_address:
+            user.referrer_address = new_address
+            updated_count += 1
+        
+        # 记录操作日志
+        operation_log = {
+            'operation': 'migrate_platform_address',
+            'old_address': old_address,
+            'new_address': new_address,
+            'updated_users_count': updated_count,
+            'updated_user_ids': [user.id for user in users_with_old_address],
+            'timestamp': datetime.now().isoformat(),
+            'admin_user': 'admin'  # 可以从session获取管理员信息
+        }
+        
+        # 保存操作日志到配置中
+        existing_logs = CommissionConfig.get_config('platform_address_migration_logs', '[]')
+        try:
+            logs = json.loads(existing_logs) if existing_logs else []
+        except:
+            logs = []
+        
+        logs.append(operation_log)
+        # 只保留最近10条记录
+        if len(logs) > 10:
+            logs = logs[-10:]
+        
+        CommissionConfig.set_config('platform_address_migration_logs', json.dumps(logs))
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功将 {updated_count} 个用户的推荐人地址从旧地址更新为新地址',
+            'data': {
+                'old_address': old_address,
+                'new_address': new_address,
+                'updated_count': updated_count,
+                'updated_users': [
+                    {
+                        'id': user.id,
+                        'username': user.username,
+                        'eth_address': user.eth_address,
+                        'solana_address': user.solana_address
+                    } for user in users_with_old_address
+                ],
+                'operation_time': datetime.now().isoformat()
+            }
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"批量更新平台地址失败: {e}")
+        db.session.rollback()
+        return jsonify({
+            'success': False, 
+            'error': f'批量更新失败: {str(e)}'
+        }), 500
+
+
+@admin_api_bp.route('/commission/platform-referrer/old-addresses', methods=['GET'])
+@api_admin_required
+def api_get_old_platform_addresses():
+    """获取所有历史平台推荐人地址的用户分布"""
+    try:
+        from app.models.commission_config import CommissionConfig
+        from app.models.user import User
+        from sqlalchemy import func
+        
+        # 获取当前平台地址
+        current_platform_address = CommissionConfig.get_config('platform_referrer_address', '')
+        
+        # 查询所有作为推荐人的地址及其用户数量
+        referrer_stats = db.session.query(
+            User.referrer_address,
+            func.count(User.id).label('user_count')
+        ).filter(
+            User.referrer_address.isnot(None),
+            User.is_active == True
+        ).group_by(User.referrer_address).all()
+        
+        # 区分平台地址和普通推荐人地址
+        platform_addresses = []
+        normal_referrers = []
+        
+        for referrer_address, user_count in referrer_stats:
+            address_info = {
+                'address': referrer_address,
+                'user_count': user_count,
+                'is_current': referrer_address == current_platform_address
+            }
+            
+            # 判断是否为平台地址（简单判断：地址长度和格式特征）
+            if (len(referrer_address) > 30 and 
+                (referrer_address.startswith('0x') or len(referrer_address) > 40)):
+                # 进一步检查是否在用户表中作为普通用户存在
+                user_exists = User.query.filter(
+                    db.or_(
+                        User.eth_address == referrer_address,
+                        User.solana_address == referrer_address
+                    )
+                ).first()
+                
+                if user_exists:
+                    normal_referrers.append({
+                        **address_info,
+                        'username': user_exists.username
+                    })
+                else:
+                    platform_addresses.append(address_info)
+            else:
+                normal_referrers.append(address_info)
+        
+        # 获取操作日志
+        logs_json = CommissionConfig.get_config('platform_address_migration_logs', '[]')
+        try:
+            migration_logs = json.loads(logs_json) if logs_json else []
+        except:
+            migration_logs = []
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'current_platform_address': current_platform_address,
+                'platform_addresses': platform_addresses,
+                'normal_referrers': normal_referrers,
+                'migration_logs': migration_logs[-5:],  # 只返回最近5条
+                'total_platform_users': sum(addr['user_count'] for addr in platform_addresses)
+            }
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取历史平台地址失败: {e}")
+        return jsonify({
+            'success': False, 
+            'error': f'获取数据失败: {str(e)}'
+        }), 500 

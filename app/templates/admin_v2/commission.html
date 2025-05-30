@@ -695,6 +695,12 @@
                         <i class="fas fa-crown"></i>
                         <span>批量设为平台下线</span>
                     </button>
+                    
+                    <!-- 平台地址管理按钮 -->
+                    <button @click="showAddressMigrationDialog()" class="inline-flex items-center px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-weight-500 rounded-lg border border-transparent shadow-sm transition-colors duration-200">
+                        <i class="fas fa-exchange-alt"></i>
+                        <span>地址管理</span>
+                    </button>
                 </div>
             </div>
             <p class="text-sm text-gray-500 mt-2">显示所有用户的推荐关系和下级统计信息</p>
@@ -961,6 +967,187 @@
                             class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">下一页</button>
                     <button @click="loadReferrals(referralPagination.pages)" :disabled="referralPagination.page >= referralPagination.pages" 
                             class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50">末页</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 🔄 平台地址迁移弹窗 -->
+        <div x-show="showAddressMigration" 
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50"
+             style="display: none;">
+            <div class="bg-white rounded-lg p-6 w-full max-w-2xl max-h-screen overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-semibold text-gray-800">
+                        <i class="fas fa-exchange-alt text-purple-500 mr-2"></i>
+                        🔄 平台推荐人地址管理
+                    </h3>
+                    <button @click="showAddressMigration = false" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- 当前状态概览 -->
+                <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 class="font-semibold text-blue-800 mb-2">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        当前平台地址状态
+                    </h4>
+                    <div class="text-sm text-blue-700 space-y-1">
+                        <p><strong>当前地址：</strong> <span x-text="platformAddressData.current_platform_address || '未设置'" class="font-mono"></span></p>
+                        <p><strong>总平台用户：</strong> <span x-text="platformAddressData.total_platform_users || 0"></span> 个</p>
+                    </div>
+                </div>
+                
+                <!-- 历史平台地址列表 -->
+                <div class="mb-6">
+                    <h4 class="font-semibold text-gray-800 mb-3">
+                        <i class="fas fa-history text-green-500 mr-2"></i>
+                        历史平台地址分布
+                    </h4>
+                    <div class="space-y-2">
+                        <template x-if="platformAddressData.platform_addresses && platformAddressData.platform_addresses.length > 0">
+                            <div>
+                                <template x-for="address in platformAddressData.platform_addresses" :key="address.address">
+                                    <div class="flex items-center justify-between p-3 border rounded-lg" :class="{
+                                        'bg-green-50 border-green-200': address.is_current,
+                                        'bg-yellow-50 border-yellow-200': !address.is_current && address.user_count > 0,
+                                        'bg-gray-50 border-gray-200': !address.is_current && address.user_count === 0
+                                    }">
+                                        <div>
+                                            <div class="font-mono text-sm" x-text="address.address"></div>
+                                            <div class="text-xs text-gray-600">
+                                                <span x-text="address.user_count"></span> 个用户 
+                                                <span x-show="address.is_current" class="text-green-600 font-medium">• 当前使用</span>
+                                                <span x-show="!address.is_current && address.user_count > 0" class="text-yellow-600 font-medium">• 需要迁移</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span x-show="address.is_current" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                ✅ 当前地址
+                                            </span>
+                                            <span x-show="!address.is_current && address.user_count > 0" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                ⚠️ 待迁移
+                                            </span>
+                                            <span x-show="!address.is_current && address.user_count === 0" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                💤 空地址
+                                            </span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        
+                        <template x-if="!platformAddressData.platform_addresses || platformAddressData.platform_addresses.length === 0">
+                            <div class="text-center text-gray-500 py-4">
+                                <i class="fas fa-inbox text-2xl mb-2"></i>
+                                <p>暂无历史平台地址</p>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                
+                <!-- 迁移操作表单 -->
+                <div x-show="platformAddressData.platform_addresses && platformAddressData.platform_addresses.length > 1" class="mb-6">
+                    <h4 class="font-semibold text-gray-800 mb-3">
+                        <i class="fas fa-exchange-alt text-purple-500 mr-2"></i>
+                        执行地址迁移
+                    </h4>
+                    <form @submit.prevent="executeMigration()">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    选择旧地址（迁移源）
+                                </label>
+                                <select x-model="migrationForm.old_address" class="w-full border-gray-300 rounded-md shadow-sm" required>
+                                    <option value="">请选择要迁移的旧地址...</option>
+                                    <template x-for="address in platformAddressData.platform_addresses" :key="address.address">
+                                        <option x-show="!address.is_current && address.user_count > 0" 
+                                                :value="address.address" 
+                                                x-text="`${address.address.slice(0, 20)}... (${address.user_count}个用户)`"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    新地址（迁移目标）
+                                </label>
+                                <input x-model="migrationForm.new_address" 
+                                       type="text" 
+                                       readonly
+                                       class="w-full border-gray-300 rounded-md shadow-sm bg-gray-50"
+                                       :value="platformAddressData.current_platform_address">
+                                <p class="text-xs text-gray-500 mt-1">自动使用当前配置的平台地址</p>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                            <div class="flex items-start">
+                                <i class="fas fa-exclamation-triangle text-yellow-500 mt-0.5 mr-3"></i>
+                                <div class="text-sm text-yellow-800">
+                                    <p class="font-medium mb-1">⚠️ 重要提醒</p>
+                                    <ul class="list-disc pl-4 space-y-1">
+                                        <li>此操作将把选定旧地址的所有用户推荐关系更新为新地址</li>
+                                        <li>迁移后，这些用户的佣金将流向新地址</li>
+                                        <li>操作不可撤销，请确认地址正确</li>
+                                        <li>建议在低峰期执行此操作</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" 
+                                    @click="showAddressMigration = false"
+                                    class="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition-colors">
+                                <i class="fas fa-times mr-2"></i>取消
+                            </button>
+                            <button type="submit"
+                                    :disabled="!migrationForm.old_address"
+                                    class="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-exchange-alt mr-2"></i>执行迁移
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- 操作历史 -->
+                <div x-show="platformAddressData.migration_logs && platformAddressData.migration_logs.length > 0" class="mb-4">
+                    <h4 class="font-semibold text-gray-800 mb-3">
+                        <i class="fas fa-clock text-blue-500 mr-2"></i>
+                        最近操作历史
+                    </h4>
+                    <div class="space-y-2 max-h-32 overflow-y-auto">
+                        <template x-for="log in platformAddressData.migration_logs" :key="log.timestamp">
+                            <div class="text-xs bg-gray-50 border border-gray-200 rounded p-2">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <span class="font-medium text-gray-800">地址迁移</span>
+                                        <span class="text-gray-600">更新了 <span x-text="log.updated_users_count"></span> 个用户</span>
+                                    </div>
+                                    <span class="text-gray-500" x-text="new Date(log.timestamp).toLocaleString('zh-CN')"></span>
+                                </div>
+                                <div class="mt-1 text-gray-600">
+                                    <div>旧址: <span class="font-mono" x-text="log.old_address.slice(0, 20) + '...'"></span></div>
+                                    <div>新址: <span class="font-mono" x-text="log.new_address.slice(0, 20) + '...'"></span></div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                
+                <!-- 帮助说明 -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h5 class="font-semibold text-blue-800 mb-2">
+                        <i class="fas fa-question-circle mr-1"></i>
+                        使用说明
+                    </h5>
+                    <div class="text-sm text-blue-700 space-y-1">
+                        <p><strong>1. 地址更换：</strong>在"佣金设置"页面修改平台推荐人地址</p>
+                        <p><strong>2. 自动检测：</strong>系统会自动检测地址变更并提示迁移</p>
+                        <p><strong>3. 批量迁移：</strong>一键将旧地址的用户迁移到新地址</p>
+                        <p><strong>4. 收益统一：</strong>确保所有平台收益流向同一个地址</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1384,6 +1571,14 @@
                 amount: ''
             },
             
+            // 🔄 平台地址管理相关
+            platformAddressData: {},
+            showAddressMigration: false,
+            migrationForm: {
+                old_address: '',
+                new_address: ''
+            },
+            
             // 数据过滤和分页
         recordFilters: {
                 status: '',
@@ -1805,7 +2000,33 @@
                     
                     const result = await response.json();
                     if (result.success) {
-                        alert(`配置保存成功！\n${result.message || '更新了佣金设置'}`);
+                        // 🔍 检查是否有地址变更
+                        if (result.address_changed) {
+                            const confirmMessage = [
+                                '🔄 检测到平台推荐人地址已更换！',
+                                '',
+                                `📍 旧地址: ${result.old_address}`,
+                                `📍 新地址: ${result.new_address}`,
+                                `👥 受影响用户: ${result.old_address_users_count} 个`,
+                                '',
+                                '❗ 注意：这些用户仍在使用旧地址作为推荐人',
+                                '💰 如不处理，平台收益将分散到多个地址',
+                                '',
+                                '是否立即将这些用户的推荐人地址更新为新地址？',
+                                '',
+                                '✅ 点击"确定"：立即批量更新（推荐）',
+                                '❌ 点击"取消"：稍后在"推荐关系"页面手动处理'
+                            ].join('\\n');
+                            
+                            if (confirm(confirmMessage)) {
+                                await this.migrateOldPlatformAddress(result.old_address, result.new_address);
+                            } else {
+                                alert('⚠️ 地址更换完成，但用户推荐关系未更新\\n\\n请在"推荐关系"页面手动批量更新，以确保平台收益统一。');
+                            }
+                        } else {
+                            alert(`配置保存成功！\\n${result.message || '更新了佣金设置'}`);
+                        }
+                        
                         // 重新加载统计数据以反映新的佣金率
                         await this.loadStats();
                     } else {
@@ -2015,6 +2236,115 @@
                     console.error('刷新自动化状态失败:', error);
                     // 不显示错误弹窗，避免干扰用户
                 }
+            },
+            
+            // 🔄 平台地址管理方法
+            async migrateOldPlatformAddress(oldAddress, newAddress) {
+                try {
+                    const response = await fetch('/api/admin/commission/platform-referrer/migrate-old-address', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            old_address: oldAddress,
+                            new_address: newAddress
+                        })
+                    });
+                    
+                    if (!response.ok) throw new Error('地址迁移失败');
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        const successMessage = [
+                            '🎉 地址迁移成功！',
+                            '',
+                            `📊 迁移结果：`,
+                            `• 旧地址：${data.data.old_address}`,
+                            `• 新地址：${data.data.new_address}`,
+                            `• 更新用户数：${data.data.updated_count} 个`,
+                            `• 操作时间：${new Date(data.data.operation_time).toLocaleString('zh-CN')}`,
+                            '',
+                            '💰 现在所有平台下线的收益都会统一到新地址！'
+                        ].join('\\n');
+                        
+                        alert(successMessage);
+                        
+                        // 刷新相关数据
+                        await this.loadReferrals();
+                        await this.loadStats();
+                    } else {
+                        throw new Error(data.error || '地址迁移失败');
+                    }
+                } catch (error) {
+                    console.error('地址迁移失败:', error);
+                    alert('❌ 地址迁移失败\\n\\n错误信息: ' + error.message);
+                }
+            },
+            
+            async loadPlatformAddressData() {
+                try {
+                    const response = await fetch('/api/admin/commission/platform-referrer/old-addresses');
+                    if (!response.ok) throw new Error('加载平台地址数据失败');
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        this.platformAddressData = data.data || {};
+                    } else {
+                        throw new Error(data.error || '加载失败');
+                    }
+                } catch (error) {
+                    console.error('加载平台地址数据失败:', error);
+                    // 不显示错误弹窗，避免干扰用户
+                }
+            },
+            
+            async showAddressMigrationDialog() {
+                await this.loadPlatformAddressData();
+                
+                if (!this.platformAddressData.platform_addresses || 
+                    this.platformAddressData.platform_addresses.length <= 1) {
+                    alert('✅ 当前只有一个平台地址，无需迁移。\\n\\n如果您刚刚更换了地址，请确保在佣金设置中保存新地址后再进行迁移操作。');
+                    return;
+                }
+                
+                // 准备迁移表单数据
+                this.migrationForm.new_address = this.platformAddressData.current_platform_address;
+                this.showAddressMigration = true;
+            },
+            
+            async executeMigration() {
+                if (!this.migrationForm.old_address || !this.migrationForm.new_address) {
+                    alert('请选择旧地址和新地址');
+                    return;
+                }
+                
+                if (this.migrationForm.old_address === this.migrationForm.new_address) {
+                    alert('新旧地址不能相同');
+                    return;
+                }
+                
+                const oldAddressInfo = this.platformAddressData.platform_addresses.find(
+                    addr => addr.address === this.migrationForm.old_address
+                );
+                
+                if (!oldAddressInfo) {
+                    alert('未找到选择的旧地址信息');
+                    return;
+                }
+                
+                const confirmMessage = [
+                    '⚠️ 确认执行地址迁移？',
+                    '',
+                    `📍 旧地址: ${this.migrationForm.old_address}`,
+                    `📍 新地址: ${this.migrationForm.new_address}`,
+                    `👥 受影响用户: ${oldAddressInfo.user_count} 个`,
+                    '',
+                    '此操作不可撤销，确定继续吗？'
+                ].join('\\n');
+                
+                if (!confirm(confirmMessage)) return;
+                
+                await this.migrateOldPlatformAddress(this.migrationForm.old_address, this.migrationForm.new_address);
+                this.showAddressMigration = false;
             }
         }
     }
