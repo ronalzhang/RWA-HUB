@@ -878,4 +878,71 @@ def api_batch_update_platform_referrer():
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f'批量更新平台推荐人关系失败: {str(e)}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_api_bp.route('/commission/user/<int:user_id>/set-platform-referrer', methods=['POST'])
+@api_admin_required
+def api_set_user_platform_referrer(user_id):
+    """设置单个用户为平台下线"""
+    try:
+        from app.models.commission_config import CommissionConfig
+        from app.models.user import User
+        from app.extensions import db
+        
+        # 获取平台推荐人地址
+        platform_address = CommissionConfig.get_config('platform_referrer_address', '')
+        enable_platform_referrer = CommissionConfig.get_config('enable_platform_referrer', True)
+        
+        if not platform_address or not enable_platform_referrer:
+            return jsonify({
+                'success': False, 
+                'error': '请先在佣金设置中配置并启用平台推荐人功能'
+            }), 400
+        
+        # 查找指定用户
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({
+                'success': False, 
+                'error': f'未找到ID为 {user_id} 的用户'
+            }), 404
+        
+        # 检查用户是否已有推荐人
+        if user.referrer_address:
+            return jsonify({
+                'success': False, 
+                'error': f'用户 {user.username} 已有推荐人: {user.referrer_address}'
+            }), 400
+        
+        # 检查用户地址是否就是平台地址（避免自己推荐自己）
+        if user.eth_address == platform_address or user.solana_address == platform_address:
+            return jsonify({
+                'success': False, 
+                'error': '不能将平台地址设置为自己的下线'
+            }), 400
+        
+        # 设置推荐人
+        old_referrer = user.referrer_address
+        user.referrer_address = platform_address
+        
+        db.session.commit()
+        
+        current_app.logger.info(f"手动设置用户 {user.username} (ID: {user.id}) 为平台下线，推荐人从 {old_referrer} 更新为 {platform_address}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功将用户 {user.username} 设置为平台下线',
+            'data': {
+                'user_id': user.id,
+                'username': user.username,
+                'old_referrer': old_referrer,
+                'new_referrer': platform_address,
+                'platform_address': platform_address
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'设置用户平台推荐人关系失败: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500 

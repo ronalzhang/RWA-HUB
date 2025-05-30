@@ -1407,8 +1407,22 @@
                 if (!confirm(`确定要将用户 ${referral.username} 设置为平台下线吗？\n\n用户ID: ${referral.id}\n当前推荐人: 无\n将设置为: 平台推荐人`)) return;
                 
                 try {
-                    // 这里可以调用单独的API，现在先用批量更新
-                    await this.batchUpdatePlatformReferrer();
+                    const response = await fetch(`/api/admin/commission/user/${referral.id}/set-platform-referrer`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    if (!response.ok) throw new Error('设置平台推荐人失败');
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(`设置成功！\n\n${data.message}\n\n用户: ${data.data.username}\n平台地址: ${data.data.platform_address}`);
+                        // 刷新推荐关系列表
+                        await this.loadReferrals();
+                        await this.loadStats();
+                    } else {
+                        throw new Error(data.error || '设置平台推荐人失败');
+                    }
                 } catch (error) {
                     console.error('设置平台推荐人失败:', error);
                     alert('设置失败: ' + error.message);
