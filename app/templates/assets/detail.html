@@ -571,25 +571,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
-            // 添加节流变量
+            // 添加节流变量 - 修复版本
             let dividendCheckThrottle = false;
             let dividendCheckTimeout = null;
+            let dividendCheckExecuted = false; // 添加执行标志
             
             /**
-             * 检查是否有权限访问分红管理 - 修复版本 (增加节流)
+             * 检查是否有权限访问分红管理 - 修复版本 (减少节流限制)
              */
             async function checkDividendManagementAccess() {
-                // 节流检查 - 防止无限循环
-                if (dividendCheckThrottle) {
+                // 减少节流限制 - 允许第一次执行
+                if (dividendCheckThrottle && dividendCheckExecuted) {
                     console.log('分红检查被节流，跳过本次调用');
                     return;
                 }
                 
-                // 设置节流，1秒内不允许重复调用
-                dividendCheckThrottle = true;
-                setTimeout(() => {
-                    dividendCheckThrottle = false;
-                }, 1000);
+                // 设置节流，但允许第一次执行
+                if (!dividendCheckExecuted) {
+                    dividendCheckExecuted = true;
+                    console.log('🚀 首次执行分红权限检查');
+                } else {
+                    // 后续调用设置较短的节流时间
+                    dividendCheckThrottle = true;
+                    setTimeout(() => {
+                        dividendCheckThrottle = false;
+                    }, 500); // 减少到500ms
+                }
                 
                 console.log('🔍 开始检查分红管理权限...');
                 
@@ -606,25 +613,37 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     console.log('✅ 钱包已连接，地址:', connectedAddress.substring(0,6) + '...' + connectedAddress.substring(connectedAddress.length-4));
                     
-                    // 2. 检查前端权限标志
+                    // 2. 检查前端权限标志 - 增强检查
                     const isWalletAdmin = window.walletState && window.walletState.isAdmin === true;
                     const isOwnerFromStorage = localStorage.getItem('walletIsOwner') === 'true';
                     const isAdminFromStorage = localStorage.getItem('walletIsAdmin') === 'true';
+                    const isAdminFromMeta = document.querySelector('meta[name="user-is-admin"]') && 
+                                           document.querySelector('meta[name="user-is-admin"]').content === 'true';
+                    
+                    console.log('🔒 权限检查结果:', {
+                        isWalletAdmin,
+                        isOwnerFromStorage, 
+                        isAdminFromStorage,
+                        isAdminFromMeta
+                    });
                     
                     // 3. 前端权限判断（宽松策略，确保管理员能看到）
-                    if (isWalletAdmin || isOwnerFromStorage || isAdminFromStorage) {
+                    if (isWalletAdmin || isOwnerFromStorage || isAdminFromStorage || isAdminFromMeta) {
                         console.log('✅ 前端权限检查通过，显示分红按钮');
                         
-                        // 确保DOM已就绪再显示按钮
-                        if (document.readyState === 'loading') {
-                            // DOM还在加载，等待加载完成
-                            document.addEventListener('DOMContentLoaded', () => {
-                                setTimeout(() => showDividendButtons(connectedAddress), 100);
-                            });
-                        } else {
-                            // DOM已就绪，直接显示
+                        // 强制显示分红按钮，不受DOM状态影响
+                        setTimeout(() => {
                             showDividendButtons(connectedAddress);
-                        }
+                            
+                            // 额外检查：如果按钮还是没显示，强制创建
+                            setTimeout(() => {
+                                const visibleButtons = document.querySelectorAll('[id*="dividend"]:not([style*="display: none"])');
+                                if (visibleButtons.length === 0) {
+                                    console.warn('🔧 按钮未显示，执行强制创建');
+                                    createEmergencyDividendButton(connectedAddress);
+                                }
+                            }, 300);
+                        }, 100);
                         return;
                     }
                     
@@ -632,7 +651,68 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                 } catch (error) {
                     console.error('分红权限检查出错:', error);
+                    
+                    // 出错时如果是管理员，仍然尝试显示按钮
+                    if (window.walletState && window.walletState.isAdmin) {
+                        console.log('🔧 检查出错但检测到管理员，尝试显示按钮');
+                        showDividendButtons(window.walletState.address);
+                    }
                 }
+            }
+            
+            /**
+             * 创建紧急分红按钮 - 确保管理员总能看到按钮
+             */
+            function createEmergencyDividendButton(address) {
+                console.log('🚨 创建紧急分红按钮');
+                
+                // 获取资产符号
+                const tokenSymbol = window.ASSET_CONFIG && window.ASSET_CONFIG.tokenSymbol ? 
+                                   window.ASSET_CONFIG.tokenSymbol : "{{ asset.token_symbol }}";
+                const dividendUrl = `/assets/${tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
+                
+                // 查找合适的容器
+                const containers = [
+                    document.querySelector('.d-flex.align-items-center.gap-2'),
+                    document.querySelector('.col-12.col-md-8.col-lg-9'),
+                    document.querySelector('.card-body'),
+                    document.querySelector('main'),
+                    document.body
+                ];
+                
+                let container = null;
+                for (let cont of containers) {
+                    if (cont) {
+                        container = cont;
+                        break;
+                    }
+                }
+                
+                if (container) {
+                    // 删除旧的紧急按钮
+                    const oldEmergencyBtn = document.getElementById('emergency-dividend-btn');
+                    if (oldEmergencyBtn) {
+                        oldEmergencyBtn.remove();
+                    }
+                    
+                    // 创建新的紧急按钮
+                    const emergencyBtn = document.createElement('a');
+                    emergencyBtn.id = 'emergency-dividend-btn';
+                    emergencyBtn.href = dividendUrl;
+                    emergencyBtn.className = 'btn btn-warning me-2';
+                    emergencyBtn.innerHTML = '<i class="fas fa-coins me-2"></i>分红管理 (Emergency)';
+                    emergencyBtn.style.cssText = 'display: inline-flex !important; margin: 10px 0 !important; position: relative !important; z-index: 1000 !important;';
+                    emergencyBtn.title = '紧急分红按钮 - 管理员专用';
+                    
+                    // 添加到容器顶部
+                    container.insertBefore(emergencyBtn, container.firstChild);
+                    console.log('✅ 紧急分红按钮已创建并显示');
+                    
+                    return true;
+                }
+                
+                console.error('❌ 无法找到合适的容器创建紧急按钮');
+                return false;
             }
             
             /**
@@ -782,42 +862,82 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             /**
-             * 显示分红管理按钮 - 修复版本 (增强DOM查找)
+             * 显示分红管理按钮 - 增强版本 (确保按钮能被显示)
              */
             function showDividendButtons(address) {
                 console.log(`🔄 显示分红按钮，地址: ${address}`);
                 
                 // 获取资产符号
-                const tokenSymbol = ASSET_CONFIG.tokenSymbol || "{{ asset.token_symbol }}";
+                const tokenSymbol = window.ASSET_CONFIG && window.ASSET_CONFIG.tokenSymbol ? 
+                                   window.ASSET_CONFIG.tokenSymbol : "{{ asset.token_symbol }}";
                 const dividendUrl = `/assets/${tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
                 
-                // 等待DOM更新后再查找按钮
+                // 强制等待DOM更新后再查找按钮
                 setTimeout(() => {
-                    // 使用多种方式查找分红按钮
+                    // 使用更全面的选择器查找分红按钮
                     const buttonSelectors = [
                         '#dividendManagementBtn',
                         '#dividendManagementBtnMobile', 
                         '#dividendManagementBtnMedium',
                         'a[data-token-symbol]',
-                        'a[href*="dividend"]'
+                        'a[href*="dividend"]',
+                        '*[id*="dividend"]'
                     ];
                     
                     let foundButtons = [];
                     
                     // 尝试每种选择器
                     buttonSelectors.forEach(selector => {
-                        const elements = document.querySelectorAll(selector);
-                        elements.forEach(el => {
-                            if (el && !foundButtons.includes(el)) {
-                                foundButtons.push(el);
-                            }
-                        });
+                        try {
+                            const elements = document.querySelectorAll(selector);
+                            elements.forEach(el => {
+                                if (el && !foundButtons.includes(el)) {
+                                    foundButtons.push(el);
+                                }
+                            });
+                        } catch (e) {
+                            console.warn(`选择器 ${selector} 查找失败:`, e);
+                        }
                     });
                     
-                    console.log(`🔍 找到 ${foundButtons.length} 个潜在的分红按钮:`, foundButtons.map(btn => btn.id || btn.className));
+                    console.log(`🔍 找到 ${foundButtons.length} 个潜在的分红按钮:`, foundButtons.map(btn => ({
+                        id: btn.id,
+                        className: btn.className,
+                        hasDataAttr: !!btn.getAttribute('data-token-symbol'),
+                        href: btn.href
+                    })));
                     
                     let hasVisibleButton = false;
                     
+                    // 显示找到的按钮 - 放宽条件
+                    foundButtons.forEach((btn) => {
+                        // 检查是否是分红相关按钮
+                        const isDividendBtn = btn.id && btn.id.includes('dividend') ||
+                                             btn.href && btn.href.includes('dividend') ||
+                                             btn.getAttribute('data-token-symbol') ||
+                                             btn.className && btn.className.includes('dividend');
+                        
+                        if (btn && isDividendBtn) {
+                            try {
+                                // 更新URL（如果是链接）
+                                if (btn.tagName === 'A') {
+                                    btn.href = dividendUrl;
+                                }
+                                
+                                // 强制显示按钮 - 移除所有可能的隐藏样式
+                                btn.style.display = '';
+                                btn.style.visibility = 'visible';
+                                btn.style.opacity = '1';
+                                btn.removeAttribute('hidden');
+                                
+                                // 移除Bootstrap和其他隐藏类
+                                btn.classList.remove('d-none', 'invisible', 'hidden', 'hide');
+                                
+                                // 根据按钮ID设置合适的显示方式
+                                if (btn.id === 'dividendManagementBtn') {
+                                    btn.style.display = 'inline-flex';
+                                    btn.classList.remove('d-none', 'd-md-none');
+                                } else if (btn.id === 'dividendManagementBtnMobile') {
                     // 显示找到的按钮
                     foundButtons.forEach((btn, index) => {
                         if (btn && btn.getAttribute && btn.getAttribute('data-token-symbol')) {
