@@ -752,6 +752,44 @@ document.addEventListener('DOMContentLoaded', function() {
             window.forceDividendButtonsDisplay = forceDividendButtonsDisplay;
             
             /**
+             * 获取资产符号的通用函数
+             */
+            function getAssetTokenSymbol() {
+                // 1. 尝试从全局ASSET_CONFIG获取
+                if (window.ASSET_CONFIG && window.ASSET_CONFIG.tokenSymbol) {
+                    return window.ASSET_CONFIG.tokenSymbol;
+                }
+                
+                // 2. 尝试从模板变量获取
+                const templateSymbol = "{{ asset.token_symbol }}";
+                if (templateSymbol && templateSymbol !== "{{ asset.token_symbol }}") {
+                    return templateSymbol;
+                }
+                
+                // 3. 尝试从页面元数据获取
+                const metaSymbol = document.querySelector('meta[name="asset-token-symbol"]');
+                if (metaSymbol && metaSymbol.content) {
+                    return metaSymbol.content;
+                }
+                
+                // 4. 尝试从URL路径提取
+                const pathMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
+                if (pathMatch && pathMatch[1]) {
+                    return pathMatch[1];
+                }
+                
+                // 5. 尝试从现有按钮的data属性获取
+                const existingBtn = document.querySelector('[data-token-symbol]');
+                if (existingBtn && existingBtn.dataset.tokenSymbol) {
+                    return existingBtn.dataset.tokenSymbol;
+                }
+                
+                // 如果都没找到，返回默认值
+                console.warn('⚠️ 无法获取资产符号，使用默认值');
+                return 'UNKNOWN';
+            }
+            
+            /**
              * 显示分红管理按钮
              */
             function showDividendButtons(address) {
