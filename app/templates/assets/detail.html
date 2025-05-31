@@ -14,7 +14,6 @@
 
 <!-- JavaScript库 -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -37,17 +36,9 @@ window.ASSET_CONFIG = {
     platformFeeRate: 0.035
 };
 
-// 费用计算函数
-window.calculatePlatformFee = function(amount) {
-    return amount * window.PLATFORM_FEE_RATE;
-};
-
-window.calculateActualPayment = function(amount) {
-    return amount * window.ACTUAL_PAYMENT_RATE;
-};
-
-// Solana库初始化
+// 页面初始化函数
 document.addEventListener('DOMContentLoaded', function() {
+    // 初始化Solana库
     if (typeof SolanaWeb3 !== 'undefined') {
         window.solanaWeb3 = SolanaWeb3;
     }
@@ -62,18 +53,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 页面初始化函数
 function initializePage() {
-    // 设置交易表单
     setupTradeForm();
-    
-    // 加载交易历史
     loadTradeHistory();
-    
-    // 加载累计分红信息
     loadTotalDividends();
-    
-    // 检查分红管理权限
     checkDividendAccess();
-    
     console.log('页面初始化完成');
 }
 
@@ -81,7 +64,6 @@ function initializePage() {
 function setupTradeForm() {
     const amountInput = document.getElementById('purchase-amount');
     const totalPriceDisplay = document.getElementById('totalPrice');
-    const buyButton = document.getElementById('buy-button');
     
     if (amountInput && totalPriceDisplay) {
         amountInput.addEventListener('input', function() {
@@ -89,12 +71,13 @@ function setupTradeForm() {
             const totalPrice = amount * window.ASSET_CONFIG.tokenPrice;
             totalPriceDisplay.value = totalPrice.toFixed(2);
         });
+        
+        // 初始计算
+        const initialAmount = parseFloat(amountInput.value) || 100;
+        totalPriceDisplay.value = (initialAmount * window.ASSET_CONFIG.tokenPrice).toFixed(2);
     }
     
-    if (buyButton) {
-        buyButton.addEventListener('click', handleBuyClick);
-        updateBuyButtonState();
-    }
+    updateBuyButtonState();
 }
 
 // 更新购买按钮状态
@@ -102,17 +85,7 @@ function updateBuyButtonState() {
     const buyButton = document.getElementById('buy-button');
     if (!buyButton) return;
     
-    let isConnected = false;
-    
-    // 检查钱包连接状态
-    if (window.walletState && (window.walletState.connected || window.walletState.isConnected)) {
-        isConnected = true;
-    } else {
-        const storedAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
-        if (storedAddress && storedAddress.length > 10) {
-            isConnected = true;
-        }
-    }
+    const isConnected = checkWalletConnection();
     
     if (isConnected) {
         buyButton.disabled = false;
@@ -127,9 +100,26 @@ function updateBuyButtonState() {
     }
 }
 
+// 检查钱包连接状态
+function checkWalletConnection() {
+    if (window.walletState && (window.walletState.connected || window.walletState.isConnected)) {
+        return true;
+    }
+    
+    const storedAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
+    return storedAddress && storedAddress.length > 10;
+}
+
+// 获取钱包地址
+function getWalletAddress() {
+    if (window.walletState && window.walletState.address) {
+        return window.walletState.address;
+    }
+    return localStorage.getItem('walletAddress') || localStorage.getItem('eth_address') || '';
+}
+
 // 处理购买按钮点击
 function handleBuyClick() {
-    // 检查钱包连接
     const address = getWalletAddress();
     if (!address) {
         alert('Please Connect Wallet');
@@ -139,7 +129,6 @@ function handleBuyClick() {
         return;
     }
     
-    // 调用全局购买函数
     if (typeof window.handleBuy === 'function') {
         const assetId = document.getElementById('buy-button').getAttribute('data-asset-id');
         const amountInput = document.getElementById('purchase-amount');
@@ -151,63 +140,42 @@ function handleBuyClick() {
     }
 }
 
-// 获取钱包地址
-function getWalletAddress() {
-    if (window.walletState && window.walletState.address) {
-        return window.walletState.address;
-    }
-    return localStorage.getItem('walletAddress') || localStorage.getItem('eth_address') || '';
-}
-
 // 检查分红管理权限
 function checkDividendAccess() {
-    if (!window.walletState || !window.walletState.connected) {
-        return;
-    }
-    
     const address = getWalletAddress();
     if (!address) return;
     
-    // 如果用户是管理员，显示分红按钮并更新URL
-    if (window.walletState.isAdmin) {
-        const dividendBtn = document.getElementById('dividendManagementBtn');
-        if (dividendBtn) {
-            const correctUrl = `/assets/${window.ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
-            dividendBtn.href = correctUrl;
-            dividendBtn.style.display = 'inline-flex';
-            console.log('Dividend Button URL Updated:', correctUrl);
-        }
-        
-        // 如果按钮不存在，创建一个
-        if (!dividendBtn) {
-            const buttonContainer = document.querySelector('.d-flex.gap-2');
-            if (buttonContainer) {
-                const newBtn = document.createElement('a');
-                newBtn.id = 'dividendManagementBtn';
-                newBtn.href = `/assets/${window.ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
-                newBtn.className = 'btn btn-outline-primary';
-                newBtn.innerHTML = '<i class="fas fa-coins me-2"></i>Dividend Management';
-                buttonContainer.appendChild(newBtn);
-                console.log('Dividend Button Created');
-            }
-        }
-    }
+    const dividendBtn = document.getElementById('dividendManagementBtn');
+    if (!dividendBtn) return;
+    
+    // 更新分红按钮URL
+    const correctUrl = `/assets/${window.ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
+    dividendBtn.href = correctUrl;
+    console.log('Dividend Button URL Updated:', correctUrl);
 }
 
 // 加载交易历史
 async function loadTradeHistory(page = 1) {
+    const container = document.getElementById('trade-history');
+    if (!container) return;
+    
     try {
-        const container = document.getElementById('trade-history');
-        if (!container) return;
-        
         container.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p class="mt-2">Loading...</p></div>';
         
-        const response = await fetch(`/api/trades?asset_id=${window.ASSET_CONFIG.id}&page=${page}&per_page=5`);
-        if (!response.ok) throw new Error('Failed to Load Trade History');
+        const response = await fetch(`/api/trades?asset_id=${window.ASSET_CONFIG.id}&page=${page}&per_page=5`, {
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         
         const data = await response.json();
         
-        if (data.trades.length === 0) {
+        if (!data.trades || data.trades.length === 0) {
             container.innerHTML = '<div class="text-center text-muted my-4">No Trade Records</div>';
             return;
         }
@@ -221,9 +189,9 @@ async function loadTradeHistory(page = 1) {
                     <th>Time</th>
                     <th>Type</th>
                     <th>Amount</th>
-                    <th>Amount</th>
+                    <th>Total</th>
                     <th>Status</th>
-                    <th>Transaction Hash</th>
+                    <th>Transaction</th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -244,10 +212,7 @@ async function loadTradeHistory(page = 1) {
         }
     } catch (error) {
         console.error('Failed to Load Trade History:', error);
-        const container = document.getElementById('trade-history');
-        if (container) {
-            container.innerHTML = '<div class="alert alert-danger">Failed to Load, Please Try Again Later</div>';
-        }
+        container.innerHTML = '<div class="alert alert-warning">Unable to load trading history at the moment</div>';
     }
 }
 
@@ -256,7 +221,7 @@ function createTradeRow(trade) {
     const tr = document.createElement('tr');
     
     const date = new Date(trade.created_at);
-    const formattedDate = date.toLocaleString('zh-CN');
+    const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
     
     const typeClass = trade.type === 'buy' ? 'text-success' : 'text-danger';
     const typeText = trade.type === 'buy' ? 'Buy' : 'Sell';
@@ -276,15 +241,15 @@ function createTradeRow(trade) {
     let txHashDisplay = 'N/A';
     if (trade.tx_hash) {
         const shortHash = trade.tx_hash.substring(0, 8) + '...' + trade.tx_hash.substring(trade.tx_hash.length - 8);
-        txHashDisplay = `<a href="https://solscan.io/tx/${trade.tx_hash}" target="_blank">${shortHash}</a>`;
+        txHashDisplay = `<a href="https://solscan.io/tx/${trade.tx_hash}" target="_blank" class="text-decoration-none">${shortHash}</a>`;
     }
     
     tr.innerHTML = `
         <td>${formattedDate}</td>
-        <td class="${typeClass}">${typeText}</td>
+        <td><span class="${typeClass}">${typeText}</span></td>
         <td>${trade.amount}</td>
         <td>${parseFloat(total).toFixed(2)} USDC</td>
-        <td class="${statusClass}">${statusText}</td>
+        <td><span class="${statusClass}">${statusText}</span></td>
         <td>${txHashDisplay}</td>
     `;
     
@@ -318,16 +283,28 @@ async function loadTotalDividends() {
     if (!element) return;
     
     try {
-        element.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Loading...';
+        element.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Loading...';
         
-        const response = await fetch(`/api/assets/symbol/${window.ASSET_CONFIG.tokenSymbol}/dividend_stats`);
-        if (!response.ok) throw new Error('Failed to Load Dividend Statistics');
+        const response = await fetch(`/api/assets/symbol/${window.ASSET_CONFIG.tokenSymbol}/dividend_stats`, {
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         
         const stats = await response.json();
-        element.innerHTML = `${Number(stats.total_amount || 0).toLocaleString()} USDC`;
+        if (stats.success) {
+            element.innerHTML = `${Number(stats.total_amount || 0).toLocaleString()} USDC`;
+        } else {
+            throw new Error(stats.error || 'Unknown error');
+        }
     } catch (error) {
         console.error('Failed to Load Dividend Information:', error);
-        element.innerHTML = '<span class="text-danger">Failed to Load</span>';
+        element.innerHTML = '0 USDC';
     }
 }
 
@@ -342,10 +319,8 @@ function shareAsset() {
         return;
     }
     
-    // 生成分享链接
     const shareUrl = `${window.location.origin}${window.location.pathname}?ref=${encodeURIComponent(address)}`;
     
-    // 显示分享模态框
     const modalHtml = `
         <div class="modal fade" id="shareModal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
@@ -373,7 +348,6 @@ function shareAsset() {
         </div>
     `;
     
-    // 移除旧模态框并添加新的
     const oldModal = document.getElementById('shareModal');
     if (oldModal) oldModal.remove();
     
@@ -415,9 +389,22 @@ async function copyToClipboard(elementId, button) {
 }
 
 // 钱包事件监听
-window.addEventListener('walletConnected', updateBuyButtonState);
-window.addEventListener('walletDisconnected', updateBuyButtonState);
-window.addEventListener('walletStateChanged', checkDividendAccess);
+window.addEventListener('walletConnected', function() {
+    updateBuyButtonState();
+    checkDividendAccess();
+});
+
+window.addEventListener('walletDisconnected', function() {
+    updateBuyButtonState();
+});
+
+// 绑定购买按钮事件
+document.addEventListener('DOMContentLoaded', function() {
+    const buyButton = document.getElementById('buy-button');
+    if (buyButton) {
+        buyButton.addEventListener('click', handleBuyClick);
+    }
+});
 </script>
 
 <style>
@@ -439,18 +426,6 @@ window.addEventListener('walletStateChanged', checkDividendAccess);
     z-index: 10;
 }
 
-.thumbnail-nav {
-    height: 65px;
-    object-fit: cover;
-    cursor: pointer;
-    transition: all 0.2s;
-    opacity: 0.7;
-}
-
-.thumbnail-nav:hover {
-    opacity: 1;
-}
-
 .table th {
     font-weight: 600;
     border-top: none;
@@ -460,6 +435,11 @@ window.addEventListener('walletStateChanged', checkDividendAccess);
     display: flex;
     align-items: center;
     justify-content: flex-end;
+}
+
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
 }
 </style>
 {% endblock %}
@@ -504,7 +484,7 @@ window.addEventListener('walletStateChanged', checkDividendAccess);
                         {% if asset.images and asset.images|length > 0 %}
                         {% for image in asset.images %}
                         <div class="carousel-item {% if loop.first %}active{% endif %}">
-                            <img src="{{ image }}" class="d-block w-100" alt="资产图片">
+                            <img src="{{ image }}" class="d-block w-100" alt="Asset Image">
                         </div>
                         {% endfor %}
                         {% else %}
@@ -632,7 +612,7 @@ window.addEventListener('walletStateChanged', checkDividendAccess);
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">Trading History</h5>
-                        <div class="pagination-controls" id="pagination-controls">
+                        <div class="pagination-controls">
                             <button class="btn btn-sm btn-outline-primary me-2" id="prevPageBtn" disabled>
                                 <i class="fas fa-chevron-left"></i> Previous
                             </button>
