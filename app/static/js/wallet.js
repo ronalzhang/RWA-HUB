@@ -1118,24 +1118,15 @@ const walletState = {
                     this._lastDividendCheckTime = now;
                     
                     if (typeof window.checkDividendManagementAccess === 'function') {
-                        const checkType = shouldSkipThrottle ? '管理员立即检查' : '常规节流检查';
+                        const checkType = shouldSkipThrottle ? '立即检查' : '常规检查';
                         console.log(`检测到资产详情页，${checkType}分红入口状态`);
                         window.checkDividendManagementAccess();
                     } else {
-                        console.log('检测到资产详情页，但分红入口检查函数不可用，尝试手动创建或显示');
+                        console.log('分红权限检查函数不可用，使用备用方案');
                         this.createOrShowDividendButtons();
                     }
                 } else {
                     console.log('分红检查被节流，跳过本次调用');
-                    // 但如果缓存权限为true，直接显示按钮
-                    if (window.dividendPermissionCache && window.dividendPermissionCache.hasPermission) {
-                        console.log('检测到缓存权限为true，直接显示分红按钮');
-                        if (typeof window.showDividendButtons === 'function') {
-                            window.showDividendButtons(this.address);
-                        } else {
-                            this.createOrShowDividendButtons();
-                        }
-                    }
                 }
             }
         } catch (error) {
@@ -1787,163 +1778,38 @@ const walletState = {
      * 完全使用DOM API创建元素，彻底解决箭头问题
      */
     updateAssetsUI() {
-        try {
-            console.log('[updateAssetsUI] 更新资产列表UI');
+        console.log('[updateAssetsUI] 更新资产列表UI');
+        
+        const assetsContainer = document.getElementById('userAssets');
+        const assetsWrapper = document.querySelector('.assets-wrapper');
+        
+        if (!assetsContainer) {
+            console.warn('[updateAssetsUI] 未找到资产容器');
+            return;
+        }
+        
+        const assets = this.assets || [];
+        console.log(`[updateAssetsUI] 处理 ${assets.length} 个资产`);
+        
+        if (assets.length === 0) {
+            assetsContainer.innerHTML = '<div class="no-assets">暂无资产</div>';
+            if (assetsWrapper) assetsWrapper.style.display = 'none';
+        } else {
+            // 生成资产HTML
+            const assetsHTML = assets.map(asset => `
+                <div class="asset-item">
+                    <div class="asset-info">
+                        <h4>${asset.name}</h4>
+                        <p>符号: ${asset.symbol}</p>
+                        <p>数量: ${asset.quantity}</p>
+                    </div>
+                </div>
+            `).join('');
             
-            // 获取资产列表容器
-            const assetsList = document.getElementById('walletAssetsList');
-            if (!assetsList) {
-                console.warn('[updateAssetsUI] 资产列表容器不存在');
-                return;
-            }
-            
-            // 清空现有内容
-            assetsList.innerHTML = '';
-            
-            // 使用当前资产列表
-            const assets = this.assets;
-            
-            console.log('[updateAssetsUI] 当前资产数据:', assets);
-            
-            // 检查是否有资产
-            if (!assets || !Array.isArray(assets) || assets.length === 0) {
-                console.log('[updateAssetsUI] 没有资产可显示');
-                const emptyItem = document.createElement('li');
-                emptyItem.className = 'text-muted text-center py-1';
-                emptyItem.style.fontSize = '11px';
-                emptyItem.textContent = 'No Assets Found';
-                assetsList.appendChild(emptyItem);
-                
-                // 仍然显示资产容器，只是显示"没有资产"的信息
-                const assetContainers = document.querySelectorAll('.assets-container, .user-assets');
-                assetContainers.forEach(container => {
-                    if (container) {
-                        container.style.display = 'block';
-                    }
-                });
-                return;
-            }
-            
-            console.log(`[updateAssetsUI] 显示 ${assets.length} 个资产`);
-            
-            // 创建文档片段来优化DOM操作
-            const fragment = document.createDocumentFragment();
-            
-            // 遍历资产并创建列表项
-            assets.forEach(asset => {
-                // 提取资产数据
-                const assetId = asset.asset_id || asset.id || 0;
-                const assetName = asset.name || 'Unknown Asset';
-                const quantity = asset.quantity || asset.amount || asset.holding_amount || 0;
-                const symbol = asset.symbol || `RH-${assetId}`;
-                
-                // 创建列表项元素
-                const listItem = document.createElement('li');
-                listItem.className = 'wallet-asset-item';
-                listItem.style.marginBottom = '1px';
-                
-                // 创建链接元素
-                const link = document.createElement('a');
-                link.href = `/assets/${assetId}`;
-                Object.assign(link.style, {
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '3px 4px',
-                    backgroundColor: '#f8f9fa',
-                    borderRadius: '4px',
-                    color: '#333',
-                    textDecoration: 'none',
-                    height: '24px',
-                    border: 'none',
-                    boxShadow: 'none'
-                });
-                
-                // 添加鼠标悬停效果
-                link.onmouseover = function() {
-                    this.style.backgroundColor = '#e9ecef';
-                    this.style.color = '#0d6efd';
-                };
-                
-                link.onmouseout = function() {
-                    this.style.backgroundColor = '#f8f9fa';
-                    this.style.color = '#333';
-                };
-                
-                // 创建资产名称元素
-                const nameSpan = document.createElement('span');
-                nameSpan.textContent = assetName;
-                Object.assign(nameSpan.style, {
-                    fontSize: '11px',
-                    fontWeight: '500',
-                    maxWidth: '110px',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                });
-                
-                // 创建资产信息容器
-                const infoDiv = document.createElement('div');
-                Object.assign(infoDiv.style, {
-                    display: 'flex',
-                    alignItems: 'center',
-                    minWidth: '60px',
-                    justifyContent: 'flex-end'
-                });
-                
-                // 创建数量元素
-                const quantitySpan = document.createElement('span');
-                quantitySpan.textContent = quantity;
-                Object.assign(quantitySpan.style, {
-                    fontSize: '11px',
-                    color: '#333',
-                    backgroundColor: '#eeeeee',
-                    padding: '1px 3px',
-                    borderRadius: '2px',
-                    textAlign: 'center'
-                });
-                
-                // 创建符号元素
-                const symbolSpan = document.createElement('span');
-                symbolSpan.textContent = symbol;
-                Object.assign(symbolSpan.style, {
-                    fontSize: '10px',
-                    color: '#666',
-                    marginLeft: '2px',
-                    minWidth: '30px',
-                    textAlign: 'right'
-                });
-                
-                // 组装DOM结构
-                infoDiv.appendChild(quantitySpan);
-                infoDiv.appendChild(symbolSpan);
-                link.appendChild(nameSpan);
-                link.appendChild(infoDiv);
-                listItem.appendChild(link);
-                fragment.appendChild(listItem);
-            });
-            
-            // 一次性添加所有元素到DOM
-            assetsList.appendChild(fragment);
-            
-            // 显示包含资产列表的区域
-            const userAssetsSection = document.getElementById('userAssetsSection');
-            if (userAssetsSection) {
-                userAssetsSection.style.display = 'block';
-                console.log('[updateAssetsUI] 显示资产列表区域');
-            }
-            
-            // 显示所有资产容器
-            const assetContainers = document.querySelectorAll('.assets-container, .user-assets');
-            assetContainers.forEach(container => {
-                if (container) {
-                    container.style.display = 'block';
-                }
-            });
+            assetsContainer.innerHTML = assetsHTML;
+            if (assetsWrapper) assetsWrapper.style.display = 'block';
             
             console.log('[updateAssetsUI] 资产列表更新完成');
-        } catch (error) {
-            console.error('[updateAssetsUI] 更新资产列表失败:', error);
         }
     },
 
@@ -2212,64 +2078,44 @@ const walletState = {
      * @returns {Promise<Array>} 用户资产列表
      */
     async getUserAssets(address) {
-        if (!address) {
-            this.assets = [];
-            return [];
-        }
+        if (!address) return [];
         
         try {
-            // 获取当前钱包类型
-            const walletType = this.walletType || 'ethereum';
+            // 防抖机制，避免短时间内重复调用
+            const now = Date.now();
+            const lastCall = this._lastGetAssetsCall || 0;
+            if (now - lastCall < 2000) {
+                console.log('[getUserAssets] 调用过于频繁，使用缓存数据');
+                return this._lastAssetsResult || [];
+            }
+            this._lastGetAssetsCall = now;
+            
+            const walletType = this.walletType || 'phantom';
             console.log(`[getUserAssets] 获取 ${walletType} 钱包 ${address} 的资产`);
             
-            // 通过API获取真实数据
-            try {
-                // 构建API请求URL，添加时间戳防止缓存
-                const timestamp = new Date().getTime();
-                const url = `/api/user/assets?address=${address}&wallet_type=${walletType}&_=${timestamp}`;
-                console.log(`[getUserAssets] 调用API: ${url}`);
-                
-                const response = await fetch(url);
-                
-                if (response.ok) {
-                    // 处理API返回数据
-                    const data = await response.json();
-                    console.log('[getUserAssets] API返回的资产数据:', data);
-                    
-                    let assets = Array.isArray(data) ? data : 
-                                (data.assets || data.data || []);
-                    
-                    // 标准化资产格式
-                    const formattedAssets = assets.map(asset => ({
-                        asset_id: asset.asset_id || asset.id || 0,
-                        name: asset.name || asset.asset_name || asset.title || 'Unknown Asset',
-                        quantity: asset.holding_amount || asset.balance || asset.tokens || asset.amount || 0,
-                        symbol: asset.symbol || asset.token_symbol || `RH-${asset.asset_id || asset.id || '???'}`
-                    }));
-                    
-                    console.log(`[getUserAssets] 处理后的资产数据 (${formattedAssets.length} 个资产):`, formattedAssets);
-                    this.assets = formattedAssets;
-                    
-                    // 更新资产UI
-                    this.updateAssetsUI();
-                    
-                    return formattedAssets;
-                } else {
-                    console.warn('[getUserAssets] API响应不成功:', response.status, response.statusText);
-                    this.assets = [];
-                    this.updateAssetsUI();
-                    return [];
+            const apiUrl = `/api/user/assets?address=${address}&wallet_type=${walletType}&_=${Date.now()}`;
+            
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Eth-Address': address
                 }
-            } catch (error) {
-                console.warn('[getUserAssets] API请求失败:', error);
-                this.assets = [];
-                this.updateAssetsUI();
-                return [];
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
             }
+            
+            const data = await response.json();
+            console.log(`[getUserAssets] 获取到 ${data.length || 0} 个资产`);
+            
+            // 缓存结果
+            this._lastAssetsResult = data;
+            
+            return data;
         } catch (error) {
-            console.error('[getUserAssets] 获取用户资产失败:', error);
-            // 错误情况下返回空数组
-            this.assets = [];
+            console.error(`[getUserAssets] 获取资产失败:`, error);
             return [];
         }
     },

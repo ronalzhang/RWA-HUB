@@ -1,5 +1,7 @@
 from flask import Blueprint, jsonify, request, current_app
 from app.extensions import db
+from app.models import Asset
+from app.utils.decorators import is_admin
 import json
 from datetime import datetime
 
@@ -35,19 +37,35 @@ def check_permission(token_symbol):
         if not eth_address:
             return jsonify({'has_permission': False}), 200
             
-        # 简化版本 - 总是检查管理员权限
-        try:
-            from app.utils.admin_utils import is_admin
-            is_admin_user = is_admin(eth_address)
+        # 检查管理员权限
+        is_admin_user = is_admin(eth_address)
+        
+        # 如果是管理员，直接通过
+        if is_admin_user:
+            return jsonify({'has_permission': True, 'reason': 'admin'})
             
-            return jsonify({'has_permission': is_admin_user})
-        except ImportError:
-            # 如果导入失败，返回false
-            return jsonify({'has_permission': False}), 200
+        # 检查是否是资产所有者
+        try:
+            asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+            if asset and asset.owner_address:
+                # 对ETH地址（0x开头）忽略大小写比较
+                if eth_address.startswith('0x') and asset.owner_address.startswith('0x'):
+                    is_owner = eth_address.lower() == asset.owner_address.lower()
+                # 对SOL地址严格区分大小写
+                else:
+                    is_owner = eth_address == asset.owner_address
+                    
+                if is_owner:
+                    return jsonify({'has_permission': True, 'reason': 'owner'})
+        except Exception as e:
+            current_app.logger.warning(f"检查资产所有者权限时出错: {str(e)}")
+            
+        # 都不符合，无权限
+        return jsonify({'has_permission': False, 'reason': 'unauthorized'})
             
     except Exception as e:
         current_app.logger.error(f"检查分红权限出错: {str(e)}")
-        return jsonify({'has_permission': False}), 200
+        return jsonify({'has_permission': False, 'reason': 'error'})
 
 @bp.route('/api/dividend/distribute/<string:token_symbol>', methods=['POST'])
 def distribute_dividend(token_symbol):
