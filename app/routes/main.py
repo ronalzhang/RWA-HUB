@@ -47,3 +47,14 @@ def index():
                              current_user_address=None,
                              AssetStatus=AssetStatus,
                              _=_)
+
+# 在文件末尾添加favicon路由
+@main_bp.route('/favicon.ico')
+def favicon():
+    """提供favicon.ico文件"""
+    from flask import send_from_directory
+    import os
+    try:
+        return send_from_directory(os.path.join(current_app.root_path, 'static'), 'favicon.ico', mimetype='image/vnd.microsoft.icon')
+    except FileNotFoundError:
+        return '', 404
