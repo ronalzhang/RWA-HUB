@@ -54,20 +54,37 @@
   }
   
   // 显示消息
-  function showMessage(message, type = 'info') {
+  function showMessage(message, type = 'info', title = null) {
     if (typeof Swal !== 'undefined') {
-      Swal.fire({
-        title: type === 'error' ? '错误' : (type === 'success' ? '成功' : '提示'),
+      const swalConfig = {
+        title: title || (type === 'error' ? '错误' : (type === 'success' ? '成功' : '提示')),
         text: message,
         icon: type,
-        confirmButtonText: '确定'
-      });
-    } else {
+        confirmButtonText: '确定',
+        confirmButtonColor: '#007bff',
+        customClass: {
+          popup: 'swal2-popup-custom',
+          title: 'swal2-title-custom',
+          content: 'swal2-content-custom'
+        }
+      };
+      
+      // 错误消息显示更长时间
       if (type === 'error') {
-        alert('错误: ' + message);
-      } else {
-        alert(message);
+        swalConfig.timer = 8000;
+        swalConfig.timerProgressBar = true;
+        swalConfig.confirmButtonColor = '#dc3545';
+      } else if (type === 'success') {
+        swalConfig.timer = 3000;
+        swalConfig.timerProgressBar = true;
+        swalConfig.confirmButtonColor = '#28a745';
       }
+      
+      Swal.fire(swalConfig);
+    } else {
+      // 降级为原生alert，但格式化消息
+      const prefix = type === 'error' ? '❌ 错误: ' : (type === 'success' ? '✅ 成功: ' : 'ℹ️ 提示: ');
+      alert(prefix + message);
     }
   }
   
@@ -78,6 +95,12 @@
         title: '请稍候',
         text: message,
         allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        customClass: {
+          popup: 'swal2-popup-loading',
+          title: 'swal2-title-loading'
+        },
         didOpen: () => {
           Swal.showLoading();
         }
@@ -88,29 +111,36 @@
       if (!loadingEl) {
         loadingEl = document.createElement('div');
         loadingEl.id = 'dividendLoadingOverlay';
-        loadingEl.style.position = 'fixed';
-        loadingEl.style.top = '0';
-        loadingEl.style.left = '0';
-        loadingEl.style.width = '100%';
-        loadingEl.style.height = '100%';
-        loadingEl.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-        loadingEl.style.display = 'flex';
-        loadingEl.style.justifyContent = 'center';
-        loadingEl.style.alignItems = 'center';
-        loadingEl.style.zIndex = '9999';
+        loadingEl.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.5);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 9999;
+        `;
         
         const spinnerContainer = document.createElement('div');
-        spinnerContainer.style.backgroundColor = 'white';
-        spinnerContainer.style.padding = '20px';
-        spinnerContainer.style.borderRadius = '5px';
-        spinnerContainer.style.textAlign = 'center';
+        spinnerContainer.style.cssText = `
+          background-color: white;
+          padding: 30px;
+          border-radius: 10px;
+          text-align: center;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        `;
         
         const spinner = document.createElement('div');
         spinner.className = 'spinner-border text-primary';
         spinner.setAttribute('role', 'status');
+        spinner.style.cssText = 'width: 3rem; height: 3rem;';
         
         const messageEl = document.createElement('p');
-        messageEl.className = 'dividend-loading-message mt-2';
+        messageEl.className = 'dividend-loading-message mt-3 mb-0';
+        messageEl.style.cssText = 'margin: 0; font-size: 16px; color: #333;';
         messageEl.textContent = message;
         
         spinnerContainer.appendChild(spinner);

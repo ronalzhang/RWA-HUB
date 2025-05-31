@@ -1062,12 +1062,20 @@ const walletState = {
             // 检查是否在资产详情页，如果是则更新分红入口（仅管理员）
             const isDetailPage = document.querySelector('.asset-detail-page') !== null;
             if (isDetailPage && this.isAdmin) {
-                if (typeof window.checkDividendManagementAccess === 'function') {
-                    console.log('检测到资产详情页，更新分红入口状态');
-                    window.checkDividendManagementAccess();
+                // 添加节流机制，避免频繁调用
+                const now = Date.now();
+                if (!this._lastDividendCheckTime || (now - this._lastDividendCheckTime > 5000)) { // 5秒节流
+                    this._lastDividendCheckTime = now;
+                    
+                    if (typeof window.checkDividendManagementAccess === 'function') {
+                        console.log('检测到资产详情页，更新分红入口状态');
+                        window.checkDividendManagementAccess();
+                    } else {
+                        console.log('检测到资产详情页，但分红入口检查函数不可用，尝试手动创建或显示');
+                        this.createOrShowDividendButtons();
+                    }
                 } else {
-                    console.log('检测到资产详情页，但分红入口检查函数不可用，尝试手动创建或显示');
-                    this.createOrShowDividendButtons();
+                    console.log('分红检查被节流，跳过本次调用');
                 }
             }
         } catch (error) {
@@ -1123,14 +1131,54 @@ const walletState = {
             let dividendBtnMobile = document.getElementById('dividendManagementBtnMobile');
             let dividendBtnMedium = document.getElementById('dividendManagementBtnMedium');
             
-            // 在窗口上查找资产符号
-            const tokenSymbol = window.ASSET_CONFIG?.tokenSymbol || 
-                               document.querySelector('[data-token-symbol]')?.getAttribute('data-token-symbol');
+            // 修复：改进资产符号获取逻辑，添加多种获取方式
+            let tokenSymbol = null;
+            
+            // 方式1: 从全局ASSET_CONFIG获取
+            if (window.ASSET_CONFIG && window.ASSET_CONFIG.tokenSymbol) {
+                tokenSymbol = window.ASSET_CONFIG.tokenSymbol;
+                console.log('从ASSET_CONFIG获取资产符号:', tokenSymbol);
+            }
+            
+            // 方式2: 从现有按钮的data属性获取
+            if (!tokenSymbol && dividendBtn) {
+                tokenSymbol = dividendBtn.getAttribute('data-token-symbol');
+                console.log('从现有按钮获取资产符号:', tokenSymbol);
+            }
+            
+            // 方式3: 从页面中任何包含data-token-symbol的元素获取
+            if (!tokenSymbol) {
+                const tokenElement = document.querySelector('[data-token-symbol]');
+                if (tokenElement) {
+                    tokenSymbol = tokenElement.getAttribute('data-token-symbol');
+                    console.log('从页面元素获取资产符号:', tokenSymbol);
+                }
+            }
+            
+            // 方式4: 从URL路径中提取
+            if (!tokenSymbol) {
+                const urlMatch = window.location.pathname.match(/\/assets\/([^\/]+)/);
+                if (urlMatch && urlMatch[1]) {
+                    tokenSymbol = urlMatch[1];
+                    console.log('从URL路径获取资产符号:', tokenSymbol);
+                }
+            }
+            
+            // 方式5: 从页面元数据获取
+            if (!tokenSymbol) {
+                const metaTokenSymbol = document.querySelector('meta[name="asset-token-symbol"]');
+                if (metaTokenSymbol) {
+                    tokenSymbol = metaTokenSymbol.getAttribute('content');
+                    console.log('从页面元数据获取资产符号:', tokenSymbol);
+                }
+            }
             
             if (!tokenSymbol) {
-                console.warn('未能找到资产符号，无法创建分红按钮');
+                console.error('所有方式都无法获取资产符号，分红按钮创建失败');
                 return;
             }
+            
+            console.log('最终使用的资产符号:', tokenSymbol);
             
             // 更新或创建常规按钮
             if (dividendBtn) {
@@ -1147,6 +1195,7 @@ const walletState = {
                     dividendBtn.href = `/assets/${tokenSymbol}/dividend?eth_address=${this.address}`;
                     dividendBtn.className = 'btn btn-outline-primary';
                     dividendBtn.style.display = 'inline-flex';
+                    dividendBtn.setAttribute('data-token-symbol', tokenSymbol);
                     dividendBtn.innerHTML = '<i class="fas fa-coins me-2"></i>Dividend Management';
                     
                     // 添加到容器中
@@ -1170,6 +1219,7 @@ const walletState = {
                     dividendBtnMobile.href = `/assets/${tokenSymbol}/dividend?eth_address=${this.address}`;
                     dividendBtnMobile.className = 'btn btn-sm btn-outline-primary d-md-none d-block';
                     dividendBtnMobile.style.display = 'block';
+                    dividendBtnMobile.setAttribute('data-token-symbol', tokenSymbol);
                     dividendBtnMobile.innerHTML = '<i class="fas fa-coins me-2"></i>Dividend';
                     
                     // 添加到容器中
@@ -1193,6 +1243,7 @@ const walletState = {
                     dividendBtnMedium.href = `/assets/${tokenSymbol}/dividend?eth_address=${this.address}`;
                     dividendBtnMedium.className = 'btn btn-outline-primary d-none d-md-block d-lg-none';
                     dividendBtnMedium.style.display = 'block';
+                    dividendBtnMedium.setAttribute('data-token-symbol', tokenSymbol);
                     dividendBtnMedium.innerHTML = '<i class="fas fa-coins me-2"></i>Dividend Management';
                     
                     // 添加到容器中
@@ -1200,6 +1251,8 @@ const walletState = {
                     console.log('成功创建中屏分红管理按钮');
                 }
             }
+            
+            console.log('分红按钮创建或更新完成');
         } catch (error) {
             console.error('手动创建或显示分红按钮失败:', error);
         }
