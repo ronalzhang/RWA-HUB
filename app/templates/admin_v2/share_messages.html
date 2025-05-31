@@ -3,63 +3,16 @@
 {% block title %}分享消息管理{% endblock %}
 
 {% block extra_head %}
-<!-- Bootstrap CSS -->
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<!-- 移除Bootstrap CSS，使用统一的样式 -->
 <!-- Toastr CSS -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
 <!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <!-- Toastr JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 
 <style>
-.card {
-    border: none;
-    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15) !important;
-}
-
-.border-left-primary {
-    border-left: 0.25rem solid #4e73df !important;
-}
-
-.border-left-success {
-    border-left: 0.25rem solid #1cc88a !important;
-}
-
-.border-left-info {
-    border-left: 0.25rem solid #36b9cc !important;
-}
-
-.border-left-warning {
-    border-left: 0.25rem solid #f6c23e !important;
-}
-
-.text-gray-800 {
-    color: #5a5c69 !important;
-}
-
-.text-gray-300 {
-    color: #dddfeb !important;
-}
-
-.text-xs {
-    font-size: 0.75rem;
-}
-
-.font-weight-bold {
-    font-weight: 700 !important;
-}
-
-.text-uppercase {
-    text-transform: uppercase !important;
-}
-
-.shadow {
-    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15) !important;
-}
-
+/* 自定义样式补充，使用与admin_v2一致的设计 */
 .message-content {
     max-width: 400px;
     word-wrap: break-word;
@@ -67,154 +20,157 @@
 }
 
 @media (max-width: 768px) {
-    .table-responsive {
-        font-size: 0.875rem;
-    }
-    
     .message-content {
         max-width: 200px;
     }
+}
+
+/* 统一模态框样式 */
+.modal {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal-dialog {
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    max-width: 32rem;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+<div class="p-6">
+    <div class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="h3 mb-0 text-gray-800">分享消息管理</h1>
-            <p class="text-muted">管理系统中的分享消息文案，用户分享资产时将随机展示这些消息</p>
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">分享消息管理</h1>
+            <p class="text-gray-600">管理系统中的分享消息文案，用户分享资产时将随机展示这些消息</p>
         </div>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createMessageModal" onclick="openCreateModal()">
-            <i class="fas fa-plus"></i> 添加消息
+        <button type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center" onclick="openCreateModal()">
+            <i class="fas fa-plus mr-2"></i> 添加消息
         </button>
     </div>
 
     <!-- 统计卡片 -->
-    <div class="row mb-4">
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-primary shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                总消息数</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalMessages">0</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-comments fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div class="bg-white rounded-lg shadow border-l-4 border-blue-500 p-6">
+            <div class="flex items-center">
+                <div class="flex-1">
+                    <div class="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">总消息数</div>
+                    <div class="text-2xl font-bold text-gray-900" id="totalMessages">0</div>
+                </div>
+                <div class="text-blue-300">
+                    <i class="fas fa-comments text-3xl"></i>
                 </div>
             </div>
         </div>
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-success shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                激活消息</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="activeMessages">0</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
+        
+        <div class="bg-white rounded-lg shadow border-l-4 border-green-500 p-6">
+            <div class="flex items-center">
+                <div class="flex-1">
+                    <div class="text-xs font-semibold text-green-600 uppercase tracking-wide mb-1">启用消息</div>
+                    <div class="text-2xl font-bold text-gray-900" id="activeMessages">0</div>
+                </div>
+                <div class="text-green-300">
+                    <i class="fas fa-check-circle text-3xl"></i>
                 </div>
             </div>
         </div>
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-info shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">最新添加</div>
-                            <div class="h6 mb-0 font-weight-bold text-gray-800" id="latestMessage">-</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-clock fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
+        
+        <div class="bg-white rounded-lg shadow border-l-4 border-cyan-500 p-6">
+            <div class="flex items-center">
+                <div class="flex-1">
+                    <div class="text-xs font-semibold text-cyan-600 uppercase tracking-wide mb-1">分享内容</div>
+                    <div class="text-2xl font-bold text-gray-900" id="shareContentCount">0</div>
+                </div>
+                <div class="text-cyan-300">
+                    <i class="fas fa-share-alt text-3xl"></i>
                 </div>
             </div>
         </div>
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                随机展示</div>
-                            <div class="h6 mb-0 font-weight-bold text-gray-800">权重算法</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-random fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
+        
+        <div class="bg-white rounded-lg shadow border-l-4 border-yellow-500 p-6">
+            <div class="flex items-center">
+                <div class="flex-1">
+                    <div class="text-xs font-semibold text-yellow-600 uppercase tracking-wide mb-1">随机展示</div>
+                    <div class="text-sm font-bold text-gray-900">权重算法</div>
+                </div>
+                <div class="text-yellow-300">
+                    <i class="fas fa-random text-3xl"></i>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- 筛选和搜索 -->
-    <div class="row mb-4">
-        <div class="col-md-4">
-            <label for="typeFilter" class="form-label">消息类型</label>
-            <select class="form-select" id="typeFilter" onchange="filterMessages()">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div>
+            <label for="typeFilter" class="block text-sm font-medium text-gray-700 mb-2">消息类型</label>
+            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" id="typeFilter" onchange="filterMessages()">
                 <option value="">全部类型</option>
                 <option value="share_content">分享内容</option>
                 <option value="reward_plan">奖励计划</option>
             </select>
         </div>
-        <div class="col-md-4">
-            <label for="statusFilter" class="form-label">状态</label>
-            <select class="form-select" id="statusFilter" onchange="filterMessages()">
+        <div>
+            <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-2">状态</label>
+            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" id="statusFilter" onchange="filterMessages()">
                 <option value="">全部状态</option>
                 <option value="active">启用</option>
                 <option value="inactive">禁用</option>
             </select>
         </div>
-        <div class="col-md-4">
-            <label for="searchInput" class="form-label">搜索内容</label>
-            <input type="text" class="form-control" id="searchInput" placeholder="输入关键词搜索..." onkeyup="filterMessages()">
+        <div>
+            <label for="searchInput" class="block text-sm font-medium text-gray-700 mb-2">搜索内容</label>
+            <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" id="searchInput" placeholder="输入关键词搜索..." onkeyup="filterMessages()">
         </div>
     </div>
 
     <!-- 分享消息列表 -->
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">
-                <i class="fas fa-share-alt text-primary me-2"></i>
+    <div class="bg-white rounded-lg shadow">
+        <div class="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+            <h5 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i class="fas fa-share-alt text-indigo-600 mr-2"></i>
                 分享内容管理
             </h5>
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createMessageModal" onclick="openCreateModal()">
-                <i class="fas fa-plus"></i> 添加消息
+            <button type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center" onclick="openCreateModal()">
+                <i class="fas fa-plus mr-2"></i> 添加消息
             </button>
         </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width: 8%">ID</th>
-                            <th style="width: 15%">类型</th>
-                            <th style="width: 40%">内容</th>
-                            <th style="width: 10%">权重</th>
-                            <th style="width: 10%">状态</th>
-                            <th style="width: 12%">创建时间</th>
-                            <th style="width: 15%">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody id="messagesTableBody">
-                        <!-- 动态加载内容 -->
-                    </tbody>
-                </table>
-                
-                <!-- 分页 -->
-                <div id="paginationContainer" class="d-flex justify-content-center mt-3">
-                    <!-- 分页组件将在这里动态生成 -->
-                </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">类型</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">内容</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">权重</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">状态</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">创建时间</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="messagesTableBody">
+                    <!-- 动态加载内容 -->
+                </tbody>
+            </table>
+            
+            <!-- 分页 -->
+            <div id="paginationContainer" class="flex justify-center px-6 py-4">
+                <!-- 分页组件将在这里动态生成 -->
             </div>
         </div>
     </div>

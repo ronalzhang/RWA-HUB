@@ -1107,12 +1107,19 @@ const walletState = {
                 // 获取当前时间用于节流检查
                 const now = Date.now();
                 
-                // 添加节流机制，避免频繁调用
-                if (!this._lastDividendCheckTime || (now - this._lastDividendCheckTime > 3000)) { // 改为3秒节流
+                // 优化节流机制：
+                // 1. 如果是管理员且没有缓存，立即检查（不受节流限制）
+                // 2. 否则使用3秒节流
+                const shouldSkipThrottle = this.isAdmin && !cachedResult;
+                const throttleInterval = shouldSkipThrottle ? 0 : 3000;
+                const shouldCheck = !this._lastDividendCheckTime || (now - this._lastDividendCheckTime > throttleInterval);
+                
+                if (shouldCheck) {
                     this._lastDividendCheckTime = now;
                     
                     if (typeof window.checkDividendManagementAccess === 'function') {
-                        console.log('检测到资产详情页，更新分红入口状态');
+                        const checkType = shouldSkipThrottle ? '管理员立即检查' : '常规节流检查';
+                        console.log(`检测到资产详情页，${checkType}分红入口状态`);
                         window.checkDividendManagementAccess();
                     } else {
                         console.log('检测到资产详情页，但分红入口检查函数不可用，尝试手动创建或显示');

@@ -791,10 +791,19 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 监听钱包状态变化，自动显示调试按钮
             function checkAndShowDebugButton() {
-                const debugBtn = document.getElementById('debugForceShowDividend');
-                if (debugBtn && window.walletState && window.walletState.connected && window.walletState.isAdmin) {
-                    debugBtn.style.display = 'inline-block';
-                    console.log('管理员已连接，显示调试按钮');
+                const debugBtns = [
+                    document.getElementById('debugForceShowDividend'),
+                    document.getElementById('debugForceShowDividendMobile'),
+                    document.getElementById('debugForceShowDividendMedium')
+                ];
+                
+                if (window.walletState && window.walletState.connected && window.walletState.isAdmin) {
+                    debugBtns.forEach(btn => {
+                        if (btn) {
+                            btn.style.display = btn.classList.contains('d-md-none') ? 'block' : 'inline-block';
+                        }
+                    });
+                    console.log('管理员已连接，显示所有调试按钮');
                 }
             }
             
@@ -3289,6 +3298,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary d-none d-md-block d-lg-none" id="dividendManagementBtnMedium" data-token-symbol="{{ asset.token_symbol }}" style="display: none;">
                     <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
                 </a>
+                <!-- 调试按钮 - 移动版 -->
+                <button class="btn btn-outline-secondary btn-sm d-md-none d-block" id="debugForceShowDividendMobile" onclick="debugForceShowDividend()" style="display: none;" title="调试：强制显示分红按钮">
+                    <i class="fas fa-bug"></i>
+                </button>
+                <!-- 调试按钮 - 中屏版 -->
+                <button class="btn btn-outline-secondary btn-sm d-none d-md-block d-lg-none" id="debugForceShowDividendMedium" onclick="debugForceShowDividend()" style="display: none;" title="调试：强制显示分红按钮">
+                    <i class="fas fa-bug me-1"></i>Debug
+                </button>
                 {% endif %}
                 <button class="btn btn-sm btn-outline-success d-md-none d-block" id="shareAssetBtnMobile" onclick="shareAsset()">
                     <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}
