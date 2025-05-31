@@ -48,6 +48,9 @@ from .admin.commission_config import commission_config_bp
 # 导入IP统计管理
 from .admin.ip_stats import ip_stats_bp
 
+# 导入分红管理
+from .dividend import bp as dividend_bp
+
 # 注册蓝图到app
 def register_blueprints(app):
     """初始化所有路由"""
@@ -64,6 +67,9 @@ def register_blueprints(app):
     
     # 注册IP统计管理蓝图
     app.register_blueprint(ip_stats_bp)
+    
+    # 注册分红管理蓝图
+    app.register_blueprint(dividend_bp)
     
     # 注册API蓝图
     app.register_blueprint(api_bp)
