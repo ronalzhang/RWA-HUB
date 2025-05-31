@@ -177,11 +177,6 @@ document.addEventListener('DOMContentLoaded', function() {
         window.addEventListener('load', initSolanaLibs);
     </script>
     -->
-    
-            }
-            if (!window.spl_token) {
-                window.spl_token = {};
-            }
             console.log('[ensureSolanaBasicObjects] 基本对象检查完成');
         };
     </script>
@@ -2228,7 +2223,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             }
-
             // 获取钱包地址，优先从全局walletState获取
             function getWalletAddress() {
                 // 优先使用全局钱包状态
@@ -3711,88 +3705,4 @@ document.addEventListener('DOMContentLoaded', function() {
     window.refreshWalletAssets = refreshWalletAssets;
 </script>
 
-<!-- 添加钱包余额检查函数 - 放在页面顶部script标签内 -->
-<script>
-// 检查Solana USDC余额函数
-async function checkSolanaUSDCBalance(walletAddress) {
-    console.log('检查钱包USDC余额:', walletAddress);
-    try {
-        // 调用API获取余额
-        const response = await fetch(`/api/service/wallet/token_balance?address=${walletAddress}&token=USDC&_=${Date.now()}`);
-        if (!response.ok) {
-            throw new Error('获取余额接口请求失败');
-        }
-        
-        const data = await response.json();
-        console.log('获取到的余额数据:', data);
-        
-    
-    try {
-        // 检查钱包状态
-        if (!window.walletState || !window.walletState.transferToken) {
-            throw new Error('钱包状态不可用或缺少transferToken方法');
-        }
-        
-        // 计算平台费和实际支付金额
-        const platformFeeRate = 0.035; // 3.5%平台费率
-        const platformFee = amount * platformFeeRate;
-        const actualPayment = amount * (1 - platformFeeRate);
-        
-        console.log(`转账明细: 总金额=${amount}, 平台费=${platformFee}, 实际支付=${actualPayment}`);
-        
-        // 平台手续费地址 - 应该由后端提供或配置
-                        const platformAddress = "{{ platform_fee_address|default('EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4') }}";
-        
-        // 1. 转账平台费用
-        console.log(`转账平台费用: ${platformFee} USDC 到 ${platformAddress}`);
-        const platformFeeResult = await window.walletState.transferToken(
-            'USDC',
-            platformAddress,
-            platformFee
-        );
-        
-        if (!platformFeeResult || !platformFeeResult.success) {
-            throw new Error('平台费用转账失败: ' + (platformFeeResult?.error || '未知错误'));
-        }
-        
-        console.log('平台费用转账成功:', platformFeeResult);
-        
-        // 2. 转账到资产创建者
-        console.log(`转账到资产创建者: ${actualPayment} USDC 到 ${toAddress}`);
-        const creatorPaymentResult = await window.walletState.transferToken(
-            'USDC',
-            toAddress,
-            actualPayment
-        );
-        
-        if (!creatorPaymentResult || !creatorPaymentResult.success) {
-            throw new Error('支付给资产创建者失败: ' + (creatorPaymentResult?.error || '未知错误'));
-        }
-        
-        console.log('支付给资产创建者成功:', creatorPaymentResult);
-        
-        // 返回成功结果，包含签名信息
-        return {
-            success: true,
-            signature: platformFeeResult.txHash || platformFeeResult.signature || 'tx_' + Date.now(),
-            platformFeeSignature: platformFeeResult.txHash || platformFeeResult.signature,
-            creatorPaymentSignature: creatorPaymentResult.txHash || creatorPaymentResult.signature
-        };
-    } catch (error) {
-        console.error('USDC转账失败:', error);
-        return {
-            success: false,
-            error: error.message || '转账过程中发生未知错误'
-        };
-    }
-}
-*/
-// ... existing code ...
-</script>
-
-{% block scripts %}
-<!-- 仅加载必要的脚本 -->
-{% set js_loaded = true %}
-<script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
 {% endblock %}
-
