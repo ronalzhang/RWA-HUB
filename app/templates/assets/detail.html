@@ -2295,15 +2295,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // 同时获取分享文案和分享配置
+            // 同时获取分享文案、奖励计划文案和分享配置
             Promise.all([
-                fetch('/api/share-messages/random'),
+                fetch('/api/share-messages/random?type=share_content'),
+                fetch('/api/share-reward-plan/random'),
                 fetch('/api/share-config')
             ])
-            .then(([messageResponse, configResponse]) => Promise.all([
+            .then(([messageResponse, rewardPlanResponse, configResponse]) => Promise.all([
                 messageResponse.json().catch(error => ({
                     success: true,
                     message: "🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，透明度高、收益稳定。通过我的专属链接投资，我们都能获得长期收益！"
+                })),
+                rewardPlanResponse.json().catch(error => ({
+                    success: true,
+                    message: "一次分享，终身收益 - 无限下级20%分成"
                 })),
                 configResponse.json().catch(error => ({
                     success: true,
@@ -2314,8 +2319,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }))
             ]))
-            .then(([messageData, configData]) => {
+            .then(([messageData, rewardPlanData, configData]) => {
                 const shareMessage = messageData.message || "🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，透明度高、收益稳定。";
+                const rewardPlanMessage = rewardPlanData.message || "一次分享，终身收益 - 无限下级20%分成";
                 const shareConfig = configData.success ? configData.data : {
                     commission_rate: 20,
                     is_unlimited_levels: true,
@@ -2323,23 +2329,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
                 
                 // 生成分享链接模态框
-                showShareModal(address, shareMessage, shareConfig);
+                showShareModal(address, shareMessage, shareConfig, rewardPlanMessage);
             })
             .catch(error => {
                 console.error('获取分享数据失败:', error);
                 // 使用默认数据
                 const defaultMessage = "🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，透明度高、收益稳定。";
+                const defaultRewardPlan = "一次分享，终身收益 - 无限下级20%分成";
                 const defaultConfig = {
                     commission_rate: 20,
                     is_unlimited_levels: true,
                     model_description: '无限层级分销，每级上贡20%'
                 };
-                showShareModal(address, defaultMessage, defaultConfig);
+                showShareModal(address, defaultMessage, defaultConfig, defaultRewardPlan);
             });
         }
         
         // 显示分享模态框
-        function showShareModal(address, shareMessage, shareConfig = null) {
+        function showShareModal(address, shareMessage, shareConfig = null, rewardPlanMessage = null) {
             // 如果没有传入配置，使用默认配置
             if (!shareConfig) {
                 shareConfig = {
@@ -2347,6 +2354,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     is_unlimited_levels: true,
                     model_description: '无限层级分销，每级上贡20%'
                 };
+            }
+            
+            // 如果没有传入奖励计划文案，使用默认文案
+            if (!rewardPlanMessage) {
+                rewardPlanMessage = "一次分享，终身收益 - 无限下级20%分成";
             }
             
             // 根据配置生成不同的层级显示
@@ -2423,7 +2435,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     
                                     <div class="commission-info mb-4">
                                         <div class="d-flex align-items-center mb-2">
-                                            <strong class="text-primary">💰 分享奖励计划</strong>
+                                            <strong class="text-primary">💰 ${rewardPlanMessage}</strong>
                                             <span class="badge bg-success ms-2">长期有效</span>
                                             <span class="info-icon ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="${tooltipContent}">
                                                 <i class="fas fa-info-circle text-primary"></i>

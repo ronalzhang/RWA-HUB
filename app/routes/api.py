@@ -1554,46 +1554,47 @@ def get_random_share_message():
     """获取随机分享消息"""
     try:
         from app.models.share_message import ShareMessage
-        import random
-        import os
         
-        # 优先从数据库获取
-        random_message_obj = ShareMessage.get_random_message()
-        if random_message_obj:
-            return jsonify({
-                'success': True,
-                'message': random_message_obj.content
-            })
+        # 获取消息类型参数，默认为分享内容
+        message_type = request.args.get('type', 'share_content')
         
-        # 如果数据库为空，尝试从JSON文件读取
-        share_messages_file = os.path.join(current_app.static_folder, 'data', 'share_messages.json')
+        # 获取随机消息
+        message = ShareMessage.get_random_message(message_type)
         
-        if os.path.exists(share_messages_file):
-            with open(share_messages_file, 'r', encoding='utf-8') as f:
-                import json
-                messages = json.load(f)
-                
-            if messages:
-                random_message = random.choice(messages)
-                return jsonify({
-                    'success': True,
-                    'message': random_message
-                })
-        
-        # 如果文件也不存在，返回默认消息
-        default_message = "📈 分享赚佣金！邀请好友投资，您可获得高达30%的推广佣金！链接由您独享，佣金终身受益，朋友越多，收益越丰厚！"
         return jsonify({
             'success': True,
-            'message': default_message
+            'message': message,
+            'type': message_type
         })
         
     except Exception as e:
-        current_app.logger.error(f"获取分享消息失败: {str(e)}", exc_info=True)
-        # 返回默认消息
+        current_app.logger.error(f'获取随机分享消息失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': '获取分享消息失败'
+        }), 500
+
+@api_bp.route('/share-reward-plan/random', methods=['GET'])
+def get_random_reward_plan():
+    """获取随机奖励计划文案"""
+    try:
+        from app.models.share_message import ShareMessage
+        
+        # 获取奖励计划类型的随机消息
+        message = ShareMessage.get_random_message('reward_plan')
+        
         return jsonify({
             'success': True,
-            'message': "📈 分享赚佣金！邀请好友投资，您可获得高达30%的推广佣金！链接由您独享，佣金终身受益，朋友越多，收益越丰厚！"
+            'message': message,
+            'type': 'reward_plan'
         })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取随机奖励计划文案失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': '获取奖励计划文案失败'
+        }), 500
 
 @api_bp.route('/shortlink/create', methods=['POST'])
 def create_shortlink():

@@ -7,31 +7,45 @@ class ShareMessage(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False, comment='分享消息内容')
+    message_type = db.Column(db.String(50), nullable=False, default='share_content', comment='消息类型：share_content=分享内容，reward_plan=奖励计划')
+    weight = db.Column(db.Integer, default=100, comment='权重，数值越大越容易被选中')
     is_active = db.Column(db.Boolean, default=True, comment='是否启用')
-    weight = db.Column(db.Integer, default=1, comment='权重，用于随机选择时的概率')
     created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
     
     @classmethod
-    def get_random_message(cls):
-        """获取随机的分享消息"""
+    def get_random_message(cls, message_type='share_content'):
+        """获取随机消息"""
         import random
         
-        # 获取所有启用的消息
-        active_messages = cls.query.filter_by(is_active=True).all()
+        # 获取指定类型的活跃消息
+        messages = cls.query.filter_by(
+            message_type=message_type,
+            is_active=True
+        ).all()
         
-        if not active_messages:
-            return None
-            
+        if not messages:
+            # 如果没有找到指定类型的消息，返回默认消息
+            if message_type == 'reward_plan':
+                return "一次分享，终身收益 - 无限下级20%分成"
+            else:
+                return "🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，透明度高、收益稳定。"
+        
         # 根据权重随机选择
-        messages_with_weights = []
-        for msg in active_messages:
-            messages_with_weights.extend([msg] * msg.weight)
-            
-        if messages_with_weights:
-            return random.choice(messages_with_weights)
+        total_weight = sum(msg.weight for msg in messages)
+        if total_weight == 0:
+            return random.choice(messages).content
         
-        return None
+        random_num = random.randint(1, total_weight)
+        current_weight = 0
+        
+        for message in messages:
+            current_weight += message.weight
+            if random_num <= current_weight:
+                return message.content
+        
+        # 兜底返回第一个消息
+        return messages[0].content
     
     @classmethod
     def get_default_messages(cls):
@@ -62,8 +76,9 @@ class ShareMessage(db.Model):
         return {
             'id': self.id,
             'content': self.content,
-            'is_active': self.is_active,
+            'message_type': self.message_type,
             'weight': self.weight,
+            'is_active': self.is_active,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         } 

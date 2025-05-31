@@ -3558,34 +3558,70 @@ def get_assets_stats():
 @admin_v2_bp.route('/share-messages', methods=['GET'])
 @admin_required
 def get_share_messages():
-    """获取分享消息列表"""
+    """获取所有分享消息"""
     try:
         from app.models.share_message import ShareMessage
         
         page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        message_type = request.args.get('type', '')  # 添加类型筛选
         
-        query = ShareMessage.query.order_by(ShareMessage.created_at.desc())
-        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        # 构建查询
+        query = ShareMessage.query
+        
+        # 如果指定了类型，则筛选
+        if message_type:
+            query = query.filter_by(message_type=message_type)
+        
+        pagination = query.order_by(ShareMessage.weight.desc(), ShareMessage.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
         
         messages = []
-        for msg in pagination.items:
-            messages.append(msg.to_dict())
+        for message in pagination.items:
+            messages.append({
+                'id': message.id,
+                'content': message.content,
+                'message_type': message.message_type,
+                'weight': message.weight,
+                'is_active': message.is_active,
+                'created_at': message.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'updated_at': message.updated_at.strftime('%Y-%m-%d %H:%M:%S') if message.updated_at else None
+            })
+        
+        # 计算统计信息
+        total_messages = ShareMessage.query.count()
+        active_messages = ShareMessage.query.filter_by(is_active=True).count()
+        share_content_count = ShareMessage.query.filter_by(message_type='share_content').count()
+        reward_plan_count = ShareMessage.query.filter_by(message_type='reward_plan').count()
         
         return jsonify({
             'success': True,
-            'data': messages,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': pagination.total,
-                'pages': pagination.pages
+            'data': {
+                'messages': messages,
+                'pagination': {
+                    'page': page,
+                    'pages': pagination.pages,
+                    'per_page': per_page,
+                    'total': pagination.total,
+                    'has_prev': pagination.has_prev,
+                    'has_next': pagination.has_next
+                },
+                'stats': {
+                    'total': total_messages,
+                    'active': active_messages,
+                    'share_content': share_content_count,
+                    'reward_plan': reward_plan_count
+                }
             }
         })
         
     except Exception as e:
-        current_app.logger.error(f"获取分享消息列表失败: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        current_app.logger.error(f'获取分享消息失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': '获取分享消息失败'
+        }), 500
 
 @admin_v2_bp.route('/share-messages', methods=['POST'])
 @admin_required
@@ -3596,20 +3632,32 @@ def create_share_message():
         
         data = request.get_json()
         if not data:
-            return jsonify({'success': False, 'error': '缺少请求数据'}), 400
+            return jsonify({
+                'success': False,
+                'error': '请提供有效的JSON数据'
+            }), 400
         
         content = data.get('content', '').strip()
-        if not content:
-            return jsonify({'success': False, 'error': '分享消息内容不能为空'}), 400
-        
-        weight = data.get('weight', 1)
-        if weight < 1:
-            weight = 1
-        
+        message_type = data.get('message_type', 'share_content')
+        weight = data.get('weight', 100)
         is_active = data.get('is_active', True)
         
+        if not content:
+            return jsonify({
+                'success': False,
+                'error': '消息内容不能为空'
+            }), 400
+        
+        if message_type not in ['share_content', 'reward_plan']:
+            return jsonify({
+                'success': False,
+                'error': '消息类型必须是 share_content 或 reward_plan'
+            }), 400
+        
+        # 创建新消息
         message = ShareMessage(
             content=content,
+            message_type=message_type,
             weight=weight,
             is_active=is_active
         )
@@ -3624,9 +3672,12 @@ def create_share_message():
         })
         
     except Exception as e:
-        current_app.logger.error(f"创建分享消息失败: {str(e)}", exc_info=True)
+        current_app.logger.error(f'创建分享消息失败: {str(e)}')
         db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'error': '创建分享消息失败'
+        }), 500
 
 @admin_v2_bp.route('/share-messages/<int:message_id>', methods=['PUT'])
 @admin_required
@@ -3635,24 +3686,44 @@ def update_share_message(message_id):
     try:
         from app.models.share_message import ShareMessage
         
-        message = ShareMessage.query.get_or_404(message_id)
+        message = ShareMessage.query.get(message_id)
+        if not message:
+            return jsonify({
+                'success': False,
+                'error': '分享消息不存在'
+            }), 404
         
         data = request.get_json()
         if not data:
-            return jsonify({'success': False, 'error': '缺少请求数据'}), 400
+            return jsonify({
+                'success': False,
+                'error': '请提供有效的JSON数据'
+            }), 400
         
-        content = data.get('content', '').strip()
-        if content:
+        # 更新字段
+        if 'content' in data:
+            content = data['content'].strip()
+            if not content:
+                return jsonify({
+                    'success': False,
+                    'error': '消息内容不能为空'
+                }), 400
             message.content = content
         
+        if 'message_type' in data:
+            message_type = data['message_type']
+            if message_type not in ['share_content', 'reward_plan']:
+                return jsonify({
+                    'success': False,
+                    'error': '消息类型必须是 share_content 或 reward_plan'
+                }), 400
+            message.message_type = message_type
+        
         if 'weight' in data:
-            weight = data.get('weight', 1)
-            if weight < 1:
-                weight = 1
-            message.weight = weight
+            message.weight = int(data['weight'])
         
         if 'is_active' in data:
-            message.is_active = data.get('is_active', True)
+            message.is_active = bool(data['is_active'])
         
         message.updated_at = datetime.utcnow()
         db.session.commit()
@@ -3664,9 +3735,12 @@ def update_share_message(message_id):
         })
         
     except Exception as e:
-        current_app.logger.error(f"更新分享消息失败: {str(e)}", exc_info=True)
+        current_app.logger.error(f'更新分享消息失败: {str(e)}')
         db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'error': '更新分享消息失败'
+        }), 500
 
 @admin_v2_bp.route('/share-messages/<int:message_id>', methods=['DELETE'])
 @admin_required
