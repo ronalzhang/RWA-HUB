@@ -2578,6 +2578,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </div>
                                 </div>
                                 
+                                <!-- 错误信息显示区域 -->
                                 <div id="shareError" class="alert alert-danger mt-3" style="display:none;">
                                 </div>
                                 
@@ -2627,7 +2628,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('shareLoading').style.display = 'block';
             document.getElementById('shareContent').style.display = 'none';
             document.getElementById('shareError').style.display = 'none';
-            document.getElementById('shareSuccess').style.display = 'none';
+            // 删除对shareSuccess的隐藏操作，因为已经移除了该元素
             
             // 构建带钱包地址的原始URL
             const currentUrl = window.location.origin + window.location.pathname;
@@ -2708,7 +2709,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // 改进的复制到剪贴板功能
         async function copyShareLink(buttonElement) {
             const shareLink = document.getElementById('shareLink').value;
-            const successElement = document.getElementById('shareSuccess');
             const errorElement = document.getElementById('shareError');
             
             if (!shareLink) {
@@ -2742,8 +2742,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('使用fallback方法复制成功');
                 }
                 
-                // 显示成功反馈
-                showShareSuccess();
+                // 只显示按钮成功状态，不显示大提示框
                 updateButtonSuccess(buttonElement);
                 
             } catch (error) {
@@ -2780,9 +2779,7 @@ document.addEventListener('DOMContentLoaded', function() {
         function showShareError(message) {
             // 优先在模态框内显示错误
             const errorElement = document.getElementById('shareError');
-            const successElement = document.getElementById('shareSuccess');
             
-            if (successElement) successElement.style.display = 'none';
             if (errorElement) {
                 errorElement.innerHTML = `<i class="fas fa-exclamation-circle me-2"></i>${message}`;
                 errorElement.style.display = 'block';
@@ -2816,7 +2813,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!buttonElement) return;
             
             const originalHtml = buttonElement.innerHTML;
-            buttonElement.innerHTML = '<i class="fas fa-check text-success"></i>';
+            buttonElement.innerHTML = '<span class="text-success">已复制</span>';
             buttonElement.disabled = true;
             
             setTimeout(() => {
@@ -2897,12 +2894,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (buttonElement) {
                     updateButtonSuccess(buttonElement);
                 } else {
-                    // 如果没有按钮，显示成功提示
-                    if (typeof showShareSuccess === 'function') {
-                        showShareSuccess();
-                    } else {
-                        console.log('内容已复制到剪贴板');
-                    }
+                    // 如果没有按钮，只记录日志，不显示提示
+                    console.log('内容已复制到剪贴板');
                 }
                 
                 return true;
