@@ -2485,7 +2485,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 `<div class="commission-info mt-2 p-3 bg-light rounded">
                     <div class="text-center">
                         <p class="mb-1 fw-bold text-primary">无限层级收益模式</p>
-                        <p class="mb-0 small text-muted">每级享受${shareConfig.commission_rate}%持续分成</p>
+                        <p class="mb-0 small text-muted">每级享有20%终身佣金收益</p>
                     </div>
                 </div>` :
                 `<div class="commission-tiers mt-2 d-flex justify-content-around text-center bg-light p-3 rounded">
@@ -2790,8 +2790,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // 显示错误提示
+        // 显示错误提示 - 改进版本，兼容模态框内外调用
         function showShareError(message) {
+            // 优先在模态框内显示错误
             const errorElement = document.getElementById('shareError');
             const successElement = document.getElementById('shareSuccess');
             
@@ -2799,7 +2800,29 @@ document.addEventListener('DOMContentLoaded', function() {
             if (errorElement) {
                 errorElement.innerHTML = `<i class="fas fa-exclamation-circle me-2"></i>${message}`;
                 errorElement.style.display = 'block';
+                return;
             }
+            
+            // 如果模态框不存在，使用全局toast提示
+            console.warn('分享错误:', message);
+            
+            // 创建临时错误提示
+            const toast = document.createElement('div');
+            toast.className = 'position-fixed top-0 start-50 translate-middle-x mt-3 alert alert-danger d-flex align-items-center';
+            toast.style.zIndex = '9999';
+            toast.innerHTML = `
+                <i class="fas fa-exclamation-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close ms-2" onclick="this.parentElement.remove()"></button>
+            `;
+            document.body.appendChild(toast);
+            
+            // 5秒后自动移除
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 5000);
         }
         
         // 更新按钮成功状态
@@ -2828,28 +2851,44 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 2000);
         }
         
-        // 复制到剪贴板 (保留原有函数以兼容其他地方的调用)
+        // 复制到剪贴板 - 改进版本，添加更健壮的错误处理
         async function copyToClipboard(elementId, buttonElement) {
-            const copyTextElement = document.getElementById(elementId);
-            let textToCopy = '';
-            
-            if (!copyTextElement) {
-                console.error('找不到要复制的元素:', elementId);
-                return false;
-            }
-            
-            if (copyTextElement.tagName === 'INPUT' || copyTextElement.tagName === 'TEXTAREA') {
-                textToCopy = copyTextElement.value;
-            } else {
-                textToCopy = copyTextElement.textContent || copyTextElement.innerText;
-            }
-
-            if (!textToCopy) {
-                console.error('无法获取要复制的文本');
-                return false;
-            }
-
             try {
+                const copyTextElement = document.getElementById(elementId);
+                let textToCopy = '';
+                
+                if (!copyTextElement) {
+                    console.error('找不到要复制的元素:', elementId);
+                    const errorMsg = '复制功能暂时不可用，请刷新页面后重试';
+                    
+                    // 使用改进的错误显示函数
+                    if (typeof showShareError === 'function') {
+                        showShareError(errorMsg);
+                    } else {
+                        alert(errorMsg);
+                    }
+                    return false;
+                }
+                
+                if (copyTextElement.tagName === 'INPUT' || copyTextElement.tagName === 'TEXTAREA') {
+                    textToCopy = copyTextElement.value;
+                } else {
+                    textToCopy = copyTextElement.textContent || copyTextElement.innerText;
+                }
+
+                if (!textToCopy) {
+                    console.error('无法获取要复制的文本');
+                    const errorMsg = '没有可复制的内容';
+                    
+                    if (typeof showShareError === 'function') {
+                        showShareError(errorMsg);
+                    } else {
+                        alert(errorMsg);
+                    }
+                    return false;
+                }
+
+                // 执行复制操作
                 if (navigator.clipboard && window.isSecureContext) {
                     await navigator.clipboard.writeText(textToCopy);
                 } else {
@@ -2865,17 +2904,44 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (!successful) throw new Error('Fallback copy failed');
                 }
                 
+                // 复制成功
+                console.log('复制成功:', textToCopy.substring(0, 50) + '...');
+                
                 // 更新按钮状态
                 if (buttonElement) {
                     updateButtonSuccess(buttonElement);
+                } else {
+                    // 如果没有按钮，显示成功提示
+                    if (typeof showShareSuccess === 'function') {
+                        showShareSuccess();
+                    } else {
+                        console.log('内容已复制到剪贴板');
+                    }
                 }
                 
                 return true;
+                
             } catch (err) {
                 console.error('复制失败:', err);
-                if (buttonElement) {
-                    updateButtonError(buttonElement);
+                const errorMsg = '复制失败，请手动选择并复制链接';
+                
+                // 安全的错误处理
+                try {
+                    if (buttonElement) {
+                        updateButtonError(buttonElement);
+                    }
+                    
+                    if (typeof showShareError === 'function') {
+                        showShareError(errorMsg);
+                    } else {
+                        alert(errorMsg);
+                    }
+                } catch (secondaryError) {
+                    console.error('错误处理也失败了:', secondaryError);
+                    // 最后的fallback
+                    alert('复制功能出现问题，请刷新页面重试');
                 }
+                
                 return false;
             }
         }
