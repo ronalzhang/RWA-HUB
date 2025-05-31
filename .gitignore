@@ -560,3 +560,12 @@ instance/
 logs/
 security_*.log
 *_backup*
+# 报告和分析文档（仅本地保留）
+*REPORT*.md
+*COMPLETE*.md
+*ANALYSIS*.md
+*VERIFICATION*.md
+*INSTRUCTIONS*.md
+*CHECKLIST*.md
+*OPTIMIZATION*.md
+*POLICY*.md
