@@ -37,7 +37,7 @@ from .solana_api import solana_api as solana_api_bp
 from .admin_solana import admin_solana_bp
 
 # 导入管理员API兼容路由
-from .admin_api import admin_compat_routes_bp, admin_v2_bp, admin_compat_bp
+from .admin_api import admin_compat_routes_bp, admin_v2_bp, admin_compat_bp, admin_frontend_bp
 
 # 导入新的模块化admin系统
 from .admin import admin_bp, admin_api_bp
@@ -91,6 +91,7 @@ def register_blueprints(app):
     app.register_blueprint(admin_v2_bp)           # 启用V2 API蓝图以支持新的认证系统
     app.register_blueprint(admin_compat_bp)        # 启用兼容路由以支持前端API调用
     app.register_blueprint(admin_compat_routes_bp) # 启用兼容路由以支持前端页面API调用
+    app.register_blueprint(admin_frontend_bp)        # 启用前端管理员蓝图
     
     # 注册全局处理器
     register_global_handlers(app)

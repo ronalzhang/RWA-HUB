@@ -45,6 +45,9 @@ try:
 except ImportError:
     NACL_AVAILABLE = False
 
+# 为前端期望的URL路径添加额外的蓝图
+admin_frontend_bp = Blueprint('admin_frontend', __name__, url_prefix='/api/admin/v2')
+
 # 管理员API蓝图 - 新认证系统
 admin_v2_bp = Blueprint('admin_v2', __name__, url_prefix='/admin/api/v2')
 
@@ -3843,3 +3846,132 @@ def get_shortlinks():
     except Exception as e:
         current_app.logger.error(f"获取短链接列表失败: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# 在文件末尾添加前端期望的认证路由
+@admin_frontend_bp.route('/auth/challenge', methods=['GET'])
+def frontend_get_auth_challenge():
+    """
+    生成一个用于管理员钱包签名认证的挑战字符串 (nonce) - 前端兼容版本
+    """
+    try:
+        nonce = secrets.token_hex(32)
+        session['admin_auth_nonce'] = nonce
+        session['admin_auth_nonce_timestamp'] = datetime.utcnow().timestamp()
+        current_app.logger.info(f"Frontend auth challenge generated successfully. Nonce stored in session.")
+        return jsonify({'nonce': nonce, 'message_prefix': '请签名此消息以验证您的身份: '}), 200
+    except Exception as e:
+        current_app.logger.error(f"Error generating frontend auth challenge: {str(e)}")
+        return jsonify({'error': 'Failed to generate challenge', 'message': str(e)}), 500
+
+@admin_frontend_bp.route('/auth/login', methods=['POST'])
+def frontend_admin_auth_login():
+    """
+    验证管理员钱包签名并处理登录 - 前端兼容版本
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Request body must be JSON.'}), 400
+
+    wallet_address = data.get('wallet_address')
+    signature_b64 = data.get('signature')
+    original_message_from_frontend = data.get('message')
+    
+    if not wallet_address or not signature_b64 or not original_message_from_frontend:
+        return jsonify({'error': 'wallet_address, signature (Base64), and message are required.'}), 400
+
+    # 从session中获取nonce，并检查其有效性
+    nonce_from_session = session.pop('admin_auth_nonce', None)
+    nonce_timestamp = session.pop('admin_auth_nonce_timestamp', None)
+
+    if not nonce_from_session:
+        current_app.logger.warning(f"Frontend admin login attempt for {wallet_address} failed: Nonce not found in session.")
+        return jsonify({'error': 'Login challenge not found or expired. Please request a new challenge.'}), 400
+    
+    if nonce_timestamp and (datetime.utcnow().timestamp() - nonce_timestamp) > 300:
+        current_app.logger.warning(f"Frontend admin login attempt for {wallet_address} failed: Nonce expired.")
+        return jsonify({'error': 'Login challenge expired. Please request a new challenge.'}), 400
+
+    # 验证前端发送的原始消息是否包含正确的nonce
+    expected_message_prefix = "请签名此消息以验证您的身份: "
+    if not original_message_from_frontend.startswith(expected_message_prefix) or \
+       original_message_from_frontend[len(expected_message_prefix):] != nonce_from_session:
+        current_app.logger.warning(
+            f"Frontend admin login attempt for {wallet_address} failed: Message-Nonce mismatch. "
+            f"Frontend msg: '{original_message_from_frontend}', Expected nonce: '{nonce_from_session}'."
+        )
+        return jsonify({'error': 'Message does not match the challenge nonce. Please try again.'}), 400
+
+    try:
+        # 检查是否有必要的库
+        if not SOLDERS_AVAILABLE or not NACL_AVAILABLE:
+            current_app.logger.warning(f"Solana signature verification libraries not available. Skipping signature verification for {wallet_address}")
+            admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
+            if not admin_user:
+                current_app.logger.warning(f"Frontend admin login attempt for {wallet_address} failed: Address is not a registered admin.")
+                return jsonify({'error': 'Access denied. Wallet address is not registered as an administrator.'}), 403
+        else:
+            # 解码Base64签名
+            signature_bytes = base64.b64decode(signature_b64)
+            
+            # 创建Solana公钥对象
+            public_key = Pubkey.from_string(wallet_address)
+            
+            # 创建验证密钥对象
+            verify_key = nacl.signing.VerifyKey(bytes(public_key))
+            
+            # 验证签名
+            message_bytes = original_message_from_frontend.encode('utf-8')
+            verify_key.verify(message_bytes, signature_bytes)
+            current_app.logger.info(f"Frontend Solana signature verified successfully for {wallet_address}.")
+
+            # 验证签名者是否是数据库中的管理员
+            admin_user = AdminUser.query.filter(AdminUser.wallet_address == wallet_address).first()
+            
+            if not admin_user:
+                current_app.logger.warning(f"Frontend admin login attempt for {wallet_address} failed: Address is not a registered admin.")
+                return jsonify({'error': 'Access denied. Wallet address is not registered as an administrator.'}), 403
+
+        # 登录成功
+        session['admin_verified'] = True
+        session['admin_wallet_address'] = wallet_address
+        session['admin_user_id'] = admin_user.id
+        session['admin_role'] = admin_user.role
+        
+        # 更新最后登录时间
+        admin_user.last_login = datetime.utcnow()
+        db.session.commit()
+        
+        current_app.logger.info(f"Frontend admin user {wallet_address} (ID: {admin_user.id}) logged in successfully.")
+        return jsonify({
+            'success': True, 
+            'message': 'Admin login successful.', 
+            'wallet_address': wallet_address,
+            'role': admin_user.role
+        }), 200
+
+    except Exception as sig_err:
+        if NACL_AVAILABLE and 'BadSignatureError' in str(type(sig_err)):
+            current_app.logger.error(f"Frontend admin login signature verification error for {wallet_address}: {str(sig_err)}")
+            return jsonify({'error': 'Signature verification failed.', 'details': str(sig_err)}), 403
+        else:
+            current_app.logger.error(f"Frontend admin login error for {wallet_address}: {str(sig_err)}")
+            current_app.logger.error(traceback.format_exc())
+            return jsonify({'error': 'An unexpected error occurred during login.', 'message': str(sig_err)}), 500
+
+@admin_frontend_bp.route('/auth/logout', methods=['POST'])
+def frontend_admin_auth_logout():
+    """
+    处理管理员登出，清除session - 前端兼容版本
+    """
+    try:
+        wallet_address_for_log = session.get('admin_wallet_address', 'N/A')
+        session.pop('admin_verified', None)
+        session.pop('admin_wallet_address', None)
+        session.pop('admin_user_id', None)
+        session.pop('admin_role', None)
+        current_app.logger.info(f"Frontend admin user {wallet_address_for_log} logged out successfully.")
+        return jsonify({'success': True, 'message': 'Logout successful.'}), 200
+    except Exception as e:
+        current_app.logger.error(f"Error during frontend admin logout: {str(e)}")
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({'error': 'An unexpected error occurred during logout.', 'message': str(e)}), 500
