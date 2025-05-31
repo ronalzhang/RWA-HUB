@@ -86,7 +86,7 @@
             <p class="text-muted">管理系统中的分享消息文案，用户分享资产时将随机展示这些消息</p>
         </div>
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createMessageModal">
-            <i class="fas fa-plus"></i> 添加分享消息
+            <i class="fas fa-plus"></i> 添加消息
         </button>
     </div>
 
@@ -189,7 +189,7 @@
                 分享内容管理
             </h5>
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#messageModal" onclick="openCreateModal()">
-                <i class="fas fa-plus"></i> 新增分享文案
+                <i class="fas fa-plus"></i> 添加消息
             </button>
         </div>
         <div class="card-body p-0">
@@ -274,7 +274,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-primary" onclick="createMessage()">
+                <button type="button" class="btn btn-primary" onclick="saveMessage()">
                     <i class="fas fa-save"></i> 保存
                 </button>
             </div>
@@ -652,7 +652,7 @@ function editMessage(id) {
                 messageIdField.style.display = 'block';
                 
                 // 设置模态框标题
-                document.querySelector('#messageModal .modal-title').textContent = '编辑分享文案';
+                document.querySelector('#messageModal .modal-title').textContent = '编辑消息';
                 
                 // 显示模态框
                 const modal = new bootstrap.Modal(document.getElementById('messageModal'));
@@ -705,7 +705,7 @@ function openCreateModal() {
     document.getElementById('messageStatus').value = 'true';
     
     // 设置模态框标题
-    document.querySelector('#messageModal .modal-title').textContent = '新增分享文案';
+    document.querySelector('#messageModal .modal-title').textContent = '添加消息';
     
     // 隐藏消息ID字段
     const messageIdField = document.getElementById('messageId');
