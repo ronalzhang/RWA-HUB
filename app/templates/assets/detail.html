@@ -280,77 +280,102 @@ console.log('- is_admin_user类型:', typeof("{{ is_admin_user|default('None') }
 console.log('- is_owner类型:', typeof("{{ is_owner|default('None') }}"));
 console.log('- 分红按钮应该显示:', "{{ (is_admin_user or is_owner)|string }}");
 
-// 分享资产功能 - 立即定义为全局函数
+// 分享功能
 window.shareAsset = function() {
     console.log('分享功能被调用');
-    const address = getWalletAddress();
-    if (!address) {
-        const confirm = window.confirm('Please Connect Wallet to Generate Exclusive Share Link\\n\\nClick OK to Connect Wallet, Click Cancel to Continue Viewing');
-        if (confirm && typeof window.openWalletSelector === 'function') {
-            window.openWalletSelector();
-        }
-        return;
+    
+    // 显示模态框
+    const modal = document.getElementById('shareModal');
+    if (modal) {
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        
+        // 获取钱包地址用于创建短链接
+        const ethAddress = localStorage.getItem('eth_address') || window.ethereum?.selectedAddress;
+        console.log('当前钱包地址:', ethAddress);
+        
+        // 构建分享链接（包含推荐码）
+        const baseUrl = window.location.origin + window.location.pathname;
+        const shareUrl = ethAddress ? `${baseUrl}?ref=${ethAddress.slice(-8)}` : baseUrl;
+        console.log('原始分享链接:', shareUrl);
+        
+        // 并行获取分享消息和创建短链接
+        Promise.all([
+            // 获取随机分享消息
+            fetch('/api/share-messages/random?type=share_content')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        return data.message;
+                    } else {
+                        return '🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，高透明度，稳定收益。';
+                    }
+                })
+                .catch(error => {
+                    console.error('获取分享消息失败:', error);
+                    return '🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，高透明度，稳定收益。';
+                }),
+            
+            // 创建短链接
+            fetch('/api/shortlink/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Eth-Address': ethAddress || ''
+                },
+                body: JSON.stringify({
+                    url: shareUrl,
+                    expires_days: 365
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        return data.short_url;
+                    } else {
+                        return shareUrl; // 如果短链接创建失败，使用原始链接
+                    }
+                })
+                .catch(error => {
+                    console.error('创建短链接失败:', error);
+                    return shareUrl; // 如果短链接创建失败，使用原始链接
+                })
+        ])
+        .then(([shareMessage, finalShareUrl]) => {
+            console.log('获取到分享消息:', shareMessage);
+            console.log('最终分享链接:', finalShareUrl);
+            
+            // 更新模态框内容
+            const messageElement = document.querySelector('#shareModal .bg-blue-50 p');
+            if (messageElement) {
+                messageElement.textContent = shareMessage;
+            }
+            
+            const linkElement = document.querySelector('#shareModal input[readonly]');
+            if (linkElement) {
+                linkElement.value = finalShareUrl;
+            }
+            
+            // 更新复制按钮的数据
+            window.currentShareUrl = finalShareUrl;
+        })
+        .catch(error => {
+            console.error('分享准备失败:', error);
+            // 使用默认值
+            const messageElement = document.querySelector('#shareModal .bg-blue-50 p');
+            if (messageElement) {
+                messageElement.textContent = '🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，高透明度，稳定收益。';
+            }
+            
+            const linkElement = document.querySelector('#shareModal input[readonly]');
+            if (linkElement) {
+                linkElement.value = shareUrl;
+            }
+            
+            window.currentShareUrl = shareUrl;
+        });
     }
-    
-    const shareUrl = `${window.location.origin}${window.location.pathname}?ref=${encodeURIComponent(address)}`;
-    
-    const modalHtml = `
-        <div class="modal fade" id="shareModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title"><i class="fas fa-share-alt me-2"></i>Share RWA Asset</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <p class="alert alert-info">🚀 Discover High-Quality RWA Assets! Real World Asset Digital Investment New Opportunity, High Transparency and Stable Income.</p>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Your Exclusive Invitation Link</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="shareLink" value="${shareUrl}" readonly>
-                                <button class="btn btn-outline-primary" onclick="window.copyShareLink()">
-                                    <i class="fas fa-copy"></i> Copy
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    const oldModal = document.getElementById('shareModal');
-    if (oldModal) oldModal.remove();
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modal = new bootstrap.Modal(document.getElementById('shareModal'));
-    modal.show();
 };
-
-// 复制分享链接 - 立即定义为全局函数
-window.copyShareLink = async function() {
-    const input = document.getElementById('shareLink');
-    if (!input) return;
-    
-    try {
-        await navigator.clipboard.writeText(input.value);
-        alert('Link Copied to Clipboard!');
-    } catch (error) {
-        input.select();
-        document.execCommand('copy');
-        alert('Link Copied to Clipboard!');
-    }
-};
-
-// 获取钱包地址
-function getWalletAddress() {
-    if (window.walletState && window.walletState.address) {
-        return window.walletState.address;
-    }
-    return localStorage.getItem('walletAddress') || localStorage.getItem('eth_address') || '';
-}
 
 // 检查DOM中是否存在分红按钮
 document.addEventListener('DOMContentLoaded', function() {
@@ -679,5 +704,36 @@ document.addEventListener('DOMContentLoaded', function() {
         buyButton.addEventListener('click', handleBuyClick);
     }
 });
+
+// 复制分享链接
+window.copyShareLink = async function() {
+    console.log('复制分享链接被调用');
+    
+    const shareUrl = window.currentShareUrl || document.querySelector('#shareModal input[readonly]')?.value;
+    
+    if (!shareUrl) {
+        alert('分享链接不可用，请重试');
+        return;
+    }
+    
+    try {
+        await navigator.clipboard.writeText(shareUrl);
+        alert('🎉 分享链接已复制到剪贴板！');
+        console.log('分享链接复制成功:', shareUrl);
+    } catch (error) {
+        console.error('使用剪贴板API复制失败，尝试传统方法:', error);
+        // 降级到传统复制方法
+        const input = document.querySelector('#shareModal input[readonly]');
+        if (input) {
+            input.select();
+            input.setSelectionRange(0, 99999); // 对移动端兼容
+            document.execCommand('copy');
+            alert('🎉 分享链接已复制到剪贴板！');
+            console.log('分享链接复制成功（传统方法）:', shareUrl);
+        } else {
+            alert('复制失败，请手动复制链接');
+        }
+    }
+};
 </script>
 {% endblock %}
