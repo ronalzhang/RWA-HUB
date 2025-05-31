@@ -2485,7 +2485,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 `<div class="commission-info mt-2 p-3 bg-light rounded">
                     <div class="text-center">
                         <p class="mb-1 fw-bold text-primary">无限层级收益模式</p>
-                        <p class="mb-0 small text-muted">每级获得${shareConfig.commission_rate}%永久分润收益</p>
+                        <p class="mb-0 small text-muted">每级享有${shareConfig.commission_rate}%永久分润收益</p>
                     </div>
                 </div>` :
                 `<div class="commission-tiers mt-2 d-flex justify-content-around text-center bg-light p-3 rounded">
@@ -2561,16 +2561,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                         </small>
                                     </div>
                                     
-                                    <!-- 分享按钮组 -->
-                                    <div class="d-flex gap-2">
-                                        <button class="btn btn-success flex-grow-1" id="copyShareLinkBtn2">
-                                            <i class="fas fa-copy me-2"></i>复制链接
-                                        </button>
-                                        <button class="btn btn-primary flex-grow-1" id="shareWhatsAppBtn">
-                                            <i class="fab fa-whatsapp me-2"></i>WhatsApp
-                                        </button>
-                                        <button class="btn btn-info flex-grow-1" id="shareTwitterBtn">
-                                            <i class="fab fa-twitter me-2"></i>Twitter
                                         </button>
                                     </div>
                                 </div>
@@ -2608,30 +2598,13 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 设置分享模态框事件监听器
         function setupShareModalEvents() {
-            // 复制按钮事件
+            // 只保留输入框旁边的复制按钮事件
             const copyBtn1 = document.getElementById('copyShareLinkBtn');
-            const copyBtn2 = document.getElementById('copyShareLinkBtn2');
-            const whatsappBtn = document.getElementById('shareWhatsAppBtn');
-            const twitterBtn = document.getElementById('shareTwitterBtn');
             
             if (copyBtn1) {
                 copyBtn1.addEventListener('click', function() {
                     copyShareLink(this);
                 });
-            }
-            
-            if (copyBtn2) {
-                copyBtn2.addEventListener('click', function() {
-                    copyShareLink(this);
-                });
-            }
-            
-            if (whatsappBtn) {
-                whatsappBtn.addEventListener('click', shareViaWhatsApp);
-            }
-            
-            if (twitterBtn) {
-                twitterBtn.addEventListener('click', shareViaTwitter);
             }
         }
         
@@ -2946,56 +2919,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // 分享到WhatsApp
-        function shareViaWhatsApp() {
-            try {
-                const shareLink = document.getElementById('shareLink');
-                if (!shareLink || !shareLink.value) {
-                    showShareError('分享链接还未生成，请稍后重试');
-                    return;
-                }
-                
-                const assetName = "{{ asset.name|e }}";
-                const shareText = `🚀 发现了一个优质的RWA资产！\n\n💎 ${assetName}\n\n真实世界资产代币化，透明安全，快来看看: ${shareLink.value}`;
-                
-                const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
-                console.log('WhatsApp分享URL:', whatsappUrl);
-                
-                // 检测是否是移动设备
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                
-                if (isMobile) {
-                    // 移动设备上直接打开
-                    window.location.href = whatsappUrl;
-                } else {
-                    // 桌面设备上在新窗口打开
-                    const newWindow = window.open(whatsappUrl, '_blank', 'width=600,height=400');
-                    if (!newWindow) {
-                        showShareError('弹窗被阻止，请允许弹窗后重试或手动复制链接分享');
-                    }
-                }
-            } catch (error) {
-                console.error('WhatsApp分享失败:', error);
-                showShareError('WhatsApp分享功能暂时不可用');
-            }
-        }
-        
-        // 分享到Twitter
-        function shareViaTwitter() {
-            try {
-                const shareLink = document.getElementById('shareLink');
-                if (!shareLink || !shareLink.value) {
-                    showShareError('分享链接还未生成，请稍后重试');
-                    return;
-                }
-                
-                const assetName = "{{ asset.name|e }}";
-                const shareText = `💎 投资新趋势：${assetName} - 真实世界资产代币化投资机会！区块链技术让传统资产投资更透明、更便捷 🌟`;
-                
-                const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareLink.value)}&hashtags=RWA,区块链投资,代币化`;
-                console.log('Twitter分享URL:', twitterUrl);
-                
-                const newWindow = window.open(twitterUrl, '_blank', 'width=600,height=400');
                 if (!newWindow) {
                     showShareError('弹窗被阻止，请允许弹窗后重试或手动复制链接分享');
                 }
