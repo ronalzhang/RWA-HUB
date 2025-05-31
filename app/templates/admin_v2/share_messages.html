@@ -1,6 +1,6 @@
 {% extends "admin_v2/base.html" %}
 
-{% block title %}分享消息管理{% endblock %}
+{% block title %}消息管理{% endblock %}
 
 {% block extra_head %}
 <!-- 移除Bootstrap CSS，使用统一的样式 -->
@@ -56,7 +56,7 @@
 <div class="p-6">
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 mb-2">分享消息管理</h1>
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">消息管理</h1>
             <p class="text-gray-600">管理系统中的分享消息文案，用户分享资产时将随机展示这些消息</p>
         </div>
         <button type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center" onclick="openCreateModal()">
@@ -139,12 +139,12 @@
         </div>
     </div>
 
-    <!-- 分享消息列表 -->
-    <div class="bg-white rounded-lg shadow">
+    <!-- 消息列表 -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
         <div class="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
             <h5 class="text-lg font-semibold text-gray-900 flex items-center">
-                <i class="fas fa-share-alt text-indigo-600 mr-2"></i>
-                分享内容管理
+                <i class="fas fa-comments text-indigo-600 mr-2"></i>
+                消息内容管理
             </h5>
             <button type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center" onclick="openCreateModal()">
                 <i class="fas fa-plus mr-2"></i> 添加消息
@@ -154,13 +154,13 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">ID</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">类型</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">内容</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">权重</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">状态</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">创建时间</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">操作</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">权重</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200" id="messagesTableBody">
@@ -169,132 +169,107 @@
             </table>
             
             <!-- 分页 -->
-            <div id="paginationContainer" class="flex justify-center px-6 py-4">
+            <div id="paginationContainer" class="flex justify-center px-6 py-4 bg-gray-50 border-t border-gray-200">
                 <!-- 分页组件将在这里动态生成 -->
             </div>
         </div>
     </div>
 </div>
 
-<!-- 创建分享消息模态框 -->
-<div class="modal fade" id="createMessageModal" tabindex="-1" aria-labelledby="createMessageModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="createMessageModalLabel">
-                    <i class="fas fa-plus-circle text-primary"></i> 添加分享消息
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
-            </div>
-            <div class="modal-body">
-                <form id="messageForm">
-                    <div class="mb-3">
-                        <label for="messageType" class="form-label">消息类型 <span class="text-danger">*</span></label>
-                        <select class="form-select" id="messageType" name="message_type" required>
-                            <option value="share_content">分享内容消息</option>
-                            <option value="reward_plan">奖励计划文案</option>
+<!-- 创建/编辑消息模态框 -->
+<div id="createMessageModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-90vh overflow-y-auto">
+        <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h5 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i class="fas fa-plus-circle text-indigo-600 mr-2"></i>
+                <span id="modalTitle">添加消息</span>
+            </h5>
+            <button type="button" class="text-gray-400 hover:text-gray-600" onclick="closeModal()">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <div class="px-6 py-4">
+            <form id="messageForm" onsubmit="saveMessage(event)">
+                <input type="hidden" id="messageId" name="id">
+                
+                <div class="mb-4">
+                    <label for="messageType" class="block text-sm font-medium text-gray-700 mb-2">
+                        消息类型 <span class="text-red-500">*</span>
+                    </label>
+                    <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                            id="messageType" name="message_type" required>
+                        <option value="share_content">分享内容消息</option>
+                        <option value="reward_plan">奖励计划文案</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">选择消息的使用场景类型</p>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="messageContent" class="block text-sm font-medium text-gray-700 mb-2">
+                        消息内容 <span class="text-red-500">*</span>
+                    </label>
+                    <textarea class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                              id="messageContent" name="content" rows="4" required 
+                              placeholder="请输入分享消息内容，支持emoji表情..."></textarea>
+                    <p class="text-xs text-gray-500 mt-1">这段文字将在用户分享资产时展示</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="messageWeight" class="block text-sm font-medium text-gray-700 mb-2">
+                            展示权重 <span class="text-red-500">*</span>
+                        </label>
+                        <input type="number" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                               id="messageWeight" name="weight" min="1" max="100" value="50" required>
+                        <p class="text-xs text-gray-500 mt-1">权重越高，被随机选中的概率越大 (1-100)</p>
+                    </div>
+                    
+                    <div>
+                        <label for="messageStatus" class="block text-sm font-medium text-gray-700 mb-2">状态</label>
+                        <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                                id="messageStatus" name="status">
+                            <option value="active">启用</option>
+                            <option value="inactive">禁用</option>
                         </select>
-                        <div class="form-text">选择消息的使用场景类型</div>
                     </div>
-                    <div class="mb-3">
-                        <label for="messageContent" class="form-label">消息内容 <span class="text-danger">*</span></label>
-                        <textarea class="form-control" id="messageContent" name="content" rows="3" required 
-                            placeholder="请输入分享消息内容..."></textarea>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="messageWeight" class="form-label">权重</label>
-                                <select class="form-select" id="messageWeight" name="weight">
-                                    <option value="50">50 - 低</option>
-                                    <option value="75">75</option>
-                                    <option value="100" selected>100 - 中</option>
-                                    <option value="125">125</option>
-                                    <option value="150">150 - 高</option>
-                                </select>
-                                <div class="form-text">权重越高，展示概率越大</div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="messageStatus" class="form-label">状态</label>
-                                <select class="form-select" id="messageStatus" name="is_active">
-                                    <option value="true" selected>激活</option>
-                                    <option value="false">禁用</option>
-                                </select>
-                                <div class="form-text">只有激活的消息才会被展示</div>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-primary" onclick="saveMessage()">
-                    <i class="fas fa-save"></i> 保存
-                </button>
-            </div>
+                </div>
+                
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                    <button type="button" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md" 
+                            onclick="closeModal()">
+                        取消
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md flex items-center">
+                        <i class="fas fa-save mr-2"></i>
+                        <span id="saveButtonText">保存</span>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
-<!-- 编辑分享消息模态框 -->
-<div class="modal fade" id="editMessageModal" tabindex="-1" aria-labelledby="editMessageModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="editMessageModalLabel">
-                    <i class="fas fa-edit text-warning"></i> 编辑分享消息
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+<!-- 删除确认模态框 -->
+<div id="deleteConfirmModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div class="px-6 py-4">
+            <div class="flex items-center mb-4">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-exclamation-triangle text-red-500 text-2xl"></i>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-medium text-gray-900">确认删除</h3>
+                    <p class="text-sm text-gray-500 mt-1">此操作不可撤销，确定要删除这条消息吗？</p>
+                </div>
             </div>
-            <div class="modal-body">
-                <form id="editMessageForm">
-                    <input type="hidden" id="editMessageId" name="id">
-                    <div class="mb-3">
-                        <label for="editMessageType" class="form-label">消息类型</label>
-                        <select class="form-select" id="editMessageType" name="message_type">
-                            <option value="share_content">分享内容</option>
-                            <option value="reward_plan">奖励计划</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="editMessageContent" class="form-label">消息内容 <span class="text-danger">*</span></label>
-                        <textarea class="form-control" id="editMessageContent" name="content" rows="4" 
-                                maxlength="500" placeholder="请输入分享消息内容，支持emoji表情"></textarea>
-                        <div class="form-text">
-                            <span id="editMessageCount">0</span>/500 字符
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="editMessageWeight" class="form-label">权重</label>
-                                <select class="form-select" id="editMessageWeight" name="weight">
-                                    <option value="50">50 - 低</option>
-                                    <option value="75">75</option>
-                                    <option value="100" selected>100 - 中</option>
-                                    <option value="125">125</option>
-                                    <option value="150">150 - 高</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="editMessageStatus" class="form-label">状态</label>
-                                <select class="form-select" id="editMessageStatus" name="is_active">
-                                    <option value="true">激活</option>
-                                    <option value="false">禁用</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-warning" onclick="updateMessage()">
-                    <i class="fas fa-save"></i> 更新
+            <div class="flex justify-end gap-3">
+                <button type="button" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md" 
+                        onclick="closeDeleteModal()">
+                    取消
+                </button>
+                <button type="button" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md" 
+                        onclick="confirmDelete()">
+                    删除
                 </button>
             </div>
         </div>
@@ -308,42 +283,22 @@
 let messagesData = [];
 let currentPage = 1;
 let totalPages = 1;
+let deleteMessageId = null;
 
 // 页面加载完成后初始化
 $(document).ready(function() {
     loadMessages();
-    
-    // 字符计数
-    $('#messageContent').on('input', function() {
-        const count = $(this).val().length;
-        $('#messageCount').text(count);
-        if (count > 450) {
-            $('#messageCount').addClass('text-warning');
-        } else {
-            $('#messageCount').removeClass('text-warning');
-        }
-    });
-    
-    $('#editMessageContent').on('input', function() {
-        const count = $(this).val().length;
-        $('#editMessageCount').text(count);
-        if (count > 450) {
-            $('#editMessageCount').addClass('text-warning');
-        } else {
-            $('#editMessageCount').removeClass('text-warning');
-        }
-    });
 });
 
 // 加载分享消息列表
 function loadMessages(page = 1) {
     const loadingHtml = `
         <tr>
-            <td colspan="7" class="text-center py-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">加载中...</span>
+            <td colspan="7" class="text-center py-8">
+                <div class="flex flex-col items-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                    <p class="mt-2 text-gray-500">正在加载消息...</p>
                 </div>
-                <p class="mt-2 mb-0">正在加载分享消息...</p>
             </td>
         </tr>
     `;
@@ -380,9 +335,11 @@ function loadMessages(page = 1) {
             console.error('加载分享消息失败:', error);
             document.getElementById('messagesTableBody').innerHTML = `
                 <tr>
-                    <td colspan="7" class="text-center py-4 text-danger">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <p class="mt-2 mb-0">加载失败: ${error.message}</p>
+                    <td colspan="7" class="text-center py-8 text-red-600">
+                        <div class="flex flex-col items-center">
+                            <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
+                            <p>加载失败: ${error.message}</p>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -396,9 +353,11 @@ function displayMessages(messages) {
     if (messages.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="text-center py-4 text-muted">
-                    <i class="fas fa-inbox fa-3x mb-3"></i>
-                    <p class="mb-0">暂无分享消息</p>
+                <td colspan="7" class="text-center py-8 text-gray-500">
+                    <div class="flex flex-col items-center">
+                        <i class="fas fa-inbox text-4xl mb-3"></i>
+                        <p>暂无分享消息</p>
+                    </div>
                 </td>
             </tr>
         `;
@@ -407,57 +366,49 @@ function displayMessages(messages) {
     
     const rows = messages.map(message => {
         const statusBadge = message.is_active 
-            ? '<span class="badge bg-success">启用</span>'
-            : '<span class="badge bg-secondary">禁用</span>';
+            ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">启用</span>'
+            : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">禁用</span>';
         
         const typeBadge = message.message_type === 'reward_plan'
-            ? '<span class="badge bg-info">奖励计划</span>'
-            : '<span class="badge bg-primary">分享内容</span>';
+            ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">奖励计划</span>'
+            : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">分享内容</span>';
         
         // 根据权重值显示不同的标识
         let weightDisplay = '';
-        switch(message.weight) {
-            case 50:
-                weightDisplay = '<span class="badge bg-light text-dark">50 - 低</span>';
-                break;
-            case 75:
-                weightDisplay = '<span class="badge bg-info">75 - 中低</span>';
-                break;
-            case 100:
-                weightDisplay = '<span class="badge bg-primary">100 - 中</span>';
-                break;
-            case 125:
-                weightDisplay = '<span class="badge bg-warning">125 - 中高</span>';
-                break;
-            case 150:
-                weightDisplay = '<span class="badge bg-danger">150 - 高</span>';
-                break;
-            default:
-                weightDisplay = `<span class="badge bg-secondary">${message.weight}</span>`;
+        if (message.weight <= 30) {
+            weightDisplay = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">${message.weight} - 低</span>`;
+        } else if (message.weight <= 70) {
+            weightDisplay = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">${message.weight} - 中</span>`;
+        } else {
+            weightDisplay = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">${message.weight} - 高</span>`;
         }
         
-        const contentPreview = message.content.length > 50 
-            ? message.content.substring(0, 50) + '...'
+        // 截断长文本
+        const maxLength = 80;
+        const displayContent = message.content.length > maxLength 
+            ? message.content.substring(0, maxLength) + '...'
             : message.content;
         
         return `
-            <tr>
-                <td>${message.id}</td>
-                <td>${typeBadge}</td>
-                <td>
-                    <div class="message-content" title="${escapeHtml(message.content)}">
-                        ${escapeHtml(contentPreview)}
-                    </div>
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${message.id}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${typeBadge}</td>
+                <td class="px-6 py-4 text-sm text-gray-900" style="max-width: 300px;">
+                    <div class="message-content" title="${message.content.replace(/"/g, '&quot;')}">${displayContent}</div>
                 </td>
-                <td>${weightDisplay}</td>
-                <td>${statusBadge}</td>
-                <td>${formatDateTime(message.created_at)}</td>
-                <td>
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="editMessage(${message.id})" title="编辑">
+                <td class="px-6 py-4 whitespace-nowrap">${weightDisplay}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${statusBadge}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${new Date(message.created_at).toLocaleDateString('zh-CN')}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div class="flex space-x-2">
+                        <button onclick="editMessage(${message.id})" 
+                                class="text-indigo-600 hover:text-indigo-900" title="编辑">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteMessage(${message.id})" title="删除">
+                        <button onclick="deleteMessage(${message.id})" 
+                                class="text-red-600 hover:text-red-900" title="删除">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -467,280 +418,224 @@ function displayMessages(messages) {
     }).join('');
     
     tbody.innerHTML = rows;
+    messagesData = messages;
 }
 
-// 更新分页组件
-function updatePagination(pagination) {
-    const paginationContainer = document.getElementById('paginationContainer');
-    if (!paginationContainer) return;
-    
-    let paginationHtml = '';
-    
-    if (pagination.pages > 1) {
-        paginationHtml = '<nav><ul class="pagination justify-content-center">';
-        
-        // 上一页
-        if (pagination.has_prev) {
-            paginationHtml += `<li class="page-item">
-                <a class="page-link" href="javascript:void(0)" onclick="loadMessages(${pagination.page - 1})">上一页</a>
-            </li>`;
-        } else {
-            paginationHtml += '<li class="page-item disabled"><span class="page-link">上一页</span></li>';
-        }
-        
-        // 页码
-        const startPage = Math.max(1, pagination.page - 2);
-        const endPage = Math.min(pagination.pages, pagination.page + 2);
-        
-        if (startPage > 1) {
-            paginationHtml += '<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadMessages(1)">1</a></li>';
-            if (startPage > 2) {
-                paginationHtml += '<li class="page-item disabled"><span class="page-link">...</span></li>';
-            }
-        }
-        
-        for (let i = startPage; i <= endPage; i++) {
-            if (i === pagination.page) {
-                paginationHtml += `<li class="page-item active"><span class="page-link">${i}</span></li>`;
-            } else {
-                paginationHtml += `<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadMessages(${i})">${i}</a></li>`;
-            }
-        }
-        
-        if (endPage < pagination.pages) {
-            if (endPage < pagination.pages - 1) {
-                paginationHtml += '<li class="page-item disabled"><span class="page-link">...</span></li>';
-            }
-            paginationHtml += `<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadMessages(${pagination.pages})">${pagination.pages}</a></li>`;
-        }
-        
-        // 下一页
-        if (pagination.has_next) {
-            paginationHtml += `<li class="page-item">
-                <a class="page-link" href="javascript:void(0)" onclick="loadMessages(${pagination.page + 1})">下一页</a>
-            </li>`;
-        } else {
-            paginationHtml += '<li class="page-item disabled"><span class="page-link">下一页</span></li>';
-        }
-        
-        paginationHtml += '</ul></nav>';
-    }
-    
-    paginationContainer.innerHTML = paginationHtml;
-}
-
-// 更新统计信息
+// 更新统计数据
 function updateStats(stats) {
-    const totalElement = document.getElementById('totalMessages');
-    const activeElement = document.getElementById('activeMessages');
+    document.getElementById('totalMessages').textContent = stats.total || 0;
+    document.getElementById('activeMessages').textContent = stats.active || 0;
+    document.getElementById('shareContentCount').textContent = stats.share_content || 0;
+}
+
+// 更新分页
+function updatePagination(pagination) {
+    currentPage = pagination.page;
+    totalPages = pagination.pages;
     
-    if (totalElement) totalElement.textContent = stats.total;
-    if (activeElement) activeElement.textContent = stats.active;
+    const container = document.getElementById('paginationContainer');
     
-    // 如果有分享内容和奖励计划的统计元素，则更新
-    const shareContentElement = document.getElementById('shareContentCount');
-    const rewardPlanElement = document.getElementById('rewardPlanCount');
-    
-    if (shareContentElement) shareContentElement.textContent = stats.share_content;
-    if (rewardPlanElement) rewardPlanElement.textContent = stats.reward_plan;
-}
-
-// 工具函数
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function formatDateTime(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleString('zh-CN');
-}
-
-function showSuccess(message) {
-    toastr.success(message);
-}
-
-function showError(message) {
-    toastr.error(message);
-}
-
-function showAlert(message, type = 'info') {
-    switch(type) {
-        case 'success':
-            toastr.success(message);
-            break;
-        case 'error':
-        case 'danger':
-            toastr.error(message);
-            break;
-        case 'warning':
-            toastr.warning(message);
-            break;
-        default:
-            toastr.info(message);
-    }
-}
-
-// 保存分享消息
-function saveMessage() {
-    const form = document.getElementById('messageForm');
-    const formData = new FormData(form);
-    
-    const content = formData.get('content').trim();
-    const messageType = formData.get('message_type');
-    const weight = parseInt(formData.get('weight')) || 100;
-    const isActive = formData.get('is_active') === 'true';
-    const messageId = formData.get('id');
-    
-    if (!content) {
-        showAlert('请输入消息内容', 'warning');
+    if (pagination.pages <= 1) {
+        container.innerHTML = '';
         return;
     }
     
-    const data = {
-        content: content,
-        message_type: messageType,
-        weight: weight,
-        is_active: isActive
+    let paginationHtml = `
+        <nav class="flex items-center justify-between">
+            <div class="flex-1 flex justify-between sm:hidden">
+                <button onclick="loadMessages(${pagination.page - 1})" 
+                        class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 ${pagination.page <= 1 ? 'opacity-50 cursor-not-allowed' : ''}"
+                        ${pagination.page <= 1 ? 'disabled' : ''}>
+                    上一页
+                </button>
+                <button onclick="loadMessages(${pagination.page + 1})" 
+                        class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 ${pagination.page >= pagination.pages ? 'opacity-50 cursor-not-allowed' : ''}"
+                        ${pagination.page >= pagination.pages ? 'disabled' : ''}>
+                    下一页
+                </button>
+            </div>
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-gray-700">
+                        显示第 <span class="font-medium">${(pagination.page - 1) * pagination.per_page + 1}</span> 到 
+                        <span class="font-medium">${Math.min(pagination.page * pagination.per_page, pagination.total)}</span> 条，
+                        共 <span class="font-medium">${pagination.total}</span> 条记录
+                    </p>
+                </div>
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+    `;
+    
+    // 上一页按钮
+    paginationHtml += `
+        <button onclick="loadMessages(${pagination.page - 1})" 
+                class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 ${pagination.page <= 1 ? 'opacity-50 cursor-not-allowed' : ''}"
+                ${pagination.page <= 1 ? 'disabled' : ''}>
+            <i class="fas fa-chevron-left"></i>
+        </button>
+    `;
+    
+    // 页码按钮
+    for (let i = Math.max(1, pagination.page - 2); i <= Math.min(pagination.pages, pagination.page + 2); i++) {
+        const isActive = i === pagination.page;
+        paginationHtml += `
+            <button onclick="loadMessages(${i})" 
+                    class="relative inline-flex items-center px-4 py-2 border text-sm font-medium ${isActive 
+                        ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600' 
+                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}">
+                ${i}
+            </button>
+        `;
+    }
+    
+    // 下一页按钮
+    paginationHtml += `
+        <button onclick="loadMessages(${pagination.page + 1})" 
+                class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 ${pagination.page >= pagination.pages ? 'opacity-50 cursor-not-allowed' : ''}"
+                ${pagination.page >= pagination.pages ? 'disabled' : ''}>
+            <i class="fas fa-chevron-right"></i>
+        </button>
+    `;
+    
+    paginationHtml += `
+                    </nav>
+                </div>
+            </div>
+        </nav>
+    `;
+    
+    container.innerHTML = paginationHtml;
+}
+
+// 打开创建模态框
+function openCreateModal() {
+    document.getElementById('modalTitle').textContent = '添加消息';
+    document.getElementById('saveButtonText').textContent = '保存';
+    document.getElementById('messageForm').reset();
+    document.getElementById('messageId').value = '';
+    document.getElementById('messageWeight').value = '50';
+    document.getElementById('messageStatus').value = 'active';
+    
+    // 显示模态框
+    const modal = document.getElementById('createMessageModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+// 编辑消息
+function editMessage(id) {
+    const message = messagesData.find(m => m.id === id);
+    if (!message) {
+        toastr.error('找不到要编辑的消息');
+        return;
+    }
+    
+    // 填充表单
+    document.getElementById('modalTitle').textContent = '编辑消息';
+    document.getElementById('saveButtonText').textContent = '更新';
+    document.getElementById('messageId').value = message.id;
+    document.getElementById('messageType').value = message.message_type;
+    document.getElementById('messageContent').value = message.content;
+    document.getElementById('messageWeight').value = message.weight;
+    document.getElementById('messageStatus').value = message.is_active ? 'active' : 'inactive';
+    
+    // 显示模态框
+    const modal = document.getElementById('createMessageModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+// 关闭模态框
+function closeModal() {
+    const modal = document.getElementById('createMessageModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+// 删除消息
+function deleteMessage(id) {
+    deleteMessageId = id;
+    const modal = document.getElementById('deleteConfirmModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+// 关闭删除确认模态框
+function closeDeleteModal() {
+    const modal = document.getElementById('deleteConfirmModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    deleteMessageId = null;
+}
+
+// 确认删除
+function confirmDelete() {
+    if (!deleteMessageId) return;
+    
+    fetch(`/admin/api/v2/share-messages/${deleteMessageId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            toastr.success('消息删除成功');
+            closeDeleteModal();
+            loadMessages(currentPage);
+        } else {
+            toastr.error(data.error || '删除失败');
+        }
+    })
+    .catch(error => {
+        console.error('删除消息失败:', error);
+        toastr.error('删除失败，请重试');
+    });
+}
+
+// 保存消息
+function saveMessage(event) {
+    event.preventDefault();
+    
+    const form = document.getElementById('messageForm');
+    const formData = new FormData(form);
+    
+    const messageData = {
+        message_type: formData.get('message_type'),
+        content: formData.get('content'),
+        weight: parseInt(formData.get('weight')),
+        is_active: formData.get('status') === 'active'
     };
     
-    // 判断是创建还是更新
-    const isUpdate = messageId && messageId.trim() !== '';
-    const url = isUpdate ? `/admin/api/v2/share-messages/${messageId}` : '/admin/api/v2/share-messages';
-    const method = isUpdate ? 'PUT' : 'POST';
+    const messageId = formData.get('id');
+    const isEdit = messageId && messageId !== '';
+    
+    const url = isEdit 
+        ? `/admin/api/v2/share-messages/${messageId}`
+        : '/admin/api/v2/share-messages';
+    const method = isEdit ? 'PUT' : 'POST';
     
     fetch(url, {
         method: method,
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(messageData)
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showAlert(data.message || (isUpdate ? '更新成功' : '创建成功'), 'success');
-            
-            // 关闭模态框 - 统一使用createMessageModal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('createMessageModal'));
-            if (modal) {
-                modal.hide();
-            }
-            
-            // 重新加载列表
-            loadMessages();
+            toastr.success(isEdit ? '消息更新成功' : '消息创建成功');
+            closeModal();
+            loadMessages(currentPage);
         } else {
-            throw new Error(data.error || '操作失败');
+            toastr.error(data.error || (isEdit ? '更新失败' : '创建失败'));
         }
     })
     .catch(error => {
-        console.error('保存分享消息失败:', error);
-        showAlert('保存失败: ' + error.message, 'danger');
-    });
-}
-
-// 编辑消息
-function editMessage(id) {
-    fetch(`/admin/api/v2/share-messages/${id}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const message = data.data;
-                
-                // 填充表单 - 确保元素存在
-                const contentElement = document.getElementById('messageContent');
-                const typeElement = document.getElementById('messageType');
-                const weightElement = document.getElementById('messageWeight');
-                const statusElement = document.getElementById('messageStatus');
-                
-                if (contentElement) contentElement.value = message.content;
-                if (typeElement) typeElement.value = message.message_type;
-                
-                // 特别处理权重值 - 确保匹配到正确的选项
-                if (weightElement) {
-                    const weight = message.weight;
-                    // 先尝试直接匹配
-                    if (weightElement.querySelector(`option[value="${weight}"]`)) {
-                        weightElement.value = weight;
-                    } else {
-                        // 如果没有直接匹配，找最接近的值
-                        const validWeights = [50, 75, 100, 125, 150];
-                        let closestWeight = 100; // 默认值
-                        let minDiff = Math.abs(weight - 100);
-                        
-                        validWeights.forEach(validWeight => {
-                            const diff = Math.abs(weight - validWeight);
-                            if (diff < minDiff) {
-                                minDiff = diff;
-                                closestWeight = validWeight;
-                            }
-                        });
-                        
-                        weightElement.value = closestWeight;
-                        console.log(`权重 ${weight} 映射到最接近的值 ${closestWeight}`);
-                    }
-                }
-                
-                if (statusElement) statusElement.value = message.is_active ? 'true' : 'false';
-                
-                // 添加隐藏的ID字段
-                let messageIdField = document.getElementById('messageId');
-                if (!messageIdField) {
-                    messageIdField = document.createElement('input');
-                    messageIdField.type = 'hidden';
-                    messageIdField.id = 'messageId';
-                    messageIdField.name = 'id';
-                    const form = document.getElementById('messageForm');
-                    if (form) {
-                        form.appendChild(messageIdField);
-                    }
-                }
-                if (messageIdField) {
-                    messageIdField.value = id;
-                    messageIdField.style.display = 'block';
-                }
-                
-                // 设置模态框标题 - 使用createMessageModal
-                const titleElement = document.querySelector('#createMessageModal .modal-title');
-                if (titleElement) {
-                    titleElement.textContent = '编辑消息';
-                }
-                
-                // 显示模态框
-                const modal = new bootstrap.Modal(document.getElementById('createMessageModal'));
-                modal.show();
-            } else {
-                throw new Error(data.error || '获取消息详情失败');
-            }
-        })
-        .catch(error => {
-            console.error('获取消息详情失败:', error);
-            showAlert('获取消息详情失败: ' + error.message, 'danger');
-        });
-}
-
-// 删除消息
-function deleteMessage(id) {
-    if (!confirm('确定要删除这条分享消息吗？')) {
-        return;
-    }
-    
-    fetch(`/admin/api/v2/share-messages/${id}`, {
-        method: 'DELETE'
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showSuccess('消息删除成功');
-            loadMessages();
-        } else {
-            showError(data.error);
-        }
-    })
-    .catch(error => {
-        console.error('删除消息失败:', error);
-        showError('删除消息失败');
+        console.error('保存消息失败:', error);
+        toastr.error('保存失败，请重试');
     });
 }
 
@@ -749,132 +644,17 @@ function filterMessages() {
     loadMessages(1); // 重新加载第一页
 }
 
-// 打开新建消息模态框
-function openCreateModal() {
-    // 重置表单
-    const form = document.getElementById('messageForm');
-    if (form) {
-        form.reset();
+// 点击模态框外部关闭
+document.addEventListener('click', function(event) {
+    const createModal = document.getElementById('createMessageModal');
+    const deleteModal = document.getElementById('deleteConfirmModal');
+    
+    if (event.target === createModal) {
+        closeModal();
     }
-    
-    const typeElement = document.getElementById('messageType');
-    const weightElement = document.getElementById('messageWeight');
-    const statusElement = document.getElementById('messageStatus');
-    
-    if (typeElement) typeElement.value = 'share_content';
-    if (weightElement) weightElement.value = '100';
-    if (statusElement) statusElement.value = 'true';
-    
-    // 设置模态框标题
-    const titleElement = document.querySelector('#createMessageModal .modal-title');
-    if (titleElement) {
-        titleElement.textContent = '添加消息';
+    if (event.target === deleteModal) {
+        closeDeleteModal();
     }
-    
-    // 隐藏消息ID字段
-    const messageIdField = document.getElementById('messageId');
-    if (messageIdField) {
-        messageIdField.style.display = 'none';
-    }
-}
-
-// 关闭消息模态框
-function closeMessageModal() {
-    const modal = bootstrap.Modal.getInstance(document.getElementById('createMessageModal'));
-    if (modal) {
-        modal.hide();
-    }
-}
-
-// 初始化默认消息（包含新的奖励计划文案）
-function initDefaultMessages() {
-    if (!confirm('确定要初始化默认分享消息吗？这将添加一些预设的消息模板。')) {
-        return;
-    }
-    
-    const defaultMessages = [
-        // 分享内容消息
-        {
-            content: "🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，透明度高、收益稳定。通过我的专属链接投资，我们都能获得长期收益！",
-            message_type: "share_content",
-            weight: 100,
-            is_active: true
-        },
-        {
-            content: "🌟 投资新趋势：真实世界资产代币化！房产、艺术品等实体资产现在可以通过区块链投资，门槛更低，流动性更强！",
-            message_type: "share_content",
-            weight: 90,
-            is_active: true
-        },
-        {
-            content: "💎 传统投资的数字化革命正在到来！RWA资产让您以更小的资金参与大型实体投资，收益透明可追溯！",
-            message_type: "share_content",
-            weight: 80,
-            is_active: true
-        },
-        // 奖励计划文案
-        {
-            content: "一次分享，终身收益 - 无限下级20%分成",
-            message_type: "reward_plan",
-            weight: 100,
-            is_active: true
-        },
-        {
-            content: "建立收益网络，所有下线终身20%分成",
-            message_type: "reward_plan",
-            weight: 90,
-            is_active: true
-        },
-        {
-            content: "分享即赚钱，团队收益永久分成",
-            message_type: "reward_plan",
-            weight: 80,
-            is_active: true
-        },
-        {
-            content: "智能分润：分享一次，终身享受团队收益",
-            message_type: "reward_plan",
-            weight: 70,
-            is_active: true
-        },
-        {
-            content: "无限层级分成，一次分享终身受益",
-            message_type: "reward_plan",
-            weight: 60,
-            is_active: true
-        }
-    ];
-    
-    // 逐个创建消息
-    let createdCount = 0;
-    const createNext = (index) => {
-        if (index >= defaultMessages.length) {
-            showSuccess(`成功初始化 ${createdCount} 条默认消息`);
-            loadMessages();
-            return;
-        }
-        
-        fetch('/admin/api/v2/share-messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(defaultMessages[index])
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                createdCount++;
-            }
-            createNext(index + 1);
-        })
-        .catch(error => {
-            console.error('创建默认消息失败:', error);
-            createNext(index + 1);
-        });
-    };
-    
-    createNext(0);
-}
+});
 </script>
 {% endblock %} 

@@ -36,6 +36,12 @@ window.ASSET_CONFIG = {
     platformFeeRate: 0.035
 };
 
+// 调试模板变量
+console.log('模板变量调试:');
+console.log('is_admin_user:', "{{ is_admin_user|default('None') }}");
+console.log('is_owner:', "{{ is_owner|default('None') }}"); 
+console.log('current_user_address:', "{{ current_user_address|default('None') }}");
+
 // 页面初始化函数
 document.addEventListener('DOMContentLoaded', function() {
     // 初始化Solana库
@@ -326,7 +332,7 @@ async function loadTotalDividends() {
     }
 }
 
-// 分享资产功能
+// 分享资产功能 - 全局函数
 function shareAsset() {
     console.log('分享功能被调用');
     const address = getWalletAddress();
@@ -375,6 +381,9 @@ function shareAsset() {
     modal.show();
 }
 
+// 确保shareAsset在全局范围内可用
+window.shareAsset = shareAsset;
+
 // 复制分享链接
 async function copyShareLink() {
     const input = document.getElementById('shareLink');
@@ -389,6 +398,9 @@ async function copyShareLink() {
         alert('Link Copied to Clipboard!');
     }
 }
+
+// 确保copyShareLink在全局范围内可用
+window.copyShareLink = copyShareLink;
 
 // 复制地址到剪贴板
 async function copyToClipboard(elementId, button) {
