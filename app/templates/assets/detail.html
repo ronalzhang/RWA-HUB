@@ -41,6 +41,24 @@ console.log('模板变量调试:');
 console.log('is_admin_user:', "{{ is_admin_user|default('None') }}");
 console.log('is_owner:', "{{ is_owner|default('None') }}"); 
 console.log('current_user_address:', "{{ current_user_address|default('None') }}");
+console.log('asset.owner_address:', "{{ asset.owner_address|default('None') }}");
+
+// 详细的权限检查调试
+console.log('权限检查详情:');
+console.log('- is_admin_user类型:', typeof("{{ is_admin_user|default('None') }}"));
+console.log('- is_owner类型:', typeof("{{ is_owner|default('None') }}"));
+console.log('- 分红按钮应该显示:', "{{ (is_admin_user or is_owner)|string }}");
+
+// 检查DOM中是否存在分红按钮
+document.addEventListener('DOMContentLoaded', function() {
+    const dividendBtn = document.getElementById('dividendManagementBtn');
+    console.log('分红按钮DOM检查:');
+    console.log('- 分红按钮存在:', !!dividendBtn);
+    if (dividendBtn) {
+        console.log('- 分红按钮可见:', dividendBtn.style.display !== 'none');
+        console.log('- 分红按钮HTML:', dividendBtn.outerHTML);
+    }
+});
 
 // 页面初始化函数
 document.addEventListener('DOMContentLoaded', function() {
@@ -332,8 +350,8 @@ async function loadTotalDividends() {
     }
 }
 
-// 分享资产功能 - 全局函数
-function shareAsset() {
+// 分享资产功能 - 立即定义为全局函数
+window.shareAsset = function() {
     console.log('分享功能被调用');
     const address = getWalletAddress();
     if (!address) {
@@ -362,7 +380,7 @@ function shareAsset() {
                             <label class="form-label fw-bold">Your Exclusive Invitation Link</label>
                             <div class="input-group">
                                 <input type="text" class="form-control" id="shareLink" value="${shareUrl}" readonly>
-                                <button class="btn btn-outline-primary" onclick="copyShareLink()">
+                                <button class="btn btn-outline-primary" onclick="window.copyShareLink()">
                                     <i class="fas fa-copy"></i> Copy
                                 </button>
                             </div>
@@ -379,13 +397,10 @@ function shareAsset() {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modal = new bootstrap.Modal(document.getElementById('shareModal'));
     modal.show();
-}
+};
 
-// 确保shareAsset在全局范围内可用
-window.shareAsset = shareAsset;
-
-// 复制分享链接
-async function copyShareLink() {
+// 复制分享链接 - 立即定义为全局函数
+window.copyShareLink = async function() {
     const input = document.getElementById('shareLink');
     if (!input) return;
     
@@ -397,10 +412,7 @@ async function copyShareLink() {
         document.execCommand('copy');
         alert('Link Copied to Clipboard!');
     }
-}
-
-// 确保copyShareLink在全局范围内可用
-window.copyShareLink = copyShareLink;
+};
 
 // 复制地址到剪贴板
 async function copyToClipboard(elementId, button) {
@@ -500,7 +512,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <i class="fas fa-coins me-2"></i>Dividend Management
                 </a>
                 {% endif %}
-                <button class="btn btn-outline-success" onclick="shareAsset()">
+                <button class="btn btn-outline-success" onclick="window.shareAsset()">
                     <i class="fas fa-share-alt me-2"></i>Share
                 </button>
             </div>
