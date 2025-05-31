@@ -1086,6 +1086,9 @@ const walletState = {
                     return;
                 }
                 
+                // 获取当前时间用于节流检查
+                const now = Date.now();
+                
                 // 添加节流机制，避免频繁调用
                 if (!this._lastDividendCheckTime || (now - this._lastDividendCheckTime > 3000)) { // 改为3秒节流
                     this._lastDividendCheckTime = now;
