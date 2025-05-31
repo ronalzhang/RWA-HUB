@@ -85,7 +85,7 @@
             <h1 class="h3 mb-0 text-gray-800">分享消息管理</h1>
             <p class="text-muted">管理系统中的分享消息文案，用户分享资产时将随机展示这些消息</p>
         </div>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createMessageModal">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createMessageModal" onclick="openCreateModal()">
             <i class="fas fa-plus"></i> 添加消息
         </button>
     </div>
@@ -188,7 +188,7 @@
                 <i class="fas fa-share-alt text-primary me-2"></i>
                 分享内容管理
             </h5>
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#messageModal" onclick="openCreateModal()">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createMessageModal" onclick="openCreateModal()">
                 <i class="fas fa-plus"></i> 添加消息
             </button>
         </div>
@@ -250,11 +250,11 @@
                             <div class="mb-3">
                                 <label for="messageWeight" class="form-label">权重</label>
                                 <select class="form-select" id="messageWeight" name="weight">
-                                    <option value="1">1 - 低</option>
-                                    <option value="2">2</option>
-                                    <option value="3" selected>3 - 中</option>
-                                    <option value="4">4</option>
-                                    <option value="5">5 - 高</option>
+                                    <option value="50">50 - 低</option>
+                                    <option value="75">75</option>
+                                    <option value="100" selected>100 - 中</option>
+                                    <option value="125">125</option>
+                                    <option value="150">150 - 高</option>
                                 </select>
                                 <div class="form-text">权重越高，展示概率越大</div>
                             </div>
@@ -315,11 +315,11 @@
                             <div class="mb-3">
                                 <label for="editMessageWeight" class="form-label">权重</label>
                                 <select class="form-select" id="editMessageWeight" name="weight">
-                                    <option value="1">1 - 低</option>
-                                    <option value="2">2</option>
-                                    <option value="3">3 - 中</option>
-                                    <option value="4">4</option>
-                                    <option value="5">5 - 高</option>
+                                    <option value="50">50 - 低</option>
+                                    <option value="75">75</option>
+                                    <option value="100" selected>100 - 中</option>
+                                    <option value="125">125</option>
+                                    <option value="150">150 - 高</option>
                                 </select>
                             </div>
                         </div>
@@ -569,6 +569,43 @@ function updateStats(stats) {
     if (rewardPlanElement) rewardPlanElement.textContent = stats.reward_plan;
 }
 
+// 工具函数
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatDateTime(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleString('zh-CN');
+}
+
+function showSuccess(message) {
+    toastr.success(message);
+}
+
+function showError(message) {
+    toastr.error(message);
+}
+
+function showAlert(message, type = 'info') {
+    switch(type) {
+        case 'success':
+            toastr.success(message);
+            break;
+        case 'error':
+        case 'danger':
+            toastr.error(message);
+            break;
+        case 'warning':
+            toastr.warning(message);
+            break;
+        default:
+            toastr.info(message);
+    }
+}
+
 // 保存分享消息
 function saveMessage() {
     const form = document.getElementById('messageForm');
@@ -609,9 +646,11 @@ function saveMessage() {
         if (data.success) {
             showAlert(data.message || (isUpdate ? '更新成功' : '创建成功'), 'success');
             
-            // 关闭模态框
-            const modal = bootstrap.Modal.getInstance(document.getElementById('messageModal'));
-            modal.hide();
+            // 关闭模态框 - 统一使用createMessageModal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('createMessageModal'));
+            if (modal) {
+                modal.hide();
+            }
             
             // 重新加载列表
             loadMessages();
@@ -633,11 +672,16 @@ function editMessage(id) {
             if (data.success) {
                 const message = data.data;
                 
-                // 填充表单
-                document.getElementById('messageContent').value = message.content;
-                document.getElementById('messageType').value = message.message_type;
-                document.getElementById('messageWeight').value = message.weight;
-                document.getElementById('messageStatus').value = message.is_active ? 'true' : 'false';
+                // 填充表单 - 确保元素存在
+                const contentElement = document.getElementById('messageContent');
+                const typeElement = document.getElementById('messageType');
+                const weightElement = document.getElementById('messageWeight');
+                const statusElement = document.getElementById('messageStatus');
+                
+                if (contentElement) contentElement.value = message.content;
+                if (typeElement) typeElement.value = message.message_type;
+                if (weightElement) weightElement.value = message.weight;
+                if (statusElement) statusElement.value = message.is_active ? 'true' : 'false';
                 
                 // 添加隐藏的ID字段
                 let messageIdField = document.getElementById('messageId');
@@ -646,16 +690,24 @@ function editMessage(id) {
                     messageIdField.type = 'hidden';
                     messageIdField.id = 'messageId';
                     messageIdField.name = 'id';
-                    document.getElementById('messageForm').appendChild(messageIdField);
+                    const form = document.getElementById('messageForm');
+                    if (form) {
+                        form.appendChild(messageIdField);
+                    }
                 }
-                messageIdField.value = id;
-                messageIdField.style.display = 'block';
+                if (messageIdField) {
+                    messageIdField.value = id;
+                    messageIdField.style.display = 'block';
+                }
                 
-                // 设置模态框标题
-                document.querySelector('#messageModal .modal-title').textContent = '编辑消息';
+                // 设置模态框标题 - 使用createMessageModal
+                const titleElement = document.querySelector('#createMessageModal .modal-title');
+                if (titleElement) {
+                    titleElement.textContent = '编辑消息';
+                }
                 
                 // 显示模态框
-                const modal = new bootstrap.Modal(document.getElementById('messageModal'));
+                const modal = new bootstrap.Modal(document.getElementById('createMessageModal'));
                 modal.show();
             } else {
                 throw new Error(data.error || '获取消息详情失败');
@@ -699,13 +751,24 @@ function filterMessages() {
 // 打开新建消息模态框
 function openCreateModal() {
     // 重置表单
-    document.getElementById('messageForm').reset();
-    document.getElementById('messageType').value = 'share_content';
-    document.getElementById('messageWeight').value = '100';
-    document.getElementById('messageStatus').value = 'true';
+    const form = document.getElementById('messageForm');
+    if (form) {
+        form.reset();
+    }
+    
+    const typeElement = document.getElementById('messageType');
+    const weightElement = document.getElementById('messageWeight');
+    const statusElement = document.getElementById('messageStatus');
+    
+    if (typeElement) typeElement.value = 'share_content';
+    if (weightElement) weightElement.value = '100';
+    if (statusElement) statusElement.value = 'true';
     
     // 设置模态框标题
-    document.querySelector('#messageModal .modal-title').textContent = '添加消息';
+    const titleElement = document.querySelector('#createMessageModal .modal-title');
+    if (titleElement) {
+        titleElement.textContent = '添加消息';
+    }
     
     // 隐藏消息ID字段
     const messageIdField = document.getElementById('messageId');
@@ -811,26 +874,6 @@ function initDefaultMessages() {
     };
     
     createNext(0);
-}
-
-// 工具函数
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function formatDateTime(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleString('zh-CN');
-}
-
-function showSuccess(message) {
-    toastr.success(message);
-}
-
-function showError(message) {
-    toastr.error(message);
 }
 </script>
 {% endblock %} 
