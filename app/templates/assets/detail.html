@@ -172,40 +172,12 @@ document.addEventListener('DOMContentLoaded', function() {
     <!-- 
     <script>
         // 初始化全局对象
-        function initSolanaLibs() {
-            // 确保solanaWeb3对象可用
-            if (typeof solanaWeb3 === 'undefined' && typeof SolanaWeb3 !== 'undefined') {
-                window.solanaWeb3 = SolanaWeb3;
-                console.log('已将SolanaWeb3设置到window.solanaWeb3');
-            }
-            
-            // 确保splToken对象可用
-            if (typeof splToken === 'undefined' && typeof SolanaToken !== 'undefined') {
-                window.splToken = SolanaToken;
-                console.log('已将SolanaToken设置到window.splToken');
-                
-                // 同时设置到solanaWeb3.SPL上
-                if (window.solanaWeb3 && !window.solanaWeb3.SPL) {
-                    window.solanaWeb3.SPL = SolanaToken;
-                }
-            }
-        }
-        
-        // 页面加载完成后执行初始化
-        document.addEventListener('DOMContentLoaded', initSolanaLibs);
         
         // 同时在window加载完成后再次检查
         window.addEventListener('load', initSolanaLibs);
     </script>
     -->
     
-    <!-- 紧急全局修复 - 确保在交易前可获取必要对象 -->
-    <script>
-        // 删除重复的全局对象创建，因为已在上方处理
-        // 保留简单的备用检查
-        window.ensureSolanaBasicObjects = function() {
-            if (!window.solanaWeb3) {
-                window.solanaWeb3 = {};
             }
             if (!window.spl_token) {
                 window.spl_token = {};
@@ -2255,9 +2227,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 3000);
             }
 
-            // 显示错误信息
-            function showError(message) {
-                showMessage(message, 'danger');
             }
 
             // 获取钱包地址，优先从全局walletState获取
@@ -2276,11 +2245,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 return localStorage.getItem('walletAddress') || localStorage.getItem('eth_address') || '';
             }
 
-            // 辅助函数：缩短地址显示
-            function shortenAddress(address) {
-                if (!address) return '';
-                return address.substring(0, 6) + '...' + address.substring(address.length - 4);
-            }
 
             // 设置页面中的钱包相关元素
             
@@ -2289,12 +2253,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 // ... 其他代码保持不变
 
             // 获取Cookie
-            function getCookie(name) {
-                const value = `; ${document.cookie}`;
-                const parts = value.split(`; ${name}=`);
-                if (parts.length === 2) return parts.pop().split(';').shift();
-                return null;
-            }
         
         // 分享资产功能
         function shareAsset() {
@@ -3636,60 +3594,6 @@ async function connectWallet() {
 </script>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-        // 购买金额输入框验证
-        const purchaseAmountInput = document.getElementById('purchase-amount');
-        if (purchaseAmountInput) {
-            purchaseAmountInput.addEventListener('input', function(e) {
-                // 移除非数字字符
-                this.value = this.value.replace(/\D/g, '');
-                
-                // 确保不为空
-                if (!this.value) {
-                    this.value = '1';
-                }
-                
-                // 确保不小于1
-                if (parseInt(this.value) < 1) {
-                    this.value = '1';
-                }
-                
-                // 确保不超过最大值
-                const maxValue = parseInt(this.getAttribute('max') || '999999999');
-                if (parseInt(this.value) > maxValue) {
-                    this.value = maxValue.toString();
-                }
-                
-                // 更新总价
-                updateTotalPrice();
-            });
-        }
-        
-        // 函数：更新总价
-        function updateTotalPrice() {
-            const amountInput = document.getElementById('purchase-amount');
-            const totalPriceInput = document.getElementById('totalPrice');
-            const buyButton = document.getElementById('buy-button');
-            
-            if (amountInput && totalPriceInput && buyButton) {
-                const amount = parseInt(amountInput.value) || 1;
-                const pricePerToken = parseFloat(buyButton.getAttribute('data-token-price')) || 0;
-                const totalPrice = (amount * pricePerToken).toFixed(2);
-                
-                totalPriceInput.value = totalPrice;
-                
-                // 重要：确保购买按钮文本不会被修改为数字
-                if (buyButton.innerHTML !== '<i class="fas fa-shopping-cart me-2"></i>Buy' && 
-                    buyButton.innerHTML !== '<i class="fas fa-wallet me-2"></i>请先连接钱包') {
-                    buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
-                }
-            }
-        }
-        
-        // 初始更新总价
-        updateTotalPrice();
-        
-        // 为购买按钮添加事件监听器
         const buyButton = document.getElementById('buy-button');
         if (buyButton) {
             // 确保按钮文本正确初始化
@@ -3795,74 +3699,8 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="{{ url_for('proxy.cached_vendor', filename='solana-spl-token.js') }}"></script>
 <script>
     // 简化的SPL Token库检查 - 与头部初始化逻辑保持一致
-    window.initSplTokenLib = async function() {
-        console.log('[initSplTokenLib] 检查SPL Token库状态');
-        
-        // 如果已经有spl_token对象且功能完整，直接返回
-        if (window.spl_token && window.spl_token.getAssociatedTokenAddress) {
-            console.log('[initSplTokenLib] SPL Token库已可用');
-            return true;
-        }
-        
-        // 尝试从全局变量获取 - 与头部初始化保持一致
-        if (typeof SolanaToken !== 'undefined') {
-            window.spl_token = SolanaToken;
-            console.log('[initSplTokenLib] 从SolanaToken设置spl_token');
-            return true;
-        }
-        
-        if (window.splToken && window.splToken.getAssociatedTokenAddress) {
-            window.spl_token = window.splToken;
-            console.log('[initSplTokenLib] 从splToken设置spl_token');
-            return true;
-        }
-        
-        console.warn('[initSplTokenLib] SPL Token库不可用');
-        return false;
-    };
-
-    // 仅在DOM加载后执行一次检查
-    if (!window.splTokenChecked) {
-        window.splTokenChecked = true;
-        document.addEventListener('DOMContentLoaded', async function() {
-            try {
-                await window.initSplTokenLib();
-                console.log('[detail.html] SPL Token库检查完成');
-            } catch (error) {
-                console.error('[detail.html] SPL Token库检查失败:', error);
-            }
-        });
-    }
 </script>
 
-<script type="module">
-    import { API_ENDPOINTS, CONTRACT_CONFIG } from '/static/js/config/api.js';
-    import { 
-        checkWeb3Environment, 
-        getWalletAddress, 
-        checkUSDCBalance, 
-        approveUSDC, 
-        executeTrade, 
-        updateTradeStatus 
-    } from '/static/js/utils/web3.js';
-    import { 
-        validateCreateTradeParams, 
-        validateUpdateTradeParams, 
-        validateTradeHistoryParams,
-        validateApiResponse,
-        validateTradeRecord 
-    } from '/static/js/utils/apiValidator.js';
-
-    // 检查Web3环境
-    try {
-        checkWeb3Environment();
-    } catch (error) {
-        console.error('Web3环境检查失败:', error);
-        showError(error.message);
-    }
-
-    // 刷新钱包资产列表
-    function refreshWalletAssets() {
         if (typeof loadUserAssets === 'function') {
             console.log('使用全局loadUserAssets函数加载钱包资产');
             loadUserAssets();
@@ -3888,28 +3726,6 @@ async function checkSolanaUSDCBalance(walletAddress) {
         const data = await response.json();
         console.log('获取到的余额数据:', data);
         
-        if (data && data.success) {
-            return parseFloat(data.balance);
-        } else {
-            console.error('获取余额失败:', data.error || '未知错误');
-            return 0;
-        }
-    } catch (error) {
-        console.error('检查USDC余额时出错:', error);
-        return 0;
-    }
-}
-
-// 确保函数在全局作用域可用
-window.checkSolanaUSDCBalance = checkSolanaUSDCBalance;
-</script>
-
-<!-- 添加USDC转账函数 - 现在不再需要，因为使用智能合约 -->
-<script>
-// 移除旧的 transferUSDC 函数，因为它不再被使用
-/*
-async function transferUSDC(fromAddress, toAddress, amount) {
-    console.log(`执行USDC转账: 从 ${fromAddress} 到 ${toAddress}, 金额: ${amount}`);
     
     try {
         // 检查钱包状态
@@ -3980,4 +3796,3 @@ async function transferUSDC(fromAddress, toAddress, amount) {
 <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
 {% endblock %}
 
-<!-- 确保只使用一次Solana库，删除所有冗余加载 -->
