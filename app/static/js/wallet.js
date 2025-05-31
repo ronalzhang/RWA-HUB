@@ -1062,13 +1062,19 @@ const walletState = {
             // 检查是否在资产详情页，如果是则更新分红入口（仅管理员）
             const isDetailPage = document.querySelector('.asset-detail-page') !== null;
             if (isDetailPage && this.isAdmin) {
-                // 检查是否有缓存的权限结果
-                const cachedResult = window._dividendPermissionCache || {};
-                const now = Date.now();
-                const hasCachedPermission = cachedResult.timestamp && 
-                    (now - cachedResult.timestamp < 30000) && 
+                // 检查是否有缓存的分红权限结果
+                const cachedResult = window.dividendPermissionCache;
+                const hasCachedPermission = cachedResult &&
+                    (Date.now() - cachedResult.timestamp) < 30000 && // 30秒缓存
                     cachedResult.hasPermission === true &&
                     cachedResult.address === this.address;
+                
+                // 特殊处理：如果管理员状态为true但缓存权限为false，清除缓存强制重新检查
+                if (this.isAdmin && cachedResult && cachedResult.hasPermission === false) {
+                    console.log('管理员状态为true但缓存权限为false，清除缓存强制重新检查');
+                    window.dividendPermissionCache = null;
+                    this._lastDividendCheckTime = 0; // 重置节流时间
+                }
                 
                 if (hasCachedPermission) {
                     console.log('检测到缓存的分红权限，直接显示按钮');
@@ -1093,6 +1099,15 @@ const walletState = {
                     }
                 } else {
                     console.log('分红检查被节流，跳过本次调用');
+                    // 但如果缓存权限为true，直接显示按钮
+                    if (window.dividendPermissionCache && window.dividendPermissionCache.hasPermission) {
+                        console.log('检测到缓存权限为true，直接显示分红按钮');
+                        if (typeof window.showDividendButtons === 'function') {
+                            window.showDividendButtons(this.address);
+                        } else {
+                            this.createOrShowDividendButtons();
+                        }
+                    }
                 }
             }
         } catch (error) {
