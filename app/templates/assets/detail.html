@@ -161,22 +161,37 @@ function getWalletAddress() {
 
 // 检查分红管理权限
 function checkDividendAccess() {
-    if (!window.walletState || !window.walletState.connected || !window.walletState.isAdmin) {
+    if (!window.walletState || !window.walletState.connected) {
         return;
     }
     
     const address = getWalletAddress();
     if (!address) return;
     
-    // 显示分红按钮
-    const buttons = ['dividendManagementBtn', 'dividendManagementBtnMobile', 'dividendManagementBtnMedium'];
-    buttons.forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) {
-            btn.style.display = '';
-            btn.href = `/assets/${window.ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
+    // 如果用户是管理员，显示分红按钮并更新URL
+    if (window.walletState.isAdmin) {
+        const dividendBtn = document.getElementById('dividendManagementBtn');
+        if (dividendBtn) {
+            const correctUrl = `/assets/${window.ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
+            dividendBtn.href = correctUrl;
+            dividendBtn.style.display = 'inline-flex';
+            console.log('分红按钮URL已更新:', correctUrl);
         }
-    });
+        
+        // 如果按钮不存在，创建一个
+        if (!dividendBtn) {
+            const buttonContainer = document.querySelector('.d-flex.gap-2');
+            if (buttonContainer) {
+                const newBtn = document.createElement('a');
+                newBtn.id = 'dividendManagementBtn';
+                newBtn.href = `/assets/${window.ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
+                newBtn.className = 'btn btn-outline-primary';
+                newBtn.innerHTML = '<i class="fas fa-coins me-2"></i>分红管理';
+                buttonContainer.appendChild(newBtn);
+                console.log('分红按钮已创建');
+            }
+        }
+    }
 }
 
 // 加载交易历史
