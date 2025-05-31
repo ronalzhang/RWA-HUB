@@ -116,12 +116,12 @@ function updateBuyButtonState() {
     
     if (isConnected) {
         buyButton.disabled = false;
-        buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>购买';
+        buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Purchase';
         buyButton.classList.remove('btn-secondary');
         buyButton.classList.add('btn-primary');
     } else {
         buyButton.disabled = true;
-        buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
+        buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>Please Connect Wallet';
         buyButton.classList.remove('btn-primary');
         buyButton.classList.add('btn-secondary');
     }
@@ -132,7 +132,7 @@ function handleBuyClick() {
     // 检查钱包连接
     const address = getWalletAddress();
     if (!address) {
-        alert('请先连接钱包');
+        alert('Please Connect Wallet');
         if (typeof window.openWalletSelector === 'function') {
             window.openWalletSelector();
         }
@@ -146,8 +146,8 @@ function handleBuyClick() {
         const buyButton = document.getElementById('buy-button');
         window.handleBuy(assetId, amountInput, buyButton);
     } else {
-        console.error('购买功能不可用');
-        alert('购买功能暂时不可用，请刷新页面重试');
+        console.error('Purchase Function Unavailable');
+        alert('Purchase Function Temporarily Unavailable, Please Refresh Page and Try Again');
     }
 }
 
@@ -175,7 +175,7 @@ function checkDividendAccess() {
             const correctUrl = `/assets/${window.ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
             dividendBtn.href = correctUrl;
             dividendBtn.style.display = 'inline-flex';
-            console.log('分红按钮URL已更新:', correctUrl);
+            console.log('Dividend Button URL Updated:', correctUrl);
         }
         
         // 如果按钮不存在，创建一个
@@ -186,9 +186,9 @@ function checkDividendAccess() {
                 newBtn.id = 'dividendManagementBtn';
                 newBtn.href = `/assets/${window.ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
                 newBtn.className = 'btn btn-outline-primary';
-                newBtn.innerHTML = '<i class="fas fa-coins me-2"></i>分红管理';
+                newBtn.innerHTML = '<i class="fas fa-coins me-2"></i>Dividend Management';
                 buttonContainer.appendChild(newBtn);
-                console.log('分红按钮已创建');
+                console.log('Dividend Button Created');
             }
         }
     }
@@ -200,15 +200,15 @@ async function loadTradeHistory(page = 1) {
         const container = document.getElementById('trade-history');
         if (!container) return;
         
-        container.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p class="mt-2">加载中...</p></div>';
+        container.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p class="mt-2">Loading...</p></div>';
         
         const response = await fetch(`/api/trades?asset_id=${window.ASSET_CONFIG.id}&page=${page}&per_page=5`);
-        if (!response.ok) throw new Error('获取交易历史失败');
+        if (!response.ok) throw new Error('Failed to Load Trade History');
         
         const data = await response.json();
         
         if (data.trades.length === 0) {
-            container.innerHTML = '<div class="text-center text-muted my-4">暂无交易记录</div>';
+            container.innerHTML = '<div class="text-center text-muted my-4">No Trade Records</div>';
             return;
         }
         
@@ -218,12 +218,12 @@ async function loadTradeHistory(page = 1) {
         table.innerHTML = `
             <thead>
                 <tr>
-                    <th>时间</th>
-                    <th>类型</th>
-                    <th>数量</th>
-                    <th>金额</th>
-                    <th>状态</th>
-                    <th>交易哈希</th>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Transaction Hash</th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -243,10 +243,10 @@ async function loadTradeHistory(page = 1) {
             updatePagination(data.pagination);
         }
     } catch (error) {
-        console.error('加载交易历史失败:', error);
+        console.error('Failed to Load Trade History:', error);
         const container = document.getElementById('trade-history');
         if (container) {
-            container.innerHTML = '<div class="alert alert-danger">加载失败，请稍后重试</div>';
+            container.innerHTML = '<div class="alert alert-danger">Failed to Load, Please Try Again Later</div>';
         }
     }
 }
@@ -259,15 +259,15 @@ function createTradeRow(trade) {
     const formattedDate = date.toLocaleString('zh-CN');
     
     const typeClass = trade.type === 'buy' ? 'text-success' : 'text-danger';
-    const typeText = trade.type === 'buy' ? '买入' : '卖出';
+    const typeText = trade.type === 'buy' ? 'Buy' : 'Sell';
     
-    let statusText = '处理中';
+    let statusText = 'Processing';
     let statusClass = 'text-warning';
     if (trade.status === 'completed' || trade.status === 2) {
-        statusText = '已完成';
+        statusText = 'Completed';
         statusClass = 'text-success';
     } else if (trade.status === 'failed' || trade.status === 3) {
-        statusText = '失败';
+        statusText = 'Failed';
         statusClass = 'text-danger';
     }
     
@@ -318,16 +318,16 @@ async function loadTotalDividends() {
     if (!element) return;
     
     try {
-        element.innerHTML = '<div class="spinner-border spinner-border-sm"></div> 加载中...';
+        element.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Loading...';
         
         const response = await fetch(`/api/assets/symbol/${window.ASSET_CONFIG.tokenSymbol}/dividend_stats`);
-        if (!response.ok) throw new Error('获取分红统计失败');
+        if (!response.ok) throw new Error('Failed to Load Dividend Statistics');
         
         const stats = await response.json();
         element.innerHTML = `${Number(stats.total_amount || 0).toLocaleString()} USDC`;
     } catch (error) {
-        console.error('加载分红信息失败:', error);
-        element.innerHTML = '<span class="text-danger">加载失败</span>';
+        console.error('Failed to Load Dividend Information:', error);
+        element.innerHTML = '<span class="text-danger">Failed to Load</span>';
     }
 }
 
@@ -335,7 +335,7 @@ async function loadTotalDividends() {
 function shareAsset() {
     const address = getWalletAddress();
     if (!address) {
-        const confirm = window.confirm('请先连接钱包以生成专属分享链接\n\n点击确定连接钱包，点击取消继续查看');
+        const confirm = window.confirm('Please Connect Wallet to Generate Exclusive Share Link\n\nClick OK to Connect Wallet, Click Cancel to Continue Viewing');
         if (confirm && typeof window.openWalletSelector === 'function') {
             window.openWalletSelector();
         }
@@ -351,19 +351,19 @@ function shareAsset() {
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title"><i class="fas fa-share-alt me-2"></i>分享RWA资产</h5>
+                        <h5 class="modal-title"><i class="fas fa-share-alt me-2"></i>Share RWA Asset</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <p class="alert alert-info">🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，透明度高、收益稳定。</p>
+                            <p class="alert alert-info">🚀 Discover High-Quality RWA Assets! Real World Asset Digital Investment New Opportunity, High Transparency and Stable Income.</p>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold">您的专属邀请链接</label>
+                            <label class="form-label fw-bold">Your Exclusive Invitation Link</label>
                             <div class="input-group">
                                 <input type="text" class="form-control" id="shareLink" value="${shareUrl}" readonly>
                                 <button class="btn btn-outline-primary" onclick="copyShareLink()">
-                                    <i class="fas fa-copy"></i> 复制
+                                    <i class="fas fa-copy"></i> Copy
                                 </button>
                             </div>
                         </div>
@@ -389,11 +389,11 @@ async function copyShareLink() {
     
     try {
         await navigator.clipboard.writeText(input.value);
-        alert('链接已复制到剪贴板！');
+        alert('Link Copied to Clipboard!');
     } catch (error) {
         input.select();
         document.execCommand('copy');
-        alert('链接已复制到剪贴板！');
+        alert('Link Copied to Clipboard!');
     }
 }
 
@@ -410,7 +410,7 @@ async function copyToClipboard(elementId, button) {
         button.innerHTML = '<i class="fas fa-check text-success"></i>';
         setTimeout(() => button.innerHTML = original, 2000);
     } catch (error) {
-        alert('复制失败，请手动复制');
+        alert('Copy Failed, Please Manually Copy');
     }
 }
 
@@ -469,7 +469,7 @@ window.addEventListener('walletStateChanged', checkDividendAccess);
     <div class="container mt-4">
         <!-- 返回按钮 -->
         <a href="{{ url_for('assets.list_assets_page') }}" class="btn btn-link text-muted mb-3">
-            <i class="fas fa-arrow-left me-2"></i>返回列表
+            <i class="fas fa-arrow-left me-2"></i>Back to List
         </a>
 
         <!-- 页面标题和按钮 -->
@@ -477,20 +477,20 @@ window.addEventListener('walletStateChanged', checkDividendAccess);
             <div class="d-flex align-items-center gap-3">
                 <h2 class="mb-0">{{ asset.name }}</h2>
                 {% if asset.status == 2 %}
-                <span class="badge bg-success">已上链</span>
+                <span class="badge bg-success">On-chain</span>
                 {% elif asset.status == 1 %}
-                <span class="badge bg-warning">待审核</span>
+                <span class="badge bg-warning">Pending Review</span>
                 {% endif %}
             </div>
             <div class="d-flex gap-2">
                 {% if is_admin_user or is_owner %}
                 <a href="/assets/{{ asset.token_symbol }}/dividend?eth_address={{ current_user_address|urlencode }}" 
-                   class="btn btn-outline-primary" id="dividendManagementBtn" style="display:none;">
-                    <i class="fas fa-coins me-2"></i>分红管理
+                   class="btn btn-outline-primary" id="dividendManagementBtn">
+                    <i class="fas fa-coins me-2"></i>Dividend Management
                 </a>
                 {% endif %}
                 <button class="btn btn-outline-success" onclick="shareAsset()">
-                    <i class="fas fa-share-alt me-2"></i>分享
+                    <i class="fas fa-share-alt me-2"></i>Share
                 </button>
             </div>
         </div>
@@ -520,27 +520,27 @@ window.addEventListener('walletStateChanged', checkDividendAccess);
                 <!-- 资产描述 -->
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0">资产描述</h5>
+                        <h5 class="mb-0">Asset Description</h5>
                     </div>
                     <div class="card-body">
-                        <p>{{ asset.description|default('暂无描述', true) }}</p>
+                        <p>{{ asset.description|default('No description available', true) }}</p>
                         
                         <div class="mt-4">
-                            <h6 class="fw-bold">资产详情</h6>
+                            <h6 class="fw-bold">Asset Details</h6>
                             <ul class="list-unstyled">
                                 <li class="mb-2">
                                     <i class="fas fa-map-marker-alt text-muted me-2"></i>
-                                    <strong>位置：</strong> {{ asset.location }}
+                                    <strong>Location:</strong> {{ asset.location }}
                                 </li>
                                 {% if asset.asset_type == 10 %}
                                 <li class="mb-2">
                                     <i class="fas fa-ruler-combined text-muted me-2"></i>
-                                    <strong>面积：</strong> {{ asset.area }} ㎡
+                                    <strong>Area:</strong> {{ asset.area }} ㎡
                                 </li>
                                 {% endif %}
                                 <li class="mb-2">
                                     <i class="fas fa-user-tie text-muted me-2"></i>
-                                    <strong>发起人：</strong>
+                                    <strong>Creator:</strong>
                                     <span id="creatorAddressFull" style="display: none;">{{ asset.creator_address }}</span>
                                     <span title="{{ asset.creator_address }}">{{ asset.creator_address[:6] }}...{{ asset.creator_address[-4:] }}</span>
                                     <button class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1" 
@@ -556,17 +556,17 @@ window.addEventListener('walletStateChanged', checkDividendAccess);
                 <!-- 分红信息 -->
                 <div class="card">
                     <div class="card-header">
-                        <h5 class="mb-0">分红信息</h5>
+                        <h5 class="mb-0">Dividend Information</h5>
                     </div>
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6">
-                                <p><strong>年收益：</strong> {{ asset.annual_revenue }} USDC</p>
-                                <p><strong>分红频率：</strong> 季度</p>
+                                <p><strong>Annual Revenue:</strong> {{ asset.annual_revenue }} USDC</p>
+                                <p><strong>Dividend Frequency:</strong> Quarterly</p>
                             </div>
                             <div class="col-md-6">
-                                <p><strong>累计分红：</strong> <span id="totalDividendsDistributed">加载中...</span></p>
-                                <p><strong>下次分红：</strong> {{ asset.next_dividend_date|default('待定', true) }}</p>
+                                <p><strong>Total Dividends:</strong> <span id="totalDividendsDistributed">Loading...</span></p>
+                                <p><strong>Next Dividend:</strong> {{ asset.next_dividend_date|default('TBD', true) }}</p>
                             </div>
                         </div>
                     </div>
@@ -577,38 +577,38 @@ window.addEventListener('walletStateChanged', checkDividendAccess);
             <div class="col-lg-5">
                 <div class="card trade-card">
                     <div class="card-header">
-                        <h5 class="mb-0">资产交易</h5>
+                        <h5 class="mb-0">Asset Trading</h5>
                     </div>
                     <div class="card-body">
                         <div class="mb-4">
                             <h4 class="mb-3">{{ asset.token_symbol }}</h4>
                             <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">资产名称：</span>
+                                <span class="text-muted">Asset Name:</span>
                                 <span>{{ asset.name }}</span>
                             </div>
                             <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">代币价格：</span>
+                                <span class="text-muted">Token Price:</span>
                                 <span class="fw-bold fs-5">{{ asset.token_price }} USDC</span>
                             </div>
                             <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">代币总量：</span>
+                                <span class="text-muted">Token Supply:</span>
                                 <span>{{ asset.token_supply }}</span>
                             </div>
                             <div class="d-flex justify-content-between mb-4">
-                                <span class="text-muted">可购买：</span>
+                                <span class="text-muted">Available:</span>
                                 <span>{{ remaining_supply }}</span>
                             </div>
                         </div>
 
                         <!-- 交易表单 -->
                         <div class="mb-3">
-                            <label for="purchase-amount" class="form-label">购买数量</label>
+                            <label for="purchase-amount" class="form-label">Purchase Amount</label>
                             <input type="number" class="form-control" id="purchase-amount" 
                                    min="1" max="{{ remaining_supply }}" value="100">
                         </div>
                         
                         <div class="mb-4">
-                            <label for="totalPrice" class="form-label">总价</label>
+                            <label for="totalPrice" class="form-label">Total Price</label>
                             <div class="input-group">
                                 <input type="text" class="form-control" id="totalPrice" readonly>
                                 <span class="input-group-text">USDC</span>
@@ -619,7 +619,7 @@ window.addEventListener('walletStateChanged', checkDividendAccess);
                         
                         <button type="button" id="buy-button" class="btn btn-primary w-100 py-2" 
                                 data-token-price="{{ asset.token_price }}" data-asset-id="{{ asset.id }}">
-                            <i class="fas fa-shopping-cart me-2"></i>购买
+                            <i class="fas fa-shopping-cart me-2"></i>Purchase
                         </button>
                     </div>
                 </div>
@@ -631,14 +631,14 @@ window.addEventListener('walletStateChanged', checkDividendAccess);
             <div class="col-12">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">交易历史</h5>
+                        <h5 class="mb-0">Trading History</h5>
                         <div class="pagination-controls" id="pagination-controls">
                             <button class="btn btn-sm btn-outline-primary me-2" id="prevPageBtn" disabled>
-                                <i class="fas fa-chevron-left"></i> 上一页
+                                <i class="fas fa-chevron-left"></i> Previous
                             </button>
-                            <span>第 <span id="currentPageDisplay">1</span> 页，共 <span id="totalPagesDisplay">1</span> 页</span>
+                            <span>Page <span id="currentPageDisplay">1</span> of <span id="totalPagesDisplay">1</span></span>
                             <button class="btn btn-sm btn-outline-primary ms-2" id="nextPageBtn" disabled>
-                                下一页 <i class="fas fa-chevron-right"></i>
+                                Next <i class="fas fa-chevron-right"></i>
                             </button>
                         </div>
                     </div>
@@ -646,7 +646,7 @@ window.addEventListener('walletStateChanged', checkDividendAccess);
                         <div id="trade-history">
                             <div class="text-center py-3">
                                 <div class="spinner-border text-primary"></div>
-                                <p class="mt-2 text-muted">加载交易历史...</p>
+                                <p class="mt-2 text-muted">Loading trading history...</p>
                             </div>
                         </div>
                     </div>
