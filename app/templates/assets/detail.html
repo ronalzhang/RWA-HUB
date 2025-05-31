@@ -732,6 +732,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     return false;
                 }
                 
+                // 重置节流保护，允许立即执行
+                window.lastDividendButtonCheck = 0;
+                
                 // 强制显示按钮
                 showDividendButtons(connectedAddress);
                 
@@ -754,46 +757,118 @@ document.addEventListener('DOMContentLoaded', function() {
             function showDividendButtons(address) {
                 console.log('开始显示分红按钮，地址:', address);
                 
-                const tokenSymbol = ASSET_CONFIG.tokenSymbol || "{{ asset.token_symbol }}";
-                const dividendUrl = `/assets/${tokenSymbol}/dividend?eth_address=${address}`;
+                if (!address) {
+                    console.error('❌ 地址为空，无法显示分红按钮');
+                    return;
+                }
+                
+                // 防止重复调用 - 添加调用节流
+                const now = Date.now();
+                if (window.lastDividendButtonCheck && (now - window.lastDividendButtonCheck) < 2000) {
+                    console.log('⏳ 节流保护：2秒内已检查过分红按钮，跳过此次调用');
+                    return;
+                }
+                window.lastDividendButtonCheck = now;
+                
+                // 获取资产符号
+                const tokenSymbol = getAssetTokenSymbol();
+                const dividendUrl = `/assets/${tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
                 
                 console.log('分红页面URL:', dividendUrl);
                 console.log('资产符号:', tokenSymbol);
                 
-                const dividendBtns = [
-                    document.getElementById('dividendManagementBtn'),         // 正常屏幕
-                    document.getElementById('dividendManagementBtnMobile'),   // 移动版
-                    document.getElementById('dividendManagementBtnMedium')    // 中等屏幕
+                // 查找现有的分红按钮
+                const existingButtons = [
+                    document.getElementById('dividendManagementBtn'),
+                    document.getElementById('dividendManagementBtnMobile'), 
+                    document.getElementById('dividendManagementBtnMedium')
                 ];
                 
-                console.log('找到的分红按钮:', dividendBtns.map(btn => btn ? btn.id : 'null'));
+                console.log('找到的分红按钮:', existingButtons.map(btn => btn ? btn.id : 'null'));
                 
-                let buttonUpdated = false;
-                dividendBtns.forEach(btn => {
+                let hasVisibleButton = false;
+                
+                // 显示现有按钮
+                existingButtons.forEach((btn, index) => {
                     if (btn) {
-                        console.log(`更新按钮 ${btn.id}:`, {
-                            '原显示状态': btn.style.display,
-                            '原链接': btn.href
-                        });
-                        
-                        btn.style.display = btn.id === 'dividendManagementBtnMobile' ? 'block' : 'inline-flex';
+                        console.log(`✅ 找到按钮 ${index}: ${btn.id}`);
+                        btn.style.display = 'inline-block';
                         btn.href = dividendUrl;
-                        buttonUpdated = true;
-                        
-                        console.log(`按钮 ${btn.id} 已更新:`, {
-                            '新显示状态': btn.style.display,
-                            '新链接': btn.href
-                        });
+                        btn.setAttribute('data-token-symbol', tokenSymbol);
+                        hasVisibleButton = true;
                     } else {
-                        console.warn('按钮未找到:', dividendBtns.indexOf(btn));
+                        console.log(`❌ 按钮未找到: ${index}`);
                     }
                 });
                 
-                if (buttonUpdated) {
-                    console.log('✅ 分红按钮显示完成');
+                // 如果没有找到任何按钮，动态创建
+                if (!hasVisibleButton) {
+                    console.log('🔧 没有找到任何分红按钮，开始动态创建...');
+                    createDividendButtons(tokenSymbol, address);
                 } else {
-                    console.error('❌ 没有找到任何分红按钮');
+                    console.log('✅ 成功显示现有分红按钮');
                 }
+            }
+            
+            // 动态创建分红按钮的函数
+            function createDividendButtons(tokenSymbol, address) {
+                const dividendUrl = `/assets/${tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
+                
+                // 1. 为大屏幕创建主按钮
+                const mainContainer = document.querySelector('.d-none.d-lg-flex .d-flex.align-items-center.gap-2');
+                if (mainContainer && !document.getElementById('dividendManagementBtn')) {
+                    const mainBtn = document.createElement('a');
+                    mainBtn.id = 'dividendManagementBtn';
+                    mainBtn.href = dividendUrl;
+                    mainBtn.className = 'btn btn-outline-primary';
+                    mainBtn.setAttribute('data-token-symbol', tokenSymbol);
+                    mainBtn.innerHTML = '<i class="fas fa-coins me-2"></i>分红管理';
+                    
+                    // 插入到分享按钮前面
+                    const shareBtn = document.getElementById('shareAssetBtn');
+                    if (shareBtn) {
+                        mainContainer.insertBefore(mainBtn, shareBtn);
+                        console.log('✅ 创建了主分红按钮');
+                    }
+                }
+                
+                // 2. 为移动端创建按钮
+                const mobileContainer = document.querySelector('.d-md-none.d-block').parentElement;
+                if (mobileContainer && !document.getElementById('dividendManagementBtnMobile')) {
+                    const mobileBtn = document.createElement('a');
+                    mobileBtn.id = 'dividendManagementBtnMobile';
+                    mobileBtn.href = dividendUrl;
+                    mobileBtn.className = 'btn btn-sm btn-outline-primary d-md-none d-block';
+                    mobileBtn.setAttribute('data-token-symbol', tokenSymbol);
+                    mobileBtn.innerHTML = '<i class="fas fa-coins me-2"></i>分红';
+                    
+                    // 插入到分享按钮前面
+                    const shareBtn = document.getElementById('shareAssetBtnMobile');
+                    if (shareBtn) {
+                        mobileContainer.insertBefore(mobileBtn, shareBtn);
+                        console.log('✅ 创建了移动端分红按钮');
+                    }
+                }
+                
+                // 3. 为中等屏幕创建按钮
+                const mediumContainer = document.querySelector('.d-none.d-md-block.d-lg-none').parentElement;
+                if (mediumContainer && !document.getElementById('dividendManagementBtnMedium')) {
+                    const mediumBtn = document.createElement('a');
+                    mediumBtn.id = 'dividendManagementBtnMedium';
+                    mediumBtn.href = dividendUrl;
+                    mediumBtn.className = 'btn btn-outline-primary d-none d-md-block d-lg-none';
+                    mediumBtn.setAttribute('data-token-symbol', tokenSymbol);
+                    mediumBtn.innerHTML = '<i class="fas fa-coins me-2"></i>分红管理';
+                    
+                    // 插入到分享按钮前面
+                    const shareBtn = document.getElementById('shareAssetBtnMedium');
+                    if (shareBtn) {
+                        mediumContainer.insertBefore(mediumBtn, shareBtn);
+                        console.log('✅ 创建了中等屏幕分红按钮');
+                    }
+                }
+                
+                console.log('🎉 动态创建分红按钮完成');
             }
 
             // 翻页相关变量
