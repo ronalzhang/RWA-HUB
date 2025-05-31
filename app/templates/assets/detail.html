@@ -21,435 +21,6 @@
 <script src="{{ url_for('static', filename='js/contracts/solana-web3.iife.js') }}"></script>
 <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
 
-<script>
-// 全局配置
-window.PLATFORM_FEE_RATE = 0.035;
-window.ACTUAL_PAYMENT_RATE = 0.965;
-
-// 资产配置
-window.ASSET_CONFIG = {
-    id: "{{ asset.id }}",
-    tokenSymbol: "{{ asset.token_symbol }}",
-    tokenPrice: parseFloat("{{ asset.token_price }}"),
-    totalSupply: parseInt("{{ asset.token_supply }}"),
-    remainingSupply: parseInt("{{ remaining_supply }}"),
-    platformFeeRate: 0.035
-};
-
-// 调试模板变量
-console.log('模板变量调试:');
-console.log('is_admin_user:', "{{ is_admin_user|default('None') }}");
-console.log('is_owner:', "{{ is_owner|default('None') }}"); 
-console.log('current_user_address:', "{{ current_user_address|default('None') }}");
-console.log('asset.owner_address:', "{{ asset.owner_address|default('None') }}");
-
-// 详细的权限检查调试
-console.log('权限检查详情:');
-console.log('- is_admin_user类型:', typeof("{{ is_admin_user|default('None') }}"));
-console.log('- is_owner类型:', typeof("{{ is_owner|default('None') }}"));
-console.log('- 分红按钮应该显示:', "{{ (is_admin_user or is_owner)|string }}");
-
-// 检查DOM中是否存在分红按钮
-document.addEventListener('DOMContentLoaded', function() {
-    const dividendBtn = document.getElementById('dividendManagementBtn');
-    console.log('分红按钮DOM检查:');
-    console.log('- 分红按钮存在:', !!dividendBtn);
-    if (dividendBtn) {
-        console.log('- 分红按钮可见:', dividendBtn.style.display !== 'none');
-        console.log('- 分红按钮HTML:', dividendBtn.outerHTML);
-    }
-});
-
-// 页面初始化函数
-document.addEventListener('DOMContentLoaded', function() {
-    // 初始化Solana库
-    if (typeof SolanaWeb3 !== 'undefined') {
-        window.solanaWeb3 = SolanaWeb3;
-    }
-    if (typeof SolanaToken !== 'undefined') {
-        window.spl_token = SolanaToken;
-        window.splToken = SolanaToken;
-    }
-    
-    // 初始化页面功能
-    initializePage();
-});
-
-// 页面初始化函数
-function initializePage() {
-    console.log('开始初始化页面...');
-    setupTradeForm();
-    loadTradeHistory();
-    loadTotalDividends();
-    checkDividendAccess();
-    updateBuyButtonState();
-    console.log('页面初始化完成');
-}
-
-// 设置交易表单
-function setupTradeForm() {
-    const amountInput = document.getElementById('purchase-amount');
-    const totalPriceDisplay = document.getElementById('totalPrice');
-    
-    if (amountInput && totalPriceDisplay) {
-        amountInput.addEventListener('input', function() {
-            const amount = parseFloat(this.value) || 0;
-            const totalPrice = amount * window.ASSET_CONFIG.tokenPrice;
-            totalPriceDisplay.value = totalPrice.toFixed(2);
-        });
-        
-        // 初始计算
-        const initialAmount = parseFloat(amountInput.value) || 100;
-        totalPriceDisplay.value = (initialAmount * window.ASSET_CONFIG.tokenPrice).toFixed(2);
-    }
-}
-
-// 更新购买按钮状态
-function updateBuyButtonState() {
-    const buyButton = document.getElementById('buy-button');
-    if (!buyButton) return;
-    
-    const isConnected = checkWalletConnection();
-    
-    if (isConnected) {
-        buyButton.disabled = false;
-        buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Purchase';
-        buyButton.classList.remove('btn-secondary');
-        buyButton.classList.add('btn-primary');
-    } else {
-        buyButton.disabled = true;
-        buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>Please Connect Wallet';
-        buyButton.classList.remove('btn-primary');
-        buyButton.classList.add('btn-secondary');
-    }
-}
-
-// 检查钱包连接状态
-function checkWalletConnection() {
-    if (window.walletState && (window.walletState.connected || window.walletState.isConnected)) {
-        return true;
-    }
-    
-    const storedAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
-    return storedAddress && storedAddress.length > 10;
-}
-
-// 获取钱包地址
-function getWalletAddress() {
-    if (window.walletState && window.walletState.address) {
-        return window.walletState.address;
-    }
-    return localStorage.getItem('walletAddress') || localStorage.getItem('eth_address') || '';
-}
-
-// 处理购买按钮点击
-function handleBuyClick() {
-    const address = getWalletAddress();
-    if (!address) {
-        alert('Please Connect Wallet');
-        if (typeof window.openWalletSelector === 'function') {
-            window.openWalletSelector();
-        }
-        return;
-    }
-    
-    if (typeof window.handleBuy === 'function') {
-        const assetId = document.getElementById('buy-button').getAttribute('data-asset-id');
-        const amountInput = document.getElementById('purchase-amount');
-        const buyButton = document.getElementById('buy-button');
-        window.handleBuy(assetId, amountInput, buyButton);
-    } else {
-        console.error('Purchase Function Unavailable');
-        alert('Purchase Function Temporarily Unavailable, Please Refresh Page and Try Again');
-    }
-}
-
-// 检查分红管理权限
-function checkDividendAccess() {
-    const address = getWalletAddress();
-    if (!address) return;
-    
-    const dividendBtn = document.getElementById('dividendManagementBtn');
-    if (!dividendBtn) return;
-    
-    // 更新分红按钮URL
-    const correctUrl = `/assets/${window.ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
-    dividendBtn.href = correctUrl;
-    console.log('Dividend Button URL Updated:', correctUrl);
-}
-
-// 加载交易历史
-async function loadTradeHistory(page = 1) {
-    const container = document.getElementById('trade-history');
-    if (!container) {
-        console.error('交易历史容器不存在');
-        return;
-    }
-    
-    try {
-        console.log(`开始加载交易历史，页码: ${page}, 资产ID: ${window.ASSET_CONFIG.id}`);
-        container.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p class="mt-2">Loading trading history...</p></div>';
-        
-        const response = await fetch(`/api/trades?asset_id=${window.ASSET_CONFIG.id}&page=${page}&per_page=5`, {
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        console.log(`交易历史API响应状态: ${response.status}`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log('交易历史API返回数据:', data);
-        
-        if (!data.trades || data.trades.length === 0) {
-            container.innerHTML = '<div class="text-center text-muted my-4">No Trade Records</div>';
-            return;
-        }
-                
-        // 创建表格
-        const table = document.createElement('table');
-        table.className = 'table table-striped';
-        table.innerHTML = `
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Type</th>
-                    <th>Amount</th>
-                    <th>Total</th>
-                    <th>Status</th>
-                    <th>Transaction</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        `;
-        
-        const tbody = table.querySelector('tbody');
-        data.trades.forEach(trade => {
-            const row = createTradeRow(trade);
-            tbody.appendChild(row);
-        });
-        
-        container.innerHTML = '';
-        container.appendChild(table);
-        
-        // 更新分页
-        if (data.pagination) {
-            updatePagination(data.pagination);
-        }
-        
-        console.log(`交易历史加载完成，显示 ${data.trades.length} 条记录`);
-    } catch (error) {
-        console.error('Failed to Load Trade History:', error);
-        container.innerHTML = '<div class="alert alert-warning">Unable to load trading history at the moment</div>';
-    }
-}
-
-// 创建交易行
-function createTradeRow(trade) {
-    const tr = document.createElement('tr');
-    
-    const date = new Date(trade.created_at);
-    const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-    
-    const typeClass = trade.type === 'buy' ? 'text-success' : 'text-danger';
-    const typeText = trade.type === 'buy' ? 'Buy' : 'Sell';
-                        
-    let statusText = 'Processing';
-    let statusClass = 'text-warning';
-    if (trade.status === 'completed' || trade.status === 2) {
-        statusText = 'Completed';
-        statusClass = 'text-success';
-    } else if (trade.status === 'failed' || trade.status === 3) {
-        statusText = 'Failed';
-        statusClass = 'text-danger';
-    }
-    
-    const total = trade.total || (trade.amount * trade.price);
-    
-    let txHashDisplay = 'N/A';
-    if (trade.tx_hash) {
-        const shortHash = trade.tx_hash.substring(0, 8) + '...' + trade.tx_hash.substring(trade.tx_hash.length - 8);
-        txHashDisplay = `<a href="https://solscan.io/tx/${trade.tx_hash}" target="_blank" class="text-decoration-none">${shortHash}</a>`;
-    }
-    
-    tr.innerHTML = `
-        <td>${formattedDate}</td>
-        <td><span class="${typeClass}">${typeText}</span></td>
-        <td>${trade.amount}</td>
-        <td>${parseFloat(total).toFixed(2)} USDC</td>
-        <td><span class="${statusClass}">${statusText}</span></td>
-        <td>${txHashDisplay}</td>
-    `;
-    
-    return tr;
-}
-                    
-// 更新分页
-function updatePagination(pagination) {
-    const prevBtn = document.getElementById('prevPageBtn');
-    const nextBtn = document.getElementById('nextPageBtn');
-    const currentPageSpan = document.getElementById('currentPageDisplay');
-    const totalPagesSpan = document.getElementById('totalPagesDisplay');
-    
-    if (currentPageSpan) currentPageSpan.textContent = pagination.page;
-    if (totalPagesSpan) totalPagesSpan.textContent = pagination.pages;
-    
-    if (prevBtn) {
-        prevBtn.disabled = pagination.page <= 1;
-        prevBtn.onclick = () => loadTradeHistory(pagination.page - 1);
-    }
-    
-    if (nextBtn) {
-        nextBtn.disabled = pagination.page >= pagination.pages;
-        nextBtn.onclick = () => loadTradeHistory(pagination.page + 1);
-    }
-}
-
-// 加载累计分红信息
-async function loadTotalDividends() {
-    const element = document.getElementById('totalDividendsDistributed');
-    if (!element) {
-        console.error('分红信息元素不存在');
-        return;
-    }
-    
-    try {
-        console.log(`开始加载分红信息，Token Symbol: ${window.ASSET_CONFIG.tokenSymbol}`);
-        element.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Loading...';
-        
-        const response = await fetch(`/api/assets/symbol/${window.ASSET_CONFIG.tokenSymbol}/dividend_stats`, {
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        console.log(`分红API响应状态: ${response.status}`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const stats = await response.json();
-        console.log('分红API返回数据:', stats);
-        
-        if (stats.success) {
-            element.innerHTML = `${Number(stats.total_amount || 0).toLocaleString()} USDC`;
-            console.log(`分红信息加载完成: ${stats.total_amount} USDC`);
-        } else {
-            throw new Error(stats.error || 'Unknown error');
-        }
-    } catch (error) {
-        console.error('Failed to Load Dividend Information:', error);
-        element.innerHTML = '0 USDC';
-    }
-}
-
-// 分享资产功能 - 立即定义为全局函数
-window.shareAsset = function() {
-    console.log('分享功能被调用');
-    const address = getWalletAddress();
-    if (!address) {
-        const confirm = window.confirm('Please Connect Wallet to Generate Exclusive Share Link\n\nClick OK to Connect Wallet, Click Cancel to Continue Viewing');
-        if (confirm && typeof window.openWalletSelector === 'function') {
-            window.openWalletSelector();
-        }
-        return;
-    }
-    
-    const shareUrl = `${window.location.origin}${window.location.pathname}?ref=${encodeURIComponent(address)}`;
-    
-    const modalHtml = `
-        <div class="modal fade" id="shareModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title"><i class="fas fa-share-alt me-2"></i>Share RWA Asset</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <p class="alert alert-info">🚀 Discover High-Quality RWA Assets! Real World Asset Digital Investment New Opportunity, High Transparency and Stable Income.</p>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Your Exclusive Invitation Link</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="shareLink" value="${shareUrl}" readonly>
-                                <button class="btn btn-outline-primary" onclick="window.copyShareLink()">
-                                    <i class="fas fa-copy"></i> Copy
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    const oldModal = document.getElementById('shareModal');
-    if (oldModal) oldModal.remove();
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modal = new bootstrap.Modal(document.getElementById('shareModal'));
-    modal.show();
-};
-
-// 复制分享链接 - 立即定义为全局函数
-window.copyShareLink = async function() {
-    const input = document.getElementById('shareLink');
-    if (!input) return;
-    
-    try {
-        await navigator.clipboard.writeText(input.value);
-        alert('Link Copied to Clipboard!');
-    } catch (error) {
-        input.select();
-        document.execCommand('copy');
-        alert('Link Copied to Clipboard!');
-    }
-};
-
-// 复制地址到剪贴板
-async function copyToClipboard(elementId, button) {
-    const element = document.getElementById(elementId);
-    if (!element) return;
-    
-    const text = element.textContent || element.value;
-    
-    try {
-        await navigator.clipboard.writeText(text);
-        const original = button.innerHTML;
-        button.innerHTML = '<i class="fas fa-check text-success"></i>';
-        setTimeout(() => button.innerHTML = original, 2000);
-    } catch (error) {
-        alert('Copy Failed, Please Manually Copy');
-    }
-}
-
-// 钱包事件监听
-window.addEventListener('walletConnected', function() {
-    updateBuyButtonState();
-    checkDividendAccess();
-});
-
-window.addEventListener('walletDisconnected', function() {
-    updateBuyButtonState();
-});
-
-// 绑定购买按钮事件
-document.addEventListener('DOMContentLoaded', function() {
-    const buyButton = document.getElementById('buy-button');
-    if (buyButton) {
-        buyButton.addEventListener('click', handleBuyClick);
-    }
-});
-</script>
-
 <style>
 .asset-detail-page .card {
     border-radius: 12px;
@@ -678,4 +249,435 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 全局配置
+window.PLATFORM_FEE_RATE = 0.035;
+window.ACTUAL_PAYMENT_RATE = 0.965;
+
+// 资产配置
+window.ASSET_CONFIG = {
+    id: "{{ asset.id }}",
+    tokenSymbol: "{{ asset.token_symbol }}",
+    tokenPrice: parseFloat("{{ asset.token_price }}"),
+    totalSupply: parseInt("{{ asset.token_supply }}"),
+    remainingSupply: parseInt("{{ remaining_supply }}"),
+    platformFeeRate: 0.035
+};
+
+// 调试模板变量
+console.log('模板变量调试:');
+console.log('is_admin_user:', "{{ is_admin_user|default('None') }}");
+console.log('is_owner:', "{{ is_owner|default('None') }}"); 
+console.log('current_user_address:', "{{ current_user_address|default('None') }}");
+console.log('asset.owner_address:', "{{ asset.owner_address|default('None') }}");
+
+// 详细的权限检查调试
+console.log('权限检查详情:');
+console.log('- is_admin_user类型:', typeof("{{ is_admin_user|default('None') }}"));
+console.log('- is_owner类型:', typeof("{{ is_owner|default('None') }}"));
+console.log('- 分红按钮应该显示:', "{{ (is_admin_user or is_owner)|string }}");
+
+// 分享资产功能 - 立即定义为全局函数
+window.shareAsset = function() {
+    console.log('分享功能被调用');
+    const address = getWalletAddress();
+    if (!address) {
+        const confirm = window.confirm('Please Connect Wallet to Generate Exclusive Share Link\\n\\nClick OK to Connect Wallet, Click Cancel to Continue Viewing');
+        if (confirm && typeof window.openWalletSelector === 'function') {
+            window.openWalletSelector();
+        }
+        return;
+    }
+    
+    const shareUrl = `${window.location.origin}${window.location.pathname}?ref=${encodeURIComponent(address)}`;
+    
+    const modalHtml = `
+        <div class="modal fade" id="shareModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="fas fa-share-alt me-2"></i>Share RWA Asset</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <p class="alert alert-info">🚀 Discover High-Quality RWA Assets! Real World Asset Digital Investment New Opportunity, High Transparency and Stable Income.</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Your Exclusive Invitation Link</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="shareLink" value="${shareUrl}" readonly>
+                                <button class="btn btn-outline-primary" onclick="window.copyShareLink()">
+                                    <i class="fas fa-copy"></i> Copy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const oldModal = document.getElementById('shareModal');
+    if (oldModal) oldModal.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('shareModal'));
+    modal.show();
+};
+
+// 复制分享链接 - 立即定义为全局函数
+window.copyShareLink = async function() {
+    const input = document.getElementById('shareLink');
+    if (!input) return;
+    
+    try {
+        await navigator.clipboard.writeText(input.value);
+        alert('Link Copied to Clipboard!');
+    } catch (error) {
+        input.select();
+        document.execCommand('copy');
+        alert('Link Copied to Clipboard!');
+    }
+};
+
+// 获取钱包地址
+function getWalletAddress() {
+    if (window.walletState && window.walletState.address) {
+        return window.walletState.address;
+    }
+    return localStorage.getItem('walletAddress') || localStorage.getItem('eth_address') || '';
+}
+
+// 检查DOM中是否存在分红按钮
+document.addEventListener('DOMContentLoaded', function() {
+    const dividendBtn = document.getElementById('dividendManagementBtn');
+    console.log('分红按钮DOM检查:');
+    console.log('- 分红按钮存在:', !!dividendBtn);
+    if (dividendBtn) {
+        console.log('- 分红按钮可见:', dividendBtn.style.display !== 'none');
+        console.log('- 分红按钮HTML:', dividendBtn.outerHTML);
+    }
+});
+
+// 页面初始化函数
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化Solana库
+    if (typeof SolanaWeb3 !== 'undefined') {
+        window.solanaWeb3 = SolanaWeb3;
+    }
+    if (typeof SolanaToken !== 'undefined') {
+        window.spl_token = SolanaToken;
+        window.splToken = SolanaToken;
+    }
+    
+    // 初始化页面功能
+    initializePage();
+});
+
+// 页面初始化函数
+function initializePage() {
+    console.log('开始初始化页面...');
+    setupTradeForm();
+    loadTradeHistory();
+    loadTotalDividends();
+    checkDividendAccess();
+    updateBuyButtonState();
+    console.log('页面初始化完成');
+}
+
+// 设置交易表单
+function setupTradeForm() {
+    const amountInput = document.getElementById('purchase-amount');
+    const totalPriceDisplay = document.getElementById('totalPrice');
+    
+    if (amountInput && totalPriceDisplay) {
+        amountInput.addEventListener('input', function() {
+            const amount = parseFloat(this.value) || 0;
+            const totalPrice = amount * window.ASSET_CONFIG.tokenPrice;
+            totalPriceDisplay.value = totalPrice.toFixed(2);
+        });
+        
+        // 初始计算
+        const initialAmount = parseFloat(amountInput.value) || 100;
+        totalPriceDisplay.value = (initialAmount * window.ASSET_CONFIG.tokenPrice).toFixed(2);
+    }
+}
+
+// 更新购买按钮状态
+function updateBuyButtonState() {
+    const buyButton = document.getElementById('buy-button');
+    if (!buyButton) return;
+    
+    const isConnected = checkWalletConnection();
+    
+    if (isConnected) {
+        buyButton.disabled = false;
+        buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Purchase';
+        buyButton.classList.remove('btn-secondary');
+        buyButton.classList.add('btn-primary');
+    } else {
+        buyButton.disabled = true;
+        buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>Please Connect Wallet';
+        buyButton.classList.remove('btn-primary');
+        buyButton.classList.add('btn-secondary');
+    }
+}
+
+// 检查钱包连接状态
+function checkWalletConnection() {
+    if (window.walletState && (window.walletState.connected || window.walletState.isConnected)) {
+        return true;
+    }
+    
+    const storedAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
+    return storedAddress && storedAddress.length > 10;
+}
+
+// 处理购买按钮点击
+function handleBuyClick() {
+    const address = getWalletAddress();
+    if (!address) {
+        alert('Please Connect Wallet');
+        if (typeof window.openWalletSelector === 'function') {
+            window.openWalletSelector();
+        }
+        return;
+    }
+    
+    if (typeof window.handleBuy === 'function') {
+        const assetId = document.getElementById('buy-button').getAttribute('data-asset-id');
+        const amountInput = document.getElementById('purchase-amount');
+        const buyButton = document.getElementById('buy-button');
+        window.handleBuy(assetId, amountInput, buyButton);
+    } else {
+        console.error('Purchase Function Unavailable');
+        alert('Purchase Function Temporarily Unavailable, Please Refresh Page and Try Again');
+    }
+}
+
+// 检查分红管理权限
+function checkDividendAccess() {
+    const address = getWalletAddress();
+    if (!address) return;
+    
+    const dividendBtn = document.getElementById('dividendManagementBtn');
+    if (!dividendBtn) return;
+    
+    // 更新分红按钮URL
+    const correctUrl = `/assets/${window.ASSET_CONFIG.tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
+    dividendBtn.href = correctUrl;
+    console.log('Dividend Button URL Updated:', correctUrl);
+}
+
+// 加载交易历史
+async function loadTradeHistory(page = 1) {
+    const container = document.getElementById('trade-history');
+    if (!container) {
+        console.error('交易历史容器不存在');
+        return;
+    }
+    
+    try {
+        console.log(`开始加载交易历史，页码: ${page}, 资产ID: ${window.ASSET_CONFIG.id}`);
+        container.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p class="mt-2">Loading trading history...</p></div>';
+        
+        const response = await fetch(`/api/trades?asset_id=${window.ASSET_CONFIG.id}&page=${page}&per_page=5`, {
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log(`交易历史API响应状态: ${response.status}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('交易历史API返回数据:', data);
+        
+        if (!data.trades || data.trades.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted my-4">No Trade Records</div>';
+            return;
+        }
+                
+        // 创建表格
+        const table = document.createElement('table');
+        table.className = 'table table-striped';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Transaction</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+        
+        const tbody = table.querySelector('tbody');
+        data.trades.forEach(trade => {
+            const row = createTradeRow(trade);
+            tbody.appendChild(row);
+        });
+        
+        container.innerHTML = '';
+        container.appendChild(table);
+        
+        // 更新分页
+        if (data.pagination) {
+            updatePagination(data.pagination);
+        }
+        
+        console.log(`交易历史加载完成，显示 ${data.trades.length} 条记录`);
+    } catch (error) {
+        console.error('Failed to Load Trade History:', error);
+        container.innerHTML = '<div class="alert alert-warning">Unable to load trading history at the moment</div>';
+    }
+}
+
+// 创建交易行
+function createTradeRow(trade) {
+    const tr = document.createElement('tr');
+    
+    const date = new Date(trade.created_at);
+    const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    
+    const typeClass = trade.type === 'buy' ? 'text-success' : 'text-danger';
+    const typeText = trade.type === 'buy' ? 'Buy' : 'Sell';
+                        
+    let statusText = 'Processing';
+    let statusClass = 'text-warning';
+    if (trade.status === 'completed' || trade.status === 2) {
+        statusText = 'Completed';
+        statusClass = 'text-success';
+    } else if (trade.status === 'failed' || trade.status === 3) {
+        statusText = 'Failed';
+        statusClass = 'text-danger';
+    }
+    
+    const total = trade.total || (trade.amount * trade.price);
+    
+    let txHashDisplay = 'N/A';
+    if (trade.tx_hash) {
+        const shortHash = trade.tx_hash.substring(0, 8) + '...' + trade.tx_hash.substring(trade.tx_hash.length - 8);
+        txHashDisplay = `<a href="https://solscan.io/tx/${trade.tx_hash}" target="_blank" class="text-decoration-none">${shortHash}</a>`;
+    }
+    
+    tr.innerHTML = `
+        <td>${formattedDate}</td>
+        <td><span class="${typeClass}">${typeText}</span></td>
+        <td>${trade.amount}</td>
+        <td>${parseFloat(total).toFixed(2)} USDC</td>
+        <td><span class="${statusClass}">${statusText}</span></td>
+        <td>${txHashDisplay}</td>
+    `;
+    
+    return tr;
+}
+                    
+// 更新分页
+function updatePagination(pagination) {
+    const prevBtn = document.getElementById('prevPageBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+    const currentPageSpan = document.getElementById('currentPageDisplay');
+    const totalPagesSpan = document.getElementById('totalPagesDisplay');
+    
+    if (currentPageSpan) currentPageSpan.textContent = pagination.page;
+    if (totalPagesSpan) totalPagesSpan.textContent = pagination.pages;
+    
+    if (prevBtn) {
+        prevBtn.disabled = pagination.page <= 1;
+        prevBtn.onclick = () => loadTradeHistory(pagination.page - 1);
+    }
+    
+    if (nextBtn) {
+        nextBtn.disabled = pagination.page >= pagination.pages;
+        nextBtn.onclick = () => loadTradeHistory(pagination.page + 1);
+    }
+}
+
+// 加载累计分红信息
+async function loadTotalDividends() {
+    const element = document.getElementById('totalDividendsDistributed');
+    if (!element) {
+        console.error('分红信息元素不存在');
+        return;
+    }
+    
+    try {
+        console.log(`开始加载分红信息，Token Symbol: ${window.ASSET_CONFIG.tokenSymbol}`);
+        element.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Loading...';
+        
+        const response = await fetch(`/api/assets/symbol/${window.ASSET_CONFIG.tokenSymbol}/dividend_stats`, {
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log(`分红API响应状态: ${response.status}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const stats = await response.json();
+        console.log('分红API返回数据:', stats);
+        
+        if (stats.success) {
+            element.innerHTML = `${Number(stats.total_amount || 0).toLocaleString()} USDC`;
+            console.log(`分红信息加载完成: ${stats.total_amount} USDC`);
+        } else {
+            throw new Error(stats.error || 'Unknown error');
+        }
+    } catch (error) {
+        console.error('Failed to Load Dividend Information:', error);
+        element.innerHTML = '0 USDC';
+    }
+}
+
+// 复制地址到剪贴板
+async function copyToClipboard(elementId, button) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    const text = element.textContent || element.value;
+    
+    try {
+        await navigator.clipboard.writeText(text);
+        const original = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check text-success"></i>';
+        setTimeout(() => button.innerHTML = original, 2000);
+    } catch (error) {
+        alert('Copy Failed, Please Manually Copy');
+    }
+}
+
+// 钱包事件监听
+window.addEventListener('walletConnected', function() {
+    updateBuyButtonState();
+    checkDividendAccess();
+});
+
+window.addEventListener('walletDisconnected', function() {
+    updateBuyButtonState();
+});
+
+// 绑定购买按钮事件
+document.addEventListener('DOMContentLoaded', function() {
+    const buyButton = document.getElementById('buy-button');
+    if (buyButton) {
+        buyButton.addEventListener('click', handleBuyClick);
+    }
+});
+</script>
 {% endblock %}
