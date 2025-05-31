@@ -458,6 +458,28 @@ function displayMessages(messages) {
             ? '<span class="badge bg-info">奖励计划</span>'
             : '<span class="badge bg-primary">分享内容</span>';
         
+        // 根据权重值显示不同的标识
+        let weightDisplay = '';
+        switch(message.weight) {
+            case 50:
+                weightDisplay = '<span class="badge bg-light text-dark">50 - 低</span>';
+                break;
+            case 75:
+                weightDisplay = '<span class="badge bg-info">75 - 中低</span>';
+                break;
+            case 100:
+                weightDisplay = '<span class="badge bg-primary">100 - 中</span>';
+                break;
+            case 125:
+                weightDisplay = '<span class="badge bg-warning">125 - 中高</span>';
+                break;
+            case 150:
+                weightDisplay = '<span class="badge bg-danger">150 - 高</span>';
+                break;
+            default:
+                weightDisplay = `<span class="badge bg-secondary">${message.weight}</span>`;
+        }
+        
         const contentPreview = message.content.length > 50 
             ? message.content.substring(0, 50) + '...'
             : message.content;
@@ -471,9 +493,7 @@ function displayMessages(messages) {
                         ${escapeHtml(contentPreview)}
                     </div>
                 </td>
-                <td>
-                    <span class="badge bg-light text-dark">${message.weight}</span>
-                </td>
+                <td>${weightDisplay}</td>
                 <td>${statusBadge}</td>
                 <td>${formatDateTime(message.created_at)}</td>
                 <td>
@@ -680,7 +700,32 @@ function editMessage(id) {
                 
                 if (contentElement) contentElement.value = message.content;
                 if (typeElement) typeElement.value = message.message_type;
-                if (weightElement) weightElement.value = message.weight;
+                
+                // 特别处理权重值 - 确保匹配到正确的选项
+                if (weightElement) {
+                    const weight = message.weight;
+                    // 先尝试直接匹配
+                    if (weightElement.querySelector(`option[value="${weight}"]`)) {
+                        weightElement.value = weight;
+                    } else {
+                        // 如果没有直接匹配，找最接近的值
+                        const validWeights = [50, 75, 100, 125, 150];
+                        let closestWeight = 100; // 默认值
+                        let minDiff = Math.abs(weight - 100);
+                        
+                        validWeights.forEach(validWeight => {
+                            const diff = Math.abs(weight - validWeight);
+                            if (diff < minDiff) {
+                                minDiff = diff;
+                                closestWeight = validWeight;
+                            }
+                        });
+                        
+                        weightElement.value = closestWeight;
+                        console.log(`权重 ${weight} 映射到最接近的值 ${closestWeight}`);
+                    }
+                }
+                
                 if (statusElement) statusElement.value = message.is_active ? 'true' : 'false';
                 
                 // 添加隐藏的ID字段
