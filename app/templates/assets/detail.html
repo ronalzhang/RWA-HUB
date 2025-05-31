@@ -830,10 +830,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 existingButtons.forEach((btn, index) => {
                     if (btn) {
                         console.log(`✅ 找到按钮 ${index}: ${btn.id}`);
-                        btn.style.display = 'inline-block';
+                        // 移除原有的 style="display: none;" 样式
+                        btn.style.display = '';
+                        btn.style.removeProperty('display');
+                        // 如果有 d-none 类，也要移除
+                        btn.classList.remove('d-none');
+                        
+                        // 更新链接和属性
                         btn.href = dividendUrl;
                         btn.setAttribute('data-token-symbol', tokenSymbol);
                         hasVisibleButton = true;
+                        
+                        console.log(`✅ 按钮 ${btn.id} 已显示, href: ${btn.href}`);
                     } else {
                         console.log(`❌ 按钮未找到: ${index}`);
                     }
@@ -860,7 +868,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     mainBtn.href = dividendUrl;
                     mainBtn.className = 'btn btn-outline-primary';
                     mainBtn.setAttribute('data-token-symbol', tokenSymbol);
-                    mainBtn.innerHTML = '<i class="fas fa-coins me-2"></i>分红管理';
+                    mainBtn.innerHTML = '<i class="fas fa-coins me-2"></i>{{ _("Dividend Management") }}';
                     
                     // 插入到分享按钮前面
                     const shareBtn = document.getElementById('shareAssetBtn');
@@ -871,14 +879,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 // 2. 为移动端创建按钮
-                const mobileContainer = document.querySelector('.d-md-none.d-block').parentElement;
+                const mobileContainers = document.querySelectorAll('.d-flex.d-lg-none .d-flex');
+                let mobileContainer = null;
+                for (let container of mobileContainers) {
+                    if (container.querySelector('#shareAssetBtnMobile')) {
+                        mobileContainer = container;
+                        break;
+                    }
+                }
+                
                 if (mobileContainer && !document.getElementById('dividendManagementBtnMobile')) {
                     const mobileBtn = document.createElement('a');
                     mobileBtn.id = 'dividendManagementBtnMobile';
                     mobileBtn.href = dividendUrl;
                     mobileBtn.className = 'btn btn-sm btn-outline-primary d-md-none d-block';
                     mobileBtn.setAttribute('data-token-symbol', tokenSymbol);
-                    mobileBtn.innerHTML = '<i class="fas fa-coins me-2"></i>分红';
+                    mobileBtn.innerHTML = '<i class="fas fa-coins me-2"></i>{{ _("Dividend") }}';
                     
                     // 插入到分享按钮前面
                     const shareBtn = document.getElementById('shareAssetBtnMobile');
@@ -889,14 +905,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 // 3. 为中等屏幕创建按钮
-                const mediumContainer = document.querySelector('.d-none.d-md-block.d-lg-none').parentElement;
+                let mediumContainer = null;
+                for (let container of mobileContainers) {
+                    if (container.querySelector('#shareAssetBtnMedium')) {
+                        mediumContainer = container;
+                        break;
+                    }
+                }
+                
                 if (mediumContainer && !document.getElementById('dividendManagementBtnMedium')) {
                     const mediumBtn = document.createElement('a');
                     mediumBtn.id = 'dividendManagementBtnMedium';
                     mediumBtn.href = dividendUrl;
                     mediumBtn.className = 'btn btn-outline-primary d-none d-md-block d-lg-none';
                     mediumBtn.setAttribute('data-token-symbol', tokenSymbol);
-                    mediumBtn.innerHTML = '<i class="fas fa-coins me-2"></i>分红管理';
+                    mediumBtn.innerHTML = '<i class="fas fa-coins me-2"></i>{{ _("Dividend Management") }}';
                     
                     // 插入到分享按钮前面
                     const shareBtn = document.getElementById('shareAssetBtnMedium');
