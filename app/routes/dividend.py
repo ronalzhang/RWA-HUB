@@ -1,9 +1,4 @@
 from flask import Blueprint, jsonify, request, current_app
-from app.models.dividend import DividendRecord, DividendDistribution, WithdrawalRequest
-from app.models.asset import Asset
-from app.models.user import User
-from app.utils.solana import get_solana_client
-from app.utils.wallet import get_wallet_balance
 from app.extensions import db
 import json
 from datetime import datetime
@@ -14,10 +9,6 @@ bp = Blueprint('dividend', __name__)
 def get_dividend_stats(token_symbol):
     """获取分红统计信息"""
     try:
-        asset = Asset.query.filter_by(token_symbol=token_symbol).first()
-        if not asset:
-            return jsonify({'error': '资产不存在'}), 404
-            
         # 简化版本，返回基本统计
         return jsonify({
             'count': 0,
@@ -31,10 +22,6 @@ def get_dividend_stats(token_symbol):
 def get_dividend_history(token_symbol):
     """获取分红历史记录"""
     try:
-        asset = Asset.query.filter_by(token_symbol=token_symbol).first()
-        if not asset:
-            return jsonify({'error': '资产不存在'}), 404
-            
         return jsonify([])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -48,21 +35,19 @@ def check_permission(token_symbol):
         if not eth_address:
             return jsonify({'has_permission': False}), 200
             
-        asset = Asset.query.filter_by(token_symbol=token_symbol).first()
-        if not asset:
-            return jsonify({'error': '资产不存在'}), 404
+        # 简化版本 - 总是检查管理员权限
+        try:
+            from app.utils.admin_utils import is_admin
+            is_admin_user = is_admin(eth_address)
             
-        # 检查是否是管理员或资产所有者
-        from app.utils.admin_utils import is_admin
-        is_admin_user = is_admin(eth_address)
-        is_owner = asset.owner_address and eth_address.lower() == asset.owner_address.lower()
-        
-        has_permission = is_admin_user or is_owner
-        
-        return jsonify({'has_permission': has_permission})
+            return jsonify({'has_permission': is_admin_user})
+        except ImportError:
+            # 如果导入失败，返回false
+            return jsonify({'has_permission': False}), 200
+            
     except Exception as e:
         current_app.logger.error(f"检查分红权限出错: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'has_permission': False}), 200
 
 @bp.route('/api/dividend/distribute/<string:token_symbol>', methods=['POST'])
 def distribute_dividend(token_symbol):
