@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <!-- 添加jQuery库 -->
-<script src="{{ url_for('static', filename='vendor/jquery.min.js') }}"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 
 <!-- 添加Solana Web3 SDK (使用本地文件) -->
 <script src="{{ url_for('static', filename='js/contracts/solana-web3.iife.js') }}"></script>
@@ -2232,11 +2232,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 添加单独刷新钱包资产列表的函数 - 使用全局loadUserAssets函数替代
             function refreshWalletAssets() {
-                if (typeof loadUserAssets === 'function') {
+                if (typeof window.loadUserAssets === 'function') {
                     console.log('使用全局loadUserAssets函数加载钱包资产');
+                    window.loadUserAssets();
+                } else if (typeof loadUserAssets === 'function') {
+                    console.log('使用本地loadUserAssets函数加载钱包资产');
                     loadUserAssets();
                 } else {
-                    console.warn('全局loadUserAssets函数不可用');
+                    console.warn('loadUserAssets函数不可用');
                 }
             }
 
@@ -2984,7 +2987,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <!-- 分红管理按钮 - 管理员和资产所有者可见 -->
         <div class="d-flex align-items-center gap-2">
             {% if is_admin_user or is_owner %}
-            <a href="/admin/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary" id="dividendManagementBtn" data-token-symbol="{{ asset.token_symbol }}">
+            <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary" id="dividendManagementBtn" data-token-symbol="{{ asset.token_symbol }}">
                 <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
             </a>
             <!-- 调试用：手动触发分红按钮显示 -->
@@ -3020,10 +3023,10 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="d-flex gap-2">
                 {% if is_admin_user or is_owner %}
-                <a href="/admin/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-sm btn-outline-primary d-md-none d-block" id="dividendManagementBtnMobile" data-token-symbol="{{ asset.token_symbol }}">
+                <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-sm btn-outline-primary d-md-none d-block" id="dividendManagementBtnMobile" data-token-symbol="{{ asset.token_symbol }}">
                     <i class="fas fa-coins me-2"></i>{{ _('Dividend') }}
                 </a>
-                <a href="/admin/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary d-none d-md-block d-lg-none" id="dividendManagementBtnMedium" data-token-symbol="{{ asset.token_symbol }}">
+                <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary d-none d-md-block d-lg-none" id="dividendManagementBtnMedium" data-token-symbol="{{ asset.token_symbol }}">
                     <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
                 </a>
                 <!-- 调试按钮 - 移动版 -->
@@ -3511,7 +3514,7 @@ function showDividendModal() {
 // 获取持有人信息
 async function fetchHoldersInfo() {
     try {
-        const response = await fetch(`/api/assets/${asset.id}/holders`);
+        const response = await fetch(`/api/assets/{{ asset.id }}/holders`);
         const data = await response.json();
         
         document.getElementById('holdersCount').value = data.holders_count;
@@ -3564,7 +3567,7 @@ async function startDividend() {
             return;
         }
         
-        const response = await fetch(`/api/assets/${asset.id}/dividend`, {
+        const response = await fetch(`/api/assets/{{ asset.id }}/dividend`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -3588,8 +3591,10 @@ async function startDividend() {
     }
 }
 
-// 全局导出函数
-window.refreshWalletAssets = refreshWalletAssets;
+// 全局导出函数 - 确保refreshWalletAssets函数已定义
+if (typeof refreshWalletAssets === 'function') {
+    window.refreshWalletAssets = refreshWalletAssets;
+}
 </script>
 
 {% endblock %}
