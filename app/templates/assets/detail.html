@@ -218,6 +218,19 @@ document.addEventListener('DOMContentLoaded', function() {
             ASSET_CONFIG.platformFeeAddress = "{{ platform_fee_address }}";
             ASSET_CONFIG.platformFeeRate = parseFloat("{{ PLATFORM_FEE_RATE }}");
 
+            // 为wallet.js提供资产符号信息
+            window.CURRENT_ASSET_SYMBOL = "{{ asset.token_symbol }}";
+            window.CURRENT_ASSET_ID = parseInt("{{ asset.id }}");
+            
+            // 确保wallet.js能够访问到资产信息
+            window.ASSET_DATA = {
+                id: parseInt("{{ asset.id }}"),
+                symbol: "{{ asset.token_symbol }}",
+                name: "{{ asset.name }}",
+                token_address: "{{ asset.token_address }}",
+                creator_address: "{{ asset.creator_address }}"
+            };
+
             // 当前资产对象，用于全局引用
             var currentAsset = {
                 id: parseInt("{{ asset.id }}"),
@@ -2919,14 +2932,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-                if (!newWindow) {
-                    showShareError('弹窗被阻止，请允许弹窗后重试或手动复制链接分享');
-                }
-            } catch (error) {
-                console.error('Twitter分享失败:', error);
-                showShareError('Twitter分享功能暂时不可用');
-            }
-        }
     </script>
 
     <!-- 返回按钮 -->
