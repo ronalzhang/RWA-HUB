@@ -29,213 +29,306 @@
         const container = document.querySelector('.container');
         if (container) {
             const alert = document.createElement('div');
-            alert.className = 'alert alert-danger mt-3';
-            alert.innerHTML = '<strong>错误:</strong> 无法加载Web3.js，分红功能可能无法正常使用。请刷新页面重试。';
+            alert.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mt-4';
+            alert.innerHTML = '<strong class="font-bold">错误:</strong> 无法加载Web3.js，分红功能可能无法正常使用。请刷新页面重试。';
             container.prepend(alert);
         }
     });
 </script>
 <style>
-    .stats-card {
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        transition: all 0.3s ease;
-        padding: 10px;
-        margin-bottom: 15px;
-        position: relative;
-        overflow: hidden;
-        height: 100%;
-        min-height: 120px;
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .stats-card:hover {
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    /* 自定义样式补充 */
+    .stats-card-hover:hover {
         transform: translateY(-2px);
+        box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
     
-    .stats-card .card-body {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        height: 100%;
-        padding: 1rem;
+    .loading-spinner {
+        animation: spin 1s linear infinite;
     }
     
-    .stats-card .card-title {
-        font-size: 0.85rem;
-        color: #6c757d;
-        font-weight: 500;
-        margin-bottom: 5px;
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
     }
     
-    .stats-card .card-value {
-        font-size: 1.5rem;
-        font-weight: 600;
-        margin: 5px 0;
+    .fade-in {
+        animation: fadeIn 0.5s ease-in;
     }
     
-    .stats-card .icon-bg {
-        position: absolute;
-        right: 0;
-        bottom: 0;
-        opacity: 0.1;
-        transform: translate(20%, 20%);
-        font-size: 3rem !important;
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
     }
     
-    #dividend-form {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 20px;
-        margin-bottom: 20px;
-    }
-    
-    .loading-indicator {
-        width: 16px;
-        height: 16px;
-        margin-right: 5px;
-    }
-    
-    .stats-tooltip {
+    .input-group {
         position: relative;
-        display: inline-block;
-        margin-left: 3px;
-        cursor: help;
     }
     
-    .stats-tooltip .tooltiptext {
-        visibility: hidden;
-        width: 200px;
-        background-color: #555;
-        color: #fff;
-        text-align: center;
-        border-radius: 6px;
-        padding: 5px;
+    .input-group-icon {
         position: absolute;
-        z-index: 1;
-        bottom: 125%;
-        left: 50%;
-        margin-left: -100px;
-        opacity: 0;
-        transition: opacity 0.3s;
-        font-size: 0.75rem;
-        font-weight: normal;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6b7280;
+        pointer-events: none;
     }
     
-    .stats-tooltip:hover .tooltiptext {
-        visibility: visible;
-        opacity: 1;
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        transition: all 0.3s ease;
     }
     
-    @media (max-width: 768px) {
-        .stats-row {
-            display: flex;
-            flex-wrap: wrap;
-            margin: 0 -5px;
-        }
-        
-        .stats-card-wrapper {
-            width: 50%;
-            padding: 0 5px;
-            margin-bottom: 10px;
-        }
-        
-        .stats-card {
-            min-height: 100px;
-        }
-        
-        .stats-card .card-value {
-            font-size: 1.3rem;
-        }
-        
-        .stats-card .icon-bg {
-            font-size: 2.5rem !important;
-        }
+    .btn-primary:hover {
+        background: linear-gradient(135deg, #5a67d8 0%, #6c63ff 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1);
     }
     
-    .usdc-icon {
-        width: 18px;
-        height: 18px;
-        margin-right: 2px;
-        vertical-align: text-bottom;
-    }
-    
-    .stats-card .usdc-icon {
-        width: 16px;
-        height: 16px;
-        margin-right: 2px;
-        vertical-align: middle;
+    .btn-primary:disabled {
+        background: #9ca3af;
+        transform: none;
+        box-shadow: none;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold mb-8">分红管理</h1>
+<div class="min-h-screen bg-gray-50">
+    <!-- 导航栏信息 -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/assets/{{ symbol }}" class="text-sm text-gray-500 hover:text-gray-700 flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                        </svg>
+                        返回资产详情
+                    </a>
+                </div>
+                <div class="text-sm text-gray-500">
+                    {{ symbol }} 分红管理
+                </div>
+            </div>
+        </div>
+    </div>
     
-    <!-- 资产统计 -->
-    <div class="grid grid-cols-3 gap-4 mb-8">
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold mb-2">总分红次数</h3>
-            <p class="text-2xl font-bold" id="totalDividends">0</p>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- 页面标题 -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">分红管理</h1>
+            <p class="text-gray-600">管理 {{ symbol }} 的分红发放和历史记录</p>
         </div>
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold mb-2">总分红金额</h3>
-            <p class="text-2xl font-bold" id="totalAmount">0 USDC</p>
+        
+        <!-- 资产统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 stats-card-hover transition-all duration-300 fade-in">
+                <div class="flex items-center">
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-600 mb-1">总分红次数</p>
+                        <p class="text-2xl font-bold text-gray-900" id="totalDividends">
+                            <span class="loading-spinner inline-block w-5 h-5 border-2 border-gray-300 border-t-blue-600 rounded-full"></span>
+                        </p>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 stats-card-hover transition-all duration-300 fade-in">
+                <div class="flex items-center">
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-600 mb-1">总分红金额</p>
+                        <p class="text-2xl font-bold text-gray-900" id="totalAmount">
+                            <span class="loading-spinner inline-block w-5 h-5 border-2 border-gray-300 border-t-green-600 rounded-full"></span>
+                        </p>
+                    </div>
+                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 stats-card-hover transition-all duration-300 fade-in">
+                <div class="flex items-center">
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-600 mb-1">持有人数量</p>
+                        <p class="text-2xl font-bold text-gray-900" id="holderCount">
+                            <span class="loading-spinner inline-block w-5 h-5 border-2 border-gray-300 border-t-purple-600 rounded-full"></span>
+                        </p>
+                    </div>
+                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold mb-2">持有人数量</h3>
-            <p class="text-2xl font-bold" id="holderCount">0</p>
-        </div>
-    </div>
 
-    <!-- 发起分红表单 -->
-    <div class="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 class="text-xl font-bold mb-4">发起分红</h2>
-        <form id="dividendForm" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700">分红金额 (USDC)</label>
-                <input type="number" id="amount" name="amount" step="0.01" min="0" required
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+        <!-- 主要内容网格 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- 发起分红表单 -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 fade-in">
+                    <div class="p-6 border-b border-gray-200">
+                        <h2 class="text-xl font-bold text-gray-900 flex items-center">
+                            <svg class="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                            </svg>
+                            发起分红
+                        </h2>
+                        <p class="text-gray-600 mt-1">向所有持有人分发收益</p>
+                    </div>
+                    
+                    <div class="p-6">
+                        <form id="dividendForm" class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="input-group">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">分红金额</label>
+                                    <div class="relative">
+                                        <input type="number" id="amount" name="amount" step="0.01" min="0" required
+                                            class="w-full pl-4 pr-16 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+                                            placeholder="0.00" oninput="calculateFees()">
+                                        <span class="input-group-icon font-medium text-gray-500">USDC</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="input-group">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">分红间隔</label>
+                                    <div class="relative">
+                                        <input type="number" id="interval" name="interval" min="1" required
+                                            class="w-full pl-4 pr-16 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+                                            placeholder="24">
+                                        <span class="input-group-icon font-medium text-gray-500">小时</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <h3 class="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                                    </svg>
+                                    预估信息
+                                </h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">平台手续费 (3.5%):</span>
+                                        <span class="font-medium text-gray-900" id="platformFee">0 USDC</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">实际分红金额:</span>
+                                        <span class="font-medium text-green-600" id="actualAmount">0 USDC</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" id="submitBtn"
+                                class="w-full btn-primary text-white py-3 px-6 rounded-lg font-medium transition-all duration-200 flex items-center justify-center">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                </svg>
+                                发起分红
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">分红间隔 (小时)</label>
-                <input type="number" id="interval" name="interval" min="1" required
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            
+            <!-- 操作指南 -->
+            <div class="space-y-6">
+                <div class="bg-blue-50 rounded-xl border border-blue-200 fade-in">
+                    <div class="p-6">
+                        <h3 class="text-lg font-bold text-blue-900 mb-3 flex items-center">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            操作指南
+                        </h3>
+                        <div class="space-y-3 text-sm text-blue-800">
+                            <div class="flex items-start">
+                                <span class="inline-block w-6 h-6 bg-blue-200 text-blue-800 rounded-full text-xs font-bold flex items-center justify-center mr-3 mt-0.5">1</span>
+                                <p>确保钱包中有足够的USDC用于分红</p>
+                            </div>
+                            <div class="flex items-start">
+                                <span class="inline-block w-6 h-6 bg-blue-200 text-blue-800 rounded-full text-xs font-bold flex items-center justify-center mr-3 mt-0.5">2</span>
+                                <p>输入分红金额，系统将自动计算手续费</p>
+                            </div>
+                            <div class="flex items-start">
+                                <span class="inline-block w-6 h-6 bg-blue-200 text-blue-800 rounded-full text-xs font-bold flex items-center justify-center mr-3 mt-0.5">3</span>
+                                <p>设置分红间隔时间（建议24小时以上）</p>
+                            </div>
+                            <div class="flex items-start">
+                                <span class="inline-block w-6 h-6 bg-blue-200 text-blue-800 rounded-full text-xs font-bold flex items-center justify-center mr-3 mt-0.5">4</span>
+                                <p>确认信息无误后点击发起分红</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-yellow-50 rounded-xl border border-yellow-200 fade-in">
+                    <div class="p-6">
+                        <h3 class="text-lg font-bold text-yellow-900 mb-3 flex items-center">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.232 15.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            </svg>
+                            重要提示
+                        </h3>
+                        <div class="space-y-2 text-sm text-yellow-800">
+                            <p>• 分红一旦发起不可撤销，请仔细确认</p>
+                            <p>• 平台收取3.5%手续费用于系统维护</p>
+                            <p>• 分红将按持有比例自动分配给所有持有人</p>
+                            <p>• 建议在持有人较多时进行分红操作</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="bg-gray-50 p-4 rounded-md">
-                <h3 class="text-sm font-medium text-gray-700 mb-2">预估信息</h3>
-                <p class="text-sm text-gray-600">平台手续费: <span id="platformFee">0 USDC</span></p>
-                <p class="text-sm text-gray-600">实际分红金额: <span id="actualAmount">0 USDC</span></p>
-            </div>
-            <button type="submit" id="submitBtn"
-                class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                发起分红
-            </button>
-        </form>
-    </div>
+        </div>
 
-    <!-- 分红历史 -->
-    <div class="bg-white rounded-lg shadow">
-        <h2 class="text-xl font-bold p-6 border-b">分红历史</h2>
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">金额</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">间隔</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">发起人</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易哈希</th>
-                    </tr>
-                </thead>
-                <tbody id="historyTable" class="bg-white divide-y divide-gray-200">
-                    <!-- 历史记录将通过JavaScript动态加载 -->
-                </tbody>
-            </table>
+        <!-- 分红历史表格 -->
+        <div class="mt-8">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 fade-in">
+                <div class="p-6 border-b border-gray-200">
+                    <h2 class="text-xl font-bold text-gray-900 flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v6a2 2 0 002 2h2m4 0h2a2 2 0 002-2V7a2 2 0 00-2-2h-2m-4 0V3a2 2 0 10-4 0v2m4 0a2 2 0 10-4 0m8 6v6m-3-3h6"></path>
+                        </svg>
+                        分红历史
+                    </h2>
+                    <p class="text-gray-600 mt-1">查看所有历史分红记录</p>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">金额</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">间隔</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">发起人</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易哈希</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTable" class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="5" class="px-6 py-12 text-center">
+                                    <div class="flex flex-col items-center">
+                                        <div class="loading-spinner w-8 h-8 border-3 border-gray-300 border-t-indigo-600 rounded-full mb-4"></div>
+                                        <p class="text-gray-500">正在加载分红历史...</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>
