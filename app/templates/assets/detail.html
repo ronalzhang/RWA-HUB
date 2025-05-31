@@ -249,9 +249,46 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
+<!-- 分享模态框 -->
+<div id="shareModal" class="modal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 12px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                <h5 class="modal-title">
+                    <i class="fas fa-share-alt me-2"></i>Share RWA Asset
+                </h5>
+                <button type="button" class="btn-close btn-close-white" onclick="closeShareModal()"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="alert" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border: none; border-radius: 8px;">
+                        <p class="mb-0" style="color: #1565c0;">🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，高透明度，稳定收益。</p>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Your Exclusive Invitation Link</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" readonly 
+                               style="background-color: #f8f9fa; border-radius: 8px 0 0 8px;"
+                               placeholder="Generating share link...">
+                        <button class="btn btn-primary" onclick="window.copyShareLink()" 
+                                style="border-radius: 0 8px 8px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
+                            <i class="fas fa-copy me-2"></i>Copy
+                        </button>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <small class="text-muted">
+                        <i class="fas fa-gift me-1"></i>
+                        Share and earn commission on every successful referral!
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // 全局配置
 window.PLATFORM_FEE_RATE = 0.035;
@@ -346,7 +383,7 @@ window.shareAsset = function() {
             console.log('最终分享链接:', finalShareUrl);
             
             // 更新模态框内容
-            const messageElement = document.querySelector('#shareModal .bg-blue-50 p');
+            const messageElement = document.querySelector('#shareModal .modal-body .alert p');
             if (messageElement) {
                 messageElement.textContent = shareMessage;
             }
@@ -362,7 +399,7 @@ window.shareAsset = function() {
         .catch(error => {
             console.error('分享准备失败:', error);
             // 使用默认值
-            const messageElement = document.querySelector('#shareModal .bg-blue-50 p');
+            const messageElement = document.querySelector('#shareModal .modal-body .alert p');
             if (messageElement) {
                 messageElement.textContent = '🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，高透明度，稳定收益。';
             }
@@ -735,5 +772,29 @@ window.copyShareLink = async function() {
         }
     }
 };
+
+// 关闭分享模态框
+function closeShareModal() {
+    const modal = document.getElementById('shareModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+// 点击模态框背景关闭
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('shareModal');
+    if (event.target === modal) {
+        closeShareModal();
+    }
+});
+
+// ESC键关闭模态框
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeShareModal();
+    }
+});
 </script>
 {% endblock %}
