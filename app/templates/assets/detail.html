@@ -861,145 +861,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 return 'UNKNOWN';
             }
             
-            /**
-             * 显示分红管理按钮 - 增强版本 (确保按钮能被显示)
-             */
+            // === 简化的分红管理功能 ===
             function showDividendButtons(address) {
-                console.log(`🔄 显示分红按钮，地址: ${address}`);
-                
-                // 获取资产符号
-                const tokenSymbol = window.ASSET_CONFIG && window.ASSET_CONFIG.tokenSymbol ? 
-                                   window.ASSET_CONFIG.tokenSymbol : "{{ asset.token_symbol }}";
+                if (!address) return;
+                const tokenSymbol = window.ASSET_CONFIG?.tokenSymbol || "{{ asset.token_symbol }}";
                 const dividendUrl = `/assets/${tokenSymbol}/dividend?eth_address=${encodeURIComponent(address)}`;
-                
-                // 强制等待DOM更新后再查找按钮
-                setTimeout(() => {
-                    // 使用更全面的选择器查找分红按钮
-                    const buttonSelectors = [
-                        '#dividendManagementBtn',
-                        '#dividendManagementBtnMobile', 
-                        '#dividendManagementBtnMedium',
-                        'a[data-token-symbol]',
-                        'a[href*="dividend"]',
-                        '*[id*="dividend"]'
-                    ];
-                    
-                    let foundButtons = [];
-                    
-                    // 尝试每种选择器
-                    buttonSelectors.forEach(selector => {
-                        try {
-                            const elements = document.querySelectorAll(selector);
-                            elements.forEach(el => {
-                                if (el && !foundButtons.includes(el)) {
-                                    foundButtons.push(el);
-                                }
-                            });
-                        } catch (e) {
-                            console.warn(`选择器 ${selector} 查找失败:`, e);
-                        }
-                    });
-                    
-                    console.log(`🔍 找到 ${foundButtons.length} 个潜在的分红按钮:`, foundButtons.map(btn => ({
-                        id: btn.id,
-                        className: btn.className,
-                        hasDataAttr: !!btn.getAttribute('data-token-symbol'),
-                        href: btn.href
-                    })));
-                    
-                    let hasVisibleButton = false;
-                    
-                    // 显示找到的按钮 - 放宽条件
-                    foundButtons.forEach((btn) => {
-                        // 检查是否是分红相关按钮
-                        const isDividendBtn = btn.id && btn.id.includes('dividend') ||
-                                             btn.href && btn.href.includes('dividend') ||
-                                             btn.getAttribute('data-token-symbol') ||
-                                             btn.className && btn.className.includes('dividend');
-                        
-                        if (btn && isDividendBtn) {
-                            try {
-                                // 更新URL（如果是链接）
-                                if (btn.tagName === 'A') {
-                                    btn.href = dividendUrl;
-                                }
-                                
-                                // 强制显示按钮 - 移除所有可能的隐藏样式
-                                btn.style.display = '';
-                                btn.style.visibility = 'visible';
-                                btn.style.opacity = '1';
-                                btn.removeAttribute('hidden');
-                                
-                                // 移除Bootstrap和其他隐藏类
-                                btn.classList.remove('d-none', 'invisible', 'hidden', 'hide');
-                                
-                                // 根据按钮ID设置合适的显示方式
-                                if (btn.id === 'dividendManagementBtn') {
-                                    btn.style.display = 'inline-flex';
-                                    btn.classList.remove('d-none', 'd-md-none');
-                                } else if (btn.id === 'dividendManagementBtnMobile') {
-                    // 显示找到的按钮
-                    foundButtons.forEach((btn, index) => {
-                        if (btn && btn.getAttribute && btn.getAttribute('data-token-symbol')) {
-                            // 更新URL
-                            btn.href = dividendUrl;
-                            
-                            // 强制显示按钮 - 移除所有隐藏样式
-                            btn.style.display = '';
-                            btn.style.visibility = 'visible';
-                            btn.style.opacity = '1';
-                            btn.removeAttribute('hidden');
-                            
-                            // 移除Bootstrap隐藏类
-                            btn.classList.remove('d-none', 'invisible', 'hidden');
-                            
-                            // 根据按钮ID设置合适的显示方式
-                            if (btn.id === 'dividendManagementBtn') {
-                                btn.style.display = 'inline-flex';
-                                btn.classList.add('d-lg-inline-flex', 'd-none', 'd-md-none');
-                                btn.classList.remove('d-none');
-                            } else if (btn.id === 'dividendManagementBtnMobile') {
-                                btn.style.display = 'block';
-                                btn.classList.add('d-md-none', 'd-block');
-                            } else if (btn.id === 'dividendManagementBtnMedium') {
-                                btn.style.display = 'block'; 
-                                btn.classList.add('d-none', 'd-md-block', 'd-lg-none');
-                                btn.classList.remove('d-none');
-                            } else {
-                                btn.style.display = 'inline-block';
-                            }
-                            
-                            hasVisibleButton = true;
-                            console.log(`✅ 按钮 ${btn.id || btn.className} 已显示`);
-                        }
-                    });
-                    
-                    // 如果还是没找到，尝试创建一个调试按钮
-                    if (!hasVisibleButton) {
-                        console.warn('❌ 未找到任何分红按钮，尝试创建调试按钮');
-                        
-                        // 查找主容器
-                        const container = document.querySelector('.col-12.col-md-8.col-lg-9') || 
-                                        document.querySelector('.card-body') ||
-                                        document.querySelector('main');
-                                        
-                        if (container) {
-                            // 创建临时调试按钮
-                            const debugBtn = document.createElement('a');
-                            debugBtn.id = 'temp-dividend-btn';
-                            debugBtn.href = dividendUrl;
-                            debugBtn.className = 'btn btn-outline-primary me-2';
-                            debugBtn.innerHTML = '<i class="fas fa-coins me-2"></i>分红管理 (调试)';
-                            debugBtn.style.marginTop = '10px';
-                            
-                            container.appendChild(debugBtn);
-                            console.log('✅ 创建了临时调试分红按钮');
-                        }
-                    } else {
-                        console.log('✅ 分红按钮显示成功');
+                const buttonIds = ['dividendManagementBtn', 'dividendManagementBtnMobile', 'dividendManagementBtnMedium'];
+                let shown = 0;
+                buttonIds.forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) {
+                        btn.href = dividendUrl;
+                        btn.style.display = '';
+                        btn.style.visibility = 'visible';
+                        btn.classList.remove('d-none', 'hidden');
+                        shown++;
                     }
-                }, 200); // 等待200ms确保DOM更新完成
+                });
+                if (shown > 0) console.log('✅ 分红按钮已显示');
             }
+            
+            function checkDividendManagementAccess() {
+                if (window.walletState?.connected && window.walletState?.isAdmin && window.walletState?.address) {
+                    showDividendButtons(window.walletState.address);
+                }
+            }
+            
+            window.checkDividendManagementAccess = checkDividendManagementAccess;
+            window.showDividendButtons = showDividendButtons;
+            // === 分红管理功能结束 ===
 
             // 翻页相关变量
             let currentPage = 1;
