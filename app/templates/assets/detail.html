@@ -53,10 +53,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 页面初始化函数
 function initializePage() {
+    console.log('开始初始化页面...');
     setupTradeForm();
     loadTradeHistory();
     loadTotalDividends();
     checkDividendAccess();
+    updateBuyButtonState();
     console.log('页面初始化完成');
 }
 
@@ -76,8 +78,6 @@ function setupTradeForm() {
         const initialAmount = parseFloat(amountInput.value) || 100;
         totalPriceDisplay.value = (initialAmount * window.ASSET_CONFIG.tokenPrice).toFixed(2);
     }
-    
-    updateBuyButtonState();
 }
 
 // 更新购买按钮状态
@@ -157,10 +157,14 @@ function checkDividendAccess() {
 // 加载交易历史
 async function loadTradeHistory(page = 1) {
     const container = document.getElementById('trade-history');
-    if (!container) return;
+    if (!container) {
+        console.error('交易历史容器不存在');
+        return;
+    }
     
     try {
-        container.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p class="mt-2">Loading...</p></div>';
+        console.log(`开始加载交易历史，页码: ${page}, 资产ID: ${window.ASSET_CONFIG.id}`);
+        container.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p class="mt-2">Loading trading history...</p></div>';
         
         const response = await fetch(`/api/trades?asset_id=${window.ASSET_CONFIG.id}&page=${page}&per_page=5`, {
             headers: {
@@ -169,17 +173,20 @@ async function loadTradeHistory(page = 1) {
             }
         });
         
+        console.log(`交易历史API响应状态: ${response.status}`);
+        
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
+        console.log('交易历史API返回数据:', data);
         
         if (!data.trades || data.trades.length === 0) {
             container.innerHTML = '<div class="text-center text-muted my-4">No Trade Records</div>';
             return;
         }
-        
+                
         // 创建表格
         const table = document.createElement('table');
         table.className = 'table table-striped';
@@ -210,6 +217,8 @@ async function loadTradeHistory(page = 1) {
         if (data.pagination) {
             updatePagination(data.pagination);
         }
+        
+        console.log(`交易历史加载完成，显示 ${data.trades.length} 条记录`);
     } catch (error) {
         console.error('Failed to Load Trade History:', error);
         container.innerHTML = '<div class="alert alert-warning">Unable to load trading history at the moment</div>';
@@ -225,7 +234,7 @@ function createTradeRow(trade) {
     
     const typeClass = trade.type === 'buy' ? 'text-success' : 'text-danger';
     const typeText = trade.type === 'buy' ? 'Buy' : 'Sell';
-    
+                        
     let statusText = 'Processing';
     let statusClass = 'text-warning';
     if (trade.status === 'completed' || trade.status === 2) {
@@ -255,7 +264,7 @@ function createTradeRow(trade) {
     
     return tr;
 }
-
+                    
 // 更新分页
 function updatePagination(pagination) {
     const prevBtn = document.getElementById('prevPageBtn');
@@ -280,9 +289,13 @@ function updatePagination(pagination) {
 // 加载累计分红信息
 async function loadTotalDividends() {
     const element = document.getElementById('totalDividendsDistributed');
-    if (!element) return;
+    if (!element) {
+        console.error('分红信息元素不存在');
+        return;
+    }
     
     try {
+        console.log(`开始加载分红信息，Token Symbol: ${window.ASSET_CONFIG.tokenSymbol}`);
         element.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Loading...';
         
         const response = await fetch(`/api/assets/symbol/${window.ASSET_CONFIG.tokenSymbol}/dividend_stats`, {
@@ -292,13 +305,18 @@ async function loadTotalDividends() {
             }
         });
         
+        console.log(`分红API响应状态: ${response.status}`);
+        
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const stats = await response.json();
+        console.log('分红API返回数据:', stats);
+        
         if (stats.success) {
             element.innerHTML = `${Number(stats.total_amount || 0).toLocaleString()} USDC`;
+            console.log(`分红信息加载完成: ${stats.total_amount} USDC`);
         } else {
             throw new Error(stats.error || 'Unknown error');
         }
@@ -310,6 +328,7 @@ async function loadTotalDividends() {
 
 // 分享资产功能
 function shareAsset() {
+    console.log('分享功能被调用');
     const address = getWalletAddress();
     if (!address) {
         const confirm = window.confirm('Please Connect Wallet to Generate Exclusive Share Link\n\nClick OK to Connect Wallet, Click Cancel to Continue Viewing');
@@ -347,7 +366,7 @@ function shareAsset() {
             </div>
         </div>
     `;
-    
+
     const oldModal = document.getElementById('shareModal');
     if (oldModal) oldModal.remove();
     
@@ -552,7 +571,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
             </div>
-
+            
             <!-- 右侧交易卡片 -->
             <div class="col-lg-5">
                 <div class="card trade-card">
