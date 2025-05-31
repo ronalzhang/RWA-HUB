@@ -476,6 +476,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadDividendHistory();
                 }
                 
+                // 添加钱包状态监听器，当钱包连接后自动检查分红权限
+                window.addEventListener('walletConnected', function(event) {
+                    console.log('检测到钱包连接事件，尝试显示分红按钮');
+                    setTimeout(() => {
+                        if (typeof checkDividendManagementAccess === 'function') {
+                            checkDividendManagementAccess();
+                        } else if (typeof forceDividendButtonsDisplay === 'function') {
+                            forceDividendButtonsDisplay();
+                        }
+                    }, 1000); // 延迟1秒确保钱包状态完全更新
+                });
+                
                 // 添加延迟检查，确保wallet.js完全加载
                 setTimeout(function() {
                     console.log('执行钱包功能检查和修复');
@@ -698,11 +710,55 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             /**
+             * 强制显示分红按钮（无论缓存状态）
+             */
+            function forceDividendButtonsDisplay() {
+                console.log('🔧 强制显示分红按钮');
+                
+                // 检查钱包连接状态
+                const connectedAddress = window.walletState && window.walletState.connected 
+                    ? window.walletState.address 
+                    : (window.wallet && window.wallet.connected ? window.wallet.address : null);
+                
+                if (!connectedAddress) {
+                    console.warn('钱包未连接，无法显示分红按钮');
+                    return false;
+                }
+                
+                // 检查管理员权限
+                const isAdmin = window.walletState && window.walletState.isAdmin;
+                if (!isAdmin) {
+                    console.warn('非管理员用户，无法显示分红按钮');
+                    return false;
+                }
+                
+                // 强制显示按钮
+                showDividendButtons(connectedAddress);
+                
+                // 更新缓存
+                window._dividendPermissionCache = {
+                    hasPermission: true,
+                    address: connectedAddress,
+                    timestamp: Date.now()
+                };
+                
+                return true;
+            }
+            
+            // 将函数暴露到全局，供控制台调试使用
+            window.forceDividendButtonsDisplay = forceDividendButtonsDisplay;
+            
+            /**
              * 显示分红管理按钮
              */
             function showDividendButtons(address) {
+                console.log('开始显示分红按钮，地址:', address);
+                
                 const tokenSymbol = ASSET_CONFIG.tokenSymbol || "{{ asset.token_symbol }}";
                 const dividendUrl = `/assets/${tokenSymbol}/dividend?eth_address=${address}`;
+                
+                console.log('分红页面URL:', dividendUrl);
+                console.log('资产符号:', tokenSymbol);
                 
                 const dividendBtns = [
                     document.getElementById('dividendManagementBtn'),         // 正常屏幕
@@ -710,13 +766,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('dividendManagementBtnMedium')    // 中等屏幕
                 ];
                 
+                console.log('找到的分红按钮:', dividendBtns.map(btn => btn ? btn.id : 'null'));
+                
+                let buttonUpdated = false;
                 dividendBtns.forEach(btn => {
                     if (btn) {
+                        console.log(`更新按钮 ${btn.id}:`, {
+                            '原显示状态': btn.style.display,
+                            '原链接': btn.href
+                        });
+                        
                         btn.style.display = btn.id === 'dividendManagementBtnMobile' ? 'block' : 'inline-flex';
                         btn.href = dividendUrl;
-                        console.log('已显示分红按钮:', btn.id);
+                        buttonUpdated = true;
+                        
+                        console.log(`按钮 ${btn.id} 已更新:`, {
+                            '新显示状态': btn.style.display,
+                            '新链接': btn.href
+                        });
+                    } else {
+                        console.warn('按钮未找到:', dividendBtns.indexOf(btn));
                     }
                 });
+                
+                if (buttonUpdated) {
+                    console.log('✅ 分红按钮显示完成');
+                } else {
+                    console.error('❌ 没有找到任何分红按钮');
+                }
             }
 
             // 翻页相关变量

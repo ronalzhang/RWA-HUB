@@ -1062,9 +1062,26 @@ const walletState = {
             // 检查是否在资产详情页，如果是则更新分红入口（仅管理员）
             const isDetailPage = document.querySelector('.asset-detail-page') !== null;
             if (isDetailPage && this.isAdmin) {
-                // 添加节流机制，避免频繁调用
+                // 检查是否有缓存的权限结果
+                const cachedResult = window._dividendPermissionCache || {};
                 const now = Date.now();
-                if (!this._lastDividendCheckTime || (now - this._lastDividendCheckTime > 5000)) { // 5秒节流
+                const hasCachedPermission = cachedResult.timestamp && 
+                    (now - cachedResult.timestamp < 30000) && 
+                    cachedResult.hasPermission === true &&
+                    cachedResult.address === this.address;
+                
+                if (hasCachedPermission) {
+                    console.log('检测到缓存的分红权限，直接显示按钮');
+                    if (typeof window.showDividendButtons === 'function') {
+                        window.showDividendButtons(this.address);
+                    } else {
+                        this.createOrShowDividendButtons();
+                    }
+                    return;
+                }
+                
+                // 添加节流机制，避免频繁调用
+                if (!this._lastDividendCheckTime || (now - this._lastDividendCheckTime > 3000)) { // 改为3秒节流
                     this._lastDividendCheckTime = now;
                     
                     if (typeof window.checkDividendManagementAccess === 'function') {
