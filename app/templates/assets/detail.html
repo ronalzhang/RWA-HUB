@@ -172,11 +172,44 @@ document.addEventListener('DOMContentLoaded', function() {
     <!-- 
     <script>
         // 初始化全局对象
+        function initSolanaLibs() {
+            // 确保solanaWeb3对象可用
+            if (typeof solanaWeb3 === 'undefined' && typeof SolanaWeb3 !== 'undefined') {
+                window.solanaWeb3 = SolanaWeb3;
+                console.log('已将SolanaWeb3设置到window.solanaWeb3');
+            }
+            
+            // 确保splToken对象可用
+            if (typeof splToken === 'undefined' && typeof SolanaToken !== 'undefined') {
+                window.splToken = SolanaToken;
+                console.log('已将SolanaToken设置到window.splToken');
+                
+                // 同时设置到solanaWeb3.SPL上
+                if (window.solanaWeb3 && !window.solanaWeb3.SPL) {
+                    window.solanaWeb3.SPL = SolanaToken;
+                }
+            }
+        }
+        
+        // 页面加载完成后执行初始化
+        document.addEventListener('DOMContentLoaded', initSolanaLibs);
         
         // 同时在window加载完成后再次检查
         window.addEventListener('load', initSolanaLibs);
     </script>
     -->
+    
+    <!-- 紧急全局修复 - 确保在交易前可获取必要对象 -->
+    <script>
+        // 删除重复的全局对象创建，因为已在上方处理
+        // 保留简单的备用检查
+        window.ensureSolanaBasicObjects = function() {
+            if (!window.solanaWeb3) {
+                window.solanaWeb3 = {};
+            }
+            if (!window.spl_token) {
+                window.spl_token = {};
+            }
             console.log('[ensureSolanaBasicObjects] 基本对象检查完成');
         };
     </script>
@@ -2189,7 +2222,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
             `;
-
             // 确保模态框HTML已添加到页面，仅添加一次
                 if (!document.getElementById('buyModal')) {
                     document.body.insertAdjacentHTML('beforeend', buyModalHtml);
@@ -2222,7 +2254,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 3000);
             }
 
+            // 显示错误信息
+            function showError(message) {
+                showMessage(message, 'danger');
             }
+
             // 获取钱包地址，优先从全局walletState获取
             function getWalletAddress() {
                 // 优先使用全局钱包状态
@@ -2239,6 +2275,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 return localStorage.getItem('walletAddress') || localStorage.getItem('eth_address') || '';
             }
 
+            // 辅助函数：缩短地址显示
+            function shortenAddress(address) {
+                if (!address) return '';
+                return address.substring(0, 6) + '...' + address.substring(address.length - 4);
+            }
 
             // 设置页面中的钱包相关元素
             
@@ -2247,6 +2288,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 // ... 其他代码保持不变
 
             // 获取Cookie
+            function getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
+            }
         
         // 分享资产功能
         function shareAsset() {
@@ -3541,168 +3588,8 @@ async function startDividend() {
     }
 }
 
-// 显示模态框
-function showModal(modalId) {
-    const modal = new bootstrap.Modal(document.getElementById(modalId));
-    modal.show();
-}
-
-// 连接钱包函数
-async function connectWallet() {
-    console.log('开始连接钱包...');
-    
-    // 检查是否已安装MetaMask
-    if (typeof window.ethereum === 'undefined') {
-        alert('请安装MetaMask或其他兼容的钱包插件');
-        throw new Error('未安装钱包插件');
-    }
-    
-    try {
-        // 请求账户授权
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        if (accounts.length === 0) {
-            throw new Error('用户拒绝连接钱包');
-        }
-        
-        console.log('钱包连接成功:', accounts[0]);
-        
-        // 更新全局状态 - 保持正确大小写
-        const walletAddress = accounts[0];
-        if (typeof window.walletState === 'undefined') {
-            window.walletState = {};
-        }
-        window.walletState.currentAccount = walletAddress;
-        
-        // 使用全局变量提升兼容性 - 保持正确大小写
-        window.walletPublicKey = { toString: () => walletAddress };
-        
-        // 设置cookie - 保持正确大小写
-        document.cookie = `eth_address=${walletAddress}; path=/; max-age=3600`;
-        
-        return walletAddress;
-    } catch (error) {
-        console.error('连接钱包失败:', error);
-        throw error;
-    }
-}
-</script>
-
-<script>
-        const buyButton = document.getElementById('buy-button');
-        if (buyButton) {
-            // 确保按钮文本正确初始化
-            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
-            
-            // 添加事件监听器
-            buyButton.addEventListener('click', localHandleBuy);
-            console.log('购买按钮成功绑定点击事件');
-            
-            // 防止按钮文本被意外修改 - 优化检测逻辑
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.type === 'childList' || mutation.type === 'characterData') {
-                        const currentHTML = buyButton.innerHTML.trim();
-                        const textContent = buyButton.textContent.trim();
-                        
-                        // 定义合法的按钮状态文本
-                        const validStates = [
-                            'Buy',
-                            '购买',
-                            'Connect Wallet',
-                            '请先连接钱包',
-                            '连接钱包',
-                            'Processing...',
-                            '处理中',
-                            '处理中...',
-                            'Loading...',
-                            '加载中',
-                            '加载中...',
-                            '准备中...',
-                            '连接中...',
-                            'Confirming...',
-                            '确认中...',
-                            'Please wait...',
-                            '请稍候...'
-                        ];
-                        
-                        // 检查是否是价格数字（这是错误的）
-                        const isPricePattern = /^\$?\d+(\.\d{2})?$/.test(textContent);
-                        
-                        // 检查是否包含合法状态文本
-                        const hasValidState = validStates.some(state => 
-                            textContent.includes(state) || currentHTML.includes(state)
-                        );
-                        
-                        // 检查是否包含图标（正常按钮应该有图标）
-                        const hasIcon = currentHTML.includes('fas fa-') || currentHTML.includes('<i ');
-                        
-                        // 只有在明确是价格数字时才恢复按钮文本
-                        if (isPricePattern && !hasValidState) {
-                            console.warn('检测到购买按钮文本被修改为价格:', textContent, '正在恢复...');
-                            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
-                        } else if (!hasValidState && !hasIcon && textContent.length > 0 && textContent !== 'Buy') {
-                            // 如果既没有合法状态文本，也没有图标，但有内容，可能是被错误修改了
-                            console.warn('检测到购买按钮可能被错误修改:', textContent, '正在恢复...');
-                            buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
-                        }
-                    }
-                });
-            });
-            
-            // 开始观察按钮文本变化
-            observer.observe(buyButton, {
-                childList: true,
-                subtree: true,
-                characterData: true
-            });
-        }
-    });
-</script>
-
-{% endblock %}
-    </div>
-</div>
-
-<!-- 添加在文件底部，确保bs58库已加载 -->
-<script>
-// 检查bs58库是否正确加载
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(function() {
-        if (typeof bs58 === 'undefined') {
-            console.warn('bs58库未加载，尝试手动加载');
-            
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/index.js';
-            script.onload = function() {
-                console.log('bs58库已手动加载成功');
-            };
-            script.onerror = function() {
-                console.error('bs58库加载失败');
-            };
-            document.head.appendChild(script);
-        } else {
-            console.log('bs58库已正确加载');
-        }
-    }, 1000);
-});
-</script>
-
-<!-- 添加Solana Web3.js -->
-<script src="{{ url_for('proxy.cached_vendor', filename='solana-web3-stable.js') }}"></script>
-<!-- 添加SPL Token库 -->
-<script src="{{ url_for('proxy.cached_vendor', filename='solana-spl-token.js') }}"></script>
-<script>
-    // 简化的SPL Token库检查 - 与头部初始化逻辑保持一致
-</script>
-
-        if (typeof loadUserAssets === 'function') {
-            console.log('使用全局loadUserAssets函数加载钱包资产');
-            loadUserAssets();
-        }
-    }
-
-    // 导出函数供其他模块使用
-    window.refreshWalletAssets = refreshWalletAssets;
+// 全局导出函数
+window.refreshWalletAssets = refreshWalletAssets;
 </script>
 
 {% endblock %}
