@@ -3623,6 +3623,32 @@ def get_share_messages():
             'error': '获取分享消息失败'
         }), 500
 
+@admin_v2_bp.route('/share-messages/<int:message_id>', methods=['GET'])
+@admin_required
+def get_share_message(message_id):
+    """获取单个分享消息详情"""
+    try:
+        from app.models.share_message import ShareMessage
+        
+        message = ShareMessage.query.get(message_id)
+        if not message:
+            return jsonify({
+                'success': False,
+                'error': '分享消息不存在'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'data': message.to_dict()
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取分享消息详情失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': '获取分享消息详情失败'
+        }), 500
+
 @admin_v2_bp.route('/share-messages', methods=['POST'])
 @admin_required
 def create_share_message():

@@ -183,8 +183,14 @@
 
     <!-- 分享消息列表 -->
     <div class="card">
-        <div class="card-header">
-            <h5 class="mb-0">分享消息列表</h5>
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-share-alt text-primary me-2"></i>
+                分享内容管理
+            </h5>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#messageModal" onclick="openCreateModal()">
+                <i class="fas fa-plus"></i> 新增分享文案
+            </button>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -204,6 +210,11 @@
                         <!-- 动态加载内容 -->
                     </tbody>
                 </table>
+                
+                <!-- 分页 -->
+                <div id="paginationContainer" class="d-flex justify-content-center mt-3">
+                    <!-- 分页组件将在这里动态生成 -->
+                </div>
             </div>
         </div>
     </div>
@@ -220,24 +231,25 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
             </div>
             <div class="modal-body">
-                <form id="createMessageForm">
+                <form id="messageForm">
                     <div class="mb-3">
-                        <label for="createMessageContent" class="form-label">消息内容 <span class="text-danger">*</span></label>
-                        <textarea class="form-control" id="createMessageContent" name="content" rows="4" 
-                                maxlength="500" placeholder="请输入分享消息内容，支持emoji表情"></textarea>
-                        <div class="form-text">
-                            <span id="createMessageCount">0</span>/500 字符
-                            <span class="ms-3 text-info">
-                                <i class="fas fa-lightbulb"></i> 
-                                建议使用吸引人的文案，包含收益信息和邀请语
-                            </span>
-                        </div>
+                        <label for="messageType" class="form-label">消息类型 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="messageType" name="message_type" required>
+                            <option value="share_content">分享内容消息</option>
+                            <option value="reward_plan">奖励计划文案</option>
+                        </select>
+                        <div class="form-text">选择消息的使用场景类型</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="messageContent" class="form-label">消息内容 <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="messageContent" name="content" rows="3" required 
+                            placeholder="请输入分享消息内容..."></textarea>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="createMessageWeight" class="form-label">权重</label>
-                                <select class="form-select" id="createMessageWeight" name="weight">
+                                <label for="messageWeight" class="form-label">权重</label>
+                                <select class="form-select" id="messageWeight" name="weight">
                                     <option value="1">1 - 低</option>
                                     <option value="2">2</option>
                                     <option value="3" selected>3 - 中</option>
@@ -249,8 +261,8 @@
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="createMessageStatus" class="form-label">状态</label>
-                                <select class="form-select" id="createMessageStatus" name="is_active">
+                                <label for="messageStatus" class="form-label">状态</label>
+                                <select class="form-select" id="messageStatus" name="is_active">
                                     <option value="true" selected>激活</option>
                                     <option value="false">禁用</option>
                                 </select>
@@ -283,6 +295,13 @@
             <div class="modal-body">
                 <form id="editMessageForm">
                     <input type="hidden" id="editMessageId" name="id">
+                    <div class="mb-3">
+                        <label for="editMessageType" class="form-label">消息类型</label>
+                        <select class="form-select" id="editMessageType" name="message_type">
+                            <option value="share_content">分享内容</option>
+                            <option value="reward_plan">奖励计划</option>
+                        </select>
+                    </div>
                     <div class="mb-3">
                         <label for="editMessageContent" class="form-label">消息内容 <span class="text-danger">*</span></label>
                         <textarea class="form-control" id="editMessageContent" name="content" rows="4" 
@@ -339,13 +358,13 @@ $(document).ready(function() {
     loadMessages();
     
     // 字符计数
-    $('#createMessageContent').on('input', function() {
+    $('#messageContent').on('input', function() {
         const count = $(this).val().length;
-        $('#createMessageCount').text(count);
+        $('#messageCount').text(count);
         if (count > 450) {
-            $('#createMessageCount').addClass('text-warning');
+            $('#messageCount').addClass('text-warning');
         } else {
-            $('#createMessageCount').removeClass('text-warning');
+            $('#messageCount').removeClass('text-warning');
         }
     });
     
@@ -386,7 +405,8 @@ function loadMessages(page = 1) {
     });
     
     if (typeFilter) params.append('type', typeFilter);
-    if (statusFilter) params.append('status', statusFilter);
+    if (statusFilter === 'active') params.append('status', 'true');
+    if (statusFilter === 'inactive') params.append('status', 'false');
     if (searchKeyword) params.append('search', searchKeyword);
     
     fetch(`/admin/api/v2/share-messages?${params.toString()}`)
@@ -397,12 +417,19 @@ function loadMessages(page = 1) {
                 updatePagination(data.data.pagination);
                 updateStats(data.data.stats);
             } else {
-                showError('加载分享消息失败: ' + data.error);
+                throw new Error(data.error || '获取分享消息失败');
             }
         })
         .catch(error => {
             console.error('加载分享消息失败:', error);
-            showError('加载分享消息失败');
+            document.getElementById('messagesTableBody').innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p class="mt-2 mb-0">加载失败: ${error.message}</p>
+                    </td>
+                </tr>
+            `;
         });
 }
 
@@ -466,24 +493,95 @@ function displayMessages(messages) {
     tbody.innerHTML = rows;
 }
 
-// 更新统计信息
-function updateStats(stats) {
-    document.getElementById('totalMessages').textContent = stats.total;
-    document.getElementById('activeMessages').textContent = stats.active;
-    document.getElementById('shareContentMessages').textContent = stats.share_content;
-    document.getElementById('rewardPlanMessages').textContent = stats.reward_plan;
+// 更新分页组件
+function updatePagination(pagination) {
+    const paginationContainer = document.getElementById('paginationContainer');
+    if (!paginationContainer) return;
+    
+    let paginationHtml = '';
+    
+    if (pagination.pages > 1) {
+        paginationHtml = '<nav><ul class="pagination justify-content-center">';
+        
+        // 上一页
+        if (pagination.has_prev) {
+            paginationHtml += `<li class="page-item">
+                <a class="page-link" href="javascript:void(0)" onclick="loadMessages(${pagination.page - 1})">上一页</a>
+            </li>`;
+        } else {
+            paginationHtml += '<li class="page-item disabled"><span class="page-link">上一页</span></li>';
+        }
+        
+        // 页码
+        const startPage = Math.max(1, pagination.page - 2);
+        const endPage = Math.min(pagination.pages, pagination.page + 2);
+        
+        if (startPage > 1) {
+            paginationHtml += '<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadMessages(1)">1</a></li>';
+            if (startPage > 2) {
+                paginationHtml += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+            }
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            if (i === pagination.page) {
+                paginationHtml += `<li class="page-item active"><span class="page-link">${i}</span></li>`;
+            } else {
+                paginationHtml += `<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadMessages(${i})">${i}</a></li>`;
+            }
+        }
+        
+        if (endPage < pagination.pages) {
+            if (endPage < pagination.pages - 1) {
+                paginationHtml += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+            }
+            paginationHtml += `<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadMessages(${pagination.pages})">${pagination.pages}</a></li>`;
+        }
+        
+        // 下一页
+        if (pagination.has_next) {
+            paginationHtml += `<li class="page-item">
+                <a class="page-link" href="javascript:void(0)" onclick="loadMessages(${pagination.page + 1})">下一页</a>
+            </li>`;
+        } else {
+            paginationHtml += '<li class="page-item disabled"><span class="page-link">下一页</span></li>';
+        }
+        
+        paginationHtml += '</ul></nav>';
+    }
+    
+    paginationContainer.innerHTML = paginationHtml;
 }
 
-// 创建或编辑消息
+// 更新统计信息
+function updateStats(stats) {
+    const totalElement = document.getElementById('totalMessages');
+    const activeElement = document.getElementById('activeMessages');
+    
+    if (totalElement) totalElement.textContent = stats.total;
+    if (activeElement) activeElement.textContent = stats.active;
+    
+    // 如果有分享内容和奖励计划的统计元素，则更新
+    const shareContentElement = document.getElementById('shareContentCount');
+    const rewardPlanElement = document.getElementById('rewardPlanCount');
+    
+    if (shareContentElement) shareContentElement.textContent = stats.share_content;
+    if (rewardPlanElement) rewardPlanElement.textContent = stats.reward_plan;
+}
+
+// 保存分享消息
 function saveMessage() {
-    const messageId = document.getElementById('messageId').value;
-    const content = document.getElementById('messageContent').value.trim();
-    const messageType = document.getElementById('messageType').value;
-    const weight = parseInt(document.getElementById('messageWeight').value) || 100;
-    const isActive = document.getElementById('messageActive').checked;
+    const form = document.getElementById('messageForm');
+    const formData = new FormData(form);
+    
+    const content = formData.get('content').trim();
+    const messageType = formData.get('message_type');
+    const weight = parseInt(formData.get('weight')) || 100;
+    const isActive = formData.get('is_active') === 'true';
+    const messageId = formData.get('id');
     
     if (!content) {
-        showError('消息内容不能为空');
+        showAlert('请输入消息内容', 'warning');
         return;
     }
     
@@ -494,29 +592,36 @@ function saveMessage() {
         is_active: isActive
     };
     
-    const url = messageId ? `/admin/api/v2/share-messages/${messageId}` : '/admin/api/v2/share-messages';
-    const method = messageId ? 'PUT' : 'POST';
+    // 判断是创建还是更新
+    const isUpdate = messageId && messageId.trim() !== '';
+    const url = isUpdate ? `/admin/api/v2/share-messages/${messageId}` : '/admin/api/v2/share-messages';
+    const method = isUpdate ? 'PUT' : 'POST';
     
     fetch(url, {
         method: method,
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
         },
         body: JSON.stringify(data)
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showSuccess(messageId ? '消息更新成功' : '消息创建成功');
-            closeMessageModal();
+            showAlert(data.message || (isUpdate ? '更新成功' : '创建成功'), 'success');
+            
+            // 关闭模态框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('messageModal'));
+            modal.hide();
+            
+            // 重新加载列表
             loadMessages();
         } else {
-            showError(data.error);
+            throw new Error(data.error || '操作失败');
         }
     })
     .catch(error => {
-        console.error('保存消息失败:', error);
-        showError('保存消息失败');
+        console.error('保存分享消息失败:', error);
+        showAlert('保存失败: ' + error.message, 'danger');
     });
 }
 
@@ -527,21 +632,38 @@ function editMessage(id) {
         .then(data => {
             if (data.success) {
                 const message = data.data;
-                document.getElementById('messageId').value = message.id;
+                
+                // 填充表单
                 document.getElementById('messageContent').value = message.content;
                 document.getElementById('messageType').value = message.message_type;
                 document.getElementById('messageWeight').value = message.weight;
-                document.getElementById('messageActive').checked = message.is_active;
+                document.getElementById('messageStatus').value = message.is_active ? 'true' : 'false';
                 
-                document.getElementById('createMessageModalLabel').textContent = '编辑分享消息';
-                new bootstrap.Modal(document.getElementById('createMessageModal')).show();
+                // 添加隐藏的ID字段
+                let messageIdField = document.getElementById('messageId');
+                if (!messageIdField) {
+                    messageIdField = document.createElement('input');
+                    messageIdField.type = 'hidden';
+                    messageIdField.id = 'messageId';
+                    messageIdField.name = 'id';
+                    document.getElementById('messageForm').appendChild(messageIdField);
+                }
+                messageIdField.value = id;
+                messageIdField.style.display = 'block';
+                
+                // 设置模态框标题
+                document.querySelector('#messageModal .modal-title').textContent = '编辑分享文案';
+                
+                // 显示模态框
+                const modal = new bootstrap.Modal(document.getElementById('messageModal'));
+                modal.show();
             } else {
-                showError('获取消息详情失败');
+                throw new Error(data.error || '获取消息详情失败');
             }
         })
         .catch(error => {
             console.error('获取消息详情失败:', error);
-            showError('获取消息详情失败');
+            showAlert('获取消息详情失败: ' + error.message, 'danger');
         });
 }
 
@@ -576,10 +698,20 @@ function filterMessages() {
 
 // 打开新建消息模态框
 function openCreateModal() {
+    // 重置表单
     document.getElementById('messageForm').reset();
-    document.getElementById('messageId').value = '';
-    document.getElementById('createMessageModalLabel').textContent = '添加分享消息';
-    new bootstrap.Modal(document.getElementById('createMessageModal')).show();
+    document.getElementById('messageType').value = 'share_content';
+    document.getElementById('messageWeight').value = '100';
+    document.getElementById('messageStatus').value = 'true';
+    
+    // 设置模态框标题
+    document.querySelector('#messageModal .modal-title').textContent = '新增分享文案';
+    
+    // 隐藏消息ID字段
+    const messageIdField = document.getElementById('messageId');
+    if (messageIdField) {
+        messageIdField.style.display = 'none';
+    }
 }
 
 // 关闭消息模态框
