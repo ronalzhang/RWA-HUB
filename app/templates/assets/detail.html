@@ -2256,70 +2256,147 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 分享资产功能
         function shareAsset() {
+            console.log('开始分享资产流程...');
+            
             // 检查用户是否已连接钱包 - 使用多种方法检查
             let address = null;
+            let checkMethods = [];
             
-            // 方法1: 检查window.walletState
+            // 方法1: 检查window.walletState (最可靠的方法)
             if (window.walletState && window.walletState.isConnected && window.walletState.address) {
                 address = window.walletState.address;
+                checkMethods.push('walletState');
             }
             
-            // 方法2: 检查全局变量
+            // 方法2: 检查localStorage (最常用的备选方案)
+            if (!address) {
+                const storedAddress = localStorage.getItem('walletAddress') || localStorage.getItem('connectedWallet') || localStorage.getItem('eth_address');
+                if (storedAddress && storedAddress.length > 10) {
+                    address = storedAddress;
+                    checkMethods.push('localStorage');
+                }
+            }
+            
+            // 方法3: 检查全局变量
             if (!address && window.currentWalletAddress) {
                 address = window.currentWalletAddress;
-            }
-            
-            // 方法3: 检查localStorage
-            if (!address) {
-                address = localStorage.getItem('walletAddress') || localStorage.getItem('connectedWallet');
+                checkMethods.push('globalVariable');
             }
             
             // 方法4: 检查cookie
             if (!address) {
-                address = getCookie('eth_address') || getCookie('wallet_address');
+                const cookieAddress = getCookie('eth_address') || getCookie('wallet_address');
+                if (cookieAddress && cookieAddress.length > 10) {
+                    address = cookieAddress;
+                    checkMethods.push('cookie');
+                }
             }
             
-            // 方法5: 检查页面中的用户地址
+            // 方法5: 检查页面中的用户地址函数
             if (!address && typeof getCurrentUserAddress === 'function') {
-                address = getCurrentUserAddress();
+                try {
+                    const userAddress = getCurrentUserAddress();
+                    if (userAddress && userAddress.length > 10) {
+                        address = userAddress;
+                        checkMethods.push('getCurrentUserAddress');
+                    }
+                } catch (error) {
+                    console.warn('调用getCurrentUserAddress函数失败:', error);
+                }
             }
+            
+            // 方法6: 检查钱包状态通过函数调用
+            if (!address && window.walletState && typeof window.walletState.getAddress === 'function') {
+                try {
+                    const funcAddress = window.walletState.getAddress();
+                    if (funcAddress && funcAddress.length > 10) {
+                        address = funcAddress;
+                        checkMethods.push('walletState.getAddress');
+                    }
+                } catch (error) {
+                    console.warn('调用walletState.getAddress函数失败:', error);
+                }
+            }
+            
+            console.log('钱包地址检查结果:', {
+                address: address ? `${address.substring(0,6)}...${address.substring(address.length-4)}` : 'none',
+                methods: checkMethods,
+                checkCount: checkMethods.length
+            });
             
             if (!address) {
-                alert('{{ _("Please connect your wallet first to generate your exclusive sharing link") }}');
-                // 调用全局钱包连接函数
-                if (typeof toggleWalletMenu === 'function') {
-                    toggleWalletMenu();
-                } else if (typeof connectWallet === 'function') {
-                    connectWallet();
+                console.warn('未检测到钱包连接');
+                
+                // 显示连接钱包提示
+                const confirmation = confirm('{{ _("Please connect your wallet first to generate your exclusive sharing link") }}\n\n点击确定连接钱包，点击取消继续查看');
+                
+                if (confirmation) {
+                    // 尝试调用多种钱包连接方法
+                    try {
+                        if (typeof window.openWalletSelector === 'function') {
+                            window.openWalletSelector();
+                            console.log('已调用openWalletSelector');
+                        } else if (typeof window.toggleWalletMenu === 'function') {
+                            window.toggleWalletMenu();
+                            console.log('已调用toggleWalletMenu');
+                        } else if (typeof connectWallet === 'function') {
+                            connectWallet();
+                            console.log('已调用connectWallet');
+                        } else {
+                            alert('钱包连接功能暂时不可用，请手动连接钱包后重试');
+                        }
+                    } catch (error) {
+                        console.error('调用钱包连接失败:', error);
+                        alert('钱包连接失败，请刷新页面后重试');
+                    }
                 }
                 return;
             }
             
+            console.log('钱包已连接，开始获取分享数据...');
+            
+            // 显示加载提示
+            const loadingToast = showLoadingToast('正在准备分享内容...');
+            
             // 同时获取分享文案、奖励计划文案和分享配置
-            Promise.all([
-                fetch('/api/share-messages/random?type=share_content'),
-                fetch('/api/share-reward-plan/random'),
-                fetch('/api/share-config')
-            ])
-            .then(([messageResponse, rewardPlanResponse, configResponse]) => Promise.all([
-                messageResponse.json().catch(error => ({
-                    success: true,
-                    message: "🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，透明度高、收益稳定。通过我的专属链接投资，我们都能获得长期收益！"
-                })),
-                rewardPlanResponse.json().catch(error => ({
-                    success: true,
-                    message: "一次分享，终身收益 - 无限下级20%分成"
-                })),
-                configResponse.json().catch(error => ({
-                    success: true,
-                    data: {
-                        commission_rate: 20,
-                        is_unlimited_levels: true,
-                        model_description: '无限层级分销，每级上贡20%'
-                    }
-                }))
-            ]))
+            const fetchPromises = [
+                fetchWithTimeout('/api/share-messages/random?type=share_content', 10000)
+                    .then(response => response.json())
+                    .catch(error => {
+                        console.warn('获取分享文案失败:', error);
+                        return {
+                            success: true,
+                            message: "🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，透明度高、收益稳定。通过我的专属链接投资，我们都能获得长期收益！"
+                        };
+                    }),
+                fetchWithTimeout('/api/share-reward-plan/random', 10000)
+                    .then(response => response.json())
+                    .catch(error => {
+                        console.warn('获取奖励计划失败:', error);
+                        return {
+                            success: true,
+                            message: "一次分享，终身收益 - 无限下级20%分成"
+                        };
+                    }),
+                fetchWithTimeout('/api/share-config', 10000)
+                    .then(response => response.json())
+                    .catch(error => {
+                        console.warn('获取分享配置失败:', error);
+                        return {
+                            success: true,
+                            data: {
+                                commission_rate: 20,
+                                is_unlimited_levels: true,
+                                model_description: '无限层级分销，每级上贡20%'
+                            }
+                        };
+                    })
+            ];
+            
+            Promise.all(fetchPromises)
             .then(([messageData, rewardPlanData, configData]) => {
+                hideLoadingToast(loadingToast);
+                
                 const shareMessage = messageData.message || "🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，透明度高、收益稳定。";
                 const rewardPlanMessage = rewardPlanData.message || "一次分享，终身收益 - 无限下级20%分成";
                 const shareConfig = configData.success ? configData.data : {
@@ -2328,12 +2405,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     model_description: '无限层级分销，每级上贡20%'
                 };
                 
+                console.log('分享数据获取成功，显示分享模态框');
+                
                 // 生成分享链接模态框
                 showShareModal(address, shareMessage, shareConfig, rewardPlanMessage);
             })
             .catch(error => {
+                hideLoadingToast(loadingToast);
                 console.error('获取分享数据失败:', error);
-                // 使用默认数据
+                
+                // 使用默认数据继续
+                console.log('使用默认分享数据');
                 const defaultMessage = "🚀 发现优质RWA资产！真实世界资产数字化投资新机遇，透明度高、收益稳定。";
                 const defaultRewardPlan = "一次分享，终身收益 - 无限下级20%分成";
                 const defaultConfig = {
@@ -2343,6 +2425,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
                 showShareModal(address, defaultMessage, defaultConfig, defaultRewardPlan);
             });
+        }
+        
+        // 带超时的fetch函数
+        async function fetchWithTimeout(url, timeout = 10000) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+            
+            try {
+                const response = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                return response;
+            } catch (error) {
+                clearTimeout(timeoutId);
+                throw error;
+            }
+        }
+        
+        // 显示加载提示
+        function showLoadingToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'position-fixed top-0 start-50 translate-middle-x mt-3 alert alert-info d-flex align-items-center';
+            toast.style.zIndex = '9999';
+            toast.innerHTML = `
+                <div class="spinner-border spinner-border-sm me-2" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                ${message}
+            `;
+            document.body.appendChild(toast);
+            return toast;
+        }
+        
+        // 隐藏加载提示
+        function hideLoadingToast(toast) {
+            if (toast && toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
         }
         
         // 显示分享模态框
@@ -2433,7 +2552,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         </label>
                                         <div class="input-group">
                                             <input type="text" class="form-control" id="shareLink" readonly>
-                                            <button class="btn btn-outline-primary" type="button" onclick="copyToClipboard('shareLink')">
+                                            <button class="btn btn-outline-primary" type="button" id="copyShareLinkBtn">
                                                 <i class="fas fa-copy"></i>
                                             </button>
                                         </div>
@@ -2444,19 +2563,24 @@ document.addEventListener('DOMContentLoaded', function() {
                                     
                                     <!-- 分享按钮组 -->
                                     <div class="d-flex gap-2">
-                                        <button class="btn btn-success flex-grow-1" onclick="copyToClipboard('shareLink')">
+                                        <button class="btn btn-success flex-grow-1" id="copyShareLinkBtn2">
                                             <i class="fas fa-copy me-2"></i>复制链接
                                         </button>
-                                        <button class="btn btn-primary flex-grow-1" onclick="shareViaWhatsApp()">
+                                        <button class="btn btn-primary flex-grow-1" id="shareWhatsAppBtn">
                                             <i class="fab fa-whatsapp me-2"></i>WhatsApp
                                         </button>
-                                        <button class="btn btn-info flex-grow-1" onclick="shareViaTwitter()">
+                                        <button class="btn btn-info flex-grow-1" id="shareTwitterBtn">
                                             <i class="fab fa-twitter me-2"></i>Twitter
                                         </button>
                                     </div>
                                 </div>
                                 
                                 <div id="shareError" class="alert alert-danger mt-3" style="display:none;">
+                                </div>
+                                
+                                <!-- 成功提示 -->
+                                <div id="shareSuccess" class="alert alert-success mt-3" style="display:none;">
+                                    <i class="fas fa-check-circle me-2"></i>链接已成功复制到剪贴板！
                                 </div>
                             </div>
                         </div>
@@ -2475,17 +2599,40 @@ document.addEventListener('DOMContentLoaded', function() {
             const modal = new bootstrap.Modal(document.getElementById('shareModal'));
             modal.show();
             
+            // 绑定事件监听器
+            setupShareModalEvents();
+            
             // 生成短链接
             generateShortLink(address);
+        }
+        
+        // 设置分享模态框事件监听器
+        function setupShareModalEvents() {
+            // 复制按钮事件
+            const copyBtn1 = document.getElementById('copyShareLinkBtn');
+            const copyBtn2 = document.getElementById('copyShareLinkBtn2');
+            const whatsappBtn = document.getElementById('shareWhatsAppBtn');
+            const twitterBtn = document.getElementById('shareTwitterBtn');
             
-            // 初始化tooltip
-            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-            tooltipTriggerList.map(function (tooltipTriggerEl) {
-                return new bootstrap.Tooltip(tooltipTriggerEl, {
-                    html: true,
-                    boundary: 'window'
+            if (copyBtn1) {
+                copyBtn1.addEventListener('click', function() {
+                    copyShareLink(this);
                 });
-            });
+            }
+            
+            if (copyBtn2) {
+                copyBtn2.addEventListener('click', function() {
+                    copyShareLink(this);
+                });
+            }
+            
+            if (whatsappBtn) {
+                whatsappBtn.addEventListener('click', shareViaWhatsApp);
+            }
+            
+            if (twitterBtn) {
+                twitterBtn.addEventListener('click', shareViaTwitter);
+            }
         }
         
         // 生成短链接
@@ -2494,10 +2641,15 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('shareLoading').style.display = 'block';
             document.getElementById('shareContent').style.display = 'none';
             document.getElementById('shareError').style.display = 'none';
+            document.getElementById('shareSuccess').style.display = 'none';
             
             // 构建带钱包地址的原始URL
             const currentUrl = window.location.origin + window.location.pathname;
             const originalUrl = `${currentUrl}?ref=${encodeURIComponent(address)}`;
+            
+            // 设置请求超时
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15秒超时
             
             // 调用短链接API
             fetch('/api/shortlink/create', {
@@ -2509,81 +2661,282 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     url: originalUrl,
                     expires_days: 365  // 链接一年后过期
-                })
+                }),
+                signal: controller.signal
             })
-            .then(response => response.json())
+            .then(response => {
+                clearTimeout(timeoutId);
+                if (!response.ok) {
+                    throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 // 隐藏加载状态
                 document.getElementById('shareLoading').style.display = 'none';
                 
                 if (data.success) {
                     // 设置分享链接并显示内容
-                    document.getElementById('shareLink').value = data.short_url;
+                    const shareLink = data.short_url || originalUrl; // fallback到原始URL
+                    document.getElementById('shareLink').value = shareLink;
                     document.getElementById('shareContent').style.display = 'block';
+                    
+                    console.log('分享链接生成成功:', shareLink);
                 } else {
-                    // 显示错误
-                    const errorElement = document.getElementById('shareError');
-                    errorElement.style.display = 'block';
-                    errorElement.textContent = data.error || '生成分享链接失败';
+                    throw new Error(data.error || '生成分享链接失败');
                 }
             })
             .catch(error => {
-                // 隐藏加载状态，显示错误
-                document.getElementById('shareLoading').style.display = 'none';
-                const errorElement = document.getElementById('shareError');
-                errorElement.style.display = 'block';
-                errorElement.textContent = '生成分享链接失败: ' + error.message;
+                clearTimeout(timeoutId);
+                console.error('生成分享链接失败:', error);
+                
+                // 使用原始URL作为fallback
+                if (error.name !== 'AbortError') {
+                    console.log('使用原始URL作为备选方案');
+                    const fallbackUrl = `${window.location.origin}${window.location.pathname}?ref=${encodeURIComponent(address)}`;
+                    document.getElementById('shareLink').value = fallbackUrl;
+                    document.getElementById('shareLoading').style.display = 'none';
+                    document.getElementById('shareContent').style.display = 'block';
+                    
+                    // 显示警告但不阻止用户使用
+                    const errorElement = document.getElementById('shareError');
+                    errorElement.style.display = 'block';
+                    errorElement.innerHTML = `
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>注意：</strong>短链接服务暂时不可用，已为您生成标准分享链接。功能不受影响。
+                    `;
+                } else {
+                    // 请求超时
+                    document.getElementById('shareLoading').style.display = 'none';
+                    const errorElement = document.getElementById('shareError');
+                    errorElement.style.display = 'block';
+                    errorElement.innerHTML = `
+                        <i class="fas fa-clock me-2"></i>
+                        <strong>请求超时：</strong>网络连接较慢，请稍后重试。
+                        <button class="btn btn-sm btn-outline-primary ms-2" onclick="generateShortLink('${address}')">重试</button>
+                    `;
+                }
             });
         }
         
-        // 复制到剪贴板 (修改以支持隐藏元素)
-        function copyToClipboard(elementId, buttonElement) {
+        // 改进的复制到剪贴板功能
+        async function copyShareLink(buttonElement) {
+            const shareLink = document.getElementById('shareLink').value;
+            const successElement = document.getElementById('shareSuccess');
+            const errorElement = document.getElementById('shareError');
+            
+            if (!shareLink) {
+                console.error('没有可复制的分享链接');
+                showShareError('没有可复制的分享链接');
+                return;
+            }
+            
+            try {
+                // 现代浏览器使用Clipboard API
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(shareLink);
+                    console.log('使用Clipboard API复制成功');
+                } else {
+                    // 旧浏览器fallback
+                    const textArea = document.createElement('textarea');
+                    textArea.value = shareLink;
+                    textArea.style.position = 'fixed';
+                    textArea.style.left = '-999999px';
+                    textArea.style.top = '-999999px';
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    
+                    if (!successful) {
+                        throw new Error('document.execCommand复制失败');
+                    }
+                    console.log('使用fallback方法复制成功');
+                }
+                
+                // 显示成功反馈
+                showShareSuccess();
+                updateButtonSuccess(buttonElement);
+                
+            } catch (error) {
+                console.error('复制失败:', error);
+                // 显示手动复制提示
+                showShareError('自动复制失败，请手动选择链接进行复制');
+                updateButtonError(buttonElement);
+                
+                // 自动选择输入框中的文本供用户手动复制
+                const linkInput = document.getElementById('shareLink');
+                if (linkInput) {
+                    linkInput.focus();
+                    linkInput.select();
+                }
+            }
+        }
+        
+        // 显示成功提示
+        function showShareSuccess() {
+            const successElement = document.getElementById('shareSuccess');
+            const errorElement = document.getElementById('shareError');
+            
+            if (errorElement) errorElement.style.display = 'none';
+            if (successElement) {
+                successElement.style.display = 'block';
+                // 3秒后自动隐藏
+                setTimeout(() => {
+                    successElement.style.display = 'none';
+                }, 3000);
+            }
+        }
+        
+        // 显示错误提示
+        function showShareError(message) {
+            const errorElement = document.getElementById('shareError');
+            const successElement = document.getElementById('shareSuccess');
+            
+            if (successElement) successElement.style.display = 'none';
+            if (errorElement) {
+                errorElement.innerHTML = `<i class="fas fa-exclamation-circle me-2"></i>${message}`;
+                errorElement.style.display = 'block';
+            }
+        }
+        
+        // 更新按钮成功状态
+        function updateButtonSuccess(buttonElement) {
+            if (!buttonElement) return;
+            
+            const originalHtml = buttonElement.innerHTML;
+            buttonElement.innerHTML = '<i class="fas fa-check text-success"></i>';
+            buttonElement.disabled = true;
+            
+            setTimeout(() => {
+                buttonElement.innerHTML = originalHtml;
+                buttonElement.disabled = false;
+            }, 2000);
+        }
+        
+        // 更新按钮错误状态
+        function updateButtonError(buttonElement) {
+            if (!buttonElement) return;
+            
+            const originalHtml = buttonElement.innerHTML;
+            buttonElement.innerHTML = '<i class="fas fa-times text-danger"></i>';
+            
+            setTimeout(() => {
+                buttonElement.innerHTML = originalHtml;
+            }, 2000);
+        }
+        
+        // 复制到剪贴板 (保留原有函数以兼容其他地方的调用)
+        async function copyToClipboard(elementId, buttonElement) {
             const copyTextElement = document.getElementById(elementId);
             let textToCopy = '';
             
+            if (!copyTextElement) {
+                console.error('找不到要复制的元素:', elementId);
+                return false;
+            }
+            
             if (copyTextElement.tagName === 'INPUT' || copyTextElement.tagName === 'TEXTAREA') {
                 textToCopy = copyTextElement.value;
-                copyTextElement.select(); // 选择输入框内容以便某些浏览器API工作
-                copyTextElement.setSelectionRange(0, 99999); 
             } else {
-                // 对于非输入元素（如span），直接获取其文本内容
                 textToCopy = copyTextElement.textContent || copyTextElement.innerText;
             }
 
             if (!textToCopy) {
                 console.error('无法获取要复制的文本');
-                return;
+                return false;
             }
 
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                // 显示成功提示
-                const originalHtml = buttonElement.innerHTML;
-                buttonElement.innerHTML = '<i class="fas fa-check text-success"></i>';
-            setTimeout(() => {
-                    buttonElement.innerHTML = originalHtml;
-            }, 2000);
-            }).catch(err => {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(textToCopy);
+                } else {
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = textToCopy;
+                    textArea.style.position = 'fixed';
+                    textArea.style.left = '-999999px';
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    if (!successful) throw new Error('Fallback copy failed');
+                }
+                
+                // 更新按钮状态
+                if (buttonElement) {
+                    updateButtonSuccess(buttonElement);
+                }
+                
+                return true;
+            } catch (err) {
                 console.error('复制失败:', err);
-                // 可以添加错误提示
-                const originalHtml = buttonElement.innerHTML;
-                buttonElement.innerHTML = '<i class="fas fa-times text-danger"></i>';
-                 setTimeout(() => {
-                    buttonElement.innerHTML = originalHtml;
-                }, 2000);
-            });
+                if (buttonElement) {
+                    updateButtonError(buttonElement);
+                }
+                return false;
+            }
         }
         
         // 分享到WhatsApp
         function shareViaWhatsApp() {
-            const shareText = `🚀 发现了一个优质的RWA资产！真实世界资产代币化，透明安全，快来看看: ${document.getElementById('shareLink').value}`;
-            window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+            try {
+                const shareLink = document.getElementById('shareLink');
+                if (!shareLink || !shareLink.value) {
+                    showShareError('分享链接还未生成，请稍后重试');
+                    return;
+                }
+                
+                const assetName = "{{ asset.name|e }}";
+                const shareText = `🚀 发现了一个优质的RWA资产！\n\n💎 ${assetName}\n\n真实世界资产代币化，透明安全，快来看看: ${shareLink.value}`;
+                
+                const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+                console.log('WhatsApp分享URL:', whatsappUrl);
+                
+                // 检测是否是移动设备
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                if (isMobile) {
+                    // 移动设备上直接打开
+                    window.location.href = whatsappUrl;
+                } else {
+                    // 桌面设备上在新窗口打开
+                    const newWindow = window.open(whatsappUrl, '_blank', 'width=600,height=400');
+                    if (!newWindow) {
+                        showShareError('弹窗被阻止，请允许弹窗后重试或手动复制链接分享');
+                    }
+                }
+            } catch (error) {
+                console.error('WhatsApp分享失败:', error);
+                showShareError('WhatsApp分享功能暂时不可用');
+            }
         }
         
         // 分享到Twitter
         function shareViaTwitter() {
-            const assetName = "{{ asset.name }}";
-            const shareText = `💎 投资新趋势：${assetName} - 真实世界资产代币化投资机会！区块链技术让传统资产投资更透明、更便捷 🌟`;
-            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(document.getElementById('shareLink').value)}`, '_blank');
+            try {
+                const shareLink = document.getElementById('shareLink');
+                if (!shareLink || !shareLink.value) {
+                    showShareError('分享链接还未生成，请稍后重试');
+                    return;
+                }
+                
+                const assetName = "{{ asset.name|e }}";
+                const shareText = `💎 投资新趋势：${assetName} - 真实世界资产代币化投资机会！区块链技术让传统资产投资更透明、更便捷 🌟`;
+                
+                const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareLink.value)}&hashtags=RWA,区块链投资,代币化`;
+                console.log('Twitter分享URL:', twitterUrl);
+                
+                const newWindow = window.open(twitterUrl, '_blank', 'width=600,height=400');
+                if (!newWindow) {
+                    showShareError('弹窗被阻止，请允许弹窗后重试或手动复制链接分享');
+                }
+            } catch (error) {
+                console.error('Twitter分享失败:', error);
+                showShareError('Twitter分享功能暂时不可用');
+            }
         }
     </script>
 
