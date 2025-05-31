@@ -752,6 +752,63 @@ document.addEventListener('DOMContentLoaded', function() {
             window.forceDividendButtonsDisplay = forceDividendButtonsDisplay;
             
             /**
+             * 调试函数：强制显示分红按钮
+             */
+            function debugForceShowDividend() {
+                console.log('🐛 调试：强制清除缓存并显示分红按钮');
+                
+                // 清除所有相关缓存
+                window.dividendPermissionCache = null;
+                if (window.walletState) {
+                    window.walletState._lastDividendCheckTime = 0;
+                }
+                
+                // 强制显示调试按钮
+                const debugBtn = document.getElementById('debugForceShowDividend');
+                if (debugBtn) {
+                    debugBtn.style.display = 'inline-block';
+                }
+                
+                // 执行强制显示
+                if (typeof window.forceDividendButtonsDisplay === 'function') {
+                    const result = window.forceDividendButtonsDisplay();
+                    console.log('强制显示结果:', result);
+                } else {
+                    console.warn('forceDividendButtonsDisplay函数不可用');
+                }
+                
+                // 如果钱包已连接，尝试重新检查权限
+                if (window.walletState && window.walletState.connected && window.walletState.isAdmin) {
+                    console.log('重新检查分红管理权限...');
+                    if (typeof window.checkDividendManagementAccess === 'function') {
+                        window.checkDividendManagementAccess();
+                    }
+                }
+            }
+            
+            // 暴露调试函数到全局
+            window.debugForceShowDividend = debugForceShowDividend;
+            
+            // 监听钱包状态变化，自动显示调试按钮
+            function checkAndShowDebugButton() {
+                const debugBtn = document.getElementById('debugForceShowDividend');
+                if (debugBtn && window.walletState && window.walletState.connected && window.walletState.isAdmin) {
+                    debugBtn.style.display = 'inline-block';
+                    console.log('管理员已连接，显示调试按钮');
+                }
+            }
+            
+            // 页面加载时检查
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(checkAndShowDebugButton, 1000);
+            });
+            
+            // 监听钱包连接事件
+            if (window.walletState) {
+                window.walletState.onStateChange(checkAndShowDebugButton);
+            }
+            
+            /**
              * 获取资产符号的通用函数
              */
             function getAssetTokenSymbol() {
@@ -3190,6 +3247,10 @@ document.addEventListener('DOMContentLoaded', function() {
             <a href="/assets/{{ asset.token_symbol }}/dividend{% if current_user_address %}?eth_address={{ current_user_address|urlencode }}{% endif %}" class="btn btn-outline-primary" id="dividendManagementBtn" data-token-symbol="{{ asset.token_symbol }}" style="display: none;">
                 <i class="fas fa-coins me-2"></i>{{ _('Dividend Management') }}
             </a>
+            <!-- 调试用：手动触发分红按钮显示 -->
+            <button class="btn btn-outline-secondary btn-sm" id="debugForceShowDividend" onclick="debugForceShowDividend()" style="display: none;" title="调试：强制显示分红按钮">
+                <i class="fas fa-bug me-1"></i>Debug
+            </button>
             {% endif %}
             <button class="btn btn-outline-success" id="shareAssetBtn" onclick="shareAsset()">
                 <i class="fas fa-share-alt me-2"></i>{{ _('Share') }}

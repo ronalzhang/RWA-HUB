@@ -1064,17 +1064,35 @@ const walletState = {
             if (isDetailPage && this.isAdmin) {
                 // 检查是否有缓存的分红权限结果
                 const cachedResult = window.dividendPermissionCache;
+                
+                console.log('检查分红权限缓存:', {
+                    hasCached: !!cachedResult,
+                    cachedPermission: cachedResult ? cachedResult.hasPermission : null,
+                    isAdmin: this.isAdmin,
+                    address: this.address
+                });
+                
+                // 特殊处理：如果管理员状态为true但缓存权限为false，清除缓存强制重新检查
+                if (this.isAdmin && cachedResult && cachedResult.hasPermission === false) {
+                    console.log('🔄 管理员状态为true但缓存权限为false，清除缓存强制重新检查');
+                    window.dividendPermissionCache = null;
+                    this._lastDividendCheckTime = 0; // 重置节流时间
+                    
+                    // 立即触发权限检查，不受节流限制
+                    if (typeof window.checkDividendManagementAccess === 'function') {
+                        console.log('强制重新检查分红管理权限');
+                        window.checkDividendManagementAccess();
+                    } else {
+                        console.log('checkDividendManagementAccess不可用，使用备用方案');
+                        this.createOrShowDividendButtons();
+                    }
+                    return; // 直接返回，避免后续节流检查
+                }
+                
                 const hasCachedPermission = cachedResult &&
                     (Date.now() - cachedResult.timestamp) < 30000 && // 30秒缓存
                     cachedResult.hasPermission === true &&
                     cachedResult.address === this.address;
-                
-                // 特殊处理：如果管理员状态为true但缓存权限为false，清除缓存强制重新检查
-                if (this.isAdmin && cachedResult && cachedResult.hasPermission === false) {
-                    console.log('管理员状态为true但缓存权限为false，清除缓存强制重新检查');
-                    window.dividendPermissionCache = null;
-                    this._lastDividendCheckTime = 0; // 重置节流时间
-                }
                 
                 if (hasCachedPermission) {
                     console.log('检测到缓存的分红权限，直接显示按钮');
