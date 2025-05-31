@@ -747,28 +747,91 @@ window.copyShareLink = async function() {
     console.log('复制分享链接被调用');
     
     const shareUrl = window.currentShareUrl || document.querySelector('#shareModal input[readonly]')?.value;
+    const copyButton = document.querySelector('#shareModal .btn-primary');
     
     if (!shareUrl) {
-        alert('分享链接不可用，请重试');
+        if (copyButton) {
+            const originalHtml = copyButton.innerHTML;
+            copyButton.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Error';
+            copyButton.classList.add('btn-danger');
+            copyButton.classList.remove('btn-primary');
+            setTimeout(() => {
+                copyButton.innerHTML = originalHtml;
+                copyButton.classList.remove('btn-danger');
+                copyButton.classList.add('btn-primary');
+            }, 2000);
+        }
         return;
     }
     
+    // 保存原始按钮内容
+    const originalHtml = copyButton ? copyButton.innerHTML : '';
+    
     try {
         await navigator.clipboard.writeText(shareUrl);
-        alert('🎉 分享链接已复制到剪贴板！');
+        
+        // 显示成功状态
+        if (copyButton) {
+            copyButton.innerHTML = '<i class="fas fa-check me-2"></i>Copied!';
+            copyButton.classList.add('btn-success');
+            copyButton.classList.remove('btn-primary');
+            copyButton.disabled = true;
+            
+            // 2秒后恢复原状
+            setTimeout(() => {
+                copyButton.innerHTML = originalHtml;
+                copyButton.classList.remove('btn-success');
+                copyButton.classList.add('btn-primary');
+                copyButton.disabled = false;
+            }, 2000);
+        }
+        
         console.log('分享链接复制成功:', shareUrl);
     } catch (error) {
         console.error('使用剪贴板API复制失败，尝试传统方法:', error);
+        
         // 降级到传统复制方法
         const input = document.querySelector('#shareModal input[readonly]');
         if (input) {
             input.select();
             input.setSelectionRange(0, 99999); // 对移动端兼容
-            document.execCommand('copy');
-            alert('🎉 分享链接已复制到剪贴板！');
-            console.log('分享链接复制成功（传统方法）:', shareUrl);
-        } else {
-            alert('复制失败，请手动复制链接');
+            const success = document.execCommand('copy');
+            
+            if (success && copyButton) {
+                copyButton.innerHTML = '<i class="fas fa-check me-2"></i>Copied!';
+                copyButton.classList.add('btn-success');
+                copyButton.classList.remove('btn-primary');
+                copyButton.disabled = true;
+                
+                setTimeout(() => {
+                    copyButton.innerHTML = originalHtml;
+                    copyButton.classList.remove('btn-success');
+                    copyButton.classList.add('btn-primary');
+                    copyButton.disabled = false;
+                }, 2000);
+                
+                console.log('分享链接复制成功（传统方法）:', shareUrl);
+            } else if (copyButton) {
+                copyButton.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Failed';
+                copyButton.classList.add('btn-danger');
+                copyButton.classList.remove('btn-primary');
+                
+                setTimeout(() => {
+                    copyButton.innerHTML = originalHtml;
+                    copyButton.classList.remove('btn-danger');
+                    copyButton.classList.add('btn-primary');
+                }, 2000);
+            }
+        } else if (copyButton) {
+            copyButton.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Failed';
+            copyButton.classList.add('btn-danger');
+            copyButton.classList.remove('btn-primary');
+            
+            setTimeout(() => {
+                copyButton.innerHTML = originalHtml;
+                copyButton.classList.remove('btn-danger');
+                copyButton.classList.add('btn-primary');
+            }, 2000);
         }
     }
 };
