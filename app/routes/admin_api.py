@@ -45,8 +45,8 @@ try:
 except ImportError:
     NACL_AVAILABLE = False
 
-# 创建蓝图
-admin_v2_bp = Blueprint('admin_v2', __name__, url_prefix='/api/admin/v2')
+# 管理员API蓝图 - 新认证系统
+admin_v2_bp = Blueprint('admin_v2', __name__, url_prefix='/admin/api/v2')
 
 # 为管理后台前端添加兼容路由
 admin_compat_routes_bp = Blueprint('admin_compat_routes', __name__, url_prefix='/admin/v2/api')
