@@ -1,0 +1,662 @@
+{% extends "base_v6.html" %}
+
+{% block title %}Home - RWA-HUB 6.0{% endblock %}
+
+{% block styles %}
+<style>
+    /* Hero Section Advanced Styling */
+    .hero-particles {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        z-index: -1;
+    }
+    
+    .particle {
+        position: absolute;
+        width: 4px;
+        height: 4px;
+        background: rgba(102, 126, 234, 0.3);
+        border-radius: 50%;
+        animation: float 6s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-20px) rotate(180deg); }
+    }
+    
+    .feature-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        background: var(--gradient-primary);
+        color: white;
+        font-size: 1.5rem;
+        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .feature-icon:hover {
+        transform: scale(1.1);
+        box-shadow: 0 12px 48px rgba(102, 126, 234, 0.5);
+    }
+    
+    .crypto-card {
+        background: var(--dark-glass);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: var(--border-glass);
+        border-radius: 16px;
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .crypto-card::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: conic-gradient(from 0deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+        animation: rotate 4s linear infinite;
+        z-index: -1;
+    }
+    
+    @keyframes rotate {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .crypto-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-glow);
+    }
+    
+    .price-change.positive {
+        color: #10b981;
+    }
+    
+    .price-change.negative {
+        color: #ef4444;
+    }
+    
+    .tech-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(168, 85, 247, 0.2));
+        border: 1px solid rgba(102, 126, 234, 0.3);
+        border-radius: 25px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin: 0.25rem;
+        transition: all 0.3s ease;
+    }
+    
+    .tech-badge:hover {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.3), rgba(168, 85, 247, 0.3));
+        transform: translateY(-2px);
+    }
+    
+    .ai-assistant {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 60px;
+        height: 60px;
+        background: var(--gradient-primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        z-index: 1000;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3); }
+        50% { box-shadow: 0 8px 32px rgba(102, 126, 234, 0.6); }
+        100% { box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3); }
+    }
+    
+    .ai-assistant:hover {
+        transform: scale(1.1);
+        box-shadow: 0 12px 48px rgba(102, 126, 234, 0.5);
+    }
+    
+    .blockchain-network {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0.5rem 0;
+        padding: 0.5rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .network-status {
+        width: 8px;
+        height: 8px;
+        background: #10b981;
+        border-radius: 50%;
+        animation: blink 2s infinite;
+    }
+    
+    @keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0.3; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-v6">
+    <div class="hero-particles" id="particles"></div>
+    <div class="container">
+        <div class="row align-items-center min-vh-100">
+            <div class="col-lg-6">
+                <div class="hero-content" data-aos="fade-up">
+                    <h1 class="hero-title">
+                        RWA-HUB 6.0<br>
+                        <span class="text-primary">Real World Asset Management</span>
+                    </h1>
+                    <p class="hero-subtitle">
+                        Professional RWA Asset Management Platform powered by AI and blockchain technology. 
+                        Experience cutting-edge dark glass morphism interface design with unparalleled asset management capabilities.
+                    </p>
+                    <div class="mb-4">
+                        <span class="tech-badge">AI-Powered</span>
+                        <span class="tech-badge">Multi-Chain</span>
+                        <span class="tech-badge">DeFi Integration</span>
+                        <span class="tech-badge">Zero-Knowledge</span>
+                        <span class="tech-badge">Web3 Native</span>
+                    </div>
+                    <div class="hero-buttons">
+                        {% if current_user.is_authenticated %}
+                            <a href="{{ url_for('main.dashboard') }}" class="btn btn-glass-primary btn-lg me-3">
+                                <i class="fas fa-tachometer-alt me-2"></i>Launch Dashboard
+                            </a>
+                        {% else %}
+                            <a href="{{ url_for('auth.register') }}" class="btn btn-glass-primary btn-lg me-3">
+                                <i class="fas fa-rocket me-2"></i>Start Trading
+                            </a>
+                        {% endif %}
+                        <a href="{{ url_for('main.about') }}" class="btn btn-glass-secondary btn-lg">
+                            <i class="fas fa-info-circle me-2"></i>Explore Features
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="hero-dashboard glass-container" data-aos="fade-left">
+                    <h5 class="text-center mb-4">Real-time Market Data</h5>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="crypto-card">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="crypto-info">
+                                        <h6 class="mb-0">BTC</h6>
+                                        <small class="text-muted">Bitcoin</small>
+                                    </div>
+                                    <div class="crypto-price text-end">
+                                        <div class="price">$65,432</div>
+                                        <div class="price-change positive">+2.45%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="crypto-card">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="crypto-info">
+                                        <h6 class="mb-0">ETH</h6>
+                                        <small class="text-muted">Ethereum</small>
+                                    </div>
+                                    <div class="crypto-price text-end">
+                                        <div class="price">$3,241</div>
+                                        <div class="price-change positive">+1.23%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="crypto-card">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="crypto-info">
+                                        <h6 class="mb-0">SOL</h6>
+                                        <small class="text-muted">Solana</small>
+                                    </div>
+                                    <div class="crypto-price text-end">
+                                        <div class="price">$185.67</div>
+                                        <div class="price-change negative">-0.87%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="crypto-card">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="crypto-info">
+                                        <h6 class="mb-0">USDT</h6>
+                                        <small class="text-muted">Tether</small>
+                                    </div>
+                                    <div class="crypto-price text-end">
+                                        <div class="price">$1.00</div>
+                                        <div class="price-change">0.00%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Blockchain Network Status -->
+                    <div class="mt-4">
+                        <h6 class="mb-3">Network Status</h6>
+                        <div class="blockchain-network">
+                            <div class="network-status"></div>
+                            <span class="small">Ethereum Mainnet</span>
+                            <span class="ms-auto small text-success">Active</span>
+                        </div>
+                        <div class="blockchain-network">
+                            <div class="network-status"></div>
+                            <span class="small">Polygon Network</span>
+                            <span class="ms-auto small text-success">Active</span>
+                        </div>
+                        <div class="blockchain-network">
+                            <div class="network-status"></div>
+                            <span class="small">Binance Smart Chain</span>
+                            <span class="ms-auto small text-success">Active</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Statistics Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-3 col-md-6">
+                <div class="stats-card" data-aos="fade-up" data-aos-delay="100">
+                    <span class="stats-number">{{ total_users or '50,000+' }}</span>
+                    <p class="stats-label">Active Users</p>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="stats-card" data-aos="fade-up" data-aos-delay="200">
+                    <span class="stats-number">{{ total_assets or '$2.5B+' }}</span>
+                    <p class="stats-label">Assets Under Management</p>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="stats-card" data-aos="fade-up" data-aos-delay="300">
+                    <span class="stats-number">{{ total_transactions or '10M+' }}</span>
+                    <p class="stats-label">Total Transactions</p>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="stats-card" data-aos="fade-up" data-aos-delay="400">
+                    <span class="stats-number">99.98%</span>
+                    <p class="stats-label">System Uptime</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8 text-center mb-5">
+                <h2 class="hero-title" data-aos="fade-up">Advanced Features</h2>
+                <p class="hero-subtitle" data-aos="fade-up" data-aos-delay="100">
+                    RWA-HUB 6.0 provides comprehensive digital asset management solutions powered by cutting-edge technology
+                </p>
+            </div>
+        </div>
+        <div class="row g-4">
+            <div class="col-lg-4 col-md-6">
+                <div class="card-v6 text-center" data-aos="fade-up" data-aos-delay="100">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h4 class="card-title">Smart Asset Management</h4>
+                    <p class="card-text">AI-powered portfolio optimization with real-time market analysis and intelligent risk assessment for maximum returns.</p>
+                </div>
+            </div>
+            <div class="col-lg-4 col-md-6">
+                <div class="card-v6 text-center" data-aos="fade-up" data-aos-delay="200">
+                    <div class="feature-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h4 class="card-title">Military-Grade Security</h4>
+                    <p class="card-text">Multi-layer security architecture with cold storage, multi-signature wallets, and advanced smart contract auditing.</p>
+                </div>
+            </div>
+            <div class="col-lg-4 col-md-6">
+                <div class="card-v6 text-center" data-aos="fade-up" data-aos-delay="300">
+                    <div class="feature-icon">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <h4 class="card-title">Lightning-Fast Execution</h4>
+                    <p class="card-text">Sub-millisecond trade execution with advanced algorithmic trading strategies and AI-assisted decision making.</p>
+                </div>
+            </div>
+            <div class="col-lg-4 col-md-6">
+                <div class="card-v6 text-center" data-aos="fade-up" data-aos-delay="400">
+                    <div class="feature-icon">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <h4 class="card-title">Cross-Platform Access</h4>
+                    <p class="card-text">Seamless experience across all devices with responsive design and native mobile applications for iOS and Android.</p>
+                </div>
+            </div>
+            <div class="col-lg-4 col-md-6">
+                <div class="card-v6 text-center" data-aos="fade-up" data-aos-delay="500">
+                    <div class="feature-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h4 class="card-title">Social Trading Network</h4>
+                    <p class="card-text">Follow top traders, share strategies, and build your investment community with advanced social features.</p>
+                </div>
+            </div>
+            <div class="col-lg-4 col-md-6">
+                <div class="card-v6 text-center" data-aos="fade-up" data-aos-delay="600">
+                    <div class="feature-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h4 class="card-title">AI Trading Assistant</h4>
+                    <p class="card-text">24/7 AI-powered market analysis with personalized investment recommendations and automated trading strategies.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Technology Stack Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10 text-center mb-5">
+                <h2 class="hero-title" data-aos="fade-up">Powered by Next-Gen Technology</h2>
+                <p class="hero-subtitle" data-aos="fade-up" data-aos-delay="100">
+                    Built on the most advanced blockchain and AI technologies
+                </p>
+            </div>
+        </div>
+        <div class="row g-4">
+            <div class="col-lg-3 col-md-6">
+                <div class="tech-stack-card" data-aos="zoom-in" data-aos-delay="100">
+                    <i class="fab fa-ethereum"></i>
+                    <h5>Ethereum</h5>
+                    <p>Smart Contracts & DeFi</p>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="tech-stack-card" data-aos="zoom-in" data-aos-delay="200">
+                    <i class="fas fa-brain"></i>
+                    <h5>AI/ML</h5>
+                    <p>Machine Learning</p>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="tech-stack-card" data-aos="zoom-in" data-aos-delay="300">
+                    <i class="fas fa-cube"></i>
+                    <h5>Polygon</h5>
+                    <p>Layer 2 Scaling</p>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="tech-stack-card" data-aos="zoom-in" data-aos-delay="400">
+                    <i class="fas fa-lock"></i>
+                    <h5>Zero-Knowledge</h5>
+                    <p>Privacy & Security</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card-v6 text-center" data-aos="fade-up">
+                    <h2 class="hero-title mb-4">Ready to Start Your Journey?</h2>
+                    <p class="hero-subtitle mb-4">
+                        Join RWA-HUB 6.0 and experience the future of digital asset management
+                    </p>
+                    {% if not current_user.is_authenticated %}
+                        <div class="d-flex justify-content-center gap-3">
+                            <a href="{{ url_for('auth.register') }}" class="btn btn-glass-primary btn-lg">
+                                <i class="fas fa-user-plus me-2"></i>Create Account
+                            </a>
+                            <a href="{{ url_for('auth.login') }}" class="btn btn-glass-secondary btn-lg">
+                                <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                            </a>
+                        </div>
+                    {% else %}
+                        <a href="{{ url_for('main.dashboard') }}" class="btn btn-glass-primary btn-lg">
+                            <i class="fas fa-tachometer-alt me-2"></i>Enter Dashboard
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- AI Assistant Button -->
+<div class="ai-assistant" onclick="toggleAiAssistant()">
+    <i class="fas fa-robot text-white"></i>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- AOS Animation -->
+<script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+<script>
+    // Initialize AOS
+    AOS.init({
+        duration: 1000,
+        once: true,
+        offset: 100
+    });
+    
+    // Particles animation
+    function createParticles() {
+        const container = document.getElementById('particles');
+        const particleCount = 80;
+        
+        for (let i = 0; i < particleCount; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.top = Math.random() * 100 + '%';
+            particle.style.animationDelay = Math.random() * 6 + 's';
+            particle.style.animationDuration = (Math.random() * 3 + 3) + 's';
+            
+            // Add different particle types
+            if (Math.random() > 0.7) {
+                particle.style.background = 'rgba(168, 85, 247, 0.4)';
+            } else if (Math.random() > 0.5) {
+                particle.style.background = 'rgba(59, 130, 246, 0.4)';
+            }
+            
+            container.appendChild(particle);
+        }
+    }
+    
+    // Real-time price updates with WebSocket simulation
+    function updatePrices() {
+        const cryptoData = [
+            { symbol: 'BTC', basePrice: 65432, volatility: 0.03 },
+            { symbol: 'ETH', basePrice: 3241, volatility: 0.04 },
+            { symbol: 'SOL', basePrice: 185.67, volatility: 0.05 },
+            { symbol: 'USDT', basePrice: 1.00, volatility: 0.001 }
+        ];
+        
+        cryptoData.forEach((crypto, index) => {
+            const priceElement = document.querySelectorAll('.crypto-price .price')[index];
+            const changeElement = document.querySelectorAll('.crypto-price .price-change')[index];
+            
+            if (priceElement && changeElement) {
+                const change = (Math.random() - 0.5) * crypto.volatility;
+                const newPrice = crypto.basePrice * (1 + change);
+                
+                priceElement.textContent = '$' + newPrice.toLocaleString('en-US', {
+                    minimumFractionDigits: crypto.symbol === 'USDT' ? 2 : 0,
+                    maximumFractionDigits: crypto.symbol === 'USDT' ? 4 : 2
+                });
+                
+                if (crypto.symbol !== 'USDT') {
+                    const changePercent = (change * 100).toFixed(2);
+                    changeElement.textContent = (change >= 0 ? '+' : '') + changePercent + '%';
+                    changeElement.className = 'price-change ' + (change >= 0 ? 'positive' : 'negative');
+                }
+            }
+        });
+    }
+    
+    // AI Assistant toggle
+    function toggleAiAssistant() {
+        // For now, just show an alert. In real implementation, this would open a chat interface
+        alert('AI Assistant: Hello! I\'m your RWA-HUB AI assistant. How can I help you today?');
+    }
+    
+    // Technology stack cards animation
+    function animateTechCards() {
+        const cards = document.querySelectorAll('.tech-stack-card');
+        cards.forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-10px) scale(1.05)';
+            });
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0) scale(1)';
+            });
+        });
+    }
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        createParticles();
+        animateTechCards();
+        
+        // Update prices every 3 seconds for more dynamic feel
+        setInterval(updatePrices, 3000);
+        
+        // Add typing animation to hero title
+        const heroTitle = document.querySelector('.hero-title');
+        if (heroTitle) {
+            heroTitle.style.borderRight = '3px solid rgba(102, 126, 234, 0.7)';
+            heroTitle.style.animation = 'typing 3s steps(40, end), blink-caret 0.75s step-end infinite';
+        }
+    });
+    
+    // Enhanced smooth scrolling
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+    
+    // Parallax effect for hero section
+    window.addEventListener('scroll', function() {
+        const scrolled = window.pageYOffset;
+        const heroSection = document.querySelector('.hero-v6');
+        if (heroSection) {
+            heroSection.style.transform = `translateY(${scrolled * 0.5}px)`;
+        }
+    });
+</script>
+
+<!-- AOS CSS -->
+<link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet">
+
+<!-- Additional styling for tech stack cards -->
+<style>
+    .tech-stack-card {
+        background: var(--dark-glass);
+        backdrop-filter: blur(20px);
+        border: var(--border-glass);
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .tech-stack-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+        transition: left 0.5s;
+    }
+    
+    .tech-stack-card:hover::before {
+        left: 100%;
+    }
+    
+    .tech-stack-card i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        background: var(--gradient-primary);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .tech-stack-card h5 {
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+    
+    .tech-stack-card p {
+        color: var(--text-secondary);
+        margin: 0;
+        font-size: 0.9rem;
+    }
+    
+    @keyframes typing {
+        from { width: 0; }
+        to { width: 100%; }
+    }
+    
+    @keyframes blink-caret {
+        from, to { border-color: transparent; }
+        50% { border-color: rgba(102, 126, 234, 0.7); }
+    }
+</style>
+{% endblock %} 
