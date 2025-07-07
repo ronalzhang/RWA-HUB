@@ -36,14 +36,14 @@
         window.RWA_HUB_CONFIG = {
             version: '6.0',
             theme: 'dark-glass',
-            locale: '{{ g.locale }}',
-            csrfToken: '{{ csrf_token() }}',
-            api: {
-                baseUrl: '{{ url_for("main.index") }}',
+            locale: 'en',
+            csrfToken: '',
+                            api: {
+                baseUrl: '/',
                 endpoints: {
-                    auth: '{{ url_for("auth.login") }}',
-                    assets: '{{ url_for("main.assets") }}',
-                    admin: '{{ url_for("admin_v2.dashboard") }}'
+                    auth: '/admin/login',
+                    assets: '/assets',
+                    admin: '/admin'
                 }
             }
         };
@@ -54,7 +54,7 @@
     <nav class="navbar navbar-expand-lg navbar-v6">
         <div class="container-fluid">
             <!-- Brand -->
-            <a class="navbar-brand" href="{{ url_for('main.index') }}">
+            <a class="navbar-brand" href="/">
                 <i class="fas fa-cube me-2"></i>
                 RWA-HUB <span class="text-muted">6.0</span>
             </a>
@@ -68,25 +68,25 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.index') }}">
+                        <a class="nav-link" href="/">
                             <i class="fas fa-home me-1"></i>
                             Home
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.assets') }}">
+                        <a class="nav-link" href="/assets">
                             <i class="fas fa-chart-line me-1"></i>
                             Assets
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.portfolio') }}">
+                        <a class="nav-link" href="/portfolio">
                             <i class="fas fa-briefcase me-1"></i>
                             Portfolio
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.market') }}">
+                        <a class="nav-link" href="/market">
                             <i class="fas fa-chart-bar me-1"></i>
                             Market
                         </a>
@@ -102,8 +102,8 @@
                             <span class="d-none d-md-inline">Language</span>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end glass-container">
-                            <li><a class="dropdown-item" href="{{ url_for('main.set_language', language='en') }}">English</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('main.set_language', language='zh') }}">繁體中文</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="setLanguage('en')">English</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="setLanguage('zh')">繁體中文</a></li>
                         </ul>
                     </li>
                     
@@ -122,33 +122,31 @@
                                 <span class="d-none d-md-inline">{{ current_user.username }}</span>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end glass-container">
-                                <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}">
+                                <li><a class="dropdown-item" href="/profile">
                                     <i class="fas fa-user-circle me-2"></i>Profile
                                 </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('auth.settings') }}">
+                                <li><a class="dropdown-item" href="/settings">
                                     <i class="fas fa-cog me-2"></i>Settings
                                 </a></li>
-                                {% if current_user.is_admin %}
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('admin_v2.dashboard') }}">
-                                        <i class="fas fa-shield-alt me-2"></i>Admin Panel
-                                    </a></li>
-                                {% endif %}
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">
+                                <li><a class="dropdown-item" href="/admin">
+                                    <i class="fas fa-shield-alt me-2"></i>Admin Panel
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="/logout">
                                     <i class="fas fa-sign-out-alt me-2"></i>Logout
                                 </a></li>
                             </ul>
                         </li>
                     {% else %}
                         <li class="nav-item">
-                            <a class="btn btn-glass-primary me-2" href="{{ url_for('auth.login') }}">
-                                <i class="fas fa-sign-in-alt me-1"></i>{{ _('登录') }}
+                            <a class="btn btn-glass-primary me-2" href="/admin/login">
+                                <i class="fas fa-sign-in-alt me-1"></i>Login
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="btn btn-glass-secondary" href="{{ url_for('auth.register') }}">
-                                <i class="fas fa-user-plus me-1"></i>{{ _('注册') }}
+                            <a class="btn btn-glass-secondary" href="/admin/register">
+                                <i class="fas fa-user-plus me-1"></i>Register
                             </a>
                         </li>
                     {% endif %}
@@ -183,18 +181,18 @@
             <div class="row">
                 <div class="col-md-6">
                     <h5 class="text-primary">RWA-HUB 6.0</h5>
-                    <p class="text-muted">{{ _('专业的RWA资产管理平台，助力您的数字资产增值') }}</p>
+                    <p class="text-muted">Professional RWA Asset Management Platform</p>
                 </div>
                 <div class="col-md-3">
-                    <h6>{{ _('快速链接') }}</h6>
+                    <h6>Quick Links</h6>
                     <ul class="list-unstyled">
-                        <li><a href="{{ url_for('main.about') }}" class="text-muted">{{ _('关于我们') }}</a></li>
-                        <li><a href="{{ url_for('main.help') }}" class="text-muted">{{ _('帮助中心') }}</a></li>
-                        <li><a href="{{ url_for('main.terms') }}" class="text-muted">{{ _('服务条款') }}</a></li>
+                        <li><a href="/about" class="text-muted">About Us</a></li>
+                        <li><a href="/help" class="text-muted">Help Center</a></li>
+                        <li><a href="/terms" class="text-muted">Terms of Service</a></li>
                     </ul>
                 </div>
                 <div class="col-md-3">
-                    <h6>{{ _('联系我们') }}</h6>
+                    <h6>Contact Us</h6>
                     <ul class="list-unstyled">
                         <li><i class="fas fa-envelope me-2"></i>support@rwa-hub.com</li>
                         <li><i class="fas fa-phone me-2"></i>+86 400-888-0000</li>
@@ -209,10 +207,10 @@
             <hr class="my-4">
             <div class="row">
                 <div class="col-md-6">
-                    <p class="text-muted mb-0">&copy; 2024 RWA-HUB. {{ _('版权所有') }}</p>
+                    <p class="text-muted mb-0">&copy; 2025 RWA-HUB. All Rights Reserved</p>
                 </div>
                 <div class="col-md-6 text-md-end">
-                    <p class="text-muted mb-0">{{ _('版本') }} 6.0 | {{ _('构建时间') }}: {{ moment().format('YYYY-MM-DD') }}</p>
+                    <p class="text-muted mb-0">Version 6.0 | Build: 2025-07-08</p>
                 </div>
             </div>
         </div>
@@ -223,9 +221,9 @@
         <div class="d-flex justify-content-center align-items-center h-100">
             <div class="glass-container p-4 text-center">
                 <div class="spinner-border text-primary mb-3" role="status">
-                    <span class="visually-hidden">{{ _('加载中...') }}</span>
+                    <span class="visually-hidden">Loading...</span>
                 </div>
-                <p class="text-muted mb-0">{{ _('加载中，请稍候...') }}</p>
+                <p class="text-muted mb-0">Loading, please wait...</p>
             </div>
         </div>
     </div>
@@ -268,6 +266,12 @@
         
         window.hideLoading = function() {
             document.getElementById('loading-overlay').classList.add('d-none');
+        };
+        
+        // Language switching function
+        window.setLanguage = function(lang) {
+            localStorage.setItem('language', lang);
+            location.reload();
         };
         
         // Auto-hide flash messages

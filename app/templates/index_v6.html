@@ -187,16 +187,10 @@
                         <span class="tech-badge">Web3 Native</span>
                     </div>
                     <div class="hero-buttons">
-                        {% if current_user.is_authenticated %}
-                            <a href="{{ url_for('main.dashboard') }}" class="btn btn-glass-primary btn-lg me-3">
-                                <i class="fas fa-tachometer-alt me-2"></i>Launch Dashboard
-                            </a>
-                        {% else %}
-                            <a href="{{ url_for('auth.register') }}" class="btn btn-glass-primary btn-lg me-3">
-                                <i class="fas fa-rocket me-2"></i>Start Trading
-                            </a>
-                        {% endif %}
-                        <a href="{{ url_for('main.about') }}" class="btn btn-glass-secondary btn-lg">
+                        <a href="/admin" class="btn btn-glass-primary btn-lg me-3">
+                            <i class="fas fa-rocket me-2"></i>Start Trading
+                        </a>
+                        <a href="/about" class="btn btn-glass-secondary btn-lg">
                             <i class="fas fa-info-circle me-2"></i>Explore Features
                         </a>
                     </div>
@@ -445,20 +439,14 @@
                     <p class="hero-subtitle mb-4">
                         Join RWA-HUB 6.0 and experience the future of digital asset management
                     </p>
-                    {% if not current_user.is_authenticated %}
-                        <div class="d-flex justify-content-center gap-3">
-                            <a href="{{ url_for('auth.register') }}" class="btn btn-glass-primary btn-lg">
-                                <i class="fas fa-user-plus me-2"></i>Create Account
-                            </a>
-                            <a href="{{ url_for('auth.login') }}" class="btn btn-glass-secondary btn-lg">
-                                <i class="fas fa-sign-in-alt me-2"></i>Sign In
-                            </a>
-                        </div>
-                    {% else %}
-                        <a href="{{ url_for('main.dashboard') }}" class="btn btn-glass-primary btn-lg">
-                            <i class="fas fa-tachometer-alt me-2"></i>Enter Dashboard
+                    <div class="d-flex justify-content-center gap-3">
+                        <a href="/admin/register" class="btn btn-glass-primary btn-lg">
+                            <i class="fas fa-user-plus me-2"></i>Create Account
                         </a>
-                    {% endif %}
+                        <a href="/admin/login" class="btn btn-glass-secondary btn-lg">
+                            <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
