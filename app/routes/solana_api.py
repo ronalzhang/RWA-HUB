@@ -27,19 +27,15 @@ solana_loggers = init_solana_logger()
 # 创建Blueprint
 solana_api = Blueprint('solana_api', __name__, url_prefix='/api/solana')
 
-# Solana RPC节点列表
+# Solana RPC节点列表 (优先使用测试可用的节点)
 RPC_NODES = [
-    # 官方节点
+    # 测试可用的公共节点
+    "https://solana.publicnode.com",
+    # 备用节点
     "https://api.mainnet-beta.solana.com",
-    # Project Serum节点 (CDN可能在中国访问更快)
-    "https://solana-api.projectserum.com",
-    # GenesysGo节点
-    "https://ssc-dao.genesysgo.net",
-    # Ankr节点
+    "https://solana-api.projectserum.com", 
     "https://rpc.ankr.com/solana",
-    # Alchemy演示节点
     "https://solana-mainnet.g.alchemy.com/v2/demo",
-    "https://solana-mainnet.g.alchemy.com/v2/VvBRX5GaJA5VC5M1F681uL-3ivk3wGt2",
     "https://mainnet.rpcpool.com"
 ]
 

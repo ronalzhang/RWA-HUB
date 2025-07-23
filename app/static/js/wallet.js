@@ -3,6 +3,13 @@
  * 支持多种钱包类型的连接、管理和状态同步
  */
 
+// 防止重复加载
+if (window.RWA_WALLET_LOADED) {
+    console.warn('Wallet script already loaded, skipping...');
+    return;
+}
+window.RWA_WALLET_LOADED = true;
+
 // 添加调试模式检查 - 只在开发环境或明确启用时输出详细日志
 const DEBUG_MODE = window.location.hostname === 'localhost' || 
                    window.location.hostname === '127.0.0.1' || 
