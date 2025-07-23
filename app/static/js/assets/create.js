@@ -1007,6 +1007,7 @@ async function checkAndConnectWallet() {
             // 尝试使用全局钱包选择器连接
             console.log('尝试连接钱包...');
             showLoadingState('正在连接钱包...');
+            updateProgress(10, '正在连接钱包...', 1);
             
             // 使用全局钱包选择器
             if (typeof window.walletState === 'object' && typeof window.walletState.openWalletSelector === 'function') {
@@ -1267,25 +1268,40 @@ function closePreview() {
     }
     }
 
-// 生成预览HTML内容
-    function generatePreviewHTML(data) {
-        return `
-        <!-- 预览内容 -->
-            <div class="row">
-                <div class="col-md-8">
+// 获取资产类型名称
+function getAssetTypeName(assetType) {
+    const types = {
+        '10': 'Real Estate',
+        '20': 'Mining/Energy',
+        '30': 'Infrastructure',
+        '40': 'Agriculture',
+        '50': 'Other'
+    };
+    return types[assetType] || 'Unknown';
+}
+
+// 生成预览HTML内容 - 与详情页保持一致的样式
+function generatePreviewHTML(data) {
+    const feeAmount = (parseFloat(data.total_value) * 0.035).toFixed(2);
+    
+    return `
+    <div class="asset-detail-page">
+        <div class="row">
+            <!-- 左侧内容 -->
+            <div class="col-lg-7">
                 <!-- 资产图片轮播 -->
                 <div id="previewCarousel" class="carousel slide mb-4" data-bs-ride="carousel">
                     <div class="carousel-inner">
                         ${data.images.length > 0 ? 
                             data.images.map((img, index) => `
                                 <div class="carousel-item ${index === 0 ? 'active' : ''}">
-                                    <img src="${img.url}" class="d-block w-100" alt="${window._("Asset Image")}">
+                                    <img src="${img.url}" class="d-block w-100" style="border-radius: 12px; height: 400px; object-fit: cover;" alt="Asset Image">
                                 </div>
                             `).join('') : 
                             `<div class="carousel-item active">
-                                <div class="d-block w-100 bg-light text-center py-5" style="height: 300px;">
+                                <div class="d-block w-100 bg-light text-center py-5" style="height: 400px; border-radius: 12px;">
                                     <i class="fas fa-image text-muted" style="font-size: 64px;"></i>
-                                    <p class="mt-3 text-muted">${window._("No images uploaded")}</p>
+                                    <p class="mt-3 text-muted">No images uploaded</p>
                                 </div>
                             </div>`
                         }
@@ -1293,107 +1309,104 @@ function closePreview() {
                     ${data.images.length > 1 ? `
                         <button class="carousel-control-prev" type="button" data-bs-target="#previewCarousel" data-bs-slide="prev">
                             <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                            <span class="visually-hidden">${window._("Previous")}</span>
                         </button>
                         <button class="carousel-control-next" type="button" data-bs-target="#previewCarousel" data-bs-slide="next">
                             <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                            <span class="visually-hidden">${window._("Next")}</span>
                         </button>
                     ` : ''}
                 </div>
-                
-                <!-- 缩略图导航 -->
-                ${data.images.length > 1 ? `
-                    <div class="d-flex gap-2 mb-4">
-                        ${data.images.map((img, index) => `
-                            <div class="thumbnail" style="width: 80px; height: 60px; cursor: pointer;" 
-                                onclick="$('#previewCarousel').carousel(${index})">
-                                <img src="${img.url}" class="img-fluid rounded" alt="${window._("Thumbnail")}">
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-                
-                <!-- 资产描述 -->
+
+                <!-- 资产基本信息 -->
                 <div class="card mb-4">
-                        <div class="card-body">
-                            <h5 class="card-title">${data.name}</h5>
-                            <p class="card-text">${data.description}</p>
-                        
-                        <div class="row mt-4">
-                                <div class="col-md-6">
-                                <h6 class="text-muted">${window._("Asset Details")}</h6>
-                                    <ul class="list-unstyled">
-                                    <li><strong>${window._("Type")}:</strong> ${data.asset_type === 10 ? window._("Real Estate") : window._("Similar Assets")}</li>
-                                    <li><strong>${window._("Location")}:</strong> ${data.location}</li>
-                                    ${data.asset_type === 10 ? `
-                                        <li><strong>${window._("Area")}:</strong> ${data.area} ${window._("sqm")}</li>
-                                    ` : ''}
-                                    <li><strong>${window._("Total Value")}:</strong> ${data.total_value} USDC</li>
-                                    </ul>
-                                </div>
+                    <div class="card-header">
+                        <h5 class="mb-0">Asset Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Asset Name:</strong> ${data.name}</p>
+                                <p><strong>Location:</strong> ${data.location || 'Not specified'}</p>
+                                <p><strong>Asset Type:</strong> ${getAssetTypeName(data.asset_type)}</p>
                             </div>
-                        
-                        <!-- 相关文档 -->
-                        <div class="mt-4">
-                            <h6 class="text-muted">${window._("Related Documents")}</h6>
-                            ${data.documents.length > 0 ? `
-                                <ul class="list-unstyled">
-                                    ${data.documents.map(doc => `
-                                        <li><i class="fas fa-file-alt me-2"></i>${doc.name}</li>
-                                    `).join('')}
-                                </ul>
-                            ` : `<p class="text-muted">${window._("No documents uploaded")}</p>`}
+                            <div class="col-md-6">
+                                <p><strong>Total Value:</strong> ${parseFloat(data.total_value).toLocaleString()} USDC</p>
+                                <p><strong>Token Supply:</strong> ${parseInt(data.token_supply).toLocaleString()}</p>
+                                <p><strong>Token Price:</strong> ${parseFloat(data.token_price).toFixed(4)} USDC</p>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <p><strong>Description:</strong></p>
+                            <p class="text-muted">${data.description || 'No description provided'}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 分红信息 -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Dividend Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Annual Revenue:</strong> ${parseFloat(data.annual_revenue || 0).toLocaleString()} USDC</p>
+                                <p><strong>Dividend Frequency:</strong> Quarterly</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Expected Yield:</strong> ${((parseFloat(data.annual_revenue || 0) / parseFloat(data.total_value)) * 100).toFixed(2)}%</p>
+                                <p><strong>First Dividend:</strong> After asset launch</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- 右侧交易信息 -->
-                <div class="col-md-4">
-                    <div class="card">
-                        <div class="card-body">
-                        <h5 class="card-title">${window._("Asset Trading")}</h5>
+
+            <!-- 右侧交易卡片 -->
+            <div class="col-lg-5">
+                <div class="card trade-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Asset Preview</h5>
+                    </div>
+                    <div class="card-body">
                         <div class="mb-4">
+                            <h4 class="mb-3 text-primary">RH-PREVIEW</h4>
                             <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">${window._("Total Supply")}</span>
-                                    <span>${data.token_supply} ${data.token_symbol}</span>
-                                </div>
+                                <span class="text-muted">Asset Name:</span>
+                                <span>${data.name}</span>
+                            </div>
                             <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">${window._("Token Price")}</span>
-                                    <span>${data.token_price} USDC</span>
-                                </div>
-                                <div class="d-flex justify-content-between">
-                                <span class="text-muted">${window._("Publishing Fee")}</span>
-                                <span>${data.publishing_fee}</span>
-                                </div>
+                                <span class="text-muted">Token Price:</span>
+                                <span class="fw-bold fs-5">${parseFloat(data.token_price).toFixed(4)} USDC</span>
                             </div>
-                        
-                        <!-- 购买表单（预览模式下禁用） -->
-                        <form class="mb-4">
-                            <div class="mb-3">
-                                <label class="form-label">${window._("Purchase Amount")}</label>
-                                <div class="input-group">
-                                    <input type="number" class="form-control" placeholder="${window._("Enter amount")}" disabled>
-                                    <span class="input-group-text">${window._("tokens")}</span>
-                                </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">Token Supply:</span>
+                                <span>${parseInt(data.token_supply).toLocaleString()}</span>
                             </div>
-                            <button type="button" class="btn btn-gradient-primary" data-page="create-asset" disabled>
-                                ${window._("Not available in preview mode")}
-                            </button>
-                        </form>
-                        
-                        <!-- 近期交易 -->
-                        <div>
-                            <h6 class="text-muted mb-3">${window._("Recent Transactions")}</h6>
-                            <p class="text-muted">${window._("No transaction records yet")}</p>
+                            <div class="d-flex justify-content-between mb-4">
+                                <span class="text-muted">Available:</span>
+                                <span>${parseInt(data.token_supply).toLocaleString()}</span>
+                            </div>
                         </div>
+
+                        <!-- 发布成本信息 -->
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">Publishing Cost</h6>
+                            <p class="mb-1"><strong>Platform Fee (3.5%):</strong> ${feeAmount} USDC</p>
+                            <p class="mb-0 small text-muted">This fee covers asset tokenization and blockchain deployment costs.</p>
+                        </div>
+
+                        <!-- 预览说明 -->
+                        <div class="alert alert-warning">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Preview Mode</strong><br>
+                            <small>This is how your asset will appear to investors after publishing. Review all information carefully before proceeding with payment.</small>
                         </div>
                     </div>
                 </div>
             </div>
-        `;
-    }
+        </div>
+    </div>`;
+}
 
 // 显示支付确认对话框
     function showPaymentConfirmation() {
@@ -1480,7 +1493,7 @@ async function processPayment() {
         try {
             console.log('开始处理支付...');
             showLoadingState('处理支付交易...');
-            updateProgress(20, '准备支付...');
+            updateProgress(20, '准备支付...', 2);
             
             // 检查并加载Solana Web3.js库
             if (typeof solanaWeb3 === 'undefined') {
@@ -1544,7 +1557,7 @@ async function processPayment() {
             }
             
             try {
-                updateProgress(50, '处理支付...');
+                updateProgress(50, '正在钱包中确认支付...', 2);
                 
                 console.log('开始处理支付交易，不预先检查余额...');
                 
@@ -1562,7 +1575,7 @@ async function processPayment() {
             }
             
                 console.log('支付成功，交易哈希:', result.txHash);
-                updateProgress(80, '支付成功，处理资产创建...');
+                updateProgress(80, '支付成功，正在创建资产...', 3);
             
                 // 处理资产创建
                 await handlePaymentSuccess(result.txHash, formData);
@@ -1659,7 +1672,7 @@ async function processAssetCreation(formData, txHash) {
         
         console.log('资产创建请求成功:', createResult);
        
-        updateProgress(100, '{{ _("Asset creation request submitted!") }}');
+        updateProgress(100, '{{ _("Asset creation request submitted!") }}', 4);
         
         // 显示成功消息并立即跳转
         hideLoadingState();
@@ -1838,9 +1851,16 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(fixButtonStyles, 500);
 });
 
+    // 支付过程状态跟踪
+    let isPaymentInProgress = false;
+
     // 显示加载状态
     function showLoadingState(message) {
         const loadingOverlay = document.getElementById('loadingOverlay');
+        isPaymentInProgress = true;
+        
+        // 添加页面关闭警告
+        window.addEventListener('beforeunload', handleBeforeUnload);
     
         if (loadingOverlay) {
             loadingOverlay.classList.remove('d-none');
@@ -1857,26 +1877,74 @@ document.addEventListener('DOMContentLoaded', function() {
     // 隐藏加载状态
     function hideLoadingState() {
         const loadingOverlay = document.getElementById('loadingOverlay');
+        isPaymentInProgress = false;
+        
+        // 移除页面关闭警告
+        window.removeEventListener('beforeunload', handleBeforeUnload);
     
         if (loadingOverlay) {
             loadingOverlay.classList.add('d-none');
         }
     }
-
-// 更新进度条
-    function updateProgress(percent, message) {
-        const progressBar = document.getElementById('progressBar');
-        const statusElement = document.getElementById('loadingStatus');
-        
-        if (progressBar) {
-            progressBar.style.width = `${percent}%`;
-            progressBar.setAttribute('aria-valuenow', percent);
-        }
-        
-        if (statusElement && message) {
-            statusElement.textContent = message;
+    
+    // 处理页面关闭前的警告
+    function handleBeforeUnload(event) {
+        if (isPaymentInProgress) {
+            const message = '正在处理支付交易，关闭页面可能导致交易失败。确定要离开吗？';
+            event.preventDefault();
+            event.returnValue = message;
+            return message;
         }
     }
+
+// 更新进度条和步骤指示器
+function updateProgress(percent, message, step = null) {
+    const progressBar = document.getElementById('progressBar');
+    const statusElement = document.getElementById('progressStatus');
+    const loadingText = document.querySelector('.loading-text');
+    
+    if (progressBar) {
+        progressBar.style.width = `${percent}%`;
+        progressBar.setAttribute('aria-valuenow', percent);
+    }
+    
+    if (statusElement && message) {
+        statusElement.textContent = message;
+    }
+    
+    if (loadingText && message) {
+        loadingText.textContent = message;
+    }
+    
+    // 更新步骤指示器
+    updateStepIndicator(step, percent);
+}
+
+// 更新步骤指示器
+function updateStepIndicator(currentStep, percent) {
+    const steps = ['step1', 'step2', 'step3', 'step4'];
+    
+    // 根据进度百分比自动确定步骤
+    if (currentStep === null) {
+        if (percent < 25) currentStep = 1;
+        else if (percent < 50) currentStep = 2;
+        else if (percent < 90) currentStep = 3;
+        else currentStep = 4;
+    }
+    
+    steps.forEach((stepId, index) => {
+        const stepElement = document.getElementById(stepId);
+        if (stepElement) {
+            stepElement.classList.remove('active', 'completed');
+            
+            if (index + 1 < currentStep) {
+                stepElement.classList.add('completed');
+            } else if (index + 1 === currentStep) {
+                stepElement.classList.add('active');
+            }
+        }
+    });
+}
 
 // 获取表单数据
 function getAssetFormData() {
@@ -1937,7 +2005,7 @@ function getAssetFormData() {
 // 处理支付成功的情况
 async function handlePaymentSuccess(txHash, formData) {
     try {
-        updateProgress(85, '支付已确认，正在创建资产...');
+        updateProgress(85, '支付已确认，正在创建资产...', 3);
         
         // 重新生成Token Symbol，避免重复使用
         const assetType = formData.asset_type || '20';

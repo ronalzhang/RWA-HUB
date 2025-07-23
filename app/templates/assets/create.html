@@ -584,32 +584,70 @@
     </div>
 </div>
 
-<!-- 加载覆盖层 -->
-<div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" style="background-color: rgba(0,0,0,0.5); z-index: 9999;">
+<!-- 优化的支付进度模态框 -->
+<div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" style="background-color: rgba(0,0,0,0.8); z-index: 9999;">
     <div class="d-flex justify-content-center align-items-center h-100">
-        <div class="bg-white p-4 rounded shadow">
-            <div class="d-flex align-items-center">
-                <div class="spinner-border text-primary me-3" role="status">
-                    <span class="visually-hidden">{{ _('Loading...') }}</span>
+        <div class="bg-white p-4 rounded shadow" style="width: 420px; max-width: 90vw;">
+            <!-- 标题和警告 -->
+            <div class="text-center mb-3">
+                <h5 class="mb-2" id="progressTitle">{{ _('Processing Asset Creation') }}</h5>
+                <div class="alert alert-warning py-2 mb-3" style="font-size: 0.9em;">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    {{ _('Please do not close this page during the transaction') }}
                 </div>
-                <span class="loading-text">{{ _('Processing...') }}</span>
+            </div>
+            
+            <!-- 进度条 -->
+            <div class="progress mb-3" style="height: 12px;">
+                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                     role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            
+            <!-- 状态信息 -->
+            <div class="text-center">
+                <div class="d-flex align-items-center justify-content-center mb-2">
+                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                        <span class="visually-hidden">{{ _('Loading...') }}</span>
+                    </div>
+                    <span class="loading-text fw-medium">{{ _('Processing...') }}</span>
+                </div>
+                <p id="progressStatus" class="text-muted small mb-0">{{ _('Please wait...') }}</p>
+            </div>
+            
+            <!-- 状态步骤指示器 -->
+            <div class="mt-3">
+                <div class="d-flex justify-content-between small text-muted" id="statusSteps">
+                    <span id="step1" class="step-item">{{ _('Connect Wallet') }}</span>
+                    <span id="step2" class="step-item">{{ _('Payment') }}</span>
+                    <span id="step3" class="step-item">{{ _('Create Asset') }}</span>
+                    <span id="step4" class="step-item">{{ _('Complete') }}</span>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- 进度显示 -->
-<div id="progressContainer" class="position-fixed top-0 start-0 w-100 h-100 d-none" style="background-color: rgba(0,0,0,0.5); z-index: 9999;">
-    <div class="d-flex justify-content-center align-items-center h-100">
-        <div class="bg-white p-4 rounded shadow" style="width: 300px;">
-            <h5 class="text-center mb-3" id="progressTitle">{{ _('Processing') }}</h5>
-            <div class="progress mb-3" style="height: 10px;">
-                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
-            </div>
-            <p id="progressStatus" class="text-center text-muted small mb-0">{{ _('Please wait...') }}</p>
-        </div>
-    </div>
-</div>
+<style>
+.step-item {
+    position: relative;
+    opacity: 0.5;
+    transition: all 0.3s ease;
+}
+.step-item.active {
+    opacity: 1;
+    color: #0d6efd !important;
+    font-weight: 500;
+}
+.step-item.completed {
+    opacity: 1;
+    color: #198754 !important;
+}
+.step-item.completed::after {
+    content: '✓';
+    margin-left: 4px;
+    color: #198754;
+}
+</style>
 
 <!-- 成功提示 -->
 <div id="successMessage" class="modal fade" tabindex="-1">
