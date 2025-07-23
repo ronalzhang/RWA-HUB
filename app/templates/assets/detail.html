@@ -190,7 +190,7 @@
                             </div>
                             <div class="d-flex justify-content-between mb-4">
                                 <span class="text-muted">Available:</span>
-                                <span>{{ remaining_supply }}</span>
+                                <span data-field="remaining_supply">{{ remaining_supply }}</span>
                             </div>
                         </div>
 
@@ -444,11 +444,87 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializePage() {
     console.log('开始初始化页面...');
     setupTradeForm();
+    loadRealTimeAssetData();
     loadTradeHistory();
     loadTotalDividends();
     checkDividendAccess();
     updateBuyButtonState();
+    
+    // 设置定期更新
+    setInterval(loadRealTimeAssetData, 30000); // 每30秒更新一次资产数据
+    setInterval(loadTradeHistory, 60000); // 每分钟更新一次交易历史
+    
     console.log('页面初始化完成');
+}
+
+// 加载实时资产数据
+async function loadRealTimeAssetData() {
+    try {
+        console.log(`开始加载实时资产数据，资产ID: ${window.ASSET_CONFIG.id}`);
+        
+        const response = await fetch(`/api/trades/asset/${window.ASSET_CONFIG.id}/data/realtime`, {
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('实时资产数据API返回:', data);
+        
+        if (data.success && data.asset) {
+            updateAssetDisplay(data.asset);
+        } else {
+            console.error('获取实时资产数据失败:', data.error);
+        }
+        
+    } catch (error) {
+        console.error('加载实时资产数据失败:', error);
+    }
+}
+
+// 更新资产显示
+function updateAssetDisplay(assetData) {
+    try {
+        // 更新剩余供应量
+        const remainingSupplyElements = document.querySelectorAll('[data-field="remaining_supply"]');
+        remainingSupplyElements.forEach(element => {
+            element.textContent = assetData.remaining_supply || assetData.token_supply;
+        });
+        
+        // 更新交易表单中的最大值
+        const purchaseAmountInput = document.getElementById('purchase-amount');
+        if (purchaseAmountInput) {
+            purchaseAmountInput.max = assetData.remaining_supply || assetData.token_supply;
+        }
+        
+        // 更新全局配置
+        window.ASSET_CONFIG.remainingSupply = assetData.remaining_supply || assetData.token_supply;
+        
+        // 更新统计信息（如果页面有显示的话）
+        if (assetData.total_trades !== undefined) {
+            const totalTradesElement = document.querySelector('[data-field="total_trades"]');
+            if (totalTradesElement) {
+                totalTradesElement.textContent = assetData.total_trades;
+            }
+        }
+        
+        if (assetData.total_volume !== undefined) {
+            const totalVolumeElement = document.querySelector('[data-field="total_volume"]');
+            if (totalVolumeElement) {
+                totalVolumeElement.textContent = `${parseFloat(assetData.total_volume).toFixed(2)} USDC`;
+            }
+        }
+        
+        console.log('资产显示数据已更新');
+        
+    } catch (error) {
+        console.error('更新资产显示失败:', error);
+    }
 }
 
 // 设置交易表单
@@ -535,7 +611,7 @@ function checkDividendAccess() {
     console.log('Dividend Button URL Updated:', correctUrl);
 }
 
-// 加载交易历史
+// 加载交易历史（使用实时数据API）
 async function loadTradeHistory(page = 1) {
     const container = document.getElementById('trade-history');
     if (!container) {
@@ -547,7 +623,8 @@ async function loadTradeHistory(page = 1) {
         console.log(`开始加载交易历史，页码: ${page}, 资产ID: ${window.ASSET_CONFIG.id}`);
         container.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p class="mt-2">Loading trading history...</p></div>';
         
-        const response = await fetch(`/api/trades?asset_id=${window.ASSET_CONFIG.id}&page=${page}&per_page=5`, {
+        // 使用新的实时数据API
+        const response = await fetch(`/api/trades/asset/${window.ASSET_CONFIG.id}/trades/history?page=${page}&per_page=5`, {
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
@@ -562,6 +639,10 @@ async function loadTradeHistory(page = 1) {
 
         const data = await response.json();
         console.log('交易历史API返回数据:', data);
+        
+        if (!data.success) {
+            throw new Error(data.error || '获取交易历史失败');
+        }
         
         if (!data.trades || data.trades.length === 0) {
             container.innerHTML = '<div class="text-center text-muted my-4">No Trade Records</div>';

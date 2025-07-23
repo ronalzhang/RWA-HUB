@@ -6,15 +6,22 @@ from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime
 import json
 import logging
+from decimal import Decimal
 from app.models import Asset, AssetStatus, Trade, TradeStatus
 from app.blockchain.asset_service import AssetService
 from app.extensions import db
+from app.services.payment_processor import PaymentProcessor
+from app.services.data_consistency_manager import DataConsistencyManager
 
 # 获取日志记录器
 logger = logging.getLogger(__name__)
 
 # 创建蓝图（在__init__.py中已定义，这里导入）
 from app.routes import trades_api_bp
+
+# 初始化服务
+payment_processor = PaymentProcessor()
+data_manager = DataConsistencyManager()
 
 @trades_api_bp.route('/payment/confirm', methods=['POST'])
 def confirm_asset_payment():
@@ -249,4 +256,195 @@ def trigger_payment_monitoring(asset_id):
         return jsonify({
             'success': False,
             'error': f"触发支付监控失败: {str(e)}"
-        }), 500 
+        }), 500
+
+@trades_api_bp.route('/asset/publish/payment', methods=['POST'])
+def process_asset_publication_payment():
+    """
+    处理资产发布支付（新优化版本）
+    """
+    try:
+        data = request.json
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '请求数据为空'
+            }), 400
+        
+        # 验证必要参数
+        asset_id = data.get('asset_id')
+        payer_address = data.get('payer_address')
+        payment_amount = data.get('payment_amount')
+        
+        if not all([asset_id, payer_address, payment_amount]):
+            return jsonify({
+                'success': False,
+                'error': '缺少必要参数: asset_id, payer_address, payment_amount'
+            }), 400
+        
+        # 处理支付
+        result = payment_processor.process_asset_publication_payment(
+            asset_id=asset_id,
+            payer_address=payer_address,
+            payment_amount=Decimal(str(payment_amount))
+        )
+        
+        if result.success:
+            return jsonify({
+                'success': True,
+                'message': '资产发布支付处理成功',
+                'transaction_hash': result.transaction_hash,
+                'amount': float(result.amount),
+                'platform_fee': float(result.platform_fee),
+                'payment_details': result.payment_details
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.error_message
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"处理资产发布支付失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"支付处理失败: {str(e)}"
+        }), 500
+
+@trades_api_bp.route('/asset/purchase/payment', methods=['POST'])
+def process_asset_purchase_payment():
+    """
+    处理资产购买支付（新优化版本）
+    """
+    try:
+        data = request.json
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '请求数据为空'
+            }), 400
+        
+        # 验证必要参数
+        trade_id = data.get('trade_id')
+        
+        if not trade_id:
+            return jsonify({
+                'success': False,
+                'error': '缺少交易ID'
+            }), 400
+        
+        # 处理购买支付
+        result = payment_processor.process_asset_purchase_payment(trade_id)
+        
+        if result.success:
+            # 更新资产数据
+            trade = Trade.query.get(trade_id)
+            if trade:
+                data_manager.update_asset_after_trade(trade_id)
+            
+            return jsonify({
+                'success': True,
+                'message': '资产购买支付处理成功',
+                'transaction_hash': result.transaction_hash,
+                'amount': float(result.amount),
+                'commission_breakdown': result.commission_breakdown,
+                'payment_details': result.payment_details
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.error_message
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"处理资产购买支付失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"购买支付处理失败: {str(e)}"
+        }), 500
+
+@trades_api_bp.route('/asset/<int:asset_id>/data/realtime', methods=['GET'])
+def get_realtime_asset_data(asset_id):
+    """
+    获取实时资产数据
+    """
+    try:
+        asset_data = data_manager.get_real_time_asset_data(asset_id)
+        
+        if asset_data:
+            return jsonify({
+                'success': True,
+                'asset': asset_data
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': '资产不存在或获取数据失败'
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"获取实时资产数据失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"获取数据失败: {str(e)}"
+        }), 500
+
+@trades_api_bp.route('/asset/<int:asset_id>/trades/history', methods=['GET'])
+def get_asset_trade_history(asset_id):
+    """
+    获取资产交易历史（实时数据）
+    """
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        result = data_manager.get_trade_history(asset_id, page, per_page)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        logger.error(f"获取交易历史失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"获取交易历史失败: {str(e)}"
+        }), 500
+
+@trades_api_bp.route('/asset/<int:asset_id>/sync', methods=['POST'])
+def sync_asset_blockchain_data(asset_id):
+    """
+    同步资产区块链数据
+    """
+    try:
+        result = data_manager.sync_blockchain_data(asset_id)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        logger.error(f"同步区块链数据失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"同步失败: {str(e)}"
+        }), 500
+
+@trades_api_bp.route('/asset/<int:asset_id>/validate', methods=['GET'])
+def validate_asset_data_consistency(asset_id):
+    """
+    验证资产数据一致性
+    """
+    try:
+        result = data_manager.validate_data_consistency(asset_id)
+        
+        return jsonify(result), 200
+            
+    except Exception as e:
+        logger.error(f"验证数据一致性失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"验证失败: {str(e)}"
+        }), 500

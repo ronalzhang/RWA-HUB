@@ -72,7 +72,7 @@ def register_blueprints(app):
     app.register_blueprint(ip_stats_bp)
     
     # 注册支付管理蓝图
-    app.register_blueprint(payment_management_bp)
+    app.register_blueprint(payment_management_bp, url_prefix='/admin')
     
     # 注册分红管理蓝图
     app.register_blueprint(dividend_bp)

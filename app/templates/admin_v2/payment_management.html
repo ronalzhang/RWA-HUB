@@ -602,5 +602,173 @@ function updateStats(stats) {
     $('#totalAmount').text((stats.total_amount || 0).toFixed(2) + ' USDC');
 }
 
+// 全选/取消全选
+function toggleSelectAll() {
+    const selectAllBtn = $('#selectAllBtn');
+    const checkboxes = $('.payment-checkbox:not(:disabled)');
+    const isSelectAll = selectAllBtn.text().includes('全选');
+    
+    if (isSelectAll) {
+        // 全选
+        checkboxes.prop('checked', true);
+        checkboxes.each(function() {
+            const paymentId = $(this).data('payment-id');
+            const amount = parseFloat($(this).data('amount'));
+            selectedPayments.add({id: paymentId, amount: amount});
+        });
+        selectAllBtn.html('<i class="fas fa-times mr-2"></i>取消全选');
+    } else {
+        // 取消全选
+        checkboxes.prop('checked', false);
+        selectedPayments.clear();
+        selectAllBtn.html('<i class="fas fa-check-square mr-2"></i>全选');
+    }
+    
+    updateSelectionUI();
+}
+
+// 清除选择
+function clearSelection() {
+    $('.payment-checkbox').prop('checked', false);
+    selectedPayments.clear();
+    $('#selectAllBtn').html('<i class="fas fa-check-square mr-2"></i>全选');
+    updateSelectionUI();
+}
+
+// 显示单个支付模态框
+function showSinglePaymentModal(paymentId) {
+    const payment = allPayments.find(p => p.id === paymentId);
+    if (!payment) {
+        toastr.error('找不到支付记录');
+        return;
+    }
+    
+    const detailsHtml = `
+        <div class="space-y-4">
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h6 class="font-semibold mb-2">支付信息</h6>
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div><span class="text-gray-500">标题:</span> ${payment.title}</div>
+                    <div><span class="text-gray-500">类型:</span> ${payment.payment_type}</div>
+                    <div><span class="text-gray-500">金额:</span> <span class="font-bold">${payment.amount} ${payment.token_symbol}</span></div>
+                    <div><span class="text-gray-500">优先级:</span> ${payment.priority}</div>
+                </div>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h6 class="font-semibold mb-2">收款信息</h6>
+                <div class="text-sm">
+                    <div class="mb-2"><span class="text-gray-500">地址:</span> <span class="font-mono">${payment.recipient_address}</span></div>
+                    <div><span class="text-gray-500">备注:</span> ${payment.description}</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    $('#paymentDetails').html(detailsHtml);
+    $('#paymentModal').removeClass('hidden').addClass('flex');
+    
+    // 设置确认按钮的支付ID
+    $('#confirmPaymentBtn').data('payment-id', paymentId);
+}
+
+// 显示批量支付模态框
+function showBatchPaymentModal() {
+    if (selectedPayments.size === 0) {
+        toastr.warning('请先选择要处理的支付');
+        return;
+    }
+    
+    const selectedArray = Array.from(selectedPayments);
+    const totalAmount = selectedArray.reduce((sum, item) => sum + item.amount, 0);
+    
+    const detailsHtml = `
+        <div class="space-y-4">
+            <div class="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                <h6 class="font-semibold text-yellow-800 mb-2">批量支付确认</h6>
+                <div class="text-sm text-yellow-700">
+                    <div>选中支付数量: <span class="font-bold">${selectedArray.length}</span></div>
+                    <div>总金额: <span class="font-bold">${totalAmount.toFixed(2)} USDC</span></div>
+                </div>
+            </div>
+            <div class="text-sm text-gray-600">
+                <p>确认要处理这些支付吗？此操作将会：</p>
+                <ul class="list-disc list-inside mt-2 space-y-1">
+                    <li>将选中的支付标记为"处理中"状态</li>
+                    <li>需要您在钱包中逐一确认每笔交易</li>
+                    <li>处理过程中请不要关闭页面</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    $('#paymentDetails').html(detailsHtml);
+    $('#paymentModal').removeClass('hidden').addClass('flex');
+    
+    // 设置为批量模式
+    $('#confirmPaymentBtn').data('batch-mode', true);
+}
+
+// 隐藏支付模态框
+function hidePaymentModal() {
+    $('#paymentModal').addClass('hidden').removeClass('flex');
+    $('#confirmPaymentBtn').removeData('payment-id').removeData('batch-mode');
+}
+
+// 处理支付
+async function processPayment() {
+    const isBatch = $('#confirmPaymentBtn').data('batch-mode');
+    
+    if (isBatch) {
+        await executeBatchPayment();
+    } else {
+        const paymentId = $('#confirmPaymentBtn').data('payment-id');
+        await processSinglePayment(paymentId);
+    }
+    
+    hidePaymentModal();
+}
+
+// 执行批量支付
+async function executeBatchPayment() {
+    if (!walletConnected) {
+        toastr.error('请先连接钱包');
+        return;
+    }
+    
+    const selectedArray = Array.from(selectedPayments);
+    toastr.info(`开始处理 ${selectedArray.length} 笔支付...`);
+    
+    for (let i = 0; i < selectedArray.length; i++) {
+        const payment = selectedArray[i];
+        try {
+            await processSinglePayment(payment.id);
+            toastr.success(`支付 ${i + 1}/${selectedArray.length} 处理成功`);
+        } catch (error) {
+            toastr.error(`支付 ${i + 1}/${selectedArray.length} 处理失败: ${error.message}`);
+        }
+    }
+    
+    clearSelection();
+    loadPayments();
+}
+
+// 加载更多支付
+function loadMorePayments() {
+    currentPage++;
+    loadPayments();
+}
+
+// 显示支付详情
+function showPaymentDetails(paymentId) {
+    const payment = allPayments.find(p => p.id === paymentId);
+    if (!payment) {
+        toastr.error('找不到支付记录');
+        return;
+    }
+    
+    // 这里可以显示更详细的支付信息
+    showSinglePaymentModal(paymentId);
+}
+
 </script>
 {% endblock %}
