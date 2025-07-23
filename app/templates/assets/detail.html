@@ -186,11 +186,11 @@
                             </div>
                             <div class="d-flex justify-content-between mb-2">
                                 <span class="text-muted">Token Supply:</span>
-                                <span>{{ asset.token_supply }}</span>
+                                <span>{{ "{:,}".format(asset.token_supply|int) }}</span>
                             </div>
                             <div class="d-flex justify-content-between mb-4">
                                 <span class="text-muted">Available:</span>
-                                <span data-field="remaining_supply">{{ remaining_supply }}</span>
+                                <span data-field="remaining_supply">{{ "{:,}".format(remaining_supply|int) }}</span>
                             </div>
                         </div>
 
@@ -493,7 +493,8 @@ function updateAssetDisplay(assetData) {
         // 更新剩余供应量
         const remainingSupplyElements = document.querySelectorAll('[data-field="remaining_supply"]');
         remainingSupplyElements.forEach(element => {
-            element.textContent = assetData.remaining_supply || assetData.token_supply;
+            const supply = parseInt(assetData.remaining_supply || assetData.token_supply);
+            element.textContent = supply.toLocaleString();
         });
         
         // 更新交易表单中的最大值
@@ -718,7 +719,7 @@ function createTradeRow(trade) {
     tr.innerHTML = `
         <td>${formattedDate}</td>
         <td><span class="${typeClass}">${typeText}</span></td>
-        <td>${trade.amount}</td>
+        <td>${parseInt(trade.amount).toLocaleString()}</td>
         <td>${parseFloat(total).toFixed(2)} USDC</td>
         <td><span class="${statusClass}">${statusText}</span></td>
         <td>${txHashDisplay}</td>

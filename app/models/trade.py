@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from app.extensions import db
 from sqlalchemy.orm import validates
 from sqlalchemy import event
@@ -35,7 +35,7 @@ class Trade(db.Model):
     trader_address = db.Column(db.String(64), nullable=False)  # 交易者钱包地址，支持Solana长度
     tx_hash = db.Column(db.String(100))  # 交易哈希，支持各种区块链
     status = db.Column(db.String(20), default=TradeStatus.PENDING.value)  # pending, completed, failed
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone(timedelta(hours=8))))
     gas_used = db.Column(db.Numeric, nullable=True)  # 交易使用的gas量
     is_self_trade = db.Column(db.Boolean, nullable=False, default=False)  # 是否是自交易(和自己交易)
     payment_details = db.Column(db.Text)  # 支付详情，JSON格式

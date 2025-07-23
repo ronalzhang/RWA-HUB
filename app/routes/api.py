@@ -950,6 +950,7 @@ def confirm_purchase():
             
         # 验证必要字段 - 兼容前端发送的purchase_id和trade_id
         trade_id = data.get('trade_id') or data.get('purchase_id')
+        signature = data.get('signature')  # 获取交易签名
         
         if not trade_id:
             return jsonify({
@@ -1041,6 +1042,7 @@ def confirm_purchase():
                 total=total,
                 trader_address=wallet_address,
                 status=TradeStatus.COMPLETED.value,  # 直接设为已完成
+                tx_hash=signature,  # 保存交易签名作为交易哈希
                 payment_details=json.dumps(payment_details)
             )
             
@@ -1070,6 +1072,7 @@ def confirm_purchase():
                     'price': price,
                     'total': total,
                     'status': new_trade.status,
+                    'tx_hash': signature,  # 包含交易哈希
                     'created_at': new_trade.created_at.isoformat()
                 }
             }
