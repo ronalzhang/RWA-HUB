@@ -62,6 +62,11 @@ class Asset(db.Model):
     blockchain_details = db.Column(db.Text)  # 区块链部署详情，JSON格式
     deployment_tx_hash = db.Column(db.String(100))  # 部署交易哈希
     
+    # 智能合约相关字段
+    contract_address = db.Column(db.String(64), nullable=True)  # 智能合约资产账户地址
+    vault_address = db.Column(db.String(64), nullable=True)  # 资产金库PDA地址
+    blockchain_data = db.Column(db.Text, nullable=True)  # 智能合约数据（JSON格式）
+    
     # 支付相关字段
     payment_tx_hash = db.Column(db.String(255), nullable=True)  # 支付交易哈希
     payment_details = db.Column(db.Text, nullable=True)  # 支付详情（JSON字符串）

@@ -54,6 +54,9 @@ from .admin.payment_management import payment_management_bp
 # 导入分红管理
 from .dividend import bp as dividend_bp
 
+# 导入区块链API
+from .blockchain_api import blockchain_bp
+
 # 注册蓝图到app
 def register_blueprints(app):
     """初始化所有路由"""
@@ -76,6 +79,9 @@ def register_blueprints(app):
     
     # 注册分红管理蓝图
     app.register_blueprint(dividend_bp)
+    
+    # 注册区块链API蓝图
+    app.register_blueprint(blockchain_bp)
     
     # 注册API蓝图
     app.register_blueprint(api_bp)

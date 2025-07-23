@@ -1025,6 +1025,39 @@ def create_asset_api():
             
             current_app.logger.info(f"资产创建API：成功创建资产 {new_asset.id}, {token_symbol}")
             
+            # 创建智能合约上链请求
+            try:
+                from app.blockchain.rwa_contract_service import rwa_contract_service
+                
+                contract_result = rwa_contract_service.create_asset_on_chain(
+                    creator_address=creator_address,
+                    asset_name=data.get('name', ''),
+                    asset_symbol=token_symbol,
+                    total_supply=int(data.get('token_supply', 0)),
+                    decimals=0,  # RWA代币通常不需要小数位
+                    price_per_token=float(data.get('token_price', 1.0))
+                )
+                
+                if contract_result['success']:
+                    # 保存智能合约相关信息
+                    new_asset.token_address = contract_result['mint_account']
+                    new_asset.contract_address = contract_result['asset_account']
+                    new_asset.vault_address = contract_result['vault_pda']
+                    new_asset.blockchain_data = json.dumps({
+                        'vault_bump': contract_result['vault_bump'],
+                        'transaction_data': contract_result['transaction_data'],
+                        'signers': contract_result['signers']
+                    })
+                    new_asset.status = 8  # 设置为等待智能合约部署状态
+                    
+                    db.session.commit()
+                    current_app.logger.info(f"资产 {new_asset.id} 智能合约数据已准备完成")
+                else:
+                    current_app.logger.error(f"资产 {new_asset.id} 智能合约准备失败: {contract_result.get('error')}")
+                    
+            except Exception as contract_error:
+                current_app.logger.error(f"资产 {new_asset.id} 智能合约处理异常: {str(contract_error)}", exc_info=True)
+            
             # 添加: 触发支付确认监控任务
             if new_asset.payment_tx_hash:
                 try:
@@ -1049,13 +1082,27 @@ def create_asset_api():
                     import traceback
                     current_app.logger.error(traceback.format_exc())
             
-            # 返回成功响应
-            return jsonify({
+            # 返回成功响应，包含智能合约部署信息
+            response_data = {
                 'success': True,
                 'message': '资产创建成功',
                 'id': new_asset.id,
-                'token_symbol': token_symbol
-            }), 201
+                'token_symbol': token_symbol,
+                'contract_ready': False  # 默认值
+            }
+            
+            # 如果智能合约数据准备成功，添加部署信息
+            if contract_result and contract_result.get('success'):
+                response_data['contract_ready'] = True
+                response_data['contract_deployment'] = {
+                    'asset_account': contract_result.get('asset_account'),
+                    'mint_account': contract_result.get('mint_account'),
+                    'vault_pda': contract_result.get('vault_pda'),
+                    'requires_deployment': True,
+                    'deployment_message': '资产智能合约已准备完成，请部署到链上以开始交易'
+                }
+                
+            return jsonify(response_data), 201
             
         except Exception as db_error:
             db.session.rollback()

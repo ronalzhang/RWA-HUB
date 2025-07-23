@@ -1678,14 +1678,42 @@ async function processAssetCreation(formData, txHash) {
         
         console.log('资产创建请求成功:', createResult);
        
-        updateProgress(100, '{{ _("Asset creation request submitted!") }}', 4);
+        updateProgress(90, '{{ _("Asset creation request submitted!") }}', 4);
         
-        // 显示成功消息并立即跳转
-        hideLoadingState();
-        showSuccess('{{ _("Asset creation request submitted successfully! Redirecting to asset page...") }}');
+        // 检查是否需要部署智能合约
+        if (createResult.contract_ready) {
+            console.log('资产智能合约已准备完成，需要部署到区块链');
+            updateProgress(95, '准备部署智能合约到区块链...', 4);
+            
+            // 询问用户是否立即部署智能合约
+            const shouldDeploy = await showDeploymentConfirmDialog();
+            if (shouldDeploy) {
+                try {
+                    await deployAssetContract(createResult);
+                    updateProgress(100, '智能合约部署成功！', 4);
+                    hideLoadingState();
+                    showSuccess('{{ _("Asset creation and smart contract deployment completed! Redirecting to asset page...") }}');
+                } catch (deployError) {
+                    console.error('智能合约部署失败:', deployError);
+                    updateProgress(100, '资产创建成功，但智能合约部署失败', 4);
+                    hideLoadingState();
+                    showWarning('资产创建成功，但智能合约部署失败。您可以稍后在资产详情页面重新部署。');
+                }
+            } else {
+                updateProgress(100, '资产创建成功，智能合约稍后部署', 4);
+                hideLoadingState();
+                showSuccess('{{ _("Asset creation request submitted successfully! You can deploy the smart contract later from the asset page.") }}');
+            }
+        } else {
+            updateProgress(100, '{{ _("Asset creation request submitted!") }}', 4);
+            hideLoadingState();
+            showSuccess('{{ _("Asset creation request submitted successfully! Redirecting to asset page...") }}');
+        }
         
-        // 立即跳转到资产详情页
-        window.location.href = `/assets/${createResult.token_symbol}`;
+        // 延迟跳转到资产详情页，给用户时间看到消息
+        setTimeout(() => {
+            window.location.href = `/assets/${createResult.token_symbol}`;
+        }, 2000);
         
         return createResult;
     } catch (error) {
@@ -1694,6 +1722,128 @@ async function processAssetCreation(formData, txHash) {
         showError(error.message || '{{ _("Processing error, please try again.") }}');
         disablePublishButtons(false);
         throw error; // 重新抛出错误以便调用者处理
+    }
+}
+
+/**
+ * 显示智能合约部署确认对话框
+ */
+async function showDeploymentConfirmDialog() {
+    return new Promise((resolve) => {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: '部署智能合约',
+                text: '您的资产已创建成功！是否立即部署智能合约到区块链？这将启用真正的链上交易功能。',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '立即部署',
+                cancelButtonText: '稍后部署',
+                confirmButtonColor: '#007bff',
+                cancelButtonColor: '#6c757d'
+            }).then((result) => {
+                resolve(result.isConfirmed);
+            });
+        } else {
+            const deploy = confirm('您的资产已创建成功！是否立即部署智能合约到区块链？');
+            resolve(deploy);
+        }
+    });
+}
+
+/**
+ * 部署资产智能合约
+ */
+async function deployAssetContract(createResult) {
+    try {
+        console.log('开始部署智能合约:', createResult);
+        
+        if (!createResult.contract_deployment) {
+            throw new Error('缺少智能合约部署信息');
+        }
+        
+        // 检查钱包连接
+        if (!window.walletState || !window.walletState.connected) {
+            throw new Error('钱包未连接，无法部署智能合约');
+        }
+        
+        const walletAddress = window.walletState.getAddress();
+        if (!walletAddress) {
+            throw new Error('无法获取钱包地址');
+        }
+        
+        // 获取智能合约交易数据
+        const deploymentData = {
+            asset_id: createResult.id,
+            wallet_address: walletAddress
+        };
+        
+        console.log('请求智能合约部署数据:', deploymentData);
+        
+        // 请求智能合约部署交易
+        const response = await fetch('/api/blockchain/deploy_asset', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Wallet-Address': walletAddress
+            },
+            body: JSON.stringify(deploymentData)
+        });
+        
+        const deployData = await response.json();
+        
+        if (!response.ok || !deployData.success) {
+            throw new Error(deployData.error || '准备智能合约部署失败');
+        }
+        
+        console.log('智能合约部署数据准备完成，等待用户签名');
+        
+        // 检查Solana钱包API
+        if (!window.solana || !window.solana.signAndSendTransaction) {
+            throw new Error('Solana钱包API不可用');
+        }
+        
+        // 解码并签名智能合约部署交易
+        const transactionBuffer = Uint8Array.from(atob(deployData.transaction_data), c => c.charCodeAt(0));
+        const transaction = solanaWeb3.Transaction.from(transactionBuffer);
+        
+        // 请求钱包签名并发送交易
+        const result = await window.solana.signAndSendTransaction(transaction);
+        
+        if (!result.signature) {
+            throw new Error('智能合约部署交易失败：无签名返回');
+        }
+        
+        console.log('智能合约部署交易成功，签名:', result.signature);
+        
+        // 等待交易确认（可选）
+        // 这里可以添加交易确认逻辑
+        
+        return {
+            success: true,
+            signature: result.signature,
+            message: '智能合约部署成功'
+        };
+        
+    } catch (error) {
+        console.error('智能合约部署失败:', error);
+        throw error;
+    }
+}
+
+/**
+ * 显示警告消息
+ */
+function showWarning(message) {
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            title: '注意',
+            text: message,
+            icon: 'warning',
+            confirmButtonText: '确定',
+            confirmButtonColor: '#ffc107'
+        });
+    } else {
+        alert(message);
     }
 }
 

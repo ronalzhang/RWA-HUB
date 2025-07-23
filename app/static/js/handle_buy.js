@@ -140,9 +140,9 @@ function handleBuy(assetId, amountInput, buyButton) {
   // 显示加载状态
   showLoadingState('正在准备购买...');
   
-  // 发送准备购买请求
-  console.log('发送准备购买请求:', purchaseData);
-  fetch('/api/trades/prepare_purchase', {
+  // 发送智能合约购买准备请求
+  console.log('发送智能合约购买准备请求:', purchaseData);
+  fetch('/api/blockchain/prepare_purchase', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -158,58 +158,58 @@ function handleBuy(assetId, amountInput, buyButton) {
     return response.json();
   })
   .then(data => {
-    console.log('准备购买响应:', data);
+    console.log('智能合约购买准备响应:', data);
     
-    if (data.error) {
-      throw new Error(data.error);
+    if (!data.success) {
+      throw new Error(data.error || '准备智能合约交易失败');
     }
     
-    // 获取接收地址和金额
-    const recipientAddress = data.recipient_address || data.platform_address;
-    const totalAmount = parseFloat(data.total_amount || data.amount);
+    // 获取智能合约交易数据
+    const transactionData = data.transaction_data;
+    const totalPrice = data.total_price;
     
-    if (!recipientAddress || isNaN(totalAmount) || totalAmount <= 0) {
-      throw new Error('服务器返回的支付信息不完整');
+    if (!transactionData) {
+      throw new Error('服务器返回的智能合约交易数据不完整');
     }
     
     // 更新加载状态
-    showLoadingState('请在钱包中确认交易...');
+    showLoadingState('请在钱包中确认智能合约交易...');
     
-    // 检查钱包API是否可用
-    if (!window.walletState || typeof window.walletState.transferSolanaToken !== 'function') {
-      throw new Error('钱包API不可用，无法完成支付');
+    // 检查Solana钱包API是否可用
+    if (!window.solana || !window.solana.signAndSendTransaction) {
+      throw new Error('Solana钱包API不可用，无法完成智能合约交易');
     }
     
-    // 跟踪交易详情
-    purchaseData.recipient_address = recipientAddress;
-    purchaseData.total_amount = totalAmount;
-    purchaseData.purchase_id = data.purchase_id || data.id;
+    // 准备智能合约交易
+    console.log(`执行智能合约资产购买: ${amount}个代币，总价: ${totalPrice} USDC`);
     
-    // 执行支付
-    console.log(`使用钱包API执行USDC转账: ${totalAmount} USDC 到 ${recipientAddress}`);
-    return window.walletState.transferSolanaToken('USDC', recipientAddress, totalAmount)
+    // 解码交易数据
+    const transactionBuffer = Uint8Array.from(atob(transactionData), c => c.charCodeAt(0));
+    const transaction = solanaWeb3.Transaction.from(transactionBuffer);
+    
+    // 使用钱包签名并发送交易
+    return window.solana.signAndSendTransaction(transaction)
       .then(paymentResult => {
-        if (!paymentResult.success) {
-          throw new Error(paymentResult.error || '钱包转账失败');
+        if (!paymentResult.signature) {
+          throw new Error('智能合约交易失败：无签名返回');
         }
         
-        console.log('支付成功，交易哈希:', paymentResult.txHash);
+        console.log('智能合约交易成功，签名:', paymentResult.signature);
         
-        // 确认购买
-        return confirmPurchase(
-          purchaseData.purchase_id, 
-          paymentResult.txHash,
-          purchaseData.asset_id,
+        // 确认智能合约购买
+        return confirmSmartContractPurchase(
+          assetId,
           walletAddress,
-          amount
+          amount,
+          paymentResult.signature
         );
       });
   })
   .then(result => {
-    console.log('购买完成:', result);
+    console.log('智能合约购买完成:', result);
     
     // 显示成功消息
-    showSuccessMessage('购买成功！', `您已成功购买 ${amount} 个代币，交易将在链上确认后到账。`);
+    showSuccessMessage('智能合约购买成功！', `您已成功通过智能合约购买 ${amount} 个代币，USDC支付和代币转移已同步完成。交易哈希: ${result.transaction_signature}`);
     
     // 重置按钮状态
     resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
@@ -237,7 +237,58 @@ function handleBuy(assetId, amountInput, buyButton) {
 }
 
 /**
- * 确认购买函数
+ * 确认智能合约购买函数
+ * @param {string} assetId - 资产ID
+ * @param {string} walletAddress - 钱包地址
+ * @param {number} amount - 购买数量
+ * @param {string} signature - 交易签名
+ */
+function confirmSmartContractPurchase(assetId, walletAddress, amount, signature) {
+  // 更新加载状态
+  showLoadingState('正在确认智能合约购买...');
+  
+  // 确认购买数据
+  const confirmData = { 
+    asset_id: assetId,
+    buyer_address: walletAddress,
+    amount: amount,
+    signed_transaction: signature
+  };
+  
+  console.log('发送智能合约购买确认请求:', confirmData);
+  
+  // 发送确认购买请求
+  return fetch('/api/blockchain/execute_purchase', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Wallet-Address': walletAddress
+    },
+    body: JSON.stringify(confirmData)
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`智能合约购买确认失败: ${response.status}`);
+    }
+    return response.json();
+  })
+  .then(data => {
+    if (!data.success) {
+      throw new Error(data.error || '智能合约购买确认失败');
+    }
+    
+    console.log('智能合约购买确认成功:', data);
+    return {
+      success: true,
+      transaction_signature: data.transaction_signature,
+      trade_id: data.trade_id,
+      message: '智能合约购买已确认，代币转移和USDC支付同步完成'
+    };
+  });
+}
+
+/**
+ * 确认购买函数（旧版本，保留向后兼容）
  * @param {string} purchaseId - 购买ID
  * @param {string} signature - 交易签名
  * @param {string} assetId - 资产ID
