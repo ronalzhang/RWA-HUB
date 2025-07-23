@@ -14,7 +14,7 @@
     --dark-glass: rgba(26, 35, 50, 0.85);
     --dark-glass-light: rgba(26, 35, 50, 0.65);
     --dark-glass-darker: rgba(10, 15, 26, 0.95);
-    
+
     /* 主色调 */
     --primary-color: #667eea;
     --secondary-color: #764ba2;
@@ -22,7 +22,7 @@
     --info-color: #06b6d4;
     --warning-color: #f59e0b;
     --danger-color: #ef4444;
-    
+
     /* 渐变色 */
     --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     --gradient-primary-hover: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
@@ -30,19 +30,19 @@
     --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
     --gradient-info: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
     --gradient-glass: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
-    
+
     /* 文字颜色 */
     --text-primary: #ffffff;
     --text-secondary: #b3c1d8;
     --text-muted: #8692a6;
     --text-accent: #667eea;
-    
+
     /* 边框和阴影 */
     --border-glass: 1px solid rgba(255, 255, 255, 0.1);
     --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.3);
     --shadow-glass-hover: 0 12px 40px rgba(0, 0, 0, 0.4);
     --shadow-glow: 0 0 20px rgba(102, 126, 234, 0.3);
-    
+
     /* 模糊效果 */
     --blur-glass: backdrop-filter: blur(20px);
     --blur-light: backdrop-filter: blur(10px);
@@ -57,7 +57,7 @@
 
 body {
     background: var(--dark-primary);
-    background-image: 
+    background-image:
         radial-gradient(circle at 20% 20%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
         radial-gradient(circle at 80% 80%, rgba(118, 75, 162, 0.1) 0%, transparent 50%),
         radial-gradient(circle at 40% 60%, rgba(245, 87, 108, 0.05) 0%, transparent 50%);
@@ -252,7 +252,7 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: 
+    background:
         radial-gradient(circle at 30% 20%, rgba(102, 126, 234, 0.15) 0%, transparent 50%),
         radial-gradient(circle at 70% 80%, rgba(118, 75, 162, 0.15) 0%, transparent 50%);
     z-index: -1;
@@ -391,8 +391,13 @@ body {
 }
 
 @keyframes shimmer {
-    0% { left: -100%; }
-    100% { left: 100%; }
+    0% {
+        left: -100%;
+    }
+
+    100% {
+        left: 100%;
+    }
 }
 
 /* 固定宽度设计 - 调整为920px，优化边距为10px */
@@ -477,4 +482,4 @@ body {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
-} 
+}
