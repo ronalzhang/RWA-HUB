@@ -13,9 +13,12 @@
 /* Hero Section */
 .index-page .hero-section {
     background: var(--gradient) !important;
-    padding: 2rem 0 1rem !important;
+    padding: 6rem 0 4rem !important;
     position: relative !important;
     overflow: hidden !important;
+    min-height: 90vh !important;
+    display: flex !important;
+    align-items: center !important;
 }
 
 .index-page .hero-bg-pattern {
@@ -330,7 +333,170 @@ section[id="assets"] .card .card-text,
     max-width: 100% !important;
     height: auto !important;
     object-fit: contain !important;
-    opacity: 0.8 !important;  /* 设置透明度，0.8 = 80%不透明 */
+    opacity: 0.9 !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2) !important;
+}
+
+/* Hero按钮区域样式 - 优化布局 */
+.index-page .hero-buttons {
+    margin-top: 3rem !important;
+    padding-top: 2rem !important;
+    border-top: 1px solid rgba(255,255,255,0.1) !important;
+}
+
+.index-page .hero-buttons .d-flex {
+    gap: 2rem !important;
+    justify-content: center !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+}
+
+.index-page .hero-buttons .btn {
+    min-width: 200px !important;
+    font-weight: 600 !important;
+    font-size: 1.1rem !important;
+    padding: 1rem 2.5rem !important;
+    border-radius: 0.75rem !important;
+    transition: all 0.3s ease !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+.index-page .hero-buttons .btn-primary {
+    background: rgba(255,255,255,0.2) !important;
+    border: 2px solid rgba(255,255,255,0.3) !important;
+    color: white !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+}
+
+.index-page .hero-buttons .btn-primary:hover {
+    background: rgba(255,255,255,0.3) !important;
+    border-color: rgba(255,255,255,0.5) !important;
+    transform: translateY(-3px) !important;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2) !important;
+    color: white !important;
+}
+
+.index-page .hero-buttons .btn-outline-light {
+    border: 2px solid rgba(255,255,255,0.5) !important;
+    color: white !important;
+    background: transparent !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+}
+
+.index-page .hero-buttons .btn-outline-light:hover {
+    background: rgba(255,255,255,0.1) !important;
+    border-color: rgba(255,255,255,0.7) !important;
+    color: white !important;
+    transform: translateY(-3px) !important;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2) !important;
+}
+
+/* 按钮图标样式 */
+.index-page .hero-buttons .btn i {
+    transition: transform 0.3s ease !important;
+}
+
+.index-page .hero-buttons .btn:hover i {
+    transform: scale(1.1) !important;
+}
+
+/* Hero内容区域优化 - 左右布局 */
+.index-page .hero-content {
+    padding-right: 2rem !important;
+}
+
+.index-page .hero-content h1 {
+    font-size: 3.5rem !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+    margin-bottom: 1.5rem !important;
+    color: white !important;
+}
+
+.index-page .hero-content .gradient-text {
+    background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    display: block !important;
+}
+
+.index-page .hero-content p.lead {
+    font-size: 1.25rem !important;
+    line-height: 1.6 !important;
+    opacity: 0.9 !important;
+    color: rgba(255,255,255,0.9) !important;
+    max-width: 500px !important;
+    margin-bottom: 0 !important;
+}
+
+/* 平台插图区域优化 */
+.index-page .platform-illustration {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    height: 100% !important;
+    padding-left: 2rem !important;
+}
+
+.index-page .platform-illustration img {
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: 400px !important;
+    object-fit: contain !important;
+    opacity: 0.95 !important;
+    border-radius: 1.5rem !important;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important;
+    transition: all 0.3s ease !important;
+}
+
+.index-page .platform-illustration img:hover {
+    transform: translateY(-10px) scale(1.02) !important;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.4) !important;
+}
+
+/* 响应式调整 */
+@media (max-width: 991.98px) {
+    .index-page .hero-content {
+        padding-right: 0 !important;
+        text-align: center !important;
+        margin-bottom: 2rem !important;
+    }
+    
+    .index-page .platform-illustration {
+        padding-left: 0 !important;
+        margin-top: 2rem !important;
+    }
+    
+    .index-page .hero-content h1 {
+        font-size: 2.5rem !important;
+    }
+    
+    .index-page .hero-content p.lead {
+        font-size: 1.1rem !important;
+        max-width: 100% !important;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .index-page .hero-content h1 {
+        font-size: 2rem !important;
+    }
+    
+    .index-page .hero-buttons .d-flex {
+        flex-direction: column !important;
+        gap: 1rem !important;
+    }
+    
+    .index-page .hero-buttons .btn {
+        min-width: 250px !important;
+        width: 100% !important;
+        max-width: 300px !important;
+    }
 }
 
 .index-page .card-body {

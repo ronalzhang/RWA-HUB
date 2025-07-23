@@ -13,29 +13,40 @@
 <div class="hero-section position-relative overflow-hidden">
     <div class="hero-bg-pattern"></div>
     <div class="container position-relative">
-        <div class="row align-items-center min-vh-80">
-            <div class="col-lg-6 pe-lg-5">
-                <div class="hero-content" data-aos="fade-up">
-                    <h1 class="display-4 fw-bold text-white mb-4">
-                        {{ _('Real World Assets') }}<br>
-                        <span class="gradient-text">{{ _('Tokenization Platform') }}</span>
-                    </h1>
-                    <p class="lead text-white-75 mb-5">{{ _('Start your asset tokenization journey now') }}<br>{{ _('Secure, transparent, and efficient blockchain asset management platform') }}</p>
-                    <div class="d-flex gap-3 flex-wrap">
-                        <button type="button" id="publishAssetBtn" class="btn btn-primary btn-lg px-4 py-3 me-3">
-                            <i class="fas fa-plus me-2"></i>{{ _('Publish Asset') }}
-                        </button>
-                        <a href="{{ url_for('static', filename='docs/whitpaper.pdf') }}" class="btn btn-outline-light btn-lg px-4 py-3" target="_blank">
-                            {{ _('White Paper') }} <i class="fas fa-file-pdf ms-2"></i>
-                        </a>
+        <div class="row min-vh-80">
+            <!-- 上半部分：文字和图片左右排列 -->
+            <div class="col-12">
+                <div class="row align-items-center mb-5">
+                    <div class="col-lg-6 pe-lg-4">
+                        <div class="hero-content" data-aos="fade-up">
+                            <h1 class="display-4 fw-bold text-white mb-4">
+                                {{ _('Real World Assets') }}<br>
+                                <span class="gradient-text">{{ _('Tokenization Platform') }}</span>
+                            </h1>
+                            <p class="lead text-white-75 mb-0">{{ _('Start your asset tokenization journey now') }}<br>{{ _('Secure, transparent, and efficient blockchain asset management platform') }}</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-6 mt-4 mt-lg-0 ps-lg-4">
+                        <div class="platform-illustration" data-aos="fade-left">
+                            <img src="{{ url_for('static', filename='images/platform-illustration.png') }}" 
+                                 alt="Platform Illustration" 
+                                 class="img-fluid">
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-lg-6 mt-5 mt-lg-0">
-                <div class="platform-illustration" data-aos="fade-left">
-                    <img src="{{ url_for('static', filename='images/platform-illustration.png') }}" 
-                         alt="Platform Illustration" 
-                         class="img-fluid">
+            
+            <!-- 下半部分：按钮居中并排显示 -->
+            <div class="col-12">
+                <div class="hero-buttons text-center" data-aos="fade-up" data-aos-delay="300">
+                    <div class="d-flex gap-3 justify-content-center flex-wrap">
+                        <button type="button" id="publishAssetBtn" class="btn btn-primary btn-lg px-5 py-3">
+                            <i class="fas fa-plus me-2"></i>{{ _('Publish Asset') }}
+                        </button>
+                        <a href="{{ url_for('static', filename='docs/whitpaper.pdf') }}" class="btn btn-outline-light btn-lg px-5 py-3" target="_blank">
+                            {{ _('White Paper') }} <i class="fas fa-file-pdf ms-2"></i>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
