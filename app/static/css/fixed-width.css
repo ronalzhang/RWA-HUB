@@ -3,9 +3,9 @@
  * 确保所有页面在手机和电脑上显示相同的布局，只是等比例缩放
  */
 
-/* 基础固定宽度设置 - 优化为980px */
+/* 基础固定宽度设置 - 进一步优化为860px */
 html, body {
-    min-width: 980px;
+    min-width: 860px;
     overflow-x: auto;
 }
 
@@ -17,7 +17,7 @@ html, body {
 .container-lg,
 .container-xl,
 .container-xxl {
-    width: 980px !important;
+    width: 860px !important;
     max-width: none !important;
     margin: 0 auto !important;
     padding-left: 15px !important;
@@ -27,52 +27,52 @@ html, body {
 /* 移除所有响应式断点 */
 @media (min-width: 576px) {
     .container-sm {
-        width: 980px !important;
+        width: 860px !important;
         max-width: none !important;
     }
 }
 
 @media (min-width: 768px) {
     .container-md {
-        width: 980px !important;
+        width: 860px !important;
         max-width: none !important;
     }
 }
 
 @media (min-width: 992px) {
     .container-lg {
-        width: 980px !important;
+        width: 860px !important;
         max-width: none !important;
     }
 }
 
 @media (min-width: 1200px) {
     .container-xl {
-        width: 980px !important;
+        width: 860px !important;
         max-width: none !important;
     }
 }
 
 @media (min-width: 1400px) {
     .container-xxl {
-        width: 980px !important;
+        width: 860px !important;
         max-width: none !important;
     }
 }
 
 /* 导航栏固定样式 */
 .navbar {
-    min-width: 980px;
+    min-width: 860px;
 }
 
 .navbar .container {
-    width: 980px !important;
+    width: 860px !important;
 }
 
 /* 表格固定宽度 */
 .table-responsive {
     overflow-x: auto;
-    min-width: 980px;
+    min-width: 860px;
 }
 
 /* 卡片网格固定布局 */
@@ -280,11 +280,9 @@ img {
 .overflow-hidden { overflow: hidden !important; }
 .overflow-scroll { overflow: scroll !important; }
 
-/* 钱包和语言切换按钮确保可点击 - 增强移动端支持 */
-.language-dropdown .btn,
+/* 钱包按钮确保可点击 - 增强移动端支持 */
 .wallet-btn,
-#walletBtn,
-#languageDropdown {
+#walletBtn {
     cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
@@ -299,10 +297,8 @@ img {
 
 /* 移动端触摸优化 */
 @media (hover: none) and (pointer: coarse) {
-    .language-dropdown .btn,
     .wallet-btn,
-    #walletBtn,
-    #languageDropdown {
+    #walletBtn {
         min-height: 44px;
         min-width: 44px;
         padding: 8px 12px;

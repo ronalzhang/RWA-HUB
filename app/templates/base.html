@@ -2,7 +2,7 @@
 <html lang="{{ g.locale }}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=980, initial-scale=0.4, minimum-scale=0.2, maximum-scale=3.0, user-scalable=yes">
+    <meta name="viewport" content="width=860, initial-scale=0.45, minimum-scale=0.2, maximum-scale=3.0, user-scalable=yes">
     <title>{% block title %}{% endblock %}</title>
     
     <!-- 阻止Font Awesome Kit的加载 -->
@@ -60,14 +60,14 @@
             background-color: #fff;
         }
         
-        /* 固定宽度布局 - 优化宽度 */
+        /* 固定宽度布局 - 进一步优化宽度 */
         body {
-            min-width: 980px;
+            min-width: 860px;
             overflow-x: auto;
         }
         
         .container {
-            width: 980px;
+            width: 860px;
             max-width: none;
             margin: 0 auto;
         }
@@ -83,15 +83,7 @@
             font-size: 1rem;
         }
         
-        .language-dropdown .btn {
-            padding: 0.4rem 0.8rem;
-            font-size: 0.85rem;
-        }
-        
-        .language-dropdown .btn .fas {
-            margin-right: 0.25rem;
-            font-size: 0.85rem;
-        }
+        /* 语言切换器样式已移除 */
         
         .wallet-btn {
             min-width: auto;
@@ -104,71 +96,7 @@
             font-size: 0.9rem;
         }
         
-        /* 语言切换按钮和下拉菜单的统一样式 */
-        .language-dropdown {
-            position: relative;
-        }
-        
-        .language-dropdown .btn {
-            border-radius: 8px;
-            transition: all 0.2s ease-in-out;
-            padding: 0.4rem 0.8rem;
-            display: flex;
-            align-items: center;
-            font-size: 0.85rem;
-            border: 1px solid #dee2e6;
-            background-color: #f8f9fa;
-            margin-right: 0.5rem;
-        }
-        
-        .language-dropdown .btn:hover {
-            background-color: #e9ecef;
-            border-color: #ced4da;
-            transform: translateY(-1px);
-        }
-        
-        .language-dropdown .btn .fas {
-            margin-right: 0.25rem;
-            color: #6c757d;
-            font-size: 0.85rem;
-        }
-        
-        .language-dropdown .dropdown-menu {
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            border: 1px solid #eee;
-            padding: 8px 0;
-            min-width: 120px;
-            width: auto;
-            margin-top: 10px;
-            right: 0;
-            left: auto !important;
-            overflow: hidden;
-            z-index: 1050;
-            background-color: white;
-        }
-        
-        .language-dropdown .dropdown-item {
-            padding: 6px 12px;
-            transition: all 0.15s ease-in-out;
-            font-size: 0.9rem;
-            white-space: nowrap;
-            display: block;
-            width: 100%;
-            clear: both;
-            text-align: left;
-        }
-        
-        .language-dropdown .dropdown-item:hover {
-            background-color: #f8f9fa;
-            color: var(--primary-color);
-            transform: translateX(5px);
-        }
-        
-        .language-dropdown .dropdown-item:active {
-            background-color: var(--primary-color);
-            color: white;
-        }
+        /* 语言切换器已移除 */
         
         /* 钱包按钮样式优化 */
         .wallet-btn {
@@ -696,21 +624,11 @@
                 </ul>
                 
                 <div class="d-flex align-items-center">
-                    <!-- 语言切换 -->
-                    <div class="dropdown me-3 language-dropdown">
-                        <button class="btn btn-sm btn-outline-secondary" type="button" id="languageDropdown" data-bs-toggle="dropdown" style="padding:6px 12px; font-size:14px; border-radius:6px; display:inline-flex; align-items:center;">
-                            <i class="fas fa-globe" style="margin-right:4px; font-size:14px;"></i>
-                            <span id="currentLanguage">{{ _('English') if g.locale == 'en' else _('繁體中文') }}</span>
-                                </button>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" onclick="changeLanguage('en')">English</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="changeLanguage('zh_Hant')">繁體中文</a></li>
-                        </ul>
-                                    </div>
+                    <!-- 语言切换器已移除 -->
                     
                     <!-- 钱包按钮和下拉菜单 -->
                     <div class="wallet-dropdown" id="walletDropdown">
-                        <button id="walletBtn" class="btn btn-primary" type="button" onclick="checkWalletConnection(event)" style="display: inline-flex; align-items: center; gap:4px; padding:6px 12px; font-size:14px; max-width:160px; border:none; background:#0d6efd; color:#fff; border-radius:6px;">
+                        <button id="walletBtn" class="btn btn-primary" type="button" style="display: inline-flex; align-items: center; gap:4px; padding:6px 12px; font-size:14px; max-width:160px; border:none; background:#0d6efd; color:#fff; border-radius:6px; cursor: pointer;">
                             <i class="fas fa-wallet" style="margin-right:2px;"></i>
                             <span id="walletBtnText" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ _('Connect Wallet') }}</span>
                         </button>
@@ -869,11 +787,26 @@
             toggleWalletMenu();
         } else {
             // 未连接，打开钱包选择器
-            if (typeof window.openWalletSelector === 'function') {
+            if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+                console.log('调用钱包选择器');
+                window.walletState.openWalletSelector();
+            } else if (typeof window.openWalletSelector === 'function') {
+                console.log('调用全局钱包选择器');
                 window.openWalletSelector();
             } else {
-                console.error('钱包选择器函数不存在');
-                alert('请先加载钱包连接模块');
+                console.error('钱包选择器函数不存在，尝试重新加载钱包模块');
+                // 尝试重新初始化钱包
+                if (window.walletState) {
+                    console.log('钱包状态存在，尝试直接调用');
+                    try {
+                        window.walletState.openWalletSelector();
+                    } catch (e) {
+                        console.error('调用钱包选择器失败:', e);
+                        alert('钱包连接功能暂时不可用，请刷新页面重试');
+                    }
+                } else {
+                    alert('钱包连接模块未加载，请刷新页面重试');
+                }
             }
         }
     }
@@ -927,10 +860,13 @@
         }
         
         // 打开钱包选择器
-        if (typeof window.openWalletSelector === 'function') {
+        if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+            window.walletState.openWalletSelector();
+        } else if (typeof window.openWalletSelector === 'function') {
             window.openWalletSelector();
         } else {
             console.error('钱包选择器函数不存在');
+            alert('钱包切换功能暂时不可用，请刷新页面重试');
         }
     }
     
@@ -973,68 +909,42 @@
     document.addEventListener('DOMContentLoaded', function() {
         console.log('页面加载完成，初始化钱包和语言功能');
         
-        // 确保语言下拉菜单正常工作
-        const languageDropdown = document.getElementById('languageDropdown');
-        if (languageDropdown) {
-            // 移动端兼容性处理
-            languageDropdown.addEventListener('touchstart', function(e) {
-                e.stopPropagation();
-            }, { passive: true });
-            
-            languageDropdown.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const dropdownMenu = languageDropdown.nextElementSibling;
-                if (dropdownMenu && dropdownMenu.classList.contains('dropdown-menu')) {
-                    const isVisible = dropdownMenu.classList.contains('show');
-                    
-                    // 关闭所有其他下拉菜单
-                    document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
-                        if (menu !== dropdownMenu) {
-                            menu.classList.remove('show');
-                        }
-                    });
-                    
-                    // 切换当前菜单
-                    if (isVisible) {
-                        dropdownMenu.classList.remove('show');
-                    } else {
-                        dropdownMenu.classList.add('show');
-                    }
-                }
-            });
-            
-            // 使用Bootstrap的dropdown功能作为备用
-            if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
-                try {
-                    new bootstrap.Dropdown(languageDropdown);
-                } catch (e) {
-                    console.log('Bootstrap dropdown初始化失败，使用自定义实现');
-                }
-            }
-        }
+        // 语言切换器已移除
         
         // 钱包按钮移动端兼容性处理
         const walletBtn = document.getElementById('walletBtn');
         if (walletBtn) {
+            console.log('找到钱包按钮，绑定事件');
+            
+            // 移除现有的onclick属性，避免冲突
+            walletBtn.removeAttribute('onclick');
+            
+            // 添加触摸事件支持
             walletBtn.addEventListener('touchstart', function(e) {
                 e.stopPropagation();
+                console.log('钱包按钮触摸开始');
             }, { passive: true });
             
-            // 确保点击事件正确绑定
+            // 添加点击事件
             walletBtn.addEventListener('click', function(e) {
                 console.log('钱包按钮被点击');
+                e.preventDefault();
+                e.stopPropagation();
                 checkWalletConnection(e);
             });
+            
+            // 添加触摸结束事件作为备用
+            walletBtn.addEventListener('touchend', function(e) {
+                console.log('钱包按钮触摸结束');
+                e.preventDefault();
+                e.stopPropagation();
+                checkWalletConnection(e);
+            }, { passive: false });
+        } else {
+            console.error('找不到钱包按钮元素');
         }
         
-        // 为语言切换项添加移动端支持
-        document.querySelectorAll('.dropdown-item').forEach(item => {
-            item.addEventListener('touchstart', function(e) {
-                e.stopPropagation();
-            }, { passive: true });
-        });
+        // 语言切换项已移除
         
         // 点击外部关闭所有下拉菜单
         document.addEventListener('click', function(e) {
@@ -1440,38 +1350,7 @@
 
     <!-- 语言切换 -->
     <script>
-    // 语言切换函数（增强版）
-    function changeLanguage(lang) {
-        console.log('切换语言到:', lang);
-        
-        // 发送请求到后端切换语言
-        fetch('/api/change_language', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({ language: lang })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // 刷新页面以应用新语言
-                window.location.reload();
-            } else {
-                console.error('语言切换失败:', data.error);
-                // 如果API不存在，直接设置cookie并刷新
-                document.cookie = `language=${lang};path=/;max-age=31536000`;
-                window.location.reload();
-            }
-        })
-        .catch(error => {
-            console.error('语言切换请求失败:', error);
-            // 降级处理：直接设置cookie并刷新
-            document.cookie = `language=${lang};path=/;max-age=31536000`;
-            window.location.reload();
-        });
-    }
+    // 语言切换功能已移除
     </script>
     
     <!-- 确保钱包按钮点击响应 -->
