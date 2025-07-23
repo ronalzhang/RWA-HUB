@@ -119,8 +119,8 @@ function handleBuy(assetId, amountInput, buyButton) {
   // 检查钱包连接状态
   const walletConnected = isWalletConnected();
   if (!walletConnected) {
-    showError('请先连接您的钱包');
-    resetButton(buyButton, '<i class="fas fa-wallet me-2"></i>请先连接钱包');
+    showError('Please connect your wallet first');
+    resetButton(buyButton, '<i class="fas fa-wallet me-2"></i>Please Connect Wallet');
     buyButton.disabled = true;
     return;
   }
@@ -395,10 +395,10 @@ function updateBuyButtonState() {
       buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
       buyButton.removeAttribute('title');
     } else {
-        if (shouldLog) console.log('钱包未连接，禁用购买按钮');
+        if (shouldLog) console.log('Wallet not connected, disabling buy button');
       buyButton.disabled = true;
-      buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
-      buyButton.title = '请先连接钱包';
+      buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>Please Connect Wallet';
+      buyButton.title = 'Please Connect Wallet';
       }
     }
   });

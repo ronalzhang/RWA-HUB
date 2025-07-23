@@ -39,7 +39,7 @@ function shareAsset(platform) {
   switch(platform) {
     case 'wechat':
       // 微信通常使用二维码分享，这里可以打开一个显示二维码的模态框
-      alert('请使用微信扫一扫功能扫描二维码分享');
+      alert('Please use WeChat to scan the QR code for sharing');
       return;
     case 'weibo':
       shareUrl = 'http://service.weibo.com/share/share.php?url=' + encodeURIComponent(url) + '&title=' + encodeURIComponent(title);

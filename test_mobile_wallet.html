@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Wallet Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 400px;
+            margin: 0 auto;
+            background-color: #f5f5f5;
+        }
+        
+        .test-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .wallet-option {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: #fff;
+            cursor: pointer;
+            text-align: center;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .wallet-option:hover {
+            border-color: #007bff;
+            background: #f8f9fa;
+        }
+        
+        .wallet-option.phantom {
+            border-color: #ab7dff;
+            color: #ab7dff;
+        }
+        
+        .wallet-option.metamask {
+            border-color: #f6851b;
+            color: #f6851b;
+        }
+        
+        .status {
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .device-info {
+            margin: 20px 0;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Mobile Wallet Test</h1>
+        
+        <div class="device-info">
+            <strong>Device Info:</strong><br>
+            <span id="deviceInfo">Loading...</span>
+        </div>
+        
+        <div class="status info" id="status">
+            Click a wallet option to test mobile connection
+        </div>
+        
+        <button class="wallet-option phantom" onclick="testPhantomConnection()">
+            🦄 Test Phantom Wallet
+        </button>
+        
+        <button class="wallet-option metamask" onclick="testMetaMaskConnection()">
+            🦊 Test MetaMask Wallet
+        </button>
+        
+        <div style="margin-top: 20px;">
+            <h3>Test Results:</h3>
+            <div id="testResults" style="font-size: 14px; background: #f8f9fa; padding: 10px; border-radius: 5px; min-height: 100px;">
+                No tests run yet...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 简化版的移动端检测
+        function isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+        
+        // 显示设备信息
+        function showDeviceInfo() {
+            const info = {
+                isMobile: isMobile(),
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                cookieEnabled: navigator.cookieEnabled,
+                language: navigator.language
+            };
+            
+            document.getElementById('deviceInfo').innerHTML = `
+                Mobile: ${info.isMobile ? 'Yes' : 'No'}<br>
+                Platform: ${info.platform}<br>
+                Language: ${info.language}<br>
+                UserAgent: ${info.userAgent.substring(0, 50)}...
+            `;
+        }
+        
+        // 更新状态显示
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+        
+        // 添加测试结果
+        function addTestResult(message) {
+            const resultsEl = document.getElementById('testResults');
+            const timestamp = new Date().toLocaleTimeString();
+            const currentResults = resultsEl.innerHTML === 'No tests run yet...' ? '' : resultsEl.innerHTML;
+            resultsEl.innerHTML = `${currentResults}<div><strong>[${timestamp}]</strong> ${message}</div>`;
+            resultsEl.scrollTop = resultsEl.scrollHeight;
+        }
+        
+        // 测试深度链接跳转
+        async function attemptDeepLink(deepLinkUrl, walletName) {
+            return new Promise((resolve) => {
+                addTestResult(`Attempting deep link for ${walletName}: ${deepLinkUrl}`);
+                
+                const timeout = setTimeout(() => {
+                    addTestResult(`${walletName} deep link timeout`);
+                    resolve(false);
+                }, 2500);
+                
+                // 创建隐藏的iframe尝试跳转
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = deepLinkUrl;
+                
+                document.body.appendChild(iframe);
+                
+                // 检测页面是否失去焦点（表示跳转成功）
+                const startTime = Date.now();
+                const checkVisibility = () => {
+                    if (document.hidden || Date.now() - startTime > 1000) {
+                        clearTimeout(timeout);
+                        document.body.removeChild(iframe);
+                        addTestResult(`${walletName} deep link appeared to work (page lost focus)`);
+                        resolve(true);
+                    } else {
+                        setTimeout(checkVisibility, 100);
+                    }
+                };
+                
+                setTimeout(() => {
+                    checkVisibility();
+                    // 清理iframe
+                    setTimeout(() => {
+                        if (iframe && iframe.parentNode) {
+                            document.body.removeChild(iframe);
+                        }
+                    }, 1000);
+                }, 500);
+            });
+        }
+        
+        // 测试通用链接跳转
+        async function attemptUniversalLink(universalLinkUrl, walletName) {
+            return new Promise((resolve) => {
+                addTestResult(`Attempting universal link for ${walletName}: ${universalLinkUrl}`);
+                
+                const timeout = setTimeout(() => {
+                    addTestResult(`${walletName} universal link timeout`);
+                    resolve(false);
+                }, 3000);
+                
+                // 创建隐藏的链接并点击
+                const link = document.createElement('a');
+                link.href = universalLinkUrl;
+                link.target = '_blank';
+                link.style.display = 'none';
+                
+                document.body.appendChild(link);
+                link.click();
+                
+                // 检测页面是否失去焦点
+                const startTime = Date.now();
+                const checkVisibility = () => {
+                    if (document.hidden || Date.now() - startTime > 1500) {
+                        clearTimeout(timeout);
+                        document.body.removeChild(link);
+                        addTestResult(`${walletName} universal link appeared to work (page lost focus)`);
+                        resolve(true);
+                    } else if (Date.now() - startTime < 2500) {
+                        setTimeout(checkVisibility, 100);
+                    }
+                };
+                
+                setTimeout(() => {
+                    checkVisibility();
+                    // 清理链接
+                    setTimeout(() => {
+                        if (link && link.parentNode) {
+                            document.body.removeChild(link);
+                        }
+                    }, 1000);
+                }, 500);
+            });
+        }
+        
+        // 测试Phantom钱包连接
+        async function testPhantomConnection() {
+            updateStatus('Testing Phantom wallet connection...', 'info');
+            addTestResult('=== Starting Phantom Wallet Test ===');
+            
+            if (!isMobile()) {
+                updateStatus('This test is designed for mobile devices', 'error');
+                addTestResult('ERROR: Not on mobile device, deep links may not work');
+                return;
+            }
+            
+            try {
+                // 生成连接参数
+                const currentUrl = encodeURIComponent(window.location.href);
+                const baseUrl = window.location.origin;
+                const randomKey = Array.from(crypto.getRandomValues(new Uint8Array(32)), 
+                    byte => byte.toString(16).padStart(2, '0')).join('');
+                
+                const connectParams = new URLSearchParams({
+                    dapp_encryption_public_key: randomKey,
+                    cluster: 'mainnet-beta',
+                    app_url: baseUrl,
+                    redirect_link: currentUrl
+                }).toString();
+                
+                const deepLinkUrl = `phantom://v1/connect?${connectParams}`;
+                const universalLinkUrl = `https://phantom.app/ul/v1/connect?${connectParams}`;
+                
+                // 设置检测标记
+                sessionStorage.setItem('pendingWalletConnection', 'phantom');
+                sessionStorage.setItem('walletConnectionStartTime', Date.now().toString());
+                
+                // 尝试深度链接
+                const deepLinkSuccess = await attemptDeepLink(deepLinkUrl, 'Phantom');
+                
+                if (deepLinkSuccess) {
+                    updateStatus('Phantom deep link successful!', 'success');
+                    return;
+                }
+                
+                // 尝试通用链接
+                const universalLinkSuccess = await attemptUniversalLink(universalLinkUrl, 'Phantom');
+                
+                if (universalLinkSuccess) {
+                    updateStatus('Phantom universal link successful!', 'success');
+                    return;
+                }
+                
+                // 所有尝试都失败
+                updateStatus('All Phantom connection attempts failed', 'error');
+                addTestResult('All connection methods failed for Phantom');
+                
+                // 提示下载
+                if (confirm('Phantom wallet app not detected. Would you like to download it?')) {
+                    const appStoreUrl = navigator.userAgent.toLowerCase().includes('iphone') || 
+                                       navigator.userAgent.toLowerCase().includes('ipad') 
+                        ? 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977'
+                        : 'https://play.google.com/store/apps/details?id=app.phantom';
+                    
+                    window.open(appStoreUrl, '_blank');
+                    addTestResult(`Redirected to app store: ${appStoreUrl}`);
+                }
+                
+            } catch (error) {
+                updateStatus('Error testing Phantom connection', 'error');
+                addTestResult(`ERROR: ${error.message}`);
+            }
+        }
+        
+        // 测试MetaMask钱包连接
+        async function testMetaMaskConnection() {
+            updateStatus('Testing MetaMask wallet connection...', 'info');
+            addTestResult('=== Starting MetaMask Wallet Test ===');
+            
+            if (!isMobile()) {
+                updateStatus('This test is designed for mobile devices', 'error');
+                addTestResult('ERROR: Not on mobile device, deep links may not work');
+                return;
+            }
+            
+            try {
+                const deepLinkUrl = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
+                
+                // 设置检测标记
+                sessionStorage.setItem('pendingWalletConnection', 'metamask');
+                sessionStorage.setItem('walletConnectionStartTime', Date.now().toString());
+                
+                // MetaMask使用相同的URL作为深度链接和通用链接
+                const success = await attemptUniversalLink(deepLinkUrl, 'MetaMask');
+                
+                if (success) {
+                    updateStatus('MetaMask connection successful!', 'success');
+                    return;
+                }
+                
+                // 连接失败
+                updateStatus('MetaMask connection failed', 'error');
+                addTestResult('MetaMask connection attempt failed');
+                
+                // 提示下载
+                if (confirm('MetaMask wallet app not detected. Would you like to download it?')) {
+                    const appStoreUrl = navigator.userAgent.toLowerCase().includes('iphone') || 
+                                       navigator.userAgent.toLowerCase().includes('ipad') 
+                        ? 'https://apps.apple.com/app/metamask/id1438144202'
+                        : 'https://play.google.com/store/apps/details?id=io.metamask';
+                    
+                    window.open(appStoreUrl, '_blank');
+                    addTestResult(`Redirected to app store: ${appStoreUrl}`);
+                }
+                
+            } catch (error) {
+                updateStatus('Error testing MetaMask connection', 'error');
+                addTestResult(`ERROR: ${error.message}`);
+            }
+        }
+        
+        // 监听页面可见性变化
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                const pendingConnection = sessionStorage.getItem('pendingWalletConnection');
+                const startTime = sessionStorage.getItem('walletConnectionStartTime');
+                
+                if (pendingConnection && startTime) {
+                    const timeDiff = Date.now() - parseInt(startTime);
+                    addTestResult(`Returned from ${pendingConnection} wallet app after ${Math.round(timeDiff/1000)}s`);
+                    
+                    // 清除标记
+                    sessionStorage.removeItem('pendingWalletConnection');
+                    sessionStorage.removeItem('walletConnectionStartTime');
+                    
+                    updateStatus(`Returned from ${pendingConnection} wallet app`, 'success');
+                }
+            }
+        });
+        
+        // 初始化
+        showDeviceInfo();
+    </script>
+</body>
+</html>

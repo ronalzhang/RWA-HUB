@@ -597,35 +597,7 @@ function setupTradeForm() {
     }
 }
 
-// 更新购买按钮状态
-function updateBuyButtonState() {
-    const buyButton = document.getElementById('buy-button');
-    if (!buyButton) return;
-    
-    const isConnected = checkWalletConnection();
-    
-    if (isConnected) {
-        buyButton.disabled = false;
-        buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Purchase';
-        buyButton.classList.remove('btn-secondary');
-        buyButton.classList.add('btn-primary');
-    } else {
-        buyButton.disabled = true;
-        buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>Please Connect Wallet';
-        buyButton.classList.remove('btn-primary');
-        buyButton.classList.add('btn-secondary');
-    }
-}
-
-// 检查钱包连接状态
-function checkWalletConnection() {
-    if (window.walletState && (window.walletState.connected || window.walletState.isConnected)) {
-        return true;
-    }
-    
-    const storedAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
-    return storedAddress && storedAddress.length > 10;
-}
+// 钱包连接状态检查由handle_buy.js处理
 
 // 处理购买按钮点击
 function handleBuyClick() {

@@ -407,8 +407,8 @@ const walletState = {
             buyButton.removeAttribute('title');
         } else {
             buyButton.disabled = true;
-            buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>请先连接钱包';
-            buyButton.title = '请先连接钱包';
+            buyButton.innerHTML = '<i class="fas fa-wallet me-2"></i>Please Connect Wallet';
+            buyButton.title = 'Please Connect Wallet';
         }
         
         // 如果存在分红按钮检查函数，也一并调用，但避免引起循环
@@ -554,6 +554,19 @@ const walletState = {
         console.log(`尝试连接钱包: ${walletType}`);
         this.connecting = true;
         this.updateUI();
+        
+        // 在移动设备上，首先尝试跳转到钱包应用
+        if (this.isMobile() && !this._isReconnecting) {
+            console.log('检测到移动设备，尝试跳转到钱包应用');
+            const deepLinkSuccess = await this.tryMobileWalletRedirect(walletType);
+            if (deepLinkSuccess) {
+                // 跳转成功，等待用户从钱包app返回
+                console.log('深度链接跳转成功，等待用户从钱包应用返回');
+                this.connecting = false;
+                this.updateUI();
+                return true; // 返回true表示跳转成功，但连接状态待定
+            }
+        }
         
         let success = false;
         try {
@@ -2427,7 +2440,7 @@ async connectPhantom(isReconnect = false) {
             // 如果是从钱包App返回但不支持直接连接
             if (returningFromWallet && !isReconnect && this.isMobile() && (!window.solana || !window.solana.isPhantom)) {
                 console.warn('从Phantom钱包返回，但浏览器不支持钱包连接');
-                showError('钱包连接未完成，请尝试使用Phantom App内置浏览器访问');
+                showError('Connection not completed. Please use Phantom App\'s built-in browser to access this site');
                 return false;
             }
             
@@ -2445,8 +2458,20 @@ async connectPhantom(isReconnect = false) {
                     
                     // 显示安装指引
                     setTimeout(() => {
-                        if (confirm('是否现在前往Phantom官网下载安装？')) {
-                            window.open('https://phantom.app/', '_blank');
+                        if (confirm('Would you like to download and install Phantom wallet now?')) {
+                            if (this.isMobile()) {
+                                // 移动设备跳转到应用商店
+                                const userAgent = navigator.userAgent.toLowerCase();
+                                if (userAgent.includes('iphone') || userAgent.includes('ipad')) {
+                                    window.open('https://apps.apple.com/app/phantom-solana-wallet/id1598432977', '_blank');
+                                } else if (userAgent.includes('android')) {
+                                    window.open('https://play.google.com/store/apps/details?id=app.phantom', '_blank');
+                                } else {
+                                    window.open('https://phantom.app/download', '_blank');
+                                }
+                            } else {
+                                window.open('https://phantom.app/', '_blank');
+                            }
                         }
                     }, 2000);
                         }
@@ -2557,7 +2582,33 @@ async connectPhantom(isReconnect = false) {
  */
 checkIfReturningFromWalletApp(walletType) {
     try {
-        // 检查localStorage中的标记
+        // 优先检查sessionStorage中的标记（新的跳转方式）
+        const pendingConnectionType = sessionStorage.getItem('pendingWalletConnection');
+        const connectionStartTime = sessionStorage.getItem('walletConnectionStartTime');
+        
+        console.log(`[checkIfReturningFromWalletApp] 检查${walletType}钱包返回状态`);
+        console.log(`[checkIfReturningFromWalletApp] sessionStorage pendingConnection: ${pendingConnectionType}`);
+        
+        if (pendingConnectionType === walletType && connectionStartTime) {
+            const startTime = parseInt(connectionStartTime, 10);
+            const now = Date.now();
+            const timeDiff = now - startTime;
+            
+            console.log(`[checkIfReturningFromWalletApp] 时间差: ${timeDiff}ms`);
+            
+            // 检查时间是否在合理范围内（10分钟内）
+            if (timeDiff < 10 * 60 * 1000 && timeDiff > 0) {
+                console.log(`[checkIfReturningFromWalletApp] 检测到从${walletType}钱包App返回（新方式）`);
+                
+                // 清除标记，避免重复处理
+                sessionStorage.removeItem('pendingWalletConnection');
+                sessionStorage.removeItem('walletConnectionStartTime');
+                
+                return true;
+            }
+        }
+        
+        // 回退到检查localStorage中的标记（旧的方式）
         const pendingWalletType = localStorage.getItem('pendingWalletType');
         const pendingWalletConnection = localStorage.getItem('pendingWalletConnection');
         const pendingWalletTimestamp = localStorage.getItem('pendingWalletTimestamp');
@@ -2570,7 +2621,7 @@ checkIfReturningFromWalletApp(walletType) {
                            lastConnectionUrl === window.location.href;
         
         if (isReturning) {
-            console.log(`检测到从${walletType}钱包App返回`);
+            console.log(`[checkIfReturningFromWalletApp] 检测到从${walletType}钱包App返回（旧方式）`);
             
             // 检查时间戳是否在合理范围内（5分钟内）
             const timestamp = parseInt(pendingWalletTimestamp, 10);
@@ -2578,7 +2629,7 @@ checkIfReturningFromWalletApp(walletType) {
             const timeDiff = now - timestamp;
             
             if (timeDiff > 5 * 60 * 1000) {
-                console.log('返回时间超过5分钟，可能不是从钱包App直接返回');
+                console.log('[checkIfReturningFromWalletApp] 返回时间超过5分钟，可能不是从钱包App直接返回');
                 return false;
             }
             
@@ -2938,7 +2989,7 @@ checkIfReturningFromWalletApp(walletType) {
             
             // 2. 检查钱包连接
             if (!window.solana || !window.solana.isConnected) {
-                throw new Error('Solana钱包未连接，请先连接钱包');
+                throw new Error('Solana wallet not connected, please connect wallet first');
             }
 
             if (tokenSymbol !== 'USDC') {
@@ -4382,9 +4433,9 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
     // 如果仍然未检测到连接，显示错误
     if (!isConnected || !walletAddress) {
         console.error("所有方法均未检测到钱包连接");
-        showError("请先连接钱包");
+        showError("Please connect wallet first");
         if (modalErrorDiv) {
-            modalErrorDiv.textContent = "请先连接钱包";
+            modalErrorDiv.textContent = "Please connect wallet first";
             modalErrorDiv.style.display = "block";
         }
         return;
@@ -4948,6 +4999,198 @@ window.wallet = {
     },
     
     // 转账接口 - 直接调用walletState的转账方法
+    /**
+     * 尝试移动端钱包重定向
+     * @param {string} walletType - 钱包类型
+     * @returns {Promise<boolean>} 是否成功跳转
+     */
+    async tryMobileWalletRedirect(walletType) {
+        if (!this.isMobile()) {
+            return false;
+        }
+        
+        try {
+            console.log(`[tryMobileWalletRedirect] 开始尝试${walletType}钱包跳转`);
+            
+            let deepLinkUrl = '';
+            let universalLinkUrl = '';
+            let appStoreUrl = '';
+            
+            // 获取当前页面URL，用于回调
+            const currentUrl = encodeURIComponent(window.location.href);
+            const baseUrl = window.location.origin;
+            
+            // 根据钱包类型设置不同的链接
+            if (walletType === 'phantom' || walletType === 'solana') {
+                // Phantom钱包的深度链接和通用链接
+                const connectParams = new URLSearchParams({
+                    dapp_encryption_public_key: this.generateRandomKey(),
+                    cluster: 'mainnet-beta',
+                    app_url: baseUrl,
+                    redirect_link: currentUrl
+                }).toString();
+                
+                deepLinkUrl = `phantom://v1/connect?${connectParams}`;
+                universalLinkUrl = `https://phantom.app/ul/v1/connect?${connectParams}`;
+                
+                // 应用商店链接
+                if (navigator.userAgent.toLowerCase().includes('iphone') || 
+                    navigator.userAgent.toLowerCase().includes('ipad')) {
+                    appStoreUrl = 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977';
+                } else {
+                    appStoreUrl = 'https://play.google.com/store/apps/details?id=app.phantom';
+                }
+            } else if (walletType === 'ethereum' || walletType === 'metamask') {
+                // MetaMask的深度链接
+                deepLinkUrl = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
+                universalLinkUrl = deepLinkUrl;
+                
+                // 应用商店链接
+                if (navigator.userAgent.toLowerCase().includes('iphone') || 
+                    navigator.userAgent.toLowerCase().includes('ipad')) {
+                    appStoreUrl = 'https://apps.apple.com/app/metamask/id1438144202';
+                } else {
+                    appStoreUrl = 'https://play.google.com/store/apps/details?id=io.metamask';
+                }
+            } else {
+                console.warn(`[tryMobileWalletRedirect] 不支持的钱包类型: ${walletType}`);
+                return false;
+            }
+            
+            // 设置钱包返回检测标记
+            sessionStorage.setItem('pendingWalletConnection', walletType);
+            sessionStorage.setItem('walletConnectionStartTime', Date.now().toString());
+            
+            // 尝试深度链接跳转
+            console.log(`[tryMobileWalletRedirect] 尝试深度链接: ${deepLinkUrl}`);
+            const deepLinkSuccess = await this.attemptDeepLink(deepLinkUrl);
+            
+            if (deepLinkSuccess) {
+                console.log(`[tryMobileWalletRedirect] 深度链接跳转成功`);
+                return true;
+            }
+            
+            // 深度链接失败，尝试通用链接
+            console.log(`[tryMobileWalletRedirect] 深度链接失败，尝试通用链接: ${universalLinkUrl}`);
+            const universalLinkSuccess = await this.attemptUniversalLink(universalLinkUrl);
+            
+            if (universalLinkSuccess) {
+                console.log(`[tryMobileWalletRedirect] 通用链接跳转成功`);
+                return true;
+            }
+            
+            // 所有跳转都失败，提示用户下载应用
+            console.log(`[tryMobileWalletRedirect] 所有跳转失败，提示下载应用`);
+            const shouldDownload = confirm(`${walletType === 'phantom' ? 'Phantom' : 'MetaMask'} wallet app not detected. Would you like to download it?`);
+            
+            if (shouldDownload && appStoreUrl) {
+                window.open(appStoreUrl, '_blank');
+            }
+            
+            return false;
+            
+        } catch (error) {
+            console.error(`[tryMobileWalletRedirect] 移动端钱包跳转失败:`, error);
+            return false;
+        }
+    },
+    
+    /**
+     * 尝试深度链接跳转
+     * @param {string} deepLinkUrl - 深度链接URL
+     * @returns {Promise<boolean>} 是否成功跳转
+     */
+    async attemptDeepLink(deepLinkUrl) {
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                resolve(false);
+            }, 2500); // 2.5秒超时
+            
+            // 创建隐藏的iframe尝试跳转
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = deepLinkUrl;
+            
+            document.body.appendChild(iframe);
+            
+            // 检测页面是否失去焦点（表示跳转成功）
+            const startTime = Date.now();
+            const checkVisibility = () => {
+                if (document.hidden || Date.now() - startTime > 1000) {
+                    clearTimeout(timeout);
+                    document.body.removeChild(iframe);
+                    resolve(true);
+                } else {
+                    setTimeout(checkVisibility, 100);
+                }
+            };
+            
+            setTimeout(() => {
+                checkVisibility();
+                // 清理iframe
+                setTimeout(() => {
+                    if (iframe && iframe.parentNode) {
+                        document.body.removeChild(iframe);
+                    }
+                }, 1000);
+            }, 500);
+        });
+    },
+    
+    /**
+     * 尝试通用链接跳转
+     * @param {string} universalLinkUrl - 通用链接URL
+     * @returns {Promise<boolean>} 是否成功跳转
+     */
+    async attemptUniversalLink(universalLinkUrl) {
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                resolve(false);
+            }, 3000); // 3秒超时
+            
+            // 创建隐藏的链接并点击
+            const link = document.createElement('a');
+            link.href = universalLinkUrl;
+            link.target = '_blank';
+            link.style.display = 'none';
+            
+            document.body.appendChild(link);
+            link.click();
+            
+            // 检测页面是否失去焦点
+            const startTime = Date.now();
+            const checkVisibility = () => {
+                if (document.hidden || Date.now() - startTime > 1500) {
+                    clearTimeout(timeout);
+                    document.body.removeChild(link);
+                    resolve(true);
+                } else if (Date.now() - startTime < 2500) {
+                    setTimeout(checkVisibility, 100);
+                }
+            };
+            
+            setTimeout(() => {
+                checkVisibility();
+                // 清理链接
+                setTimeout(() => {
+                    if (link && link.parentNode) {
+                        document.body.removeChild(link);
+                    }
+                }, 1000);
+            }, 500);
+        });
+    },
+    
+    /**
+     * 生成随机密钥（用于钱包连接）
+     * @returns {string} 随机密钥
+     */
+    generateRandomKey() {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+    },
+
     transferToken: async function(tokenSymbol, to, amount) {
         console.log(`wallet.transferToken被调用: ${tokenSymbol}, ${to}, ${amount}`);
         

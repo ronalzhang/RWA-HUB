@@ -57,10 +57,10 @@
   function showMessage(message, type = 'info', title = null) {
     if (typeof Swal !== 'undefined') {
       const swalConfig = {
-        title: title || (type === 'error' ? '错误' : (type === 'success' ? '成功' : '提示')),
+        title: title || (type === 'error' ? 'Error' : (type === 'success' ? 'Success' : 'Notice')),
         text: message,
         icon: type,
-        confirmButtonText: '确定',
+        confirmButtonText: 'OK',
         confirmButtonColor: '#007bff',
         customClass: {
           popup: 'swal2-popup-custom',
