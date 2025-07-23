@@ -1,3 +1,11 @@
+// 安全的翻译函数
+function safeTranslate(text) {
+    if (typeof window._ === 'function') {
+        return window._(text);
+    }
+    return text;
+}
+
 // 配置常量
 const CONFIG = {
     IMAGE: {
@@ -780,7 +788,7 @@ async function handleFiles(files, fileType) {
         if (!container) return;
         
     if (uploadedImages.length === 0) {
-        container.innerHTML = `<div class="text-center text-muted">${window._("No images uploaded")}</div>`;
+        container.innerHTML = `<div class="text-center text-muted">${safeTranslate("No images uploaded")}</div>`;
             return;
         }
         
@@ -789,7 +797,7 @@ async function handleFiles(files, fileType) {
             html += `
                 <div class="col-md-4">
                     <div class="position-relative">
-                    <img src="${image.url}" class="img-fluid rounded" alt="${window._("Asset Image")}">
+                    <img src="${image.url}" class="img-fluid rounded" alt="${safeTranslate("Asset Image")}">
                         <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2" 
                                 onclick="removeImage(${index})">
                             <i class="fas fa-times"></i>
@@ -808,7 +816,7 @@ async function handleFiles(files, fileType) {
         if (!container) return;
         
     if (uploadedDocuments.length === 0) {
-        container.innerHTML = `<div class="text-center text-muted">${window._("No documents uploaded")}</div>`;
+        container.innerHTML = `<div class="text-center text-muted">${safeTranslate("No documents uploaded")}</div>`;
             return;
         }
         

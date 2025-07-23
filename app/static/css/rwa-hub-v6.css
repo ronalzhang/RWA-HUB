@@ -395,15 +395,15 @@ body {
     100% { left: 100%; }
 }
 
-/* 固定宽度设计 - 移除响应式断点 */
+/* 固定宽度设计 - 优化为980px */
 body {
-    min-width: 1200px;
+    min-width: 980px;
     overflow-x: auto;
 }
 
 .container,
 .container-fluid {
-    width: 1200px;
+    width: 980px;
     max-width: none;
     margin: 0 auto;
     padding-left: 15px;

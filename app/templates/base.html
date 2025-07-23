@@ -2,7 +2,7 @@
 <html lang="{{ g.locale }}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=1200, initial-scale=0.3, minimum-scale=0.1, maximum-scale=2.0, user-scalable=yes">
+    <meta name="viewport" content="width=980, initial-scale=0.4, minimum-scale=0.2, maximum-scale=3.0, user-scalable=yes">
     <title>{% block title %}{% endblock %}</title>
     
     <!-- 阻止Font Awesome Kit的加载 -->
@@ -60,14 +60,14 @@
             background-color: #fff;
         }
         
-        /* 固定宽度布局 - 移除响应式断点 */
+        /* 固定宽度布局 - 优化宽度 */
         body {
-            min-width: 1200px;
+            min-width: 980px;
             overflow-x: auto;
         }
         
         .container {
-            width: 1200px;
+            width: 980px;
             max-width: none;
             margin: 0 auto;
         }
@@ -795,6 +795,14 @@
     
     <!-- JavaScript翻譯字典 - 置於其他JS腳本之前 -->
     <script>
+    // 立即定义翻译函数，确保在所有脚本加载前可用
+    window._ = function(text) {
+        if (typeof window.translations === 'object' && window.translations !== null) {
+            return window.translations[text] || text;
+        }
+        return text;
+    };
+    
     // 全局翻譯字典，供JavaScript使用
     window.translations = {
         // 通用
@@ -968,11 +976,74 @@
         // 确保语言下拉菜单正常工作
         const languageDropdown = document.getElementById('languageDropdown');
         if (languageDropdown) {
-            // 使用Bootstrap的dropdown功能
+            // 移动端兼容性处理
+            languageDropdown.addEventListener('touchstart', function(e) {
+                e.stopPropagation();
+            }, { passive: true });
+            
+            languageDropdown.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const dropdownMenu = languageDropdown.nextElementSibling;
+                if (dropdownMenu && dropdownMenu.classList.contains('dropdown-menu')) {
+                    const isVisible = dropdownMenu.classList.contains('show');
+                    
+                    // 关闭所有其他下拉菜单
+                    document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+                        if (menu !== dropdownMenu) {
+                            menu.classList.remove('show');
+                        }
+                    });
+                    
+                    // 切换当前菜单
+                    if (isVisible) {
+                        dropdownMenu.classList.remove('show');
+                    } else {
+                        dropdownMenu.classList.add('show');
+                    }
+                }
+            });
+            
+            // 使用Bootstrap的dropdown功能作为备用
             if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
-                new bootstrap.Dropdown(languageDropdown);
+                try {
+                    new bootstrap.Dropdown(languageDropdown);
+                } catch (e) {
+                    console.log('Bootstrap dropdown初始化失败，使用自定义实现');
+                }
             }
         }
+        
+        // 钱包按钮移动端兼容性处理
+        const walletBtn = document.getElementById('walletBtn');
+        if (walletBtn) {
+            walletBtn.addEventListener('touchstart', function(e) {
+                e.stopPropagation();
+            }, { passive: true });
+            
+            // 确保点击事件正确绑定
+            walletBtn.addEventListener('click', function(e) {
+                console.log('钱包按钮被点击');
+                checkWalletConnection(e);
+            });
+        }
+        
+        // 为语言切换项添加移动端支持
+        document.querySelectorAll('.dropdown-item').forEach(item => {
+            item.addEventListener('touchstart', function(e) {
+                e.stopPropagation();
+            }, { passive: true });
+        });
+        
+        // 点击外部关闭所有下拉菜单
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.dropdown')) {
+                document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+                    menu.classList.remove('show');
+                });
+            }
+        });
         
         // 初始化钱包按钮状态
         setTimeout(function() {
@@ -1048,9 +1119,17 @@
         "MetaMask not installed!": "{{ _('MetaMask not installed!') }}"
     };
     
-    // 定義一個全局翻譯函數
+    // 定義一個全局翻譯函數 - 确保立即可用
     window._ = function(text) {
-        return window.translations[text] || text;
+        if (typeof window.translations === 'object' && window.translations !== null) {
+            return window.translations[text] || text;
+        }
+        return text;
+    };
+    
+    // 确保翻译函数在所有脚本加载前就可用
+    if (typeof window._ !== 'function') {
+        window._ = function(text) { return text; };
     }
     </script>
 

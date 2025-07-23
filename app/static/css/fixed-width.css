@@ -3,9 +3,9 @@
  * 确保所有页面在手机和电脑上显示相同的布局，只是等比例缩放
  */
 
-/* 基础固定宽度设置 */
+/* 基础固定宽度设置 - 优化为980px */
 html, body {
-    min-width: 1200px;
+    min-width: 980px;
     overflow-x: auto;
 }
 
@@ -17,7 +17,7 @@ html, body {
 .container-lg,
 .container-xl,
 .container-xxl {
-    width: 1200px !important;
+    width: 980px !important;
     max-width: none !important;
     margin: 0 auto !important;
     padding-left: 15px !important;
@@ -27,52 +27,52 @@ html, body {
 /* 移除所有响应式断点 */
 @media (min-width: 576px) {
     .container-sm {
-        width: 1200px !important;
+        width: 980px !important;
         max-width: none !important;
     }
 }
 
 @media (min-width: 768px) {
     .container-md {
-        width: 1200px !important;
+        width: 980px !important;
         max-width: none !important;
     }
 }
 
 @media (min-width: 992px) {
     .container-lg {
-        width: 1200px !important;
+        width: 980px !important;
         max-width: none !important;
     }
 }
 
 @media (min-width: 1200px) {
     .container-xl {
-        width: 1200px !important;
+        width: 980px !important;
         max-width: none !important;
     }
 }
 
 @media (min-width: 1400px) {
     .container-xxl {
-        width: 1200px !important;
+        width: 980px !important;
         max-width: none !important;
     }
 }
 
 /* 导航栏固定样式 */
 .navbar {
-    min-width: 1200px;
+    min-width: 980px;
 }
 
 .navbar .container {
-    width: 1200px !important;
+    width: 980px !important;
 }
 
 /* 表格固定宽度 */
 .table-responsive {
     overflow-x: auto;
-    min-width: 1200px;
+    min-width: 980px;
 }
 
 /* 卡片网格固定布局 */
@@ -280,7 +280,7 @@ img {
 .overflow-hidden { overflow: hidden !important; }
 .overflow-scroll { overflow: scroll !important; }
 
-/* 钱包和语言切换按钮确保可点击 */
+/* 钱包和语言切换按钮确保可点击 - 增强移动端支持 */
 .language-dropdown .btn,
 .wallet-btn,
 #walletBtn,
@@ -292,6 +292,31 @@ img {
     -ms-user-select: none;
     pointer-events: auto;
     touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(0,0,0,0.1);
+    position: relative;
+    z-index: 10;
+}
+
+/* 移动端触摸优化 */
+@media (hover: none) and (pointer: coarse) {
+    .language-dropdown .btn,
+    .wallet-btn,
+    #walletBtn,
+    #languageDropdown {
+        min-height: 44px;
+        min-width: 44px;
+        padding: 8px 12px;
+    }
+    
+    /* 确保下拉菜单项可点击 */
+    .dropdown-item {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        padding: 12px 16px;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: rgba(0,0,0,0.1);
+    }
 }
 
 /* 确保下拉菜单在固定布局中正常工作 */
