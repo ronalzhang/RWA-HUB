@@ -630,7 +630,9 @@
                     
                     <!-- 钱包按钮和下拉菜单 -->
                     <div class="wallet-dropdown" id="walletDropdown">
-                        <button id="walletBtn" class="btn btn-primary" type="button" style="display: inline-flex; align-items: center; gap:4px; padding:6px 12px; font-size:14px; max-width:160px; border:none; background:#0d6efd; color:#fff; border-radius:6px; cursor: pointer;">
+                        <button id="walletBtn" class="btn btn-primary" type="button" 
+                                style="display: inline-flex; align-items: center; gap:4px; padding:6px 12px; font-size:14px; max-width:160px; border:none; background:#0d6efd; color:#fff; border-radius:6px; cursor: pointer; pointer-events: auto; user-select: none;"
+                                onclick="console.log('钱包按钮直接点击测试'); checkWalletConnection(event);">
                             <i class="fas fa-wallet" style="margin-right:2px;"></i>
                             <span id="walletBtnText" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ _('Connect Wallet') }}</span>
                         </button>
@@ -780,23 +782,39 @@
             event.stopPropagation();
         }
         
-        // 等待钱包模块加载完成
-        function waitForWallet(retries = 10) {
-            if (retries <= 0) {
-                console.error('钱包模块加载超时');
-                alert('钱包连接功能暂时不可用，请刷新页面重试');
-                return;
-            }
+        // 检查钱包模块是否已加载
+        if (!window.walletState) {
+            console.log('钱包模块未加载，尝试等待...');
             
-            if (!window.walletState) {
-                console.log('等待钱包模块加载...', retries);
-                setTimeout(() => waitForWallet(retries - 1), 100);
-                return;
-            }
+            // 等待最多3秒
+            let attempts = 0;
+            const maxAttempts = 30;
             
-            // 钱包模块已加载，继续处理
+            const checkInterval = setInterval(() => {
+                attempts++;
+                
+                if (window.walletState) {
+                    console.log('钱包模块已加载');
+                    clearInterval(checkInterval);
+                    proceedWithWalletCheck();
+                } else if (attempts >= maxAttempts) {
+                    console.error('钱包模块加载超时');
+                    clearInterval(checkInterval);
+                    alert('钱包连接功能暂时不可用，请刷新页面重试');
+                }
+            }, 100);
+            
+            return;
+        }
+        
+        proceedWithWalletCheck();
+        
+        function proceedWithWalletCheck() {
+            // 检查是否已连接钱包
             const isConnected = window.walletState && (window.walletState.isConnected || window.walletState.connected);
             const walletAddress = localStorage.getItem('walletAddress');
+            
+            console.log('钱包连接状态:', { isConnected, walletAddress });
             
             if (isConnected || walletAddress) {
                 // 已连接，显示钱包菜单
@@ -805,16 +823,20 @@
             } else {
                 // 未连接，打开钱包选择器
                 console.log('钱包未连接，打开选择器');
-                if (typeof window.walletState.openWalletSelector === 'function') {
-                    window.walletState.openWalletSelector();
+                
+                if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+                    try {
+                        window.walletState.openWalletSelector();
+                    } catch (error) {
+                        console.error('打开钱包选择器失败:', error);
+                        alert('钱包连接功能出现错误，请刷新页面重试');
+                    }
                 } else {
                     console.error('钱包选择器函数不存在');
                     alert('钱包连接功能暂时不可用，请刷新页面重试');
                 }
             }
         }
-        
-        waitForWallet();
     }
     
     // 切换钱包菜单显示
@@ -917,35 +939,35 @@
         
         // 语言切换器已移除
         
-        // 钱包按钮初始化 - 延迟执行确保DOM和脚本完全加载
-        setTimeout(function() {
+        // 钱包按钮初始化 - 简化版本
+        function initWalletButton() {
             const walletBtn = document.getElementById('walletBtn');
             if (walletBtn) {
                 console.log('找到钱包按钮，开始初始化');
                 
-                // 清除所有现有事件监听器
-                walletBtn.removeAttribute('onclick');
-                
-                // 克隆按钮以移除所有事件监听器
-                const newWalletBtn = walletBtn.cloneNode(true);
-                walletBtn.parentNode.replaceChild(newWalletBtn, walletBtn);
-                
-                // 重新获取按钮引用
-                const walletButton = document.getElementById('walletBtn');
-                
-                // 添加单一点击事件处理器
-                walletButton.addEventListener('click', function(e) {
+                // 直接设置onclick属性，这是最可靠的方法
+                walletBtn.onclick = function(e) {
                     console.log('钱包按钮被点击');
                     e.preventDefault();
                     e.stopPropagation();
                     checkWalletConnection(e);
-                });
+                    return false;
+                };
+                
+                // 确保按钮可点击
+                walletBtn.style.pointerEvents = 'auto';
+                walletBtn.style.cursor = 'pointer';
                 
                 console.log('钱包按钮事件绑定完成');
             } else {
                 console.error('找不到钱包按钮元素');
+                // 如果没找到，1秒后重试
+                setTimeout(initWalletButton, 1000);
             }
-        }, 500);  // 延迟500ms确保所有脚本加载完成
+        }
+        
+        // 立即尝试初始化，如果失败会自动重试
+        initWalletButton();
         
         // 语言切换项已移除
         
@@ -1326,6 +1348,21 @@
     <!-- 钱包主脚本 -->
     <script src="{{ url_for('static', filename='js/wallet.js') }}?v=20241231-fix3&t=1735659600"></script>
     <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
+    
+    <!-- 钱包按钮初始化脚本 -->
+    <script>
+        // 确保钱包脚本加载完成后初始化按钮
+        document.addEventListener('DOMContentLoaded', function() {
+            // 等待一小段时间确保所有脚本都加载完成
+            setTimeout(function() {
+                if (typeof initWalletButton === 'function') {
+                    initWalletButton();
+                } else {
+                    console.error('initWalletButton函数未定义');
+                }
+            }, 100);
+        });
+    </script>
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {

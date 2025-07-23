@@ -339,9 +339,8 @@ section[id="assets"] .card .card-text,
 
 /* Hero按钮区域样式 - 优化布局 */
 .index-page .hero-buttons {
-    margin-top: 3rem !important;
-    padding-top: 2rem !important;
-    border-top: 1px solid rgba(255,255,255,0.1) !important;
+    margin-top: 2rem !important;
+    padding-top: 0 !important;
 }
 
 .index-page .hero-buttons .d-flex {
