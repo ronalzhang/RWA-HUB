@@ -459,45 +459,7 @@ section[id="assets"] .card .card-text,
     box-shadow: 0 30px 80px rgba(0,0,0,0.4) !important;
 }
 
-/* 响应式调整 */
-@media (max-width: 991.98px) {
-    .index-page .hero-content {
-        padding-right: 0 !important;
-        text-align: center !important;
-        margin-bottom: 2rem !important;
-    }
-    
-    .index-page .platform-illustration {
-        padding-left: 0 !important;
-        margin-top: 2rem !important;
-    }
-    
-    .index-page .hero-content h1 {
-        font-size: 2.5rem !important;
-    }
-    
-    .index-page .hero-content p.lead {
-        font-size: 1.1rem !important;
-        max-width: 100% !important;
-    }
-}
-
-@media (max-width: 767.98px) {
-    .index-page .hero-content h1 {
-        font-size: 2rem !important;
-    }
-    
-    .index-page .hero-buttons .d-flex {
-        flex-direction: column !important;
-        gap: 1rem !important;
-    }
-    
-    .index-page .hero-buttons .btn {
-        min-width: 250px !important;
-        width: 100% !important;
-        max-width: 300px !important;
-    }
-}
+/* 移除响应式调整，保持固定宽度等比例缩小 */
 
 .index-page .card-body {
     padding: 1rem !important;

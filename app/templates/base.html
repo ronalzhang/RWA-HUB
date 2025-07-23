@@ -780,37 +780,41 @@
             event.stopPropagation();
         }
         
-        // 检查是否已连接钱包
-        const isConnected = window.walletState && (window.walletState.isConnected || window.walletState.connected);
-        const walletAddress = localStorage.getItem('walletAddress');
-        
-        if (isConnected || walletAddress) {
-            // 已连接，显示钱包菜单
-            toggleWalletMenu();
-        } else {
-            // 未连接，打开钱包选择器
-            if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
-                console.log('调用钱包选择器');
-                window.walletState.openWalletSelector();
-            } else if (typeof window.openWalletSelector === 'function') {
-                console.log('调用全局钱包选择器');
-                window.openWalletSelector();
+        // 等待钱包模块加载完成
+        function waitForWallet(retries = 10) {
+            if (retries <= 0) {
+                console.error('钱包模块加载超时');
+                alert('钱包连接功能暂时不可用，请刷新页面重试');
+                return;
+            }
+            
+            if (!window.walletState) {
+                console.log('等待钱包模块加载...', retries);
+                setTimeout(() => waitForWallet(retries - 1), 100);
+                return;
+            }
+            
+            // 钱包模块已加载，继续处理
+            const isConnected = window.walletState && (window.walletState.isConnected || window.walletState.connected);
+            const walletAddress = localStorage.getItem('walletAddress');
+            
+            if (isConnected || walletAddress) {
+                // 已连接，显示钱包菜单
+                console.log('钱包已连接，显示菜单');
+                toggleWalletMenu();
             } else {
-                console.error('钱包选择器函数不存在，尝试重新加载钱包模块');
-                // 尝试重新初始化钱包
-                if (window.walletState) {
-                    console.log('钱包状态存在，尝试直接调用');
-                    try {
-                        window.walletState.openWalletSelector();
-                    } catch (e) {
-                        console.error('调用钱包选择器失败:', e);
-                        alert('钱包连接功能暂时不可用，请刷新页面重试');
-                    }
+                // 未连接，打开钱包选择器
+                console.log('钱包未连接，打开选择器');
+                if (typeof window.walletState.openWalletSelector === 'function') {
+                    window.walletState.openWalletSelector();
                 } else {
-                    alert('钱包连接模块未加载，请刷新页面重试');
+                    console.error('钱包选择器函数不存在');
+                    alert('钱包连接功能暂时不可用，请刷新页面重试');
                 }
             }
         }
+        
+        waitForWallet();
     }
     
     // 切换钱包菜单显示
@@ -913,38 +917,35 @@
         
         // 语言切换器已移除
         
-        // 钱包按钮移动端兼容性处理
-        const walletBtn = document.getElementById('walletBtn');
-        if (walletBtn) {
-            console.log('找到钱包按钮，绑定事件');
-            
-            // 移除现有的onclick属性，避免冲突
-            walletBtn.removeAttribute('onclick');
-            
-            // 添加触摸事件支持
-            walletBtn.addEventListener('touchstart', function(e) {
-                e.stopPropagation();
-                console.log('钱包按钮触摸开始');
-            }, { passive: true });
-            
-            // 添加点击事件
-            walletBtn.addEventListener('click', function(e) {
-                console.log('钱包按钮被点击');
-                e.preventDefault();
-                e.stopPropagation();
-                checkWalletConnection(e);
-            });
-            
-            // 添加触摸结束事件作为备用
-            walletBtn.addEventListener('touchend', function(e) {
-                console.log('钱包按钮触摸结束');
-                e.preventDefault();
-                e.stopPropagation();
-                checkWalletConnection(e);
-            }, { passive: false });
-        } else {
-            console.error('找不到钱包按钮元素');
-        }
+        // 钱包按钮初始化 - 延迟执行确保DOM和脚本完全加载
+        setTimeout(function() {
+            const walletBtn = document.getElementById('walletBtn');
+            if (walletBtn) {
+                console.log('找到钱包按钮，开始初始化');
+                
+                // 清除所有现有事件监听器
+                walletBtn.removeAttribute('onclick');
+                
+                // 克隆按钮以移除所有事件监听器
+                const newWalletBtn = walletBtn.cloneNode(true);
+                walletBtn.parentNode.replaceChild(newWalletBtn, walletBtn);
+                
+                // 重新获取按钮引用
+                const walletButton = document.getElementById('walletBtn');
+                
+                // 添加单一点击事件处理器
+                walletButton.addEventListener('click', function(e) {
+                    console.log('钱包按钮被点击');
+                    e.preventDefault();
+                    e.stopPropagation();
+                    checkWalletConnection(e);
+                });
+                
+                console.log('钱包按钮事件绑定完成');
+            } else {
+                console.error('找不到钱包按钮元素');
+            }
+        }, 500);  // 延迟500ms确保所有脚本加载完成
         
         // 语言切换项已移除
         
@@ -1088,12 +1089,7 @@
                                 walletBtn.removeAttribute('data-bs-toggle');
                                 walletBtn.classList.remove('dropdown-toggle');
                                 
-                                // 确保钱包按钮有点击事件
-                                walletBtn.onclick = function(event) {
-                                console.log('钱包按钮被点击');
-                                    checkWalletConnection(event);
-                                    return false;
-                                };
+                                // 钱包按钮事件已在上面统一处理，这里不再重复绑定
                                 
                             console.log('钱包按钮事件已重新绑定');
                             }
