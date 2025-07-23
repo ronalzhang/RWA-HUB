@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="RWA-HUB 6.0 - Professional Real World Asset Management Platform">
+    <meta name="description" content="RWA-HUB - Professional Real World Asset Tokenization Platform">
     <meta name="keywords" content="RWA,Asset Management,Blockchain,Web3,DeFi,Trading,Investment">
     <meta name="author" content="RWA-HUB Team">
-    <title>{% block title %}{% endblock %} - RWA-HUB 6.0</title>
+    <title>{% block title %}{% endblock %}</title>
     
     <!-- Preload critical resources -->
     <link rel="preload" href="{{ url_for('static', filename='css/rwa-hub-v6.css') }}" as="style">
@@ -14,295 +14,225 @@
     
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Bootstrap CSS (minimal) -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- CSS Framework -->
+    <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/all.min.css') }}" rel="stylesheet">
     
-    <!-- Font Awesome -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    
-    <!-- RWA-HUB 6.0 Dark Glass Theme -->
+    <!-- Main Styles -->
     <link href="{{ url_for('static', filename='css/rwa-hub-v6.css') }}" rel="stylesheet">
     
-    <!-- Additional page-specific styles -->
+    <!-- Block for page-specific styles -->
     {% block styles %}{% endblock %}
     
-    <!-- Global JavaScript variables -->
+    <!-- Web3 Dependencies -->
+    <script src="{{ url_for('static', filename='vendor/web3.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/axios.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/config.js') }}"></script>
+    
+    <!-- Performance optimization -->
     <script>
-        window.RWA_HUB_CONFIG = {
-            version: '6.0',
-            theme: 'dark-glass',
-            locale: 'en',
-            csrfToken: '',
-                            api: {
-                baseUrl: '/',
-                endpoints: {
-                    auth: '/admin/login',
-                    assets: '/assets',
-                    admin: '/admin'
-                }
-            }
-        };
+        // Preload critical images
+        const preloadImages = [
+            "{{ url_for('static', filename='images/platform-illustration.png') }}",
+            "{{ url_for('static', filename='images/hero-illustration.svg') }}"
+        ];
+        preloadImages.forEach(src => {
+            const link = document.createElement('link');
+            link.rel = 'preload';
+            link.as = 'image';
+            link.href = src;
+            document.head.appendChild(link);
+        });
     </script>
 </head>
-<body class="d-flex flex-column h-100">
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-v6">
-        <div class="container-fluid">
-            <!-- Brand -->
-            <a class="navbar-brand" href="/">
-                <i class="fas fa-cube me-2"></i>
-                RWA-HUB <span class="text-muted">6.0</span>
-            </a>
-            
-            <!-- Mobile toggle -->
-            <button class="navbar-toggler btn-glass-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <i class="fas fa-bars"></i>
-            </button>
-            
-            <!-- Navigation items -->
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">
-                            <i class="fas fa-home me-1"></i>
-                            Home
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/assets">
-                            <i class="fas fa-chart-line me-1"></i>
-                            Assets
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/portfolio">
-                            <i class="fas fa-briefcase me-1"></i>
-                            Portfolio
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/market">
-                            <i class="fas fa-chart-bar me-1"></i>
-                            Market
-                        </a>
-                    </li>
-                </ul>
-                
-                <!-- Right side items -->
-                <ul class="navbar-nav">
-                    <!-- Language selector -->
-                    <li class="nav-item dropdown me-3">
-                        <a class="nav-link dropdown-toggle btn-glass-secondary" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-globe me-1"></i>
-                            <span class="d-none d-md-inline">Language</span>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end glass-container">
-                            <li><a class="dropdown-item" href="#" onclick="setLanguage('en')">English</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="setLanguage('zh')">繁體中文</a></li>
-                        </ul>
-                    </li>
-                    
-                    <!-- Theme toggle -->
-                    <li class="nav-item me-3">
-                        <button class="btn btn-glass-secondary" onclick="toggleTheme()">
-                            <i class="fas fa-moon" id="theme-icon"></i>
-                        </button>
-                    </li>
-                    
-                    <!-- User menu -->
-                    {% if current_user.is_authenticated %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle btn-glass-secondary" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-user me-1"></i>
-                                <span class="d-none d-md-inline">{{ current_user.username }}</span>
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end glass-container">
-                                <li><a class="dropdown-item" href="/profile">
-                                    <i class="fas fa-user-circle me-2"></i>Profile
-                                </a></li>
-                                <li><a class="dropdown-item" href="/settings">
-                                    <i class="fas fa-cog me-2"></i>Settings
-                                </a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="/admin">
-                                    <i class="fas fa-shield-alt me-2"></i>Admin Panel
-                                </a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="/logout">
-                                    <i class="fas fa-sign-out-alt me-2"></i>Logout
-                                </a></li>
-                            </ul>
-                        </li>
-                    {% else %}
-                        <li class="nav-item">
-                            <a class="btn btn-glass-primary me-2" href="/admin/login">
-                                <i class="fas fa-sign-in-alt me-1"></i>Login
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="btn btn-glass-secondary" href="/admin/register">
-                                <i class="fas fa-user-plus me-1"></i>Register
-                            </a>
-                        </li>
-                    {% endif %}
-                </ul>
-            </div>
-        </div>
-    </nav>
+<body class="bg-dark text-light">
+    <!-- 全局通知容器 -->
+    <div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
     
-    <!-- Flash messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="flash-messages position-fixed top-0 end-0 p-3" style="z-index: 1100; margin-top: 80px;">
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show glass-container" role="alert">
-                        <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'info-circle' }} me-2"></i>
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
-    
-    <!-- Main content -->
-    <main class="flex-grow-1" style="padding-top: 80px;">
+    <!-- 主要内容区域 -->
+    <div id="main-wrapper" class="min-vh-100">
         {% block content %}{% endblock %}
-    </main>
-    
-    <!-- Footer -->
-    <footer class="glass-container mt-5">
-        <div class="container-fluid py-4">
-            <div class="row">
-                <div class="col-md-6">
-                    <h5 class="text-primary">RWA-HUB 6.0</h5>
-                    <p class="text-muted">Professional RWA Asset Management Platform</p>
+    </div>
+
+    <!-- 钱包连接模态框 -->
+    <div class="modal fade" id="walletModal" tabindex="-1" aria-labelledby="walletModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-light" id="walletModalLabel">{{ _('Connect Wallet') }}</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="col-md-3">
-                    <h6>Quick Links</h6>
-                    <ul class="list-unstyled">
-                        <li><a href="/about" class="text-muted">About Us</a></li>
-                        <li><a href="/help" class="text-muted">Help Center</a></li>
-                        <li><a href="/terms" class="text-muted">Terms of Service</a></li>
-                    </ul>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <!-- MetaMask -->
+                        <div class="col-6">
+                            <button class="btn btn-outline-light w-100 h-100 p-3 wallet-option" data-wallet="metamask">
+                                <img src="{{ url_for('static', filename='images/wallets/metamask.png') }}" 
+                                     alt="MetaMask" class="mb-2" style="width: 48px; height: 48px;">
+                                <div class="fw-bold">MetaMask</div>
+                            </button>
+                        </div>
+                        <!-- WalletConnect -->
+                        <div class="col-6">
+                            <button class="btn btn-outline-light w-100 h-100 p-3 wallet-option" data-wallet="walletconnect">
+                                <img src="{{ url_for('static', filename='images/wallets/walletconnect.svg') }}" 
+                                     alt="WalletConnect" class="mb-2" style="width: 48px; height: 48px;">
+                                <div class="fw-bold">WalletConnect</div>
+                            </button>
+                        </div>
+                        <!-- Coinbase -->
+                        <div class="col-6">
+                            <button class="btn btn-outline-light w-100 h-100 p-3 wallet-option" data-wallet="coinbase">
+                                <img src="{{ url_for('static', filename='images/wallets/coinbase.png') }}" 
+                                     alt="Coinbase" class="mb-2" style="width: 48px; height: 48px;">
+                                <div class="fw-bold">Coinbase</div>
+                            </button>
+                        </div>
+                        <!-- Trust Wallet -->
+                        <div class="col-6">
+                            <button class="btn btn-outline-light w-100 h-100 p-3 wallet-option" data-wallet="trust">
+                                <img src="{{ url_for('static', filename='images/wallets/trust.png') }}" 
+                                     alt="Trust Wallet" class="mb-2" style="width: 48px; height: 48px;">
+                                <div class="fw-bold">Trust Wallet</div>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-3">
-                    <h6>Contact Us</h6>
-                    <ul class="list-unstyled">
-                        <li><i class="fas fa-envelope me-2"></i>support@rwa-hub.com</li>
-                        <li><i class="fas fa-phone me-2"></i>+86 400-888-0000</li>
-                        <li>
-                            <a href="#" class="text-muted me-2"><i class="fab fa-twitter"></i></a>
-                            <a href="#" class="text-muted me-2"><i class="fab fa-telegram"></i></a>
-                            <a href="#" class="text-muted"><i class="fab fa-discord"></i></a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-            <hr class="my-4">
-            <div class="row">
-                <div class="col-md-6">
-                    <p class="text-muted mb-0">&copy; 2025 RWA-HUB. All Rights Reserved</p>
-                </div>
-                <div class="col-md-6 text-md-end">
-                    <p class="text-muted mb-0">Version 6.0 | Build: 2025-07-08</p>
-                </div>
-            </div>
-        </div>
-    </footer>
-    
-    <!-- Loading overlay -->
-    <div id="loading-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" style="background: rgba(10, 15, 26, 0.9); z-index: 9999;">
-        <div class="d-flex justify-content-center align-items-center h-100">
-            <div class="glass-container p-4 text-center">
-                <div class="spinner-border text-primary mb-3" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="text-muted mb-0">Loading, please wait...</p>
             </div>
         </div>
     </div>
+
+    <!-- JavaScript Dependencies -->
+    <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/jquery.min.js') }}"></script>
     
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+    <!-- Web3 and Wallet Integration -->
+    <script src="{{ url_for('static', filename='js/wallet_unified.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/auth-service.js') }}"></script>
     
-    <!-- Core JavaScript -->
+    <!-- Global JavaScript -->
     <script>
-        // Theme toggle functionality
-        function toggleTheme() {
-            const body = document.body;
-            const themeIcon = document.getElementById('theme-icon');
+        // 全局变量
+        window.RWA_HUB = {
+            current_user_address: "{{ current_user_address or '' }}",
+            csrf_token: "{{ csrf_token() }}",
+            locale: "{{ g.locale }}",
+            api_base: "/api",
+            static_url: "{{ url_for('static', filename='') }}"
+        };
+
+        // 通知系统
+        function showToast(message, type = 'info', duration = 5000) {
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-white bg-${type} border-0`;
+            toast.setAttribute('role', 'alert');
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            document.getElementById('toast-container').appendChild(toast);
             
-            if (body.classList.contains('light-theme')) {
-                body.classList.remove('light-theme');
-                themeIcon.className = 'fas fa-moon';
-                localStorage.setItem('theme', 'dark');
-            } else {
-                body.classList.add('light-theme');
-                themeIcon.className = 'fas fa-sun';
-                localStorage.setItem('theme', 'light');
-            }
-        }
-        
-        // Initialize theme
-        document.addEventListener('DOMContentLoaded', function() {
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'light') {
-                document.body.classList.add('light-theme');
-                document.getElementById('theme-icon').className = 'fas fa-sun';
-            }
-        });
-        
-        // Loading overlay utilities
-        window.showLoading = function() {
-            document.getElementById('loading-overlay').classList.remove('d-none');
-        };
-        
-        window.hideLoading = function() {
-            document.getElementById('loading-overlay').classList.add('d-none');
-        };
-        
-        // Language switching function
-        window.setLanguage = function(lang) {
-            localStorage.setItem('language', lang);
-            location.reload();
-        };
-        
-        // Auto-hide flash messages
-        document.addEventListener('DOMContentLoaded', function() {
-            const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(alert => {
-                setTimeout(() => {
-                    if (alert.parentNode) {
-                        alert.classList.add('fade-out');
-                        setTimeout(() => alert.remove(), 300);
-                    }
-                }, 5000);
+            const bsToast = new bootstrap.Toast(toast, { delay: duration });
+            bsToast.show();
+            
+            toast.addEventListener('hidden.bs.toast', () => {
+                toast.remove();
             });
+        }
+
+        // 错误处理
+        window.addEventListener('error', function(e) {
+            console.error('Global error:', e.error);
+            showToast('An unexpected error occurred', 'danger');
         });
-        
-        // Smooth scrolling for anchor links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
+
+        // 钱包连接处理
+        document.addEventListener('DOMContentLoaded', function() {
+            // 钱包连接按钮
+            const connectButtons = document.querySelectorAll('[data-bs-target="#walletModal"], .btn:contains("Connect Wallet")');
+            connectButtons.forEach(btn => {
+                if (btn.textContent.includes('Connect Wallet') || btn.textContent.includes('连接钱包')) {
+                    btn.addEventListener('click', function() {
+                        const modal = new bootstrap.Modal(document.getElementById('walletModal'));
+                        modal.show();
                     });
                 }
             });
+
+            // 钱包选择
+            document.querySelectorAll('.wallet-option').forEach(option => {
+                option.addEventListener('click', async function() {
+                    const walletType = this.getAttribute('data-wallet');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('walletModal'));
+                    
+                    try {
+                        modal.hide();
+                        showToast('{{ _("Connecting wallet...") }}', 'info');
+                        
+                        // 这里调用钱包连接逻辑
+                        if (typeof connectWallet === 'function') {
+                            await connectWallet(walletType);
+                        } else {
+                            console.warn('Wallet connection function not available');
+                        }
+                    } catch (error) {
+                        console.error('Wallet connection error:', error);
+                        showToast('{{ _("Failed to connect wallet") }}', 'danger');
+                    }
+                });
+            });
+
+            // 初始化钱包状态检查
+            if (typeof checkWalletConnection === 'function') {
+                checkWalletConnection();
+            }
         });
+
+        // 语言切换功能
+        function switchLanguage(locale) {
+            const url = new URL(window.location);
+            url.searchParams.set('lang', locale);
+            window.location.href = url.toString();
+        }
+
+        // 性能监控
+        window.addEventListener('load', function() {
+            if ('performance' in window) {
+                const loadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
+                console.log('Page load time:', loadTime + 'ms');
+                
+                // 如果加载时间过长，显示提示
+                if (loadTime > 3000) {
+                    console.warn('Slow page load detected');
+                }
+            }
+        });
+
+        // 主题切换功能 (预留)
+        function toggleTheme() {
+            // 未来可以在这里添加主题切换逻辑
+            console.log('Theme toggle feature coming soon');
+        }
     </script>
     
-    <!-- Page-specific scripts -->
+    <!-- 页面特定脚本 -->
     {% block scripts %}{% endblock %}
+    
+    <!-- Google Analytics (如果需要) -->
+    {% if config.GOOGLE_ANALYTICS_ID %}
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ config.GOOGLE_ANALYTICS_ID }}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', '{{ config.GOOGLE_ANALYTICS_ID }}');
+    </script>
+    {% endif %}
 </body>
 </html> 

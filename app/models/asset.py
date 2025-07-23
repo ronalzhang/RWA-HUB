@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from app.extensions import db
 from sqlalchemy.orm import validates
-from sqlalchemy import Index, CheckConstraint
+from sqlalchemy import Index, CheckConstraint, event
 import re
 from flask import current_app, url_for
 from urllib.parse import urlparse
@@ -309,3 +309,36 @@ class AssetStatusHistory(db.Model):
     
     def __repr__(self):
         return f'<AssetStatusHistory {self.id}: Asset {self.asset_id} {self.old_status}->{self.new_status}>'
+
+
+# Event listeners for data consistency
+@event.listens_for(Asset, 'before_insert')
+@event.listens_for(Asset, 'before_update')
+def ensure_asset_data_consistency(mapper, connection, target):
+    """确保资产数据一致性的事件监听器"""
+    try:
+        # 自动修复 remaining_supply = None 的问题
+        if target.remaining_supply is None and target.token_supply:
+            target.remaining_supply = target.token_supply
+            if current_app:
+                current_app.logger.info(f"Auto-fixed remaining_supply for asset {getattr(target, 'id', 'new')}")
+        
+        # 修复负的 remaining_supply
+        if target.remaining_supply is not None and target.remaining_supply < 0:
+            target.remaining_supply = 0
+            if current_app:
+                current_app.logger.info(f"Auto-fixed negative remaining_supply for asset {getattr(target, 'id', 'new')}")
+        
+        # 修复 remaining_supply > token_supply
+        if (target.remaining_supply is not None and target.token_supply and 
+            target.remaining_supply > target.token_supply):
+            target.remaining_supply = target.token_supply
+            if current_app:
+                current_app.logger.info(f"Auto-fixed excess remaining_supply for asset {getattr(target, 'id', 'new')}")
+    
+    except Exception as e:
+        # 记录错误但不阻止保存
+        if current_app:
+            current_app.logger.error(f"数据一致性检查失败: {e}")
+        else:
+            print(f"数据一致性检查失败: {e}")

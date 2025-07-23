@@ -14,7 +14,7 @@ PURCHASE_CONTRACT_ADDRESS = os.environ.get('PURCHASE_CONTRACT_ADDRESS', 'rwaHubT
 
 # 平台手续费收款地址
     # 平台费用地址现在通过ConfigManager动态获取，不再使用硬编码
-    # PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4')
+    # PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b')
 
 # USDC代币地址
 USDC_TOKEN_ADDRESS = os.environ.get('USDC_TOKEN_ADDRESS', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')

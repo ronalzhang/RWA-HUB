@@ -9,13 +9,26 @@
     --dark-primary: #0a0f1a;
     --dark-secondary: #1a2332;
     --dark-accent: #2d3b52;
+    --dark-bg: linear-gradient(135deg, #0a0f1a 0%, #1a2332 100%);
+    --section-bg: linear-gradient(135deg, #1a2332 0%, #2d3b52 100%);
     --dark-glass: rgba(26, 35, 50, 0.85);
     --dark-glass-light: rgba(26, 35, 50, 0.65);
     --dark-glass-darker: rgba(10, 15, 26, 0.95);
     
+    /* 主色调 */
+    --primary-color: #667eea;
+    --secondary-color: #764ba2;
+    --success-color: #10b981;
+    --info-color: #06b6d4;
+    --warning-color: #f59e0b;
+    --danger-color: #ef4444;
+    
     /* 渐变色 */
     --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-primary-hover: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
     --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --gradient-info: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
     --gradient-glass: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
     
     /* 文字颜色 */
@@ -52,6 +65,63 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     line-height: 1.6;
     overflow-x: hidden;
+}
+
+/* 新增按钮样式类 */
+.btn-glass-primary {
+    background: var(--gradient-primary);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-glass);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-glass-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glow);
+    color: white;
+    background: var(--gradient-primary-hover);
+}
+
+.btn-glass-secondary {
+    background: var(--dark-glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: var(--border-glass);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-weight: 500;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-glass-secondary:hover {
+    background: var(--dark-glass-light);
+    transform: translateY(-1px);
+    color: var(--text-primary);
+}
+
+/* 响应式工具类 */
+.py-6 {
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+}
+
+.min-vh-80 {
+    min-height: 80vh;
 }
 
 /* 磨砂玻璃容器基础类 */
@@ -125,43 +195,6 @@ body {
 
 .navbar-v6 .nav-link:hover::before {
     left: 0;
-}
-
-/* 按钮样式 */
-.btn-glass-primary {
-    background: var(--gradient-primary);
-    border: none;
-    border-radius: 12px;
-    color: white;
-    font-weight: 600;
-    padding: 0.75rem 1.5rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-    box-shadow: var(--shadow-glass);
-}
-
-.btn-glass-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-glow);
-}
-
-.btn-glass-secondary {
-    background: var(--dark-glass);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: var(--border-glass);
-    border-radius: 12px;
-    color: var(--text-primary);
-    font-weight: 500;
-    padding: 0.75rem 1.5rem;
-    transition: all 0.3s ease;
-}
-
-.btn-glass-secondary:hover {
-    background: var(--dark-glass-light);
-    transform: translateY(-1px);
-    color: var(--text-primary);
 }
 
 /* 卡片样式 */

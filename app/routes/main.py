@@ -1,9 +1,16 @@
 from flask import render_template, request, current_app
 from flask_babel import gettext as _
+from flask_wtf.csrf import generate_csrf
 from ..models.asset import Asset, AssetStatus
 from ..models.user import User
 from ..utils import is_admin
 from . import main_bp
+
+# 创建一个简单的用户对象模拟
+class MockUser:
+    def __init__(self):
+        self.is_authenticated = False
+        self.username: str | None = None
 
 @main_bp.route('/')
 def index():
@@ -46,6 +53,62 @@ def index():
                              assets=[],
                              current_user_address=None,
                              AssetStatus=AssetStatus,
+                             _=_)
+
+@main_bp.route('/v6')
+def index_v6():
+    """v6版本首页"""
+    try:
+        # 获取当前用户的钱包地址（从多个来源）
+        eth_address_header = request.headers.get('X-Eth-Address')
+        eth_address_cookie = request.cookies.get('eth_address')
+        eth_address_args = request.args.get('eth_address')
+        
+        # 优先使用 Args > Header > Cookie
+        eth_address = eth_address_args or eth_address_header or eth_address_cookie
+        
+        current_app.logger.info(f'V6界面 - 钱包地址来源:')
+        current_app.logger.info(f'- Header: {eth_address_header}')
+        current_app.logger.info(f'- Cookie: {eth_address_cookie}')
+        current_app.logger.info(f'- Args: {eth_address_args}')
+        current_app.logger.info(f'最终使用地址: {eth_address}')
+        
+        # 只显示状态为ON_CHAIN且未删除的资产
+        query = Asset.query.filter(
+            Asset.status == AssetStatus.ON_CHAIN.value,
+            Asset.deleted_at.is_(None)
+        )
+            
+        # 获取最新3个资产
+        assets = query.order_by(Asset.created_at.desc()).limit(3).all()
+        current_app.logger.info(f'V6界面 - 获取资产列表成功: 找到 {len(assets)} 个资产')
+        
+        # 创建模拟的current_user对象
+        mock_user = MockUser()
+        if eth_address:
+            mock_user.is_authenticated = True
+            mock_user.username = eth_address[:10] + "..."  # 简化显示
+        
+        # 使用v6版本的模板
+        return render_template('index_v6.html', 
+                             assets=assets,
+                             current_user_address=eth_address,
+                             current_user=mock_user,  # 添加current_user变量
+                             AssetStatus=AssetStatus,
+                             csrf_token=generate_csrf,  # 添加CSRF token
+                             _=_)
+                             
+    except Exception as e:
+        current_app.logger.error(f'V6界面 - 获取资产列表失败: {str(e)}')
+        # 创建模拟的current_user对象
+        mock_user = MockUser()
+        
+        return render_template('index_v6.html', 
+                             assets=[],
+                             current_user_address=None,
+                             current_user=mock_user,  # 添加current_user变量
+                             AssetStatus=AssetStatus,
+                             csrf_token=generate_csrf,  # 添加CSRF token
                              _=_)
 
 # 在文件末尾添加favicon路由

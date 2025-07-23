@@ -22,7 +22,7 @@ def create_sample_commission_data():
                 'transaction_id': 1001,  # 使用integer
                 'asset_id': 1,
                 'payer_address': '0x1234567890123456789012345678901234567890',
-                'recipient_address': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
+                'recipient_address': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
                 'amount': 35.0,
                 'currency': 'USDC',
                 'commission_type': 'referral_commission',
@@ -36,7 +36,7 @@ def create_sample_commission_data():
                 'transaction_id': 1002,  # 使用integer
                 'asset_id': 2,
                 'payer_address': '0x2345678901234567890123456789012345678901',
-                'recipient_address': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
+                'recipient_address': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
                 'amount': 70.0,
                 'currency': 'USDC',
                 'commission_type': 'referral_commission',
@@ -50,7 +50,7 @@ def create_sample_commission_data():
                 'transaction_id': 1003,  # 使用integer
                 'asset_id': 3,
                 'payer_address': '0x1234567890123456789012345678901234567890',
-                'recipient_address': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
+                'recipient_address': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
                 'amount': 17.5,
                 'currency': 'USDC',
                 'commission_type': 'upstream_commission',
@@ -63,8 +63,8 @@ def create_sample_commission_data():
             {
                 'transaction_id': 1004,  # 使用integer
                 'asset_id': 1,
-                'payer_address': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
-                'recipient_address': 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4',
+                'payer_address': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
+                'recipient_address': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
                 'amount': 15.0,
                 'currency': 'USDC',
                 'commission_type': 'platform_commission',

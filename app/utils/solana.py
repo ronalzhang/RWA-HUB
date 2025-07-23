@@ -35,7 +35,7 @@ SOLANA_RPC_URL = os.environ.get("SOLANA_RPC_URL", "https://api.mainnet-beta.sola
 USDC_MINT = os.environ.get("SOLANA_USDC_MINT", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
 PROGRAM_ID = os.environ.get("SOLANA_PROGRAM_ID", "2TsURTNQXyqHLB2bfbzFME7HkSMLWueYPjqXBBy2u1wP")
 # 平台费用地址现在通过ConfigManager动态获取，不再使用硬编码
-# PLATFORM_FEE_ADDRESS = os.environ.get("PLATFORM_FEE_ADDRESS", "EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4")
+# PLATFORM_FEE_ADDRESS = os.environ.get("PLATFORM_FEE_ADDRESS", "6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b")
 
 # 指令类型枚举
 INSTRUCTION_INITIALIZE_ASSET = 0

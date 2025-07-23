@@ -13,7 +13,7 @@ else:
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
     PURCHASE_CONTRACT_ADDRESS = os.environ.get('PURCHASE_CONTRACT_ADDRESS', 'rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql://rwa_hub_user:password@localhost/rwa_hub?sslmode=require')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql://rwa_hub_user:password@localhost/rwa_hub')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static/uploads')
 
@@ -24,7 +24,7 @@ class Config:
     
     # 管理员配置
     ADMIN_CONFIG = {
-        'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4': {
+        '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b': {
             'role': 'super_admin',
             'name': 'SOL超级管理员',
             'level': 1,
@@ -55,7 +55,7 @@ class Config:
     SOLANA_PROGRAM_ID = os.environ.get('SOLANA_PROGRAM_ID', '2TsURTNQXyqHLB2bfbzFME7HkSMLWueYPjqXBBy2u1wP')
     SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')  # Mainnet USDC
     # 平台费用地址现在通过ConfigManager动态获取，不再使用硬编码
-    # PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4')
+    # PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b')
     PLATFORM_FEE_RATE = float(os.environ.get('PLATFORM_FEE_RATE', 0.035))  # 3.5%平台费率
     PLATFORM_FEE_BASIS_POINTS = int(os.environ.get('PLATFORM_FEE_BASIS_POINTS', 350))  # 3.5%平台费率，以基点表示
     
@@ -83,14 +83,14 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     
-    # !! 关键改动：直接指定生产环境使用本地数据库 (SSL enabled) !!
-    SQLALCHEMY_DATABASE_URI = 'postgresql://rwa_hub_user:password@localhost/rwa_hub?sslmode=require'
-    print(f"生产环境强制使用本地数据库 (SSL enabled): {SQLALCHEMY_DATABASE_URI}")
+    # 生产环境数据库配置 - 本地开发环境不需要SSL
+    SQLALCHEMY_DATABASE_URI = 'postgresql://rwa_hub_user:password@localhost/rwa_hub'
+    print(f"生产环境使用本地数据库: {SQLALCHEMY_DATABASE_URI}")
     
     @staticmethod
     def init_app(app):
         Config.init_app(app)
-        # 生产环境特定的配置 (数据库URI已在类级别硬编码为本地)
+        # 生产环境特定的配置
         pass
 
 config = {

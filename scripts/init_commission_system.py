@@ -88,7 +88,7 @@ def init_commission_system():
         for address in user_addresses:
             balance = UserCommissionBalance.get_balance(address)
             # 为示例用户添加一些佣金余额
-            if address == 'EsfAFJFBa49RMc2UZNUjsWhGFZeA1uLgEkNPY5oYsDW4':  # admin_user
+            if address == '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b':  # admin_user
                 UserCommissionBalance.update_balance(address, 150.0, 'add')
                 print(f"✅ 为管理员用户添加150 USDC佣金余额")
             else:
