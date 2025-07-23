@@ -644,16 +644,32 @@ function filterMessages() {
     loadMessages(1); // 重新加载第一页
 }
 
-// 点击模态框外部关闭
+// 点击模态框外部关闭 - 修复权重输入导致对话框关闭的问题
 document.addEventListener('click', function(event) {
     const createModal = document.getElementById('createMessageModal');
     const deleteModal = document.getElementById('deleteConfirmModal');
     
-    if (event.target === createModal) {
+    // 只有当点击的是模态框背景（而不是模态框内容）时才关闭
+    if (event.target === createModal && !createModal.querySelector('.bg-white').contains(event.target)) {
         closeModal();
     }
-    if (event.target === deleteModal) {
+    if (event.target === deleteModal && !deleteModal.querySelector('.bg-white').contains(event.target)) {
         closeDeleteModal();
+    }
+});
+
+// 阻止模态框内部的点击事件冒泡到模态框背景
+document.getElementById('createMessageModal').addEventListener('click', function(event) {
+    // 如果点击的是模态框内容区域，阻止事件冒泡
+    if (event.target.closest('.bg-white')) {
+        event.stopPropagation();
+    }
+});
+
+document.getElementById('deleteConfirmModal').addEventListener('click', function(event) {
+    // 如果点击的是模态框内容区域，阻止事件冒泡
+    if (event.target.closest('.bg-white')) {
+        event.stopPropagation();
     }
 });
 </script>
