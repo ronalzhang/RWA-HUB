@@ -22,6 +22,18 @@
 <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
 
 <style>
+/* 固定宽度布局样式 */
+body {
+    min-width: 1200px;
+    overflow-x: auto;
+}
+
+.container {
+    width: 1200px;
+    max-width: none;
+    margin: 0 auto;
+}
+
 .asset-detail-page .card {
     border-radius: 12px;
     box-shadow: 0 3px 15px rgba(0,0,0,0.08);

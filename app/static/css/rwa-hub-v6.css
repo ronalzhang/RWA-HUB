@@ -395,37 +395,40 @@ body {
     100% { left: 100%; }
 }
 
-/* 响应式设计 */
-@media (max-width: 768px) {
-    .hero-title {
-        font-size: 2.5rem;
-    }
-    
-    .hero-subtitle {
-        font-size: 1.1rem;
-    }
-    
-    .card-v6 {
-        padding: 1.5rem;
-    }
-    
-    .navbar-v6 .navbar-brand {
-        font-size: 1.4rem;
-    }
+/* 固定宽度设计 - 移除响应式断点 */
+body {
+    min-width: 1200px;
+    overflow-x: auto;
 }
 
-@media (max-width: 576px) {
-    .hero-title {
-        font-size: 2rem;
-    }
-    
-    .stats-number {
-        font-size: 1.5rem;
-    }
-    
-    .card-v6 {
-        padding: 1rem;
-    }
+.container,
+.container-fluid {
+    width: 1200px;
+    max-width: none;
+    margin: 0 auto;
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+/* 确保所有元素保持固定尺寸 */
+.hero-title {
+    font-size: 3.5rem;
+}
+
+.hero-subtitle {
+    font-size: 1.25rem;
+}
+
+.card-v6 {
+    padding: 2rem;
+}
+
+.navbar-v6 .navbar-brand {
+    font-size: 1.8rem;
+}
+
+.stats-number {
+    font-size: 2rem;
 }
 
 /* 滚动条样式 */

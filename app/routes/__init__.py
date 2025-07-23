@@ -57,6 +57,9 @@ from .dividend import bp as dividend_bp
 # 导入区块链API
 from .blockchain_api import blockchain_bp
 
+# 导入语言切换API
+from .language_api import language_api
+
 # 注册蓝图到app
 def register_blueprints(app):
     """初始化所有路由"""
@@ -82,6 +85,9 @@ def register_blueprints(app):
     
     # 注册区块链API蓝图
     app.register_blueprint(blockchain_bp)
+    
+    # 注册语言切换API蓝图
+    app.register_blueprint(language_api)
     
     # 注册API蓝图
     app.register_blueprint(api_bp)

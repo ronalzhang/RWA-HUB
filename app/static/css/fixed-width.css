@@ -1,0 +1,330 @@
+/* 
+ * 固定宽度布局样式
+ * 确保所有页面在手机和电脑上显示相同的布局，只是等比例缩放
+ */
+
+/* 基础固定宽度设置 */
+html, body {
+    min-width: 1200px;
+    overflow-x: auto;
+}
+
+/* 容器固定宽度 */
+.container,
+.container-fluid,
+.container-sm,
+.container-md,
+.container-lg,
+.container-xl,
+.container-xxl {
+    width: 1200px !important;
+    max-width: none !important;
+    margin: 0 auto !important;
+    padding-left: 15px !important;
+    padding-right: 15px !important;
+}
+
+/* 移除所有响应式断点 */
+@media (min-width: 576px) {
+    .container-sm {
+        width: 1200px !important;
+        max-width: none !important;
+    }
+}
+
+@media (min-width: 768px) {
+    .container-md {
+        width: 1200px !important;
+        max-width: none !important;
+    }
+}
+
+@media (min-width: 992px) {
+    .container-lg {
+        width: 1200px !important;
+        max-width: none !important;
+    }
+}
+
+@media (min-width: 1200px) {
+    .container-xl {
+        width: 1200px !important;
+        max-width: none !important;
+    }
+}
+
+@media (min-width: 1400px) {
+    .container-xxl {
+        width: 1200px !important;
+        max-width: none !important;
+    }
+}
+
+/* 导航栏固定样式 */
+.navbar {
+    min-width: 1200px;
+}
+
+.navbar .container {
+    width: 1200px !important;
+}
+
+/* 表格固定宽度 */
+.table-responsive {
+    overflow-x: auto;
+    min-width: 1200px;
+}
+
+/* 卡片网格固定布局 */
+.row {
+    margin-left: -15px;
+    margin-right: -15px;
+}
+
+.col,
+.col-1, .col-2, .col-3, .col-4, .col-5, .col-6,
+.col-7, .col-8, .col-9, .col-10, .col-11, .col-12,
+.col-auto,
+.col-sm, .col-sm-1, .col-sm-2, .col-sm-3, .col-sm-4, .col-sm-5, .col-sm-6,
+.col-sm-7, .col-sm-8, .col-sm-9, .col-sm-10, .col-sm-11, .col-sm-12, .col-sm-auto,
+.col-md, .col-md-1, .col-md-2, .col-md-3, .col-md-4, .col-md-5, .col-md-6,
+.col-md-7, .col-md-8, .col-md-9, .col-md-10, .col-md-11, .col-md-12, .col-md-auto,
+.col-lg, .col-lg-1, .col-lg-2, .col-lg-3, .col-lg-4, .col-lg-5, .col-lg-6,
+.col-lg-7, .col-lg-8, .col-lg-9, .col-lg-10, .col-lg-11, .col-lg-12, .col-lg-auto,
+.col-xl, .col-xl-1, .col-xl-2, .col-xl-3, .col-xl-4, .col-xl-5, .col-xl-6,
+.col-xl-7, .col-xl-8, .col-xl-9, .col-xl-10, .col-xl-11, .col-xl-12, .col-xl-auto,
+.col-xxl, .col-xxl-1, .col-xxl-2, .col-xxl-3, .col-xxl-4, .col-xxl-5, .col-xxl-6,
+.col-xxl-7, .col-xxl-8, .col-xxl-9, .col-xxl-10, .col-xxl-11, .col-xxl-12, .col-xxl-auto {
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+/* 按钮和表单元素保持固定尺寸 */
+.btn {
+    white-space: nowrap;
+}
+
+.form-control,
+.form-select {
+    min-width: auto;
+}
+
+/* 模态框固定宽度 */
+.modal-dialog {
+    max-width: 500px;
+    margin: 1.75rem auto;
+}
+
+.modal-dialog-lg {
+    max-width: 800px;
+}
+
+.modal-dialog-xl {
+    max-width: 1140px;
+}
+
+/* 下拉菜单固定宽度 */
+.dropdown-menu {
+    min-width: 160px;
+}
+
+/* 工具提示和弹出框固定样式 */
+.tooltip,
+.popover {
+    font-size: 0.875rem;
+}
+
+/* 分页固定样式 */
+.pagination {
+    justify-content: center;
+}
+
+/* 面包屑固定样式 */
+.breadcrumb {
+    margin-bottom: 1rem;
+}
+
+/* 警告框固定样式 */
+.alert {
+    margin-bottom: 1rem;
+}
+
+/* 进度条固定样式 */
+.progress {
+    height: 1rem;
+}
+
+/* 徽章固定样式 */
+.badge {
+    font-size: 0.75em;
+}
+
+/* 列表组固定样式 */
+.list-group-item {
+    padding: 0.75rem 1.25rem;
+}
+
+/* 卡片固定样式 */
+.card {
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    padding: 0.75rem 1.25rem;
+}
+
+.card-body {
+    padding: 1.25rem;
+}
+
+.card-footer {
+    padding: 0.75rem 1.25rem;
+}
+
+/* 确保所有文本不会因为缩放而变得过小 */
+body {
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    line-height: 1.2;
+}
+
+/* 确保图片在固定布局中正常显示 */
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* 表格在固定宽度下的样式 */
+.table {
+    width: 100%;
+    margin-bottom: 1rem;
+}
+
+.table th,
+.table td {
+    padding: 0.75rem;
+    vertical-align: top;
+    border-top: 1px solid #dee2e6;
+}
+
+/* 输入组固定样式 */
+.input-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    width: 100%;
+}
+
+/* 确保flex布局在固定宽度下正常工作 */
+.d-flex {
+    display: flex !important;
+}
+
+.flex-column {
+    flex-direction: column !important;
+}
+
+.flex-row {
+    flex-direction: row !important;
+}
+
+.justify-content-center {
+    justify-content: center !important;
+}
+
+.justify-content-between {
+    justify-content: space-between !important;
+}
+
+.align-items-center {
+    align-items: center !important;
+}
+
+/* 间距工具类保持固定 */
+.m-0 { margin: 0 !important; }
+.m-1 { margin: 0.25rem !important; }
+.m-2 { margin: 0.5rem !important; }
+.m-3 { margin: 1rem !important; }
+.m-4 { margin: 1.5rem !important; }
+.m-5 { margin: 3rem !important; }
+
+.p-0 { padding: 0 !important; }
+.p-1 { padding: 0.25rem !important; }
+.p-2 { padding: 0.5rem !important; }
+.p-3 { padding: 1rem !important; }
+.p-4 { padding: 1.5rem !important; }
+.p-5 { padding: 3rem !important; }
+
+/* 文本对齐保持固定 */
+.text-left { text-align: left !important; }
+.text-center { text-align: center !important; }
+.text-right { text-align: right !important; }
+
+/* 显示/隐藏工具类 */
+.d-none { display: none !important; }
+.d-block { display: block !important; }
+.d-inline { display: inline !important; }
+.d-inline-block { display: inline-block !important; }
+
+/* 位置工具类 */
+.position-relative { position: relative !important; }
+.position-absolute { position: absolute !important; }
+.position-fixed { position: fixed !important; }
+.position-sticky { position: sticky !important; }
+
+/* 确保滚动条在需要时显示 */
+.overflow-auto { overflow: auto !important; }
+.overflow-hidden { overflow: hidden !important; }
+.overflow-scroll { overflow: scroll !important; }
+
+/* 钱包和语言切换按钮确保可点击 */
+.language-dropdown .btn,
+.wallet-btn,
+#walletBtn,
+#languageDropdown {
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    pointer-events: auto;
+    touch-action: manipulation;
+}
+
+/* 确保下拉菜单在固定布局中正常工作 */
+.dropdown-menu {
+    position: absolute;
+    z-index: 1000;
+    display: none;
+    min-width: 10rem;
+    padding: 0.5rem 0;
+    margin: 0;
+    font-size: 1rem;
+    color: #212529;
+    text-align: left;
+    list-style: none;
+    background-color: #fff;
+    background-clip: padding-box;
+    border: 1px solid rgba(0,0,0,.15);
+    border-radius: 0.375rem;
+}
+
+.dropdown-menu.show {
+    display: block;
+}
+
+/* 确保触摸设备上的交互正常 */
+@media (hover: none) and (pointer: coarse) {
+    .btn:hover,
+    .dropdown-item:hover {
+        background-color: transparent;
+    }
+    
+    .btn:active,
+    .dropdown-item:active {
+        background-color: #e9ecef;
+    }
+}

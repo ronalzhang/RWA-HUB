@@ -2,7 +2,7 @@
 <html lang="{{ g.locale }}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=1200, initial-scale=0.3, minimum-scale=0.1, maximum-scale=2.0, user-scalable=yes">
     <title>{% block title %}{% endblock %}</title>
     
     <!-- 阻止Font Awesome Kit的加载 -->
@@ -17,6 +17,8 @@
     
     <!-- Bootstrap CSS -->
     <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
+    <!-- 固定宽度布局CSS -->
+    <link href="{{ url_for('static', filename='css/fixed-width.css') }}" rel="stylesheet">
     <!-- Font Awesome -->
     <link href="{{ url_for('static', filename='fonts/fontawesome/css/all.min.css') }}" rel="stylesheet">
     <!-- AOS Animation -->
@@ -58,66 +60,48 @@
             background-color: #fff;
         }
         
-        /* 小屏幕导航栏优化 */
-        @media (max-width: 991px) {
-            .navbar-brand {
-                font-size: 1rem;
-                margin-right: 5px;
-            }
-            
-            .nav-link {
-                padding: 0.5rem 0.5rem;
-                font-size: 0.9rem;
-            }
-            
-            .language-dropdown .btn {
-                padding: 0.35rem 0.7rem;
-                font-size: 0.8rem;
-            }
-            
-            .language-dropdown .btn .fas {
-                margin-right: 0.2rem;
-                font-size: 0.8rem;
-            }
-            
-            .wallet-btn {
-                min-width: auto;
-                padding: 0.35rem 0.7rem;
-                font-size: 0.8rem;
-            }
-            
-            .wallet-btn .fas {
-                margin-right: 0.2rem;
-                font-size: 0.8rem;
-            }
-            
-            .me-3 {
-                margin-right: 0.5rem !important;
-            }
+        /* 固定宽度布局 - 移除响应式断点 */
+        body {
+            min-width: 1200px;
+            overflow-x: auto;
         }
         
-        /* 更小屏幕进一步优化 */
-        @media (max-width: 576px) {
-            #currentLanguage {
-                display: none;
-            }
-            
-            .language-dropdown .btn .fas {
-                margin-right: 0;
-            }
-            
-            #walletBtnText {
-                display: none;
-            }
-            
-            .wallet-btn .fas {
-                margin-right: 0 !important;
-            }
-            
-            .wallet-btn {
-                min-width: auto;
-                padding: 4px 8px;
-            }
+        .container {
+            width: 1200px;
+            max-width: none;
+            margin: 0 auto;
+        }
+        
+        /* 确保导航栏元素正常显示 */
+        .navbar-brand {
+            font-size: 1.2rem;
+            margin-right: 10px;
+        }
+        
+        .nav-link {
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+        }
+        
+        .language-dropdown .btn {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.85rem;
+        }
+        
+        .language-dropdown .btn .fas {
+            margin-right: 0.25rem;
+            font-size: 0.85rem;
+        }
+        
+        .wallet-btn {
+            min-width: auto;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.9rem;
+        }
+        
+        .wallet-btn .fas {
+            margin-right: 0.2rem;
+            font-size: 0.9rem;
         }
         
         /* 语言切换按钮和下拉菜单的统一样式 */
@@ -219,19 +203,7 @@
             display: none !important;
         }
         
-        /* 移动端适配 */
-        @media (max-width: 768px) {
-            .wallet-btn {
-                padding: 0.35rem 0.7rem;
-                font-size: 0.85rem;
-                max-width: 160px;
-            }
-            
-            .wallet-btn i {
-                font-size: 0.85rem;
-                margin-right: 0.15rem;
-            }
-        }
+        /* 保持固定布局，移除移动端特殊处理 */
         
         /* 确保按钮没有边框和阴影 */
         .wallet-btn:focus,
@@ -367,26 +339,10 @@
         }
         
         /* 响应式调整 */
-        @media (max-width: 576px) {
-            .wallet-dropdown-menu {
-                width: 90vw;
-                min-width: 250px;
-            }
-            
-            .wallet-actions {
-                flex-direction: column;
-            }
-            
-            /* 移除旧按钮样式 */
-            #switchWalletBtn,
-            #disconnectWalletBtn {
-                margin-bottom: 8px;
-                width: 100%;
-            }
-            
-            #switchWalletBtn {
-                margin-right: 0 !important;
-            }
+        /* 钱包下拉菜单保持固定宽度 */
+        .wallet-dropdown-menu {
+            width: 270px;
+            min-width: 270px;
         }
 
         /* 钱包选择器样式 */
@@ -397,13 +353,7 @@
             padding: 15px;
         }
         
-        @media (max-width: 576px) {
-            .wallet-grid {
-                grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-                gap: 10px;
-                padding: 10px;
-            }
-        }
+        /* 钱包网格保持固定布局 */
         
         /* 钱包选择模态框样式 - 美化版 */
         .wallet-modal-content {
@@ -592,63 +542,42 @@
             border: 1px solid rgba(0,123,255,0.1);
         }
         
-        /* 移动端适配改进 */
-        @media (max-width: 576px) {
-            .wallet-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 12px;
-                padding: 5px;
-            }
-            
-            .wallet-option {
-                height: 110px;
-                padding: 12px 8px;
-            }
-            
-            .wallet-icon-container {
-                width: 48px;
-                height: 48px;
-                margin-bottom: 8px;
-            }
-            
-            .wallet-icon-wrapper {
-                width: 40px;
-                height: 40px;
-            }
-            
-            .wallet-icon-wrapper i {
-                font-size: 20px;
-            }
-            
-            .wallet-name {
-                font-size: 12px;
-                margin-top: 5px;
-            }
-            
-            .wallet-connected-badge {
-                font-size: 14px;
-                top: 8px;
-                right: 8px;
-            }
-            
-            .wallet-modal-title {
-                font-size: 16px;
-            }
-            
-            .wallet-modal-header {
-                padding: 15px 20px;
-            }
-            
-            .wallet-modal-body {
-                padding: 15px;
-            }
+        /* 钱包选择器保持固定布局 */
+        .wallet-grid {
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 16px;
+            padding: 5px;
         }
         
-        /* 超小屏幕进一步优化 */
-        @media (max-width: 400px) {
-            .wallet-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+        .wallet-option {
+            height: 120px;
+            padding: 16px 10px;
+        }
+        
+        .wallet-icon-container {
+            width: 56px;
+            height: 56px;
+            margin-bottom: 12px;
+        }
+        
+        .wallet-icon-wrapper {
+            width: 50px;
+            height: 50px;
+        }
+        
+        .wallet-icon-wrapper i {
+            font-size: 24px;
+        }
+        
+        .wallet-name {
+            font-size: 14px;
+            margin-top: 8px;
+        }
+        
+        .wallet-connected-badge {
+            font-size: 16px;
+            top: 10px;
+            right: 10px;
         }
         
         /* 钱包选择器动画效果增强 */
@@ -877,7 +806,181 @@
         "Close": "{{ _('Close') }}",
         "Save": "{{ _('Save') }}",
         "Edit": "{{ _('Edit') }}",
-        "Delete": "{{ _('Delete') }}",
+        "Delete": "{{ _('Delete') }}"
+    };
+    
+    // 语言切换函数
+    function changeLanguage(lang) {
+        console.log('切换语言到:', lang);
+        
+        // 发送请求到后端切换语言
+        fetch('/api/change_language', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ language: lang })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 刷新页面以应用新语言
+                window.location.reload();
+            } else {
+                console.error('语言切换失败:', data.error);
+                // 如果API不存在，直接设置cookie并刷新
+                document.cookie = `language=${lang}; path=/; max-age=31536000`;
+                window.location.reload();
+            }
+        })
+        .catch(error => {
+            console.error('语言切换请求失败:', error);
+            // 降级处理：直接设置cookie并刷新
+            document.cookie = `language=${lang}; path=/; max-age=31536000`;
+            window.location.reload();
+        });
+    }
+    
+    // 钱包连接检查函数
+    function checkWalletConnection(event) {
+        console.log('检查钱包连接状态');
+        
+        // 阻止默认行为
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        
+        // 检查是否已连接钱包
+        const isConnected = window.walletState && (window.walletState.isConnected || window.walletState.connected);
+        const walletAddress = localStorage.getItem('walletAddress');
+        
+        if (isConnected || walletAddress) {
+            // 已连接，显示钱包菜单
+            toggleWalletMenu();
+        } else {
+            // 未连接，打开钱包选择器
+            if (typeof window.openWalletSelector === 'function') {
+                window.openWalletSelector();
+            } else {
+                console.error('钱包选择器函数不存在');
+                alert('请先加载钱包连接模块');
+            }
+        }
+    }
+    
+    // 切换钱包菜单显示
+    function toggleWalletMenu() {
+        const walletMenu = document.getElementById('walletMenu');
+        if (walletMenu) {
+            const isVisible = walletMenu.classList.contains('show');
+            
+            if (isVisible) {
+                walletMenu.classList.remove('show');
+                walletMenu.style.display = 'none';
+            } else {
+                // 更新钱包信息
+                updateWalletMenuInfo();
+                walletMenu.classList.add('show');
+                walletMenu.style.display = 'block';
+            }
+        }
+    }
+    
+    // 更新钱包菜单信息
+    function updateWalletMenuInfo() {
+        const addressDisplay = document.getElementById('walletAddressDisplay');
+        const balanceDisplay = document.getElementById('walletBalanceInDropdown');
+        
+        if (window.walletState) {
+            // 更新地址显示
+            if (addressDisplay && window.walletState.address) {
+                const shortAddress = window.walletState.address.slice(0, 6) + '...' + window.walletState.address.slice(-4);
+                addressDisplay.textContent = shortAddress;
+            }
+            
+            // 更新余额显示
+            if (balanceDisplay && window.walletState.balance !== null) {
+                balanceDisplay.textContent = parseFloat(window.walletState.balance).toFixed(2);
+            }
+        }
+    }
+    
+    // 切换钱包并关闭菜单
+    function switchWalletAndCloseMenu() {
+        console.log('切换钱包');
+        
+        // 关闭菜单
+        const walletMenu = document.getElementById('walletMenu');
+        if (walletMenu) {
+            walletMenu.classList.remove('show');
+            walletMenu.style.display = 'none';
+        }
+        
+        // 打开钱包选择器
+        if (typeof window.openWalletSelector === 'function') {
+            window.openWalletSelector();
+        } else {
+            console.error('钱包选择器函数不存在');
+        }
+    }
+    
+    // 断开连接并关闭菜单
+    function disconnectAndCloseMenu() {
+        console.log('断开钱包连接');
+        
+        // 关闭菜单
+        const walletMenu = document.getElementById('walletMenu');
+        if (walletMenu) {
+            walletMenu.classList.remove('show');
+            walletMenu.style.display = 'none';
+        }
+        
+        // 断开连接
+        if (window.walletState && typeof window.walletState.disconnect === 'function') {
+            window.walletState.disconnect();
+        } else {
+            // 降级处理：清除localStorage
+            localStorage.removeItem('walletAddress');
+            localStorage.removeItem('walletType');
+            window.location.reload();
+        }
+    }
+    
+    // 点击外部关闭钱包菜单
+    document.addEventListener('click', function(event) {
+        const walletDropdown = document.getElementById('walletDropdown');
+        const walletMenu = document.getElementById('walletMenu');
+        
+        if (walletMenu && walletDropdown && 
+            !walletDropdown.contains(event.target) && 
+            walletMenu.classList.contains('show')) {
+            walletMenu.classList.remove('show');
+            walletMenu.style.display = 'none';
+        }
+    });
+    
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('页面加载完成，初始化钱包和语言功能');
+        
+        // 确保语言下拉菜单正常工作
+        const languageDropdown = document.getElementById('languageDropdown');
+        if (languageDropdown) {
+            // 使用Bootstrap的dropdown功能
+            if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+                new bootstrap.Dropdown(languageDropdown);
+            }
+        }
+        
+        // 初始化钱包按钮状态
+        setTimeout(function() {
+            if (window.walletState) {
+                updateWalletMenuInfo();
+            }
+        }, 1000);
+    });
         "Submit": "{{ _('Submit') }}",
         "Processing...": "{{ _('Processing...') }}",
         
@@ -1258,9 +1361,37 @@
 
     <!-- 语言切换 -->
     <script>
+    // 语言切换函数（增强版）
     function changeLanguage(lang) {
-        document.cookie = `language=${lang};path=/;max-age=31536000`;
-        window.location.reload();
+        console.log('切换语言到:', lang);
+        
+        // 发送请求到后端切换语言
+        fetch('/api/change_language', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ language: lang })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 刷新页面以应用新语言
+                window.location.reload();
+            } else {
+                console.error('语言切换失败:', data.error);
+                // 如果API不存在，直接设置cookie并刷新
+                document.cookie = `language=${lang};path=/;max-age=31536000`;
+                window.location.reload();
+            }
+        })
+        .catch(error => {
+            console.error('语言切换请求失败:', error);
+            // 降级处理：直接设置cookie并刷新
+            document.cookie = `language=${lang};path=/;max-age=31536000`;
+            window.location.reload();
+        });
     }
     </script>
     
