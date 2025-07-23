@@ -56,6 +56,7 @@ class Config:
     SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')  # Mainnet USDC
     # 平台费用地址现在通过ConfigManager动态获取，不再使用硬编码
     # PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b')
+    PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b')
     PLATFORM_FEE_RATE = float(os.environ.get('PLATFORM_FEE_RATE', 0.035))  # 3.5%平台费率
     PLATFORM_FEE_BASIS_POINTS = int(os.environ.get('PLATFORM_FEE_BASIS_POINTS', 350))  # 3.5%平台费率，以基点表示
     
