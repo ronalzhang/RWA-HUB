@@ -378,7 +378,7 @@ function updateBuyButtonState() {
   // 只有状态真正需要改变时才记录日志和更新
   const shouldLog = !window._lastWalletConnectedState || window._lastWalletConnectedState !== walletConnected;
   if (shouldLog) {
-  console.log('钱包状态检查:', { connected: walletConnected });
+  console.log('Wallet status check:', { connected: walletConnected });
     window._lastWalletConnectedState = walletConnected;
   }
   
@@ -390,7 +390,7 @@ function updateBuyButtonState() {
     // 只有状态需要改变时才更新
     if (currentDisabled !== shouldBeDisabled) {
     if (walletConnected) {
-        if (shouldLog) console.log('钱包已连接，启用购买按钮');
+        if (shouldLog) console.log('Wallet connected, enabling buy button');
       buyButton.disabled = false;
       buyButton.innerHTML = '<i class="fas fa-shopping-cart me-2"></i>Buy';
       buyButton.removeAttribute('title');

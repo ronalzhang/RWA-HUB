@@ -2,7 +2,7 @@
 <html lang="{{ g.locale }}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=860, initial-scale=0.45, minimum-scale=0.2, maximum-scale=3.0, user-scalable=yes">
+    <meta name="viewport" content="width=920, initial-scale=0.42, minimum-scale=0.2, maximum-scale=3.0, user-scalable=yes">
     <title>{% block title %}{% endblock %}</title>
     
     <!-- 阻止Font Awesome Kit的加载 -->
@@ -60,16 +60,18 @@
             background-color: #fff;
         }
         
-        /* 固定宽度布局 - 进一步优化宽度 */
+        /* 固定宽度布局 - 调整为920px，优化边距 */
         body {
-            min-width: 860px;
+            min-width: 920px;
             overflow-x: auto;
         }
         
         .container {
-            width: 860px;
+            width: 920px;
             max-width: none;
             margin: 0 auto;
+            padding-left: 10px;
+            padding-right: 10px;
         }
         
         /* 确保导航栏元素正常显示 */

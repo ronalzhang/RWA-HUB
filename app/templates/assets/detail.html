@@ -21,6 +21,10 @@
 <script src="{{ url_for('static', filename='js/contracts/solana-web3.iife.js') }}"></script>
 <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
 
+<!-- 钱包和购买处理 -->
+<script src="{{ url_for('static', filename='js/wallet.js') }}"></script>
+<script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
+
 <style>
 /* 固定宽度布局样式 */
 body {
@@ -599,27 +603,7 @@ function setupTradeForm() {
 
 // 钱包连接状态检查由handle_buy.js处理
 
-// 处理购买按钮点击
-function handleBuyClick() {
-    const address = getWalletAddress();
-    if (!address) {
-        alert('Please Connect Wallet');
-        if (typeof window.openWalletSelector === 'function') {
-            window.openWalletSelector();
-        }
-        return;
-    }
-    
-    if (typeof window.handleBuy === 'function') {
-        const assetId = document.getElementById('buy-button').getAttribute('data-asset-id');
-        const amountInput = document.getElementById('purchase-amount');
-        const buyButton = document.getElementById('buy-button');
-        window.handleBuy(assetId, amountInput, buyButton);
-    } else {
-        console.error('Purchase Function Unavailable');
-        alert('Purchase Function Temporarily Unavailable, Please Refresh Page and Try Again');
-    }
-}
+// 购买按钮点击处理由handle_buy.js处理
 
 // 检查分红管理权限
 function checkDividendAccess() {

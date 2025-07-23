@@ -3,9 +3,9 @@
  * 确保所有页面在手机和电脑上显示相同的布局，只是等比例缩放
  */
 
-/* 基础固定宽度设置 - 进一步优化为860px */
+/* 基础固定宽度设置 - 调整为920px，优化边距为10px */
 html, body {
-    min-width: 860px;
+    min-width: 920px;
     overflow-x: auto;
 }
 
@@ -17,68 +17,68 @@ html, body {
 .container-lg,
 .container-xl,
 .container-xxl {
-    width: 860px !important;
+    width: 920px !important;
     max-width: none !important;
     margin: 0 auto !important;
-    padding-left: 15px !important;
-    padding-right: 15px !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
 }
 
 /* 移除所有响应式断点 */
 @media (min-width: 576px) {
     .container-sm {
-        width: 860px !important;
+        width: 920px !important;
         max-width: none !important;
     }
 }
 
 @media (min-width: 768px) {
     .container-md {
-        width: 860px !important;
+        width: 920px !important;
         max-width: none !important;
     }
 }
 
 @media (min-width: 992px) {
     .container-lg {
-        width: 860px !important;
+        width: 920px !important;
         max-width: none !important;
     }
 }
 
 @media (min-width: 1200px) {
     .container-xl {
-        width: 860px !important;
+        width: 920px !important;
         max-width: none !important;
     }
 }
 
 @media (min-width: 1400px) {
     .container-xxl {
-        width: 860px !important;
+        width: 920px !important;
         max-width: none !important;
     }
 }
 
 /* 导航栏固定样式 */
 .navbar {
-    min-width: 860px;
+    min-width: 920px;
 }
 
 .navbar .container {
-    width: 860px !important;
+    width: 920px !important;
 }
 
 /* 表格固定宽度 */
 .table-responsive {
     overflow-x: auto;
-    min-width: 860px;
+    min-width: 920px;
 }
 
-/* 卡片网格固定布局 */
+/* 卡片网格固定布局 - 优化间距 */
 .row {
-    margin-left: -15px;
-    margin-right: -15px;
+    margin-left: -10px;
+    margin-right: -10px;
 }
 
 .col,
@@ -95,8 +95,8 @@ html, body {
 .col-xl-7, .col-xl-8, .col-xl-9, .col-xl-10, .col-xl-11, .col-xl-12, .col-xl-auto,
 .col-xxl, .col-xxl-1, .col-xxl-2, .col-xxl-3, .col-xxl-4, .col-xxl-5, .col-xxl-6,
 .col-xxl-7, .col-xxl-8, .col-xxl-9, .col-xxl-10, .col-xxl-11, .col-xxl-12, .col-xxl-auto {
-    padding-left: 15px;
-    padding-right: 15px;
+    padding-left: 10px;
+    padding-right: 10px;
 }
 
 /* 按钮和表单元素保持固定尺寸 */
@@ -347,5 +347,40 @@ img {
     .btn:active,
     .dropdown-item:active {
         background-color: #e9ecef;
+    }
+    
+    /* 手机端进一步缩小边距 */
+    .container,
+    .container-fluid,
+    .container-sm,
+    .container-md,
+    .container-lg,
+    .container-xl,
+    .container-xxl {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+    
+    .row {
+        margin-left: -8px;
+        margin-right: -8px;
+    }
+    
+    .col,
+    .col-1, .col-2, .col-3, .col-4, .col-5, .col-6,
+    .col-7, .col-8, .col-9, .col-10, .col-11, .col-12,
+    .col-auto,
+    .col-sm, .col-sm-1, .col-sm-2, .col-sm-3, .col-sm-4, .col-sm-5, .col-sm-6,
+    .col-sm-7, .col-sm-8, .col-sm-9, .col-sm-10, .col-sm-11, .col-sm-12, .col-sm-auto,
+    .col-md, .col-md-1, .col-md-2, .col-md-3, .col-md-4, .col-md-5, .col-md-6,
+    .col-md-7, .col-md-8, .col-md-9, .col-md-10, .col-md-11, .col-md-12, .col-md-auto,
+    .col-lg, .col-lg-1, .col-lg-2, .col-lg-3, .col-lg-4, .col-lg-5, .col-lg-6,
+    .col-lg-7, .col-lg-8, .col-lg-9, .col-lg-10, .col-lg-11, .col-lg-12, .col-lg-auto,
+    .col-xl, .col-xl-1, .col-xl-2, .col-xl-3, .col-xl-4, .col-xl-5, .col-xl-6,
+    .col-xl-7, .col-xl-8, .col-xl-9, .col-xl-10, .col-xl-11, .col-xl-12, .col-xl-auto,
+    .col-xxl, .col-xxl-1, .col-xxl-2, .col-xxl-3, .col-xxl-4, .col-xxl-5, .col-xxl-6,
+    .col-xxl-7, .col-xxl-8, .col-xxl-9, .col-xxl-10, .col-xxl-11, .col-xxl-12, .col-xxl-auto {
+        padding-left: 8px;
+        padding-right: 8px;
     }
 }
