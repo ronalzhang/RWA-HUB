@@ -13,12 +13,11 @@
 /* Hero Section */
 .index-page .hero-section {
     background: var(--gradient) !important;
-    padding: 6rem 0 4rem !important;
+    padding: 4rem 0 3rem !important;
     position: relative !important;
     overflow: hidden !important;
-    min-height: 90vh !important;
-    display: flex !important;
-    align-items: center !important;
+    min-height: auto !important;
+    display: block !important;
 }
 
 .index-page .hero-bg-pattern {

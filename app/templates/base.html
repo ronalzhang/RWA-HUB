@@ -39,7 +39,7 @@
         /* 主内容区样式 */
         .main-content {
             margin-top: 76px;
-            min-height: calc(100vh - 180px);
+            min-height: auto;
         }
         
         /* 页脚样式 */
@@ -697,7 +697,7 @@
     </nav>
 
     <!-- 主要内容区域容器，添加顶部边距防止与导航栏重叠 -->
-    <div class="main-content" style="margin-top: 76px; min-height: calc(100vh - 180px);">
+    <div class="main-content" style="margin-top: 76px; min-height: auto;">
         {% block content %}{% endblock %}
                     </div>
 
