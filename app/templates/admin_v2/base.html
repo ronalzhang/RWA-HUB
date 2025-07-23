@@ -211,6 +211,12 @@
                                 <span class="ml-3">分享消息管理</span>
                             </a>
                         </li>
+                        <li>
+                            <a href="{{ url_for('payment_management.payment_management') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'payment_management.payment_management' }}">
+                                <i class="fas fa-credit-card w-5 text-center"></i>
+                                <span class="ml-3">支付管理</span>
+                            </a>
+                        </li>
                         <li class="border-t border-gray-200 mt-2 pt-2">
                             <a href="{{ url_for('admin.settings_v2') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.settings_v2' }}">
                                 <i class="fas fa-cog w-5 text-center"></i>
