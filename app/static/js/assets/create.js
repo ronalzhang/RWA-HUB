@@ -1559,6 +1559,9 @@ async function processPayment() {
             try {
                 updateProgress(50, '正在钱包中确认支付...', 2);
                 
+                // 添加延迟让用户看到进度变化
+                await new Promise(resolve => setTimeout(resolve, 800));
+                
                 console.log('开始处理支付交易，不预先检查余额...');
                 
                 // 直接调用钱包进行支付，不预先检查余额
@@ -1576,6 +1579,9 @@ async function processPayment() {
             
                 console.log('支付成功，交易哈希:', result.txHash);
                 updateProgress(80, '支付成功，正在创建资产...', 3);
+                
+                // 添加延迟让用户看到支付成功状态
+                await new Promise(resolve => setTimeout(resolve, 600));
             
                 // 处理资产创建
                 await handlePaymentSuccess(result.txHash, formData);

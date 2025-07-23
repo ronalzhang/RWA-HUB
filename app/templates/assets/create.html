@@ -223,6 +223,39 @@
     .token-symbol-container .form-control:disabled {
         cursor: not-allowed;
     }
+    
+    /* 预览页面样式 - 与详情页保持一致 */
+    .asset-detail-page .card {
+        border-radius: 12px;
+        box-shadow: 0 3px 15px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+    }
+
+    .asset-detail-page .carousel-item img {
+        border-radius: 12px;
+        height: 400px;
+        object-fit: cover;
+    }
+
+    .asset-detail-page .trade-card {
+        position: sticky;
+        top: 90px;
+        z-index: 10;
+    }
+
+    .asset-detail-page .table th {
+        font-weight: 600;
+        border-top: none;
+    }
+
+    /* 预览模态框特殊样式 */
+    .preview-modal .modal-dialog {
+        max-width: 95vw;
+    }
+    
+    .preview-modal .modal-body {
+        padding: 2rem;
+    }
 </style>
 
 <script>
