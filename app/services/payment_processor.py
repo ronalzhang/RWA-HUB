@@ -127,6 +127,23 @@ class PaymentProcessor:
                 
                 db.session.commit()
                 
+            # 6. 触发智能合约资产创建
+            try:
+                from app.blockchain.asset_service import AssetService
+                asset_service = AssetService()
+                
+                # 异步触发智能合约资产创建
+                contract_result = asset_service.create_asset_on_chain(asset_id)
+                
+                if contract_result.get('success'):
+                    logger.info(f"智能合约资产创建已触发: asset_id={asset_id}")
+                else:
+                    logger.warning(f"智能合约资产创建触发失败: {contract_result.get('error')}")
+                    
+            except Exception as contract_error:
+                logger.error(f"触发智能合约资产创建失败: {str(contract_error)}")
+                # 不影响支付确认结果
+                
             logger.info(f"资产发布支付处理完成: asset_id={asset_id}")
             
             return PaymentResult(

@@ -168,6 +168,14 @@ def create_app(config_name='development'):
     # 注册初始化分销佣金设置命令
     app.cli.add_command(init_distribution_command)
     
+    # 初始化智能合约监控服务
+    try:
+        from app.services.contract_monitor import init_contract_monitor
+        init_contract_monitor(app)
+        app.logger.info("智能合约监控服务已初始化")
+    except Exception as monitor_error:
+        app.logger.error(f"初始化智能合约监控服务失败: {str(monitor_error)}")
+    
     # 初始化后台任务处理系统
     with app.app_context():
         try:

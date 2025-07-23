@@ -448,3 +448,87 @@ def validate_asset_data_consistency(asset_id):
             'success': False,
             'error': f"验证失败: {str(e)}"
         }), 500
+
+@trades_api_bp.route('/contract/status/<int:asset_id>', methods=['GET'])
+def get_contract_status(asset_id):
+    """
+    获取资产智能合约执行状态
+    """
+    try:
+        asset = Asset.query.get(asset_id)
+        if not asset:
+            return jsonify({
+                'success': False,
+                'error': '资产不存在'
+            }), 404
+        
+        # 构建状态信息
+        status_info = {
+            'asset_id': asset_id,
+            'payment_confirmed': asset.payment_confirmed,
+            'payment_tx_hash': asset.payment_tx_hash,
+            'deployment_in_progress': asset.deployment_in_progress,
+            'deployment_tx_hash': asset.deployment_tx_hash,
+            'token_address': asset.token_address,
+            'contract_address': asset.contract_address,
+            'status': asset.status,
+            'error_message': asset.error_message
+        }
+        
+        # 添加时间戳
+        if asset.payment_confirmed_at:
+            status_info['payment_confirmed_at'] = asset.payment_confirmed_at.isoformat()
+        if asset.deployment_started_at:
+            status_info['deployment_started_at'] = asset.deployment_started_at.isoformat()
+        
+        # 判断智能合约状态
+        if asset.status == AssetStatus.ON_CHAIN.value and asset.token_address:
+            status_info['contract_status'] = 'deployed'
+            status_info['contract_message'] = '智能合约已成功部署'
+        elif asset.deployment_in_progress:
+            status_info['contract_status'] = 'deploying'
+            status_info['contract_message'] = '智能合约部署中'
+        elif asset.status == AssetStatus.DEPLOYMENT_FAILED.value:
+            status_info['contract_status'] = 'failed'
+            status_info['contract_message'] = '智能合约部署失败'
+        elif asset.payment_confirmed:
+            status_info['contract_status'] = 'pending'
+            status_info['contract_message'] = '等待智能合约部署'
+        else:
+            status_info['contract_status'] = 'waiting_payment'
+            status_info['contract_message'] = '等待支付确认'
+        
+        return jsonify({
+            'success': True,
+            'contract_status': status_info
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"获取智能合约状态失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"获取状态失败: {str(e)}"
+        }), 500
+
+@trades_api_bp.route('/contract/monitor/status', methods=['GET'])
+def get_contract_monitor_status():
+    """
+    获取智能合约监控服务状态
+    """
+    try:
+        from app.services.contract_monitor import get_contract_monitor
+        monitor = get_contract_monitor()
+        
+        status = monitor.get_monitoring_status()
+        
+        return jsonify({
+            'success': True,
+            'monitor_status': status
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"获取监控状态失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"获取监控状态失败: {str(e)}"
+        }), 500
