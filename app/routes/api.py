@@ -948,8 +948,8 @@ def confirm_purchase():
                 'error': '无效的请求数据'
             }), 400
             
-        # 验证必要字段
-        trade_id = data.get('trade_id')
+        # 验证必要字段 - 兼容前端发送的purchase_id和trade_id
+        trade_id = data.get('trade_id') or data.get('purchase_id')
         
         if not trade_id:
             return jsonify({
