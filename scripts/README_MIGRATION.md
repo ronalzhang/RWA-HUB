@@ -21,7 +21,7 @@ python scripts/migrate_share_message_types.py
 
 **数据内容**:
 
-#### 系统配置 (8条)
+#### 系统配置 (9条)
 - `PLATFORM_FEE_ADDRESS`: 平台收款地址
 - `ASSET_CREATION_FEE_ADDRESS`: 资产创建收款地址  
 - `ASSET_CREATION_FEE_AMOUNT`: 资产创建费用(0.02 USDC)
@@ -30,6 +30,7 @@ python scripts/migrate_share_message_types.py
 - `SOLANA_RPC_URL`: Solana RPC节点
 - `SOLANA_USDC_MINT`: USDC Mint地址
 - `SOLANA_PROGRAM_ID`: Solana程序ID
+- `SOLANA_PRIVATE_KEY_ENCRYPTED`: 加密的Solana私钥(待管理员设置)
 
 #### 分享消息 (8条)
 **分享内容消息** (`share_content`) - 用于资产分享:

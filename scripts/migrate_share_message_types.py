@@ -31,6 +31,7 @@ def migrate_system_configs():
         {"key": "SOLANA_RPC_URL", "value": "https://api.mainnet-beta.solana.com", "desc": "Solana RPC节点"},
         {"key": "SOLANA_USDC_MINT", "value": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "desc": "USDC Mint地址"},
         {"key": "SOLANA_PROGRAM_ID", "value": "2TsURTNQXyqHLB2bfbzFME7HkSMLWueYPjqXBBy2u1wP", "desc": "Solana程序ID"},
+        {"key": "SOLANA_PRIVATE_KEY_ENCRYPTED", "value": "", "desc": "加密的Solana私钥(待管理员设置)"},
     ]
     
     for cfg in configs:
