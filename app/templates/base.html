@@ -1174,13 +1174,34 @@
     <!-- 钱包按钮初始化脚本 -->
     <script>
         // 等待钱包脚本加载完成后初始化按钮
+        let walletScriptRetryCount = 0;
+        const maxRetries = 50; // 最多重试50次（5秒）
+        
         function waitForWalletScript() {
-            if (typeof initWalletButton === 'function') {
+            if (typeof window.initWalletButton === 'function') {
                 console.log('initWalletButton function found, calling it');
-                initWalletButton();
-            } else {
-                console.log('Waiting for wallet script to load...');
+                window.initWalletButton();
+            } else if (walletScriptRetryCount < maxRetries) {
+                walletScriptRetryCount++;
+                console.log(`Waiting for wallet script to load... (${walletScriptRetryCount}/${maxRetries})`);
                 setTimeout(waitForWalletScript, 100);
+            } else {
+                console.error('Failed to load wallet script after maximum retries. Wallet functionality may not work.');
+                // 尝试手动初始化钱包按钮事件
+                const walletBtn = document.getElementById('walletBtn');
+                if (walletBtn) {
+                    console.log('Attempting manual wallet button initialization');
+                    walletBtn.addEventListener('click', function(event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        console.log('Wallet button clicked - manual handler');
+                        if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+                            window.walletState.openWalletSelector();
+                        } else {
+                            alert('Wallet functionality is not available. Please refresh the page.');
+                        }
+                    });
+                }
             }
         }
         

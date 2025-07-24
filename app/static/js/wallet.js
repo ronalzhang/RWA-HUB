@@ -5239,7 +5239,7 @@ if (!window.walletState) {
 }
 
 // 钱包按钮事件绑定（统一处理base.html中的钱包按钮）
-function initWalletButton() {
+window.initWalletButton = function initWalletButton() {
     const walletBtn = document.getElementById('walletBtn');
     if (walletBtn) {
         console.log('Found wallet button, binding click event');
@@ -5280,8 +5280,8 @@ function initWalletButton() {
         
         console.log('Wallet button event binding completed');
     } else {
-        console.log('Wallet button not found, will retry in 1 second');
-        setTimeout(initWalletButton, 1000);
+        console.log('Wallet button not found in DOM');
+        // 不再在这里重试，让 base.html 的重试机制处理
     }
 }
 
@@ -5344,12 +5344,8 @@ window.disconnectAndCloseMenu = function() {
     }
 };
 
-// 在DOM加载完成后初始化钱包按钮
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initWalletButton);
-} else {
-    initWalletButton();
-}
+// 钱包按钮初始化现在由base.html统一处理
+// 这样可以避免重复初始化和冲突
 
 // 监听钱包状态变化，更新按钮显示
 window.addEventListener('walletConnected', function() {
