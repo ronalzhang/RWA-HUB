@@ -882,10 +882,9 @@ def get_users():
         for user in users:
             # 获取交易次数
             from app.models.trade import Trade
-            trade_count = Trade.query.filter(or_(
-                Trade.buyer_address == user.wallet_address,
-                Trade.seller_address == user.wallet_address
-            )).count()
+            trade_count = Trade.query.filter(
+                Trade.trader_address == user.wallet_address
+            ).count()
             
             # 获取持有资产数
             from app.models.asset import Asset
