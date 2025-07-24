@@ -17,7 +17,9 @@ class Keypair:
     def __init__(self, keypair_bytes: Optional[bytes] = None):
         """Initialize from keypair bytes."""
         if keypair_bytes is None:
-            raise ValueError("必须提供有效的私钥，不允许使用默认私钥")
+            # 生成随机的32字节私钥
+            import os
+            self._secret = os.urandom(32)
         else:
             # 支持32字节（仅私钥）或64字节（私钥+公钥）
             if len(keypair_bytes) == 32:

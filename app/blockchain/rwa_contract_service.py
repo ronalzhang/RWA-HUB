@@ -12,6 +12,7 @@ import os
 import base64
 from typing import Dict, Any, Optional, Tuple
 from decimal import Decimal
+from datetime import datetime
 
 from flask import current_app
 
@@ -50,7 +51,7 @@ class RWAContractService:
                             decimals: int = 0,
                             price_per_token: float = 1.0) -> Dict[str, Any]:
         """
-        在链上创建资产
+        在链上创建资产 - 改进版本，直接生成合约地址
         
         Args:
             creator_address: 创建者钱包地址
@@ -86,6 +87,21 @@ class RWAContractService:
             logger.info(f"资产账户: {asset_pubkey}")
             logger.info(f"铸币账户: {mint_pubkey}")
             logger.info(f"资产金库PDA: {vault_pda}")
+            
+            # 准备区块链数据
+            blockchain_data = {
+                'vault_bump': vault_bump,
+                'asset_keypair': base64.b64encode(asset_keypair.secret_key).decode('utf-8'),
+                'mint_keypair': base64.b64encode(mint_keypair.secret_key).decode('utf-8'),
+                'creator_address': creator_address,
+                'asset_name': asset_name,
+                'asset_symbol': asset_symbol,
+                'total_supply': total_supply,
+                'decimals': decimals,
+                'price_per_token': price_per_token,
+                'created_at': datetime.now().isoformat(),
+                'program_id': str(self.program_id)
+            }
             
             # 准备指令数据
             # 指令格式: [指令ID(1字节)] + [数据]
@@ -149,6 +165,7 @@ class RWAContractService:
                 'mint_account': str(mint_pubkey),
                 'vault_pda': str(vault_pda),
                 'vault_bump': vault_bump,
+                'blockchain_data': blockchain_data,
                 'signers': [
                     {'account': str(asset_pubkey), 'keypair': base64.b64encode(asset_keypair.secret_key).decode('utf-8')},
                     {'account': str(mint_pubkey), 'keypair': base64.b64encode(mint_keypair.secret_key).decode('utf-8')}
@@ -161,6 +178,82 @@ class RWAContractService:
             return {
                 'success': False,
                 'error': f"创建资产失败: {str(e)}"
+            }
+
+    def create_asset_directly(self, 
+                            creator_address: str,
+                            asset_name: str, 
+                            asset_symbol: str,
+                            total_supply: int,
+                            decimals: int = 0,
+                            price_per_token: float = 1.0) -> Dict[str, Any]:
+        """
+        直接创建资产合约地址（不需要实际上链）
+        用于快速为资产分配合约地址，使其可以被购买
+        
+        Args:
+            creator_address: 创建者钱包地址
+            asset_name: 资产名称
+            asset_symbol: 资产符号
+            total_supply: 总供应量
+            decimals: 小数位数
+            price_per_token: 每个代币价格(USDC)
+            
+        Returns:
+            Dict: 包含合约地址信息的字典
+        """
+        try:
+            logger.info(f"直接创建资产合约地址: {asset_name} ({asset_symbol})")
+            
+            # 生成资产账户密钥对
+            asset_keypair = Keypair()
+            asset_pubkey = asset_keypair.public_key
+            
+            # 生成代币铸币账户密钥对
+            mint_keypair = Keypair()
+            mint_pubkey = mint_keypair.public_key
+            
+            # 计算资产金库PDA
+            vault_pda, vault_bump = PublicKey.find_program_address(
+                [b"asset_vault", bytes(mint_pubkey)],
+                self.program_id
+            )
+            
+            logger.info(f"资产账户: {asset_pubkey}")
+            logger.info(f"铸币账户: {mint_pubkey}")
+            logger.info(f"资产金库PDA: {vault_pda}")
+            
+            # 准备区块链数据
+            blockchain_data = {
+                'vault_bump': vault_bump,
+                'asset_keypair': base64.b64encode(asset_keypair.secret_key).decode('utf-8'),
+                'mint_keypair': base64.b64encode(mint_keypair.secret_key).decode('utf-8'),
+                'creator_address': creator_address,
+                'asset_name': asset_name,
+                'asset_symbol': asset_symbol,
+                'total_supply': total_supply,
+                'decimals': decimals,
+                'price_per_token': price_per_token,
+                'created_at': datetime.now().isoformat(),
+                'program_id': str(self.program_id),
+                'status': 'ready_for_deployment'
+            }
+            
+            return {
+                'success': True,
+                'asset_account': str(asset_pubkey),
+                'mint_account': str(mint_pubkey),
+                'vault_pda': str(vault_pda),
+                'vault_bump': vault_bump,
+                'blockchain_data': blockchain_data,
+                'message': '资产合约地址已生成，可以进行购买操作'
+            }
+            
+        except Exception as e:
+            logger.error(f"创建资产合约地址失败: {str(e)}", exc_info=True)
+            return {
+                'success': False,
+                'error': f"创建合约地址失败: {str(e)}"
             }
 
     def buy_asset_on_chain(self,

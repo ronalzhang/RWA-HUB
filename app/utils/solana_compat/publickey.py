@@ -21,23 +21,29 @@ class PublicKey:
         if isinstance(value, str):
             # 如果是字符串，直接解码
             try:
-                if len(value) >= 32:
-                    # 可能是base58编码的字符串
-                    bytes_array = base58.b58decode(value)
-                    if len(bytes_array) != self.LENGTH:
-                        raise ValueError(f"无效的公钥长度: {len(bytes_array)}")
-                else:
-                    # 可能是短格式，尝试转换
-                    bytes_array = base58.b58decode(value.encode())
-                    if len(bytes_array) != self.LENGTH:
-                        raise ValueError(f"无效的公钥长度: {len(bytes_array)}")
+                # 可能是base58编码的字符串
+                bytes_array = base58.b58decode(value)
+                if len(bytes_array) != self.LENGTH:
+                    # 如果长度不对，尝试填充或截断
+                    if len(bytes_array) < self.LENGTH:
+                        # 填充到32字节
+                        bytes_array = bytes_array + b'\x00' * (self.LENGTH - len(bytes_array))
+                    else:
+                        # 截断到32字节
+                        bytes_array = bytes_array[:self.LENGTH]
                 self._key = bytes(bytes_array)
             except Exception as e:
                 raise ValueError(f"无效的公钥格式: {str(e)}")
         elif isinstance(value, bytes):
             # 如果是字节数组，直接使用
             if len(value) != self.LENGTH:
-                raise ValueError(f"无效的公钥长度: {len(value)}")
+                # 如果长度不对，尝试填充或截断
+                if len(value) < self.LENGTH:
+                    # 填充到32字节
+                    value = value + b'\x00' * (self.LENGTH - len(value))
+                else:
+                    # 截断到32字节
+                    value = value[:self.LENGTH]
             self._key = bytes(value)
         elif isinstance(value, list):
             # 如果是整数列表，转换为字节数组

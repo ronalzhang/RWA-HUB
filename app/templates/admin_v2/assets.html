@@ -106,6 +106,10 @@
                                 class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm">
                             <i class="fas fa-download mr-2"></i>导出
                         </button>
+                        <button @click="fixAllContracts()" 
+                                class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 text-sm">
+                            <i class="fas fa-wrench mr-2"></i>修复合约地址
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1164,6 +1168,56 @@
                 } catch (error) {
                     console.error('导出失败:', error);
                     alert('导出失败: ' + error.message);
+                }
+            },
+            
+            // 修复所有资产的合约地址
+            async fixAllContracts() {
+                if (!confirm('确定要为所有缺少合约地址的资产生成合约地址吗？这将使这些资产可以被购买。')) {
+                    return;
+                }
+                
+                try {
+                    // 显示加载状态
+                    const originalText = event.target.innerHTML;
+                    event.target.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>修复中...';
+                    event.target.disabled = true;
+                    
+                    const response = await this.authFetch('/admin/assets/fix-all-contracts', {
+                        method: 'POST'
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        let message = result.message;
+                        if (result.failed_assets && result.failed_assets.length > 0) {
+                            message += '\n\n失败的资产:\n';
+                            result.failed_assets.forEach(asset => {
+                                message += `- ${asset.name} (ID: ${asset.id}): ${asset.error}\n`;
+                            });
+                        }
+                        
+                        alert(message);
+                        
+                        // 刷新数据
+                        await this.loadAssets();
+                        await this.loadStats();
+                    } else {
+                        alert('批量修复失败: ' + result.error);
+                    }
+                    
+                    // 恢复按钮状态
+                    event.target.innerHTML = originalText;
+                    event.target.disabled = false;
+                    
+                } catch (error) {
+                    console.error('修复合约地址失败:', error);
+                    alert('修复失败: ' + error.message);
+                    
+                    // 恢复按钮状态
+                    event.target.innerHTML = '<i class="fas fa-wrench mr-2"></i>修复合约地址';
+                    event.target.disabled = false;
                 }
             },
             

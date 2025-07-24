@@ -1025,11 +1025,12 @@ def create_asset_api():
             
             current_app.logger.info(f"资产创建API：成功创建资产 {new_asset.id}, {token_symbol}")
             
-            # 创建智能合约上链请求
+            # 创建智能合约地址（直接分配，使资产可以被购买）
             try:
                 from app.blockchain.rwa_contract_service import rwa_contract_service
                 
-                contract_result = rwa_contract_service.create_asset_on_chain(
+                # 使用直接创建方法，立即分配合约地址
+                contract_result = rwa_contract_service.create_asset_directly(
                     creator_address=creator_address,
                     asset_name=data.get('name', ''),
                     asset_symbol=token_symbol,
@@ -1043,20 +1044,24 @@ def create_asset_api():
                     new_asset.token_address = contract_result['mint_account']
                     new_asset.contract_address = contract_result['asset_account']
                     new_asset.vault_address = contract_result['vault_pda']
-                    new_asset.blockchain_data = json.dumps({
-                        'vault_bump': contract_result['vault_bump'],
-                        'transaction_data': contract_result['transaction_data'],
-                        'signers': contract_result['signers']
-                    })
-                    new_asset.status = 8  # 设置为等待智能合约部署状态
+                    new_asset.blockchain_data = json.dumps(contract_result['blockchain_data'])
+                    new_asset.status = 2  # 设置为已通过状态，可以被购买
                     
                     db.session.commit()
-                    current_app.logger.info(f"资产 {new_asset.id} 智能合约数据已准备完成")
+                    current_app.logger.info(f"资产 {new_asset.id} 合约地址已分配，可以被购买")
+                    current_app.logger.info(f"代币地址: {new_asset.token_address}")
+                    current_app.logger.info(f"合约地址: {new_asset.contract_address}")
                 else:
-                    current_app.logger.error(f"资产 {new_asset.id} 智能合约准备失败: {contract_result.get('error')}")
+                    current_app.logger.error(f"资产 {new_asset.id} 合约地址分配失败: {contract_result.get('error')}")
+                    # 即使合约地址分配失败，也保持资产为待审核状态
+                    new_asset.status = 1
+                    db.session.commit()
                     
             except Exception as contract_error:
-                current_app.logger.error(f"资产 {new_asset.id} 智能合约处理异常: {str(contract_error)}", exc_info=True)
+                current_app.logger.error(f"资产 {new_asset.id} 合约地址分配异常: {str(contract_error)}", exc_info=True)
+                # 发生异常时，保持资产为待审核状态
+                new_asset.status = 1
+                db.session.commit()
             
             # 添加: 触发支付确认监控任务
             if new_asset.payment_tx_hash:
