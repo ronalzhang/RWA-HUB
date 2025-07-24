@@ -24,7 +24,7 @@
     <!-- AOS Animation -->
     <link href="{{ url_for('static', filename='vendor/aos.css') }}" rel="stylesheet">
     <!-- SweetAlert2 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/sweetalert2.min.css') }}" rel="stylesheet">
     
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     
@@ -1037,11 +1037,37 @@
         })();
     </script>
     
+    <!-- 钱包兼容性保护脚本 - 防止钱包扩展冲突 -->
+    <script>
+        // 保护window.ethereum属性，防止重复定义错误
+        if (typeof window.ethereum !== 'undefined') {
+            console.log('Ethereum provider already exists, preserving it');
+            window._originalEthereum = window.ethereum;
+        }
+        
+        // 监听钱包注入错误并静默处理
+        window.addEventListener('error', function(e) {
+            if (e.message && e.message.includes('Cannot redefine property: ethereum')) {
+                console.warn('Ethereum provider redefinition attempted, ignoring error');
+                e.stopPropagation();
+                e.preventDefault();
+                return false;
+            }
+        }, true);
+        
+        // 防止钱包扩展脚本冲突
+        window.addEventListener('DOMContentLoaded', function() {
+            if (window._originalEthereum && !window.ethereum) {
+                window.ethereum = window._originalEthereum;
+            }
+        });
+    </script>
+    
     <!-- 加载Web3.js - 直接使用本地文件，避免CDN延迟 -->
     <script src="{{ url_for('static', filename='vendor/web3.min.js') }}"></script>
     
     <!-- SweetAlert2 JavaScript -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+    <script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
     
     <!-- 钱包主脚本 -->
     <script src="{{ url_for('static', filename='js/wallet.js') }}?v=20241231-fix3&t=1735659600"></script>
@@ -1208,6 +1234,28 @@
         }
         
         // 钱包连接功能已完全移至wallet.js，避免重复代码冲突
+        
+        // 全局连接函数，供模态框中的按钮调用
+        function connectWallet(walletType) {
+            console.log('连接钱包类型:', walletType);
+            
+            // 关闭模态框
+            const modal = document.getElementById('simpleWalletModal');
+            if (modal) {
+                const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                if (bootstrapModal) {
+                    bootstrapModal.hide();
+                }
+            }
+            
+            // 调用wallet.js中的连接方法
+            if (window.walletState && typeof window.walletState.connect === 'function') {
+                window.walletState.connect(walletType);
+            } else {
+                console.error('walletState.connect function not available');
+                alert('钱包连接功能暂时不可用，请刷新页面重试');
+            }
+        }
         
         // 显示佣金详情
         function showCommissionDetails() {
