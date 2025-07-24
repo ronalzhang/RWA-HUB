@@ -5,9 +5,9 @@
 
 // 防止重复加载
 if (window.RWA_WALLET_LOADED) {
-    console.warn('Wallet script already loaded, skipping...');
-} else {
-    window.RWA_WALLET_LOADED = true;
+    console.warn('Wallet script already loaded, but continuing...');
+}
+window.RWA_WALLET_LOADED = true;
 
 // 添加调试模式检查 - 只在开发环境或明确启用时输出详细日志
 const DEBUG_MODE = window.location.hostname === 'localhost' || 
@@ -5400,6 +5400,4 @@ window.addEventListener('walletDisconnected', function() {
 
 // 导出钱包接口
 console.log('钱包接口初始化完成');
-
-} // 闭合防重复加载的else块
 
