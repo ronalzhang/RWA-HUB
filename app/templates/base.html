@@ -1099,6 +1099,12 @@
             initSimpleWalletButton();
         });
         
+        // 统一的地址格式化函数 - 避免重复代码
+        function formatWalletAddress(address) {
+            if (!address) return '';
+            return address.slice(0, 6) + '...' + address.slice(-4);
+        }
+        
         // 简单直接的钱包按钮初始化
         function initSimpleWalletButton() {
             const walletBtn = document.getElementById('walletBtn');
@@ -1160,7 +1166,7 @@
             // 更新地址显示
             const addressDisplay = document.getElementById('walletAddressDisplay');
             if (addressDisplay) {
-                const shortAddress = window.walletState.address.slice(0, 6) + '...' + window.walletState.address.slice(-4);
+                const shortAddress = formatWalletAddress(window.walletState.address);
                 addressDisplay.textContent = shortAddress;
                 console.log('地址显示已更新:', shortAddress);
             }
@@ -1694,7 +1700,7 @@
             const details = `
 佣金详情信息：
 
-钱包地址: ${address.slice(0, 6)}...${address.slice(-4)}
+钱包地址: ${formatWalletAddress(address)}
 当前佣金余额: ${commissionValue} USDC
 
 佣金说明:
@@ -1807,7 +1813,7 @@
             if (window.walletState && window.walletState.address && 
                 (window.walletState.connected || window.walletState.isConnected)) {
                 // 显示简短地址
-                const shortAddress = window.walletState.address.slice(0, 6) + '...' + window.walletState.address.slice(-4);
+                const shortAddress = formatWalletAddress(window.walletState.address);
                 walletBtnText.textContent = shortAddress;
             } else {
                 // 显示连接文本
