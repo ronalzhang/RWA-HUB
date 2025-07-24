@@ -5291,7 +5291,17 @@ function loadUserAssets(address) {
     })
     .then(response => response.json())
     .then(data => {
-        if (data.success && data.assets && data.assets.length > 0) {
+        // 检查数据格式：可能是直接数组，也可能是包装的对象
+        let assets = [];
+        if (Array.isArray(data)) {
+            assets = data;
+        } else if (data.success && data.assets) {
+            assets = data.assets;
+        } else if (data && data.length > 0) {
+            assets = data;
+        }
+        
+        if (assets && assets.length > 0) {
             // 显示资产部分
             if (assetsSection) {
                 assetsSection.style.display = 'block';
@@ -5299,8 +5309,9 @@ function loadUserAssets(address) {
             
             // 构建资产列表
             let assetsHtml = '';
-            data.assets.forEach(asset => {
-                const quantity = parseFloat(asset.quantity || 0);
+            assets.forEach(asset => {
+                // 支持不同的数量字段名
+                const quantity = parseFloat(asset.holding_amount || asset.quantity || 0);
                 if (quantity > 0) {
                     assetsHtml += `
                         <li class="wallet-asset-item">

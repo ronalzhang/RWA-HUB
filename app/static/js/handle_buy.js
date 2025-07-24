@@ -99,9 +99,21 @@ function handleBuy(assetId, amountInput, buyButton) {
     return;
   }
   
-  // 规范化资产ID格式
+  // 确保资产ID是数字格式（API期望整数）
   if (/^\d+$/.test(assetId)) {
-    assetId = `RH-${assetId}`;
+    assetId = parseInt(assetId);
+  } else if (assetId.startsWith('RH-')) {
+    // 如果是RH-格式，提取数字部分
+    const numericPart = assetId.replace('RH-', '');
+    if (/^\d+$/.test(numericPart)) {
+      assetId = parseInt(numericPart);
+    }
+  } else {
+    // 尝试解析为整数
+    const parsed = parseInt(assetId);
+    if (!isNaN(parsed)) {
+      assetId = parsed;
+    }
   }
   
   // 检查购买数量
