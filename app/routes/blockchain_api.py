@@ -155,6 +155,13 @@ def prepare_purchase():
                 'error': '资产尚未上链，无法购买'
             }), 400
         
+        # 检查资产是否有有效的智能合约地址
+        if not asset.token_address or not asset.contract_address:
+            return jsonify({
+                'success': False,
+                'error': '资产智能合约地址无效，无法购买'
+            }), 400
+        
         # 检查剩余供应量
         if asset.remaining_supply < amount:
             return jsonify({
