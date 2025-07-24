@@ -120,7 +120,7 @@ def get_trades_list():
                 'token_amount': trade.token_amount,
                 'price': float(trade.price) if trade.price else 0,
                 'total': float(trade.total) if trade.total else 0,
-                'amount': trade.token_amount,  # 兼容前端
+                'amount': trade.amount,  # 使用正确的amount字段
                 'status': trade.status,
                 'trade_type': trade.type,
                 'type': trade.type,  # 兼容前端
