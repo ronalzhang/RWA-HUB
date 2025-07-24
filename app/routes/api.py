@@ -228,13 +228,13 @@ def get_user_assets_query():
                     # ETH地址，查询原始大小写地址和小写地址
                     completed_trades = Trade.query.filter(
                         Trade.trader_address.in_([address, address.lower()]),
-                        Trade.status == TradeStatus.COMPLETED.value
+                        Trade.status.in_([TradeStatus.COMPLETED.value, TradeStatus.PENDING.value])
                     ).all()
                 else:
                     # SOL地址或其他类型，查询原始地址（区分大小写）
-                    completed_trades = Trade.query.filter_by(
-                        trader_address=address,
-                        status=TradeStatus.COMPLETED.value
+                    completed_trades = Trade.query.filter(
+                        Trade.trader_address == address,
+                        Trade.status.in_([TradeStatus.COMPLETED.value, TradeStatus.PENDING.value])
                     ).all()
                 
                 # 按资产ID分组
@@ -422,13 +422,13 @@ def get_user_assets(address):
                     # ETH地址，查询原始大小写地址和小写地址
                     completed_trades = Trade.query.filter(
                         Trade.trader_address.in_([address, address.lower()]),
-                        Trade.status == TradeStatus.COMPLETED.value
+                        Trade.status.in_([TradeStatus.COMPLETED.value, TradeStatus.PENDING.value])
                     ).all()
                 else:
                     # SOL地址或其他类型，查询原始地址（区分大小写）
-                    completed_trades = Trade.query.filter_by(
-                        trader_address=address,
-                        status=TradeStatus.COMPLETED.value
+                    completed_trades = Trade.query.filter(
+                        Trade.trader_address == address,
+                        Trade.status.in_([TradeStatus.COMPLETED.value, TradeStatus.PENDING.value])
                     ).all()
                 
                 # 按资产ID分组
