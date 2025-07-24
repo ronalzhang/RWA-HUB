@@ -807,9 +807,13 @@
             }
         });
         
-        // 初始化钱包按钮状态 - 移除不必要的延迟
-        if (window.walletState && typeof window.updateWalletMenuInfo === 'function') {
-            window.updateWalletMenuInfo();
+        // 初始化钱包按钮状态 - 但不立即加载资产数据，以改善首页性能
+        if (window.walletState && window.walletState.address) {
+            // 只更新钱包按钮显示，不立即加载资产数据
+            const walletBtnText = document.getElementById('walletBtnText');
+            if (walletBtnText && window.walletState.formatAddress) {
+                walletBtnText.textContent = window.walletState.formatAddress(window.walletState.address);
+            }
         }
     });
     
@@ -958,83 +962,12 @@
     <!-- 移除Font Awesome Kit脚本，已在头部引入CDN版本 -->
     <!-- <script src="https://kit.fontawesome.com/ad3f66688a.js" crossorigin="anonymous"></script> -->
     
-    <!-- 添加Font Awesome CDN清理脚本 -->
+    <!-- 简化的Font Awesome Kit阻止脚本 -->
     <script>
-        // 更彻底的方法阻止Kit加载
-        (function() {
-            // 1. 使用MutationObserver监视DOM变化
-            const observer = new MutationObserver(function(mutations) {
-                mutations.forEach(function(mutation) {
-                    if (mutation.addedNodes) {
-                        mutation.addedNodes.forEach(function(node) {
-                            if (node.nodeType === 1 && node.tagName === 'SCRIPT') {
-                                const src = node.src || '';
-                                if (src.includes('kit.fontawesome.com')) {
-                                    console.log('通过MutationObserver阻止加载Font Awesome Kit:', src);
-                                    node.parentNode.removeChild(node);
-                                }
-                            }
-                        });
-                    }
-                });
-            });
-            
-            // 监听整个文档的变化
-            observer.observe(document, { childList: true, subtree: true });
-            
-            // 2. 重写document.createElement来阻止创建加载Kit的script标签
-            const originalCreateElement = document.createElement;
-            document.createElement = function(tag) {
-                const element = originalCreateElement.call(document, tag);
-                if (tag.toLowerCase() === 'script') {
-                    const originalSetAttribute = element.setAttribute;
-                    element.setAttribute = function(name, value) {
-                        if (name === 'src' && typeof value === 'string' && value.includes('kit.fontawesome.com')) {
-                            console.log('拦截到Font Awesome Kit加载尝试:', value);
-                            return;
-                        }
-                        return originalSetAttribute.call(this, name, value);
-                    };
-                    
-                    // 监听src属性的直接赋值
-                    const descriptor = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
-                    const originalSrcSetter = descriptor.set;
-                    
-                    Object.defineProperty(element, 'src', {
-                        set: function(value) {
-                            if (typeof value === 'string' && value.includes('kit.fontawesome.com')) {
-                                console.log('拦截到Font Awesome Kit通过属性赋值的加载尝试:', value);
-                                return;
-                            }
-                            return originalSrcSetter.call(this, value);
-                        },
-                        get: descriptor.get
-                    });
-                }
-                return element;
-            };
-            
-            // 3. 拦截XMLHttpRequest
-            const originalXHROpen = XMLHttpRequest.prototype.open;
-            XMLHttpRequest.prototype.open = function(method, url, ...args) {
-                if (typeof url === 'string' && url.includes('kit.fontawesome.com')) {
-                    console.log('拦截到Font Awesome Kit的XHR请求:', url);
-                    this.abort();
-                    return;
-                }
-                return originalXHROpen.call(this, method, url, ...args);
-            };
-            
-            // 4. 拦截fetch
-            const originalFetch = window.fetch;
-            window.fetch = function(resource, init) {
-                if (typeof resource === 'string' && resource.includes('kit.fontawesome.com')) {
-                    console.log('拦截到Font Awesome Kit的fetch请求:', resource);
-                    return Promise.reject(new Error('请求已被拦截'));
-                }
-                return originalFetch.call(this, resource, init);
-            };
-        })();
+        // 简单阻止Font Awesome Kit加载，提升性能
+        if (window.FontAwesomeConfig) {
+            window.FontAwesomeConfig.autoReplaceSvg = false;
+        }
     </script>
     
     <!-- 钱包兼容性保护脚本 - 防止钱包扩展冲突 -->
@@ -1135,7 +1068,7 @@
                 walletMenu.classList.remove('show');
                 walletMenu.style.display = 'none';
             } else {
-                // 显示菜单并更新信息
+                // 显示菜单时才加载用户数据，提升首页性能
                 if (window.updateWalletMenuInfo) {
                     window.updateWalletMenuInfo();
                 }
