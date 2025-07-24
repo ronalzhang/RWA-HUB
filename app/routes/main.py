@@ -32,21 +32,21 @@ def index():
         current_app.logger.info(f'- Args: {eth_address_args}')
         current_app.logger.info(f'最终使用地址: {eth_address}')
         
-        # 只显示状态为ON_CHAIN且未删除的资产，优化查询性能
+        # 显示状态为2（APPROVED/ON_CHAIN）且未删除的资产
         query = Asset.query.filter(
-            Asset.status == AssetStatus.ON_CHAIN.value,
+            Asset.status == 2,  # 直接使用数值2，避免枚举问题
             Asset.deleted_at.is_(None)
-        ).options(
-            # 只加载必要的字段，避免关联查询
-            defer('blockchain_details'),
-            defer('documents'),
-            defer('blockchain_data'),
-            defer('payment_details')
         )
             
         # 获取最新3个资产
         assets = query.order_by(Asset.created_at.desc()).limit(3).all()
-        current_app.logger.info(f'获取资产列表成功: 找到 {len(assets)} 个资产')
+        current_app.logger.info(f'获取资产列表: 找到 {len(assets)} 个资产，查询条件: status=2, deleted_at IS NULL')
+        
+        # 调试信息
+        if len(assets) == 0:
+            total_assets = Asset.query.count()
+            status_2_assets = Asset.query.filter(Asset.status == 2).count()
+            current_app.logger.error(f'首页无资产显示 - 总资产数: {total_assets}, status=2的资产数: {status_2_assets}')
         
         # 直接使用ORM对象列表，不转换为字典
         return render_template('index.html', 
@@ -81,9 +81,9 @@ def index_v6():
         current_app.logger.info(f'- Args: {eth_address_args}')
         current_app.logger.info(f'最终使用地址: {eth_address}')
         
-        # 只显示状态为ON_CHAIN且未删除的资产
+        # 显示状态为2（APPROVED/ON_CHAIN）且未删除的资产  
         query = Asset.query.filter(
-            Asset.status == AssetStatus.ON_CHAIN.value,
+            Asset.status == 2,
             Asset.deleted_at.is_(None)
         )
             

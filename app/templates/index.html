@@ -73,7 +73,6 @@
             {% if assets %}
                 {% for asset in assets %}
                 <div class="col-md-4" data-aos="fade-up" data-aos-delay="{{ loop.index * 100 }}">
-                    {% if asset.status == 2 %}
                     <a href="{{ url_for('assets.asset_detail_by_symbol', token_symbol=asset.token_symbol) }}" 
                        class="text-decoration-none home-asset-card-link"
                        data-token-symbol="{{ asset.token_symbol }}"
@@ -139,7 +138,6 @@
                             </div>
                         </div>
                     </a>
-                    {% endif %}
                 </div>
                 {% endfor %}
             {% else %}

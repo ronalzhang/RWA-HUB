@@ -613,29 +613,42 @@ function handleBuyButtonClick(event) {
 
 // 初始化购买按钮
 function setupBuyButton() {
+  // 避免重复初始化
+  if (window.buyButtonInitialized) {
+    console.log('购买按钮已初始化，跳过重复初始化');
+    return;
+  }
+  
   console.log('初始化购买按钮...');
   
   // 查找所有购买按钮
   const buyButtons = document.querySelectorAll('.buy-button, #buy-button');
   if (buyButtons.length === 0) {
     console.log('当前页面没有购买按钮');
-                return;
-            }
+    return;
+  }
             
   console.log(`找到 ${buyButtons.length} 个购买按钮`);
   
   // 为每个按钮添加点击事件
   buyButtons.forEach(button => {
-    // 移除已有的点击事件(如果有)
-    button.removeEventListener('click', handleBuyButtonClick);
+    // 检查是否已经绑定过事件
+    if (button.dataset.buyEventBound) {
+      console.log('按钮已绑定事件，跳过');
+      return;
+    }
     
-    // 添加新的点击事件
+    // 添加点击事件
     button.addEventListener('click', handleBuyButtonClick);
+    button.dataset.buyEventBound = 'true'; // 标记已绑定
     console.log('已添加购买按钮点击事件');
   });
   
   // 初始更新按钮状态
   updateBuyButtonState();
+  
+  // 标记已初始化
+  window.buyButtonInitialized = true;
 }
 
 // 用于跟踪最后一次状态更新的时间戳和正在进行的更新操作
