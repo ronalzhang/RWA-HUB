@@ -5282,8 +5282,8 @@ function loadUserAssets(address) {
     // 显示加载状态
     assetsList.innerHTML = '<li style="text-align:center; padding:10px; color:#666; font-size:12px;"><i class="fas fa-spinner fa-spin me-2"></i>Loading assets...</li>';
     
-    // 获取用户资产
-    fetch(`/api/user/${address}/assets`, {
+    // 获取用户资产 - 使用查询参数方式以避免路径问题
+    fetch(`/api/user/assets?address=${encodeURIComponent(address)}`, {
         headers: {
             'Accept': 'application/json',
             'X-Eth-Address': address
