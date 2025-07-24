@@ -4018,12 +4018,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (buyButton && purchaseAmountInput && totalPriceDisplay) {
         console.log('Asset detail page elements found. Setting up purchase listeners.');
         
-        // 获取资产ID - 从URL中提取
-        const pathParts = window.location.pathname.split('/');
-        let assetId = pathParts[pathParts.length - 1];
-        // 如果资产ID以RH-开头，则使用该ID
-        if (!assetId.startsWith('RH-')) {
-            // 尝试从页面中其他位置获取
+        // 获取资产ID - 从按钮的data-asset-id属性获取
+        let assetId = buyButton.getAttribute('data-asset-id');
+        if (!assetId) {
+            // 备用方案：从页面中其他位置获取
             assetId = document.querySelector('[data-asset-id]')?.dataset.assetId;
         }
         
