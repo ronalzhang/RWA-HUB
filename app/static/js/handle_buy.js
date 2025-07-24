@@ -255,14 +255,39 @@ function handleBuy(assetId, amountInput, buyButton) {
     // 尝试使用Phantom钱包的request方法直接发送序列化交易
     console.log('调用钱包签名，交易数据长度:', transactionBuffer.length);
     
-    // 将交易数据转换为base64字符串
-    const transactionBase64 = btoa(String.fromCharCode.apply(null, transactionBuffer));
+    // 创建一个简单的base58编码函数
+    function base58Encode(buffer) {
+      const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+      let result = '';
+      let num = 0n;
+      
+      // 将buffer转换为大整数
+      for (let i = 0; i < buffer.length; i++) {
+        num = num * 256n + BigInt(buffer[i]);
+      }
+      
+      // 转换为base58
+      while (num > 0n) {
+        result = alphabet[Number(num % 58n)] + result;
+        num = num / 58n;
+      }
+      
+      // 处理前导零
+      for (let i = 0; i < buffer.length && buffer[i] === 0; i++) {
+        result = '1' + result;
+      }
+      
+      return result;
+    }
+    
+    // 将交易数据转换为base58字符串
+    const transactionBase58 = base58Encode(transactionBuffer);
     
     console.log('使用request方法发送交易...');
     return window.solana.request({
       method: 'signAndSendTransaction',
       params: {
-        message: transactionBase64
+        message: transactionBase58
       }
     })
       .then(paymentResult => {
