@@ -24,9 +24,10 @@ logger = logging.getLogger(__name__)
 class ContractMonitor:
     """智能合约执行监控器"""
     
-    def __init__(self):
+    def __init__(self, app=None):
         self.is_running = False
         self.monitor_thread = None
+        self.app = app
     
     def start_monitoring(self):
         """启动监控服务"""
@@ -56,7 +57,11 @@ class ContractMonitor:
         """运行监控器"""
         while self.is_running:
             try:
-                schedule.run_pending()
+                if self.app:
+                    with self.app.app_context():
+                        schedule.run_pending()
+                else:
+                    schedule.run_pending()
                 time.sleep(10)  # 每10秒检查一次
             except Exception as e:
                 logger.error(f"监控器运行错误: {str(e)}")
@@ -228,10 +233,12 @@ class ContractMonitor:
             }
 
 # 全局监控服务实例
-contract_monitor = ContractMonitor()
+contract_monitor = None
 
 def init_contract_monitor(app):
     """初始化合约监控服务"""
+    global contract_monitor
+    contract_monitor = ContractMonitor(app)
     with app.app_context():
         contract_monitor.start_monitoring()
 

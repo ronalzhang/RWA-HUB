@@ -141,6 +141,15 @@ function handleBuy(assetId, amountInput, buyButton) {
   const walletAddress = getWalletAddress();
   const walletType = getWalletType();
   
+  console.log('钱包信息:', { walletAddress, walletType });
+  
+  // 验证钱包地址格式
+  if (!walletAddress || walletAddress.length < 32) {
+    showError('钱包地址无效，请重新连接钱包');
+    resetButton(buyButton, '<i class="fas fa-wallet me-2"></i>Please Connect Wallet');
+    return;
+  }
+  
   // 准备购买数据
   const purchaseData = {
     asset_id: assetId,
@@ -165,8 +174,12 @@ function handleBuy(assetId, amountInput, buyButton) {
     body: JSON.stringify(purchaseData)
   })
   .then(response => {
+    console.log('API响应状态:', response.status, response.statusText);
     if (!response.ok) {
-      throw new Error(`服务器错误: ${response.status}`);
+      return response.text().then(text => {
+        console.error('API错误响应:', text);
+        throw new Error(`服务器错误 ${response.status}: ${response.statusText}`);
+      });
     }
     return response.json();
   })
