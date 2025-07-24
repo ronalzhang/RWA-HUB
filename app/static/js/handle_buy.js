@@ -205,12 +205,17 @@ function handleBuy(assetId, amountInput, buyButton) {
       throw new Error('Solana钱包API不可用，无法完成智能合约交易');
     }
     
+    // 检查Solana Web3库是否可用
+    if (!window.solanaWeb3 || !window.solanaWeb3.Transaction) {
+      throw new Error('Solana Web3库未加载，无法处理交易数据');
+    }
+    
     // 准备智能合约交易
     console.log(`执行智能合约资产购买: ${amount}个代币，总价: ${totalPrice} USDC`);
     
     // 解码交易数据
     const transactionBuffer = Uint8Array.from(atob(transactionData), c => c.charCodeAt(0));
-    const transaction = solanaWeb3.Transaction.from(transactionBuffer);
+    const transaction = window.solanaWeb3.Transaction.from(transactionBuffer);
     
     // 使用钱包签名并发送交易
     return window.solana.signAndSendTransaction(transaction)
