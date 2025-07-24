@@ -1,6 +1,8 @@
 from flask import render_template, request, current_app
 from flask_babel import gettext as _
 from flask_wtf.csrf import generate_csrf
+from sqlalchemy.orm import defer
+from ..extensions import db
 from ..models.asset import Asset, AssetStatus
 from ..models.user import User
 from ..utils import is_admin
@@ -30,10 +32,16 @@ def index():
         current_app.logger.info(f'- Args: {eth_address_args}')
         current_app.logger.info(f'最终使用地址: {eth_address}')
         
-        # 只显示状态为ON_CHAIN且未删除的资产
+        # 只显示状态为ON_CHAIN且未删除的资产，优化查询性能
         query = Asset.query.filter(
             Asset.status == AssetStatus.ON_CHAIN.value,
             Asset.deleted_at.is_(None)
+        ).options(
+            # 只加载必要的字段，避免关联查询
+            defer('blockchain_details'),
+            defer('documents'),
+            defer('blockchain_data'),
+            defer('payment_details')
         )
             
         # 获取最新3个资产
