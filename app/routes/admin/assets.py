@@ -571,8 +571,8 @@ def api_export_dividends():
     except Exception as e:
         current_app.logger.error(f'导出分红数据失败: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500 
-@admi
-n_api_bp.route('/assets/fix-all-contracts', methods=['POST'])
+
+@admin_api_bp.route('/assets/fix-all-contracts', methods=['POST'])
 @api_admin_required
 def api_fix_all_contracts():
     """批量修复所有资产的合约地址"""

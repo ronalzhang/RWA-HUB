@@ -409,17 +409,17 @@ body {
     .hero-content h1 {
         font-size: 2.5rem;
     }
-    
+
     .hero-content p {
         font-size: 1.1rem;
     }
-    
+
     .hero-buttons .btn {
         font-size: 1rem;
         padding: 0.875rem 2rem;
         min-width: 160px;
     }
-    
+
     .hero-buttons .d-flex {
         gap: 1rem;
     }
@@ -429,13 +429,13 @@ body {
     .hero-content h1 {
         font-size: 2rem;
     }
-    
+
     .hero-buttons .d-flex {
         flex-direction: column;
         align-items: center;
         gap: 1rem;
     }
-    
+
     .hero-buttons .btn {
         width: 100%;
         max-width: 280px;
