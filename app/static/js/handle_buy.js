@@ -102,17 +102,16 @@ function handleBuy(assetId, amountInput, buyButton) {
   // 确保资产ID是数字格式（API期望整数）
   if (/^\d+$/.test(assetId)) {
     assetId = parseInt(assetId);
-  } else if (assetId.startsWith('RH-')) {
-    // 如果是RH-格式，提取数字部分
-    const numericPart = assetId.replace('RH-', '');
-    if (/^\d+$/.test(numericPart)) {
-      assetId = parseInt(numericPart);
-    }
   } else {
     // 尝试解析为整数
     const parsed = parseInt(assetId);
     if (!isNaN(parsed)) {
       assetId = parsed;
+    } else {
+      console.error('无效的资产ID格式:', assetId);
+      showError('无效的资产ID格式，无法完成交易');
+      resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
+      return;
     }
   }
   
