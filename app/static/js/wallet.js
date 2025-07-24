@@ -5253,7 +5253,7 @@ window.updateWalletMenuInfo = function updateWalletMenuInfo() {
     
     // 更新地址显示
     if (addressDisplay && window.walletState.address) {
-        const shortAddress = window.walletState.address.slice(0, 6) + '...' + window.walletState.address.slice(-4);
+        const shortAddress = window.walletState.formatAddress(window.walletState.address);
         addressDisplay.textContent = shortAddress;
     }
     
@@ -5387,7 +5387,7 @@ window.disconnectAndCloseMenu = function() {
 window.addEventListener('walletConnected', function() {
     const walletBtnText = document.getElementById('walletBtnText');
     if (walletBtnText && window.walletState && window.walletState.address) {
-        const shortAddress = window.walletState.address.slice(0, 6) + '...' + window.walletState.address.slice(-4);
+        const shortAddress = window.walletState.formatAddress(window.walletState.address);
         walletBtnText.textContent = shortAddress;
     }
 });

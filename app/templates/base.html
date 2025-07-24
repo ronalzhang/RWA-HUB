@@ -1102,6 +1102,10 @@
         // 统一的地址格式化函数 - 避免重复代码
         function formatWalletAddress(address) {
             if (!address) return '';
+            // 如果walletState对象可用，使用其formatAddress方法，否则使用简单实现
+            if (window.walletState && typeof window.walletState.formatAddress === 'function') {
+                return window.walletState.formatAddress(address);
+            }
             return address.slice(0, 6) + '...' + address.slice(-4);
         }
         
