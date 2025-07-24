@@ -650,7 +650,7 @@ class AssetService:
             logger.info(f"格式化后的钱包地址: {formatted_address}")
             
             # 从数据库查询用户的资产
-            from app.models import Asset, AssetOwnership, Trade
+            from app.models import Asset, Trade
             from app import db
             from sqlalchemy import or_, and_
             
@@ -660,19 +660,30 @@ class AssetService:
                 Asset.status > 0  # 排除已删除资产
             ).all()
             
-            # 再查询用户通过交易获得的资产
-            asset_ownerships = AssetOwnership.query.filter_by(
-                owner_address=formatted_address,
-                status='active'
-            ).all()
+            # 尝试查询用户通过交易获得的资产
+            asset_ownerships = []
+            try:
+                from app.models import AssetOwnership
+                asset_ownerships = AssetOwnership.query.filter_by(
+                    owner_address=formatted_address,
+                    status='active'
+                ).all()
+            except ImportError:
+                logger.warning("AssetOwnership模型不存在，跳过所有权查询")
+            except Exception as e:
+                logger.warning(f"查询AssetOwnership失败: {str(e)}")
             
             # 查询交易中的资产
-            trade_assets = db.session.query(Asset).join(
-                Trade, Asset.id == Trade.asset_id
-            ).filter(
-                Trade.buyer_address == formatted_address,
-                Trade.status == 'completed'
-            ).all()
+            trade_assets = []
+            try:
+                trade_assets = db.session.query(Asset).join(
+                    Trade, Asset.id == Trade.asset_id
+                ).filter(
+                    Trade.buyer_address == formatted_address,
+                    Trade.status == 'completed'
+                ).all()
+            except Exception as e:
+                logger.warning(f"查询交易资产失败: {str(e)}")
             
             # 合并所有资产并去重
             all_assets = []
@@ -680,53 +691,82 @@ class AssetService:
             
             # 添加直接拥有的资产
             for asset in owned_assets:
-                if asset.id not in asset_ids:
-                    asset_ids.add(asset.id)
-                    all_assets.append({
-                        'id': asset.id,
-                        'name': asset.name,
-                        'token_symbol': asset.token_symbol,
-                        'token_price': asset.token_price,
-                        'token_supply': asset.token_supply,
-                        'remaining_supply': asset.remaining_supply,
-                        'image_url': asset.image_url,
-                        'asset_type': asset.asset_type,
-                        'ownership_type': 'creator'
-                    })
+                try:
+                    if asset.id not in asset_ids:
+                        asset_ids.add(asset.id)
+                        all_assets.append({
+                            'id': asset.id,
+                            'name': getattr(asset, 'name', 'Unknown Asset'),
+                            'token_symbol': getattr(asset, 'token_symbol', 'UNKNOWN'),
+                            'token_price': float(getattr(asset, 'token_price', 0)),
+                            'token_supply': int(getattr(asset, 'token_supply', 0)),
+                            'remaining_supply': int(getattr(asset, 'remaining_supply', 0)),
+                            'image_url': getattr(asset, 'image_url', ''),
+                            'asset_type': getattr(asset, 'asset_type', 'unknown'),
+                            'ownership_type': 'creator',
+                            'quantity': int(getattr(asset, 'token_supply', 0)),
+                            'symbol': getattr(asset, 'token_symbol', 'UNKNOWN')
+                        })
+                except Exception as e:
+                    logger.warning(f"处理创建者资产失败: {str(e)}")
             
             # 添加通过所有权表拥有的资产
             for ownership in asset_ownerships:
-                asset = Asset.query.get(ownership.asset_id)
-                if asset and asset.id not in asset_ids:
-                    asset_ids.add(asset.id)
-                    all_assets.append({
-                        'id': asset.id,
-                        'name': asset.name,
-                        'token_symbol': asset.token_symbol,
-                        'token_price': asset.token_price,
-                        'token_supply': asset.token_supply,
-                        'remaining_supply': asset.remaining_supply,
-                        'image_url': asset.image_url,
-                        'asset_type': asset.asset_type,
-                        'ownership_type': 'ownership',
-                        'amount': ownership.amount
-                    })
+                try:
+                    asset = Asset.query.get(ownership.asset_id)
+                    if asset and asset.id not in asset_ids:
+                        asset_ids.add(asset.id)
+                        ownership_amount = getattr(ownership, 'amount', 0)
+                        all_assets.append({
+                            'id': asset.id,
+                            'name': getattr(asset, 'name', 'Unknown Asset'),
+                            'token_symbol': getattr(asset, 'token_symbol', 'UNKNOWN'),
+                            'token_price': float(getattr(asset, 'token_price', 0)),
+                            'token_supply': int(getattr(asset, 'token_supply', 0)),
+                            'remaining_supply': int(getattr(asset, 'remaining_supply', 0)),
+                            'image_url': getattr(asset, 'image_url', ''),
+                            'asset_type': getattr(asset, 'asset_type', 'unknown'),
+                            'ownership_type': 'ownership',
+                            'quantity': int(ownership_amount),
+                            'symbol': getattr(asset, 'token_symbol', 'UNKNOWN'),
+                            'amount': int(ownership_amount)
+                        })
+                except Exception as e:
+                    logger.warning(f"处理所有权资产失败: {str(e)}")
             
             # 添加通过交易获得的资产
             for asset in trade_assets:
-                if asset.id not in asset_ids:
-                    asset_ids.add(asset.id)
-                    all_assets.append({
-                        'id': asset.id,
-                        'name': asset.name,
-                        'token_symbol': asset.token_symbol,
-                        'token_price': asset.token_price,
-                        'token_supply': asset.token_supply,
-                        'remaining_supply': asset.remaining_supply,
-                        'image_url': asset.image_url,
-                        'asset_type': asset.asset_type,
-                        'ownership_type': 'trade'
-                    })
+                try:
+                    if asset.id not in asset_ids:
+                        asset_ids.add(asset.id)
+                        # 尝试获取用户在该资产上的持仓量
+                        user_quantity = 0
+                        try:
+                            from app.models import Trade
+                            user_trades = Trade.query.filter_by(
+                                buyer_address=formatted_address,
+                                asset_id=asset.id,
+                                status='completed'
+                            ).all()
+                            user_quantity = sum(trade.amount for trade in user_trades)
+                        except:
+                            user_quantity = 1  # 默认值
+                        
+                        all_assets.append({
+                            'id': asset.id,
+                            'name': getattr(asset, 'name', 'Unknown Asset'),
+                            'token_symbol': getattr(asset, 'token_symbol', 'UNKNOWN'),
+                            'token_price': float(getattr(asset, 'token_price', 0)),
+                            'token_supply': int(getattr(asset, 'token_supply', 0)),
+                            'remaining_supply': int(getattr(asset, 'remaining_supply', 0)),
+                            'image_url': getattr(asset, 'image_url', ''),
+                            'asset_type': getattr(asset, 'asset_type', 'unknown'),
+                            'ownership_type': 'trade',
+                            'quantity': int(user_quantity),
+                            'symbol': getattr(asset, 'token_symbol', 'UNKNOWN')
+                        })
+                except Exception as e:
+                    logger.warning(f"处理交易资产失败: {str(e)}")
             
             logger.info(f"找到 {len(all_assets)} 个资产")
             return all_assets
@@ -893,33 +933,48 @@ class AssetService:
     @staticmethod
     def get_commission_balance(wallet_address):
         """
-        获取用户的交易总佣金（使用新的无限级分销逻辑）
+        获取用户的交易总佣金（简化版本）
         """
         try:
-            logger.info(f"开始计算钱包 {wallet_address} 的交易总佣金")
+            logger.info(f"开始获取钱包 {wallet_address} 的佣金余额")
             
-            # 优先从UserCommissionBalance表获取可用余额
-            commission_balance = UserCommissionBalance.query.filter_by(
-                user_address=wallet_address
-            ).first()
+            # 简化版本：尝试从数据库查询已有的佣金记录
+            try:
+                from app.models.commission_config import UserCommissionBalance
+                commission_balance = UserCommissionBalance.query.filter_by(
+                    user_address=wallet_address
+                ).first()
+                
+                if commission_balance:
+                    available_balance = float(commission_balance.available_balance)
+                    logger.info(f"从UserCommissionBalance表获取到可用余额: {available_balance}")
+                    return available_balance
+            except ImportError:
+                logger.warning("UserCommissionBalance模型不存在，返回默认值")
+            except Exception as e:
+                logger.warning(f"查询UserCommissionBalance失败: {str(e)}")
             
-            if commission_balance:
-                available_balance = float(commission_balance.available_balance)
-                logger.info(f"从UserCommissionBalance表获取到可用余额: {available_balance}")
-                return available_balance
+            # 如果没有找到记录，查询Commission表
+            try:
+                from app.models import Commission
+                total_commission = db.session.query(
+                    db.func.sum(Commission.amount)
+                ).filter(
+                    Commission.user_address == wallet_address,
+                    Commission.status == 'confirmed'
+                ).scalar() or 0.0
+                
+                logger.info(f"从Commission表计算总佣金: {total_commission}")
+                return float(total_commission)
+            except Exception as e:
+                logger.warning(f"查询Commission表失败: {str(e)}")
             
-            # 如果没有缓存记录，使用新算法计算
-            commission_data = AssetService.calculate_unlimited_commission(wallet_address)
-            total_commission = commission_data['total_commission']
-            
-            # 更新缓存
-            AssetService.update_commission_balance(wallet_address)
-            
-            logger.info(f"钱包 {wallet_address} 的交易总佣金: {total_commission}")
-            return total_commission
+            # 如果所有查询都失败，返回0
+            logger.info(f"无法获取钱包 {wallet_address} 的佣金余额，返回0")
+            return 0.0
             
         except Exception as e:
-            logger.error(f"计算交易总佣金失败: {str(e)}", exc_info=True)
+            logger.error(f"获取佣金余额失败: {str(e)}", exc_info=True)
             return 0.0
 
     @staticmethod

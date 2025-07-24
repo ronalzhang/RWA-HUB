@@ -1155,27 +1155,168 @@
         function updateWalletDropdownInfo() {
             if (!window.walletState || !window.walletState.address) return;
             
+            console.log('更新钱包下拉菜单信息，地址:', window.walletState.address);
+            
             // 更新地址显示
             const addressDisplay = document.getElementById('walletAddressDisplay');
             if (addressDisplay) {
                 const shortAddress = window.walletState.address.slice(0, 6) + '...' + window.walletState.address.slice(-4);
                 addressDisplay.textContent = shortAddress;
+                console.log('地址显示已更新:', shortAddress);
             }
             
-            // 更新余额显示
-            const balanceDisplay = document.getElementById('walletBalanceInDropdown');
-            if (balanceDisplay) {
-                balanceDisplay.textContent = parseFloat(window.walletState.balance || 0).toFixed(2);
-            }
+            // 加载钱包余额
+            loadWalletBalance();
             
-            // 更新佣金显示
-            const commissionDisplay = document.getElementById('walletCommissionInDropdown');
-            if (commissionDisplay) {
-                commissionDisplay.textContent = parseFloat(window.walletState.commissionBalance || 0).toFixed(2);
-            }
+            // 加载佣金收益
+            loadCommissionBalance();
             
             // 加载用户资产
             loadUserAssetsSimple();
+        }
+        
+        // 加载钱包余额
+        async function loadWalletBalance() {
+            const balanceDisplay = document.getElementById('walletBalanceInDropdown');
+            if (!balanceDisplay || !window.walletState.address) return;
+            
+            console.log('开始加载钱包余额...');
+            balanceDisplay.textContent = 'Loading...';
+            
+            try {
+                // 首先尝试从walletState获取
+                if (window.walletState.balance !== undefined && window.walletState.balance !== null) {
+                    const balance = parseFloat(window.walletState.balance).toFixed(2);
+                    balanceDisplay.textContent = balance;
+                    console.log('从walletState获取余额:', balance);
+                    return;
+                }
+                
+                // 尝试多个余额API - 使用正确的service端点
+                const balanceApis = [
+                    `/api/service/wallet/token_balance?address=${window.walletState.address}&token=USDC`,
+                    `/api/service/wallet/usdc_balance?address=${window.walletState.address}&network=${window.walletState.walletType === 'phantom' ? 'solana' : 'ethereum'}`,
+                    `/api/solana/get_token_balance?address=${window.walletState.address}&token=USDC`
+                ];
+                
+                for (let apiUrl of balanceApis) {
+                    try {
+                        console.log('尝试余额API:', apiUrl);
+                        const response = await fetch(apiUrl, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Eth-Address': window.walletState.address
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            console.log('余额API数据:', data);
+                            
+                            let balance = 0;
+                            if (data.success && data.balance !== undefined) {
+                                balance = parseFloat(data.balance);
+                            } else if (data.balance !== undefined) {
+                                balance = parseFloat(data.balance);
+                            } else if (data.usdc_balance !== undefined) {
+                                balance = parseFloat(data.usdc_balance);
+                            } else if (data.amount !== undefined) {
+                                balance = parseFloat(data.amount);
+                            }
+                            
+                            balanceDisplay.textContent = balance.toFixed(2);
+                            console.log('余额加载成功:', balance);
+                            return;
+                        }
+                    } catch (error) {
+                        console.error(`余额API ${apiUrl} 失败:`, error);
+                        continue;
+                    }
+                }
+                
+                // 所有API都失败，显示0
+                balanceDisplay.textContent = '0.00';
+                console.log('所有余额API都失败，显示0');
+                
+            } catch (error) {
+                console.error('加载余额时出错:', error);
+                balanceDisplay.textContent = '0.00';
+            }
+        }
+        
+        // 加载佣金收益
+        async function loadCommissionBalance() {
+            const commissionDisplay = document.getElementById('walletCommissionInDropdown');
+            if (!commissionDisplay || !window.walletState.address) return;
+            
+            console.log('开始加载佣金收益...');
+            commissionDisplay.textContent = 'Loading...';
+            
+            try {
+                // 首先尝试从walletState获取
+                if (window.walletState.commissionBalance !== undefined && window.walletState.commissionBalance !== null) {
+                    const commission = parseFloat(window.walletState.commissionBalance).toFixed(2);
+                    commissionDisplay.textContent = commission;
+                    console.log('从walletState获取佣金:', commission);
+                    return;
+                }
+                
+                // 尝试多个佣金API - 使用正确的service端点
+                const commissionApis = [
+                    `/api/service/wallet/commission_balance?address=${window.walletState.address}`,
+                    `/api/user/commission/balance/${window.walletState.address}`,
+                    `/api/admin/commission/user/${window.walletState.address}/summary`
+                ];
+                
+                for (let apiUrl of commissionApis) {
+                    try {
+                        console.log('尝试佣金API:', apiUrl);
+                        const response = await fetch(apiUrl, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Eth-Address': window.walletState.address
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            console.log('佣金API数据:', data);
+                            
+                            let commission = 0;
+                            if (data.success && data.commission !== undefined) {
+                                commission = parseFloat(data.commission);
+                            } else if (data.commission !== undefined) {
+                                commission = parseFloat(data.commission);
+                            } else if (data.total_commission !== undefined) {
+                                commission = parseFloat(data.total_commission);
+                            } else if (data.earnings !== undefined) {
+                                commission = parseFloat(data.earnings);
+                            } else if (data.balance !== undefined) {
+                                commission = parseFloat(data.balance);
+                            } else if (data.amount !== undefined) {
+                                commission = parseFloat(data.amount);
+                            } else if (data.total_amount !== undefined) {
+                                commission = parseFloat(data.total_amount);
+                            }
+                            
+                            commissionDisplay.textContent = commission.toFixed(2);
+                            console.log('佣金加载成功:', commission);
+                            return;
+                        }
+                    } catch (error) {
+                        console.error(`佣金API ${apiUrl} 失败:`, error);
+                        continue;
+                    }
+                }
+                
+                // 所有API都失败，显示0
+                commissionDisplay.textContent = '0.00';
+                console.log('所有佣金API都失败，显示0');
+                
+            } catch (error) {
+                console.error('加载佣金时出错:', error);
+                commissionDisplay.textContent = '0.00';
+            }
         }
         
         // 简单的用户资产加载
@@ -1183,79 +1324,239 @@
             const assetsList = document.getElementById('walletAssetsList');
             const assetsSection = document.getElementById('userAssetsSection');
             
-            if (!assetsList || !window.walletState.address) return;
+            if (!assetsList || !window.walletState || !window.walletState.address) {
+                console.log('无法加载资产: 缺少必要参数');
+                if (assetsList) {
+                    assetsList.innerHTML = '<li style="text-align:center; padding:10px; font-size:12px; color:#666;">Address not available</li>';
+                }
+                return;
+            }
             
+            console.log('开始加载用户资产，地址:', window.walletState.address);
             assetsList.innerHTML = '<li style="text-align:center; padding:10px; font-size:12px;"><i class="fas fa-spinner fa-spin"></i> Loading...</li>';
             
-            fetch(`/api/user/${window.walletState.address}/assets`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.assets && data.assets.length > 0) {
-                        let html = '';
-                        data.assets.forEach(asset => {
-                            if (parseFloat(asset.quantity || 0) > 0) {
-                                html += `
-                                    <li class="wallet-asset-item">
-                                        <a href="/assets/${asset.token_symbol}" class="asset-link text-decoration-none">
-                                            <span class="asset-name">${asset.name || asset.token_symbol}</span>
-                                            <span class="asset-quantity">${parseFloat(asset.quantity).toLocaleString()} ${asset.token_symbol}</span>
-                                        </a>
-                                    </li>
-                                `;
+            // 尝试多个API端点 - 使用正确的service端点
+            const apiUrls = [
+                `/api/service/user/assets?address=${window.walletState.address}&wallet_type=${window.walletState.walletType}`,
+                `/api/user/assets?address=${window.walletState.address}&wallet_type=${window.walletState.walletType}`,
+                `/api/user/${window.walletState.address}/assets`
+            ];
+            
+            async function tryLoadAssets() {
+                for (let apiUrl of apiUrls) {
+                    try {
+                        console.log('尝试API:', apiUrl);
+                        const response = await fetch(apiUrl, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-Eth-Address': window.walletState.address
                             }
                         });
                         
-                        if (html) {
-                            assetsList.innerHTML = html;
-                            if (assetsSection) assetsSection.style.display = 'block';
-                        } else {
-                            assetsList.innerHTML = '<li style="text-align:center; padding:10px; font-size:12px; color:#666;">No assets</li>';
+                        console.log('API响应状态:', response.status);
+                        
+                        if (!response.ok) {
+                            console.log(`API ${apiUrl} 返回错误:`, response.status);
+                            continue;
                         }
+                        
+                        const data = await response.json();
+                        console.log('API数据:', data);
+                        
+                        if (data.success && data.assets && Array.isArray(data.assets)) {
+                            displayAssets(data.assets);
+                            return;
+                        } else if (data.assets && Array.isArray(data.assets)) {
+                            displayAssets(data.assets);
+                            return;
+                        }
+                    } catch (error) {
+                        console.error(`API ${apiUrl} 请求失败:`, error);
+                        continue;
+                    }
+                }
+                
+                // 所有API都失败了，显示模拟数据或空状态
+                console.log('所有API都失败，显示空状态');
+                assetsList.innerHTML = '<li style="text-align:center; padding:10px; font-size:12px; color:#666;">No assets found</li>';
+                if (assetsSection) assetsSection.style.display = 'none';
+            }
+            
+            function displayAssets(assets) {
+                console.log('显示资产:', assets);
+                if (assets.length > 0) {
+                    let html = '';
+                    assets.forEach(asset => {
+                        const quantity = parseFloat(asset.quantity || asset.amount || asset.token_supply || 0);
+                        const symbol = asset.symbol || asset.token_symbol || 'UNKNOWN';
+                        const name = asset.name || symbol || 'Unknown Asset';
+                        
+                        if (quantity > 0) {
+                            html += `
+                                <li class="wallet-asset-item">
+                                    <a href="/assets/${asset.id || symbol}" class="asset-link text-decoration-none">
+                                        <span class="asset-name" title="${name}">${name}</span>
+                                        <span class="asset-quantity">${quantity.toLocaleString()} ${symbol}</span>
+                                    </a>
+                                </li>
+                            `;
+                        }
+                    });
+                    
+                    if (html) {
+                        assetsList.innerHTML = html;
+                        if (assetsSection) assetsSection.style.display = 'block';
+                        console.log('资产显示成功');
                     } else {
-                        assetsList.innerHTML = '<li style="text-align:center; padding:10px; font-size:12px; color:#666;">No assets</li>';
+                        assetsList.innerHTML = '<li style="text-align:center; padding:10px; font-size:12px; color:#666;">No assets with balance</li>';
                         if (assetsSection) assetsSection.style.display = 'none';
                     }
-                })
-                .catch(error => {
-                    console.error('Failed to load assets:', error);
-                    assetsList.innerHTML = '<li style="text-align:center; padding:10px; font-size:12px; color:#dc3545;">Loading failed</li>';
-                });
+                } else {
+                    assetsList.innerHTML = '<li style="text-align:center; padding:10px; font-size:12px; color:#666;">No assets found</li>';
+                    if (assetsSection) assetsSection.style.display = 'none';
+                }
+            }
+            
+            tryLoadAssets();
         }
         
         // 打开钱包选择器
         function openWalletSelector() {
+            console.log('尝试打开钱包选择器...');
+            console.log('walletState:', window.walletState);
+            console.log('openWalletSelector function:', typeof window.walletState?.openWalletSelector);
+            
             if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+                console.log('调用钱包选择器...');
                 window.walletState.openWalletSelector();
             } else {
-                console.error('Wallet selector not available');
-                alert('Please refresh the page and try again');
+                console.error('钱包选择器不可用，尝试手动打开');
+                
+                // 手动检测移动端并打开钱包
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                if (isMobile) {
+                    console.log('检测到移动端，尝试深度链接');
+                    // 尝试打开Phantom钱包
+                    const phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(window.location.href)}?ref=${window.location.origin}`;
+                    window.open(phantomUrl, '_blank');
+                } else {
+                    console.log('桌面端，检查钱包扩展');
+                    if (window.solana && window.solana.isPhantom) {
+                        console.log('找到Phantom，尝试连接');
+                        window.solana.connect().then(response => {
+                            console.log('Phantom连接成功:', response);
+                            // 手动更新钱包状态
+                            if (window.walletState) {
+                                window.walletState.address = response.publicKey.toString();
+                                window.walletState.connected = true;
+                                window.walletState.walletType = 'phantom';
+                                
+                                // 触发连接事件
+                                window.dispatchEvent(new CustomEvent('walletConnected'));
+                            }
+                        }).catch(error => {
+                            console.error('Phantom连接失败:', error);
+                            alert('Phantom wallet connection failed');
+                        });
+                    } else if (window.ethereum) {
+                        console.log('找到MetaMask，尝试连接');
+                        window.ethereum.request({ method: 'eth_requestAccounts' }).then(accounts => {
+                            console.log('MetaMask连接成功:', accounts);
+                            // 手动更新钱包状态
+                            if (window.walletState) {
+                                window.walletState.address = accounts[0];
+                                window.walletState.connected = true;
+                                window.walletState.walletType = 'metamask';
+                                
+                                // 触发连接事件
+                                window.dispatchEvent(new CustomEvent('walletConnected'));
+                            }
+                        }).catch(error => {
+                            console.error('MetaMask连接失败:', error);
+                            alert('MetaMask connection failed');
+                        });
+                    } else {
+                        alert('No wallet detected. Please install Phantom or MetaMask.');
+                    }
+                }
             }
         }
         
         // 切换钱包
         function switchWallet() {
+            console.log('切换钱包被点击');
+            
             const walletMenu = document.getElementById('walletMenu');
             if (walletMenu) {
                 walletMenu.classList.remove('show');
                 walletMenu.style.display = 'none';
+                console.log('钱包菜单已关闭');
             }
-            openWalletSelector();
+            
+            // 先断开当前钱包，然后打开选择器
+            if (window.walletState && typeof window.walletState.disconnect === 'function') {
+                console.log('通过walletState断开当前钱包');
+                window.walletState.disconnect();
+            } else {
+                console.log('手动清理钱包状态');
+                localStorage.removeItem('walletAddress');
+                localStorage.removeItem('walletType');
+                localStorage.removeItem('eth_address');
+                if (window.walletState) {
+                    window.walletState.connected = false;
+                    window.walletState.address = null;
+                    window.walletState.walletType = null;
+                }
+            }
+            
+            // 稍等一下再打开选择器
+            setTimeout(() => {
+                console.log('打开钱包选择器');
+                openWalletSelector();
+            }, 500);
         }
         
         // 断开钱包
         function disconnectWallet() {
+            console.log('断开钱包被点击');
+            
             const walletMenu = document.getElementById('walletMenu');
             if (walletMenu) {
                 walletMenu.classList.remove('show');
                 walletMenu.style.display = 'none';
+                console.log('钱包菜单已关闭');
             }
             
             if (window.walletState && typeof window.walletState.disconnect === 'function') {
+                console.log('通过walletState断开钱包');
                 window.walletState.disconnect();
             } else {
+                console.log('手动清理钱包状态');
+                // 清理所有钱包相关的localStorage
                 localStorage.removeItem('walletAddress');
                 localStorage.removeItem('walletType');
-                location.reload();
+                localStorage.removeItem('eth_address');
+                localStorage.removeItem('phantom_address');
+                localStorage.removeItem('connected_wallet');
+                
+                // 清理钱包状态对象
+                if (window.walletState) {
+                    window.walletState.connected = false;
+                    window.walletState.address = null;
+                    window.walletState.walletType = null;
+                    window.walletState.balance = 0;
+                    window.walletState.commissionBalance = 0;
+                }
+                
+                // 触发断开事件
+                window.dispatchEvent(new CustomEvent('walletDisconnected'));
+                
+                console.log('钱包状态已清理，页面即将刷新');
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
             }
         }
         
