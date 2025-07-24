@@ -5238,52 +5238,8 @@ if (!window.walletState) {
     console.warn('walletState未找到，使用window.wallet时将无法获取钱包信息');
 }
 
-// 钱包按钮事件绑定（统一处理base.html中的钱包按钮）
-window.initWalletButton = function initWalletButton() {
-    const walletBtn = document.getElementById('walletBtn');
-    if (walletBtn) {
-        console.log('Found wallet button, binding click event');
-        
-        // 绑定点击事件
-        walletBtn.addEventListener('click', function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-            
-            console.log('Wallet button clicked');
-            
-            // 检查钱包是否已连接
-            if (window.walletState && (window.walletState.connected || window.walletState.isConnected)) {
-                // 已连接，显示/隐藏钱包菜单
-                const walletMenu = document.getElementById('walletMenu');
-                if (walletMenu) {
-                    const isVisible = walletMenu.classList.contains('show');
-                    if (isVisible) {
-                        walletMenu.classList.remove('show');
-                        walletMenu.style.display = 'none';
-                    } else {
-                        // 更新钱包信息
-                        updateWalletMenuInfo();
-                        walletMenu.classList.add('show');
-                        walletMenu.style.display = 'block';
-                    }
-                }
-            } else {
-                // 未连接，打开钱包选择器
-                if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
-                    window.walletState.openWalletSelector();
-                } else {
-                    console.error('Wallet selector function not available');
-                    alert('Wallet connection temporarily unavailable, please refresh and try again');
-                }
-            }
-        });
-        
-        console.log('Wallet button event binding completed');
-    } else {
-        console.log('Wallet button not found in DOM');
-        // 不再在这里重试，让 base.html 的重试机制处理
-    }
-}
+// 钱包按钮初始化现在由 base.html 中的简单脚本处理
+// 这里保留一些辅助函数供base.html调用
 
 // 更新钱包菜单信息
 window.updateWalletMenuInfo = function updateWalletMenuInfo() {

@@ -683,10 +683,10 @@
                                 
                                 <!-- 钱包操作按钮 -->
                                 <div class="d-flex mt-2" style="border-top:1px solid #eee; padding-top:6px; gap:6px;">
-                                    <button id="switchWalletBtn" type="button" onclick="switchWalletAndCloseMenu()" style="background-color:#eef5ff; color:#0d6efd; padding:5px 8px; border-radius:6px; font-size:12px; font-weight:500; border:none; outline:none; box-shadow:none; display:flex; align-items:center; justify-content:center; flex:1;">
+                                    <button id="switchWalletBtn" type="button" onclick="switchWallet()" style="background-color:#eef5ff; color:#0d6efd; padding:5px 8px; border-radius:6px; font-size:12px; font-weight:500; border:none; outline:none; box-shadow:none; display:flex; align-items:center; justify-content:center; flex:1;">
                                         <i class="fas fa-repeat me-1"></i> {{ _('Switch') }}
                                 </button>
-                                    <button id="disconnectWalletBtn" type="button" onclick="disconnectAndCloseMenu()" style="background-color:#fff0f0; color:#dc3545; padding:5px 8px; border-radius:6px; font-size:12px; font-weight:500; border:none; outline:none; box-shadow:none; display:flex; align-items:center; justify-content:center; flex:1;">
+                                    <button id="disconnectWalletBtn" type="button" onclick="disconnectWallet()" style="background-color:#fff0f0; color:#dc3545; padding:5px 8px; border-radius:6px; font-size:12px; font-weight:500; border:none; outline:none; box-shadow:none; display:flex; align-items:center; justify-content:center; flex:1;">
                                         <i class="fas fa-power-off me-1"></i> {{ _('Disconnect') }}
                                 </button>
                                     </div>
@@ -773,30 +773,7 @@
     
     // 钱包连接处理已移动到wallet.js
     
-    // 切换钱包菜单显示
-    function toggleWalletMenu() {
-        const walletMenu = document.getElementById('walletMenu');
-        if (walletMenu) {
-            const isVisible = walletMenu.classList.contains('show');
-            
-            if (isVisible) {
-                walletMenu.classList.remove('show');
-                walletMenu.style.display = 'none';
-            } else {
-                // 更新钱包信息
-                if (typeof window.updateWalletMenuInfo === 'function') {
-                    window.updateWalletMenuInfo();
-                }
-                walletMenu.classList.add('show');
-                walletMenu.style.display = 'block';
-            }
-        }
-    }
-    
-    // 钱包菜单信息更新由wallet.js中的updateWalletMenuInfo处理
-    
-    // 钱包操作函数由wallet.js中的全局函数处理
-    // window.switchWalletAndCloseMenu() 和 window.disconnectAndCloseMenu()
+    // 钱包功能由上面的简单脚本处理
     
     // 点击外部关闭钱包菜单
     document.addEventListener('click', function(event) {
@@ -1115,73 +1092,204 @@
     <script src="{{ url_for('static', filename='js/wallet.js') }}?v=20241231-fix3&t=1735659600"></script>
     <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
     
-    <!-- 钱包按钮初始化脚本 -->
+    <!-- 简单的钱包按钮初始化 -->
     <script>
-        // 等待钱包脚本加载完成后初始化按钮
-        let walletScriptRetryCount = 0;
-        const maxRetries = 50; // 最多重试50次（5秒）
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing wallet button...');
+            initSimpleWalletButton();
+        });
         
-        function waitForWalletScript() {
-            if (typeof window.initWalletButton === 'function') {
-                console.log('initWalletButton function found, calling it');
-                window.initWalletButton();
-            } else if (walletScriptRetryCount < maxRetries) {
-                walletScriptRetryCount++;
-                console.log(`Waiting for wallet script to load... (${walletScriptRetryCount}/${maxRetries})`);
-                setTimeout(waitForWalletScript, 100);
-            } else {
-                console.error('Failed to load wallet script after maximum retries. Attempting manual initialization...');
-                // 尝试手动初始化钱包按钮事件
-                const walletBtn = document.getElementById('walletBtn');
-                if (walletBtn) {
-                    console.log('Attempting manual wallet button initialization');
-                    walletBtn.addEventListener('click', function(event) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        console.log('Wallet button clicked - manual handler');
-                        
-                        // 检查钱包是否已连接
-                        if (window.walletState && (window.walletState.connected || window.walletState.isConnected)) {
-                            // 已连接，显示/隐藏钱包菜单
-                            console.log('Wallet connected, toggling menu');
-                            if (typeof toggleWalletMenu === 'function') {
-                                toggleWalletMenu();
-                            } else {
-                                // 手动切换菜单
-                                const walletMenu = document.getElementById('walletMenu');
-                                if (walletMenu) {
-                                    const isVisible = walletMenu.classList.contains('show');
-                                    if (isVisible) {
-                                        walletMenu.classList.remove('show');
-                                        walletMenu.style.display = 'none';
-                                    } else {
-                                        // 更新钱包信息
-                                        if (typeof window.updateWalletMenuInfo === 'function') {
-                                            window.updateWalletMenuInfo();
-                                        }
-                                        walletMenu.classList.add('show');
-                                        walletMenu.style.display = 'block';
-                                    }
-                                }
-                            }
-                        } else {
-                            // 未连接，打开钱包选择器
-                            console.log('Wallet not connected, opening selector');
-                            if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
-                                window.walletState.openWalletSelector();
-                            } else {
-                                alert('Wallet functionality is not available. Please refresh the page.');
-                            }
-                        }
-                    });
-                    console.log('Manual wallet button initialization completed');
+        // 简单直接的钱包按钮初始化
+        function initSimpleWalletButton() {
+            const walletBtn = document.getElementById('walletBtn');
+            if (!walletBtn) {
+                console.error('Wallet button not found');
+                return;
+            }
+            
+            console.log('Initializing wallet button...');
+            
+            // 绑定点击事件
+            walletBtn.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                console.log('Wallet button clicked');
+                
+                // 检查钱包连接状态
+                const isConnected = window.walletState && 
+                    (window.walletState.connected || window.walletState.isConnected) &&
+                    window.walletState.address;
+                
+                if (isConnected) {
+                    console.log('Wallet connected, showing dropdown menu');
+                    showWalletDropdown();
+                } else {
+                    console.log('Wallet not connected, opening wallet selector');
+                    openWalletSelector();
                 }
+            });
+            
+            console.log('Wallet button initialized successfully');
+        }
+        
+        // 显示钱包下拉菜单
+        function showWalletDropdown() {
+            const walletMenu = document.getElementById('walletMenu');
+            if (!walletMenu) return;
+            
+            const isVisible = walletMenu.classList.contains('show');
+            
+            if (isVisible) {
+                // 隐藏菜单
+                walletMenu.classList.remove('show');
+                walletMenu.style.display = 'none';
+            } else {
+                // 显示菜单并更新信息
+                updateWalletDropdownInfo();
+                walletMenu.classList.add('show');
+                walletMenu.style.display = 'block';
             }
         }
         
-        document.addEventListener('DOMContentLoaded', function() {
-            waitForWalletScript();
+        // 更新钱包下拉菜单信息
+        function updateWalletDropdownInfo() {
+            if (!window.walletState || !window.walletState.address) return;
+            
+            // 更新地址显示
+            const addressDisplay = document.getElementById('walletAddressDisplay');
+            if (addressDisplay) {
+                const shortAddress = window.walletState.address.slice(0, 6) + '...' + window.walletState.address.slice(-4);
+                addressDisplay.textContent = shortAddress;
+            }
+            
+            // 更新余额显示
+            const balanceDisplay = document.getElementById('walletBalanceInDropdown');
+            if (balanceDisplay) {
+                balanceDisplay.textContent = parseFloat(window.walletState.balance || 0).toFixed(2);
+            }
+            
+            // 更新佣金显示
+            const commissionDisplay = document.getElementById('walletCommissionInDropdown');
+            if (commissionDisplay) {
+                commissionDisplay.textContent = parseFloat(window.walletState.commissionBalance || 0).toFixed(2);
+            }
+            
+            // 加载用户资产
+            loadUserAssetsSimple();
+        }
+        
+        // 简单的用户资产加载
+        function loadUserAssetsSimple() {
+            const assetsList = document.getElementById('walletAssetsList');
+            const assetsSection = document.getElementById('userAssetsSection');
+            
+            if (!assetsList || !window.walletState.address) return;
+            
+            assetsList.innerHTML = '<li style="text-align:center; padding:10px; font-size:12px;"><i class="fas fa-spinner fa-spin"></i> Loading...</li>';
+            
+            fetch(`/api/user/${window.walletState.address}/assets`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.assets && data.assets.length > 0) {
+                        let html = '';
+                        data.assets.forEach(asset => {
+                            if (parseFloat(asset.quantity || 0) > 0) {
+                                html += `
+                                    <li class="wallet-asset-item">
+                                        <a href="/assets/${asset.token_symbol}" class="asset-link text-decoration-none">
+                                            <span class="asset-name">${asset.name || asset.token_symbol}</span>
+                                            <span class="asset-quantity">${parseFloat(asset.quantity).toLocaleString()} ${asset.token_symbol}</span>
+                                        </a>
+                                    </li>
+                                `;
+                            }
+                        });
+                        
+                        if (html) {
+                            assetsList.innerHTML = html;
+                            if (assetsSection) assetsSection.style.display = 'block';
+                        } else {
+                            assetsList.innerHTML = '<li style="text-align:center; padding:10px; font-size:12px; color:#666;">No assets</li>';
+                        }
+                    } else {
+                        assetsList.innerHTML = '<li style="text-align:center; padding:10px; font-size:12px; color:#666;">No assets</li>';
+                        if (assetsSection) assetsSection.style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to load assets:', error);
+                    assetsList.innerHTML = '<li style="text-align:center; padding:10px; font-size:12px; color:#dc3545;">Loading failed</li>';
+                });
+        }
+        
+        // 打开钱包选择器
+        function openWalletSelector() {
+            if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+                window.walletState.openWalletSelector();
+            } else {
+                console.error('Wallet selector not available');
+                alert('Please refresh the page and try again');
+            }
+        }
+        
+        // 切换钱包
+        function switchWallet() {
+            const walletMenu = document.getElementById('walletMenu');
+            if (walletMenu) {
+                walletMenu.classList.remove('show');
+                walletMenu.style.display = 'none';
+            }
+            openWalletSelector();
+        }
+        
+        // 断开钱包
+        function disconnectWallet() {
+            const walletMenu = document.getElementById('walletMenu');
+            if (walletMenu) {
+                walletMenu.classList.remove('show');
+                walletMenu.style.display = 'none';
+            }
+            
+            if (window.walletState && typeof window.walletState.disconnect === 'function') {
+                window.walletState.disconnect();
+            } else {
+                localStorage.removeItem('walletAddress');
+                localStorage.removeItem('walletType');
+                location.reload();
+            }
+        }
+        
+        // 监听钱包连接状态变化，更新按钮显示
+        window.addEventListener('walletConnected', function() {
+            console.log('Wallet connected event received');
+            updateWalletButtonText();
         });
+        
+        window.addEventListener('walletDisconnected', function() {
+            console.log('Wallet disconnected event received');
+            updateWalletButtonText();
+        });
+        
+        // 更新钱包按钮文本
+        function updateWalletButtonText() {
+            const walletBtnText = document.getElementById('walletBtnText');
+            if (!walletBtnText) return;
+            
+            if (window.walletState && window.walletState.address && 
+                (window.walletState.connected || window.walletState.isConnected)) {
+                // 显示简短地址
+                const shortAddress = window.walletState.address.slice(0, 6) + '...' + window.walletState.address.slice(-4);
+                walletBtnText.textContent = shortAddress;
+            } else {
+                // 显示连接文本
+                walletBtnText.textContent = 'Connect Wallet';
+            }
+        }
+        
+        // 页面加载后检查钱包状态
+        setTimeout(function() {
+            updateWalletButtonText();
+        }, 1000);
     </script>
     
     <script>
