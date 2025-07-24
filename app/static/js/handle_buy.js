@@ -206,7 +206,28 @@ function handleBuy(assetId, amountInput, buyButton) {
     }
     
     // 检查Solana Web3库是否可用
-    if (!window.solanaWeb3 || !window.solanaWeb3.Transaction) {
+    console.log('调试：检查Solana Web3库状态...');
+    console.log('window.solanaWeb3:', window.solanaWeb3);
+    console.log('typeof solanaWeb3:', typeof solanaWeb3);
+    console.log('window.solana:', window.solana);
+    
+    // 尝试多种可能的全局变量
+    let solanaLib = null;
+    if (window.solanaWeb3 && window.solanaWeb3.Transaction) {
+      solanaLib = window.solanaWeb3;
+      console.log('✅ 使用 window.solanaWeb3');
+    } else if (typeof solanaWeb3 !== 'undefined' && solanaWeb3.Transaction) {
+      solanaLib = solanaWeb3;
+      window.solanaWeb3 = solanaWeb3; // 设置到window对象
+      console.log('✅ 使用 solanaWeb3 并设置到 window');
+    } else if (window.solana && window.solana.web3 && window.solana.web3.Transaction) {
+      solanaLib = window.solana.web3;
+      window.solanaWeb3 = window.solana.web3;
+      console.log('✅ 使用 window.solana.web3');
+    }
+    
+    if (!solanaLib || !solanaLib.Transaction) {
+      console.error('❌ 无法找到可用的Solana Web3库');
       throw new Error('Solana Web3库未加载，无法处理交易数据');
     }
     
@@ -215,7 +236,7 @@ function handleBuy(assetId, amountInput, buyButton) {
     
     // 解码交易数据
     const transactionBuffer = Uint8Array.from(atob(transactionData), c => c.charCodeAt(0));
-    const transaction = window.solanaWeb3.Transaction.from(transactionBuffer);
+    const transaction = solanaLib.Transaction.from(transactionBuffer);
     
     // 使用钱包签名并发送交易
     return window.solana.signAndSendTransaction(transaction)
