@@ -80,7 +80,7 @@ class RWAContractService:
             
             # 计算资产金库PDA
             vault_pda, vault_bump = PublicKey.find_program_address(
-                [b"asset_vault", bytes(mint_pubkey)],
+                [b"asset_vault", mint_pubkey.__bytes__()],
                 self.program_id
             )
             
@@ -215,7 +215,7 @@ class RWAContractService:
             
             # 计算资产金库PDA
             vault_pda, vault_bump = PublicKey.find_program_address(
-                [b"asset_vault", bytes(mint_pubkey)],
+                [b"asset_vault", mint_pubkey.__bytes__()],
                 self.program_id
             )
             
@@ -290,7 +290,7 @@ class RWAContractService:
             
             # 计算资产金库PDA
             vault_pda, _ = PublicKey.find_program_address(
-                [b"asset_vault", bytes(mint_pubkey)],
+                [b"asset_vault", mint_pubkey.__bytes__()],
                 self.program_id
             )
             asset_vault_ata = self._get_associated_token_address(vault_pda, mint_pubkey)
@@ -370,9 +370,9 @@ class RWAContractService:
             token_program_id = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
             
             seeds = [
-                bytes(owner),
-                bytes(token_program_id),
-                bytes(mint),
+                owner.__bytes__(),
+                token_program_id.__bytes__(),
+                mint.__bytes__(),
             ]
             
             address, _ = PublicKey.find_program_address(seeds, associated_token_program_id)
