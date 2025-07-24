@@ -893,6 +893,9 @@
             }
         }, 1000);
     });
+    
+    // 扩展翻译对象
+    Object.assign(window.translations, {
         "Submit": "{{ _('Submit') }}",
         "Processing...": "{{ _('Processing...') }}",
         
@@ -958,7 +961,7 @@
         "Failed to switch wallet": "{{ _('Failed to switch wallet') }}",
         "Failed to disconnect wallet": "{{ _('Failed to disconnect wallet') }}",
         "MetaMask not installed!": "{{ _('MetaMask not installed!') }}"
-    };
+    });
     
     // 定義一個全局翻譯函數 - 确保立即可用
     window._ = function(text) {
@@ -1170,16 +1173,19 @@
     
     <!-- 钱包按钮初始化脚本 -->
     <script>
-        // 确保钱包脚本加载完成后初始化按钮
+        // 等待钱包脚本加载完成后初始化按钮
+        function waitForWalletScript() {
+            if (typeof initWalletButton === 'function') {
+                console.log('initWalletButton function found, calling it');
+                initWalletButton();
+            } else {
+                console.log('Waiting for wallet script to load...');
+                setTimeout(waitForWalletScript, 100);
+            }
+        }
+        
         document.addEventListener('DOMContentLoaded', function() {
-            // 等待一小段时间确保所有脚本都加载完成
-            setTimeout(function() {
-                if (typeof initWalletButton === 'function') {
-                    initWalletButton();
-                } else {
-                    console.error('initWalletButton函数未定义');
-                }
-            }, 100);
+            waitForWalletScript();
         });
     </script>
     
