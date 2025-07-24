@@ -464,7 +464,7 @@ function initializePage() {
     loadTradeHistory();
     loadTotalDividends();
     checkDividendAccess();
-    updateBuyButtonState();
+    // 购买按钮状态由handle_buy.js自动处理
     
     // 设置定期更新
     setInterval(loadRealTimeAssetData, 30000); // 每30秒更新一次资产数据
@@ -604,6 +604,17 @@ function setupTradeForm() {
 // 钱包连接状态检查由handle_buy.js处理
 
 // 购买按钮点击处理由handle_buy.js处理
+
+// 获取钱包地址（简化版本）
+function getWalletAddress() {
+    // 从walletState获取
+    if (window.walletState && window.walletState.address) {
+        return window.walletState.address;
+    }
+    
+    // 从localStorage获取
+    return localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
+}
 
 // 检查分红管理权限
 function checkDividendAccess() {
@@ -815,21 +826,15 @@ async function copyToClipboard(elementId, button) {
 
 // 钱包事件监听
 window.addEventListener('walletConnected', function() {
-    updateBuyButtonState();
+    // 购买按钮状态由handle_buy.js自动处理
     checkDividendAccess();
 });
 
 window.addEventListener('walletDisconnected', function() {
-    updateBuyButtonState();
+    // 购买按钮状态由handle_buy.js自动处理
 });
 
-// 绑定购买按钮事件
-document.addEventListener('DOMContentLoaded', function() {
-    const buyButton = document.getElementById('buy-button');
-    if (buyButton) {
-        buyButton.addEventListener('click', handleBuyClick);
-    }
-});
+// 购买按钮事件绑定由handle_buy.js处理
 
 // 复制分享链接
 window.copyShareLink = async function() {
