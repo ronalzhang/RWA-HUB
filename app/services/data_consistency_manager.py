@@ -104,51 +104,61 @@ class DataConsistencyManager:
             int: 准确的剩余供应量
         """
         try:
-            # 使用数据库行锁防止并发更新冲突
-            with db.session.begin():
-                # 重新查询资产以获取最新数据并加锁
-                locked_asset = db.session.query(Asset).filter_by(id=asset.id).with_for_update().first()
-                if not locked_asset:
-                    logger.error(f"资产 {asset.id} 不存在")
-                    return 0
+            # 检查是否已经在事务中
+            if db.session.in_transaction():
+                # 如果已经在事务中，直接查询
+                locked_asset = db.session.query(Asset).filter_by(id=asset.id).first()
+            else:
+                # 使用数据库行锁防止并发更新冲突
+                with db.session.begin():
+                    locked_asset = db.session.query(Asset).filter_by(id=asset.id).with_for_update().first()
+            
+            if not locked_asset:
+                logger.error(f"资产 {asset.id} 不存在")
+                return 0
+            
+            # 如果数据库中有值，先使用数据库的值
+            if locked_asset.remaining_supply is not None:
+                remaining = locked_asset.remaining_supply
+            else:
+                remaining = locked_asset.token_supply
+            
+            # 验证数据一致性：通过交易记录计算实际剩余量
+            total_bought = db.session.query(func.sum(Trade.amount)).filter(
+                Trade.asset_id == locked_asset.id,
+                Trade.type == 'buy',
+                Trade.status == TradeStatus.COMPLETED.value
+            ).scalar() or 0
+            
+            total_sold = db.session.query(func.sum(Trade.amount)).filter(
+                Trade.asset_id == locked_asset.id,
+                Trade.type == 'sell',
+                Trade.status == TradeStatus.COMPLETED.value
+            ).scalar() or 0
+            
+            calculated_remaining = locked_asset.token_supply - total_bought + total_sold
+            
+            # 如果计算值与数据库值不一致，更新数据库
+            if abs(calculated_remaining - remaining) > 0:
+                logger.warning(f"资产 {locked_asset.id} 剩余供应量不一致: DB={remaining}, 计算值={calculated_remaining}")
                 
-                # 如果数据库中有值，先使用数据库的值
-                if locked_asset.remaining_supply is not None:
-                    remaining = locked_asset.remaining_supply
-                else:
-                    remaining = locked_asset.token_supply
-                
-                # 验证数据一致性：通过交易记录计算实际剩余量
-                total_bought = db.session.query(func.sum(Trade.amount)).filter(
-                    Trade.asset_id == locked_asset.id,
-                    Trade.type == 'buy',
-                    Trade.status == TradeStatus.COMPLETED.value
-                ).scalar() or 0
-                
-                total_sold = db.session.query(func.sum(Trade.amount)).filter(
-                    Trade.asset_id == locked_asset.id,
-                    Trade.type == 'sell',
-                    Trade.status == TradeStatus.COMPLETED.value
-                ).scalar() or 0
-                
-                calculated_remaining = locked_asset.token_supply - total_bought + total_sold
-                
-                # 如果计算值与数据库值不一致，更新数据库
-                if abs(calculated_remaining - remaining) > 0:
-                    logger.warning(f"资产 {locked_asset.id} 剩余供应量不一致: DB={remaining}, 计算值={calculated_remaining}")
-                    
-                    # 更新数据库中的值
-                    locked_asset.remaining_supply = max(0, calculated_remaining)  # 确保不为负数
-                    locked_asset.updated_at = datetime.utcnow()
-                    
-                    # 清除相关缓存
-                    self._invalidate_cache(f"asset_data:{locked_asset.id}")
-                    
-                    remaining = locked_asset.remaining_supply
-                    
-                    logger.info(f"已修复资产 {locked_asset.id} 的剩余供应量: {remaining}")
-                
-                return max(0, remaining)  # 确保返回值不为负数
+                # 只有在不在事务中时才更新数据库
+                if not db.session.in_transaction():
+                    try:
+                        locked_asset.remaining_supply = max(0, calculated_remaining)  # 确保不为负数
+                        locked_asset.updated_at = datetime.utcnow()
+                        db.session.commit()
+                        
+                        # 清除相关缓存
+                        self._invalidate_cache(f"asset_data:{locked_asset.id}")
+                        
+                        remaining = locked_asset.remaining_supply
+                        logger.info(f"已修复资产 {locked_asset.id} 的剩余供应量: {remaining}")
+                    except Exception as update_error:
+                        logger.error(f"更新剩余供应量失败: {str(update_error)}")
+                        db.session.rollback()
+            
+            return max(0, remaining)  # 确保返回值不为负数
             
         except Exception as e:
             logger.error(f"计算剩余供应量失败: {str(e)}")
