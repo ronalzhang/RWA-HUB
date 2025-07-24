@@ -132,6 +132,7 @@ function handleBuy(assetId, amountInput, buyButton) {
   // 准备购买数据
   const purchaseData = {
     asset_id: assetId,
+    buyer_address: walletAddress,
     amount: amount,
     wallet_address: walletAddress,
     wallet_type: walletType
