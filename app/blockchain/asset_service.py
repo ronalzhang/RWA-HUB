@@ -661,11 +661,15 @@ class AssetService:
             purchased_assets = []
             try:
                 from app.models import Trade
-                # 获取用户所有已完成的购买交易
-                user_trades = Trade.query.filter_by(
-                    buyer_address=formatted_address,
-                    status='completed'
+                # 获取用户所有的购买交易（包括completed和pending状态）
+                from app.models.trade import TradeStatus, TradeType
+                user_trades = Trade.query.filter(
+                    Trade.trader_address == formatted_address,
+                    Trade.type == TradeType.BUY.value,  # 使用字符串值 'buy'
+                    Trade.status.in_([TradeStatus.COMPLETED.value, TradeStatus.PENDING.value])
                 ).all()
+                
+                logger.info(f"找到用户 {formatted_address} 的交易记录: {len(user_trades)} 条")
                 
                 # 按资产ID分组，计算每个资产的总购买量
                 asset_quantities = {}
