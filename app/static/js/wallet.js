@@ -5286,20 +5286,100 @@ window.initWalletButton = function initWalletButton() {
 }
 
 // 更新钱包菜单信息
-function updateWalletMenuInfo() {
+window.updateWalletMenuInfo = function updateWalletMenuInfo() {
     if (!window.walletState) return;
     
     const addressDisplay = document.getElementById('walletAddressDisplay');
     const balanceDisplay = document.getElementById('walletBalanceInDropdown');
+    const commissionDisplay = document.getElementById('walletCommissionInDropdown');
+    const assetsSection = document.getElementById('userAssetsSection');
+    const assetsList = document.getElementById('walletAssetsList');
     
+    // 更新地址显示
     if (addressDisplay && window.walletState.address) {
         const shortAddress = window.walletState.address.slice(0, 6) + '...' + window.walletState.address.slice(-4);
         addressDisplay.textContent = shortAddress;
     }
     
-    if (balanceDisplay && typeof window.walletState.balance !== 'undefined') {
-        balanceDisplay.textContent = parseFloat(window.walletState.balance).toFixed(2);
+    // 更新余额显示
+    if (balanceDisplay && window.walletState.balance !== null) {
+        balanceDisplay.textContent = parseFloat(window.walletState.balance || 0).toFixed(2);
     }
+    
+    // 更新佣金显示
+    if (commissionDisplay && window.walletState.commissionBalance !== undefined) {
+        commissionDisplay.textContent = parseFloat(window.walletState.commissionBalance || 0).toFixed(2);
+    }
+    
+    // 加载用户资产
+    if (window.walletState.address) {
+        loadUserAssets(window.walletState.address);
+    }
+}
+
+// 加载用户资产
+function loadUserAssets(address) {
+    const assetsList = document.getElementById('walletAssetsList');
+    const assetsSection = document.getElementById('userAssetsSection');
+    
+    if (!assetsList || !address) return;
+    
+    // 显示加载状态
+    assetsList.innerHTML = '<li style="text-align:center; padding:10px; color:#666; font-size:12px;"><i class="fas fa-spinner fa-spin me-2"></i>Loading assets...</li>';
+    
+    // 获取用户资产
+    fetch(`/api/user/${address}/assets`, {
+        headers: {
+            'Accept': 'application/json',
+            'X-Eth-Address': address
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.assets && data.assets.length > 0) {
+            // 显示资产部分
+            if (assetsSection) {
+                assetsSection.style.display = 'block';
+            }
+            
+            // 构建资产列表
+            let assetsHtml = '';
+            data.assets.forEach(asset => {
+                const quantity = parseFloat(asset.quantity || 0);
+                if (quantity > 0) {
+                    assetsHtml += `
+                        <li class="wallet-asset-item">
+                            <a href="/assets/${asset.token_symbol}" class="asset-link text-decoration-none">
+                                <div class="asset-info">
+                                    <span class="asset-name">${asset.name || asset.token_symbol}</span>
+                                    <div>
+                                        <span class="asset-quantity">${quantity.toLocaleString()}</span>
+                                        <span class="asset-symbol">${asset.token_symbol}</span>
+                                    </div>
+                                </div>
+                            </a>
+                        </li>
+                    `;
+                }
+            });
+            
+            if (assetsHtml) {
+                assetsList.innerHTML = assetsHtml;
+            } else {
+                assetsList.innerHTML = '<li style="text-align:center; padding:10px; color:#666; font-size:12px;">No assets found</li>';
+            }
+        } else {
+            // 隐藏资产部分或显示空状态
+            assetsList.innerHTML = '<li style="text-align:center; padding:10px; color:#666; font-size:12px;">No assets found</li>';
+            if (assetsSection) {
+                assetsSection.style.display = 'none';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Failed to load user assets:', error);
+        assetsList.innerHTML = '<li style="text-align:center; padding:10px; color:#dc3545; font-size:12px;">Failed to load assets</li>';
+    });
 }
 
 // 切换钱包并关闭菜单（供base.html调用）
