@@ -654,122 +654,133 @@ class AssetService:
             from app import db
             from sqlalchemy import or_, and_
             
-            # 先查询用户直接拥有的资产
-            owned_assets = Asset.query.filter(
-                Asset.owner_address == formatted_address,
-                Asset.status > 0  # 排除已删除资产
-            ).all()
+            # 只查询用户购买的资产，不包括创建的资产
+            logger.info("只查询用户购买的资产，不包括用户创建的资产")
             
-            # 尝试查询用户通过交易获得的资产
-            asset_ownerships = []
+            # 查询通过交易购买的资产
+            purchased_assets = []
+            try:
+                from app.models import Trade
+                # 获取用户所有已完成的购买交易
+                user_trades = Trade.query.filter_by(
+                    buyer_address=formatted_address,
+                    status='completed'
+                ).all()
+                
+                # 按资产ID分组，计算每个资产的总购买量
+                asset_quantities = {}
+                for trade in user_trades:
+                    asset_id = trade.asset_id
+                    amount = getattr(trade, 'amount', 0)
+                    if asset_id in asset_quantities:
+                        asset_quantities[asset_id] += amount
+                    else:
+                        asset_quantities[asset_id] = amount
+                
+                # 获取资产详情
+                for asset_id, total_quantity in asset_quantities.items():
+                    if total_quantity > 0:  # 只显示有数量的资产
+                        try:
+                            asset = Asset.query.get(asset_id)
+                            if asset:
+                                purchased_assets.append({
+                                    'id': asset.id,
+                                    'name': getattr(asset, 'name', 'Unknown Asset'),
+                                    'token_symbol': getattr(asset, 'token_symbol', 'UNKNOWN'),
+                                    'quantity': int(total_quantity),
+                                    'symbol': getattr(asset, 'token_symbol', 'UNKNOWN')
+                                })
+                        except Exception as e:
+                            logger.warning(f"处理购买资产 {asset_id} 失败: {str(e)}")
+                            
+                logger.info(f"从Trade表找到 {len(purchased_assets)} 个购买的资产")
+                            
+            except Exception as e:
+                logger.warning(f"查询交易资产失败: {str(e)}")
+            
+            # 查询通过AssetOwnership表的资产（如果存在）
             try:
                 from app.models import AssetOwnership
                 asset_ownerships = AssetOwnership.query.filter_by(
                     owner_address=formatted_address,
                     status='active'
                 ).all()
+                
+                for ownership in asset_ownerships:
+                    try:
+                        asset = Asset.query.get(ownership.asset_id)
+                        if asset:
+                            ownership_amount = getattr(ownership, 'amount', 0)
+                            if ownership_amount > 0:
+                                # 检查是否已在购买资产列表中
+                                existing_asset = next((a for a in purchased_assets if a['id'] == asset.id), None)
+                                if existing_asset:
+                                    # 如果已存在，累加数量
+                                    existing_asset['quantity'] += int(ownership_amount)
+                                else:
+                                    # 如果不存在，添加新资产
+                                    purchased_assets.append({
+                                        'id': asset.id,
+                                        'name': getattr(asset, 'name', 'Unknown Asset'),
+                                        'token_symbol': getattr(asset, 'token_symbol', 'UNKNOWN'),
+                                        'quantity': int(ownership_amount),
+                                        'symbol': getattr(asset, 'token_symbol', 'UNKNOWN')
+                                    })
+                    except Exception as e:
+                        logger.warning(f"处理所有权资产失败: {str(e)}")
+                        
+                logger.info(f"从AssetOwnership表补充了资产信息")
             except ImportError:
-                logger.warning("AssetOwnership模型不存在，跳过所有权查询")
+                logger.info("AssetOwnership模型不存在，跳过所有权查询")
             except Exception as e:
                 logger.warning(f"查询AssetOwnership失败: {str(e)}")
             
-            # 查询交易中的资产
-            trade_assets = []
+            # 尝试从Holdings表获取更准确的持仓数据
             try:
-                trade_assets = db.session.query(Asset).join(
-                    Trade, Asset.id == Trade.asset_id
-                ).filter(
-                    Trade.buyer_address == formatted_address,
-                    Trade.status == 'completed'
+                from app.models.holding import Holding
+                holdings = Holding.query.filter_by(
+                    user_address=formatted_address,
+                    status='active'
                 ).all()
-            except Exception as e:
-                logger.warning(f"查询交易资产失败: {str(e)}")
-            
-            # 合并所有资产并去重
-            all_assets = []
-            asset_ids = set()
-            
-            # 添加直接拥有的资产
-            for asset in owned_assets:
-                try:
-                    if asset.id not in asset_ids:
-                        asset_ids.add(asset.id)
-                        all_assets.append({
-                            'id': asset.id,
-                            'name': getattr(asset, 'name', 'Unknown Asset'),
-                            'token_symbol': getattr(asset, 'token_symbol', 'UNKNOWN'),
-                            'token_price': float(getattr(asset, 'token_price', 0)),
-                            'token_supply': int(getattr(asset, 'token_supply', 0)),
-                            'remaining_supply': int(getattr(asset, 'remaining_supply', 0)),
-                            'image_url': getattr(asset, 'image_url', ''),
-                            'asset_type': getattr(asset, 'asset_type', 'unknown'),
-                            'ownership_type': 'creator',
-                            'quantity': int(getattr(asset, 'token_supply', 0)),
-                            'symbol': getattr(asset, 'token_symbol', 'UNKNOWN')
-                        })
-                except Exception as e:
-                    logger.warning(f"处理创建者资产失败: {str(e)}")
-            
-            # 添加通过所有权表拥有的资产
-            for ownership in asset_ownerships:
-                try:
-                    asset = Asset.query.get(ownership.asset_id)
-                    if asset and asset.id not in asset_ids:
-                        asset_ids.add(asset.id)
-                        ownership_amount = getattr(ownership, 'amount', 0)
-                        all_assets.append({
-                            'id': asset.id,
-                            'name': getattr(asset, 'name', 'Unknown Asset'),
-                            'token_symbol': getattr(asset, 'token_symbol', 'UNKNOWN'),
-                            'token_price': float(getattr(asset, 'token_price', 0)),
-                            'token_supply': int(getattr(asset, 'token_supply', 0)),
-                            'remaining_supply': int(getattr(asset, 'remaining_supply', 0)),
-                            'image_url': getattr(asset, 'image_url', ''),
-                            'asset_type': getattr(asset, 'asset_type', 'unknown'),
-                            'ownership_type': 'ownership',
-                            'quantity': int(ownership_amount),
-                            'symbol': getattr(asset, 'token_symbol', 'UNKNOWN'),
-                            'amount': int(ownership_amount)
-                        })
-                except Exception as e:
-                    logger.warning(f"处理所有权资产失败: {str(e)}")
-            
-            # 添加通过交易获得的资产
-            for asset in trade_assets:
-                try:
-                    if asset.id not in asset_ids:
-                        asset_ids.add(asset.id)
-                        # 尝试获取用户在该资产上的持仓量
-                        user_quantity = 0
-                        try:
-                            from app.models import Trade
-                            user_trades = Trade.query.filter_by(
-                                buyer_address=formatted_address,
-                                asset_id=asset.id,
-                                status='completed'
-                            ).all()
-                            user_quantity = sum(trade.amount for trade in user_trades)
-                        except:
-                            user_quantity = 1  # 默认值
+                
+                for holding in holdings:
+                    try:
+                        asset = Asset.query.get(holding.asset_id)
+                        if asset:
+                            holding_amount = getattr(holding, 'amount', 0)
+                            if holding_amount > 0:
+                                # 检查是否已在购买资产列表中
+                                existing_asset = next((a for a in purchased_assets if a['id'] == asset.id), None)
+                                if existing_asset:
+                                    # 如果已存在，使用Holdings表的数据（更准确）
+                                    existing_asset['quantity'] = int(holding_amount)
+                                else:
+                                    # 如果不存在，添加新资产
+                                    purchased_assets.append({
+                                        'id': asset.id,
+                                        'name': getattr(asset, 'name', 'Unknown Asset'),
+                                        'token_symbol': getattr(asset, 'token_symbol', 'UNKNOWN'),
+                                        'quantity': int(holding_amount),
+                                        'symbol': getattr(asset, 'token_symbol', 'UNKNOWN')
+                                    })
+                    except Exception as e:
+                        logger.warning(f"处理持仓资产失败: {str(e)}")
                         
-                        all_assets.append({
-                            'id': asset.id,
-                            'name': getattr(asset, 'name', 'Unknown Asset'),
-                            'token_symbol': getattr(asset, 'token_symbol', 'UNKNOWN'),
-                            'token_price': float(getattr(asset, 'token_price', 0)),
-                            'token_supply': int(getattr(asset, 'token_supply', 0)),
-                            'remaining_supply': int(getattr(asset, 'remaining_supply', 0)),
-                            'image_url': getattr(asset, 'image_url', ''),
-                            'asset_type': getattr(asset, 'asset_type', 'unknown'),
-                            'ownership_type': 'trade',
-                            'quantity': int(user_quantity),
-                            'symbol': getattr(asset, 'token_symbol', 'UNKNOWN')
-                        })
-                except Exception as e:
-                    logger.warning(f"处理交易资产失败: {str(e)}")
+                logger.info(f"从Holdings表找到 {len(holdings)} 个持仓记录")
+            except ImportError:
+                logger.info("Holdings模型不存在，跳过持仓查询")
+            except Exception as e:
+                logger.warning(f"查询Holdings失败: {str(e)}")
             
-            logger.info(f"找到 {len(all_assets)} 个资产")
-            return all_assets
+            # 过滤掉数量为0的资产
+            purchased_assets = [asset for asset in purchased_assets if asset.get('quantity', 0) > 0]
+            
+            logger.info(f"最终找到 {len(purchased_assets)} 个有效购买资产")
+            
+            # 对资产按拥有数量排序，数量多的排在前面
+            purchased_assets.sort(key=lambda x: x.get('quantity', 0), reverse=True)
+            
+            return purchased_assets
             
         except Exception as e:
             logger.exception(f"获取用户资产列表异常: {str(e)}")

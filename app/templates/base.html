@@ -666,9 +666,9 @@
                                     <div>
                                         <i class="fas fa-hand-holding-usd me-2"></i>{{ _('Commission') }}: <span id="walletCommissionInDropdown" style="font-weight:600;">0.00</span>
                                     </div>
-                                    <button class="btn btn-sm text-success p-0" style="background:none; border:none; font-size:12px;" title="{{ _('View Details') }}">
+                                    <button class="btn btn-sm text-success p-0" style="background:none; border:none; font-size:12px;" title="{{ _('View Details') }}" onclick="showCommissionDetails()">
                                         <i class="fas fa-info-circle"></i>
-                                </button>
+                                    </button>
                                     </div>
                                 
                                 <!-- 用户资产部分 -->
@@ -1388,16 +1388,16 @@
                 if (assets.length > 0) {
                     let html = '';
                     assets.forEach(asset => {
-                        const quantity = parseFloat(asset.quantity || asset.amount || asset.token_supply || 0);
-                        const symbol = asset.symbol || asset.token_symbol || 'UNKNOWN';
-                        const name = asset.name || symbol || 'Unknown Asset';
+                        const quantity = parseFloat(asset.quantity || 0);
+                        const symbol = asset.symbol || asset.token_symbol || 'UNKNOWN';  
+                        const name = asset.name || 'Unknown Asset';
                         
                         if (quantity > 0) {
                             html += `
                                 <li class="wallet-asset-item">
-                                    <a href="/assets/${asset.id || symbol}" class="asset-link text-decoration-none">
-                                        <span class="asset-name" title="${name}">${name}</span>
-                                        <span class="asset-quantity">${quantity.toLocaleString()} ${symbol}</span>
+                                    <a href="/assets/${asset.id}" class="asset-link text-decoration-none" style="display: flex; justify-content: space-between; align-items: center; padding: 3px 4px; color: #333; background-color: #f8f9fa; border-radius: 4px; margin-bottom: 1px;">
+                                        <span class="asset-name" style="font-size: 12px; font-weight: 500; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${name}">${name}</span>
+                                        <span class="asset-quantity" style="font-size: 11px; color: #333; background: #eeeeee; padding: 1px 4px; border-radius: 3px;">${quantity.toLocaleString()} ${symbol}</span>
                                     </a>
                                 </li>
                             `;
@@ -1427,61 +1427,235 @@
             console.log('walletState:', window.walletState);
             console.log('openWalletSelector function:', typeof window.walletState?.openWalletSelector);
             
+            // 优先尝试使用wallet.js的钱包选择器
             if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
                 console.log('调用钱包选择器...');
                 window.walletState.openWalletSelector();
             } else {
-                console.error('钱包选择器不可用，尝试手动打开');
-                
-                // 手动检测移动端并打开钱包
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                
-                if (isMobile) {
-                    console.log('检测到移动端，尝试深度链接');
-                    // 尝试打开Phantom钱包
-                    const phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(window.location.href)}?ref=${window.location.origin}`;
-                    window.open(phantomUrl, '_blank');
-                } else {
-                    console.log('桌面端，检查钱包扩展');
-                    if (window.solana && window.solana.isPhantom) {
-                        console.log('找到Phantom，尝试连接');
-                        window.solana.connect().then(response => {
-                            console.log('Phantom连接成功:', response);
-                            // 手动更新钱包状态
-                            if (window.walletState) {
-                                window.walletState.address = response.publicKey.toString();
-                                window.walletState.connected = true;
-                                window.walletState.walletType = 'phantom';
-                                
-                                // 触发连接事件
-                                window.dispatchEvent(new CustomEvent('walletConnected'));
-                            }
-                        }).catch(error => {
-                            console.error('Phantom连接失败:', error);
-                            alert('Phantom wallet connection failed');
-                        });
-                    } else if (window.ethereum) {
-                        console.log('找到MetaMask，尝试连接');
-                        window.ethereum.request({ method: 'eth_requestAccounts' }).then(accounts => {
-                            console.log('MetaMask连接成功:', accounts);
-                            // 手动更新钱包状态
-                            if (window.walletState) {
-                                window.walletState.address = accounts[0];
-                                window.walletState.connected = true;
-                                window.walletState.walletType = 'metamask';
-                                
-                                // 触发连接事件
-                                window.dispatchEvent(new CustomEvent('walletConnected'));
-                            }
-                        }).catch(error => {
-                            console.error('MetaMask连接失败:', error);
-                            alert('MetaMask connection failed');
-                        });
-                    } else {
-                        alert('No wallet detected. Please install Phantom or MetaMask.');
-                    }
+                console.log('钱包选择器不可用，显示简单选择弹窗');
+                // 显示简单的钱包选择弹窗
+                showSimpleWalletSelector();
+            }
+        }
+        
+        // 统一的钱包选择器 - 桌面端和移动端都显示相同的选择界面
+        function showSimpleWalletSelector() {
+            console.log('显示钱包选择器 - 统一桌面端和移动端体验');
+            
+            // 检查是否有wallet.js的钱包选择器可用
+            if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+                console.log('调用wallet.js的钱包选择器');
+                window.walletState.openWalletSelector();
+                return;
+            }
+            
+            // 如果wallet.js不可用，创建简单的模态选择器
+            console.log('wallet.js不可用，创建简单选择器');
+            createSimpleWalletModal();
+        }
+        
+        // 创建简单的钱包选择模态框
+        function createSimpleWalletModal() {
+            // 移除现有的模态框
+            const existingModal = document.getElementById('simpleWalletModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // 创建模态框HTML
+            const modalHTML = `
+                <div class="modal fade" id="simpleWalletModal" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content" style="border-radius: 20px; border: none; overflow: hidden;">
+                            <div class="modal-header" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px 25px;">
+                                <h5 class="modal-title">选择钱包</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body" style="padding: 25px;">
+                                <div class="wallet-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                                    <div class="wallet-option" onclick="connectWallet('phantom')" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 16px; padding: 16px; text-align: center; cursor: pointer; transition: all 0.25s ease;">
+                                        <div class="wallet-icon-wrapper phantom" style="width: 56px; height: 56px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #f5eeff;">
+                                            <i class="fas fa-ghost" style="font-size: 24px; color: #8a2be2;"></i>
+                                        </div>
+                                        <div class="wallet-name">Phantom</div>
+                                        <small class="text-muted">Solana Wallet</small>
+                                    </div>
+                                    <div class="wallet-option" onclick="connectWallet('metamask')" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 16px; padding: 16px; text-align: center; cursor: pointer; transition: all 0.25s ease;">
+                                        <div class="wallet-icon-wrapper ethereum" style="width: 56px; height: 56px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #fff5e6;">
+                                            <i class="fab fa-ethereum" style="font-size: 24px; color: #f7931a;"></i>
+                                        </div>
+                                        <div class="wallet-name">MetaMask</div>
+                                        <small class="text-muted">Ethereum Wallet</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 添加到页面
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('simpleWalletModal'));
+            modal.show();
+        }
+        
+        // 统一的钱包连接函数 - 支持桌面端和移动端
+        function connectWallet(walletType) {
+            console.log('连接钱包:', walletType);
+            
+            // 关闭选择模态框
+            const modal = document.getElementById('simpleWalletModal');
+            if (modal) {
+                const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                if (bootstrapModal) {
+                    bootstrapModal.hide();
                 }
             }
+            
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            if (walletType === 'phantom') {
+                if (isMobile) {
+                    connectPhantomMobile();
+                } else {
+                    connectPhantomDesktop();
+                }
+            } else if (walletType === 'metamask') {
+                if (isMobile) {
+                    connectMetaMaskMobile();
+                } else {
+                    connectMetaMaskDesktop();
+                }
+            }
+        }
+        
+        // Phantom移动端连接 - 使用正确的钱包连接深度链接
+        function connectPhantomMobile() {
+            console.log('尝试连接Phantom移动端');
+            
+            // 检测Phantom app是否已安装
+            const phantomDeepLink = 'phantom://browse/' + encodeURIComponent(window.location.href) + '?cluster=devnet';
+            const phantomAppStore = 'https://phantom.app/';
+            
+            // 尝试打开Phantom app
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = phantomDeepLink;
+            document.body.appendChild(iframe);
+            
+            // 如果2秒后还在页面上，说明app没安装，跳转到下载页
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+                if (document.hasFocus()) {
+                    if (confirm('检测到您没有安装Phantom钱包，是否前往下载？')) {
+                        window.open(phantomAppStore, '_blank');
+                    }
+                }
+            }, 2000);
+        }
+        
+        // MetaMask移动端连接
+        function connectMetaMaskMobile() {
+            console.log('尝试连接MetaMask移动端');
+            
+            // 使用MetaMask官方深度链接
+            const metamaskDeepLink = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
+            
+            console.log('跳转到MetaMask:', metamaskDeepLink);
+            window.location.href = metamaskDeepLink;
+        }
+        
+        // Phantom桌面端连接
+        function connectPhantomDesktop() {
+            if (window.solana && window.solana.isPhantom) {
+                console.log('检测到Phantom扩展，尝试连接');
+                window.solana.connect().then(response => {
+                    console.log('Phantom连接成功:', response);
+                    updateWalletState('phantom', response.publicKey.toString());
+                }).catch(error => {
+                    console.error('Phantom连接失败:', error);
+                    alert('Phantom钱包连接失败: ' + error.message);
+                });
+            } else {
+                alert('未检测到Phantom钱包扩展，请先安装Phantom浏览器扩展。');
+                window.open('https://phantom.app/', '_blank');
+            }
+        }
+        
+        // MetaMask桌面端连接
+        function connectMetaMaskDesktop() {
+            if (window.ethereum && window.ethereum.isMetaMask) {
+                console.log('检测到MetaMask扩展，尝试连接');
+                window.ethereum.request({ method: 'eth_requestAccounts' }).then(accounts => {
+                    console.log('MetaMask连接成功:', accounts);
+                    updateWalletState('metamask', accounts[0]);
+                }).catch(error => {
+                    console.error('MetaMask连接失败:', error);
+                    alert('MetaMask连接失败: ' + error.message);
+                });
+            } else {
+                alert('未检测到MetaMask钱包扩展，请先安装MetaMask浏览器扩展。');
+                window.open('https://metamask.io/', '_blank');
+            }
+        }
+        
+        // 更新钱包状态
+        function updateWalletState(walletType, address) {
+            if (window.walletState) {
+                window.walletState.address = address;
+                window.walletState.connected = true;
+                window.walletState.walletType = walletType;
+                
+                // 保存到localStorage
+                localStorage.setItem('walletAddress', address);
+                localStorage.setItem('walletType', walletType);
+                if (walletType === 'metamask') {
+                    localStorage.setItem('eth_address', address);
+                }
+                
+                // 触发连接事件
+                window.dispatchEvent(new CustomEvent('walletConnected'));
+                
+                console.log('钱包状态已更新:', {
+                    type: walletType,
+                    address: address
+                });
+            }
+        }
+        
+        // 显示佣金详情
+        function showCommissionDetails() {
+            if (!window.walletState || !window.walletState.address) {
+                alert('请先连接钱包');
+                return;
+            }
+            
+            const address = window.walletState.address;
+            const commissionValue = document.getElementById('walletCommissionInDropdown').textContent || '0.00';
+            
+            // 显示佣金详情弹窗
+            const details = `
+佣金详情信息：
+
+钱包地址: ${address.slice(0, 6)}...${address.slice(-4)}
+当前佣金余额: ${commissionValue} USDC
+
+佣金说明:
+• 推荐用户购买资产可获得佣金
+• 佣金率根据平台设置动态调整
+• 佣金实时结算到账
+• 可随时提取到钱包
+
+如需查看详细的佣金记录和提取历史，请访问个人中心页面。
+            `;
+            
+            alert(details);
+            
+            // 可以在这里添加更复杂的弹窗或跳转到佣金详情页面
+            console.log('显示佣金详情，地址:', address, '佣金:', commissionValue);
         }
         
         // 切换钱包
