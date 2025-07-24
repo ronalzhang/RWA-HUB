@@ -252,12 +252,24 @@ function handleBuy(assetId, amountInput, buyButton) {
     // 解码交易数据
     const transactionBuffer = Uint8Array.from(atob(transactionData), c => c.charCodeAt(0));
     
-    // 直接使用钱包的signAndSendTransaction，让钱包自己处理交易数据
+    // 尝试使用signTransaction方法，这样更容易调试
     console.log('调用钱包签名，交易数据长度:', transactionBuffer.length);
-    return window.solana.signAndSendTransaction({
+    
+    // 创建一个更完整的交易对象
+    const transactionObj = {
       serialize: () => transactionBuffer,
-      serializeMessage: () => transactionBuffer
-    })
+      serializeMessage: () => transactionBuffer,
+      signatures: [],
+      feePayer: null
+    };
+    
+    console.log('尝试使用signTransaction方法...');
+    return window.solana.signTransaction(transactionObj)
+      .then(signedTransaction => {
+        console.log('交易签名成功，现在发送到网络...');
+        // 这里我们可以使用自己的方法发送交易，或者让钱包发送
+        return window.solana.sendTransaction(signedTransaction);
+      })
       .then(paymentResult => {
         if (!paymentResult.signature) {
           throw new Error('智能合约交易失败：无签名返回');
