@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
  * @param {HTMLElement} buyButton - 购买按钮元素
  */
 function handleBuy(assetId, amountInput, buyButton) {
-  console.log('购买函数被调用:', { assetId });
+  console.log('Buy function called:', { assetId });
   
   // 如果已有计时器运行，清除它
   if (window.buyTimeoutId) {
@@ -81,14 +81,14 @@ function handleBuy(assetId, amountInput, buyButton) {
   
   // 防止重复点击
   if (buyButton && buyButton.disabled) {
-    console.log('购买处理中，请稍候...');
+    console.log('Purchase in progress, please wait...');
     return;
   }
   
   // 设置按钮加载状态
   if (buyButton) {
     buyButton.disabled = true;
-    buyButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 处理中...';
+    buyButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
   }
   
   // 检查资产ID
@@ -122,7 +122,7 @@ function handleBuy(assetId, amountInput, buyButton) {
   }
   
   if (!amount || amount <= 0) {
-    showError('请输入有效的购买数量');
+    showError('Please enter a valid purchase amount');
     resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
     return;
   }
@@ -159,10 +159,10 @@ function handleBuy(assetId, amountInput, buyButton) {
   };
   
   // 显示加载状态
-  showLoadingState('正在准备购买...');
+  showLoadingState('Preparing purchase...');
   
   // 发送智能合约购买准备请求
-  console.log('发送智能合约购买准备请求:', purchaseData);
+  console.log('Sending smart contract purchase preparation request:', purchaseData);
   fetch('/api/blockchain/prepare_purchase', {
     method: 'POST',
     headers: {
@@ -183,7 +183,7 @@ function handleBuy(assetId, amountInput, buyButton) {
     return response.json();
   })
   .then(data => {
-    console.log('智能合约购买准备响应:', data);
+    console.log('Smart contract purchase preparation response:', data);
     
     if (!data.success) {
       throw new Error(data.error || '准备智能合约交易失败');
@@ -198,7 +198,7 @@ function handleBuy(assetId, amountInput, buyButton) {
     }
     
     // 更新加载状态
-    showLoadingState('请在钱包中确认智能合约交易...');
+    showLoadingState('Please confirm smart contract transaction in wallet...');
     
     // 检查Solana钱包API是否可用
     if (!window.solana || !window.solana.signAndSendTransaction) {
@@ -247,7 +247,7 @@ function handleBuy(assetId, amountInput, buyButton) {
     }
     
     // 准备智能合约交易
-    console.log(`执行智能合约资产购买: ${amount}个代币，总价: ${totalPrice} USDC`);
+    console.log(`Executing smart contract asset purchase: ${amount} tokens, total price: ${totalPrice} USDC`);
     
     // 解码交易数据
     let transactionBuffer;
@@ -279,8 +279,8 @@ function handleBuy(assetId, amountInput, buyButton) {
         throw new Error('交易数据长度不足');
       }
       
-      console.log('交易数据解码成功，长度:', transactionBuffer.length);
-      console.log('交易数据前16字节:', Array.from(transactionBuffer.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+      console.log('Transaction data decoded successfully, length:', transactionBuffer.length);
+      console.log('First 16 bytes of transaction data:', Array.from(transactionBuffer.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' '));
     } catch (error) {
       console.error('交易数据解码失败:', error);
       throw new Error(`交易数据格式错误: ${error.message}`);
@@ -400,7 +400,7 @@ function handleBuy(assetId, amountInput, buyButton) {
           throw new Error('智能合约交易失败：无签名返回');
         }
         
-        console.log('智能合约交易成功，签名:', signature);
+        console.log('Smart contract transaction successful, signature:', signature);
         
         // 确认智能合约购买
         return confirmSmartContractPurchase(
@@ -437,10 +437,10 @@ function handleBuy(assetId, amountInput, buyButton) {
       });
   })
   .then(result => {
-    console.log('智能合约购买完成:', result);
+    console.log('Smart contract purchase completed:', result);
     
     // 显示成功消息
-    showSuccessMessage('智能合约购买成功！', `您已成功通过智能合约购买 ${amount} 个代币，USDC支付和代币转移已同步完成。交易哈希: ${result.transaction_signature}`);
+    showSuccessMessage('Smart Contract Purchase Successful!', `You have successfully purchased ${amount} tokens through smart contract. USDC payment and token transfer completed synchronously. Transaction hash: ${result.transaction_signature}`);
     
     // 重置按钮状态
     resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
@@ -454,10 +454,10 @@ function handleBuy(assetId, amountInput, buyButton) {
     }, 3000);
   })
   .catch(error => {
-    console.error('购买处理失败:', error);
+    console.error('Purchase processing failed:', error);
     
     // 显示错误消息
-    showError(error.message || '购买失败，请稍后重试');
+    showError(error.message || 'Purchase failed, please try again later');
     
     // 重置按钮状态
     resetButton(buyButton, '<i class="fas fa-shopping-cart me-2"></i>Buy');
@@ -476,7 +476,7 @@ function handleBuy(assetId, amountInput, buyButton) {
  */
 function confirmSmartContractPurchase(assetId, walletAddress, amount, signature) {
   // 更新加载状态
-  showLoadingState('正在确认智能合约购买...');
+  showLoadingState('Confirming smart contract purchase...');
   
   // 确认购买数据
   const confirmData = { 
@@ -486,7 +486,7 @@ function confirmSmartContractPurchase(assetId, walletAddress, amount, signature)
     signed_transaction: signature
   };
   
-  console.log('发送智能合约购买确认请求:', confirmData);
+  console.log('Sending smart contract purchase confirmation request:', confirmData);
   
   // 发送确认购买请求
   return fetch('/api/blockchain/execute_purchase', {
@@ -499,21 +499,21 @@ function confirmSmartContractPurchase(assetId, walletAddress, amount, signature)
   })
   .then(response => {
     if (!response.ok) {
-      throw new Error(`智能合约购买确认失败: ${response.status}`);
+      throw new Error(`Smart contract purchase confirmation failed: ${response.status}`);
     }
     return response.json();
   })
   .then(data => {
     if (!data.success) {
-      throw new Error(data.error || '智能合约购买确认失败');
+      throw new Error(data.error || 'Smart contract purchase confirmation failed');
     }
     
-    console.log('智能合约购买确认成功:', data);
+    console.log('Smart contract purchase confirmation successful:', data);
     return {
       success: true,
       transaction_signature: data.transaction_signature,
       trade_id: data.trade_id,
-      message: '智能合约购买已确认，代币转移和USDC支付同步完成'
+      message: 'Smart contract purchase confirmed, token transfer and USDC payment completed synchronously'
     };
   });
 }
@@ -789,10 +789,11 @@ function hideLoadingState() {
   }
 }
 
-// 处理按钮点击的简化函数
+// 处理按钮点击的简化函数 - 已禁用，使用wallet.js中的处理逻辑
 function handleBuyButtonClick(event) {
-  // 阻止默认行为
-        event.preventDefault();
+  // 禁用此函数，避免与wallet.js冲突
+  console.log('handleBuyButtonClick disabled - using wallet.js logic instead');
+  return false;
   
   try {
     // 获取按钮和相关数据
@@ -829,13 +830,11 @@ function handleBuyButtonClick(event) {
   return false;
 }
 
-// 初始化购买按钮
+// 初始化购买按钮 - 已禁用，使用wallet.js中的处理逻辑
 function setupBuyButton() {
-  // 避免重复初始化
-  if (window.buyButtonInitialized) {
-    console.log('购买按钮已初始化，跳过重复初始化');
-    return;
-  }
+  // 禁用此函数，避免与wallet.js冲突
+  console.log('setupBuyButton disabled - using wallet.js logic instead');
+  return;
   
   console.log('初始化购买按钮...');
   

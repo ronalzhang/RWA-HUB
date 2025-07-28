@@ -936,6 +936,60 @@ def get_asset_qrcode(asset_id):
         current_app.logger.warning(f"生成资产二维码失败: {str(e)}")
         return jsonify({'success': False, 'message': f'生成二维码失败: {str(e)}'}), 500
 
+@assets_api_bp.route('/<int:asset_id>', methods=['GET'])
+def get_asset_by_id(asset_id):
+    """获取资产信息 - 通过ID"""
+    try:
+        asset = Asset.query.get(asset_id)
+        if not asset:
+            return jsonify({'success': False, 'message': 'Asset not found'}), 404
+        
+        return jsonify({
+            'success': True,
+            'asset': {
+                'id': asset.id,
+                'name': asset.name,
+                'token_symbol': asset.token_symbol,
+                'token_price': float(asset.token_price),
+                'total_supply': asset.total_supply,
+                'remaining_supply': asset.remaining_supply,
+                'description': asset.description or '',
+                'creator_address': asset.creator_address,
+                'status': asset.status,
+                'created_at': asset.created_at.isoformat() if asset.created_at else None
+            }
+        })
+    except Exception as e:
+        current_app.logger.error(f"获取资产信息失败: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@assets_api_bp.route('/symbol/<string:token_symbol>', methods=['GET'])
+def get_asset_by_symbol(token_symbol):
+    """获取资产信息 - 通过token_symbol"""
+    try:
+        asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+        if not asset:
+            return jsonify({'success': False, 'message': 'Asset not found'}), 404
+        
+        return jsonify({
+            'success': True,
+            'asset': {
+                'id': asset.id,
+                'name': asset.name,
+                'token_symbol': asset.token_symbol,
+                'token_price': float(asset.token_price),
+                'total_supply': asset.total_supply,
+                'remaining_supply': asset.remaining_supply,
+                'description': asset.description or '',
+                'creator_address': asset.creator_address,
+                'status': asset.status,
+                'created_at': asset.created_at.isoformat() if asset.created_at else None
+            }
+        })
+    except Exception as e:
+        current_app.logger.error(f"获取资产信息失败: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @assets_api_bp.route('/create', methods=['POST'])
 @eth_address_required
 def create_asset_api():

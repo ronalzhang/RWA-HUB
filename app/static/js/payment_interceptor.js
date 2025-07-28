@@ -836,11 +836,11 @@
     }
   }
   
-  // 绑定购买按钮事件
+  // 绑定购买按钮事件 - 已禁用，使用wallet.js中的处理逻辑
   function bindBuyButtons() {
-    try {
-      // 找到所有购买按钮
-      const buyButtons = document.querySelectorAll('.buy-btn, .buy-button, [data-action="buy"], #buyButton, .btn-buy, #buy-button');
+    // 禁用此函数，避免与wallet.js冲突
+    console.log('bindBuyButtons disabled - using wallet.js logic instead');
+    return;
       
       buyButtons.forEach(button => {
         // 跳过无效按钮和已绑定的按钮

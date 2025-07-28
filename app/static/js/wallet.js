@@ -4447,7 +4447,7 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
             const spinner = confirmBtn.querySelector('.spinner-border');
             if (spinner) spinner.style.display = 'inline-block';
             confirmBtn.disabled = true;
-            confirmBtn.textContent = '处理中...';
+            confirmBtn.textContent = 'Processing...';
         }
         
         // 获取必要的参数
@@ -4504,7 +4504,7 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
         }
         
         // 2. 确认购买
-        console.log("转账成功，现在确认购买");
+        console.log("Transfer successful, now confirming purchase");
         
         const confirmResult = await fetch('/api/trades/confirm_purchase', {
             method: 'POST',
@@ -4523,14 +4523,14 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
         // 检查确认结果
         if (!confirmResult.ok) {
             const errorData = await confirmResult.json();
-            throw new Error(errorData.error || "确认购买失败");
+            throw new Error(errorData.error || "Purchase confirmation failed");
         }
         
         const confirmData = await confirmResult.json();
-        console.log("确认购买结果:", confirmData);
+        console.log("Purchase confirmation result:", confirmData);
         
         if (!confirmData.success) {
-            throw new Error(confirmData.error || "确认购买处理失败");
+            throw new Error(confirmData.error || "Purchase confirmation processing failed");
         }
         
         // 3. 处理成功
@@ -4543,7 +4543,7 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
         }
         
         // 显示成功消息
-        showSuccess('购买成功！交易已提交');
+        showSuccess('Purchase successful! Transaction submitted');
         
         // 刷新页面数据
         if (typeof refreshAssetInfoNow === 'function') {
@@ -4559,13 +4559,13 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
             const spinner = confirmBtn.querySelector('.spinner-border');
             if (spinner) spinner.style.display = 'none';
             confirmBtn.disabled = false;
-            confirmBtn.textContent = '确认购买';
+            confirmBtn.textContent = 'Confirm Purchase';
         }
         
         return confirmData;
         
     } catch (error) {
-        console.error("确认购买过程中出错:", error);
+        console.error("Error during purchase confirmation:", error);
         
         // 显示错误消息
         showError(error.message || "购买过程中出现错误");
@@ -4581,7 +4581,7 @@ window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) 
             const spinner = confirmBtn.querySelector('.spinner-border');
             if (spinner) spinner.style.display = 'none';
             confirmBtn.disabled = false;
-            confirmBtn.textContent = '确认购买';
+            confirmBtn.textContent = 'Confirm Purchase';
         }
         
         throw error;
