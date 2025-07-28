@@ -310,86 +310,73 @@ function handleBuy(assetId, amountInput, buyButton) {
       console.log('⚠️ 回退到直接使用交易buffer');
     }
     
-    // 尝试多种方法发送交易
+    // 使用最兼容的方法发送交易
+    console.log('准备发送交易到钱包...');
+    
+    // 将交易数据转换为base64字符串，这是最通用的格式
+    const transactionBase64 = btoa(String.fromCharCode.apply(null, transactionBuffer));
+    console.log('交易Base64长度:', transactionBase64.length);
+    
     let transactionPromise;
     
-    // 方法1: 直接使用signAndSendTransaction，传入base64字符串
-    if (window.solana && window.solana.signAndSendTransaction) {
-      console.log('尝试方法1: signAndSendTransaction (base64)');
+    // 创建完整的Transaction对象，模拟@solana/web3.js的Transaction类
+    console.log('创建完整的Transaction对象...');
+    
+    const compatibleTransaction = {
+      // 核心方法
+      serialize: function(config) {
+        console.log('Transaction.serialize() 被调用，config:', config);
+        return transactionBuffer;
+      },
       
-      // 将交易数据转换为base64字符串
-      const transactionBase64 = btoa(String.fromCharCode.apply(null, transactionBuffer));
+      serializeMessage: function() {
+        console.log('Transaction.serializeMessage() 被调用');
+        return transactionBuffer;
+      },
       
-      transactionPromise = window.solana.signAndSendTransaction({
-        message: transactionBase64
-      });
-    }
-    // 方法2: 使用request方法
-    else if (window.solana && window.solana.request) {
-      console.log('尝试方法2: request方法');
+      // 签名相关
+      sign: function(...signers) {
+        console.log('Transaction.sign() 被调用');
+        return this;
+      },
       
-      const transactionBase64 = btoa(String.fromCharCode.apply(null, transactionBuffer));
+      addSignature: function(pubkey, signature) {
+        console.log('Transaction.addSignature() 被调用');
+        this.signatures.push({ publicKey: pubkey, signature: signature });
+        return this;
+      },
       
-      transactionPromise = window.solana.request({
-        method: 'signAndSendTransaction',
-        params: {
-          message: transactionBase64
-        }
-      });
-    }
-    // 方法3: 使用signTransaction然后通过后端发送
-    else if (window.solana && window.solana.signTransaction) {
-      console.log('尝试方法3: signTransaction + 后端发送');
+      // 属性
+      signatures: [],
+      feePayer: null,
+      recentBlockhash: null,
+      instructions: [],
+      nonceInfo: null,
       
-      // 创建Transaction对象用于签名
-      let transactionForSigning;
-      if (solanaLib && solanaLib.Transaction && solanaLib.Transaction.from) {
-        try {
-          transactionForSigning = solanaLib.Transaction.from(transactionBuffer);
-        } catch (error) {
-          console.error('创建Transaction对象失败，使用原始数据:', error);
-          transactionForSigning = transactionBuffer;
-        }
-      } else {
-        transactionForSigning = transactionBuffer;
+      // 内部属性
+      _message: transactionBuffer,
+      _serialized: transactionBuffer,
+      
+      // 兼容性属性
+      constructor: {
+        name: 'Transaction'
       }
-      
-      transactionPromise = window.solana.signTransaction(transactionForSigning)
-        .then(signedTransaction => {
-          // 将签名后的交易发送到后端
-          let signedData;
-          if (signedTransaction.serialize) {
-            signedData = btoa(String.fromCharCode.apply(null, signedTransaction.serialize()));
-          } else if (signedTransaction instanceof Uint8Array) {
-            signedData = btoa(String.fromCharCode.apply(null, signedTransaction));
-          } else {
-            signedData = btoa(String.fromCharCode.apply(null, transactionBuffer));
-          }
-          
-          // 通过后端发送交易
-          return fetch('/api/blockchain/send_transaction', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Wallet-Address': walletAddress
-            },
-            body: JSON.stringify({
-              signed_transaction: signedData
-            })
-          })
-          .then(response => response.json())
-          .then(result => {
-            if (result.success) {
-              return { signature: result.signature };
-            } else {
-              throw new Error(result.error || '发送交易失败');
-            }
-          });
-        });
-    }
-    else {
+    };
+    
+    // 添加原型方法以提高兼容性
+    Object.setPrototypeOf(compatibleTransaction, {
+      constructor: compatibleTransaction.constructor,
+      serialize: compatibleTransaction.serialize,
+      serializeMessage: compatibleTransaction.serializeMessage
+    });
+    
+    console.log('使用signAndSendTransaction方法发送兼容Transaction对象');
+    
+    if (!window.solana || !window.solana.signAndSendTransaction) {
       throw new Error('钱包不支持交易签名功能');
     }
+    
+    const transactionPromise = window.solana.signAndSendTransaction(compatibleTransaction);
     
     return transactionPromise
       .then(paymentResult => {
