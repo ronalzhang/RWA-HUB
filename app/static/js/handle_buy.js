@@ -250,60 +250,203 @@ function handleBuy(assetId, amountInput, buyButton) {
     console.log(`执行智能合约资产购买: ${amount}个代币，总价: ${totalPrice} USDC`);
     
     // 解码交易数据
-    const transactionBuffer = Uint8Array.from(atob(transactionData), c => c.charCodeAt(0));
-    
-    // 尝试使用Phantom钱包的request方法直接发送序列化交易
-    console.log('调用钱包签名，交易数据长度:', transactionBuffer.length);
-    
-    // 创建一个简单的base58编码函数
-    function base58Encode(buffer) {
-      const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-      let result = '';
-      let num = 0n;
-      
-      // 将buffer转换为大整数
-      for (let i = 0; i < buffer.length; i++) {
-        num = num * 256n + BigInt(buffer[i]);
+    let transactionBuffer;
+    try {
+      // 检查transactionData是否已经是base64编码的字符串
+      if (typeof transactionData === 'string') {
+        // 验证base64格式
+        const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+        if (!base64Regex.test(transactionData)) {
+          throw new Error('无效的base64格式');
+        }
+        
+        // 解码base64
+        const binaryString = atob(transactionData);
+        transactionBuffer = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          transactionBuffer[i] = binaryString.charCodeAt(i);
+        }
+      } else if (transactionData instanceof Uint8Array) {
+        transactionBuffer = transactionData;
+      } else if (Array.isArray(transactionData)) {
+        transactionBuffer = new Uint8Array(transactionData);
+      } else {
+        throw new Error('无效的交易数据格式');
       }
       
-      // 转换为base58
-      while (num > 0n) {
-        result = alphabet[Number(num % 58n)] + result;
-        num = num / 58n;
+      // 验证交易数据长度
+      if (transactionBuffer.length < 32) {
+        throw new Error('交易数据长度不足');
       }
       
-      // 处理前导零
-      for (let i = 0; i < buffer.length && buffer[i] === 0; i++) {
-        result = '1' + result;
-      }
-      
-      return result;
+      console.log('交易数据解码成功，长度:', transactionBuffer.length);
+      console.log('交易数据前16字节:', Array.from(transactionBuffer.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+    } catch (error) {
+      console.error('交易数据解码失败:', error);
+      throw new Error(`交易数据格式错误: ${error.message}`);
     }
     
-    // 将交易数据转换为base58字符串
-    const transactionBase58 = base58Encode(transactionBuffer);
+    // 调用钱包签名，交易数据长度
+    console.log('调用钱包签名，交易数据长度:', transactionBuffer.length);
     
-    console.log('使用request方法发送交易...');
-    return window.solana.request({
-      method: 'signAndSendTransaction',
-      params: {
-        message: transactionBase58
+    // 尝试直接使用signAndSendTransaction方法
+    console.log('使用signAndSendTransaction方法发送交易...');
+    
+    // 创建Transaction对象
+    let transaction;
+    try {
+      if (solanaLib && solanaLib.Transaction && solanaLib.Transaction.from) {
+        transaction = solanaLib.Transaction.from(transactionBuffer);
+        console.log('✅ 使用Solana库创建Transaction对象');
+      } else {
+        // 如果没有Solana库，直接使用buffer
+        transaction = transactionBuffer;
+        console.log('⚠️ 直接使用交易buffer');
       }
-    })
+    } catch (error) {
+      console.error('创建Transaction对象失败:', error);
+      // 回退到直接使用buffer
+      transaction = transactionBuffer;
+      console.log('⚠️ 回退到直接使用交易buffer');
+    }
+    
+    // 尝试多种方法发送交易
+    let transactionPromise;
+    
+    // 方法1: 直接使用signAndSendTransaction，传入base64字符串
+    if (window.solana && window.solana.signAndSendTransaction) {
+      console.log('尝试方法1: signAndSendTransaction (base64)');
+      
+      // 将交易数据转换为base64字符串
+      const transactionBase64 = btoa(String.fromCharCode.apply(null, transactionBuffer));
+      
+      transactionPromise = window.solana.signAndSendTransaction({
+        message: transactionBase64
+      });
+    }
+    // 方法2: 使用request方法
+    else if (window.solana && window.solana.request) {
+      console.log('尝试方法2: request方法');
+      
+      const transactionBase64 = btoa(String.fromCharCode.apply(null, transactionBuffer));
+      
+      transactionPromise = window.solana.request({
+        method: 'signAndSendTransaction',
+        params: {
+          message: transactionBase64
+        }
+      });
+    }
+    // 方法3: 使用signTransaction然后通过后端发送
+    else if (window.solana && window.solana.signTransaction) {
+      console.log('尝试方法3: signTransaction + 后端发送');
+      
+      // 创建Transaction对象用于签名
+      let transactionForSigning;
+      if (solanaLib && solanaLib.Transaction && solanaLib.Transaction.from) {
+        try {
+          transactionForSigning = solanaLib.Transaction.from(transactionBuffer);
+        } catch (error) {
+          console.error('创建Transaction对象失败，使用原始数据:', error);
+          transactionForSigning = transactionBuffer;
+        }
+      } else {
+        transactionForSigning = transactionBuffer;
+      }
+      
+      transactionPromise = window.solana.signTransaction(transactionForSigning)
+        .then(signedTransaction => {
+          // 将签名后的交易发送到后端
+          let signedData;
+          if (signedTransaction.serialize) {
+            signedData = btoa(String.fromCharCode.apply(null, signedTransaction.serialize()));
+          } else if (signedTransaction instanceof Uint8Array) {
+            signedData = btoa(String.fromCharCode.apply(null, signedTransaction));
+          } else {
+            signedData = btoa(String.fromCharCode.apply(null, transactionBuffer));
+          }
+          
+          // 通过后端发送交易
+          return fetch('/api/blockchain/send_transaction', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Wallet-Address': walletAddress
+            },
+            body: JSON.stringify({
+              signed_transaction: signedData
+            })
+          })
+          .then(response => response.json())
+          .then(result => {
+            if (result.success) {
+              return { signature: result.signature };
+            } else {
+              throw new Error(result.error || '发送交易失败');
+            }
+          });
+        });
+    }
+    else {
+      throw new Error('钱包不支持交易签名功能');
+    }
+    
+    return transactionPromise
       .then(paymentResult => {
-        if (!paymentResult.signature) {
+        console.log('钱包返回结果:', paymentResult);
+        
+        // 检查返回结果的格式
+        let signature;
+        if (paymentResult && paymentResult.signature) {
+          signature = paymentResult.signature;
+        } else if (typeof paymentResult === 'string') {
+          // 有些钱包直接返回签名字符串
+          signature = paymentResult;
+        } else if (paymentResult && paymentResult.publicKey) {
+          // 检查是否有其他格式的返回
+          throw new Error('交易被用户取消或失败');
+        } else {
+          throw new Error('智能合约交易失败：无效的返回格式');
+        }
+        
+        if (!signature) {
           throw new Error('智能合约交易失败：无签名返回');
         }
         
-        console.log('智能合约交易成功，签名:', paymentResult.signature);
+        console.log('智能合约交易成功，签名:', signature);
         
         // 确认智能合约购买
         return confirmSmartContractPurchase(
           assetId,
           walletAddress,
           amount,
-          paymentResult.signature
+          signature
         );
+      })
+      .catch(error => {
+        console.error('钱包交易处理失败:', error);
+        
+        // 处理常见的钱包错误
+        if (error.message) {
+          const errorMsg = error.message.toLowerCase();
+          
+          if (errorMsg.includes('user rejected') || errorMsg.includes('user denied') || errorMsg.includes('cancelled')) {
+            throw new Error('用户取消了交易');
+          } else if (errorMsg.includes('insufficient funds') || errorMsg.includes('insufficient balance')) {
+            throw new Error('余额不足，请检查您的USDC余额');
+          } else if (errorMsg.includes('buffer') || errorMsg.includes('unexpected') || errorMsg.includes('deserialize')) {
+            throw new Error('交易数据格式错误，请刷新页面重试');
+          } else if (errorMsg.includes('network') || errorMsg.includes('connection')) {
+            throw new Error('网络连接错误，请检查网络后重试');
+          } else if (errorMsg.includes('timeout')) {
+            throw new Error('交易超时，请重试');
+          } else if (errorMsg.includes('not found') || errorMsg.includes('invalid')) {
+            throw new Error('交易参数无效，请刷新页面重试');
+          }
+        }
+        
+        // 如果是其他错误，抛出原始错误
+        throw error;
       });
   })
   .then(result => {

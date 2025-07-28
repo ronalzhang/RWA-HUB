@@ -214,6 +214,49 @@ def prepare_purchase():
             'error': f"准备购买失败: {str(e)}"
         }), 500
 
+@blockchain_bp.route('/send_transaction', methods=['POST'])
+def send_transaction():
+    """
+    发送已签名的交易到区块链
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '缺少请求数据'
+            }), 400
+        
+        signed_transaction = data.get('signed_transaction')
+        
+        if not signed_transaction:
+            return jsonify({
+                'success': False,
+                'error': '缺少已签名的交易数据'
+            }), 400
+        
+        # 发送交易到区块链
+        result = rwa_contract_service.send_transaction(signed_transaction)
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'signature': result['signature'],
+                'message': '交易已发送到区块链'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.get('error', '发送交易失败')
+            }), 500
+            
+    except Exception as e:
+        current_app.logger.error(f"发送交易失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"发送交易失败: {str(e)}"
+        }), 500
+
 @blockchain_bp.route('/execute_purchase', methods=['POST'])
 def execute_purchase():
     """
