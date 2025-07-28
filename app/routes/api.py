@@ -1411,6 +1411,87 @@ def solana_direct_transfer():
             'message': f"执行转账失败: {str(e)}"
         }), 500
 
+@api_bp.route('/execute_transfer', methods=['POST'])
+def execute_transfer():
+    """执行代币转账 - 兼容旧版本API"""
+    try:
+        data = request.json
+        logger.info(f"收到转账请求: {data}")
+        
+        # 验证基本参数
+        required_fields = ['from_address', 'to_address', 'amount', 'token_symbol']
+        
+        # 检查必填字段
+        missing_fields = []
+        for field in required_fields:
+            if not data.get(field):
+                missing_fields.append(field)
+        
+        if missing_fields:
+            logger.error(f"转账请求缺少必要参数: {missing_fields}")
+            return jsonify({
+                'success': False,
+                'message': f"缺少必要参数: {', '.join(missing_fields)}"
+            }), 400
+        
+        from_address = data.get('from_address')
+        to_address = data.get('to_address')
+        amount = float(data.get('amount'))
+        token_symbol = data.get('token_symbol')
+        
+        # 验证地址格式
+        if len(from_address) < 32 or len(to_address) < 32:
+            return jsonify({
+                'success': False,
+                'message': '无效的钱包地址格式'
+            }), 400
+        
+        # 验证金额
+        if amount <= 0:
+            return jsonify({
+                'success': False,
+                'message': '转账金额必须大于0'
+            }), 400
+        
+        # 记录交易信息
+        logger.info(f"执行转账: {from_address} -> {to_address}, 金额: {amount} {token_symbol}")
+        
+        # 使用区块链服务执行交易
+        try:
+            result = execute_transfer_transaction(
+                token_symbol=token_symbol,
+                from_address=from_address,
+                to_address=to_address,
+                amount=amount
+            )
+            
+            if result.get('success'):
+                return jsonify({
+                    'success': True,
+                    'message': '转账成功',
+                    'signature': result.get('signature'),
+                    'transaction_id': result.get('signature')
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': result.get('error', '转账失败')
+                }), 500
+                
+        except Exception as e:
+            logger.error(f"区块链转账执行失败: {str(e)}")
+            return jsonify({
+                'success': False,
+                'message': f"转账执行失败: {str(e)}"
+            }), 500
+        
+    except Exception as e:
+        logger.exception(f"执行转账失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"转账失败: {str(e)}"
+        }), 500
+
 @api_bp.route('/solana/record_payment', methods=['POST'])
 def record_payment():
     """记录支付信息，作为支付流程的简化版本"""

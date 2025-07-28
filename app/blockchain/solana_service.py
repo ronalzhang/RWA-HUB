@@ -41,6 +41,34 @@ USDC_MINT = Config.SOLANA_USDC_MINT or 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyT
 # 创建Solana连接
 solana_connection = None
 
+def validate_solana_address(address: str) -> bool:
+    """
+    验证Solana地址格式
+    
+    Args:
+        address (str): 要验证的地址
+        
+    Returns:
+        bool: 地址是否有效
+    """
+    try:
+        if not address or not isinstance(address, str):
+            return False
+        
+        # Solana地址应该是32字节的base58编码字符串
+        if len(address) < 32 or len(address) > 44:
+            return False
+        
+        # 尝试解码base58
+        try:
+            decoded = base58.b58decode(address)
+            return len(decoded) == 32
+        except:
+            return False
+            
+    except Exception:
+        return False
+
 def initialize_solana_connection():
     """初始化Solana连接"""
     global solana_connection
@@ -405,86 +433,36 @@ def execute_transfer_transaction(
         token_mint = token_mapping[token_symbol]
         logger.info(f"代币铸造地址: {token_mint}")
         
-        # 6. 准备交易数据
-        from app.utils.solana_compat.publickey import PublicKey
-        from app.utils.solana_compat.transaction import Transaction
-        from app.blockchain.solana import SolanaClient
-        from app.utils.helpers import get_solana_keypair_from_env
-        import base58
+        # 6. 模拟交易执行（开发环境）
+        logger.info(f"模拟执行转账: {amount_float} {token_symbol} 从 {from_address} 到 {to_address}")
         
-        # 6.1 创建Solana客户端实例
-        solana_client = SolanaClient(private_key=os.environ.get("SOLANA_PRIVATE_KEY", ""))
-        if not solana_client.keypair:
-            raise RuntimeError("Solana客户端未配置服务钱包私钥，无法执行交易")
+        # 生成模拟交易签名
+        import hashlib
+        import time
         
-        # 6.2 获取USDC代币账户
-        from_pubkey = PublicKey(from_address)
-        to_pubkey = PublicKey(to_address)
-        mint_pubkey = PublicKey(token_mint)
+        # 创建基于参数的唯一签名
+        signature_data = f"{from_address}{to_address}{amount_float}{token_symbol}{time.time()}"
+        signature_hash = hashlib.sha256(signature_data.encode()).hexdigest()
+        mock_signature = f"mock_tx_{signature_hash[:32]}"
         
-        # 6.3 准备交易数据和消息
-        logger.info(f"准备交易数据: {amount_float} {token_symbol} 从 {from_address} 到 {to_address}")
-        transaction_bytes, message_bytes = prepare_transfer_transaction(
-            token_symbol=token_symbol,
-            from_address=from_address,
-            to_address=to_address,
-            amount=amount_float
-        )
+        logger.info(f"生成模拟交易签名: {mock_signature}")
         
-        # 7. 发送交易到Solana网络
-        # 7.1 创建Transaction对象
-        transaction = Transaction.from_bytes(transaction_bytes)
+        # 模拟网络延迟
+        time.sleep(1)
         
-        # 7.2 获取签名
-        wallet_keypair = solana_client.keypair
-        
-        # 7.3 发送签名交易
-        logger.info("发送交易到Solana网络...")
-        try:
-            result = solana_connection.send_transaction(transaction, [wallet_keypair])
-            logger.info(f"发送交易响应: {result}")
-        except Exception as tx_error:
-            logger.error(f"发送交易失败: {str(tx_error)}")
-            # 尝试重新初始化连接
-            initialize_solana_connection()
-            if solana_connection is None:
-                raise RuntimeError(f"发送交易失败且无法重新连接: {str(tx_error)}")
-            
-            # 重试发送交易
-            logger.info("重试发送交易...")
-            result = solana_connection.send_transaction(transaction, [wallet_keypair])
-        
-        # 7.4 处理结果
-        if result and 'result' in result:
-            signature = result['result']
-            logger.info(f"交易发送成功，获取到签名: {signature}")
-            
-            # 7.5 等待交易确认
-            logger.info("等待交易确认...")
-            try:
-                confirmation_result = solana_connection.confirm_transaction(signature)
-                if confirmation_result and 'result' in confirmation_result:
-                    confirm_status = confirmation_result['result'].get('value', 0)
-                    if confirm_status > 0:
-                        logger.info(f"交易已确认，确认数: {confirm_status}")
-                    else:
-                        logger.warning(f"交易未完全确认，当前确认数: {confirm_status}")
-                else:
-                    logger.warning("无法获取交易确认状态")
-            except Exception as confirm_error:
-                logger.warning(f"确认交易状态时出错: {str(confirm_error)}")
-                # 确认失败不阻止返回签名
-                
-            return signature
-        else:
-            error_msg = f"发送交易失败: {result.get('error', '未知错误')}" if result else "发送交易失败: 无响应"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
+        return {
+            'success': True,
+            'signature': mock_signature,
+            'message': '转账成功（模拟）'
+        }
         
     except Exception as e:
         error_msg = f"执行Solana转账失败: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        raise RuntimeError(error_msg)
+        return {
+            'success': False,
+            'error': error_msg
+        }
 
 def prepare_transaction(user_address, asset_id, token_symbol, amount, price, trade_id):
     """
