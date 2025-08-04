@@ -1,0 +1,74 @@
+{
+  "timestamp": "2025-08-02T23:59:09.878452",
+  "test_type": "system_stability_and_stress",
+  "overall_status": "excellent",
+  "test_duration": 33.252232,
+  "summary": {
+    "total_tests": 5,
+    "passed_tests": 5,
+    "warning_tests": 0,
+    "failed_tests": 0,
+    "stability_score": "100.0%"
+  },
+  "detailed_results": {
+    "memory_usage": {
+      "status": "passed",
+      "details": [
+        "初始内存使用: 23.84 MB",
+        "最终内存使用: 24.09 MB",
+        "内存增长: 0.25 MB",
+        "✅ 内存使用正常，无明显泄漏"
+      ]
+    },
+    "concurrent_load": {
+      "status": "passed",
+      "details": [
+        "并发级别 10: 20/20 成功, 671.14 req/s, 耗时 0.03s",
+        "✅ 并发级别 10 性能良好",
+        "并发级别 50: 100/100 成功, 3297.28 req/s, 耗时 0.03s",
+        "✅ 并发级别 50 性能良好",
+        "并发级别 100: 200/200 成功, 6567.97 req/s, 耗时 0.03s",
+        "✅ 并发级别 100 性能良好"
+      ]
+    },
+    "error_handling": {
+      "status": "passed",
+      "details": [
+        "✅ 数据库连接错误: 异常处理正确",
+        "✅ 网络超时错误: 异常处理正确",
+        "✅ 内存不足错误: 异常处理正确",
+        "✅ 文件系统错误: 异常处理正确",
+        "✅ 并发竞争错误: 异常处理正确",
+        "✅ 异常处理能力良好: 100.0%"
+      ]
+    },
+    "resource_cleanup": {
+      "status": "passed",
+      "details": [
+        "初始线程数: 1",
+        "初始内存: 24.91 MB",
+        "最终线程数: 1",
+        "最终内存: 21.19 MB",
+        "✅ 资源清理正常"
+      ]
+    },
+    "long_running": {
+      "status": "passed",
+      "details": [
+        "时间 0.0s: 内存 21.25MB, 线程 2, 增长 -2.56MB",
+        "时间 5.0s: 内存 20.00MB, 线程 2, 增长 -3.81MB",
+        "时间 10.0s: 内存 19.80MB, 线程 2, 增长 -4.02MB",
+        "时间 15.0s: 内存 19.80MB, 线程 2, 增长 -4.02MB",
+        "时间 20.0s: 内存 19.80MB, 线程 2, 增长 -4.02MB",
+        "时间 25.0s: 内存 19.80MB, 线程 2, 增长 -4.02MB",
+        "✅ 长时间运行稳定: 最大内存增长 -2.56MB"
+      ]
+    }
+  },
+  "system_info": {
+    "initial_memory_mb": 23.8125,
+    "final_memory_mb": 19.765625,
+    "cpu_count": 8,
+    "available_memory_gb": 3.1057891845703125
+  }
+}

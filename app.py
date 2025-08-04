@@ -58,8 +58,8 @@ if __name__ == '__main__':
     with app.app_context():
         load_encrypted_config()
     
-    # RWA-HUB 使用默认端口 5000
-    port = int(os.environ.get('PORT', 5000))
+    # RWA-HUB 使用默认端口 9000
+    port = int(os.environ.get('PORT', 9000))
     print(f"🚀 RWA-HUB 启动应用，访问地址: http://localhost:{port}")
     print(f"📱 v6版本界面地址: http://localhost:{port}/v6")
     print(f"💾 数据库类型: PostgreSQL - {app.config.get('SQLALCHEMY_DATABASE_URI')}")

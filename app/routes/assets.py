@@ -11,7 +11,8 @@ from app.models.asset import AssetStatus, AssetType
 from app.models.trade import Trade, TradeType, TradeStatus  # 添加Trade和交易状态枚举
 from app.models.referral import UserReferral as NewUserReferral  # 使用新版UserReferral
 from app.utils import is_admin, save_files
-from app.utils.decorators import eth_address_required, admin_required, permission_required
+from app.utils.auth import eth_address_required, admin_required
+from app.routes.admin.auth import permission_required
 from app.utils.storage import storage
 import os
 import json
@@ -59,37 +60,52 @@ def list_assets_page():
         page = request.args.get('page', 1, type=int)
         per_page = 9  # 每页显示9个资产
 
-        # 构建基础查询
-        query = Asset.query
+        # 使用QueryOptimizer进行优化查询
+        from app.services.query_optimizer import query_optimizer
         
-        # 根据用户身份过滤资产
+        # 确定查询状态过滤条件
+        status_filter = None
         if current_user_address and is_admin_user:
             current_app.logger.info('管理员用户：显示所有未删除资产')
-            # 管理员可以看到所有未删除的资产
-            query = query.filter(Asset.deleted_at.is_(None))
+            # 管理员可以看到所有状态的资产（通过None表示不过滤状态）
+            status_filter = None
         else:
             current_app.logger.info('普通用户或未登录用户：只显示已上链且未删除的资产')
-            # 普通用户或未登录用户：只显示已上链且未删除的资产
-            query = query.filter(
-                Asset.status == AssetStatus.ON_CHAIN.value,
-                Asset.deleted_at.is_(None)
-            )
-            
-            # 额外日志记录，确保过滤器有效
-            count_before = Asset.query.count()
-            count_after = query.count()
-            current_app.logger.info(f'过滤前总资产数: {count_before}, 过滤后资产数: {count_after}')
+            # 普通用户只能看到已上链的资产
+            status_filter = AssetStatus.ON_CHAIN.value
         
-        # 记录过滤后的查询结果数量
-        filtered_count = query.count()
-        current_app.logger.info(f'过滤后的资产数量: {filtered_count}')
-
-        # 按创建时间倒序排序
-        query = query.order_by(Asset.created_at.desc())
-
-        # 执行分页查询
-        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-        assets = pagination.items
+        # 使用优化查询获取资产列表
+        result = query_optimizer.get_optimized_asset_list(
+            page=page,
+            per_page=per_page,
+            status=status_filter
+        )
+        
+        assets_data = result.get('assets', [])
+        pagination_info = result.get('pagination', {})
+        
+        # 转换为Asset对象以保持兼容性
+        assets = []
+        for asset_data in assets_data:
+            # 从数据库获取完整的Asset对象
+            asset = Asset.query.get(asset_data['id'])
+            if asset:
+                assets.append(asset)
+        
+        # 创建兼容的分页对象
+        class PaginationCompat:
+            def __init__(self, pagination_info):
+                self.page = pagination_info.get('page', 1)
+                self.pages = pagination_info.get('pages', 1)
+                self.per_page = pagination_info.get('per_page', per_page)
+                self.total = pagination_info.get('total', 0)
+                self.has_prev = pagination_info.get('has_prev', False)
+                self.has_next = pagination_info.get('has_next', False)
+                self.items = assets
+        
+        pagination = PaginationCompat(pagination_info)
+        
+        current_app.logger.info(f'优化查询完成，返回 {len(assets)} 个资产')
 
         # 记录每个资产的详细信息
         current_app.logger.info(f'当前页面资产列表 ({len(assets)} 个):')
@@ -186,21 +202,33 @@ def asset_detail_by_symbol(token_symbol):
             else:
                 is_owner = current_user_address == asset.owner_address
             
-        # 计算剩余供应量
-        if asset.remaining_supply is not None:
+        # 使用DataConsistencyManager获取实时资产数据
+        from app.services.data_consistency_manager import DataConsistencyManager
+        data_manager = DataConsistencyManager()
+        
+        # 获取实时资产数据
+        real_time_data = data_manager.get_real_time_asset_data(asset.id)
+        
+        # 计算剩余供应量（优先使用实时数据）
+        if real_time_data and 'remaining_supply' in real_time_data:
+            remaining_supply = real_time_data['remaining_supply']
+        elif asset.remaining_supply is not None:
             remaining_supply = asset.remaining_supply
         else:
             remaining_supply = asset.token_supply
         
-        # 获取资产累计分红数据
-        total_dividends = 0
-        try:
-            # 直接使用SQL查询，避免payment_token字段不存在的问题
-            sql = text("SELECT SUM(amount) FROM dividends WHERE asset_id = :asset_id AND status = 'confirmed'")
-            result = db.session.execute(sql, {"asset_id": asset.id}).fetchone()
-            total_dividends = result[0] if result[0] else 0
-        except Exception as div_e:
-            current_app.logger.error(f'[DETAIL_PAGE_DIVIDEND_ERROR] 获取累计分红数据失败: {str(div_e)}')
+        # 获取资产累计分红数据（优先使用实时数据）
+        if real_time_data and 'total_dividends' in real_time_data:
+            total_dividends = real_time_data['total_dividends']
+        else:
+            total_dividends = 0
+            try:
+                # 直接使用SQL查询，避免payment_token字段不存在的问题
+                sql = text("SELECT SUM(amount) FROM dividends WHERE asset_id = :asset_id AND status = 'confirmed'")
+                result = db.session.execute(sql, {"asset_id": asset.id}).fetchone()
+                total_dividends = result[0] if result[0] else 0
+            except Exception as div_e:
+                current_app.logger.error(f'[DETAIL_PAGE_DIVIDEND_ERROR] 获取累计分红数据失败: {str(div_e)}')
         
         # Log right before rendering
         current_app.logger.info(f'[DETAIL_PAGE_RENDER_START] 准备渲染模板 detail.html for {token_symbol}.')
@@ -211,6 +239,7 @@ def asset_detail_by_symbol(token_symbol):
             'is_admin_user': is_admin_user,
             'current_user_address': current_user_address,
             'total_dividends': total_dividends,
+            'real_time_data': real_time_data,  # 添加实时数据到模板上下文
             'platform_fee_address': ConfigManager.get_platform_fee_address(),
             'PLATFORM_FEE_RATE': getattr(Config, 'PLATFORM_FEE_RATE', 0.035)
         }
@@ -951,10 +980,10 @@ def get_asset_by_id(asset_id):
                 'name': asset.name,
                 'token_symbol': asset.token_symbol,
                 'token_price': float(asset.token_price),
-                'total_supply': asset.total_supply,
-                'remaining_supply': asset.remaining_supply,
+                'total_supply': asset.token_supply or 0,
+                'remaining_supply': getattr(asset, 'remaining_supply', asset.token_supply or 0),
                 'description': asset.description or '',
-                'creator_address': asset.creator_address,
+                'creator_address': getattr(asset, 'creator_address', ''),
                 'status': asset.status,
                 'created_at': asset.created_at.isoformat() if asset.created_at else None
             }
@@ -978,10 +1007,10 @@ def get_asset_by_symbol(token_symbol):
                 'name': asset.name,
                 'token_symbol': asset.token_symbol,
                 'token_price': float(asset.token_price),
-                'total_supply': asset.total_supply,
-                'remaining_supply': asset.remaining_supply,
+                'total_supply': asset.token_supply or 0,
+                'remaining_supply': getattr(asset, 'remaining_supply', asset.token_supply or 0),
                 'description': asset.description or '',
-                'creator_address': asset.creator_address,
+                'creator_address': getattr(asset, 'creator_address', ''),
                 'status': asset.status,
                 'created_at': asset.created_at.isoformat() if asset.created_at else None
             }

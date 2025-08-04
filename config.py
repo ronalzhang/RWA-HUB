@@ -26,7 +26,7 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'secret-key-needs-to-be-changed'
     
     # 数据库配置
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///app.db'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'postgresql://rwa_hub_user:password@localhost/rwa_hub'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # 文件上传配置

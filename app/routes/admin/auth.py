@@ -1,5 +1,5 @@
 """
-管理员认证模块
+管理员认证模块 - 修复版本
 统一的认证装饰器和登录相关功能
 """
 
@@ -9,8 +9,10 @@ from flask import (
 )
 from functools import wraps
 from app.models.admin import AdminUser
-from app.utils.decorators import eth_address_required, is_admin
+from app.utils.auth import eth_address_required
+from app.utils.admin import is_admin
 from app.utils.admin import get_admin_permissions
+from app.services.authentication_service import get_auth_service
 from sqlalchemy import func
 from . import admin_bp, admin_api_bp
 from .utils import get_admin_info, has_permission
@@ -23,16 +25,10 @@ def api_admin_required(f):
         # 优先检查session中的安全验证状态
         if session.get('admin_verified') and session.get('admin_wallet_address'):
             wallet_address = session.get('admin_wallet_address')
-            admin_user = AdminUser.query.filter(
-                func.lower(AdminUser.wallet_address) == wallet_address.lower()
-            ).first()
-            
-            if admin_user:
+            if auth_service.verify_admin_wallet(wallet_address):
                 g.eth_address = wallet_address
-                g.admin = admin_user
-                g.admin_user_id = admin_user.id
-                g.admin_role = admin_user.role
-                current_app.logger.info(f"API管理员验证通过(session) - 管理员ID: {admin_user.id}")
+                g.wallet_address = wallet_address
+                current_app.logger.info(f"API管理员验证通过(session) - 地址: {wallet_address}")
                 return f(*args, **kwargs)
         
         # 尝试其他认证方式
@@ -46,33 +42,19 @@ def api_admin_required(f):
         )
                      
         if not wallet_address:
+            current_app.logger.warning("API管理员验证失败 - 未提供钱包地址")
             return jsonify({'error': '请先连接钱包并登录', 'code': 'AUTH_REQUIRED'}), 401
             
-        # 直接查询数据库检查管理员权限
-        # 对于Solana地址，保持原样（大小写敏感）
-        # 对于以太坊地址，转换为小写
-        if wallet_address.startswith('0x'):
-            admin_user = AdminUser.query.filter(
-                func.lower(AdminUser.wallet_address) == wallet_address.lower()
-            ).first()
-        else:
-            # Solana地址大小写敏感
-            admin_user = AdminUser.query.filter(
-                AdminUser.wallet_address == wallet_address
-            ).first()
-            
-        if not admin_user:
+        # 使用统一认证服务验证管理员权限
+        if not auth_service.verify_admin_wallet(wallet_address):
             current_app.logger.warning(f"API管理员验证失败 - 地址: {wallet_address}")
             return jsonify({'error': '您没有管理员权限', 'code': 'ADMIN_REQUIRED'}), 403
             
         # 设置全局变量
         g.eth_address = wallet_address
         g.wallet_address = wallet_address  # 兼容性
-        g.admin = admin_user
-        g.admin_user_id = admin_user.id
-        g.admin_role = admin_user.role
         
-        current_app.logger.info(f"API管理员验证通过 - 管理员ID: {admin_user.id}, 地址: {wallet_address}")
+        current_app.logger.info(f"API管理员验证通过 - 地址: {wallet_address}")
         return f(*args, **kwargs)
     return decorated_function
 
@@ -107,14 +89,7 @@ def admin_page_required(f):
         # 检查session中的admin验证状态
         if session.get('admin_verified') and session.get('admin_wallet_address'):
             wallet_address = session.get('admin_wallet_address')
-            admin_user = AdminUser.query.filter(
-                func.lower(AdminUser.wallet_address) == wallet_address.lower()
-            ).first()
-            
-            if admin_user:
-                g.admin = admin_user
-                g.admin_user_id = admin_user.id
-                g.admin_role = admin_user.role
+            if auth_service.verify_admin_wallet(wallet_address):
                 g.eth_address = wallet_address
                 return f(*args, **kwargs)
         
@@ -142,18 +117,17 @@ def check_auth():
     try:
         if session.get('admin_verified') and session.get('admin_wallet_address'):
             wallet_address = session.get('admin_wallet_address')
-            admin_user = AdminUser.query.filter(
-                func.lower(AdminUser.wallet_address) == wallet_address.lower()
-            ).first()
+            auth_service = get_auth_service()
+            admin_info = auth_service.get_admin_info(wallet_address)
             
-            if admin_user:
+            if admin_info:
                 return jsonify({
                     'authenticated': True,
                     'admin': {
-                        'id': admin_user.id,
-                        'name': admin_user.username or 'Admin',
-                        'wallet_address': admin_user.wallet_address,
-                        'role': admin_user.role
+                        'id': admin_info.get('id'),
+                        'name': admin_info.get('username', 'Admin'),
+                        'wallet_address': admin_info.get('wallet_address'),
+                        'role': admin_info.get('role', 'admin')
                     }
                 })
         
@@ -194,19 +168,17 @@ def check_admin():
         if not address:
             return jsonify({'is_admin': False, 'error': '缺少钱包地址'}), 400
         
-        # 检查是否为管理员
-        admin_user = AdminUser.query.filter(
-            func.lower(AdminUser.wallet_address) == address.lower()
-        ).first()
+        # 使用统一认证服务检查是否为管理员
+        admin_info = auth_service.get_admin_info(address)
         
-        if admin_user:
+        if admin_info:
             current_app.logger.info(f"管理员检查通过: {address}")
             return jsonify({
                 'is_admin': True,
                 'admin_info': {
-                    'id': admin_user.id,
-                    'name': admin_user.username or 'Admin',
-                    'role': admin_user.role
+                    'id': admin_info.get('id'),
+                    'name': admin_info.get('username', 'Admin'),
+                    'role': admin_info.get('role', 'admin')
                 }
             })
         else:
@@ -216,6 +188,66 @@ def check_admin():
     except Exception as e:
         current_app.logger.error(f"检查管理员状态失败: {str(e)}")
         return jsonify({'is_admin': False, 'error': str(e)}), 500
+
+
+# 添加V2版本的认证路由
+@admin_api_bp.route('/v2/auth/challenge', methods=['GET'])
+def get_challenge():
+    """获取认证挑战"""
+    import uuid
+    nonce = str(uuid.uuid4())
+    session['auth_nonce'] = nonce
+    return jsonify({'nonce': nonce})
+
+
+@admin_api_bp.route('/v2/auth/login', methods=['POST'])
+def login_v2_api():
+    """V2版本管理员登录API"""
+    try:
+        data = request.get_json() or {}
+        wallet_address = data.get('wallet_address')
+        signature = data.get('signature')
+        message = data.get('message')
+        
+        if not wallet_address or not signature or not message:
+            return jsonify({'success': False, 'error': '缺少必要参数'}), 400
+        
+        # 验证nonce
+        expected_nonce = session.get('auth_nonce')
+        if not expected_nonce or expected_nonce not in message:
+            return jsonify({'success': False, 'error': '无效的认证挑战'}), 400
+        
+        # 验证是否为管理员
+        auth_service = get_auth_service()
+        admin_info = auth_service.get_admin_info(wallet_address)
+        
+        if not admin_info:
+            current_app.logger.warning(f"非管理员尝试登录: {wallet_address}")
+            return jsonify({'success': False, 'error': '您没有管理员权限'}), 403
+        
+        # 设置session
+        session['admin_verified'] = True
+        session['admin_wallet_address'] = wallet_address
+        session['admin_id'] = admin_info.get('id')
+        session['admin_role'] = admin_info.get('role')
+        
+        # 清除nonce
+        session.pop('auth_nonce', None)
+        
+        current_app.logger.info(f"管理员登录成功: {wallet_address}")
+        return jsonify({
+            'success': True,
+            'admin': {
+                'id': admin_info.get('id'),
+                'name': admin_info.get('username', 'Admin'),
+                'role': admin_info.get('role', 'admin'),
+                'wallet_address': wallet_address
+            }
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"管理员登录失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # 添加admin_api_bp蓝图的路由，匹配前端期望的/api/admin/check
@@ -234,19 +266,17 @@ def check_admin_api():
         if not address:
             return jsonify({'is_admin': False, 'error': '缺少钱包地址'}), 400
         
-        # 检查是否为管理员
-        admin_user = AdminUser.query.filter(
-            func.lower(AdminUser.wallet_address) == address.lower()
-        ).first()
+        # 使用统一认证服务检查是否为管理员
+        admin_info = auth_service.get_admin_info(address)
         
-        if admin_user:
+        if admin_info:
             current_app.logger.info(f"管理员检查通过: {address}")
             return jsonify({
                 'is_admin': True,
                 'admin_info': {
-                    'id': admin_user.id,
-                    'name': admin_user.username or 'Admin',
-                    'role': admin_user.role
+                    'id': admin_info.get('id'),
+                    'name': admin_info.get('username', 'Admin'),
+                    'role': admin_info.get('role', 'admin')
                 }
             })
         else:
@@ -255,4 +285,4 @@ def check_admin_api():
             
     except Exception as e:
         current_app.logger.error(f"检查管理员状态失败: {str(e)}")
-        return jsonify({'is_admin': False, 'error': str(e)}), 500 
+        return jsonify({'is_admin': False, 'error': str(e)}), 500

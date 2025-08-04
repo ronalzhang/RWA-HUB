@@ -1,0 +1,591 @@
+/* ========================================
+   响应式设计增强和用户体验优化
+   Responsive Design Enhancements & UX Optimizations
+======================================== */
+
+/* 移动端优先的响应式设计 */
+:root {
+    /* 响应式断点 */
+    --mobile-max: 767.98px;
+    --tablet-max: 991.98px;
+    --desktop-min: 992px;
+    --large-desktop-min: 1200px;
+    
+    /* 移动端优化的间距 */
+    --mobile-padding: 1rem;
+    --mobile-margin: 0.75rem;
+    --mobile-gap: 1rem;
+    
+    /* 触摸友好的尺寸 */
+    --touch-target-min: 44px;
+    --touch-padding: 12px 20px;
+}
+
+/* 基础响应式容器 */
+.responsive-container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--mobile-padding);
+}
+
+@media (min-width: 768px) {
+    .responsive-container {
+        padding: 0 2rem;
+    }
+}
+
+@media (min-width: 1200px) {
+    .responsive-container {
+        padding: 0 3rem;
+    }
+}
+
+/* 移动端导航优化 */
+.mobile-nav-toggle {
+    display: none;
+    background: transparent;
+    border: 2px solid var(--cyber-primary);
+    color: var(--cyber-primary);
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all var(--cyber-transition-normal) ease;
+}
+
+.mobile-nav-toggle:hover {
+    background: var(--cyber-primary);
+    color: var(--cyber-bg-primary);
+    box-shadow: 0 0 15px var(--cyber-primary);
+}
+
+@media (max-width: 991.98px) {
+    .mobile-nav-toggle {
+        display: block;
+    }
+    
+    .desktop-nav-links {
+        display: none;
+    }
+    
+    .mobile-nav-menu {
+        position: fixed;
+        top: 80px;
+        left: 0;
+        right: 0;
+        background: var(--cyber-glass-dark);
+        backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
+        border-bottom: var(--cyber-border);
+        padding: 2rem;
+        transform: translateY(-100%);
+        opacity: 0;
+        visibility: hidden;
+        transition: all var(--cyber-transition-normal) ease;
+        z-index: 999;
+    }
+    
+    .mobile-nav-menu.active {
+        transform: translateY(0);
+        opacity: 1;
+        visibility: visible;
+    }
+    
+    .mobile-nav-menu .nav-link {
+        display: block;
+        padding: 1rem 0;
+        border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+        color: var(--cyber-text-secondary);
+        text-decoration: none;
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 600;
+        font-size: 1.2rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: all var(--cyber-transition-normal) ease;
+    }
+    
+    .mobile-nav-menu .nav-link:hover {
+        color: var(--cyber-primary);
+        text-shadow: 0 0 8px var(--cyber-primary);
+        padding-left: 1rem;
+    }
+}
+
+/* 移动端英雄区域优化 */
+@media (max-width: 767.98px) {
+    .cyber-hero-enhanced {
+        min-height: 80vh;
+        padding: 6rem 0 3rem 0;
+    }
+    
+    .cyber-hero-title {
+        font-size: 2.5rem;
+        line-height: 1.2;
+        margin-bottom: 1.5rem;
+    }
+    
+    .cyber-hero-subtitle {
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .cyber-stats-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        margin: 2rem 0;
+    }
+    
+    .cyber-stat-card {
+        padding: 1.5rem;
+    }
+    
+    .cyber-stat-number {
+        font-size: 2rem;
+    }
+}
+
+/* 触摸友好的按钮设计 */
+.touch-friendly-btn {
+    min-height: var(--touch-target-min);
+    padding: var(--touch-padding);
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all var(--cyber-transition-normal) ease;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.touch-friendly-btn:active {
+    transform: scale(0.98);
+}
+
+/* 移动端资产卡片优化 */
+@media (max-width: 767.98px) {
+    .cyber-asset-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+        padding: 0 var(--mobile-padding);
+    }
+    
+    .cyber-asset-card-enhanced {
+        border-radius: 16px;
+        margin-bottom: 1rem;
+    }
+    
+    .cyber-asset-content {
+        padding: 1.25rem;
+    }
+    
+    .cyber-asset-title {
+        font-size: 1.1rem;
+        line-height: 1.3;
+    }
+    
+    .cyber-asset-price {
+        font-size: 1.2rem;
+    }
+}
+
+/* 加载状态和骨架屏 */
+.loading-skeleton {
+    background: var(--cyber-glass-light);
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+.loading-skeleton::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(0, 255, 255, 0.1),
+        transparent
+    );
+    animation: skeleton-loading 2s infinite;
+}
+
+@keyframes skeleton-loading {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+.skeleton-text {
+    height: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.skeleton-text.large {
+    height: 1.5rem;
+}
+
+.skeleton-text.small {
+    height: 0.75rem;
+    width: 60%;
+}
+
+.skeleton-image {
+    height: 200px;
+    width: 100%;
+}
+
+.skeleton-button {
+    height: 44px;
+    width: 120px;
+}
+
+/* 改进的加载动画 */
+.cyber-loader {
+    display: inline-block;
+    width: 60px;
+    height: 60px;
+    position: relative;
+}
+
+.cyber-loader::before,
+.cyber-loader::after {
+    content: '';
+    position: absolute;
+    border: 3px solid transparent;
+    border-top: 3px solid var(--cyber-primary);
+    border-radius: 50%;
+    animation: cyber-spin 1s linear infinite;
+}
+
+.cyber-loader::before {
+    width: 60px;
+    height: 60px;
+    top: 0;
+    left: 0;
+}
+
+.cyber-loader::after {
+    width: 40px;
+    height: 40px;
+    top: 10px;
+    left: 10px;
+    border-top-color: var(--cyber-secondary);
+    animation-duration: 0.8s;
+    animation-direction: reverse;
+}
+
+/* 状态反馈系统 */
+.status-toast {
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    background: var(--cyber-glass-dark);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: var(--cyber-border);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    color: var(--cyber-text-primary);
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    box-shadow: var(--cyber-shadow-glass);
+    transform: translateX(100%);
+    opacity: 0;
+    transition: all var(--cyber-transition-normal) ease;
+    z-index: 9999;
+    max-width: 300px;
+}
+
+.status-toast.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.status-toast.success {
+    border-color: var(--cyber-success);
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+}
+
+.status-toast.error {
+    border-color: var(--cyber-danger);
+    box-shadow: 0 0 20px rgba(255, 0, 102, 0.3);
+}
+
+.status-toast.warning {
+    border-color: var(--cyber-warning);
+    box-shadow: 0 0 20px rgba(255, 102, 0, 0.3);
+}
+
+.status-toast .toast-icon {
+    display: inline-block;
+    margin-right: 0.5rem;
+    font-size: 1.2rem;
+}
+
+.status-toast .toast-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: transparent;
+    border: none;
+    color: var(--cyber-text-secondary);
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 钱包连接状态指示器 */
+.wallet-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--cyber-glass-light);
+    border: 1px solid var(--cyber-border);
+    border-radius: 20px;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all var(--cyber-transition-normal) ease;
+}
+
+.wallet-status.connected {
+    border-color: var(--cyber-success);
+    color: var(--cyber-success);
+}
+
+.wallet-status.connecting {
+    border-color: var(--cyber-warning);
+    color: var(--cyber-warning);
+}
+
+.wallet-status.disconnected {
+    border-color: var(--cyber-danger);
+    color: var(--cyber-danger);
+}
+
+.wallet-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: status-pulse 2s ease-in-out infinite alternate;
+}
+
+@keyframes status-pulse {
+    0% { opacity: 0.5; transform: scale(1); }
+    100% { opacity: 1; transform: scale(1.2); }
+}
+
+/* 改进的进度指示器 */
+.progress-indicator {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: var(--cyber-bg-primary);
+    z-index: 9999;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: var(--cyber-gradient-primary);
+    width: 0%;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: progress-shine 2s ease-in-out infinite;
+}
+
+/* 交互反馈增强 */
+.interactive-element {
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all var(--cyber-transition-normal) ease;
+}
+
+.interactive-element::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(0, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: all 0.6s ease;
+    z-index: 0;
+}
+
+.interactive-element:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* 可访问性增强 */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.focus-visible {
+    outline: 2px solid var(--cyber-primary);
+    outline-offset: 2px;
+}
+
+/* 高对比度模式支持 */
+@media (prefers-contrast: high) {
+    :root {
+        --cyber-primary: #00ffff;
+        --cyber-secondary: #ff00ff;
+        --cyber-text-primary: #ffffff;
+        --cyber-bg-primary: #000000;
+    }
+}
+
+/* 减少动画偏好支持 */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    .data-particle,
+    .hologram-ring,
+    .cyber-loading {
+        animation: none !important;
+    }
+}
+
+/* 暗色模式偏好支持 */
+@media (prefers-color-scheme: dark) {
+    /* 已经是暗色主题，保持现有样式 */
+}
+
+/* 平板设备优化 */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .cyber-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+    
+    .cyber-asset-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 2rem;
+    }
+    
+    .cyber-hero-title {
+        font-size: 3rem;
+    }
+    
+    .cyber-hero-subtitle {
+        font-size: 1.3rem;
+    }
+}
+
+/* 大屏幕优化 */
+@media (min-width: 1400px) {
+    .responsive-container {
+        max-width: 1400px;
+    }
+    
+    .cyber-asset-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    
+    .cyber-hero-title {
+        font-size: 4.5rem;
+    }
+}
+
+/* 触摸设备优化 */
+@media (hover: none) and (pointer: coarse) {
+    .cyber-asset-card-enhanced:hover {
+        transform: none;
+    }
+    
+    .interactive-element:hover {
+        transform: none;
+    }
+    
+    /* 增加触摸目标大小 */
+    .btn-cyber-primary,
+    .btn-cyber-secondary {
+        min-height: 48px;
+        padding: 12px 24px;
+    }
+}
+
+/* 横屏模式优化 */
+@media (orientation: landscape) and (max-height: 500px) {
+    .cyber-hero-enhanced {
+        min-height: 100vh;
+        padding: 4rem 0 2rem 0;
+    }
+    
+    .cyber-stats-grid {
+        grid-template-columns: repeat(3, 1fr);
+        margin: 1.5rem 0;
+    }
+}
+
+/* 打印样式 */
+@media print {
+    .cyber-hero-enhanced,
+    .data-stream,
+    .hologram-container,
+    .mobile-nav-toggle,
+    .status-toast {
+        display: none !important;
+    }
+    
+    body {
+        background: white !important;
+        color: black !important;
+    }
+    
+    .cyber-asset-card-enhanced {
+        border: 1px solid #ccc !important;
+        background: white !important;
+        box-shadow: none !important;
+        break-inside: avoid;
+        margin-bottom: 1rem;
+    }
+}

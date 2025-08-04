@@ -58,10 +58,13 @@ from .admin.asset_management import asset_management_bp
 from .dividend import bp as dividend_bp
 
 # 导入区块链API
-from .blockchain_api import blockchain_bp
+from .blockchain_api import blockchain_api
 
 # 导入语言切换API
 from .language_api import language_api
+
+# 导入健康检查API
+from .health_api import health_bp
 
 # 注册蓝图到app
 def register_blueprints(app):
@@ -90,10 +93,13 @@ def register_blueprints(app):
     app.register_blueprint(dividend_bp)
     
     # 注册区块链API蓝图
-    app.register_blueprint(blockchain_bp)
+    app.register_blueprint(blockchain_api)
     
     # 注册语言切换API蓝图
     app.register_blueprint(language_api)
+    
+    # 注册健康检查API蓝图
+    app.register_blueprint(health_bp)
     
     # 注册API蓝图
     app.register_blueprint(api_bp)

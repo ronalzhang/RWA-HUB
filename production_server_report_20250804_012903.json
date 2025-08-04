@@ -1,0 +1,29 @@
+{
+  "timestamp": "2025-08-04T01:29:03.846216",
+  "server_ip": "156.236.74.200",
+  "server_directory": "/root/RWA-HUB",
+  "summary": {
+    "total_checks": 12,
+    "success_count": 4,
+    "warning_count": 5,
+    "error_count": 3
+  },
+  "success_items": [
+    "服务器SSH连接正常",
+    "Python版本: Python 3.10.12",
+    "pip3可用",
+    "PM2版本: 6.0.8"
+  ],
+  "warnings": [
+    "端口9000未被监听",
+    "无法连接: http://156.236.74.200:9000/",
+    "无法连接: http://156.236.74.200:9000/health",
+    "无法连接: http://156.236.74.200:5000/",
+    "无法获取磁盘使用率"
+  ],
+  "issues": [
+    "服务器目录不存在: /root/RWA-HUB",
+    "未找到RWA-HUB相关进程",
+    "未找到数据库文件"
+  ]
+}

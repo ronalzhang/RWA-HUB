@@ -398,12 +398,26 @@ def get_asset_trade_history(asset_id):
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         
-        result = data_manager.get_trade_history(asset_id, page, per_page)
+        # 使用QueryOptimizer获取优化的交易历史
+        from app.services.query_optimizer import query_optimizer
         
-        if result['success']:
-            return jsonify(result), 200
+        # 先尝试使用优化查询
+        optimized_result = query_optimizer.get_optimized_trade_history(asset_id, page, per_page)
+        
+        if optimized_result and optimized_result.get('trades'):
+            return jsonify({
+                'success': True,
+                'trades': optimized_result['trades'],
+                'pagination': optimized_result['pagination']
+            }), 200
         else:
-            return jsonify(result), 400
+            # 如果优化查询失败，回退到原始方法
+            result = data_manager.get_trade_history(asset_id, page, per_page)
+            
+            if result['success']:
+                return jsonify(result), 200
+            else:
+                return jsonify(result), 400
             
     except Exception as e:
         logger.error(f"获取交易历史失败: {str(e)}", exc_info=True)

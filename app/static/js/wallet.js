@@ -4070,7 +4070,9 @@ document.addEventListener('DOMContentLoaded', async () => {
  * 通过调用后端API准备购买并显示确认模态框
  */
 async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerToken) {
-    console.log(`handleBuy 被调用，参数:`, {assetIdOrEvent, amountInput, buttonElement, pricePerToken});
+    // 此函数已被purchase_handler.js替代，避免冲突
+    console.log('handleBuy disabled - using purchase_handler.js instead');
+    return;
     try {
         // 防止重复调用的标记
         const currentTime = new Date().getTime();
@@ -4237,7 +4239,9 @@ async function handleBuy(assetIdOrEvent, amountInput, buttonElement, pricePerTok
  * @param {object} prepareData - Data returned from the /api/trades/prepare_purchase endpoint.
  */
 function showBuyModal(prepareData) {
-    console.log("Showing buy modal with data:", prepareData);
+    // 此函数已被purchase_handler.js替代，避免冲突
+    console.log('showBuyModal disabled - using purchase_handler.js instead');
+    return;
     try {
         const modalElement = document.getElementById('buyModal');
         if (!modalElement) {
@@ -4312,7 +4316,9 @@ function showBuyModal(prepareData) {
  * @param {HTMLElement} confirmBtn - The confirmation button element.
  */
 async function confirmPurchase(purchaseData, modalElement, confirmBtn) {
-    console.log("confirmPurchase called with data:", purchaseData);
+    // 此函数已被purchase_handler.js替代，避免冲突
+    console.log('confirmPurchase disabled - using purchase_handler.js instead');
+    return;
     const modalErrorDiv = modalElement.querySelector('#buyModalError');
     modalErrorDiv.style.display = 'none'; // Clear previous errors
 
@@ -4395,7 +4401,9 @@ async function confirmPurchase(purchaseData, modalElement, confirmBtn) {
 
 // 将confirmPurchase函数设置为全局函数以便于其他模块调用
 window.confirmPurchase = async function(purchaseData, modalElement, confirmBtn) {
-    console.log("全局confirmPurchase调用，数据:", purchaseData);
+    // 此函数已被purchase_handler.js替代，避免冲突
+    console.log('Global confirmPurchase disabled - using purchase_handler.js instead');
+    return;
     
     const modalErrorDiv = modalElement?.querySelector('#buyModalError');
     

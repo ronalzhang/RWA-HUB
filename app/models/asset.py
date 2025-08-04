@@ -8,6 +8,7 @@ import re
 from flask import current_app, url_for
 from urllib.parse import urlparse
 from sqlalchemy.dialects.postgresql import JSON
+from app.utils.validation_utils import ValidationUtils, ValidationError
 
 class AssetType(enum.Enum):
     REAL_ESTATE = 10        # 不动产
@@ -120,33 +121,26 @@ class Asset(db.Model):
 
     @validates('token_address')
     def validate_token_address(self, key, value):
-        if value:
-            # 修改验证规则，接受更长的Solana地址
-            if not (re.match(r'^0x[a-fA-F0-9]{40}$', value) or    # 以太坊地址格式
-                   re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,126}$', value)):  # Solana 地址格式(最长126个字符)
-                raise ValueError('无效的代币地址格式')
-        return value
+        if value and not ValidationUtils.validate_wallet_address(value):
+            raise ValidationError('无效的代币地址格式', field='token_address')
+        return ValidationUtils.normalize_address(value) if value else value
 
     @validates('owner_address')
     def validate_owner_address(self, key, value):
-        # 修改验证规则，接受更长的Solana地址
-        if not (re.match(r'^0x[a-fA-F0-9]{40}$', value) or    # 以太坊地址格式
-               re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,126}$', value)):  # Solana 地址格式(最长126个字符)
-            raise ValueError('无效的所有者地址格式')
-        return value
+        if not ValidationUtils.validate_wallet_address(value):
+            raise ValidationError('无效的所有者地址格式', field='owner_address')
+        return ValidationUtils.normalize_address(value)
 
     @validates('creator_address')
     def validate_creator_address(self, key, value):
-        # 修改验证规则，接受更长的Solana地址
-        if not (re.match(r'^0x[a-fA-F0-9]{40}$', value) or    # 以太坊地址格式
-               re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,126}$', value)):  # Solana 地址格式(最长126个字符)
-            raise ValueError('无效的创建者地址格式')
-        return value
+        if not ValidationUtils.validate_wallet_address(value):
+            raise ValidationError('无效的创建者地址格式', field='creator_address')
+        return ValidationUtils.normalize_address(value)
 
     @validates('token_price')
     def validate_token_price(self, key, value):
-        if value <= 0:
-            raise ValueError('Token price must be greater than 0')
+        if not ValidationUtils.validate_positive_number(value, 'token_price'):
+            raise ValidationError('代币价格必须大于0', field='token_price')
         return value
 
     @validates('token_supply')
@@ -241,37 +235,9 @@ class Asset(db.Model):
             self.token_supply = int(self.area * 10000)
 
     def to_dict(self):
-        """转换为字典格式"""
-        data = {
-            'id': self.id,
-            'name': self.name,
-            'description': self.description,
-            'asset_type': self.asset_type,
-            'location': self.location,
-            'token_symbol': self.token_symbol,
-            'token_price': self.token_price,
-            'price': self.token_price,  # 添加price字段，与token_price相同，保证前端兼容性
-            'token_supply': self.token_supply,
-            'total_supply': self.token_supply,  # 添加total_supply字段，与token_supply相同，保证前端兼容性
-            'remaining_supply': self.remaining_supply,
-            'token_address': self.token_address,
-            'annual_revenue': self.annual_revenue,
-            'status': self.status,
-            'reject_reason': self.reject_reason,
-            'owner_address': self.owner_address,
-            'creator_address': self.creator_address,
-            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None,
-            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else None,
-            'images': self.images,
-            'documents': self.documents,
-            'total_value': self.total_value  # 确保所有资产类型都包含total_value字段
-        }
-
-        # 根据资产类型添加特定字段
-        if self.asset_type == AssetType.REAL_ESTATE.value:
-            data['area'] = self.area
-
-        return data
+        """转换为字典格式 - 使用统一的数据转换器"""
+        from app.utils.data_converters import AssetDataConverter
+        return AssetDataConverter.to_api_format(self)
 
     @staticmethod
     def from_dict(data):

@@ -57,7 +57,7 @@ def init_db():
     logger.info("准备初始化数据库...")
     try:
         if not os.environ.get('DATABASE_URL'):
-            default_db_url = 'sqlite:///app.db'
+            default_db_url = 'postgresql://rwa_hub_user:password@localhost/rwa_hub'
             logger.warning(f"DATABASE_URL环境变量未设置，使用默认值: {default_db_url}")
             os.environ['DATABASE_URL'] = default_db_url
             

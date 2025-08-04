@@ -1,390 +1,458 @@
-from functools import wraps
-from flask import request, g, jsonify, redirect, url_for, flash, session, current_app
-import jwt
-from app.models.user import User
-from eth_utils import is_address
-from app.utils.admin import get_admin_permissions
-import threading
-from app.extensions import db
-import traceback
+"""
+统一装饰器
+提供统一的错误处理、权限验证等装饰器
+"""
+
+import functools
 import logging
-from threading import Thread
-from datetime import datetime, timedelta
-import time
+from datetime import datetime
+from flask import jsonify, request, g, current_app
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from werkzeug.exceptions import BadRequest
+from typing import Callable, Any, Dict, Optional
+import traceback
 
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = None
-        auth_header = request.headers.get('Authorization')
-        
-        if auth_header:
-            parts = auth_header.split()
-            if len(parts) == 2 and parts[0].lower() == 'bearer':
-                token = parts[1]
-        
-        if not token:
-            return jsonify({'message': '缺少访问令牌', 'authenticated': False}), 401
-            
-        try:
-            payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
-            g.current_user = payload
-        except jwt.ExpiredSignatureError:
-            return jsonify({'message': '令牌已过期', 'authenticated': False}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({'message': '无效令牌', 'authenticated': False}), 401
-            
-        return f(*args, **kwargs)
-    return decorated
+from app.utils.validation_utils import ValidationError
 
-def eth_address_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        eth_address = None
-        
-        # 先检查X-Wallet-Address和X-Eth-Address头部
-        eth_address = request.headers.get('X-Wallet-Address') or request.headers.get('X-Eth-Address')
-        
-        # 如果头部中没有，检查Cookie
-        if not eth_address:
-            eth_address = request.cookies.get('eth_address')
-            
-        # 如果Cookie中没有，检查URL参数
-        if not eth_address:
-            eth_address = request.args.get('eth_address')
-            
-        # 如果URL参数中没有，检查会话
-        if not eth_address and 'eth_address' in session:
-            eth_address = session['eth_address']
+logger = logging.getLogger(__name__)
 
-        # 如果没有找到Ethereum地址，返回401
-        if not eth_address:
-            logging.warning("无法找到钱包地址，访问请求被拒绝")
-            return jsonify({'success': False, 'error': '未提供钱包地址', 'authenticated': False}), 401
-        
-        # 检查地址格式
-        if not eth_address.startswith('0x') and len(eth_address) < 30:
-            logging.warning(f"无效的钱包地址格式: {eth_address}")
-            return jsonify({'success': False, 'error': '无效的钱包地址格式', 'authenticated': False}), 401
-            
-        # 在g对象中存储Ethereum地址以便视图函数访问
-        g.eth_address = eth_address
-        g.wallet_address = eth_address  # 为兼容性添加wallet_address
-        
-        return f(*args, **kwargs)
-    return decorated
 
-def wallet_address_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        wallet_address = None
+def handle_api_errors(f: Callable) -> Callable:
+    """
+    统一的API错误处理装饰器
+    
+    Args:
+        f: 被装饰的函数
         
-        # 记录所有潜在的钱包地址来源，用于调试
-        logging.debug("**开始查找钱包地址**")
-        logging.debug(f"Headers: {dict(request.headers)}")
-        logging.debug(f"Cookies: {request.cookies}")
-        logging.debug(f"Args: {request.args}")
-        
-        # 首先检查X-Wallet-Address和X-Eth-Address头部
-        wallet_address = request.headers.get('X-Wallet-Address') or request.headers.get('X-Eth-Address')
-        if wallet_address:
-            logging.debug(f"从请求头找到钱包地址: {wallet_address}")
-        
-        # 如果头部中没有，检查Cookie
-        if not wallet_address:
-            wallet_address = request.cookies.get('wallet_address') or request.cookies.get('eth_address')
-            if wallet_address:
-                logging.debug(f"从Cookie找到钱包地址: {wallet_address}")
-            
-        # 如果Cookie中没有，检查URL参数
-        if not wallet_address:
-            wallet_address = request.args.get('wallet_address') or request.args.get('eth_address')
-            if wallet_address:
-                logging.debug(f"从URL参数找到钱包地址: {wallet_address}")
-            
-        # 如果URL参数中没有，检查会话
-        if not wallet_address and ('wallet_address' in session or 'eth_address' in session):
-            wallet_address = session.get('wallet_address') or session.get('eth_address')
-            if wallet_address:
-                logging.debug(f"从会话找到钱包地址: {wallet_address}")
-
-        # 如果是POST请求，检查请求体中是否有地址（适用于JSON和表单数据）
-        if not wallet_address and request.method == 'POST':
-            if request.is_json:
-                json_data = request.get_json(silent=True) or {}
-                wallet_address = json_data.get('wallet_address') or json_data.get('from_address')
-                if wallet_address:
-                    logging.debug(f"从JSON请求体找到钱包地址: {wallet_address}")
-            elif request.form:
-                wallet_address = request.form.get('wallet_address') or request.form.get('eth_address')
-                if wallet_address:
-                    logging.debug(f"从表单数据找到钱包地址: {wallet_address}")
-
-        # 如果没有找到钱包地址，记录并继续
-        if not wallet_address:
-            logging.warning("无法找到钱包地址，将继续处理但可能导致部分功能不可用")
-            g.wallet_address = None
-            g.eth_address = None
-            return f(*args, **kwargs)
-        
-        # 在g对象中存储钱包地址以便视图函数访问
-        g.wallet_address = wallet_address
-        g.eth_address = wallet_address  # 为兼容性添加eth_address
-        logging.info(f"已找到并设置钱包地址: {wallet_address}")
-        
-        return f(*args, **kwargs)
-    return decorated
-
-def api_eth_address_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        eth_address = None
-        
-        # 先检查X-Wallet-Address和X-Eth-Address头部
-        eth_address = request.headers.get('X-Wallet-Address') or request.headers.get('X-Eth-Address')
-            
-        # 如果没有找到Ethereum地址，返回401
-        if not eth_address:
-            return jsonify({'success': False, 'error': '未提供钱包地址', 'authenticated': False}), 401
-            
-        # 在g对象中存储Ethereum地址以便视图函数访问
-        g.eth_address = eth_address
-        g.wallet_address = eth_address  # 为兼容性添加wallet_address
-        
-        return f(*args, **kwargs)
-    return decorated
-
-def admin_required(f):
-    """管理员权限检查装饰器"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        eth_address = None
-        
-        # 先检查头部
-        eth_address = request.headers.get('X-Wallet-Address') or request.headers.get('X-Eth-Address')
-        
-        # 如果头部中没有，检查Cookie
-        if not eth_address:
-            eth_address = request.cookies.get('eth_address')
-            
-        # 如果Cookie中没有，检查URL参数
-        if not eth_address:
-            eth_address = request.args.get('eth_address')
-            
-        # 如果URL参数中没有，检查会话
-        if not eth_address and 'eth_address' in session:
-            eth_address = session['eth_address']
-
-        # 如果没有找到Ethereum地址，返回401
-        if not eth_address:
-            return jsonify({'success': False, 'error': '未提供钱包地址', 'authenticated': False}), 401
-        
-        # 检查是否为管理员
-        if not is_admin(eth_address):
-            logging.warning(f"非管理员尝试访问管理功能: {eth_address}")
-            return jsonify({'success': False, 'error': '无权访问，需要管理员权限', 'authenticated': True, 'authorized': False}), 403
-            
-        # 在g对象中存储Ethereum地址以便视图函数访问
-        g.eth_address = eth_address
-        g.wallet_address = eth_address  # 为兼容性添加wallet_address
-        
-        return f(*args, **kwargs)
-    return decorated
-
-def api_admin_required(f):
-    """API版本的管理员权限装饰器，失败时返回JSON错误而不是重定向"""
-    @wraps(f)
+    Returns:
+        装饰后的函数
+    """
+    @functools.wraps(f)
     def decorated_function(*args, **kwargs):
-        # 记录请求头和参数，帮助调试
-        current_app.logger.info(f"API管理员验证 - 请求头: {dict(request.headers)}")
-        current_app.logger.info(f"API管理员验证 - 请求参数: {dict(request.args)}")
-        
-        # 尝试从多个来源获取钱包地址
-        eth_address = request.headers.get('X-Eth-Address') or \
-                     request.cookies.get('eth_address') or \
-                     request.args.get('eth_address') or \
-                     session.get('eth_address') or \
-                     session.get('admin_eth_address')
-        
-        # 记录找到的钱包地址
-        current_app.logger.info(f"API管理员验证 - 找到的钱包地址: {eth_address}")
-                     
-        if not eth_address:
-            current_app.logger.warning("API管理员验证失败 - 未提供钱包地址")
-            return jsonify({'error': '请先连接钱包', 'code': 'AUTH_REQUIRED'}), 401
-            
-        admin_info = get_admin_permissions(eth_address.lower())
-        if not admin_info:
-            current_app.logger.warning(f"API管理员验证失败 - 非管理员地址: {eth_address}")
-            return jsonify({'error': '您没有管理员权限', 'code': 'ADMIN_REQUIRED'}), 403
-            
-        g.eth_address = eth_address.lower()
-        g.admin_info = admin_info
-        current_app.logger.info(f"API管理员验证成功 - 地址: {eth_address}")
-        return f(*args, **kwargs)
+        try:
+            return f(*args, **kwargs)
+        except ValidationError as e:
+            logger.warning(f"验证错误 - {request.endpoint}: {e.message}")
+            return jsonify({
+                'success': False,
+                'error': {
+                    'type': 'validation',
+                    'message': e.message,
+                    'field': e.field,
+                    'code': e.code or 'VALIDATION_ERROR'
+                },
+                'timestamp': datetime.utcnow().isoformat()
+            }), 400
+        except IntegrityError as e:
+            logger.error(f"数据完整性错误 - {request.endpoint}: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': {
+                    'type': 'integrity',
+                    'message': '数据完整性约束违反',
+                    'code': 'INTEGRITY_ERROR'
+                },
+                'timestamp': datetime.utcnow().isoformat()
+            }), 400
+        except SQLAlchemyError as e:
+            logger.error(f"数据库错误 - {request.endpoint}: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': {
+                    'type': 'database',
+                    'message': '数据库操作失败',
+                    'code': 'DATABASE_ERROR'
+                },
+                'timestamp': datetime.utcnow().isoformat()
+            }), 500
+        except BadRequest as e:
+            logger.warning(f"请求错误 - {request.endpoint}: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': {
+                    'type': 'bad_request',
+                    'message': '请求格式错误',
+                    'code': 'BAD_REQUEST'
+                },
+                'timestamp': datetime.utcnow().isoformat()
+            }), 400
+        except PermissionError as e:
+            logger.warning(f"权限错误 - {request.endpoint}: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': {
+                    'type': 'permission',
+                    'message': '权限不足',
+                    'code': 'PERMISSION_DENIED'
+                },
+                'timestamp': datetime.utcnow().isoformat()
+            }), 403
+        except Exception as e:
+            logger.error(f"未知错误 - {request.endpoint}: {str(e)}")
+            logger.error(f"错误堆栈: {traceback.format_exc()}")
+            return jsonify({
+                'success': False,
+                'error': {
+                    'type': 'internal',
+                    'message': '服务器内部错误',
+                    'code': 'INTERNAL_ERROR'
+                },
+                'timestamp': datetime.utcnow().isoformat()
+            }), 500
+    
     return decorated_function
 
-def permission_required(permission):
-    """要求特定权限的装饰器"""
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            eth_address = request.headers.get('X-Eth-Address') or \
-                         request.args.get('eth_address') or \
-                         session.get('admin_eth_address')
-                         
-            if not eth_address:
-                flash('请先连接钱包', 'error')
-                return redirect(url_for('main.index'))
-                
-            admin_info = get_admin_permissions(eth_address.lower())
-            if not admin_info:
-                flash('您没有管理员权限', 'error')
-                return redirect(url_for('main.index'))
-                
-            if permission not in admin_info['permissions']:
-                flash(f'您没有{permission}权限', 'error')
-                return redirect(url_for('admin.index'))
-                
-            g.eth_address = eth_address.lower()
-            g.admin_info = admin_info
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator 
 
-def async_task(f):
+def require_wallet_address(f: Callable) -> Callable:
     """
-    异步任务装饰器，用于将函数放入后台线程执行
+    要求钱包地址的装饰器
     
-    使用方法:
-    @async_task
-    def my_long_task():
-        # 耗时操作...
-        return result
-
-    my_long_task()  # 会在后台线程中执行
+    Args:
+        f: 被装饰的函数
+        
+    Returns:
+        装饰后的函数
     """
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        # 获取当前应用上下文
-        app = current_app._get_current_object()
+    @functools.wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 从多个来源获取钱包地址
+        wallet_address = None
         
-        def task_wrapper():
-            # 创建应用上下文
-            with app.app_context():
-                try:
-                    result = f(*args, **kwargs)
-                    return result
-                except Exception as e:
-                    # 记录异常，但不阻止主线程
-                    app.logger.error(f"异步任务出错: {str(e)}")
-                    app.logger.error(traceback.format_exc())
-                    # 确保数据库回滚，防止连接泄露
-                    try:
-                        db.session.rollback()
-                    except:
-                        pass
+        # 1. 从请求头获取
+        wallet_address = request.headers.get('X-Wallet-Address')
         
-        thread = threading.Thread(target=task_wrapper)
-        thread.daemon = True
-        thread.start()
-        return thread
+        # 2. 从请求参数获取
+        if not wallet_address:
+            wallet_address = request.args.get('wallet_address')
+        
+        # 3. 从POST数据获取
+        if not wallet_address and request.is_json:
+            data = request.get_json(silent=True)
+            if data:
+                wallet_address = data.get('wallet_address')
+        
+        # 4. 从表单数据获取
+        if not wallet_address and request.form:
+            wallet_address = request.form.get('wallet_address')
+        
+        if not wallet_address:
+            logger.warning(f"请求缺少钱包地址 - {request.endpoint}")
+            return jsonify({
+                'success': False,
+                'error': {
+                    'type': 'authentication',
+                    'message': '未提供钱包地址',
+                    'code': 'WALLET_ADDRESS_REQUIRED'
+                },
+                'timestamp': datetime.utcnow().isoformat()
+            }), 401
+        
+        # 存储到g对象中供后续使用
+        g.wallet_address = wallet_address
+        
+        return f(*args, **kwargs)
     
-    return wrapper
-    
-def log_activity(activity_type):
-    """记录用户活动的装饰器"""
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            # 获取当前用户
-            user_address = getattr(g, 'eth_address', None)
-            
-            # 记录活动开始
-            if user_address:
-                current_app.logger.info(f"用户活动 - {activity_type} - 开始 - 用户: {user_address}")
-            
-            # 执行被装饰的函数
-            result = f(*args, **kwargs)
-            
-            # 记录活动结束
-            if user_address:
-                current_app.logger.info(f"用户活动 - {activity_type} - 结束 - 用户: {user_address}")
-            
-            return result
-        return decorated_function
-    return decorator 
+    return decorated_function
 
-def task_background(f):
-    """后台任务装饰器，确保任务在后台执行，并记录执行状态"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        start_time = time.time()
+
+def require_admin_wallet(f: Callable) -> Callable:
+    """
+    要求管理员钱包的装饰器
+    
+    Args:
+        f: 被装饰的函数
+        
+    Returns:
+        装饰后的函数
+    """
+    @functools.wraps(f)
+    def decorated_function(*args, **kwargs):
+        from app.services.authentication_service import AuthenticationService
+        
+        # 先确保有钱包地址
+        wallet_address = getattr(g, 'wallet_address', None)
+        if not wallet_address:
+            # 尝试从请求中获取
+            wallet_address = request.headers.get('X-Wallet-Address')
+            if not wallet_address and request.is_json:
+                data = request.get_json(silent=True)
+                if data:
+                    wallet_address = data.get('wallet_address')
+        
+        if not wallet_address:
+            logger.warning(f"管理员验证失败 - 未提供钱包地址 - {request.endpoint}")
+            return jsonify({
+                'success': False,
+                'error': {
+                    'type': 'authentication',
+                    'message': '请先连接钱包并登录',
+                    'code': 'AUTH_REQUIRED'
+                },
+                'timestamp': datetime.utcnow().isoformat()
+            }), 401
+        
+        # 验证管理员权限
+        auth_service = AuthenticationService()
+        if not auth_service.verify_admin_wallet(wallet_address):
+            logger.warning(f"管理员权限验证失败 - {wallet_address} - {request.endpoint}")
+            return jsonify({
+                'success': False,
+                'error': {
+                    'type': 'permission',
+                    'message': '钱包地址未注册为管理员',
+                    'code': 'ADMIN_ACCESS_DENIED'
+                },
+                'timestamp': datetime.utcnow().isoformat()
+            }), 403
+        
+        # 存储管理员地址
+        g.admin_address = wallet_address
+        
+        return f(*args, **kwargs)
+    
+    return decorated_function
+
+
+def log_api_call(f: Callable) -> Callable:
+    """
+    记录API调用的装饰器
+    
+    Args:
+        f: 被装饰的函数
+        
+    Returns:
+        装饰后的函数
+    """
+    @functools.wraps(f)
+    def decorated_function(*args, **kwargs):
+        start_time = datetime.utcnow()
+        
+        # 记录请求信息
+        request_info = {
+            'endpoint': request.endpoint,
+            'method': request.method,
+            'url': request.url,
+            'remote_addr': request.remote_addr,
+            'user_agent': request.headers.get('User-Agent', ''),
+            'wallet_address': getattr(g, 'wallet_address', None),
+            'start_time': start_time.isoformat()
+        }
+        
+        logger.info(f"API调用开始: {request_info}")
+        
         try:
-            # 记录任务开始
-            task_name = f.__name__
-            logging.info(f"开始执行后台任务 {task_name}")
-            
-            # 执行实际任务
             result = f(*args, **kwargs)
             
-            # 记录成功完成
-            end_time = time.time()
-            duration = end_time - start_time
-            logging.info(f"后台任务 {task_name} 成功完成，耗时 {duration:.2f} 秒")
+            # 记录成功信息
+            end_time = datetime.utcnow()
+            duration = (end_time - start_time).total_seconds()
+            
+            logger.info(f"API调用成功: {request.endpoint} - 耗时: {duration:.3f}s")
             
             return result
         except Exception as e:
-            # 记录异常
-            end_time = time.time()
-            duration = end_time - start_time
-            logging.error(f"后台任务 {f.__name__} 执行失败，耗时 {duration:.2f} 秒，错误: {str(e)}")
+            # 记录错误信息
+            end_time = datetime.utcnow()
+            duration = (end_time - start_time).total_seconds()
             
-            # 重新抛出异常以便上层处理
+            logger.error(f"API调用失败: {request.endpoint} - 耗时: {duration:.3f}s - 错误: {str(e)}")
             raise
     
-    return decorated 
+    return decorated_function
 
-def is_admin(eth_address=None):
-    """检查指定地址或当前用户是否是管理员"""
-    target_address = eth_address if eth_address else getattr(g, 'eth_address', None)
+
+def validate_json_request(required_fields: Optional[list] = None) -> Callable:
+    """
+    验证JSON请求的装饰器
     
-    if not target_address:
-        return False
+    Args:
+        required_fields: 必填字段列表
         
-    # 检查会话状态
-    if session.get('is_admin') and session.get('eth_address') == target_address:
-        return True
+    Returns:
+        装饰器函数
+    """
+    def decorator(f: Callable) -> Callable:
+        @functools.wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not request.is_json:
+                return jsonify({
+                    'success': False,
+                    'error': {
+                        'type': 'validation',
+                        'message': '请求必须是JSON格式',
+                        'code': 'JSON_REQUIRED'
+                    },
+                    'timestamp': datetime.utcnow().isoformat()
+                }), 400
+            
+            data = request.get_json()
+            if not data:
+                return jsonify({
+                    'success': False,
+                    'error': {
+                        'type': 'validation',
+                        'message': '请求体不能为空',
+                        'code': 'EMPTY_REQUEST_BODY'
+                    },
+                    'timestamp': datetime.utcnow().isoformat()
+                }), 400
+            
+            # 验证必填字段
+            if required_fields:
+                missing_fields = []
+                for field in required_fields:
+                    if field not in data or data[field] is None or data[field] == '':
+                        missing_fields.append(field)
+                
+                if missing_fields:
+                    return jsonify({
+                        'success': False,
+                        'error': {
+                            'type': 'validation',
+                            'message': f'缺少必填字段: {", ".join(missing_fields)}',
+                            'code': 'MISSING_REQUIRED_FIELDS',
+                            'missing_fields': missing_fields
+                        },
+                        'timestamp': datetime.utcnow().isoformat()
+                    }), 400
+            
+            # 将验证后的数据存储到g对象中
+            g.json_data = data
+            
+            return f(*args, **kwargs)
         
-    # 检查cookie
-    cookie_address = request.cookies.get('eth_address')
-    if request.cookies.get('is_admin') == 'true' and cookie_address == target_address:
-        session['eth_address'] = target_address
-        session['is_admin'] = True
-        return True
+        return decorated_function
     
-    # 从配置中检查管理员
-    admin_config = current_app.config.get('ADMIN_CONFIG', {})
+    return decorator
+
+
+def rate_limit(max_requests: int = 100, window_seconds: int = 3600) -> Callable:
+    """
+    简单的速率限制装饰器
     
-    # 区分ETH和SOL地址处理
-    if target_address.startswith('0x'):
-        normalized_address = target_address.lower()
-    else:
-        normalized_address = target_address
+    Args:
+        max_requests: 最大请求次数
+        window_seconds: 时间窗口（秒）
+        
+    Returns:
+        装饰器函数
+    """
+    def decorator(f: Callable) -> Callable:
+        @functools.wraps(f)
+        def decorated_function(*args, **kwargs):
+            # 这里可以实现基于Redis或内存的速率限制
+            # 为了简化，暂时跳过实际的速率限制逻辑
+            return f(*args, **kwargs)
+        
+        return decorated_function
     
-    # 检查地址是否在管理员配置中
-    for admin_address, info in admin_config.items():
-        if admin_address.startswith('0x'):
-            config_address = admin_address.lower()
-        else:
-            config_address = admin_address
+    return decorator
+
+
+def cache_response(timeout: int = 300) -> Callable:
+    """
+    缓存响应的装饰器
+    
+    Args:
+        timeout: 缓存超时时间（秒）
+        
+    Returns:
+        装饰器函数
+    """
+    def decorator(f: Callable) -> Callable:
+        @functools.wraps(f)
+        def decorated_function(*args, **kwargs):
+            # 这里可以实现基于Redis的响应缓存
+            # 为了简化，暂时跳过实际的缓存逻辑
+            return f(*args, **kwargs)
+        
+        return decorated_function
+    
+    return decorator
+
+
+def measure_performance(f: Callable) -> Callable:
+    """
+    性能测量装饰器
+    
+    Args:
+        f: 被装饰的函数
+        
+    Returns:
+        装饰后的函数
+    """
+    @functools.wraps(f)
+    def decorated_function(*args, **kwargs):
+        start_time = datetime.utcnow()
+        
+        try:
+            result = f(*args, **kwargs)
             
-        if normalized_address == config_address:
-            return True
-    
-    # 兼容旧配置
-    admin_addresses = current_app.config.get('ADMIN_ADDRESSES', [])
-    if target_address in admin_addresses:
-        return True
+            end_time = datetime.utcnow()
+            duration = (end_time - start_time).total_seconds()
             
-    return False 
+            # 记录性能指标
+            if duration > 2.0:  # 超过2秒的请求记录警告
+                logger.warning(f"慢查询警告: {request.endpoint} - 耗时: {duration:.3f}s")
+            else:
+                logger.debug(f"性能指标: {request.endpoint} - 耗时: {duration:.3f}s")
+            
+            return result
+        except Exception as e:
+            end_time = datetime.utcnow()
+            duration = (end_time - start_time).total_seconds()
+            logger.error(f"性能测量 - 函数执行失败: {request.endpoint} - 耗时: {duration:.3f}s - 错误: {str(e)}")
+            raise
+    
+    return decorated_function
+
+
+# 组合装饰器，常用的装饰器组合
+def api_endpoint(require_wallet: bool = False, 
+                require_admin: bool = False,
+                required_fields: Optional[list] = None,
+                log_calls: bool = True,
+                measure_perf: bool = True) -> Callable:
+    """
+    API端点组合装饰器
+    
+    Args:
+        require_wallet: 是否需要钱包地址
+        require_admin: 是否需要管理员权限
+        required_fields: JSON请求的必填字段
+        log_calls: 是否记录API调用
+        measure_perf: 是否测量性能
+        
+    Returns:
+        装饰器函数
+    """
+    def decorator(f: Callable) -> Callable:
+        # 按顺序应用装饰器
+        decorated = f
+        
+        # 1. 错误处理（最外层）
+        decorated = handle_api_errors(decorated)
+        
+        # 2. 性能测量
+        if measure_perf:
+            decorated = measure_performance(decorated)
+        
+        # 3. API调用日志
+        if log_calls:
+            decorated = log_api_call(decorated)
+        
+        # 4. JSON验证
+        if required_fields:
+            decorated = validate_json_request(required_fields)(decorated)
+        
+        # 5. 管理员权限验证
+        if require_admin:
+            decorated = require_admin_wallet(decorated)
+        
+        # 6. 钱包地址验证
+        if require_wallet:
+            decorated = require_wallet_address(decorated)
+        
+        return decorated
+    
+    return decorator

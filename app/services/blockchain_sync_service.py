@@ -10,7 +10,10 @@ import time
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from threading import Thread
-import schedule
+try:
+    import schedule
+except ImportError:
+    schedule = None
 
 from flask import current_app
 from app.extensions import db
@@ -37,6 +40,10 @@ class BlockchainSyncService:
             logger.warning("同步服务已在运行")
             return
         
+        if not schedule:
+            logger.warning("schedule模块未安装，跳过同步服务启动")
+            return
+        
         self.is_running = True
         
         # 设置定时任务
@@ -53,14 +60,16 @@ class BlockchainSyncService:
     def stop_sync_service(self):
         """停止同步服务"""
         self.is_running = False
-        schedule.clear()
+        if schedule:
+            schedule.clear()
         logger.info("区块链数据同步服务已停止")
     
     def _run_scheduler(self):
         """运行调度器"""
         while self.is_running:
             try:
-                schedule.run_pending()
+                if schedule:
+                    schedule.run_pending()
                 time.sleep(30)  # 每30秒检查一次
             except Exception as e:
                 logger.error(f"调度器运行错误: {str(e)}")

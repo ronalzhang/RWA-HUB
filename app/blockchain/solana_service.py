@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Solana区块链服务，提供交易构建和处理功能
+优化的Solana区块链服务，提供高可用性连接和交易处理功能
 """
 
 import base64
@@ -10,7 +10,12 @@ import logging
 import time
 import os
 import json
-from typing import Tuple, Dict, Any, Optional
+import asyncio
+import threading
+from typing import Tuple, Dict, Any, Optional, List
+from datetime import datetime, timedelta
+from dataclasses import dataclass
+from enum import Enum
 
 from flask import current_app
 
@@ -24,7 +29,6 @@ from app.config import Config
 from app.extensions import db
 from app.models import Trade, Asset
 from app.models.trade import TradeType
-from datetime import datetime
 import base58
 
 # 使用真实的TOKEN_PROGRAM_ID常量
@@ -34,12 +38,261 @@ TOKEN_PROGRAM_ID = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
 logger = logging.getLogger(__name__)
 
 # 通用常量
-SOLANA_ENDPOINT = os.environ.get("SOLANA_NETWORK_URL") or Config.SOLANA_RPC_URL or "https://api.mainnet-beta.solana.com"
 PROGRAM_ID = Config.SOLANA_PROGRAM_ID or 'RWAxxx111111111111111111111111111111111111'
 USDC_MINT = Config.SOLANA_USDC_MINT or 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'  # Solana Mainnet USDC
 
-# 创建Solana连接
-solana_connection = None
+class NetworkStatus(Enum):
+    """网络状态枚举"""
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    FAILED = "failed"
+    UNKNOWN = "unknown"
+
+@dataclass
+class NodeConfig:
+    """节点配置"""
+    url: str
+    name: str
+    priority: int = 1  # 优先级，数字越小优先级越高
+    timeout: int = 30  # 超时时间（秒）
+    max_retries: int = 3  # 最大重试次数
+    health_check_interval: int = 60  # 健康检查间隔（秒）
+    
+@dataclass
+class NodeStatus:
+    """节点状态"""
+    config: NodeConfig
+    status: NetworkStatus = NetworkStatus.UNKNOWN
+    last_check: Optional[datetime] = None
+    response_time: Optional[float] = None
+    error_count: int = 0
+    consecutive_failures: int = 0
+    last_error: Optional[str] = None
+
+class SolanaConnectionManager:
+    """Solana连接管理器 - 支持多节点备用和故障恢复"""
+    
+    def __init__(self):
+        self.nodes = self._initialize_nodes()
+        self.current_node_index = 0
+        self.connection_cache = {}
+        self.health_check_thread = None
+        self.is_monitoring = False
+        self._lock = threading.Lock()
+        
+        # 启动健康检查
+        self.start_health_monitoring()
+    
+    def _initialize_nodes(self) -> List[NodeStatus]:
+        """初始化节点列表"""
+        # 主要节点配置
+        node_configs = [
+            NodeConfig(
+                url=Config.SOLANA_RPC_URL or "https://api.mainnet-beta.solana.com",
+                name="Primary",
+                priority=1,
+                timeout=30,
+                max_retries=3
+            ),
+            NodeConfig(
+                url="https://api.mainnet-beta.solana.com",
+                name="Solana Labs",
+                priority=2,
+                timeout=30,
+                max_retries=3
+            ),
+            NodeConfig(
+                url="https://solana-api.projectserum.com",
+                name="Project Serum",
+                priority=3,
+                timeout=35,
+                max_retries=2
+            ),
+            NodeConfig(
+                url="https://rpc.ankr.com/solana",
+                name="Ankr",
+                priority=4,
+                timeout=35,
+                max_retries=2
+            ),
+            NodeConfig(
+                url="https://solana.public-rpc.com",
+                name="Public RPC",
+                priority=5,
+                timeout=40,
+                max_retries=2
+            ),
+            NodeConfig(
+                url="https://api.mainnet-beta.solana.com",
+                name="Backup Solana Labs",
+                priority=6,
+                timeout=45,
+                max_retries=1
+            )
+        ]
+        
+        # 从环境变量添加额外节点
+        extra_nodes = os.environ.get('SOLANA_BACKUP_NODES', '').split(',')
+        for i, node_url in enumerate(extra_nodes):
+            if node_url.strip():
+                node_configs.append(NodeConfig(
+                    url=node_url.strip(),
+                    name=f"Custom-{i+1}",
+                    priority=10 + i,
+                    timeout=30,
+                    max_retries=2
+                ))
+        
+        # 按优先级排序
+        node_configs.sort(key=lambda x: x.priority)
+        
+        # 创建节点状态对象
+        return [NodeStatus(config=config) for config in node_configs]
+    
+    def get_healthy_connection(self) -> Optional[Connection]:
+        """获取健康的连接"""
+        with self._lock:
+            # 首先尝试当前节点
+            current_node = self.nodes[self.current_node_index]
+            if current_node.status == NetworkStatus.HEALTHY:
+                return self._get_connection(current_node.config.url)
+            
+            # 寻找健康的节点
+            for i, node in enumerate(self.nodes):
+                if node.status == NetworkStatus.HEALTHY:
+                    self.current_node_index = i
+                    logger.info(f"切换到健康节点: {node.config.name} ({node.config.url})")
+                    return self._get_connection(node.config.url)
+            
+            # 如果没有健康节点，尝试状态未知的节点
+            for i, node in enumerate(self.nodes):
+                if node.status == NetworkStatus.UNKNOWN:
+                    if self._test_node_health(node):
+                        self.current_node_index = i
+                        logger.info(f"发现可用节点: {node.config.name} ({node.config.url})")
+                        return self._get_connection(node.config.url)
+            
+            # 最后尝试所有节点（强制重试）
+            logger.warning("所有节点状态不佳，强制重试所有节点")
+            for i, node in enumerate(self.nodes):
+                try:
+                    connection = self._get_connection(node.config.url)
+                    # 简单测试连接
+                    result = connection.get_slot()
+                    if 'result' in result:
+                        node.status = NetworkStatus.HEALTHY
+                        node.consecutive_failures = 0
+                        self.current_node_index = i
+                        logger.info(f"强制重试成功，使用节点: {node.config.name}")
+                        return connection
+                except Exception as e:
+                    logger.debug(f"强制重试节点 {node.config.name} 失败: {e}")
+                    continue
+            
+            logger.error("所有Solana节点均不可用")
+            return None
+    
+    def _get_connection(self, url: str) -> Connection:
+        """获取连接（带缓存）"""
+        if url not in self.connection_cache:
+            self.connection_cache[url] = Connection(url)
+        return self.connection_cache[url]
+    
+    def _test_node_health(self, node: NodeStatus) -> bool:
+        """测试节点健康状态"""
+        try:
+            start_time = time.time()
+            connection = self._get_connection(node.config.url)
+            
+            # 执行简单的健康检查
+            result = connection.get_slot()
+            response_time = time.time() - start_time
+            
+            if 'result' in result and isinstance(result['result'], int):
+                node.status = NetworkStatus.HEALTHY
+                node.response_time = response_time
+                node.consecutive_failures = 0
+                node.last_check = datetime.utcnow()
+                node.last_error = None
+                logger.debug(f"节点 {node.config.name} 健康检查通过，响应时间: {response_time:.2f}s")
+                return True
+            else:
+                raise Exception(f"无效响应: {result}")
+                
+        except Exception as e:
+            node.status = NetworkStatus.FAILED
+            node.consecutive_failures += 1
+            node.error_count += 1
+            node.last_check = datetime.utcnow()
+            node.last_error = str(e)
+            logger.debug(f"节点 {node.config.name} 健康检查失败: {e}")
+            return False
+    
+    def start_health_monitoring(self):
+        """启动健康监控"""
+        if self.is_monitoring:
+            return
+        
+        self.is_monitoring = True
+        self.health_check_thread = threading.Thread(
+            target=self._health_monitor_loop,
+            daemon=True
+        )
+        self.health_check_thread.start()
+        logger.info("Solana节点健康监控已启动")
+    
+    def _health_monitor_loop(self):
+        """健康监控循环"""
+        while self.is_monitoring:
+            try:
+                for node in self.nodes:
+                    # 检查是否需要健康检查
+                    if (node.last_check is None or 
+                        datetime.utcnow() - node.last_check > timedelta(seconds=node.config.health_check_interval)):
+                        self._test_node_health(node)
+                
+                # 等待下次检查
+                time.sleep(30)  # 每30秒检查一次
+                
+            except Exception as e:
+                logger.error(f"健康监控循环出错: {e}")
+                time.sleep(60)  # 出错时等待更长时间
+    
+    def get_node_status_report(self) -> Dict[str, Any]:
+        """获取节点状态报告"""
+        with self._lock:
+            report = {
+                'current_node': self.nodes[self.current_node_index].config.name,
+                'total_nodes': len(self.nodes),
+                'healthy_nodes': sum(1 for node in self.nodes if node.status == NetworkStatus.HEALTHY),
+                'failed_nodes': sum(1 for node in self.nodes if node.status == NetworkStatus.FAILED),
+                'nodes': []
+            }
+            
+            for node in self.nodes:
+                node_info = {
+                    'name': node.config.name,
+                    'url': node.config.url,
+                    'status': node.status.value,
+                    'priority': node.config.priority,
+                    'response_time': node.response_time,
+                    'error_count': node.error_count,
+                    'consecutive_failures': node.consecutive_failures,
+                    'last_check': node.last_check.isoformat() if node.last_check else None,
+                    'last_error': node.last_error
+                }
+                report['nodes'].append(node_info)
+            
+            return report
+    
+    def stop_monitoring(self):
+        """停止健康监控"""
+        self.is_monitoring = False
+        if self.health_check_thread:
+            self.health_check_thread.join(timeout=5)
+
+# 全局连接管理器实例
+connection_manager = SolanaConnectionManager()
 
 def validate_solana_address(address: str) -> bool:
     """
@@ -69,41 +322,67 @@ def validate_solana_address(address: str) -> bool:
     except Exception:
         return False
 
-def initialize_solana_connection():
-    """初始化Solana连接"""
-    global solana_connection
-    endpoint = Config.SOLANA_RPC_URL or os.environ.get("SOLANA_NETWORK_URL", "https://api.mainnet-beta.solana.com") or 'https://api.mainnet-beta.solana.com'
-    logger.info(f"初始化Solana连接，使用端点: {endpoint}")
-    try:
-        solana_connection = Connection(endpoint)
-        logger.info("Solana连接初始化成功")
-    except Exception as e:
-        logger.error(f"初始化Solana连接失败: {str(e)}")
-        # 尝试使用备用节点
-        backup_endpoints = [
-            'https://api.mainnet-beta.solana.com',
-            'https://solana-api.projectserum.com',
-            'https://rpc.ankr.com/solana'
-        ]
-        for backup_endpoint in backup_endpoints:
-            if backup_endpoint != endpoint:
-                try:
-                    logger.info(f"尝试使用备用节点: {backup_endpoint}")
-                    solana_connection = Connection(backup_endpoint)
-                    logger.info(f"使用备用节点 {backup_endpoint} 连接成功")
-                    return
-                except Exception as be:
-                    logger.error(f"备用节点 {backup_endpoint} 连接失败: {str(be)}")
-        
-        # 如果所有尝试都失败，使用默认节点再试一次
-        try:
-            logger.warning("所有节点连接失败，使用默认节点")
-            solana_connection = Connection('https://api.mainnet-beta.solana.com')
-        except Exception as fe:
-            logger.critical(f"无法初始化Solana连接: {str(fe)}")
+def get_solana_connection() -> Optional[Connection]:
+    """获取Solana连接（使用连接管理器）"""
+    return connection_manager.get_healthy_connection()
 
-# 初始化连接
-initialize_solana_connection()
+def execute_with_retry(operation_name: str, operation_func, max_retries: int = 3, 
+                      retry_delay: float = 1.0) -> Any:
+    """
+    带重试机制的操作执行器
+    
+    Args:
+        operation_name: 操作名称（用于日志）
+        operation_func: 要执行的操作函数
+        max_retries: 最大重试次数
+        retry_delay: 重试延迟（秒）
+        
+    Returns:
+        操作结果
+    """
+    last_exception = None
+    
+    for attempt in range(max_retries + 1):
+        try:
+            if attempt > 0:
+                logger.info(f"{operation_name} 第{attempt}次重试")
+                time.sleep(retry_delay * attempt)  # 指数退避
+            
+            result = operation_func()
+            
+            if attempt > 0:
+                logger.info(f"{operation_name} 重试成功")
+            
+            return result
+            
+        except Exception as e:
+            last_exception = e
+            logger.warning(f"{operation_name} 第{attempt + 1}次尝试失败: {e}")
+            
+            # 如果是网络相关错误，尝试切换节点
+            if "network" in str(e).lower() or "timeout" in str(e).lower():
+                logger.info(f"检测到网络错误，尝试获取新连接")
+                connection_manager.get_healthy_connection()
+    
+    logger.error(f"{operation_name} 所有重试均失败，最后错误: {last_exception}")
+    raise last_exception
+
+def get_recent_blockhash_with_retry() -> str:
+    """获取最新区块哈希（带重试）"""
+    def _get_blockhash():
+        connection = get_solana_connection()
+        if not connection:
+            raise Exception("无法获取Solana连接")
+        
+        result = connection.get_recent_blockhash()
+        if 'result' in result and 'value' in result['result']:
+            blockhash = result['result']['value']['blockhash']
+            if blockhash:
+                return blockhash
+        
+        raise Exception(f"获取区块哈希失败: {result}")
+    
+    return execute_with_retry("获取区块哈希", _get_blockhash, max_retries=3)
 
 def prepare_transfer_transaction(
     token_symbol: str,
@@ -113,7 +392,7 @@ def prepare_transfer_transaction(
     blockhash: str = None
 ) -> Tuple[bytes, bytes]:
     """
-    准备转账交易数据和消息
+    准备转账交易数据和消息（优化版本）
     
     Args:
         token_symbol (str): 代币符号
@@ -125,148 +404,83 @@ def prepare_transfer_transaction(
     Returns:
         Tuple[bytes, bytes]: 交易数据和消息数据
     """
-    try:
+    def _prepare_transaction():
         logger.info(f"准备交易数据 - 代币: {token_symbol}, 发送方: {from_address}, 接收方: {to_address}, 金额: {amount}")
         
-        # 创建真实的Solana转账交易
-        from app.utils.solana_compat.publickey import PublicKey
-        from app.utils.solana_compat.transaction import Transaction, TransactionInstruction
-        from spl.token.constants import TOKEN_PROGRAM_ID
+        # 验证输入参数
+        if not all([token_symbol, from_address, to_address, amount]):
+            raise ValueError("缺少必要的交易参数")
+        
+        if amount <= 0:
+            raise ValueError("交易金额必须大于0")
+        
+        if not validate_solana_address(from_address):
+            raise ValueError(f"无效的发送方地址: {from_address}")
+        
+        if not validate_solana_address(to_address):
+            raise ValueError(f"无效的接收方地址: {to_address}")
         
         # 创建交易
         transaction = Transaction()
         
-        # 如果没有提供blockhash，则从网络获取最新区块哈希
+        # 获取区块哈希
         if not blockhash:
-            logger.info("未提供blockhash，尝试获取最新区块哈希")
-            
-            # 定义多个可用的Solana RPC节点以增加可靠性
-            solana_rpc_nodes = [
-                "https://api.mainnet-beta.solana.com",
-                "https://solana-api.projectserum.com",
-                "https://rpc.ankr.com/solana",
-                "https://solana.public-rpc.com"
-            ]
-            
-            # 尝试从多个节点获取区块哈希
-            blockhash_obtained = False
-            blockhash_errors = []
-            
-            for rpc_node in solana_rpc_nodes:
-                try:
-                    logger.info(f"尝试从节点获取区块哈希: {rpc_node}")
-                    from app.utils.solana_compat.connection import Connection
-                    temp_connection = Connection(rpc_node)
-                    
-                    recent_blockhash_response = temp_connection.get_recent_blockhash()
-                    if 'result' in recent_blockhash_response and 'value' in recent_blockhash_response['result']:
-                        blockhash = recent_blockhash_response['result']['value']['blockhash']
-                        if blockhash:
-                            logger.info(f"成功从节点 {rpc_node} 获取区块哈希: {blockhash}")
-                            blockhash_obtained = True
-                            break
-                    else:
-                        error_msg = f"从节点 {rpc_node} 获取的响应格式无效: {recent_blockhash_response}"
-                        logger.warning(error_msg)
-                        blockhash_errors.append(error_msg)
-                except Exception as rpc_error:
-                    error_msg = f"从节点 {rpc_node} 获取区块哈希失败: {str(rpc_error)}"
-                    logger.warning(error_msg)
-                    blockhash_errors.append(error_msg)
-            
-            # 如果所有节点都失败，则使用备用方法生成哈希
-            if not blockhash_obtained:
-                logger.error(f"所有Solana节点获取区块哈希均失败。错误信息: {', '.join(blockhash_errors)}")
-                # 作为最后的备用选项，生成一个适当的哈希值
-                import hashlib
-                import time
-                import random
-                
-                # 使用当前时间、随机数和一些特定信息生成哈希
-                random_data = f"backup-{time.time()}-{random.randint(1, 1000000)}-{from_address}-{to_address}"
-                blockhash = hashlib.sha256(random_data.encode()).hexdigest()
-                logger.warning(f"使用备用生成的区块哈希: {blockhash}")
-        else:
-            logger.info(f"使用提供的区块哈希: {blockhash}")
+            logger.info("获取最新区块哈希")
+            blockhash = get_recent_blockhash_with_retry()
         
-        # 设置区块哈希
         transaction.recent_blockhash = blockhash
+        logger.info(f"使用区块哈希: {blockhash}")
         
         # 获取代币铸造地址
         token_mint = PublicKey(USDC_MINT)
-        logger.info(f"使用代币铸造地址: {USDC_MINT}")
+        sender = PublicKey(from_address)
+        recipient = PublicKey(to_address)
         
-        # 将from_address和to_address转换为PublicKey
-        try:
-            sender = PublicKey(from_address)
-            recipient = PublicKey(to_address)
-            logger.info("成功转换发送方和接收方地址为PublicKey格式")
-        except Exception as pk_error:
-            logger.error(f"转换地址为PublicKey失败: {str(pk_error)}")
-            raise Exception(f"无效的Solana地址格式: {str(pk_error)}")
-        
-        # 创建转账指令所需的账户
+        # 获取代币账户地址
         try:
             from app.utils.solana import SolanaClient
             solana_client = SolanaClient()
             
-            # 获取代币账户地址
             sender_token_account = solana_client.get_token_account(sender, token_mint)
             recipient_token_account = solana_client.get_token_account(recipient, token_mint)
             
             logger.info(f"发送方代币账户: {sender_token_account}")
             logger.info(f"接收方代币账户: {recipient_token_account}")
         except Exception as account_error:
-            logger.error(f"获取代币账户失败: {str(account_error)}")
-            raise Exception(f"获取代币账户失败: {str(account_error)}")
+            logger.error(f"获取代币账户失败: {account_error}")
+            raise Exception(f"获取代币账户失败: {account_error}")
         
-        # 将金额转换为正确的小数位数
+        # 转换金额为lamports
         amount_lamports = int(amount * 1000000)  # USDC有6位小数
         logger.info(f"转换金额 {amount} USDC 为 {amount_lamports} lamports")
         
         # 创建转账指令
-        try:
-            # 这里使用SPL Token程序的transfer指令
-            transfer_instruction_data = bytes([3]) + amount_lamports.to_bytes(8, byteorder='little')  # 3 = Transfer指令ID
-            
-            keys = [
-                {"pubkey": sender_token_account, "isSigner": False, "isWritable": True},
-                {"pubkey": recipient_token_account, "isSigner": False, "isWritable": True},
-                {"pubkey": sender, "isSigner": True, "isWritable": False}
-            ]
-            
-            transfer_instruction = TransactionInstruction(
-                program_id=TOKEN_PROGRAM_ID,
-                data=transfer_instruction_data,
-                keys=keys
-            )
-            
-            # 添加指令到交易
-            transaction.add(transfer_instruction)
-            logger.info("转账指令已添加到交易")
-        except Exception as instruction_error:
-            logger.error(f"创建转账指令失败: {str(instruction_error)}")
-            raise Exception(f"创建转账指令失败: {str(instruction_error)}")
+        transfer_instruction_data = bytes([3]) + amount_lamports.to_bytes(8, byteorder='little')
+        
+        keys = [
+            {"pubkey": sender_token_account, "isSigner": False, "isWritable": True},
+            {"pubkey": recipient_token_account, "isSigner": False, "isWritable": True},
+            {"pubkey": sender, "isSigner": True, "isWritable": False}
+        ]
+        
+        transfer_instruction = TransactionInstruction(
+            program_id=TOKEN_PROGRAM_ID,
+            data=transfer_instruction_data,
+            keys=keys
+        )
+        
+        transaction.add(transfer_instruction)
+        logger.info("转账指令已添加到交易")
         
         # 序列化交易
-        try:
-            transaction_bytes = transaction.serialize()
-            # 获取交易消息（用于签名）
-            message_bytes = transaction.serialize_message()
-            
-            # 确保日志记录了序列化结果的长度
-            logger.info(f"已成功生成真实交易数据，transaction_bytes长度: {len(transaction_bytes)}, message_bytes长度: {len(message_bytes)}")
-            
-            return transaction_bytes, message_bytes
-        except Exception as serialize_error:
-            logger.error(f"序列化交易失败: {str(serialize_error)}")
-            raise Exception(f"序列化交易失败: {str(serialize_error)}")
+        transaction_bytes = transaction.serialize()
+        message_bytes = transaction.serialize_message()
         
-    except Exception as e:
-        logger.error(f"准备交易数据失败: {str(e)}")
-        import traceback
-        logger.error(f"错误堆栈: {traceback.format_exc()}")
-        raise Exception(f"准备交易数据失败: {str(e)}")
+        logger.info(f"交易序列化完成，transaction_bytes长度: {len(transaction_bytes)}, message_bytes长度: {len(message_bytes)}")
+        
+        return transaction_bytes, message_bytes
+    
+    return execute_with_retry("准备转账交易", _prepare_transaction, max_retries=3)
 
 
 def send_transaction_with_signature(
@@ -275,7 +489,7 @@ def send_transaction_with_signature(
     public_key: str
 ) -> str:
     """
-    使用签名数据发送交易
+    使用签名数据发送交易（优化版本）
     
     Args:
         transaction_data (bytes): 原始交易数据
@@ -285,11 +499,15 @@ def send_transaction_with_signature(
     Returns:
         str: 交易签名
     """
-    try:
+    def _send_transaction():
         logger.info(f"发送已签名交易 - 公钥: {public_key}")
         
-        # 在实际环境中，这里应该将交易数据和签名组合成一个完整的交易，然后发送到Solana网络
-        # 现在我们只是模拟这个过程
+        # 验证输入参数
+        if not transaction_data or not signature_data or not public_key:
+            raise ValueError("缺少必要的交易参数")
+        
+        if not validate_solana_address(public_key):
+            raise ValueError(f"无效的公钥格式: {public_key}")
         
         # 构建完整的交易对象
         transaction = Transaction.from_bytes(transaction_data)
@@ -297,19 +515,23 @@ def send_transaction_with_signature(
         # 添加签名
         transaction.add_signature(PublicKey(public_key), signature_data)
         
+        # 获取连接并发送交易
+        connection = get_solana_connection()
+        if not connection:
+            raise Exception("无法获取Solana连接")
+        
         # 发送交易到Solana网络
-        result = solana_connection.send_raw_transaction(transaction.serialize())
+        result = connection.send_raw_transaction(transaction.serialize())
         
-        # 获取交易签名
-        signature = result
+        if isinstance(result, dict) and 'error' in result:
+            raise Exception(f"交易发送失败: {result['error']}")
         
+        signature = result if isinstance(result, str) else str(result)
         logger.info(f"交易发送成功 - 签名: {signature}")
         
         return signature
-        
-    except Exception as e:
-        logger.error(f"发送交易失败: {str(e)}")
-        raise Exception(f"发送交易失败: {str(e)}")
+    
+    return execute_with_retry("发送已签名交易", _send_transaction, max_retries=3)
 
 
 def validate_solana_address(address):
@@ -358,9 +580,9 @@ def execute_transfer_transaction(
     from_address: str,
     to_address: str,
     amount: float
-) -> str:
+) -> Dict[str, Any]:
     """
-    执行Solana代币转账交易
+    执行Solana代币转账交易（优化版本）
     
     Args:
         token_symbol (str): 代币符号，例如 "USDC"
@@ -369,78 +591,47 @@ def execute_transfer_transaction(
         amount (float): 转账金额
         
     Returns:
-        str: 交易签名
+        dict: 交易结果
     """
-    try:
-        # 1. 详细记录输入参数
-        logger.info(f"执行真实Solana转账 - 参数: token={token_symbol}, from={from_address}, to={to_address}, amount={amount}")
+    def _execute_transfer():
+        logger.info(f"执行Solana转账 - 代币: {token_symbol}, 从: {from_address}, 到: {to_address}, 金额: {amount}")
         
-        # 检查solana_connection是否已初始化
-        global solana_connection
-        if solana_connection is None:
-            logger.warning("Solana连接未初始化，尝试重新初始化")
-            initialize_solana_connection()
-            
-        if solana_connection is None:
-            raise RuntimeError("无法初始化Solana连接，请检查网络连接和RPC节点状态")
-        
-        # 2. 检查参数完整性
+        # 验证参数
         if not all([token_symbol, from_address, to_address, amount]):
-            missing = []
-            if not token_symbol: missing.append("token_symbol")
-            if not from_address: missing.append("from_address")
-            if not to_address: missing.append("to_address")
-            if not amount: missing.append("amount")
-            error_msg = f"缺少必要参数: {', '.join(missing)}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+            missing = [name for name, value in [
+                ("token_symbol", token_symbol),
+                ("from_address", from_address), 
+                ("to_address", to_address),
+                ("amount", amount)
+            ] if not value]
+            raise ValueError(f"缺少必要参数: {', '.join(missing)}")
         
-        # 3. 验证并处理金额
-        try:
-            # 转换为浮点数以处理USDC的小数部分
-            amount_float = float(amount)
-            if amount_float <= 0:
-                raise ValueError("金额必须大于0")
-            
-            logger.info(f"验证后的金额: {amount_float}")
-        except Exception as e:
-            error_msg = f"金额格式无效: {str(e)}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+        amount_float = float(amount)
+        if amount_float <= 0:
+            raise ValueError("金额必须大于0")
         
-        # 4. 验证地址格式
         if not validate_solana_address(from_address):
-            error_msg = f"发送方地址格式无效: {from_address}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+            raise ValueError(f"发送方地址格式无效: {from_address}")
             
         if not validate_solana_address(to_address):
-            error_msg = f"接收方地址格式无效: {to_address}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+            raise ValueError(f"接收方地址格式无效: {to_address}")
         
-        # 5. 获取代币铸造地址
+        # 验证代币类型
         token_mapping = {
             "USDC": USDC_MINT,
-            # 其他代币映射...
+            # 可以添加其他代币映射
         }
         
         if token_symbol not in token_mapping:
-            error_msg = f"不支持的代币: {token_symbol}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-            
+            raise ValueError(f"不支持的代币: {token_symbol}")
+        
         token_mint = token_mapping[token_symbol]
-        logger.info(f"代币铸造地址: {token_mint}")
+        logger.info(f"使用代币铸造地址: {token_mint}")
         
-        # 6. 模拟交易执行（开发环境）
-        logger.info(f"模拟执行转账: {amount_float} {token_symbol} 从 {from_address} 到 {to_address}")
-        
-        # 生成模拟交易签名
+        # 在开发/测试环境中，生成模拟交易签名
+        # 在生产环境中，这里应该是真实的交易执行逻辑
         import hashlib
-        import time
         
-        # 创建基于参数的唯一签名
         signature_data = f"{from_address}{to_address}{amount_float}{token_symbol}{time.time()}"
         signature_hash = hashlib.sha256(signature_data.encode()).hexdigest()
         mock_signature = f"mock_tx_{signature_hash[:32]}"
@@ -453,20 +644,23 @@ def execute_transfer_transaction(
         return {
             'success': True,
             'signature': mock_signature,
-            'message': '转账成功（模拟）'
+            'message': '转账成功（模拟）',
+            'amount': amount_float,
+            'token': token_symbol
         }
-        
+    
+    try:
+        return execute_with_retry("执行转账交易", _execute_transfer, max_retries=3)
     except Exception as e:
-        error_msg = f"执行Solana转账失败: {str(e)}"
-        logger.error(error_msg, exc_info=True)
+        logger.error(f"执行Solana转账失败: {e}", exc_info=True)
         return {
             'success': False,
-            'error': error_msg
+            'error': str(e)
         }
 
 def prepare_transaction(user_address, asset_id, token_symbol, amount, price, trade_id):
     """
-    准备Solana交易数据
+    准备Solana交易数据（优化版本）
     
     Args:
         user_address: 用户钱包地址
@@ -479,230 +673,445 @@ def prepare_transaction(user_address, asset_id, token_symbol, amount, price, tra
     Returns:
         dict: 交易数据，包含已经base58编码的交易信息
     """
-    try:
+    def _prepare():
         logger.info(f"准备Solana交易: 用户={user_address}, 资产ID={asset_id}, 数量={amount}")
         
-        # 创建交易
-        transaction = Transaction()
+        # 验证输入参数
+        if not validate_solana_address(user_address):
+            raise ValueError(f"无效的用户地址: {user_address}")
         
-        # 将交易ID编码到交易备注中
-        transaction.add_memo(f"trade:{trade_id}", PublicKey(user_address))
+        if not all([asset_id, token_symbol, amount, price, trade_id]):
+            raise ValueError("缺少必要的交易参数")
         
-        # 创建资产购买指令
-        # 根据具体的Solana合约设计来构建指令
-        # 这里是简化的示例，实际应用中需要根据合约ABI来构建
-        instruction_data = {
-            "method": "buy_asset",
-            "params": {
-                "asset_id": asset_id,
-                "token_symbol": token_symbol,
-                "amount": amount,
-                "price": price,
-                "trade_id": trade_id,
-                "buyer": user_address
-            }
-        }
+        # 使用新的交易管理器创建交易
+        from app.blockchain.transaction_manager import transaction_manager
         
-        # 将指令数据序列化
-        instruction_bytes = json.dumps(instruction_data).encode('utf-8')
+        # 计算转账金额（价格 * 数量）
+        transfer_amount = float(price) * float(amount)
         
-        # 获取最新的区块哈希
-        try:
-            recent_blockhash = solana_connection.get_latest_blockhash()
-            if recent_blockhash and 'result' in recent_blockhash:
-                blockhash = recent_blockhash['result']['value']['blockhash']
-                transaction.set_recent_blockhash(blockhash)
-                logger.info(f"使用真实区块哈希: {blockhash}")
-            else:
-                raise Exception("无法获取最新区块哈希")
-        except Exception as e:
-            logger.error(f"获取区块哈希失败: {str(e)}")
-            raise Exception(f"无法获取Solana区块哈希: {str(e)}")
+        # 获取平台费用地址
+        platform_address = Config.PLATFORM_FEE_ADDRESS
         
-        # 直接返回base58编码的交易消息
-        import base58
+        # 创建转账交易（从用户到平台）
+        transaction, transaction_id = transaction_manager.create_transfer_transaction(
+            from_address=user_address,
+            to_address=platform_address,
+            amount=transfer_amount,
+            token_mint=USDC_MINT,
+            memo=f"trade:{trade_id}:asset:{asset_id}"
+        )
         
         # 序列化交易消息
         message_bytes = transaction.serialize_message()
         
-        # 使用base58编码 
+        # 使用base58编码
+        import base58
         base58_message = base58.b58encode(message_bytes).decode('utf-8')
         
-        logger.info(f"已生成base58格式的交易消息")
+        logger.info(f"交易准备完成，交易ID: {transaction_id}")
         
-        # 返回交易数据，包含base58编码的消息
         return {
             "success": True,
             "serialized_transaction": base58_message,
-            "trade_id": trade_id
+            "transaction_id": transaction_id,
+            "trade_id": trade_id,
+            "amount": transfer_amount,
+            "token": token_symbol
         }
-        
+    
+    try:
+        return execute_with_retry("准备Solana交易", _prepare, max_retries=3)
     except Exception as e:
-        logger.error(f"准备Solana交易失败: {str(e)}")
+        logger.error(f"准备Solana交易失败: {e}")
         return {
             "success": False,
             "error": f"准备交易失败: {str(e)}"
         }
 
-def check_transaction(signature):
+def execute_asset_purchase_transaction(
+    user_address: str,
+    asset_id: int,
+    amount: int,
+    total_price: float,
+    trade_id: int
+) -> Dict[str, Any]:
     """
-    检查Solana交易状态
+    执行资产购买交易（完整流程）
+    
+    Args:
+        user_address: 用户地址
+        asset_id: 资产ID
+        amount: 购买数量
+        total_price: 总价格
+        trade_id: 交易记录ID
+        
+    Returns:
+        dict: 交易执行结果
+    """
+    from app.blockchain.transaction_manager import transaction_manager
+    from app.blockchain.transaction_rollback import rollback_manager, RollbackReason
+    
+    logger.info(f"执行资产购买交易: 用户={user_address}, 资产={asset_id}, 数量={amount}, 价格={total_price}")
+    
+    try:
+        # 获取平台费用地址
+        platform_address = Config.PLATFORM_FEE_ADDRESS
+        
+        # 在开发环境中，模拟交易执行
+        # 在生产环境中，这里应该是真实的交易逻辑
+        
+        # 生成模拟交易签名
+        import hashlib
+        signature_data = f"{user_address}{asset_id}{amount}{total_price}{time.time()}"
+        signature_hash = hashlib.sha256(signature_data.encode()).hexdigest()
+        mock_signature = f"purchase_tx_{signature_hash[:32]}"
+        
+        # 模拟交易确认延迟
+        time.sleep(2)
+        
+        # 模拟成功率（90%成功）
+        import random
+        if random.random() < 0.9:
+            logger.info(f"资产购买交易成功: {mock_signature}")
+            return {
+                'success': True,
+                'signature': mock_signature,
+                'message': '资产购买成功',
+                'amount': amount,
+                'total_price': total_price,
+                'status': 'confirmed'
+            }
+        else:
+            # 模拟交易失败，触发回滚
+            logger.warning(f"资产购买交易失败，开始回滚: 交易ID {trade_id}")
+            
+            # 创建回滚计划
+            rollback_plan = rollback_manager.create_rollback_plan(
+                transaction_id=f"purchase_fail_{trade_id}",
+                trade_id=trade_id,
+                reason=RollbackReason.TRANSACTION_FAILED
+            )
+            
+            # 执行回滚
+            rollback_success = rollback_manager.execute_rollback(rollback_plan.transaction_id)
+            
+            return {
+                'success': False,
+                'error': '交易执行失败',
+                'rollback_executed': rollback_success,
+                'status': 'failed'
+            }
+            
+    except Exception as e:
+        logger.error(f"执行资产购买交易失败: {e}")
+        
+        # 尝试回滚
+        try:
+            rollback_plan = rollback_manager.create_rollback_plan(
+                transaction_id=f"purchase_error_{trade_id}",
+                trade_id=trade_id,
+                reason=RollbackReason.SYSTEM_ERROR
+            )
+            rollback_success = rollback_manager.execute_rollback(rollback_plan.transaction_id)
+        except Exception as rollback_error:
+            logger.error(f"回滚失败: {rollback_error}")
+            rollback_success = False
+        
+        return {
+            'success': False,
+            'error': str(e),
+            'rollback_executed': rollback_success,
+            'status': 'error'
+        }
+
+def check_transaction_status(signature: str, timeout: int = 60) -> Dict[str, Any]:
+    """
+    检查Solana交易状态（优化版本）
     
     Args:
         signature: 交易签名
+        timeout: 超时时间（秒）
         
     Returns:
         dict: 交易状态
     """
-    try:
-        logger.info(f"检查Solana交易状态: 签名={signature}")
+    def _check_status():
+        logger.info(f"检查交易状态: {signature}")
         
-        # 查询交易状态
-        try:
-            # 尝试获取交易确认状态
-            tx_result = solana_connection.confirm_transaction(signature)
-            
-            if tx_result and 'result' in tx_result:
-                confirmed = tx_result['result'].get('value', 0) > 0
-                confirmations = tx_result['result'].get('value', 0)
-                
-                return {
-                    "confirmed": confirmed,
-                    "confirmations": confirmations
-                }
-            else:
-                # 交易未找到或未确认
-                return {
-                    "confirmed": False,
-                    "confirmations": 0,
-                    "error": "交易未确认"
-                }
-                
-        except Exception as e:
-            logger.error(f"获取交易确认状态失败: {str(e)}")
+        if not signature:
+            raise ValueError("交易签名不能为空")
+        
+        connection = get_solana_connection()
+        if not connection:
+            raise Exception("无法获取Solana连接")
+        
+        # 获取交易签名状态
+        status_result = connection.get_signature_status(signature)
+        
+        if status_result is None:
             return {
                 "confirmed": False,
                 "confirmations": 0,
-                "error": f"获取确认状态失败: {str(e)}"
+                "status": "pending",
+                "error": None
             }
         
-    except Exception as e:
-        logger.error(f"检查Solana交易状态失败: {str(e)}")
+        # 解析状态结果
+        confirmed = status_result.get("confirmationStatus") in ["confirmed", "finalized"]
+        confirmations = status_result.get("confirmations", 0)
+        error = status_result.get("err")
+        
         return {
-            "confirmed": False,
-            "error": f"检查交易失败: {str(e)}"
+            "confirmed": confirmed,
+            "confirmations": confirmations,
+            "status": status_result.get("confirmationStatus", "unknown"),
+            "error": error,
+            "slot": status_result.get("slot")
         }
+    
+    return execute_with_retry("检查交易状态", _check_status, max_retries=3)
 
-def _get_token_account(self, owner_address, token_mint):
+def wait_for_transaction_confirmation(signature: str, timeout: int = 60, 
+                                    check_interval: float = 2.0) -> Dict[str, Any]:
     """
-    获取用户的代币账户地址
+    等待交易确认
     
     Args:
-        owner_address: 所有者地址
-        token_mint: 代币铸造地址
+        signature: 交易签名
+        timeout: 超时时间（秒）
+        check_interval: 检查间隔（秒）
         
     Returns:
-        代币账户地址
+        dict: 最终交易状态
+    """
+    logger.info(f"等待交易确认: {signature}, 超时: {timeout}秒")
+    
+    start_time = time.time()
+    
+    while time.time() - start_time < timeout:
+        try:
+            status = check_transaction_status(signature)
+            
+            if status["confirmed"]:
+                logger.info(f"交易已确认: {signature}")
+                return status
+            
+            if status["error"]:
+                logger.error(f"交易失败: {signature}, 错误: {status['error']}")
+                return status
+            
+            logger.debug(f"交易待确认: {signature}, 状态: {status['status']}")
+            time.sleep(check_interval)
+            
+        except Exception as e:
+            logger.warning(f"检查交易状态时出错: {e}")
+            time.sleep(check_interval)
+    
+    logger.warning(f"交易确认超时: {signature}")
+    return {
+        "confirmed": False,
+        "confirmations": 0,
+        "status": "timeout",
+        "error": "交易确认超时"
+    }
+
+# 保持向后兼容
+def check_transaction(signature):
+    """检查Solana交易状态（向后兼容）"""
+    result = check_transaction_status(signature)
+    return {
+        "confirmed": result["confirmed"],
+        "confirmations": result["confirmations"],
+        "error": result.get("error")
+    }
+
+# 新增的网络监控和诊断功能
+
+def get_network_health_report() -> Dict[str, Any]:
+    """获取网络健康报告"""
+    return connection_manager.get_node_status_report()
+
+def get_connection_metrics() -> Dict[str, Any]:
+    """获取连接指标"""
+    report = connection_manager.get_node_status_report()
+    
+    healthy_nodes = report['healthy_nodes']
+    total_nodes = report['total_nodes']
+    
+    # 计算平均响应时间
+    response_times = [
+        node['response_time'] for node in report['nodes'] 
+        if node['response_time'] is not None
+    ]
+    avg_response_time = sum(response_times) / len(response_times) if response_times else 0
+    
+    return {
+        'network_availability': (healthy_nodes / total_nodes) * 100 if total_nodes > 0 else 0,
+        'healthy_nodes': healthy_nodes,
+        'total_nodes': total_nodes,
+        'current_node': report['current_node'],
+        'average_response_time': avg_response_time,
+        'last_updated': datetime.utcnow().isoformat()
+    }
+
+def force_node_switch() -> Dict[str, Any]:
+    """强制切换到下一个可用节点"""
+    with connection_manager._lock:
+        old_node = connection_manager.nodes[connection_manager.current_node_index].config.name
+        
+        # 寻找下一个健康节点
+        for i in range(len(connection_manager.nodes)):
+            next_index = (connection_manager.current_node_index + 1 + i) % len(connection_manager.nodes)
+            next_node = connection_manager.nodes[next_index]
+            
+            if connection_manager._test_node_health(next_node):
+                connection_manager.current_node_index = next_index
+                new_node = next_node.config.name
+                logger.info(f"强制切换节点: {old_node} -> {new_node}")
+                return {
+                    'success': True,
+                    'old_node': old_node,
+                    'new_node': new_node,
+                    'message': f'已切换到节点: {new_node}'
+                }
+        
+        return {
+            'success': False,
+            'message': '没有找到可用的备用节点'
+        }
+
+def test_all_nodes() -> Dict[str, Any]:
+    """测试所有节点的连通性"""
+    results = []
+    
+    for node in connection_manager.nodes:
+        start_time = time.time()
+        success = connection_manager._test_node_health(node)
+        test_time = time.time() - start_time
+        
+        results.append({
+            'name': node.config.name,
+            'url': node.config.url,
+            'success': success,
+            'response_time': test_time,
+            'status': node.status.value,
+            'error': node.last_error
+        })
+    
+    return {
+        'test_results': results,
+        'total_tested': len(results),
+        'successful': sum(1 for r in results if r['success']),
+        'test_time': datetime.utcnow().isoformat()
+    }
+
+# 交易费用估算功能
+def estimate_transaction_fee(transaction_type: str = "transfer") -> Dict[str, Any]:
+    """
+    估算交易费用
+    
+    Args:
+        transaction_type: 交易类型
+        
+    Returns:
+        dict: 费用估算结果
+    """
+    def _estimate_fee():
+        connection = get_solana_connection()
+        if not connection:
+            raise Exception("无法获取Solana连接")
+        
+        # 获取最新的费用信息
+        # 在实际实现中，这里应该调用Solana的费用估算API
+        # 目前返回固定的估算值
+        
+        base_fee = 5000  # 基础费用（lamports）
+        
+        fee_multipliers = {
+            "transfer": 1.0,
+            "create_account": 2.0,
+            "complex": 3.0
+        }
+        
+        multiplier = fee_multipliers.get(transaction_type, 1.0)
+        estimated_fee = int(base_fee * multiplier)
+        
+        return {
+            'estimated_fee_lamports': estimated_fee,
+            'estimated_fee_sol': estimated_fee / 1_000_000_000,
+            'transaction_type': transaction_type,
+            'base_fee': base_fee,
+            'multiplier': multiplier
+        }
+    
+    return execute_with_retry("估算交易费用", _estimate_fee, max_retries=2)
+
+# 账户余额查询功能
+def get_account_balance(address: str, token_mint: str = None) -> Dict[str, Any]:
+    """
+    获取账户余额
+    
+    Args:
+        address: 账户地址
+        token_mint: 代币铸造地址（可选，不提供则查询SOL余额）
+        
+    Returns:
+        dict: 余额信息
+    """
+    def _get_balance():
+        if not validate_solana_address(address):
+            raise ValueError(f"无效的地址格式: {address}")
+        
+        connection = get_solana_connection()
+        if not connection:
+            raise Exception("无法获取Solana连接")
+        
+        if token_mint:
+            # 查询代币余额
+            # 这里需要实现代币余额查询逻辑
+            return {
+                'address': address,
+                'token_mint': token_mint,
+                'balance': 0,  # 实际实现中应该查询真实余额
+                'balance_type': 'token'
+            }
+        else:
+            # 查询SOL余额
+            result = connection.get_balance(address)
+            if 'result' in result:
+                balance_lamports = result['result']['value']
+                balance_sol = balance_lamports / 1_000_000_000
+                
+                return {
+                    'address': address,
+                    'balance_lamports': balance_lamports,
+                    'balance_sol': balance_sol,
+                    'balance_type': 'sol'
+                }
+            else:
+                raise Exception(f"获取余额失败: {result}")
+    
+    return execute_with_retry("获取账户余额", _get_balance, max_retries=3)
+
+# 向后兼容的函数
+def validate_solana_address(address):
+    """
+    验证Solana地址格式是否有效（向后兼容版本）
     """
     try:
-        logger.info(f"获取代币账户 - 所有者: {owner_address}({type(owner_address).__name__}), 代币铸造: {token_mint}({type(token_mint).__name__})")
-        
-        # 确保地址是PublicKey对象或正确的字符串格式
-        if isinstance(owner_address, str):
-            # 清理地址字符串
-            owner_address = owner_address.strip()
-            logger.debug(f"处理所有者地址: {owner_address}, 长度: {len(owner_address)}")
+        if not isinstance(address, str):
+            return False
             
-            # 如果地址非常短或格式明显无效，提前报错
-            if len(owner_address) < 30:
-                logger.error(f"所有者地址格式无效，长度过短: {owner_address}")
-                raise ValueError(f"无效的所有者地址格式: {owner_address} - 长度过短")
-                
-            # 转换为PublicKey对象
-            try:
-                from app.utils.solana_compat.publickey import PublicKey
-                owner_pubkey = PublicKey(owner_address)
-                logger.debug(f"成功创建所有者PublicKey对象")
-            except Exception as pk_error:
-                logger.error(f"转换所有者地址为PublicKey失败: {str(pk_error)}")
-                raise ValueError(f"无效的所有者地址格式: {owner_address} - {str(pk_error)}")
-        else:
-            owner_pubkey = owner_address
+        address = address.strip()
         
-        # 同样处理token_mint
-        if isinstance(token_mint, str):
-            token_mint = token_mint.strip()
-            logger.debug(f"处理代币铸造地址: {token_mint}, 长度: {len(token_mint)}")
+        if len(address) < 32:
+            return False
             
-            # 如果地址非常短或格式明显无效，提前报错
-            if len(token_mint) < 30:
-                logger.error(f"代币铸造地址格式无效，长度过短: {token_mint}")
-                raise ValueError(f"无效的代币铸造地址格式: {token_mint} - 长度过短")
-                
-            try:
-                from app.utils.solana_compat.publickey import PublicKey
-                token_mint_pubkey = PublicKey(token_mint)
-                logger.debug(f"成功创建代币铸造PublicKey对象")
-            except Exception as pk_error:
-                logger.error(f"转换代币铸造地址为PublicKey失败: {str(pk_error)}")
-                raise ValueError(f"无效的代币铸造地址格式: {token_mint} - {str(pk_error)}")
-        else:
-            token_mint_pubkey = token_mint
-        
-        # 获取关联代币账户地址
         try:
-            # 使用兼容层的代码
-            from app.utils.solana_compat.token.instructions import get_associated_token_address
-            token_account = get_associated_token_address(
-                owner_pubkey,
-                token_mint_pubkey
-            )
-            logger.info(f"获取到代币账户: {token_account}")
-            return token_account
-        except Exception as e:
-            logger.error(f"获取关联代币账户失败: {str(e)}", exc_info=True)
+            decoded = base58.b58decode(address)
+            return len(decoded) == 32
+        except Exception:
+            return False
             
-            # 尝试使用模拟spl库
-            try:
-                from app.utils.spl_mock import get_associated_token_address
-                token_account = get_associated_token_address(
-                    owner_pubkey,
-                    token_mint_pubkey
-                )
-                logger.info(f"使用模拟库获取到代币账户: {token_account}")
-                return token_account
-            except Exception as mock_error:
-                logger.error(f"使用模拟库获取关联代币账户失败: {str(mock_error)}", exc_info=True)
-            
-            # 尝试使用替代方法
-            try:
-                # 当spl库不可用时，使用公式计算关联代币账户地址
-                # 这是一个简化版本，适用于大多数情况
-                logger.info("尝试使用替代方法计算关联代币账户地址")
-                token_program_id = TOKEN_PROGRAM_ID
-                associated_token_program_id = PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
-                
-                seeds = [
-                    owner_pubkey.to_bytes(),
-                    token_program_id.to_bytes(),
-                    token_mint_pubkey.to_bytes(),
-                ]
-                
-                program_derived_address, nonce = PublicKey.find_program_address(
-                    seeds, associated_token_program_id
-                )
-                
-                logger.info(f"使用替代方法获取到代币账户: {program_derived_address}")
-                return program_derived_address
-            except Exception as native_error:
-                logger.error(f"使用替代方法获取关联代币账户也失败: {str(native_error)}", exc_info=True)
-            
-            raise ValueError(f"无法获取关联代币账户: {str(e)}")
-        
-    except Exception as e:
-        logger.error(f"获取代币账户失败: {str(e)}", exc_info=True)
-        # 提供更具体的错误信息
-        if "public key" in str(e).lower():
-            raise ValueError(f"无效的公钥格式: {str(e)}")
-        # 重新抛出异常
-        raise 
+    except Exception:
+        return False 

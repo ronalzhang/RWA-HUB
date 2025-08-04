@@ -12,6 +12,9 @@ import requests
 from app.models import Asset, User, Trade, AssetType
 from app.extensions import db
 from app.blockchain.solana_service import execute_transfer_transaction
+from app.utils.error_handler import error_handler, create_error_response
+from app.utils.decorators import api_endpoint
+from app.utils.data_converters import AssetDataConverter, DataConverter
 
 # 从__init__.py导入正确的API蓝图
 from . import api_bp
@@ -20,123 +23,75 @@ from . import api_bp
 logger = logging.getLogger(__name__)
 
 @api_bp.route('/assets/list', methods=['GET'])
+@api_endpoint(log_calls=True, measure_perf=True)
 def list_assets():
     """获取资产列表"""
-    try:
-        current_app.logger.info("请求资产列表")
+    from app.models.asset import Asset, AssetStatus
+    from sqlalchemy import desc
+    
+    # 构建查询 - 只显示已上链且未删除的资产
+    query = Asset.query.filter(
+        Asset.status == AssetStatus.ON_CHAIN.value,
+        Asset.deleted_at.is_(None)  # 排除已删除的资产
+    )
+    
+    # 获取分页参数
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 20, type=int), 100)  # 限制最大每页数量
+    
+    # 获取筛选参数
+    asset_type = request.args.get('type')
+    location = request.args.get('location')
+    search = request.args.get('search')
+    
+    # 按类型筛选
+    if asset_type:
+        try:
+            type_value = int(asset_type)
+            query = query.filter(Asset.asset_type == type_value)
+        except ValueError:
+            return create_error_response('INVALID_DATA_FORMAT', '无效的资产类型参数')
+    
+    # 按位置筛选
+    if location:
+        query = query.filter(Asset.location.ilike(f'%{location}%'))
         
-        from app.models.asset import Asset, AssetStatus
-        from app.models.user import User
-        from sqlalchemy import desc
-        
-        # 构建查询 - 只显示已上链且未删除的资产
-        query = Asset.query.filter(
-            Asset.status == AssetStatus.ON_CHAIN.value,
-            Asset.deleted_at.is_(None)  # 排除已删除的资产
-        )
-        
-        # 获取分页参数
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
-        
-        # 获取筛选参数
-        asset_type = request.args.get('type')
-        location = request.args.get('location')
-        search = request.args.get('search')
-        
-        # 按类型筛选
-        if asset_type:
-            try:
-                type_value = int(asset_type)
-                query = query.filter(Asset.asset_type == type_value)
-            except ValueError:
-                pass
-        
-        # 按位置筛选
-        if location:
-            query = query.filter(Asset.location.ilike(f'%{location}%'))
-            
-        # 搜索功能
-        if search:
-            query = query.filter(
-                db.or_(
-                    Asset.name.ilike(f'%{search}%'),
-                    Asset.description.ilike(f'%{search}%'),
-                    Asset.token_symbol.ilike(f'%{search}%')
-                )
+    # 搜索功能
+    if search:
+        query = query.filter(
+            db.or_(
+                Asset.name.ilike(f'%{search}%'),
+                Asset.description.ilike(f'%{search}%'),
+                Asset.token_symbol.ilike(f'%{search}%')
             )
-        
-        # 排序 - 按创建时间倒序
-        query = query.order_by(desc(Asset.created_at))
-        
-        # 分页
-        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-        assets = pagination.items
-        
-        # 转换为前端需要的格式
-        asset_list = []
-        for asset in assets:
-            # 获取第一张图片
-            image_url = None
-            if asset.images and len(asset.images) > 0:
-                image_url = asset.images[0]
-            
-            # 获取资产类型名称
-            asset_type_name = '其他'
-            try:
-                from app.models.asset import AssetType
-                for item in AssetType:
-                    if item.value == asset.asset_type:
-                        if item.value == 10:
-                            asset_type_name = '不动产'
-                        elif item.value == 20:
-                            asset_type_name = '商业地产'
-                        elif item.value == 30:
-                            asset_type_name = '工业地产'
-                        elif item.value == 40:
-                            asset_type_name = '土地资产'
-                        elif item.value == 50:
-                            asset_type_name = '证券资产'
-                        elif item.value == 60:
-                            asset_type_name = '艺术品'
-                        elif item.value == 70:
-                            asset_type_name = '收藏品'
-                        else:
-                            asset_type_name = '其他'
-                        break
-            except:
-                asset_type_name = '其他'
-            
-            asset_data = {
-                'id': asset.id,
-                'name': asset.name,
-                'description': asset.description,
-                'asset_type': asset.asset_type,
-                'asset_type_name': asset_type_name,
-                'location': asset.location,
-                'area': float(asset.area) if asset.area else 0,
-                'token_symbol': asset.token_symbol,
-                'token_price': float(asset.token_price) if asset.token_price else 0,
-                'token_supply': asset.token_supply,
-                'remaining_supply': asset.remaining_supply or asset.token_supply,
-                'total_value': float(asset.total_value) if asset.total_value else 0,
-                'annual_revenue': float(asset.annual_revenue) if asset.annual_revenue else 0,
-                'images': asset.images if asset.images else [],
-                'image_url': image_url,
-                'token_address': asset.token_address,
-                'creator_address': asset.creator_address,
-                'created_at': asset.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                'updated_at': asset.updated_at.strftime('%Y-%m-%d %H:%M:%S') if asset.updated_at else None
-            }
-            
-            asset_list.append(asset_data)
-        
-        current_app.logger.info(f"返回 {len(asset_list)} 个资产")
-        return jsonify(asset_list), 200
-        
-    except Exception as e:
-        current_app.logger.error(f"获取资产列表失败: {str(e)}", exc_info=True)
-        return jsonify([]), 200
+        )
+    
+    # 排序 - 按创建时间倒序
+    query = query.order_by(desc(Asset.created_at))
+    
+    # 分页
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    assets = pagination.items
+    
+    # 使用统一的数据转换器
+    asset_list = [AssetDataConverter.to_api_format(asset) for asset in assets]
+    
+    # 构建分页响应
+    response_data = DataConverter.paginate_data(
+        asset_list, 
+        page=pagination.page, 
+        per_page=pagination.per_page
+    )
+    response_data['pagination']['total'] = pagination.total
+    response_data['pagination']['pages'] = pagination.pages
+    response_data['pagination']['has_prev'] = pagination.has_prev
+    response_data['pagination']['has_next'] = pagination.has_next
+    
+    return jsonify({
+        'success': True,
+        'data': response_data['data'],
+        'pagination': response_data['pagination']
+    }), 200
 
 @api_bp.route('/user/assets', methods=['GET'])
 def get_user_assets_query():
@@ -739,57 +694,29 @@ def get_trade_history_v2(asset_identifier):
         }), 500
 
 @api_bp.route('/assets/symbol/<string:symbol>', methods=['GET'])
+@api_endpoint(log_calls=True, measure_perf=True)
 def get_asset_by_symbol(symbol):
     """通过代币符号获取资产详情"""
-    try:
-        current_app.logger.info(f"请求通过符号获取资产: {symbol}")
-        from app.models.asset import Asset
-        
-        # 查询资产
-        asset = Asset.query.filter_by(token_symbol=symbol).first()
-        
-        # 如果找不到资产，返回404
-        if not asset:
-            current_app.logger.warning(f"找不到符号为 {symbol} 的资产")
-            return jsonify({
-                'success': False,
-                'error': f'找不到符号为 {symbol} 的资产'
-            }), 404
-        
-        # 将资产转换为字典并返回
-        asset_data = asset.to_dict()
-        
-        # 添加图片URL处理
-        if hasattr(asset, 'images') and asset.images:
-            asset_data['images'] = asset.images
-            
-            # 为前端设置主图片
-            if asset.images and len(asset.images) > 0:
-                asset_data['image_url'] = asset.images[0]
-        
-        # 构建基本响应
-        response = {
-            'success': True,
-            'id': asset.id,
-            'token_symbol': asset.token_symbol,
-            'name': asset.name,
-            'token_price': float(asset.token_price),
-            'token_supply': asset.token_supply,
-            'remaining_supply': asset.remaining_supply,
-        }
-        
-        # 添加额外资产数据
-        response.update(asset_data)
-        
-        current_app.logger.info(f"成功返回资产 {symbol} 的详情")
-        return jsonify(response), 200
-        
-    except Exception as e:
-        current_app.logger.error(f"通过符号获取资产失败: {symbol}, 错误: {str(e)}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': f"获取资产失败: {str(e)}"
-        }), 500
+    from app.models.asset import Asset
+    
+    # 验证参数
+    if not symbol or not symbol.strip():
+        return create_error_response('VALIDATION_ERROR', '资产符号不能为空', field='symbol')
+    
+    # 查询资产
+    asset = Asset.query.filter_by(token_symbol=symbol.strip()).first()
+    
+    # 如果找不到资产，返回404
+    if not asset:
+        return create_error_response('ASSET_NOT_FOUND', f'找不到符号为 {symbol} 的资产')
+    
+    # 使用统一的数据转换器
+    asset_data = AssetDataConverter.to_api_format(asset)
+    
+    return jsonify({
+        'success': True,
+        'data': asset_data
+    }), 200
 
 @api_bp.route('/trades/prepare_purchase', methods=['POST'])
 def prepare_purchase():

@@ -27,6 +27,29 @@ class DataConsistencyManager:
     def __init__(self):
         self.cache_timeout = 300  # 5分钟缓存
         self._cache = {}
+        self._redis_client = None
+        self._init_redis()
+    
+    def _init_redis(self):
+        """初始化Redis连接"""
+        try:
+            import redis
+            from flask import current_app
+            
+            # 尝试从配置获取Redis URL
+            redis_url = getattr(current_app.config, 'REDIS_URL', 'redis://localhost:6379/0')
+            self._redis_client = redis.from_url(redis_url, decode_responses=True)
+            
+            # 测试连接
+            self._redis_client.ping()
+            logger.info("Redis连接成功")
+            
+        except ImportError:
+            logger.warning("Redis库未安装，使用内存缓存")
+            self._redis_client = None
+        except Exception as e:
+            logger.warning(f"Redis连接失败，使用内存缓存: {str(e)}")
+            self._redis_client = None
     
     def get_real_time_asset_data(self, asset_id: int) -> Optional[Dict[str, Any]]:
         """
@@ -42,9 +65,10 @@ class DataConsistencyManager:
             cache_key = f"asset_data:{asset_id}"
             
             # 检查缓存
-            if self._is_cache_valid(cache_key):
+            cached_data = self._get_cache(cache_key)
+            if cached_data:
                 logger.debug(f"从缓存获取资产数据: {asset_id}")
-                return self._cache[cache_key]['data']
+                return cached_data
             
             # 从数据库获取最新数据
             asset = Asset.query.get(asset_id)
@@ -81,10 +105,7 @@ class DataConsistencyManager:
             }
             
             # 缓存数据
-            self._cache[cache_key] = {
-                'data': asset_data,
-                'timestamp': time.time()
-            }
+            self._set_cache(cache_key, asset_data)
             
             logger.info(f"获取实时资产数据完成: asset_id={asset_id}")
             return asset_data
@@ -234,7 +255,8 @@ class DataConsistencyManager:
     
     def update_asset_after_trade(self, trade_id: int) -> bool:
         """
-        交易后更新资产数据
+        交易后更新资产数据（任务5.2核心功能）
+        使用数据库事务保证一致性，并自动清除缓存
         
         Args:
             trade_id: 交易ID
@@ -243,41 +265,67 @@ class DataConsistencyManager:
             bool: 更新是否成功
         """
         try:
+            # 使用数据库事务确保数据一致性
             with db.session.begin():
-                trade = Trade.query.get(trade_id)
+                # 使用行锁防止并发更新冲突
+                trade = db.session.query(Trade).filter_by(id=trade_id).with_for_update().first()
                 if not trade:
                     logger.error(f"交易记录不存在: {trade_id}")
                     return False
                 
-                asset = Asset.query.get(trade.asset_id)
+                asset = db.session.query(Asset).filter_by(id=trade.asset_id).with_for_update().first()
                 if not asset:
                     logger.error(f"资产不存在: {trade.asset_id}")
                     return False
                 
+                # 记录更新前的状态用于验证
+                old_remaining = asset.remaining_supply or asset.token_supply
+                
                 # 更新剩余供应量
                 if trade.type == 'buy':
-                    new_remaining = (asset.remaining_supply or asset.token_supply) - trade.amount
+                    new_remaining = old_remaining - trade.amount
                 elif trade.type == 'sell':
-                    new_remaining = (asset.remaining_supply or 0) + trade.amount
+                    new_remaining = old_remaining + trade.amount
                 else:
                     logger.warning(f"未知交易类型: {trade.type}")
                     return False
                 
-                # 确保剩余供应量不为负数
-                asset.remaining_supply = max(0, new_remaining)
+                # 数据验证：确保剩余供应量合理
+                if new_remaining < 0:
+                    logger.warning(f"剩余供应量将为负数，设置为0: asset_id={asset.id}, calculated={new_remaining}")
+                    new_remaining = 0
+                elif new_remaining > asset.token_supply:
+                    logger.warning(f"剩余供应量超过总供应量，设置为总供应量: asset_id={asset.id}, calculated={new_remaining}, total={asset.token_supply}")
+                    new_remaining = asset.token_supply
+                
+                # 更新资产数据
+                asset.remaining_supply = new_remaining
                 asset.updated_at = datetime.utcnow()
                 
+                # 记录数据变更日志
+                logger.info(f"资产供应量更新: asset_id={asset.id}, trade_id={trade_id}, {old_remaining} -> {new_remaining}")
+                
+                # 提交事务
                 db.session.commit()
                 
-                # 清除相关缓存
-                self._invalidate_cache(f"asset_data:{asset.id}")
-                
-                logger.info(f"交易后资产数据更新完成: asset_id={asset.id}, trade_id={trade_id}, remaining={asset.remaining_supply}")
+            # 事务成功后清除相关缓存
+            self._invalidate_cache(f"asset_data:{asset.id}")
+            
+            # 验证更新结果
+            updated_asset = Asset.query.get(asset.id)
+            if updated_asset and updated_asset.remaining_supply == new_remaining:
+                logger.info(f"交易后资产数据更新完成并验证成功: asset_id={asset.id}, remaining={new_remaining}")
                 return True
+            else:
+                logger.error(f"数据更新验证失败: asset_id={asset.id}")
+                return False
                 
         except Exception as e:
             logger.error(f"交易后更新资产数据失败: {str(e)}", exc_info=True)
-            db.session.rollback()
+            try:
+                db.session.rollback()
+            except:
+                pass
             return False
     
     def sync_blockchain_data(self, asset_id: int) -> Dict[str, Any]:
@@ -372,23 +420,147 @@ class DataConsistencyManager:
             logger.error(f"获取交易历史失败: {str(e)}")
             return {'success': False, 'error': str(e)}
     
+    def _get_cache(self, cache_key: str) -> Optional[Dict[str, Any]]:
+        """获取缓存数据"""
+        try:
+            if self._redis_client:
+                # 使用Redis缓存
+                cached_data = self._redis_client.get(cache_key)
+                if cached_data:
+                    return json.loads(cached_data)
+            else:
+                # 使用内存缓存
+                if cache_key in self._cache:
+                    cache_entry = self._cache[cache_key]
+                    if (time.time() - cache_entry['timestamp']) < self.cache_timeout:
+                        return cache_entry['data']
+                    else:
+                        # 缓存过期，删除
+                        del self._cache[cache_key]
+        except Exception as e:
+            logger.error(f"获取缓存失败: {str(e)}")
+        
+        return None
+    
+    def _set_cache(self, cache_key: str, data: Dict[str, Any], timeout: int = None):
+        """设置缓存数据"""
+        try:
+            if timeout is None:
+                timeout = self.cache_timeout
+                
+            if self._redis_client:
+                # 使用Redis缓存
+                self._redis_client.setex(cache_key, timeout, json.dumps(data, default=str))
+            else:
+                # 使用内存缓存
+                self._cache[cache_key] = {
+                    'data': data,
+                    'timestamp': time.time()
+                }
+        except Exception as e:
+            logger.error(f"设置缓存失败: {str(e)}")
+    
     def _is_cache_valid(self, cache_key: str) -> bool:
         """检查缓存是否有效"""
-        if cache_key not in self._cache:
-            return False
-        
-        cache_time = self._cache[cache_key]['timestamp']
-        return (time.time() - cache_time) < self.cache_timeout
+        return self._get_cache(cache_key) is not None
     
     def _invalidate_cache(self, cache_key: str):
         """使缓存失效"""
-        if cache_key in self._cache:
-            del self._cache[cache_key]
+        try:
+            if self._redis_client:
+                self._redis_client.delete(cache_key)
+            else:
+                if cache_key in self._cache:
+                    del self._cache[cache_key]
+        except Exception as e:
+            logger.error(f"清除缓存失败: {str(e)}")
     
     def clear_all_cache(self):
         """清除所有缓存"""
-        self._cache.clear()
-        logger.info("所有缓存已清除")
+        try:
+            if self._redis_client:
+                # 清除所有以asset_data:开头的缓存
+                pattern = "asset_data:*"
+                keys = self._redis_client.keys(pattern)
+                if keys:
+                    self._redis_client.delete(*keys)
+            else:
+                self._cache.clear()
+            logger.info("所有缓存已清除")
+        except Exception as e:
+            logger.error(f"清除所有缓存失败: {str(e)}")
+    
+    def invalidate_asset_related_cache(self, asset_id: int):
+        """
+        清除资产相关的所有缓存（任务5.2缓存自动失效功能）
+        
+        Args:
+            asset_id: 资产ID
+        """
+        try:
+            cache_patterns = [
+                f"asset_data:{asset_id}",
+                f"trade_history:{asset_id}:*",
+                f"asset_stats:{asset_id}",
+                f"asset_dividends:{asset_id}"
+            ]
+            
+            if self._redis_client:
+                # 使用Redis批量删除
+                all_keys = []
+                for pattern in cache_patterns:
+                    if '*' in pattern:
+                        keys = self._redis_client.keys(pattern)
+                        all_keys.extend(keys)
+                    else:
+                        all_keys.append(pattern)
+                
+                if all_keys:
+                    self._redis_client.delete(*all_keys)
+                    logger.info(f"已清除资产相关缓存: asset_id={asset_id}, 清除{len(all_keys)}个key")
+            else:
+                # 内存缓存清除
+                keys_to_delete = []
+                for key in self._cache.keys():
+                    if key.startswith(f"asset_data:{asset_id}"):
+                        keys_to_delete.append(key)
+                
+                for key in keys_to_delete:
+                    del self._cache[key]
+                
+                logger.info(f"已清除资产相关内存缓存: asset_id={asset_id}, 清除{len(keys_to_delete)}个key")
+                
+        except Exception as e:
+            logger.error(f"清除资产相关缓存失败: {str(e)}")
+    
+    def refresh_asset_cache(self, asset_id: int) -> bool:
+        """
+        刷新资产缓存（任务5.2缓存自动刷新功能）
+        先清除旧缓存，然后预加载新数据
+        
+        Args:
+            asset_id: 资产ID
+            
+        Returns:
+            bool: 刷新是否成功
+        """
+        try:
+            # 1. 清除旧缓存
+            self.invalidate_asset_related_cache(asset_id)
+            
+            # 2. 预加载新数据
+            new_data = self.get_real_time_asset_data(asset_id)
+            
+            if new_data:
+                logger.info(f"资产缓存刷新成功: asset_id={asset_id}")
+                return True
+            else:
+                logger.warning(f"资产缓存刷新失败，无法获取新数据: asset_id={asset_id}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"刷新资产缓存失败: {str(e)}")
+            return False
     
     def validate_data_consistency(self, asset_id: int) -> Dict[str, Any]:
         """

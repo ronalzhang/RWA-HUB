@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="{{ g.locale }}" class="h-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="RWA-HUB Admin Panel - Professional Asset Management Dashboard">
+    <title>{% block title %}RWA-HUB Admin{% endblock %}</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- CSS Framework -->
+    <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/all.min.css') }}" rel="stylesheet">
+    
+    <!-- Custom Styles -->
+    <link href="{{ url_for('static', filename='css/cyberpunk-theme.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/responsive-enhancements.css') }}" rel="stylesheet">
+    
+    <style>
+    /* 管理后台专用样式 */
+    :root {
+        --admin-sidebar-width: 280px;
+        --admin-header-height: 70px;
+        --admin-primary: #00ffff;
+        --admin-secondary: #ff00ff;
+        --admin-success: #00ff88;
+        --admin-warning: #ffaa00;
+        --admin-danger: #ff0066;
+        --admin-info: #0099ff;
+    }
+    
+    .admin-layout {
+        background: var(--cyber-bg-primary);
+        min-height: 100vh;
+        display: flex;
+        font-family: 'Inter', sans-serif;
+    }
+    
+    /* 侧边栏 */
+    .admin-sidebar {
+        width: var(--admin-sidebar-width);
+        background: var(--cyber-glass-dark);
+        backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
+        border-right: var(--cyber-border);
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        z-index: 1000;
+        overflow-y: auto;
+        transition: transform var(--cyber-transition-normal) ease;
+    }
+    
+    .admin-sidebar.collapsed {
+        transform: translateX(-100%);
+    }
+    
+    .sidebar-header {
+        padding: 2rem 1.5rem;
+        border-bottom: var(--cyber-border);
+        text-align: center;
+    }
+    
+    .sidebar-brand {
+        font-family: 'Orbitron', monospace;
+        font-size: 1.5rem;
+        font-weight: 900;
+        color: var(--admin-primary);
+        text-shadow: 0 0 15px var(--admin-primary);
+        text-decoration: none;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+    
+    .sidebar-subtitle {
+        font-size: 0.85rem;
+        color: var(--cyber-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .sidebar-nav {
+        padding: 1rem 0;
+    }
+    
+    .nav-section {
+        margin-bottom: 2rem;
+    }
+    
+    .nav-section-title {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--cyber-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 0 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .nav-item {
+        margin-bottom: 0.25rem;
+    }
+    
+    .nav-link {
+        display: flex;
+        align-items: center;
+        padding: 0.875rem 1.5rem;
+        color: var(--cyber-text-secondary);
+        text-decoration: none;
+        font-weight: 500;
+        transition: all var(--cyber-transition-normal) ease;
+        position: relative;
+        border-radius: 0;
+    }
+    
+    .nav-link::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: var(--admin-primary);
+        transform: scaleY(0);
+        transition: transform var(--cyber-transition-normal) ease;
+    }
+    
+    .nav-link:hover,
+    .nav-link.active {
+        color: var(--admin-primary);
+        background: rgba(0, 255, 255, 0.1);
+        text-shadow: 0 0 8px var(--admin-primary);
+    }
+    
+    .nav-link:hover::before,
+    .nav-link.active::before {
+        transform: scaleY(1);
+    }
+    
+    .nav-link i {
+        width: 20px;
+        margin-right: 0.75rem;
+        font-size: 1.1rem;
+    }
+    
+    .nav-badge {
+        background: var(--admin-danger);
+        color: white;
+        font-size: 0.7rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 10px;
+        margin-left: auto;
+        font-weight: 700;
+    }
+    
+    /* 主内容区域 */
+    .admin-main {
+        flex: 1;
+        margin-left: var(--admin-sidebar-width);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        transition: margin-left var(--cyber-transition-normal) ease;
+    }
+    
+    .admin-main.expanded {
+        margin-left: 0;
+    }
+    
+    /* 顶部导航 */
+    .admin-header {
+        height: var(--admin-header-height);
+        background: var(--cyber-glass-dark);
+        backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
+        border-bottom: var(--cyber-border);
+        display: flex;
+        align-items: center;
+        padding: 0 2rem;
+        position: sticky;
+        top: 0;
+        z-index: 999;
+    }
+    
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .sidebar-toggle {
+        background: transparent;
+        border: 1px solid var(--cyber-border);
+        color: var(--cyber-text-secondary);
+        padding: 0.5rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all var(--cyber-transition-normal) ease;
+    }
+    
+    .sidebar-toggle:hover {
+        border-color: var(--admin-primary);
+        color: var(--admin-primary);
+        box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+    }
+    
+    .page-title {
+        font-family: 'Orbitron', monospace;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--cyber-text-primary);
+        margin: 0;
+    }
+    
+    .header-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .header-stats {
+        display: flex;
+        gap: 2rem;
+    }
+    
+    .header-stat {
+        text-align: center;
+    }
+    
+    .header-stat-value {
+        font-family: 'Orbitron', monospace;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--admin-primary);
+        text-shadow: 0 0 8px var(--admin-primary);
+        display: block;
+    }
+    
+    .header-stat-label {
+        font-size: 0.75rem;
+        color: var(--cyber-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .admin-user {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 1rem;
+        background: rgba(0, 255, 255, 0.1);
+        border: 1px solid rgba(0, 255, 255, 0.3);
+        border-radius: 25px;
+        color: var(--cyber-text-primary);
+        text-decoration: none;
+        transition: all var(--cyber-transition-normal) ease;
+    }
+    
+    .admin-user:hover {
+        background: rgba(0, 255, 255, 0.2);
+        border-color: var(--admin-primary);
+        color: var(--cyber-text-primary);
+        box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+    }
+    
+    .admin-avatar {
+        width: 32px;
+        height: 32px;
+        background: var(--cyber-gradient-primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--cyber-bg-primary);
+        font-weight: 700;
+        font-size: 0.9rem;
+    }
+    
+    /* 内容区域 */
+    .admin-content {
+        flex: 1;
+        padding: 2rem;
+        overflow-y: auto;
+    }
+    
+    /* 卡片组件 */
+    .admin-card {
+        background: var(--cyber-glass-dark);
+        backdrop-filter: blur(25px);
+        -webkit-backdrop-filter: blur(25px);
+        border: var(--cyber-border);
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        position: relative;
+        overflow: hidden;
+        transition: all var(--cyber-transition-normal) ease;
+    }
+    
+    .admin-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--cyber-gradient-primary);
+        opacity: 0.5;
+    }
+    
+    .admin-card:hover {
+        border-color: rgba(0, 255, 255, 0.5);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    
+    .card-header {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+    }
+    
+    .card-title {
+        font-family: 'Orbitron', monospace;
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--cyber-text-primary);
+        margin: 0;
+    }
+    
+    .card-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    /* 表格样式 */
+    .admin-table {
+        width: 100%;
+        background: transparent;
+        border-collapse: collapse;
+        margin-top: 1rem;
+    }
+    
+    .admin-table th {
+        background: rgba(0, 255, 255, 0.1);
+        color: var(--cyber-text-primary);
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 1rem;
+        border: 1px solid rgba(0, 255, 255, 0.2);
+        text-align: left;
+    }
+    
+    .admin-table td {
+        padding: 1rem;
+        border: 1px solid rgba(0, 255, 255, 0.1);
+        color: var(--cyber-text-secondary);
+        vertical-align: middle;
+    }
+    
+    .admin-table tbody tr {
+        transition: all var(--cyber-transition-normal) ease;
+    }
+    
+    .admin-table tbody tr:hover {
+        background: rgba(0, 255, 255, 0.05);
+    }
+    
+    /* 按钮样式 */
+    .btn-admin-primary {
+        background: var(--cyber-gradient-primary);
+        border: none;
+        color: var(--cyber-bg-primary);
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all var(--cyber-transition-normal) ease;
+        cursor: pointer;
+    }
+    
+    .btn-admin-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 255, 255, 0.3);
+        color: var(--cyber-bg-primary);
+    }
+    
+    .btn-admin-secondary {
+        background: transparent;
+        border: 1px solid var(--cyber-border);
+        color: var(--cyber-text-secondary);
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all var(--cyber-transition-normal) ease;
+        cursor: pointer;
+    }
+    
+    .btn-admin-secondary:hover {
+        border-color: var(--admin-primary);
+        color: var(--admin-primary);
+        background: rgba(0, 255, 255, 0.1);
+    }
+    
+    .btn-admin-danger {
+        background: var(--cyber-gradient-secondary);
+        border: none;
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all var(--cyber-transition-normal) ease;
+        cursor: pointer;
+    }
+    
+    .btn-admin-danger:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(255, 0, 102, 0.3);
+        color: white;
+    }
+    
+    /* 状态指示器 */
+    .status-badge {
+        padding: 0.4rem 0.8rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .status-badge.success {
+        background: rgba(0, 255, 136, 0.2);
+        color: var(--admin-success);
+        border: 1px solid var(--admin-success);
+    }
+    
+    .status-badge.warning {
+        background: rgba(255, 170, 0, 0.2);
+        color: var(--admin-warning);
+        border: 1px solid var(--admin-warning);
+    }
+    
+    .status-badge.danger {
+        background: rgba(255, 0, 102, 0.2);
+        color: var(--admin-danger);
+        border: 1px solid var(--admin-danger);
+    }
+    
+    .status-badge.info {
+        background: rgba(0, 153, 255, 0.2);
+        color: var(--admin-info);
+        border: 1px solid var(--admin-info);
+    }
+    
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+        animation: status-pulse 2s ease-in-out infinite alternate;
+    }
+    
+    /* 表单样式 */
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: var(--cyber-text-primary);
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 0.875rem 1rem;
+        background: rgba(0, 255, 255, 0.05);
+        border: 1px solid rgba(0, 255, 255, 0.2);
+        border-radius: 8px;
+        color: var(--cyber-text-primary);
+        font-size: 0.95rem;
+        transition: all var(--cyber-transition-normal) ease;
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: var(--admin-primary);
+        background: rgba(0, 255, 255, 0.1);
+        box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.1);
+    }
+    
+    .form-control::placeholder {
+        color: var(--cyber-text-muted);
+    }
+    
+    /* 响应式设计 */
+    @media (max-width: 1200px) {
+        .admin-sidebar {
+            transform: translateX(-100%);
+        }
+        
+        .admin-sidebar.show {
+            transform: translateX(0);
+        }
+        
+        .admin-main {
+            margin-left: 0;
+        }
+        
+        .header-stats {
+            display: none;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .admin-content {
+            padding: 1rem;
+        }
+        
+        .admin-card {
+            padding: 1.5rem;
+        }
+        
+        .admin-header {
+            padding: 0 1rem;
+        }
+        
+        .page-title {
+            font-size: 1.2rem;
+        }
+        
+        .admin-table {
+            font-size: 0.85rem;
+        }
+        
+        .admin-table th,
+        .admin-table td {
+            padding: 0.75rem 0.5rem;
+        }
+    }
+    
+    /* 加载动画 */
+    .admin-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem;
+        color: var(--cyber-text-secondary);
+    }
+    
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(0, 255, 255, 0.1);
+        border-top: 3px solid var(--admin-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 1rem;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* 滚动条样式 */
+    .admin-sidebar::-webkit-scrollbar,
+    .admin-content::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .admin-sidebar::-webkit-scrollbar-track,
+    .admin-content::-webkit-scrollbar-track {
+        background: var(--cyber-bg-secondary);
+    }
+    
+    .admin-sidebar::-webkit-scrollbar-thumb,
+    .admin-content::-webkit-scrollbar-thumb {
+        background: var(--admin-primary);
+        border-radius: 3px;
+    }
+    
+    .admin-sidebar::-webkit-scrollbar-thumb:hover,
+    .admin-content::-webkit-scrollbar-thumb:hover {
+        background: var(--admin-secondary);
+    }
+    </style>
+    
+    {% block styles %}{% endblock %}
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- 侧边栏 -->
+        <nav class="admin-sidebar" id="adminSidebar">
+            <div class="sidebar-header">
+                <a href="{{ url_for('admin.dashboard') }}" class="sidebar-brand">
+                    RWA.HUB
+                </a>
+                <div class="sidebar-subtitle">Admin Console</div>
+            </div>
+            
+            <div class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Dashboard</div>
+                    <div class="nav-item">
+                        <a href="{{ url_for('admin.dashboard') }}" class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span>Overview</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{{ url_for('admin.analytics') if url_for('admin.analytics') else '#' }}" class="nav-link">
+                            <i class="fas fa-chart-line"></i>
+                            <span>Analytics</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-section-title">Asset Management</div>
+                    <div class="nav-item">
+                        <a href="{{ url_for('admin.assets') }}" class="nav-link {% if request.endpoint == 'admin.assets' %}active{% endif %}">
+                            <i class="fas fa-building"></i>
+                            <span>Assets</span>
+                            <span class="nav-badge">{{ assets_count if assets_count is defined else '0' }}</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{{ url_for('admin.trades') if url_for('admin.trades') else '#' }}" class="nav-link">
+                            <i class="fas fa-exchange-alt"></i>
+                            <span>Trades</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{{ url_for('admin.payment_management') }}" class="nav-link {% if request.endpoint == 'admin.payment_management' %}active{% endif %}">
+                            <i class="fas fa-credit-card"></i>
+                            <span>Payments</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-section-title">User Management</div>
+                    <div class="nav-item">
+                        <a href="{{ url_for('admin.users') if url_for('admin.users') else '#' }}" class="nav-link">
+                            <i class="fas fa-users"></i>
+                            <span>Users</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{{ url_for('admin.commission') if url_for('admin.commission') else '#' }}" class="nav-link">
+                            <i class="fas fa-percentage"></i>
+                            <span>Commissions</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-section-title">System</div>
+                    <div class="nav-item">
+                        <a href="{{ url_for('admin.settings') if url_for('admin.settings') else '#' }}" class="nav-link">
+                            <i class="fas fa-cog"></i>
+                            <span>Settings</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{{ url_for('admin.logs') if url_for('admin.logs') else '#' }}" class="nav-link">
+                            <i class="fas fa-file-alt"></i>
+                            <span>Logs</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        
+        <!-- 主内容区域 -->
+        <main class="admin-main" id="adminMain">
+            <!-- 顶部导航 -->
+            <header class="admin-header">
+                <div class="header-left">
+                    <button class="sidebar-toggle" id="sidebarToggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+                </div>
+                
+                <div class="header-right">
+                    <div class="header-stats">
+                        <div class="header-stat">
+                            <span class="header-stat-value">{{ total_assets if total_assets is defined else '0' }}</span>
+                            <span class="header-stat-label">Assets</span>
+                        </div>
+                        <div class="header-stat">
+                            <span class="header-stat-value">{{ active_users if active_users is defined else '0' }}</span>
+                            <span class="header-stat-label">Users</span>
+                        </div>
+                        <div class="header-stat">
+                            <span class="header-stat-value">99.9%</span>
+                            <span class="header-stat-label">Uptime</span>
+                        </div>
+                    </div>
+                    
+                    <div class="admin-user">
+                        <div class="admin-avatar">
+                            {{ current_user_address[:2].upper() if current_user_address else 'AD' }}
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.9rem;">Admin</div>
+                            <div style="font-size: 0.75rem; color: var(--cyber-text-muted);">
+                                {{ current_user_address[:8] + '...' if current_user_address else 'System' }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- 内容区域 -->
+            <div class="admin-content">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ui-enhancements.js') }}"></script>
+    
+    <script>
+        // 管理后台初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('adminSidebar');
+            const main = document.getElementById('adminMain');
+            const toggle = document.getElementById('sidebarToggle');
+            
+            // 侧边栏切换
+            toggle.addEventListener('click', function() {
+                if (window.innerWidth <= 1200) {
+                    sidebar.classList.toggle('show');
+                } else {
+                    sidebar.classList.toggle('collapsed');
+                    main.classList.toggle('expanded');
+                }
+            });
+            
+            // 响应式处理
+            function handleResize() {
+                if (window.innerWidth <= 1200) {
+                    sidebar.classList.remove('collapsed');
+                    main.classList.remove('expanded');
+                } else {
+                    sidebar.classList.remove('show');
+                }
+            }
+            
+            window.addEventListener('resize', handleResize);
+            handleResize();
+            
+            // 点击外部关闭移动端侧边栏
+            document.addEventListener('click', function(e) {
+                if (window.innerWidth <= 1200 && 
+                    !sidebar.contains(e.target) && 
+                    !toggle.contains(e.target) && 
+                    sidebar.classList.contains('show')) {
+                    sidebar.classList.remove('show');
+                }
+            });
+            
+            // 表格行点击效果
+            document.querySelectorAll('.admin-table tbody tr').forEach(row => {
+                row.addEventListener('click', function() {
+                    // 移除其他行的选中状态
+                    document.querySelectorAll('.admin-table tbody tr').forEach(r => {
+                        r.style.background = '';
+                    });
+                    // 添加当前行的选中状态
+                    this.style.background = 'rgba(0, 255, 255, 0.1)';
+                });
+            });
+            
+            // 状态指示器动画
+            document.querySelectorAll('.status-dot').forEach(dot => {
+                dot.style.animationDelay = Math.random() * 2 + 's';
+            });
+            
+            console.log('🔧 Admin panel initialized');
+        });
+        
+        // 全局通知函数
+        function showAdminNotification(message, type = 'info') {
+            if (window.uiEnhancer) {
+                window.uiEnhancer.showToast(message, type);
+            } else {
+                alert(message);
+            }
+        }
+        
+        // 确认对话框
+        function confirmAction(message, callback) {
+            if (confirm(message)) {
+                callback();
+            }
+        }
+        
+        // 数据刷新
+        function refreshData() {
+            showAdminNotification('正在刷新数据...', 'info');
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        }
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

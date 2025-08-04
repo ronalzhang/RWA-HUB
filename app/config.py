@@ -66,11 +66,35 @@ class Config:
     
     ETH_RPC_URL = os.environ.get('ETH_RPC_URL', 'https://rpc.ankr.com/eth')
     ETH_USDC_CONTRACT = os.environ.get('ETH_USDC_CONTRACT', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
+    
+    # Redis缓存配置
+    REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+    CACHE_TYPE = 'redis'
+    CACHE_DEFAULT_TIMEOUT = 300  # 5分钟默认缓存时间
+    
+    # 性能优化配置
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': 20,
+        'max_overflow': 30,
+        'pool_timeout': 30,
+        'pool_recycle': 3600,
+        'pool_pre_ping': True,
+    }
 
     @staticmethod
     def init_app(app):
         # 基础配置初始化
-        pass
+        from app.services.database_optimizer import get_database_optimizer
+        from app.services.cache_service import get_cache_manager
+        
+        # 初始化数据库优化
+        db_optimizer = get_database_optimizer()
+        db_optimizer.optimize_connection_pool(app)
+        
+        # 初始化缓存
+        cache_manager = get_cache_manager()
+        
+        # 在应用启动后创建索引（延迟执行）
 
 class DevelopmentConfig(Config):
     DEBUG = True

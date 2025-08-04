@@ -314,3 +314,148 @@ def get_trading_volume_trend(days=30):
     except Exception as e:
         current_app.logger.error(f'获取交易量趋势失败: {str(e)}')
         return {'labels': [], 'values': []} 
+
+# 添加数据库性能监控API
+@admin_bp.route('/v2/api/performance/database')
+@api_admin_required
+def database_performance_v2():
+    return database_performance_api()
+
+
+@admin_api_bp.route('/performance/database')
+@api_admin_required
+def database_performance_api():
+    """获取数据库性能统计"""
+    try:
+        from app.services.query_optimizer import query_optimizer
+        from sqlalchemy import text
+        
+        # 获取查询性能统计
+        performance_stats = query_optimizer.get_query_performance_stats()
+        
+        # 获取数据库连接池状态
+        engine = db.engine
+        pool_status = {
+            'pool_size': getattr(engine.pool, 'size', 'N/A'),
+            'checked_in': getattr(engine.pool, 'checkedin', 'N/A'),
+            'checked_out': getattr(engine.pool, 'checkedout', 'N/A'),
+            'overflow': getattr(engine.pool, 'overflow', 'N/A'),
+            'invalid': getattr(engine.pool, 'invalid', 'N/A')
+        }
+        
+        # 获取表统计信息
+        table_stats = []
+        try:
+            tables = ['assets', 'trades', 'user_referrals', 'commission_records']
+            for table in tables:
+                count_result = db.session.execute(text(f"SELECT COUNT(*) FROM {table}")).fetchone()
+                table_stats.append({
+                    'table': table,
+                    'row_count': count_result[0] if count_result else 0
+                })
+        except Exception as table_error:
+            current_app.logger.warning(f"获取表统计失败: {str(table_error)}")
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'query_performance': performance_stats,
+                'connection_pool': pool_status,
+                'table_statistics': table_stats,
+                'generated_at': datetime.utcnow().isoformat()
+            }
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取数据库性能统计失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# 添加缓存性能监控API
+@admin_bp.route('/v2/api/performance/cache')
+@api_admin_required
+def cache_performance_v2():
+    return cache_performance_api()
+
+
+@admin_api_bp.route('/performance/cache')
+@api_admin_required
+def cache_performance_api():
+    """获取缓存性能统计"""
+    try:
+        from app.services.data_consistency_manager import DataConsistencyManager
+        
+        data_manager = DataConsistencyManager()
+        
+        cache_stats = {
+            'redis_available': data_manager._redis_client is not None,
+            'cache_type': 'Redis' if data_manager._redis_client else 'Memory'
+        }
+        
+        # 如果Redis可用，获取Redis统计
+        if data_manager._redis_client:
+            try:
+                redis_info = data_manager._redis_client.info()
+                cache_stats.update({
+                    'redis_version': redis_info.get('redis_version'),
+                    'used_memory': redis_info.get('used_memory_human'),
+                    'connected_clients': redis_info.get('connected_clients'),
+                    'total_commands_processed': redis_info.get('total_commands_processed'),
+                    'keyspace_hits': redis_info.get('keyspace_hits', 0),
+                    'keyspace_misses': redis_info.get('keyspace_misses', 0)
+                })
+                
+                # 计算缓存命中率
+                hits = redis_info.get('keyspace_hits', 0)
+                misses = redis_info.get('keyspace_misses', 0)
+                total = hits + misses
+                hit_rate = (hits / total * 100) if total > 0 else 0
+                cache_stats['hit_rate'] = f"{hit_rate:.2f}%"
+                
+            except Exception as redis_error:
+                current_app.logger.warning(f"获取Redis统计失败: {str(redis_error)}")
+                cache_stats['redis_error'] = str(redis_error)
+        
+        return jsonify({
+            'success': True,
+            'data': cache_stats
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取缓存性能统计失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# 添加数据库优化执行API
+@admin_bp.route('/v2/api/performance/optimize')
+@api_admin_required
+def optimize_database_v2():
+    return optimize_database_api()
+
+
+@admin_api_bp.route('/performance/optimize')
+@api_admin_required
+def optimize_database_api():
+    """执行数据库优化"""
+    try:
+        from migrations.add_performance_indexes import optimize_database_performance
+        
+        # 执行数据库优化
+        result = optimize_database_performance()
+        
+        return jsonify({
+            'success': result['success'],
+            'data': result if result['success'] else None,
+            'error': result.get('error') if not result['success'] else None
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"执行数据库优化失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
