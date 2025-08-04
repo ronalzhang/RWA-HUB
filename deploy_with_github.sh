@@ -11,7 +11,7 @@ set -e
 SERVER_PASSWORD="Pr971V3j"
 SERVER_USER="root"
 SERVER_HOST="156.236.74.200"
-SERVER_PATH="/root/RWA-HUB_4.0"
+SERVER_PATH="/root/RWA-HUB"
 GITHUB_REPO="https://github.com/your-username/RWA-HUB_4.0.git"  # 请替换为实际的GitHub仓库地址
 
 # PostgreSQL 配置
@@ -124,6 +124,13 @@ sshpass -p "$SERVER_PASSWORD" ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SER
 set -e
 
 echo "🔧 在服务器上执行PostgreSQL数据迁移..."
+
+# 检查项目目录是否存在
+if [ ! -d "$SERVER_PATH" ]; then
+    echo "📁 项目目录不存在，正在克隆仓库..."
+    git clone $GITHUB_REPO $SERVER_PATH
+    echo "✅ 仓库克隆完成"
+fi
 
 # 进入项目目录
 cd $SERVER_PATH
