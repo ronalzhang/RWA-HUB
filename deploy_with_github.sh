@@ -12,7 +12,7 @@ SERVER_PASSWORD="Pr971V3j"
 SERVER_USER="root"
 SERVER_HOST="156.236.74.200"
 SERVER_PATH="/root/RWA-HUB"
-GITHUB_REPO="https://github.com/your-username/RWA-HUB_4.0.git"  # 请替换为实际的GitHub仓库地址
+GITHUB_REPO="https://github.com/ronalzhang/RWA-HUB.git"
 
 # PostgreSQL 配置
 PG_HOST="localhost"
