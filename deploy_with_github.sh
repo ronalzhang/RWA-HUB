@@ -125,16 +125,6 @@ set -e
 
 echo "🔧 在服务器上执行PostgreSQL数据迁移..."
 
-# 检查项目目录是否存在
-if [ ! -d "$SERVER_PATH" ]; then
-    echo "📁 项目目录不存在，正在克隆仓库..."
-    git clone $GITHUB_REPO $SERVER_PATH
-    echo "✅ 仓库克隆完成"
-fi
-
-# 进入项目目录
-cd $SERVER_PATH
-
 # 停止应用服务
 echo "⏹️  停止应用服务..."
 sudo systemctl stop rwa-hub || echo "服务未运行"
@@ -145,10 +135,28 @@ echo "💾 备份现有PostgreSQL数据库..."
 BACKUP_NAME="rwa_hub_backup_\$(date +%Y%m%d_%H%M%S).sql"
 PGPASSWORD="$PG_PASSWORD" pg_dump -h "$PG_HOST" -U "$PG_USER" -d "$PG_DATABASE" > "\$BACKUP_NAME" 2>/dev/null || echo "备份失败，可能是新数据库"
 
-# 拉取最新代码
-echo "📥 拉取最新代码..."
-git fetch origin
-git reset --hard origin/main || git reset --hard origin/master
+# 处理项目目录
+if [ -d "$SERVER_PATH" ]; then
+    echo "📁 项目目录已存在，检查Git仓库状态..."
+    cd $SERVER_PATH
+    
+    # 检查是否是Git仓库
+    if [ ! -d ".git" ]; then
+        echo "🔄 不是Git仓库，重新初始化..."
+        cd ..
+        rm -rf $SERVER_PATH
+        git clone $GITHUB_REPO $SERVER_PATH
+        cd $SERVER_PATH
+    else
+        echo "📥 拉取最新代码..."
+        git fetch origin
+        git reset --hard origin/main || git reset --hard origin/master
+    fi
+else
+    echo "📁 项目目录不存在，正在克隆仓库..."
+    git clone $GITHUB_REPO $SERVER_PATH
+    cd $SERVER_PATH
+fi
 
 # 检查PostgreSQL连接
 echo "🔍 检查PostgreSQL连接..."
