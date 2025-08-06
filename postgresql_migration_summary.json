@@ -1,0 +1,7 @@
+{
+  "migration_date": "2025-08-05T12:47:54.581176",
+  "status": "completed",
+  "database_type": "PostgreSQL",
+  "total_records": 1184,
+  "tables_migrated": 14
+}

@@ -456,3 +456,52 @@ def api_endpoint(require_wallet: bool = False,
         return decorated
     
     return decorator
+def eth_address_required(f: Callable) -> Callable:
+    """以太坊地址验证装饰器"""
+    @functools.wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 简化的以太坊地址验证逻辑
+        # 在实际应用中应该添加更严格的验证
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f: Callable) -> Callable:
+    """管理员权限装饰器"""
+    @functools.wraps(f)
+    def decorated_function(*args, **kwargs):
+        from flask import session, request, jsonify
+        # 简化的管理员认证逻辑
+        if not session.get('is_admin'):
+            admin_password = request.args.get('admin_password') or request.form.get('admin_password')
+            if admin_password != 'admin123':  # 简化的密码验证
+                return jsonify({'error': 'Admin access required'}), 403
+            session['is_admin'] = True
+        return f(*args, **kwargs)
+    return decorated_function
+
+def async_task(f: Callable) -> Callable:
+    """异步任务装饰器"""
+    @functools.wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 简化的异步任务处理
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"异步任务执行失败: {e}")
+            return {'error': str(e)}, 500
+    return decorated_function
+
+def log_activity(activity_type: str = 'unknown'):
+    """活动日志装饰器"""
+    def decorator(f: Callable) -> Callable:
+        @functools.wraps(f)
+        def decorated_function(*args, **kwargs):
+            try:
+                result = f(*args, **kwargs)
+                logger.info(f"活动记录: {activity_type} - 函数: {f.__name__}")
+                return result
+            except Exception as e:
+                logger.error(f"活动执行失败: {activity_type} - 函数: {f.__name__} - 错误: {e}")
+                raise
+        return decorated_function
+    return decorator

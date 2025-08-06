@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request, current_app
 from app.extensions import db
 from app.models import Asset
-from app.utils.decorators import is_admin
+from app.utils.admin import is_admin
 import json
 from datetime import datetime
 
