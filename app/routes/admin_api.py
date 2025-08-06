@@ -8,7 +8,8 @@ import traceback # 导入 traceback
 from functools import wraps
 import base64 # 用于解码Base64签名
 
-from app.utils.decorators import eth_address_required, async_task, log_activity, admin_required
+from app.utils.auth import eth_address_required
+from app.routes.admin import admin_required
 from app.models.admin import (
     AdminUser, SystemConfig, CommissionSetting, DistributionLevel,
     CommissionStatus, CommissionType, UserReferral, 
@@ -500,7 +501,6 @@ def refresh_dashboard_stats():
     """手动刷新仪表盘统计数据"""
     try:
         # 使用异步任务更新统计
-        @async_task
         def update_stats():
             DashboardStats.update_daily_stats()
             current_app.logger.info("仪表盘统计数据已更新")

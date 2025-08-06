@@ -64,19 +64,24 @@ class AuthenticationService:
             self.logger.error(f"从数据库获取管理员信息失败: {e}")
         
         # 2. 备用：从配置文件获取
-        admin_config = current_app.config.get('ADMIN_CONFIG', {})
-        normalized_address = self._normalize_address(wallet_address)
-        
-        for config_addr, info in admin_config.items():
-            if self._normalize_address(config_addr) == normalized_address:
-                return {
-                    'wallet_address': wallet_address,
-                    'username': info.get('name', 'Admin'),
-                    'role': info.get('role', 'admin'),
-                    'permissions': info.get('permissions', []),
-                    'is_admin': True,
-                    'source': 'config'
-                }
+        try:
+            from flask import has_app_context
+            if has_app_context():
+                admin_config = current_app.config.get('ADMIN_CONFIG', {})
+                normalized_address = self._normalize_address(wallet_address)
+                
+                for config_addr, info in admin_config.items():
+                    if self._normalize_address(config_addr) == normalized_address:
+                        return {
+                            'wallet_address': wallet_address,
+                            'username': info.get('name', 'Admin'),
+                            'role': info.get('role', 'admin'),
+                            'permissions': info.get('permissions', []),
+                            'is_admin': True,
+                            'source': 'config'
+                        }
+        except Exception as e:
+            self.logger.error(f"从配置文件获取管理员信息失败: {e}")
         
         return None
     
@@ -102,17 +107,28 @@ class AuthenticationService:
         
         # 从数据库加载
         try:
-            admins = AdminUser.query.all()
-            addresses.extend([admin.wallet_address for admin in admins])
-            self.logger.info(f"从数据库加载了 {len(admins)} 个管理员地址")
+            from flask import has_app_context
+            if has_app_context():
+                admins = AdminUser.query.all()
+                addresses.extend([admin.wallet_address for admin in admins])
+                self.logger.info(f"从数据库加载了 {len(admins)} 个管理员地址")
+            else:
+                self.logger.warning("不在应用上下文中，跳过数据库加载")
         except Exception as e:
             self.logger.error(f"从数据库加载管理员地址失败: {e}")
         
         # 从配置文件加载
-        admin_config = current_app.config.get('ADMIN_CONFIG', {})
-        config_addresses = list(admin_config.keys())
-        addresses.extend(config_addresses)
-        self.logger.info(f"从配置文件加载了 {len(config_addresses)} 个管理员地址")
+        try:
+            from flask import has_app_context
+            if has_app_context():
+                admin_config = current_app.config.get('ADMIN_CONFIG', {})
+                config_addresses = list(admin_config.keys())
+                addresses.extend(config_addresses)
+                self.logger.info(f"从配置文件加载了 {len(config_addresses)} 个管理员地址")
+            else:
+                self.logger.warning("不在应用上下文中，跳过配置文件加载")
+        except Exception as e:
+            self.logger.error(f"从配置文件加载管理员地址失败: {e}")
         
         # 从环境变量加载
         import os

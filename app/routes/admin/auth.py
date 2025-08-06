@@ -25,6 +25,7 @@ def api_admin_required(f):
         # 优先检查session中的安全验证状态
         if session.get('admin_verified') and session.get('admin_wallet_address'):
             wallet_address = session.get('admin_wallet_address')
+            auth_service = get_auth_service()
             if auth_service.verify_admin_wallet(wallet_address):
                 g.eth_address = wallet_address
                 g.wallet_address = wallet_address
@@ -46,6 +47,7 @@ def api_admin_required(f):
             return jsonify({'error': '请先连接钱包并登录', 'code': 'AUTH_REQUIRED'}), 401
             
         # 使用统一认证服务验证管理员权限
+        auth_service = get_auth_service()
         if not auth_service.verify_admin_wallet(wallet_address):
             current_app.logger.warning(f"API管理员验证失败 - 地址: {wallet_address}")
             return jsonify({'error': '您没有管理员权限', 'code': 'ADMIN_REQUIRED'}), 403
@@ -89,6 +91,7 @@ def admin_page_required(f):
         # 检查session中的admin验证状态
         if session.get('admin_verified') and session.get('admin_wallet_address'):
             wallet_address = session.get('admin_wallet_address')
+            auth_service = get_auth_service()
             if auth_service.verify_admin_wallet(wallet_address):
                 g.eth_address = wallet_address
                 return f(*args, **kwargs)
@@ -169,6 +172,7 @@ def check_admin():
             return jsonify({'is_admin': False, 'error': '缺少钱包地址'}), 400
         
         # 使用统一认证服务检查是否为管理员
+        auth_service = get_auth_service()
         admin_info = auth_service.get_admin_info(address)
         
         if admin_info:
@@ -267,6 +271,7 @@ def check_admin_api():
             return jsonify({'is_admin': False, 'error': '缺少钱包地址'}), 400
         
         # 使用统一认证服务检查是否为管理员
+        auth_service = get_auth_service()
         admin_info = auth_service.get_admin_info(address)
         
         if admin_info:
