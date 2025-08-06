@@ -1,6 +1,0 @@
-[provider]
-cluster = "mainnet-beta"
-wallet = "program-keypair.json"
-
-[programs.mainnet-beta]
-rwa_hub = "2TsURTNQXyqHLB2bfbzFME7HkSMLWueYPjqXBBy2u1wP" 
