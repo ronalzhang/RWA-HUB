@@ -320,7 +320,7 @@ function loadMessages(page = 1) {
     if (statusFilter === 'inactive') params.append('status', 'false');
     if (searchKeyword) params.append('search', searchKeyword);
     
-    fetch(`/admin/api/v2/share-messages?${params.toString()}`)
+    fetch(`/api/admin/v2/share-messages?${params.toString()}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -572,7 +572,7 @@ function closeDeleteModal() {
 function confirmDelete() {
     if (!deleteMessageId) return;
     
-    fetch(`/admin/api/v2/share-messages/${deleteMessageId}`, {
+    fetch(`/api/admin/v2/share-messages/${deleteMessageId}`, {
         method: 'DELETE',
         headers: {
             'Content-Type': 'application/json',
@@ -612,8 +612,8 @@ function saveMessage(event) {
     const isEdit = messageId && messageId !== '';
     
     const url = isEdit 
-        ? `/admin/api/v2/share-messages/${messageId}`
-        : '/admin/api/v2/share-messages';
+        ? `/api/admin/v2/share-messages/${messageId}`
+        : '/api/admin/v2/share-messages';
     const method = isEdit ? 'PUT' : 'POST';
     
     fetch(url, {
