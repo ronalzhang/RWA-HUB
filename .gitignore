@@ -531,9 +531,10 @@ security_*.py
 analyze_*.py
 crypto_password_solution.py
 
-# 文档和说明文件（保留README.md）
+# 文档和说明文件（保留README.md和部署指南）
 *.md
 !README.md
+!DEPLOYMENT_GUIDE.md
 docs/
 *.doc
 *.docx
