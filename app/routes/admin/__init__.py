@@ -945,4 +945,159 @@ def delete_admin_user(wallet_address):
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"删除管理员失败: {str(e)}")
-        return jsonify({'error': str(e)}), 500 
+        return jsonify({'error': str(e)}), 500
+
+# ================== 分享消息管理API ==================
+
+@admin_api_bp.route('/v2/share-messages', methods=['GET'])
+@api_admin_required
+def get_share_messages_v2():
+    """获取分享消息列表"""
+    try:
+        from app.models.share_message import ShareMessage
+        
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        # 分页查询
+        pagination = ShareMessage.query.order_by(ShareMessage.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        messages = []
+        for msg in pagination.items:
+            messages.append({
+                'id': msg.id,
+                'content': msg.content,
+                'is_active': msg.is_active,
+                'weight': msg.weight,
+                'created_at': msg.created_at.isoformat() if msg.created_at else None,
+                'updated_at': msg.updated_at.isoformat() if msg.updated_at else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': messages,
+            'pagination': {
+                'page': pagination.page,
+                'pages': pagination.pages,
+                'per_page': pagination.per_page,
+                'total': pagination.total,
+                'has_prev': pagination.has_prev,
+                'has_next': pagination.has_next
+            }
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取分享消息失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_api_bp.route('/v2/share-messages', methods=['POST'])
+@api_admin_required
+def create_share_message_v2():
+    """创建分享消息"""
+    try:
+        from app.models.share_message import ShareMessage
+        from app.extensions import db
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '请求数据为空'}), 400
+        
+        content = data.get('content', '').strip()
+        if not content:
+            return jsonify({'success': False, 'error': '消息内容不能为空'}), 400
+        
+        weight = data.get('weight', 1)
+        is_active = data.get('is_active', True)
+        
+        # 创建新消息
+        message = ShareMessage(
+            content=content,
+            weight=weight,
+            is_active=is_active
+        )
+        
+        db.session.add(message)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '分享消息创建成功',
+            'data': {
+                'id': message.id,
+                'content': message.content,
+                'weight': message.weight,
+                'is_active': message.is_active
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"创建分享消息失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_api_bp.route('/v2/share-messages/<int:message_id>', methods=['PUT'])
+@api_admin_required
+def update_share_message_v2(message_id):
+    """更新分享消息"""
+    try:
+        from app.models.share_message import ShareMessage
+        from app.extensions import db
+        
+        message = ShareMessage.query.get_or_404(message_id)
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': '请求数据为空'}), 400
+        
+        content = data.get('content', '').strip()
+        if not content:
+            return jsonify({'success': False, 'error': '消息内容不能为空'}), 400
+        
+        # 更新消息
+        message.content = content
+        message.weight = data.get('weight', message.weight)
+        message.is_active = data.get('is_active', message.is_active)
+        message.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '分享消息更新成功',
+            'data': {
+                'id': message.id,
+                'content': message.content,
+                'weight': message.weight,
+                'is_active': message.is_active
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"更新分享消息失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_api_bp.route('/v2/share-messages/<int:message_id>', methods=['DELETE'])
+@api_admin_required
+def delete_share_message_v2(message_id):
+    """删除分享消息"""
+    try:
+        from app.models.share_message import ShareMessage
+        from app.extensions import db
+        
+        message = ShareMessage.query.get_or_404(message_id)
+        
+        db.session.delete(message)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '分享消息删除成功'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"删除分享消息失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500 

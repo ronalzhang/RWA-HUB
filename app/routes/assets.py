@@ -64,7 +64,6 @@ def list_assets_page():
         from app.services.query_optimizer import query_optimizer
         
         # 确定查询状态过滤条件
-        status_filter = None
         if current_user_address and is_admin_user:
             current_app.logger.info('管理员用户：显示所有未删除资产')
             # 管理员可以看到所有状态的资产（通过None表示不过滤状态）
@@ -73,6 +72,8 @@ def list_assets_page():
             current_app.logger.info('普通用户或未登录用户：只显示已上链且未删除的资产')
             # 普通用户只能看到已上链的资产
             status_filter = AssetStatus.ON_CHAIN.value
+        
+        current_app.logger.info(f'状态过滤条件: {status_filter}')
         
         # 使用优化查询获取资产列表
         result = query_optimizer.get_optimized_asset_list(
