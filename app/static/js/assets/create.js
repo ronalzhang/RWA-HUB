@@ -54,45 +54,45 @@ function initializeCreatePage() {
     // 检查是否已初始化
     if (window.assetFormInitialized) {
         console.log('页面已初始化，跳过');
-            return;
-        }
+        return;
+    }
         
     // 设置初始化标志
     window.assetFormInitialized = true;
         
-    // 首先重置上传区域状态，确保不显示"uploading"
-    resetUploadAreas();
-    
-    // 检查钱包连接
-    setTimeout(initializeWalletCheck, 500); // 延迟执行，确保钱包状态已初始化
+    // 立即检查钱包连接状态，不延迟
+    initializeWalletCheck();
     
     // 初始化表单元素
-            initializeFormFields();
+    initializeFormFields();
     
-    // 加载草稿
-    loadDraft();
+    // 重置上传区域状态
+    resetUploadAreas();
     
-    // 设置自动保存
+    // 加载草稿（异步执行，不阻塞页面）
+    setTimeout(loadDraft, 100);
+    
+    // 设置自动保存（降低频率，减少性能影响）
     setInterval(saveDraft, CONFIG.DRAFT.AUTO_SAVE_INTERVAL);
     
     // 监听钱包状态变化事件
-        document.addEventListener('walletStateChanged', function(event) {
+    document.addEventListener('walletStateChanged', function(event) {
         console.log('资产创建页面收到钱包状态变化事件:', event.detail);
         // 重新检查钱包状态并更新UI
         if (event.detail && typeof event.detail.connected !== 'undefined') {
             initializeWalletCheck();
         }
-        });
+    });
         
     // 监听钱包初始化完成事件
-        document.addEventListener('walletStateInitialized', function(event) {
+    document.addEventListener('walletStateInitialized', function(event) {
         console.log('资产创建页面收到钱包初始化完成事件:', event.detail);
         // 重新检查钱包状态
-        setTimeout(initializeWalletCheck, 100);
-        });
+        initializeWalletCheck();
+    });
         
     console.log('初始化完成');
-    }
+}
 
 // 检查钱包连接状态
 // 检查钱包连接状态
@@ -509,62 +509,64 @@ function updateTokenPriceSimilar() {
     // 生成代币符号
     async function generateTokenSymbol(type) {
         try {
-        // 请求服务器生成代币符号
+            console.log(`开始生成代币符号，资产类型: ${type}`);
+            
+            // 请求服务器生成代币符号
             const response = await fetch('/api/assets/generate-token-symbol', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 },
-                body: JSON.stringify({ type: type })
+                body: JSON.stringify({ type: type || '10' })  // 提供默认值
             });
             
+            console.log(`代币符号生成响应状态: ${response.status}`);
+            
             if (!response.ok) {
-            console.error(`生成token_symbol请求失败: ${response.status}`);
-            return null;
+                const errorText = await response.text();
+                console.error(`生成token_symbol请求失败: ${response.status}, 响应: ${errorText}`);
+                throw new Error(`服务器响应错误: ${response.status}`);
             }
             
             const data = await response.json();
+            console.log('代币符号生成响应数据:', data);
             
-        // 检查success字段
-        if (!data.success) {
-            console.error('生成token_symbol失败:', data.error || '未知错误');
-            throw new Error(data.error || '生成代币符号失败');
-        }
-        
-        // 如果服务器返回了token_symbol，返回它
-        if (data.token_symbol) {
-            console.log(`生成代币符号: ${data.token_symbol}`);
+            // 检查success字段
+            if (!data.success) {
+                console.error('生成token_symbol失败:', data.error || '未知错误');
+                throw new Error(data.error || '生成代币符号失败');
+            }
+            
+            // 如果服务器返回了token_symbol，返回它
+            if (data.token_symbol) {
+                console.log(`生成代币符号: ${data.token_symbol}`);
                 return data.token_symbol;
             } else {
-            console.error('服务器未返回token_symbol');
-            return null;
+                console.error('服务器未返回token_symbol');
+                throw new Error('服务器未返回有效的代币符号');
             }
         } catch (error) {
-        console.error('生成代币符号出错:', error);
+            console.error('生成代币符号出错:', error);
             
-        // 重试逻辑
-        console.log('尝试本地生成代币符号');
-        // 生成4位随机数字
-            const randomDigits = Math.floor(1000 + Math.random() * 9000);
-        
-        // 构建代币符号
-            const symbol = `${type === '10' ? 'RH-10' : 'RH-20'}${randomDigits}`;
-        
-        // 验证符号是否可用
-        try {
-            const checkResult = await checkTokenSymbolAvailability(symbol);
-            if (checkResult.exists) {
-                console.error(`本地生成的符号 ${symbol} 已存在`);
-                return null;
+            // 本地生成作为备用方案
+            console.log('尝试本地生成代币符号');
+            try {
+                // 生成6位随机数字
+                const randomDigits = Math.floor(100000 + Math.random() * 900000);
+                
+                // 构建代币符号
+                const symbol = `RH-${randomDigits}`;
+                
+                console.log(`本地生成代币符号: ${symbol}`);
+                return symbol;
+            } catch (localError) {
+                console.error('本地生成代币符号失败:', localError);
+                // 返回一个基于时间戳的符号作为最后的备用方案
+                const timestamp = Date.now().toString().slice(-6);
+                return `RH-${timestamp}`;
+            }
         }
-            
-            console.log(`本地生成代币符号: ${symbol}`);
-            return symbol;
-        } catch (checkError) {
-            console.error('验证本地生成的符号失败:', checkError);
-            return null;
-        }
-    }
     }
 
 // 处理文件上传

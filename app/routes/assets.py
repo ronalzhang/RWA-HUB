@@ -489,18 +489,29 @@ def proxy_image(image_path):
 def generate_token_symbol():
     """生成代币代码"""
     try:
-        data = request.get_json()
-        asset_type = data.get('type')
+        # 获取请求数据
+        data = request.get_json() if request.is_json else {}
+        asset_type = data.get('type') if data else None
         
+        # 如果没有提供资产类型，使用默认值
         if not asset_type:
-            return jsonify({'error': '缺少资产类型'}), 400
+            current_app.logger.warning("未提供资产类型，使用默认值10")
+            asset_type = '10'  # 默认为不动产
+            
+        # 验证资产类型格式
+        if asset_type not in ['10', '20']:
+            current_app.logger.error(f"无效的资产类型: {asset_type}")
+            return jsonify({
+                'success': False,
+                'error': '无效的资产类型，必须是10或20'
+            }), 400
             
         # 尝试多次生成唯一的token_symbol
         max_attempts = 10
         for attempt in range(max_attempts):
             # 生成随机数
-            random_num = f"{random.randint(0, 9999):04d}"
-            token_symbol = f"RH-{asset_type}{random_num}"
+            random_num = f"{random.randint(100000, 999999)}"  # 使用6位数字
+            token_symbol = f"RH-{random_num}"
             
             # 检查是否已存在
             current_app.logger.info(f"尝试生成token_symbol: {token_symbol} (尝试 {attempt+1}/{max_attempts})")
@@ -517,13 +528,18 @@ def generate_token_symbol():
                 current_app.logger.warning(f"token_symbol已存在: {token_symbol}，重新生成")
         
         # 如果达到最大尝试次数仍未生成唯一符号，返回错误
+        current_app.logger.error("达到最大尝试次数，无法生成唯一代币符号")
         return jsonify({
             'success': False,
             'error': '无法生成唯一的代币符号，请稍后重试'
         }), 500
+        
     except Exception as e:
-        current_app.logger.error(f'生成代币代码失败: {str(e)}')
-        return jsonify({'success': False, 'error': str(e)}), 500
+        current_app.logger.error(f'生成代币代码失败: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False, 
+            'error': f'服务器内部错误: {str(e)}'
+        }), 500
 
 @assets_api_bp.route('/calculate-tokens', methods=['POST'])
 def calculate_tokens():
