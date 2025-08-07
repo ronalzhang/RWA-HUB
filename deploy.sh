@@ -18,9 +18,9 @@ if [ ! -f "$CONFIG_FILE" ]; then
 # 请根据实际情况修改以下配置
 
 # 服务器配置
-SERVER_HOST="your-server-ip"
+SERVER_HOST="156.236.74.200"
 SERVER_USER="root"
-SERVER_PASSWORD="your-password"
+SERVER_PASSWORD="Pr971V3j"
 SERVER_PATH="/root/RWA-HUB"
 
 # GitHub仓库配置
@@ -28,7 +28,7 @@ GITHUB_REPO="https://github.com/ronalzhang/RWA-HUB.git"
 GITHUB_BRANCH="main"
 
 # 数据库配置
-DB_TYPE="postgresql"  # postgresql 或 sqlite
+DB_TYPE="postgresql"  # 系统唯一数据库是postgresql
 PG_HOST="localhost"
 PG_DATABASE="rwa_hub"
 PG_USER="rwa_hub_user"
