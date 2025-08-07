@@ -206,10 +206,10 @@ class TradeDataConverter:
                 'type': trade.type or 'buy',
                 'status': trade.status or 'pending',
                 'tx_hash': trade.tx_hash or '',
-                'block_number': trade.block_number or 0,
+                'block_number': getattr(trade, 'block_number', 0),
                 'gas_used': trade.gas_used or 0,
                 'created_at': trade.created_at.isoformat() if trade.created_at else None,
-                'updated_at': trade.updated_at.isoformat() if trade.updated_at else None,
+                'updated_at': trade.status_updated_at.isoformat() if hasattr(trade, 'status_updated_at') and trade.status_updated_at else (trade.created_at.isoformat() if trade.created_at else None),
             }
             
             # 状态文本映射
@@ -238,17 +238,31 @@ class TradeDataConverter:
             
         except Exception as e:
             logger.error(f"交易数据转换失败: {e}")
+            # 即使转换失败，也要提供基本的时间信息
+            created_at = None
+            updated_at = None
+            try:
+                if hasattr(trade, 'created_at') and trade.created_at:
+                    created_at = trade.created_at.isoformat()
+                if hasattr(trade, 'status_updated_at') and trade.status_updated_at:
+                    updated_at = trade.status_updated_at.isoformat()
+                elif created_at:
+                    updated_at = created_at
+            except:
+                pass
+                
             return {
                 'id': getattr(trade, 'id', None),
                 'asset_id': getattr(trade, 'asset_id', None),
-                'trader_address': '',
-                'amount': 0,
-                'price': 0.0,
-                'total': 0.0,
-                'type': 'buy',
-                'status': 'pending',
-                'created_at': None,
-                'updated_at': None
+                'trader_address': getattr(trade, 'trader_address', ''),
+                'amount': getattr(trade, 'amount', 0),
+                'price': float(getattr(trade, 'price', 0)),
+                'total': float(getattr(trade, 'total', 0)),
+                'type': getattr(trade, 'type', 'buy'),
+                'status': getattr(trade, 'status', 'pending'),
+                'tx_hash': getattr(trade, 'tx_hash', ''),
+                'created_at': created_at,
+                'updated_at': updated_at
             }
 
 

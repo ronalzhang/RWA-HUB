@@ -726,8 +726,19 @@ async function loadTradeHistory(page = 1) {
 function createTradeRow(trade) {
     const tr = document.createElement('tr');
     
-    const date = new Date(trade.created_at);
-    const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    // 安全的时间处理，避免显示1970年
+    let formattedDate = 'N/A';
+    if (trade.created_at && trade.created_at !== null) {
+        try {
+            const date = new Date(trade.created_at);
+            // 检查日期是否有效
+            if (!isNaN(date.getTime()) && date.getFullYear() > 2020) {
+                formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            }
+        } catch (error) {
+            console.warn('时间格式化失败:', error, trade.created_at);
+        }
+    }
     
     const typeClass = trade.type === 'buy' ? 'text-success' : 'text-danger';
     const typeText = trade.type === 'buy' ? 'Buy' : 'Sell';

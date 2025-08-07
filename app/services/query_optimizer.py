@@ -247,7 +247,7 @@ class QueryOptimizer:
                     'trader_address': trade.trader_address,
                     'tx_hash': trade.tx_hash,
                     'created_at': trade.created_at.isoformat() if trade.created_at else None,
-                    'updated_at': trade.updated_at.isoformat() if trade.updated_at else None
+                    'updated_at': trade.status_updated_at.isoformat() if hasattr(trade, 'status_updated_at') and trade.status_updated_at else (trade.created_at.isoformat() if trade.created_at else None)
                 }
                 trades_data.append(trade_data)
             
