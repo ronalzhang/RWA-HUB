@@ -63,4 +63,10 @@ if __name__ == '__main__':
     print(f"🚀 RWA-HUB 启动应用，访问地址: http://localhost:{port}")
     print(f"📱 v6版本界面地址: http://localhost:{port}/v6")
     print(f"💾 数据库类型: PostgreSQL - {app.config.get('SQLALCHEMY_DATABASE_URI')}")
-    app.run(host='0.0.0.0', port=port, debug=True)
+    try:
+        app.run(host='0.0.0.0', port=port, debug=False)  # 生产环境关闭debug模式
+    except Exception as e:
+        print(f"❌ 应用启动失败: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)

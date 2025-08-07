@@ -173,6 +173,8 @@ def create_app(config_name='development'):
         from app.services.contract_monitor import init_contract_monitor
         init_contract_monitor(app)
         app.logger.info("智能合约监控服务已初始化")
+    except ImportError as import_error:
+        app.logger.warning(f"智能合约监控服务模块导入失败，跳过初始化: {str(import_error)}")
     except Exception as monitor_error:
         app.logger.error(f"初始化智能合约监控服务失败: {str(monitor_error)}")
     
