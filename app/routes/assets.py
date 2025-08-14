@@ -1129,7 +1129,6 @@ def create_asset_api():
             # 使用简化的地址生成方法，确保总是成功
             try:
                 import os
-                import json
                 
                 # 简单可靠的地址生成函数
                 def generate_solana_address():
