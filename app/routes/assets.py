@@ -1229,8 +1229,9 @@ def create_asset_api():
             }), 500
             
     except Exception as e:
+        import traceback
         current_app.logger.error(f"资产创建API：处理请求失败 {str(e)}")
-        traceback.print_exc()
+        current_app.logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'error': f'处理请求失败: {str(e)}'
