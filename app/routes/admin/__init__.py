@@ -969,6 +969,7 @@ def get_share_messages_v2():
             messages.append({
                 'id': msg.id,
                 'content': msg.content,
+                'message_type': msg.message_type,
                 'is_active': msg.is_active,
                 'weight': msg.weight,
                 'created_at': msg.created_at.isoformat() if msg.created_at else None,
@@ -1010,10 +1011,12 @@ def create_share_message_v2():
         
         weight = data.get('weight', 1)
         is_active = data.get('is_active', True)
+        message_type = data.get('message_type', 'share_content')
         
         # 创建新消息
         message = ShareMessage(
             content=content,
+            message_type=message_type,
             weight=weight,
             is_active=is_active
         )
@@ -1027,6 +1030,7 @@ def create_share_message_v2():
             'data': {
                 'id': message.id,
                 'content': message.content,
+                'message_type': message.message_type,
                 'weight': message.weight,
                 'is_active': message.is_active
             }
@@ -1057,6 +1061,7 @@ def update_share_message_v2(message_id):
         
         # 更新消息
         message.content = content
+        message.message_type = data.get('message_type', message.message_type)
         message.weight = data.get('weight', message.weight)
         message.is_active = data.get('is_active', message.is_active)
         message.updated_at = datetime.utcnow()
@@ -1069,6 +1074,7 @@ def update_share_message_v2(message_id):
             'data': {
                 'id': message.id,
                 'content': message.content,
+                'message_type': message.message_type,
                 'weight': message.weight,
                 'is_active': message.is_active
             }
