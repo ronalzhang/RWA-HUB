@@ -493,10 +493,16 @@ def generate_token_symbol():
         data = request.get_json() if request.is_json else {}
         asset_type = data.get('type') if data else None
         
+        current_app.logger.info(f"收到代币符号生成请求，原始asset_type: {asset_type}, 类型: {type(asset_type)}")
+        
         # 如果没有提供资产类型，使用默认值
         if not asset_type:
             current_app.logger.warning("未提供资产类型，使用默认值10")
             asset_type = '10'  # 默认为不动产
+        else:
+            # 转换为字符串格式，支持整数和字符串输入
+            asset_type = str(asset_type)
+            current_app.logger.info(f"转换后的asset_type: {asset_type}")
             
         # 验证资产类型格式
         if asset_type not in ['10', '20']:
@@ -536,6 +542,13 @@ def generate_token_symbol():
         
     except Exception as e:
         current_app.logger.error(f'生成代币代码失败: {str(e)}', exc_info=True)
+        # 提供更详细的错误信息用于调试
+        error_details = {
+            'error_type': type(e).__name__,
+            'error_message': str(e),
+            'asset_type': locals().get('asset_type', 'unknown')
+        }
+        current_app.logger.error(f'错误详情: {error_details}')
         return jsonify({
             'success': False, 
             'error': f'服务器内部错误: {str(e)}'

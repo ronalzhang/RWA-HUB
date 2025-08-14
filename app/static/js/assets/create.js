@@ -2396,22 +2396,26 @@ async function handlePaymentSuccess(txHash, formData) {
         updateStepStatus('step-3', 'loading');
         updateMainProgress(60);
         
-        // 重新生成Token Symbol，避免重复使用
-        const assetType = formData.asset_type || '20';
-        console.log('重新生成Token Symbol，资产类型:', assetType);
-        const newTokenSymbol = await generateTokenSymbol(assetType);
-        
-        if (newTokenSymbol) {
-            formData.token_symbol = newTokenSymbol;
-            console.log('使用新的Token Symbol:', newTokenSymbol);
+        // 验证Token Symbol是否存在，如果不存在则生成
+        if (!formData.token_symbol) {
+            const assetType = formData.asset_type || '20';
+            console.log('Token Symbol不存在，生成新的，资产类型:', assetType);
+            const newTokenSymbol = await generateTokenSymbol(assetType);
             
-            // 更新页面上的Token Symbol显示
-            const tokenSymbolInput = document.getElementById('tokensymbol');
-            if (tokenSymbolInput) {
-                tokenSymbolInput.value = newTokenSymbol;
+            if (newTokenSymbol) {
+                formData.token_symbol = newTokenSymbol;
+                console.log('使用新生成的Token Symbol:', newTokenSymbol);
+                
+                // 更新页面上的Token Symbol显示
+                const tokenSymbolInput = document.getElementById('tokensymbol');
+                if (tokenSymbolInput) {
+                    tokenSymbolInput.value = newTokenSymbol;
+                }
+            } else {
+                throw new Error('无法生成Token Symbol，请重试');
             }
         } else {
-            console.warn('无法生成新的Token Symbol，使用原有的');
+            console.log('使用现有的Token Symbol:', formData.token_symbol);
         }
         
         // 创建资产
