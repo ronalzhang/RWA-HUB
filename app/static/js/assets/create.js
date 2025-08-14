@@ -1495,6 +1495,141 @@ function generatePreviewHTML(data) {
     </div>`;
 }
 
+// 显示详细的进度步骤
+function showDetailedProgress() {
+    const progressSteps = [
+        { id: 'step-1', title: '准备支付', description: '获取支付配置和验证钱包连接', status: 'pending' },
+        { id: 'step-2', title: '处理支付', description: '在钱包中确认USDC转账交易', status: 'pending' },
+        { id: 'step-3', title: '生成代币符号', description: '为资产生成唯一的代币标识符', status: 'pending' },
+        { id: 'step-4', title: '创建资产', description: '在区块链上部署资产智能合约', status: 'pending' },
+        { id: 'step-5', title: '完成', description: '资产创建完成，可以开始交易', status: 'pending' }
+    ];
+
+    const progressHtml = `
+        <div class="progress-steps-container">
+            <div class="progress-header mb-4">
+                <h5 class="mb-2">资产创建进度</h5>
+                <div class="progress mb-3" style="height: 8px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 0%" id="main-progress-bar"></div>
+                </div>
+            </div>
+            <div class="steps-list">
+                ${progressSteps.map(step => `
+                    <div class="step-item" id="${step.id}">
+                        <div class="step-icon">
+                            <i class="fas fa-circle step-pending"></i>
+                            <i class="fas fa-spinner fa-spin step-loading" style="display: none;"></i>
+                            <i class="fas fa-check step-completed" style="display: none;"></i>
+                            <i class="fas fa-times step-error" style="display: none;"></i>
+                        </div>
+                        <div class="step-content">
+                            <div class="step-title">${step.title}</div>
+                            <div class="step-description">${step.description}</div>
+                            <div class="step-error-message" style="display: none;"></div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+
+    return progressHtml;
+}
+
+// 更新步骤状态
+function updateStepStatus(stepId, status, errorMessage = '') {
+    const stepElement = document.getElementById(stepId);
+    if (!stepElement) return;
+
+    const icons = {
+        pending: stepElement.querySelector('.step-pending'),
+        loading: stepElement.querySelector('.step-loading'),
+        completed: stepElement.querySelector('.step-completed'),
+        error: stepElement.querySelector('.step-error')
+    };
+
+    const errorDiv = stepElement.querySelector('.step-error-message');
+
+    // 隐藏所有图标
+    Object.values(icons).forEach(icon => {
+        if (icon) icon.style.display = 'none';
+    });
+
+    // 显示对应状态的图标
+    if (icons[status]) {
+        icons[status].style.display = 'inline-block';
+    }
+
+    // 更新步骤样式
+    stepElement.className = `step-item step-${status}`;
+
+    // 显示错误消息
+    if (status === 'error' && errorMessage && errorDiv) {
+        errorDiv.textContent = errorMessage;
+        errorDiv.style.display = 'block';
+    } else if (errorDiv) {
+        errorDiv.style.display = 'none';
+    }
+}
+
+// 更新主进度条
+function updateMainProgress(percentage) {
+    const progressBar = document.getElementById('main-progress-bar');
+    if (progressBar) {
+        progressBar.style.width = `${percentage}%`;
+    }
+}
+
+// 显示进度模态框
+function showProgressModal() {
+    // 创建进度模态框
+    const progressModalHtml = `
+        <div class="modal fade" id="progressModal" tabindex="-1" aria-labelledby="progressModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="progressModalLabel">创建资产</h5>
+                    </div>
+                    <div class="modal-body">
+                        ${showDetailedProgress()}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // 移除已存在的进度模态框
+    const existingModal = document.getElementById('progressModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // 添加新的进度模态框
+    document.body.insertAdjacentHTML('beforeend', progressModalHtml);
+    
+    // 显示模态框
+    const progressModal = new bootstrap.Modal(document.getElementById('progressModal'));
+    progressModal.show();
+    
+    return progressModal;
+}
+
+// 隐藏进度模态框
+function hideProgressModal() {
+    const progressModal = document.getElementById('progressModal');
+    if (progressModal) {
+        const modal = bootstrap.Modal.getInstance(progressModal);
+        if (modal) {
+            modal.hide();
+        }
+        // 延迟移除DOM元素
+        setTimeout(() => {
+            progressModal.remove();
+        }, 300);
+    }
+}
+
 // 显示支付确认对话框
     function showPaymentConfirmation() {
     try {
@@ -1540,6 +1675,9 @@ function generatePreviewHTML(data) {
                     if (connected) {
                         // 隐藏确认模态框
                 confirmModal.hide();
+                        // 显示进度对话框
+                        showProgressModal();
+                        
                         // 执行支付流程
                         processPayment().then(paymentResult => {
                             if (paymentResult.success) {
@@ -1549,11 +1687,13 @@ function generatePreviewHTML(data) {
                                 // 支付失败
                                 showError(paymentResult.error || '支付处理失败');
                                 disablePublishButtons(false);
+                                hideProgressModal();
                             }
                         }).catch(error => {
                             console.error('支付处理错误:', error);
                             showError(error.message || '支付处理错误');
                             disablePublishButtons(false);
+                            hideProgressModal();
             });
                     } else {
                         // 钱包连接失败
@@ -1579,8 +1719,8 @@ async function processPayment() {
     return new Promise(async (resolve, reject) => {
         try {
             console.log('开始处理支付...');
-            showLoadingState('处理支付交易...');
-            updateProgress(20, '准备支付...', 2);
+            updateStepStatus('step-1', 'loading');
+            updateMainProgress(10);
             
             // 检查并加载Solana Web3.js库
             if (typeof solanaWeb3 === 'undefined') {
@@ -1644,7 +1784,9 @@ async function processPayment() {
             }
             
             try {
-                updateProgress(50, '正在钱包中确认支付...', 2);
+                updateStepStatus('step-1', 'completed');
+                updateStepStatus('step-2', 'loading');
+                updateMainProgress(30);
                 
                 // 添加延迟让用户看到进度变化
                 await new Promise(resolve => setTimeout(resolve, 800));
@@ -1665,7 +1807,8 @@ async function processPayment() {
             }
             
                 console.log('支付成功，交易哈希:', result.txHash);
-                updateProgress(80, '支付成功，正在创建资产...', 3);
+                updateStepStatus('step-2', 'completed');
+                updateMainProgress(50);
                 
                 // 添加延迟让用户看到支付成功状态
                 await new Promise(resolve => setTimeout(resolve, 600));
@@ -2248,7 +2391,8 @@ function getAssetFormData() {
 // 处理支付成功的情况
 async function handlePaymentSuccess(txHash, formData) {
     try {
-        updateProgress(85, '支付已确认，正在创建资产...', 3);
+        updateStepStatus('step-3', 'loading');
+        updateMainProgress(60);
         
         // 重新生成Token Symbol，避免重复使用
         const assetType = formData.asset_type || '20';
@@ -2269,9 +2413,19 @@ async function handlePaymentSuccess(txHash, formData) {
         }
         
         // 创建资产
+        updateStepStatus('step-3', 'completed');
+        updateStepStatus('step-4', 'loading');
+        updateMainProgress(75);
+        
         const result = await processAssetCreation(formData, txHash);
         
         if (result.success) {
+            // 更新进度显示
+            updateStepStatus('step-3', 'completed');
+            updateStepStatus('step-4', 'completed');
+            updateStepStatus('step-5', 'completed');
+            updateMainProgress(100);
+            
             // 创建成功
             let successMessage = `
                 <div class="text-center">
@@ -2344,8 +2498,17 @@ async function handlePaymentSuccess(txHash, formData) {
         }
     } catch (error) {
         console.error('处理支付成功后发生错误:', error);
+        
+        // 更新失败的步骤状态
+        if (error.message.includes('生成代币符号')) {
+            updateStepStatus('step-3', 'error', error.message);
+        } else if (error.message.includes('创建资产')) {
+            updateStepStatus('step-4', 'error', error.message);
+        } else {
+            updateStepStatus('step-4', 'error', error.message || '未知错误');
+        }
+        
         showError(`资产创建过程出错: ${error.message || '未知错误'}`);
-        updateProgress(0, '创建失败，请重试');
         enablePublishButtons(false);
         }
 }

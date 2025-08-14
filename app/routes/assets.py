@@ -879,8 +879,8 @@ def check_token_symbol():
     if not symbol:
         return jsonify({'error': 'Symbol is required'}), 400
     
-    # 验证符号格式：必须以RH-开头，后面跟10或20，然后是4位数字
-    if not re.match(r'^RH-(10|20)\d{4}$', symbol):
+    # 验证符号格式：必须以RH-开头，后面跟6位数字
+    if not re.match(r'^RH-\d{6}$', symbol):
         return jsonify({'error': 'Invalid symbol format', 'available': False}), 400
     
     # 检查数据库中是否已存在该符号
