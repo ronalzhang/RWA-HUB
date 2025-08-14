@@ -38,7 +38,18 @@ def eth_address_required(f):
     """以太坊地址验证装饰器（简化版）"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 这里可以添加以太坊地址验证逻辑
-        # 暂时跳过验证
+        # 从请求头获取以太坊地址
+        eth_address = request.headers.get('X-Eth-Address')
+        
+        if not eth_address:
+            return jsonify({'error': '缺少以太坊地址'}), 400
+        
+        # 简单的地址格式验证（可以根据需要增强）
+        if len(eth_address) < 10:  # 基本长度检查
+            return jsonify({'error': '无效的以太坊地址格式'}), 400
+        
+        # 将地址存储到Flask的g对象中
+        g.eth_address = eth_address
+        
         return f(*args, **kwargs)
     return decorated_function
