@@ -282,6 +282,63 @@ function updateUiForAdminStatus(isAdmin) {
     
     // 初始化上传区域显示状态
     resetUploadAreas();
+    
+    // 初始化时禁用上传区域，直到选择资产类型
+    toggleUploadAreas(false);
+}
+
+// 启用/禁用上传区域
+function toggleUploadAreas(enabled) {
+    const imageDropzone = document.getElementById('imageDropzone');
+    const documentDropzone = document.getElementById('documentDropzone');
+    const imageInput = document.getElementById('imageInput');
+    const documentInput = document.getElementById('documentInput');
+    
+    if (imageDropzone) {
+        const imageText = imageDropzone.querySelector('p');
+        if (enabled) {
+            imageDropzone.classList.remove('disabled');
+            imageDropzone.style.opacity = '1';
+            imageDropzone.style.pointerEvents = 'auto';
+            if (imageText) {
+                imageText.textContent = safeTranslate('Drag and drop images here or click to select');
+            }
+        } else {
+            imageDropzone.classList.add('disabled');
+            imageDropzone.style.opacity = '0.5';
+            imageDropzone.style.pointerEvents = 'none';
+            if (imageText) {
+                imageText.textContent = safeTranslate('Please select asset type first');
+            }
+        }
+    }
+    
+    if (documentDropzone) {
+        const documentText = documentDropzone.querySelector('p');
+        if (enabled) {
+            documentDropzone.classList.remove('disabled');
+            documentDropzone.style.opacity = '1';
+            documentDropzone.style.pointerEvents = 'auto';
+            if (documentText) {
+                documentText.textContent = safeTranslate('Drag and drop documents here or click to select');
+            }
+        } else {
+            documentDropzone.classList.add('disabled');
+            documentDropzone.style.opacity = '0.5';
+            documentDropzone.style.pointerEvents = 'none';
+            if (documentText) {
+                documentText.textContent = safeTranslate('Please select asset type first');
+            }
+        }
+    }
+    
+    if (imageInput) {
+        imageInput.disabled = !enabled;
+    }
+    
+    if (documentInput) {
+        documentInput.disabled = !enabled;
+    }
 }
 
 // 重置上传区域状态
@@ -404,6 +461,9 @@ function initializeFileUploads() {
             realEstateFields.forEach(el => el.style.display = 'none');
             similarAssetsFields.forEach(el => el.style.display = 'block');
         }
+        
+        // 启用/禁用文件上传区域
+        toggleUploadAreas(!!type);
     }
 
     // 处理面积变化
@@ -574,6 +634,14 @@ async function handleFiles(files, fileType) {
     console.log(`开始处理${fileType}上传，文件数量:`, files.length);
     if (!files || files.length === 0) return;
     
+    // 检查是否已选择资产类型
+    const assetTypeSelect = document.getElementById('type');
+    const assetType = assetTypeSelect ? assetTypeSelect.value : '';
+    if (!assetType) {
+        alert('请先选择资产类型再上传文件');
+        return;
+    }
+    
     // 确定文件类型参数
     const isImage = fileType === 'IMAGE';
     const maxFiles = isImage ? CONFIG.IMAGE.MAX_FILES : CONFIG.DOCUMENT.MAX_FILES;
@@ -649,6 +717,15 @@ async function handleFiles(files, fileType) {
         // 获取当前选择的资产类型
         const assetTypeSelect = document.getElementById('type');
         const assetType = assetTypeSelect ? assetTypeSelect.value : '';
+        
+        // 检查是否已选择资产类型
+        if (!assetType) {
+            statusElement.textContent = '请先选择资产类型再上传文件';
+            console.error('未选择资产类型，无法上传文件');
+            failed++;
+            continue;
+        }
+        
         formData.append('asset_type', assetType);
         
         // 获取代币符号
