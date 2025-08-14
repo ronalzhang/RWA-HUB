@@ -509,9 +509,9 @@ def generate_token_symbol():
         # 尝试多次生成唯一的token_symbol
         max_attempts = 10
         for attempt in range(max_attempts):
-            # 生成随机数
-            random_num = f"{random.randint(100000, 999999)}"  # 使用6位数字
-            token_symbol = f"RH-{random_num}"
+            # 生成随机数 - 使用资产类型 + 4位随机数字的格式
+            random_num = f"{random.randint(1000, 9999)}"  # 使用4位数字
+            token_symbol = f"RH-{asset_type}{random_num}"
             
             # 检查是否已存在
             current_app.logger.info(f"尝试生成token_symbol: {token_symbol} (尝试 {attempt+1}/{max_attempts})")
@@ -879,8 +879,8 @@ def check_token_symbol():
     if not symbol:
         return jsonify({'error': 'Symbol is required'}), 400
     
-    # 验证符号格式：必须以RH-开头，后面跟6位数字
-    if not re.match(r'^RH-\d{6}$', symbol):
+    # 验证符号格式：必须以RH-开头，后面跟10或20，然后是4位数字
+    if not re.match(r'^RH-(?:10|20)\d{4}$', symbol):
         return jsonify({'error': 'Invalid symbol format', 'available': False}), 400
     
     # 检查数据库中是否已存在该符号
@@ -1075,7 +1075,7 @@ def create_asset_api():
             
         # 验证代币符号格式和可用性
         token_symbol = data.get('token_symbol')
-        if not re.match(r'^RH-\d{6}$', token_symbol):
+        if not re.match(r'^RH-(?:10|20)\d{4}$', token_symbol):
             current_app.logger.error(f"资产创建API：代币符号格式无效 {token_symbol}")
             return jsonify({
                 'success': False,
