@@ -173,13 +173,23 @@ class HealthCheckService:
             engine = db.engine
             pool = engine.pool
             
-            pool_info = {
-                'pool_size': pool.size(),
-                'checked_in': pool.checkedin(),
-                'checked_out': pool.checkedout(),
-                'overflow': pool.overflow(),
-                'invalid': pool.invalid()
-            }
+            try:
+                pool_info = {
+                    'pool_size': pool.size(),
+                    'checked_in': pool.checkedin(),
+                    'checked_out': pool.checkedout(),
+                    'overflow': pool.overflow(),
+                    'invalid': getattr(pool, 'invalid', lambda: 0)()  # 兼容不同版本的SQLAlchemy
+                }
+            except AttributeError as e:
+                # 如果连接池方法不存在，使用默认值
+                pool_info = {
+                    'pool_size': 0,
+                    'checked_in': 0,
+                    'checked_out': 0,
+                    'overflow': 0,
+                    'invalid': 0
+                }
             
             # 检查数据库版本和基本信息
             version_result = db.session.execute(text("SELECT version()")).fetchone()

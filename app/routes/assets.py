@@ -1075,7 +1075,7 @@ def create_asset_api():
             
         # 验证代币符号格式和可用性
         token_symbol = data.get('token_symbol')
-        if not re.match(r'^RH-(10|20)\d{4}$', token_symbol):
+        if not re.match(r'^RH-\d{6}$', token_symbol):
             current_app.logger.error(f"资产创建API：代币符号格式无效 {token_symbol}")
             return jsonify({
                 'success': False,
@@ -1205,21 +1205,18 @@ def create_asset_api():
             response_data = {
                 'success': True,
                 'message': '资产创建成功',
+                'asset_id': new_asset.id,
                 'id': new_asset.id,
                 'token_symbol': token_symbol,
-                'contract_ready': False  # 默认值
-            }
-            
-            # 如果智能合约数据准备成功，添加部署信息
-            if contract_result and contract_result.get('success'):
-                response_data['contract_ready'] = True
-                response_data['contract_deployment'] = {
-                    'asset_account': contract_result.get('asset_account'),
-                    'mint_account': contract_result.get('mint_account'),
-                    'vault_pda': contract_result.get('vault_pda'),
-                    'requires_deployment': True,
-                    'deployment_message': '资产智能合约已准备完成，请部署到链上以开始交易'
+                'contract_ready': True,  # 合约地址已分配
+                'status': new_asset.status,
+                'contract_deployment': {
+                    'token_address': new_asset.token_address,
+                    'contract_address': new_asset.contract_address,
+                    'vault_address': new_asset.vault_address,
+                    'deployment_message': '资产智能合约地址已分配，可以开始交易'
                 }
+            }
                 
             return jsonify(response_data), 201
             
