@@ -976,16 +976,30 @@ def get_share_messages_v2():
                 'updated_at': msg.updated_at.isoformat() if msg.updated_at else None
             })
         
+        # 计算统计信息
+        total_messages = ShareMessage.query.count()
+        active_messages = ShareMessage.query.filter_by(is_active=True).count()
+        share_content_count = ShareMessage.query.filter_by(message_type='share_content').count()
+        reward_plan_count = ShareMessage.query.filter_by(message_type='reward_plan').count()
+        
         return jsonify({
             'success': True,
-            'data': messages,
-            'pagination': {
-                'page': pagination.page,
-                'pages': pagination.pages,
-                'per_page': pagination.per_page,
-                'total': pagination.total,
-                'has_prev': pagination.has_prev,
-                'has_next': pagination.has_next
+            'data': {
+                'messages': messages,
+                'pagination': {
+                    'page': pagination.page,
+                    'pages': pagination.pages,
+                    'per_page': pagination.per_page,
+                    'total': pagination.total,
+                    'has_prev': pagination.has_prev,
+                    'has_next': pagination.has_next
+                },
+                'stats': {
+                    'total': total_messages,
+                    'active': active_messages,
+                    'share_content': share_content_count,
+                    'reward_plan': reward_plan_count
+                }
             }
         })
         
