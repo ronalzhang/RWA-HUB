@@ -612,19 +612,21 @@ function updateTokenPriceSimilar() {
             // 本地生成作为备用方案
             console.log('尝试本地生成代币符号');
             try {
-                // 生成6位随机数字
-                const randomDigits = Math.floor(100000 + Math.random() * 900000);
+                // 生成4位随机数字，使用资产类型前缀
+                const randomDigits = Math.floor(1000 + Math.random() * 9000);
                 
-                // 构建代币符号
-                const symbol = `RH-${randomDigits}`;
+                // 构建代币符号 - 使用资产类型 + 4位数字格式
+                const assetTypePrefix = type || '20'; // 默认使用20
+                const symbol = `RH-${assetTypePrefix}${randomDigits}`;
                 
                 console.log(`本地生成代币符号: ${symbol}`);
                 return symbol;
             } catch (localError) {
                 console.error('本地生成代币符号失败:', localError);
                 // 返回一个基于时间戳的符号作为最后的备用方案
-                const timestamp = Date.now().toString().slice(-6);
-                return `RH-${timestamp}`;
+                const timestamp = Date.now().toString().slice(-4); // 使用4位时间戳
+                const assetTypePrefix = type || '20';
+                return `RH-${assetTypePrefix}${timestamp}`;
             }
         }
     }
