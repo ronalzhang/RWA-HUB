@@ -7,7 +7,7 @@
 """
 
 from functools import wraps
-from flask import request, jsonify, session, redirect, url_for, current_app
+from flask import request, jsonify, session, redirect, url_for, current_app, g
 import hashlib
 
 def admin_required(f):
