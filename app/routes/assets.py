@@ -1130,7 +1130,6 @@ def create_asset_api():
             try:
                 import os
                 import json
-                from datetime import datetime
                 
                 # 简单可靠的地址生成函数
                 def generate_solana_address():
