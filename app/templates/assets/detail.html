@@ -39,8 +39,6 @@ console.log('✅ 创建了简化的solanaWeb3对象');
 
 <!-- 钱包和购买处理 -->
 <script src="{{ url_for('static', filename='js/wallet.js') }}"></script>
-<script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
-<script src="{{ url_for('static', filename='js/smart_contract_deployment.js') }}"></script>
 
 <style>
 /* 固定宽度布局样式 */
@@ -999,4 +997,8 @@ document.addEventListener('keydown', function(event) {
     }
 });
 </script>
+
+<!-- 购买和智能合约部署脚本 -->
+<script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
+<script src="{{ url_for('static', filename='js/smart_contract_deployment.js') }}"></script>
 {% endblock %}
