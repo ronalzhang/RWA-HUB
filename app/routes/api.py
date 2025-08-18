@@ -39,7 +39,11 @@ def deploy_contract():
             return jsonify({'success': False, 'message': '资产不存在'})
         
         if asset.contract_address:
-            return jsonify({'success': False, 'message': '智能合约已部署'})
+            return jsonify({
+                'success': True, 
+                'contract_address': asset.contract_address,
+                'message': '智能合约已部署'
+            })
         
         # 部署到Solana
         if blockchain == 'solana':
@@ -53,7 +57,6 @@ def deploy_contract():
             
             # 更新资产状态
             asset.contract_address = contract_address
-            asset.is_deployed = True
             asset.status = 2  # ON_CHAIN状态
             db.session.commit()
             
