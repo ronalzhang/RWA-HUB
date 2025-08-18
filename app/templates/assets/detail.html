@@ -40,6 +40,7 @@ console.log('✅ 创建了简化的solanaWeb3对象');
 <!-- 钱包和购买处理 -->
 <script src="{{ url_for('static', filename='js/wallet.js') }}"></script>
 <script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
+<script src="{{ url_for('static', filename='js/smart_contract_deployment.js') }}"></script>
 
 <style>
 /* 固定宽度布局样式 */
@@ -130,7 +131,15 @@ body {
                         {% if asset.images and asset.images|length > 0 %}
                         {% for image in asset.images %}
                         <div class="carousel-item {% if loop.first %}active{% endif %}">
-                            <img src="{{ image }}" class="d-block w-100" alt="Asset Image">
+                            {% if image.startswith('/static/') %}
+                            <img src="{{ image }}" 
+                                 class="d-block w-100" alt="Asset Image"
+                                 onerror="this.src='{{ url_for('static', filename='images/placeholder.jpg') }}'; this.onerror=null;">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + image) }}" 
+                                 class="d-block w-100" alt="Asset Image"
+                                 onerror="this.src='{{ url_for('static', filename='images/placeholder.jpg') }}'; this.onerror=null;">
+                            {% endif %}
                         </div>
                         {% endfor %}
                         {% else %}
@@ -243,10 +252,19 @@ body {
                         
                         <div id="buy-error" class="alert alert-danger" style="display: none;"></div>
                         
+                        {% if asset.contract_address %}
                         <button type="button" id="buy-button" class="btn btn-primary w-100 py-2" 
-                                data-token-price="{{ asset.token_price }}" data-asset-id="{{ asset.id }}">
-                            <i class="fas fa-shopping-cart me-2"></i>Buy
+                                data-token-price="{{ asset.token_price }}" data-asset-id="{{ asset.id }}"
+                                onclick="handlePurchaseClick()">
+                            <i class="fas fa-shopping-cart me-2"></i>Buy Tokens
                         </button>
+                        {% else %}
+                        <button type="button" class="btn btn-warning w-100 py-2" 
+                                onclick="deploySmartContract({{ asset.id }})">
+                            <i class="fas fa-rocket me-2"></i>Deploy Smart Contract
+                        </button>
+                        <small class="text-muted mt-2 d-block">Smart contract must be deployed before trading</small>
+                        {% endif %}
                     </div>
                 </div>
             </div>

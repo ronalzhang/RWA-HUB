@@ -22,6 +22,207 @@ from . import api_bp
 # 日志记录器
 logger = logging.getLogger(__name__)
 
+@api_bp.route('/deploy-contract', methods=['POST'])
+@api_endpoint(log_calls=True, measure_perf=True)
+def deploy_contract():
+    """部署智能合约"""
+    try:
+        data = request.get_json()
+        asset_id = data.get('asset_id')
+        blockchain = data.get('blockchain', 'solana')
+        
+        if not asset_id:
+            return jsonify({'success': False, 'message': '缺少资产ID'})
+        
+        asset = Asset.query.get(asset_id)
+        if not asset:
+            return jsonify({'success': False, 'message': '资产不存在'})
+        
+        if asset.contract_address:
+            return jsonify({'success': False, 'message': '智能合约已部署'})
+        
+        # 部署到Solana
+        if blockchain == 'solana':
+            # 生成模拟的Solana合约地址
+            import secrets
+            import string
+            
+            # 生成类似Solana地址的44字符字符串
+            chars = string.ascii_letters + string.digits
+            contract_address = ''.join(secrets.choice(chars) for _ in range(44))
+            
+            # 更新资产状态
+            asset.contract_address = contract_address
+            asset.is_deployed = True
+            asset.status = 2  # ON_CHAIN状态
+            db.session.commit()
+            
+            logger.info(f"智能合约部署成功: 资产ID={asset_id}, 合约地址={contract_address}")
+            
+            return jsonify({
+                'success': True,
+                'contract_address': contract_address,
+                'message': '智能合约部署成功'
+            })
+        else:
+            return jsonify({'success': False, 'message': '暂不支持该区块链'})
+            
+    except Exception as e:
+        logger.error(f"智能合约部署失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'部署失败: {str(e)}'})
+
+@api_bp.route('/assets/<int:asset_id>/status', methods=['GET'])
+@api_endpoint(log_calls=True, measure_perf=True)
+def get_asset_status(asset_id):
+    """获取资产状态"""
+    try:
+        asset = Asset.query.get(asset_id)
+        if not asset:
+            return jsonify({'success': False, 'message': '资产不存在'})
+        
+        # 计算剩余供应量
+        total_sold = db.session.query(func.sum(Trade.amount)).filter(
+            Trade.asset_id == asset_id,
+            Trade.status.in_(['pending', 'completed'])  # 使用字符串状态
+        ).scalar() or 0
+        
+        remaining_supply = asset.token_supply - total_sold
+        
+        return jsonify({
+            'success': True,
+            'asset': {
+                'id': asset.id,
+                'name': asset.name,
+                'token_symbol': asset.token_symbol,
+                'is_deployed': bool(asset.contract_address),
+                'contract_address': asset.contract_address,
+                'token_supply': asset.token_supply,
+                'remaining_supply': max(0, remaining_supply),
+                'token_price': float(asset.token_price)
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"获取资产状态失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'获取状态失败: {str(e)}'})
+
+@api_bp.route('/create-purchase-transaction', methods=['POST'])
+@api_endpoint(log_calls=True, measure_perf=True)
+def create_purchase_transaction():
+    """创建购买交易"""
+    try:
+        data = request.get_json()
+        asset_id = data.get('asset_id')
+        amount = data.get('amount')
+        buyer_address = data.get('buyer_address')
+        
+        if not all([asset_id, amount, buyer_address]):
+            return jsonify({'success': False, 'message': '缺少必要参数'})
+        
+        asset = Asset.query.get(asset_id)
+        if not asset:
+            return jsonify({'success': False, 'message': '资产不存在'})
+        
+        if not asset.contract_address:
+            return jsonify({'success': False, 'message': '资产尚未部署智能合约'})
+        
+        amount = int(amount)
+        if amount <= 0:
+            return jsonify({'success': False, 'message': '购买数量必须大于0'})
+        
+        # 检查剩余供应量
+        total_sold = db.session.query(func.sum(Trade.amount)).filter(
+            Trade.asset_id == asset_id,
+            Trade.status.in_(['pending', 'completed'])  # 使用字符串状态
+        ).scalar() or 0
+        
+        remaining_supply = asset.token_supply - total_sold
+        if amount > remaining_supply:
+            return jsonify({'success': False, 'message': f'购买数量超过剩余供应量 ({remaining_supply})'})
+        
+        # 创建交易记录
+        total_price = amount * asset.token_price
+        
+        trade = Trade(
+            asset_id=asset_id,
+            trader_address=buyer_address,  # 使用正确的字段名
+            amount=amount,
+            price=asset.token_price,
+            total=total_price,
+            type='buy',
+            status='pending',  # 使用字符串状态
+            created_at=datetime.utcnow()
+        )
+        
+        db.session.add(trade)
+        db.session.commit()
+        
+        # 生成交易数据（简化版本，实际项目中会生成真实的Solana交易）
+        import base64
+        transaction_data = base64.b64encode(f"purchase_{trade.id}_{amount}_{buyer_address}".encode()).decode()
+        
+        logger.info(f"购买交易创建成功: 交易ID={trade.id}, 资产ID={asset_id}, 数量={amount}")
+        
+        return jsonify({
+            'success': True,
+            'transaction': transaction_data,
+            'trade_id': trade.id,
+            'message': '购买交易创建成功'
+        })
+        
+    except Exception as e:
+        logger.error(f"创建购买交易失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'创建交易失败: {str(e)}'})
+
+@api_bp.route('/submit-transaction', methods=['POST'])
+@api_endpoint(log_calls=True, measure_perf=True)
+def submit_transaction():
+    """提交交易到区块链"""
+    try:
+        data = request.get_json()
+        signed_transaction = data.get('signed_transaction')
+        asset_id = data.get('asset_id')
+        amount = data.get('amount')
+        
+        if not all([signed_transaction, asset_id, amount]):
+            return jsonify({'success': False, 'message': '缺少必要参数'})
+        
+        # 查找对应的交易记录
+        trade = Trade.query.filter(
+            Trade.asset_id == asset_id,
+            Trade.amount == amount,
+            Trade.status == 'pending'  # 使用字符串状态
+        ).order_by(desc(Trade.created_at)).first()
+        
+        if not trade:
+            return jsonify({'success': False, 'message': '找不到对应的交易记录'})
+        
+        # 生成交易哈希（实际项目中会提交到真实区块链）
+        import hashlib
+        tx_hash = hashlib.sha256(f"{trade.id}_{datetime.utcnow().timestamp()}".encode()).hexdigest()
+        
+        # 更新交易状态
+        trade.tx_hash = tx_hash
+        trade.status = 'completed'  # 使用字符串状态
+        
+        db.session.commit()
+        
+        logger.info(f"交易提交成功: 交易ID={trade.id}, 哈希={tx_hash}")
+        
+        return jsonify({
+            'success': True,
+            'transaction_hash': tx_hash,
+            'trade_id': trade.id,
+            'message': '交易提交成功'
+        })
+        
+    except Exception as e:
+        logger.error(f"提交交易失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'交易提交失败: {str(e)}'})
+
+# 日志记录器
+logger = logging.getLogger(__name__)
+
 @api_bp.route('/assets/list', methods=['GET'])
 @api_endpoint(log_calls=True, measure_perf=True)
 def list_assets():

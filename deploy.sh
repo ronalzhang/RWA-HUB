@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# RWA-HUB 简化部署脚本
-# 只提交代码、拉取更新、重启应用
+# RWA-HUB 全自动部署脚本
+# 自动提交代码、拉取更新、重启PM2应用
 
 set -e
 
@@ -26,7 +26,8 @@ SERVER_PATH="/root/RWA-HUB"
 # GitHub仓库配置
 GITHUB_BRANCH="main"
 
-# 应用配置
+# PM2应用配置
+PM2_APP_NAME="rwa-hub"
 APP_PORT="9000"
 EOF
     
@@ -40,7 +41,7 @@ echo "📋 加载配置文件..."
 source "$CONFIG_FILE"
 
 # 验证必要配置
-required_vars=("SERVER_HOST" "SERVER_USER" "SERVER_PASSWORD" "SERVER_PATH")
+required_vars=("SERVER_HOST" "SERVER_USER" "SERVER_PASSWORD" "SERVER_PATH" "PM2_APP_NAME")
 for var in "${required_vars[@]}"; do
     if [ -z "${!var}" ]; then
         echo "❌ 配置项 $var 未设置，请检查配置文件"
@@ -79,7 +80,7 @@ if [ -n "$(git status --porcelain)" ]; then
     git reset HEAD deploy.config 2>/dev/null || true  # 确保配置文件不被提交
     
     # 提交更改
-    COMMIT_MESSAGE="部署更新 - $(date '+%Y-%m-%d %H:%M:%S')"
+    COMMIT_MESSAGE="自动部署更新 - $(date '+%Y-%m-%d %H:%M:%S')"
     git commit -m "$COMMIT_MESSAGE"
     
     echo "✅ 代码已提交: $COMMIT_MESSAGE"
@@ -96,21 +97,14 @@ git push origin "$GITHUB_BRANCH" || {
 
 echo "✅ 代码已推送到GitHub"
 
-# 确认部署
+# 显示部署信息（无需确认，自动继续）
 echo ""
-echo "� 部署信息确仓认:"
+echo "🚀 开始自动部署..."
 echo "   服务器: $SERVER_HOST"
-echo "   用户: $SERVER_USER"
+echo "   应用: $PM2_APP_NAME"
 echo "   路径: $SERVER_PATH"
 echo "   端口: $APP_PORT"
 echo ""
-
-read -p "确认要部署到生产服务器吗? (y/N): " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "❌ 部署已取消"
-    exit 1
-fi
 
 # 连接服务器并执行部署
 echo "🔗 连接服务器并执行部署..."
@@ -123,34 +117,59 @@ echo "🔧 在服务器上执行部署..."
 # 进入项目目录
 cd $SERVER_PATH
 
-# 停止应用服务
-echo "⏹️  停止rwa-hub应用..."
-pkill -f "python.*app.py" 2>/dev/null || echo "应用未运行"
-
 # 拉取最新代码
 echo "📥 拉取最新代码..."
 git pull origin $GITHUB_BRANCH
 
-# 激活虚拟环境并启动应用
-echo "🚀 启动rwa-hub应用..."
-source venv/bin/activate
-nohup python app.py > app.log 2>&1 &
+# 检查PM2是否安装
+if ! command -v pm2 &> /dev/null; then
+    echo "❌ PM2未安装，请先安装PM2"
+    exit 1
+fi
 
-# 等待服务启动
-sleep 5
+# 重启指定的PM2应用
+echo "🔄 重启PM2应用: $PM2_APP_NAME"
+if pm2 list | grep -q "$PM2_APP_NAME"; then
+    pm2 restart $PM2_APP_NAME
+    echo "✅ PM2应用 $PM2_APP_NAME 重启成功"
+else
+    echo "❌ PM2应用 $PM2_APP_NAME 不存在"
+    echo "📋 当前PM2应用列表:"
+    pm2 list
+    exit 1
+fi
 
-# 检查服务状态
-if pgrep -f "python.*app.py" > /dev/null; then
-    echo "✅ rwa-hub应用启动成功"
-    echo "🌐 应用运行在: http://$SERVER_HOST:$APP_PORT"
+# 保存PM2配置，确保重启后自动启动
+echo "💾 保存PM2配置..."
+pm2 save
+
+# 等待应用启动
+echo "⏳ 等待应用启动..."
+sleep 3
+
+# 检查应用状态
+echo "🔍 检查应用状态..."
+if pm2 list | grep -q "$PM2_APP_NAME.*online"; then
+    echo "✅ 应用运行正常"
     
-    # 测试API
+    # 测试API连接
     echo "🧪 测试API连接..."
-    curl -s http://localhost:$APP_PORT/api/health || echo "API测试中..."
+    if curl -s --max-time 10 http://localhost:$APP_PORT/api/health/ > /dev/null; then
+        echo "✅ API连接正常"
+    else
+        echo "⚠️  API连接测试超时，但应用已启动"
+    fi
+    
+    # 显示应用信息
+    echo "📊 应用状态:"
+    pm2 list | grep "$PM2_APP_NAME" || true
     
 else
-    echo "❌ 应用启动失败，请检查日志"
-    tail -20 app.log
+    echo "❌ 应用启动失败"
+    echo "📋 PM2状态:"
+    pm2 list
+    echo "📝 最近日志:"
+    pm2 logs $PM2_APP_NAME --lines 10 --nostream || true
     exit 1
 fi
 
@@ -160,19 +179,24 @@ EOF
 # 检查部署结果
 if [ $? -eq 0 ]; then
     echo ""
-    echo "🎉 部署成功完成！"
+    echo "🎉 自动部署成功完成！"
     echo ""
     echo "📊 部署摘要:"
     echo "  - 服务器地址: http://$SERVER_HOST:$APP_PORT"
     echo "  - 管理后台: http://$SERVER_HOST:$APP_PORT/admin"
+    echo "  - PM2应用: $PM2_APP_NAME"
     echo ""
     echo "🔍 验证部署:"
-    echo "  curl -s http://$SERVER_HOST:$APP_PORT/api/health"
+    echo "  curl -s http://$SERVER_HOST:$APP_PORT/api/health/"
     echo ""
-    echo "📝 查看服务器日志:"
-    echo "  sshpass -p '$SERVER_PASSWORD' ssh $SERVER_USER@$SERVER_HOST 'cd $SERVER_PATH && tail -f app.log'"
+    echo "📝 常用命令:"
+    echo "  查看日志: sshpass -p '$SERVER_PASSWORD' ssh $SERVER_USER@$SERVER_HOST 'pm2 logs $PM2_APP_NAME'"
+    echo "  查看状态: sshpass -p '$SERVER_PASSWORD' ssh $SERVER_USER@$SERVER_HOST 'pm2 status'"
+    echo "  重启应用: sshpass -p '$SERVER_PASSWORD' ssh $SERVER_USER@$SERVER_HOST 'pm2 restart $PM2_APP_NAME'"
 else
     echo ""
     echo "❌ 部署失败！请检查服务器日志"
+    echo "🔍 查看错误日志:"
+    echo "  sshpass -p '$SERVER_PASSWORD' ssh $SERVER_USER@$SERVER_HOST 'pm2 logs $PM2_APP_NAME --err'"
     exit 1
 fi
