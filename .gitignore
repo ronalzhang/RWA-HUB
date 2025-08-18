@@ -576,3 +576,4 @@ deploy.config
 *.config
 deploy_*.sh
 !deploy.sh
+*.md
