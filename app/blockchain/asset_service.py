@@ -112,14 +112,12 @@ class AssetService:
                     "in_progress": True
                 }
                 
-            # 检查资产状态 - 应该是在 CONFIRMED 状态才能上链
-            if asset.status != AssetStatus.CONFIRMED.value:
-                logger.warning(f"尝试部署状态不正确的资产: AssetID={asset_id}, Status={asset.status}. 预期状态: CONFIRMED")
-                # 可以选择直接返回失败，或尝试继续（取决于业务逻辑）
-                # 这里选择返回失败，因为支付确认是前置条件
+            # 检查资产状态 - 待审核或已确认的资产都可以部署
+            if asset.status not in [AssetStatus.PENDING_REVIEW.value, AssetStatus.CONFIRMED.value]:
+                logger.warning(f"尝试部署状态不正确的资产: AssetID={asset_id}, Status={asset.status}. 预期状态: PENDING_REVIEW 或 CONFIRMED")
                 return {
                     "success": False,
-                    "error": f"资产状态不正确 ({asset.status})，无法部署。预期状态: CONFIRMED"
+                    "error": f"资产状态不正确 ({asset.status})，无法部署。资产必须处于待审核或已确认状态"
                 }
                 
             # 如果已经有token_address，说明已经部署过 (再次检查，以防万一)

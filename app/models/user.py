@@ -107,3 +107,53 @@ class User(db.Model):
         """转换为字典格式 - 使用统一的数据转换器"""
         from app.utils.data_converters import UserDataConverter
         return UserDataConverter.to_api_format(self)
+
+    @classmethod
+    def find_by_address(cls, address, wallet_type='ethereum'):
+        """通过地址查找用户"""
+        if wallet_type.lower() == 'ethereum':
+            return cls.query.filter(or_(cls.eth_address == address, cls.eth_address == address.lower())).first()
+        else:
+            return cls.query.filter_by(solana_address=address).first()
+
+    @classmethod
+    def find_or_create_user(cls, address, wallet_type='ethereum'):
+        """查找或创建用户"""
+        from app.models.commission_config import UserCommissionBalance
+        from app.extensions import db
+
+        user = cls.find_by_address(address, wallet_type)
+        if user:
+            return user
+
+        try:
+            new_user = cls(
+                username=f'user_{address[:8]}',
+                email=f'{address[:8]}@wallet.generated',
+                role='user',
+                is_distributor=True,
+                created_at=datetime.utcnow()
+            )
+            if wallet_type.lower() == 'ethereum':
+                new_user.eth_address = address
+            else:
+                new_user.solana_address = address
+
+            db.session.add(new_user)
+            db.session.flush()
+
+            commission_balance = UserCommissionBalance(
+                user_address=address,
+                total_earned=0,
+                available_balance=0,
+                withdrawn_amount=0,
+                frozen_amount=0
+            )
+            db.session.add(commission_balance)
+            db.session.commit()
+            return new_user
+        except Exception as e:
+            db.session.rollback()
+            # Consider logging the error
+            # current_app.logger.error(f"Failed to create user: {e}")
+            return None

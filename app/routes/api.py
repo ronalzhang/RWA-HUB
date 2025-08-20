@@ -28,15 +28,18 @@ def deploy_contract():
     """部署智能合约"""
     try:
         data = request.get_json()
+        if not data:
+            return create_error_response('INVALID_REQUEST', '无效的请求数据')
+
         asset_id = data.get('asset_id')
         blockchain = data.get('blockchain', 'solana')
         
         if not asset_id:
-            return jsonify({'success': False, 'message': '缺少资产ID'})
+            return create_error_response('VALIDATION_ERROR', '缺少资产ID', field='asset_id')
         
         asset = Asset.query.get(asset_id)
         if not asset:
-            return jsonify({'success': False, 'message': '资产不存在'})
+            return create_error_response('ASSET_NOT_FOUND', f'资产 {asset_id} 不存在')
         
         if asset.contract_address:
             return jsonify({
@@ -45,34 +48,30 @@ def deploy_contract():
                 'message': '智能合约已部署'
             })
         
-        # 部署到Solana
         if blockchain == 'solana':
-            # 生成模拟的Solana合约地址
-            import secrets
-            import string
+            from app.blockchain.asset_service import AssetService
+            asset_service = AssetService()
+            logger.info(f"开始真实部署智能合约到Solana: 资产ID={asset_id}")
+            deployment_result = asset_service.deploy_asset_to_blockchain(asset_id)
             
-            # 生成类似Solana地址的44字符字符串
-            chars = string.ascii_letters + string.digits
-            contract_address = ''.join(secrets.choice(chars) for _ in range(44))
-            
-            # 更新资产状态
-            asset.contract_address = contract_address
-            asset.status = 2  # ON_CHAIN状态
-            db.session.commit()
-            
-            logger.info(f"智能合约部署成功: 资产ID={asset_id}, 合约地址={contract_address}")
-            
-            return jsonify({
-                'success': True,
-                'contract_address': contract_address,
-                'message': '智能合约部署成功'
-            })
+            if deployment_result.get('success', False):
+                return jsonify({
+                    'success': True,
+                    'contract_address': deployment_result.get('token_address'),
+                    'tx_hash': deployment_result.get('tx_hash'),
+                    'message': '智能合约部署成功',
+                    'details': deployment_result.get('details', {})
+                })
+            else:
+                error_msg = deployment_result.get('error', '部署失败')
+                logger.error(f"智能合约部署失败: 资产ID={asset_id}, 错误={error_msg}")
+                return create_error_response('CONTRACT_DEPLOYMENT_FAILED', f'部署失败: {error_msg}')
         else:
-            return jsonify({'success': False, 'message': '暂不支持该区块链'})
+            return create_error_response('UNSUPPORTED_BLOCKCHAIN', '暂不支持该区块链')
             
     except Exception as e:
-        logger.error(f"智能合约部署失败: {str(e)}")
-        return jsonify({'success': False, 'message': f'部署失败: {str(e)}'})
+        logger.error(f"智能合约部署失败: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f'部署失败: {str(e)}')
 
 @api_bp.route('/assets/<int:asset_id>/status', methods=['GET'])
 @api_endpoint(log_calls=True, measure_perf=True)
@@ -81,12 +80,11 @@ def get_asset_status(asset_id):
     try:
         asset = Asset.query.get(asset_id)
         if not asset:
-            return jsonify({'success': False, 'message': '资产不存在'})
+            return create_error_response('ASSET_NOT_FOUND', f'资产 {asset_id} 不存在')
         
-        # 计算剩余供应量
         total_sold = db.session.query(func.sum(Trade.amount)).filter(
             Trade.asset_id == asset_id,
-            Trade.status.in_(['pending', 'completed'])  # 使用字符串状态
+            Trade.status.in_(['pending', 'completed'])
         ).scalar() or 0
         
         remaining_supply = asset.token_supply - total_sold
@@ -106,8 +104,8 @@ def get_asset_status(asset_id):
         })
         
     except Exception as e:
-        logger.error(f"获取资产状态失败: {str(e)}")
-        return jsonify({'success': False, 'message': f'获取状态失败: {str(e)}'})
+        logger.error(f"获取资产状态失败: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f'获取状态失败: {str(e)}')
 
 @api_bp.route('/create-purchase-transaction', methods=['POST'])
 @api_endpoint(log_calls=True, measure_perf=True)
@@ -115,52 +113,55 @@ def create_purchase_transaction():
     """创建购买交易"""
     try:
         data = request.get_json()
+        if not data:
+            return create_error_response('INVALID_REQUEST', '无效的请求数据')
+
         asset_id = data.get('asset_id')
         amount = data.get('amount')
         buyer_address = data.get('buyer_address')
         
         if not all([asset_id, amount, buyer_address]):
-            return jsonify({'success': False, 'message': '缺少必要参数'})
+            return create_error_response('VALIDATION_ERROR', '缺少必要参数')
         
         asset = Asset.query.get(asset_id)
         if not asset:
-            return jsonify({'success': False, 'message': '资产不存在'})
+            return create_error_response('ASSET_NOT_FOUND', f'资产 {asset_id} 不存在')
         
         if not asset.contract_address:
-            return jsonify({'success': False, 'message': '资产尚未部署智能合约'})
+            return create_error_response('CONTRACT_NOT_DEPLOYED', '资产尚未部署智能合约')
         
-        amount = int(amount)
-        if amount <= 0:
-            return jsonify({'success': False, 'message': '购买数量必须大于0'})
+        try:
+            amount = int(amount)
+            if amount <= 0:
+                return create_error_response('VALIDATION_ERROR', '购买数量必须大于0')
+        except (ValueError, TypeError):
+            return create_error_response('INVALID_DATA_FORMAT', '无效的购买数量')
         
-        # 检查剩余供应量
         total_sold = db.session.query(func.sum(Trade.amount)).filter(
             Trade.asset_id == asset_id,
-            Trade.status.in_(['pending', 'completed'])  # 使用字符串状态
+            Trade.status.in_(['pending', 'completed'])
         ).scalar() or 0
         
         remaining_supply = asset.token_supply - total_sold
         if amount > remaining_supply:
-            return jsonify({'success': False, 'message': f'购买数量超过剩余供应量 ({remaining_supply})'})
+            return create_error_response('INSUFFICIENT_SUPPLY', f'购买数量超过剩余供应量 ({remaining_supply})')
         
-        # 创建交易记录
         total_price = amount * asset.token_price
         
         trade = Trade(
             asset_id=asset_id,
-            trader_address=buyer_address,  # 使用正确的字段名
+            trader_address=buyer_address,
             amount=amount,
             price=asset.token_price,
             total=total_price,
             type='buy',
-            status='pending',  # 使用字符串状态
+            status='pending',
             created_at=datetime.utcnow()
         )
         
         db.session.add(trade)
         db.session.commit()
         
-        # 生成交易数据（简化版本，实际项目中会生成真实的Solana交易）
         import base64
         transaction_data = base64.b64encode(f"purchase_{trade.id}_{amount}_{buyer_address}".encode()).decode()
         
@@ -174,8 +175,9 @@ def create_purchase_transaction():
         })
         
     except Exception as e:
-        logger.error(f"创建购买交易失败: {str(e)}")
-        return jsonify({'success': False, 'message': f'创建交易失败: {str(e)}'})
+        db.session.rollback()
+        logger.error(f"创建购买交易失败: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f'创建交易失败: {str(e)}')
 
 @api_bp.route('/submit-transaction', methods=['POST'])
 @api_endpoint(log_calls=True, measure_perf=True)
@@ -183,30 +185,30 @@ def submit_transaction():
     """提交交易到区块链"""
     try:
         data = request.get_json()
+        if not data:
+            return create_error_response('INVALID_REQUEST', '无效的请求数据')
+
         signed_transaction = data.get('signed_transaction')
         asset_id = data.get('asset_id')
         amount = data.get('amount')
         
         if not all([signed_transaction, asset_id, amount]):
-            return jsonify({'success': False, 'message': '缺少必要参数'})
+            return create_error_response('VALIDATION_ERROR', '缺少必要参数')
         
-        # 查找对应的交易记录
         trade = Trade.query.filter(
             Trade.asset_id == asset_id,
             Trade.amount == amount,
-            Trade.status == 'pending'  # 使用字符串状态
+            Trade.status == 'pending'
         ).order_by(desc(Trade.created_at)).first()
         
         if not trade:
-            return jsonify({'success': False, 'message': '找不到对应的交易记录'})
+            return create_error_response('TRADE_NOT_FOUND', '找不到对应的交易记录')
         
-        # 生成交易哈希（实际项目中会提交到真实区块链）
         import hashlib
         tx_hash = hashlib.sha256(f"{trade.id}_{datetime.utcnow().timestamp()}".encode()).hexdigest()
         
-        # 更新交易状态
         trade.tx_hash = tx_hash
-        trade.status = 'completed'  # 使用字符串状态
+        trade.status = 'completed'
         
         db.session.commit()
         
@@ -220,8 +222,9 @@ def submit_transaction():
         })
         
     except Exception as e:
-        logger.error(f"提交交易失败: {str(e)}")
-        return jsonify({'success': False, 'message': f'交易提交失败: {str(e)}'})
+        db.session.rollback()
+        logger.error(f"提交交易失败: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f'交易提交失败: {str(e)}')
 
 # 日志记录器
 logger = logging.getLogger(__name__)
@@ -297,480 +300,166 @@ def list_assets():
         'pagination': response_data['pagination']
     }), 200
 
-@api_bp.route('/user/assets', methods=['GET'])
-def get_user_assets_query():
-    """获取用户持有的资产数据（通过查询参数）"""
-    try:
-        # 从查询参数获取地址
-        address = request.args.get('address')
-        wallet_type = request.args.get('wallet_type', 'ethereum')
-        
-        if not address:
-            return jsonify({'success': False, 'error': '缺少钱包地址'}), 400
-            
-        # 记录当前请求的钱包地址，用于调试
-        current_app.logger.info(f'通过查询参数获取资产 - 地址: {address}, 类型: {wallet_type}')
-        
-        # 查询用户
-        from app.models.asset import Asset
-        from app.models.holding import Holding
-        from app.models.user import User
-        from app.models.trade import Trade, TradeStatus
-        from sqlalchemy import or_
-        
-        user = None
-        try:
-            # 尝试查找用户 - 兼容不同地址大小写
-            if wallet_type.lower() == 'ethereum':  # 以太坊地址
-                # 查询用户 - 同时匹配原始大小写和小写地址
-                user = User.query.filter(
-                    or_(
-                        User.eth_address == address,
-                        User.eth_address == address.lower()
-                    )
-                ).first()
-            else:  # Solana地址或其他类型
-                # -- 修改：移除对 sol_address 的查询，因为 User 模型没有此字段 --
-                # user = User.query.filter_by(sol_address=address).first()
-                # 如果不是 ETH 地址，我们无法直接通过 User 模型查找，后续将通过交易记录查找
-                user = None 
-        except Exception as e:
-            current_app.logger.error(f'查询用户失败: {str(e)}')
-            # -- 修改：查询失败时也设置 user = None，进入用户创建逻辑 --
-            user = None 
-            
-        # 如果找不到用户，自动创建用户记录
-        if not user:
-            current_app.logger.info(f'未找到用户: {address}，自动创建用户记录')
-            try:
-                from app.models.commission_config import UserCommissionBalance
-                
-                # 创建新用户
-                user = User(
-                    eth_address=address if wallet_type.lower() == 'ethereum' else None,
-                    username=f'user_{address[:8]}',  # 使用地址前8位作为用户名
-                    email=f'{address[:8]}@wallet.generated',  # 生成一个临时邮箱
-                    role='user',
-                    is_distributor=True,  # 所有用户都是分销商
-                    created_at=datetime.utcnow()
-                )
-                
-                db.session.add(user)
-                db.session.flush()  # 获取用户ID
-                
-                # 为新用户创建佣金余额记录
-                commission_balance = UserCommissionBalance(
-                    user_address=address,
-                    total_earned=Decimal('0.00'),
-                    available_balance=Decimal('0.00'),
-                    withdrawn_amount=Decimal('0.00'),
-                    frozen_amount=Decimal('0.00')
-                )
-                db.session.add(commission_balance)
-                db.session.commit()
-                
-                current_app.logger.info(f'成功创建新用户: ID={user.id}, 地址={address}')
-                
-            except Exception as create_error:
-                current_app.logger.error(f'创建用户失败: {str(create_error)}')
-                db.session.rollback()
-                # 创建失败时，继续使用交易记录方式查询
-                user = None
-        
-        # 如果仍然没有用户（创建失败），尝试使用交易记录方式查询
-        if not user:
-            current_app.logger.info(f'用户创建失败或未找到用户: {address}，尝试使用交易记录查询')
-        
-            try:
-                # 根据地址类型处理
-                if wallet_type.lower() == 'ethereum':
-                    # ETH地址，查询原始大小写地址和小写地址
-                    completed_trades = Trade.query.filter(
-                        Trade.trader_address.in_([address, address.lower()]),
-                        Trade.status.in_([TradeStatus.COMPLETED.value, TradeStatus.PENDING.value])
-                    ).all()
-                else:
-                    # SOL地址或其他类型，查询原始地址（区分大小写）
-                    completed_trades = Trade.query.filter(
-                        Trade.trader_address == address,
-                        Trade.status.in_([TradeStatus.COMPLETED.value, TradeStatus.PENDING.value])
-                    ).all()
-                
-                # 按资产ID分组
-                assets_holdings = {}
-                for trade in completed_trades:
-                    asset_id = trade.asset_id
-                    
-                    if asset_id not in assets_holdings:
-                        assets_holdings[asset_id] = {
-                            'asset_id': asset_id,
-                            'holding_amount': 0,
-                            'total_value': 0,
-                            'trades': []
-                        }
-                    
-                    # 根据交易类型增加或减少持有量
-                    if trade.type == 'buy':
-                        assets_holdings[asset_id]['holding_amount'] += trade.amount
-                        assets_holdings[asset_id]['total_value'] += float(trade.total or (trade.amount * trade.price))
-                    elif trade.type == 'sell':
-                        assets_holdings[asset_id]['holding_amount'] -= trade.amount
-                        assets_holdings[asset_id]['total_value'] -= float(trade.total or (trade.amount * trade.price))
-                    
-                    assets_holdings[asset_id]['trades'].append(trade)
-                
-                # 获取资产详情并组装返回数据
-                user_assets = []
-                for asset_id, holding_data in assets_holdings.items():
-                    # 只返回持有量大于0的资产
-                    if holding_data['holding_amount'] <= 0:
-                        continue
-                        
-                    try:
-                        asset = Asset.query.get(asset_id)
-                        if not asset:
-                            continue
-                        
-                        # 处理图片URL
-                        image_url = None
-                        if hasattr(asset, 'images') and asset.images:
-                            try:
-                                # 解析JSON字符串
-                                if isinstance(asset.images, str):
-                                    images = json.loads(asset.images)
-                                    if images and len(images) > 0:
-                                        image_url = images[0]
-                                # 已经是列表的情况
-                                elif isinstance(asset.images, list) and len(asset.images) > 0:
-                                    image_url = asset.images[0]
-                            except Exception as e:
-                                current_app.logger.error(f'解析图片URL失败: {e}')
-                                # 如果解析失败，尝试直接使用
-                                if isinstance(asset.images, str) and asset.images.startswith('/'):
-                                    image_url = asset.images
-                            
-                        # 计算平均成本和当前价值
-                        avg_cost = holding_data['total_value'] / holding_data['holding_amount'] if holding_data['holding_amount'] > 0 else 0
-                        current_value = holding_data['holding_amount'] * float(asset.token_price)
-                        
-                        user_assets.append({
-                            'asset_id': asset_id,
-                            'name': asset.name,
-                            'image_url': image_url,
-                            'token_symbol': asset.token_symbol,
-                            'holding_amount': holding_data['holding_amount'],
-                            'total_supply': asset.token_supply,
-                            'holding_percentage': (holding_data['holding_amount'] / asset.token_supply) * 100 if asset.token_supply > 0 else 0,
-                            'avg_cost': round(avg_cost, 6),
-                            'current_price': float(asset.token_price),
-                            'total_value': current_value,
-                            'profit_loss': current_value - holding_data['total_value'],
-                            'profit_loss_percentage': ((current_value / holding_data['total_value']) - 1) * 100 if holding_data['total_value'] > 0 else 0
-                        })
-                    except Exception as asset_error:
-                        current_app.logger.error(f'处理资产 {asset_id} 时发生错误: {str(asset_error)}', exc_info=True)
-                        continue
-                
-                # 按持有价值降序排序
-                user_assets.sort(key=lambda x: x['total_value'], reverse=True)
-                
-                current_app.logger.info(f'通过交易记录找到了 {len(user_assets)} 个资产')
-                return jsonify(user_assets), 200
-            except Exception as trade_error:
-                current_app.logger.error(f'通过交易记录查询失败: {str(trade_error)}', exc_info=True)
-                return jsonify([]), 200
+def _get_user_assets(address, wallet_type='ethereum'):
+    """获取用户持有资产的核心逻辑"""
+    from app.models import User, Asset, Holding, Trade, TradeStatus
+    from app.models.commission_config import UserCommissionBalance
+    from sqlalchemy import or_
 
-        current_app.logger.info(f'找到用户 ID: {user.id}，查询其资产')
-        
-        # 查询用户持有的资产
+    # 查找或创建用户
+    user = User.find_or_create_user(address, wallet_type)
+
+    # 优先从Holding表获取资产
+    if user:
         holdings = Holding.query.filter_by(user_id=user.id).all()
-        
-        # 如果没有持有资产，返回空数组
-        if not holdings:
-            current_app.logger.info(f'用户 {user.id} 没有持有资产，返回空数组')
-            return jsonify([]), 200
+        if holdings:
+            result = []
+            for holding in holdings:
+                asset = Asset.query.get(holding.asset_id)
+                if not asset:
+                    continue
+                
+                image_url = _parse_asset_image_url(asset)
+                
+                asset_data = {
+                    'asset_id': asset.id,
+                    'name': asset.name,
+                    'image_url': image_url,
+                    'token_symbol': asset.token_symbol,
+                    'holding_amount': holding.quantity,
+                    'total_supply': asset.token_supply,
+                    'holding_percentage': (holding.quantity / asset.token_supply) * 100 if asset.token_supply > 0 else 0,
+                    'avg_cost': float(holding.purchase_price) if holding.purchase_price else 0,
+                    'current_price': float(asset.token_price),
+                    'total_value': holding.quantity * float(asset.token_price),
+                    'profit_loss': (holding.quantity * float(asset.token_price)) - (holding.quantity * float(holding.purchase_price or 0)),
+                    'profit_loss_percentage': ((float(asset.token_price) / float(holding.purchase_price)) - 1) * 100 if holding.purchase_price and float(holding.purchase_price) > 0 else 0
+                }
+                result.append(asset_data)
             
-        # 准备返回的资产数据
-        result = []
+            current_app.logger.info(f'通过Holding表为用户 {user.id} 返回 {len(result)} 个资产')
+            return jsonify(result), 200
+
+    # 如果Holding表没有数据，则从交易记录中计算
+    try:
+        trade_query = Trade.query.filter(
+            Trade.status.in_([TradeStatus.COMPLETED.value, TradeStatus.PENDING.value])
+        )
+        if wallet_type.lower() == 'ethereum':
+            trade_query = trade_query.filter(Trade.trader_address.in_([address, address.lower()]))
+        else:
+            trade_query = trade_query.filter(Trade.trader_address == address)
         
-        for holding in holdings:
-            # 查询资产详情
-            asset = Asset.query.get(holding.asset_id)
+        completed_trades = trade_query.all()
+        
+        assets_holdings = {}
+        for trade in completed_trades:
+            asset_id = trade.asset_id
+            if asset_id not in assets_holdings:
+                assets_holdings[asset_id] = {'holding_amount': 0, 'total_value': 0}
+            
+            if trade.type == 'buy':
+                assets_holdings[asset_id]['holding_amount'] += trade.amount
+                assets_holdings[asset_id]['total_value'] += float(trade.total or (trade.amount * trade.price))
+            elif trade.type == 'sell':
+                assets_holdings[asset_id]['holding_amount'] -= trade.amount
+                assets_holdings[asset_id]['total_value'] -= float(trade.total or (trade.amount * trade.price))
+
+        user_assets = []
+        for asset_id, holding_data in assets_holdings.items():
+            if holding_data['holding_amount'] <= 0:
+                continue
+            
+            asset = Asset.query.get(asset_id)
             if not asset:
                 continue
-                
-            # 构建资产数据
-            # 安全处理image_url
-            image_url = None
-            if hasattr(asset, 'images') and asset.images:
-                try:
-                    # 解析JSON字符串
-                    if isinstance(asset.images, str):
-                        images = json.loads(asset.images)
-                        if images and len(images) > 0:
-                            image_url = images[0]
-                    # 已经是列表的情况
-                    elif isinstance(asset.images, list) and len(asset.images) > 0:
-                        image_url = asset.images[0]
-                except Exception as e:
-                    current_app.logger.error(f'解析图片URL失败: {e}')
-                    # 如果解析失败，尝试直接使用
-                    if isinstance(asset.images, str) and asset.images.startswith('/'):
-                        image_url = asset.images
-                
-            asset_data = {
-                'asset_id': asset.id,
+
+            image_url = _parse_asset_image_url(asset)
+            current_value = holding_data['holding_amount'] * float(asset.token_price)
+            avg_cost = holding_data['total_value'] / holding_data['holding_amount'] if holding_data['holding_amount'] > 0 else 0
+
+            user_assets.append({
+                'asset_id': asset_id,
                 'name': asset.name,
                 'image_url': image_url,
                 'token_symbol': asset.token_symbol,
-                'holding_amount': holding.quantity,
+                'holding_amount': holding_data['holding_amount'],
                 'total_supply': asset.token_supply,
-                'holding_percentage': (holding.quantity / asset.token_supply) * 100 if asset.token_supply > 0 else 0,
-                'avg_cost': float(holding.purchase_price) if holding.purchase_price else 0,
+                'holding_percentage': (holding_data['holding_amount'] / asset.token_supply) * 100 if asset.token_supply > 0 else 0,
+                'avg_cost': round(avg_cost, 6),
                 'current_price': float(asset.token_price),
-                'total_value': holding.quantity * float(asset.token_price),
-                'profit_loss': (holding.quantity * float(asset.token_price)) - (holding.quantity * float(holding.purchase_price or 0)),
-                'profit_loss_percentage': ((float(asset.token_price) / float(holding.purchase_price)) - 1) * 100 if holding.purchase_price and float(holding.purchase_price) > 0 else 0
-            }
-            result.append(asset_data)
-            
-        current_app.logger.info(f'返回用户 {user.id} 的 {len(result)} 个资产')
-        return jsonify(result), 200
-        
+                'total_value': current_value,
+                'profit_loss': current_value - holding_data['total_value'],
+                'profit_loss_percentage': ((current_value / holding_data['total_value']) - 1) * 100 if holding_data['total_value'] > 0 else 0
+            })
+
+        user_assets.sort(key=lambda x: x['total_value'], reverse=True)
+        current_app.logger.info(f'通过交易记录为地址 {address} 找到了 {len(user_assets)} 个资产')
+        return jsonify(user_assets), 200
+
     except Exception as e:
         current_app.logger.error(f'获取用户资产失败: {str(e)}', exc_info=True)
         return jsonify([]), 200
+
+def _parse_asset_image_url(asset):
+    """解析资产图片URL"""
+    if hasattr(asset, 'images') and asset.images:
+        try:
+            if isinstance(asset.images, str):
+                images = json.loads(asset.images)
+                if images and len(images) > 0:
+                    return images[0]
+            elif isinstance(asset.images, list) and len(asset.images) > 0:
+                return asset.images[0]
+        except (json.JSONDecodeError, TypeError):
+            if isinstance(asset.images, str) and asset.images.startswith('/'):
+                return asset.images
+    return None
+
+@api_bp.route('/user/assets', methods=['GET'])
+def get_user_assets_query():
+    """获取用户持有的资产数据（通过查询参数）"""
+    address = request.args.get('address')
+    wallet_type = request.args.get('wallet_type', 'ethereum')
+    if not address:
+        return jsonify({'success': False, 'error': '缺少钱包地址'}), 400
+    
+    current_app.logger.info(f'通过查询参数获取资产 - 地址: {address}, 类型: {wallet_type}')
+    return _get_user_assets(address, wallet_type)
 
 @api_bp.route('/user/assets/<string:address>', methods=['GET'])
 def get_user_assets(address):
     """获取用户持有的资产数据（通过路径参数）"""
-    try:
-        # 记录当前请求的钱包地址，用于调试
-        current_app.logger.info(f'通过路径参数获取资产 - 地址: {address}')
-        
-        # 查询用户
-        from app.models.asset import Asset
-        from app.models.holding import Holding
-        from app.models.user import User
-        from app.models.trade import Trade, TradeStatus
-        from sqlalchemy import or_
-        
-        user = None
-        try:
-            # 尝试查找用户 - 兼容不同地址大小写
-            if address.startswith('0x'):  # 以太坊地址
-                # 查询用户 - 同时匹配原始大小写和小写地址
-                user = User.query.filter(
-                    or_(
-                        User.eth_address == address,
-                        User.eth_address == address.lower()
-                    )
-                ).first()
-            else:  # Solana地址
-                user = None
-        except Exception as e:
-            current_app.logger.error(f'查询用户失败: {str(e)}')
-            
-        # 如果找不到用户，尝试使用交易记录方式查询
-        if not user:
-            current_app.logger.info(f'未找到用户: {address}，尝试使用交易记录查询')
-        
-            try:
-                # 根据地址类型处理
-                if address.startswith('0x'):
-                    # ETH地址，查询原始大小写地址和小写地址
-                    completed_trades = Trade.query.filter(
-                        Trade.trader_address.in_([address, address.lower()]),
-                        Trade.status.in_([TradeStatus.COMPLETED.value, TradeStatus.PENDING.value])
-                    ).all()
-                else:
-                    # SOL地址或其他类型，查询原始地址（区分大小写）
-                    completed_trades = Trade.query.filter(
-                        Trade.trader_address == address,
-                        Trade.status.in_([TradeStatus.COMPLETED.value, TradeStatus.PENDING.value])
-                    ).all()
-                
-                # 按资产ID分组
-                assets_holdings = {}
-                for trade in completed_trades:
-                    asset_id = trade.asset_id
-                    
-                    if asset_id not in assets_holdings:
-                        assets_holdings[asset_id] = {
-                            'asset_id': asset_id,
-                            'holding_amount': 0,
-                            'total_value': 0,
-                            'trades': []
-                        }
-                    
-                    # 根据交易类型增加或减少持有量
-                    if trade.type == 'buy':
-                        assets_holdings[asset_id]['holding_amount'] += trade.amount
-                        assets_holdings[asset_id]['total_value'] += float(trade.total or (trade.amount * trade.price))
-                    elif trade.type == 'sell':
-                        assets_holdings[asset_id]['holding_amount'] -= trade.amount
-                        assets_holdings[asset_id]['total_value'] -= float(trade.total or (trade.amount * trade.price))
-                    
-                    assets_holdings[asset_id]['trades'].append(trade)
-                
-                # 获取资产详情并组装返回数据
-                user_assets = []
-                for asset_id, holding_data in assets_holdings.items():
-                    # 只返回持有量大于0的资产
-                    if holding_data['holding_amount'] <= 0:
-                        continue
-                        
-                    try:
-                        asset = Asset.query.get(asset_id)
-                        if not asset:
-                            continue
-                        
-                        # 处理图片URL
-                        image_url = None
-                        if hasattr(asset, 'images') and asset.images:
-                            try:
-                                # 解析JSON字符串
-                                if isinstance(asset.images, str):
-                                    images = json.loads(asset.images)
-                                    if images and len(images) > 0:
-                                        image_url = images[0]
-                                # 已经是列表的情况
-                                elif isinstance(asset.images, list) and len(asset.images) > 0:
-                                    image_url = asset.images[0]
-                            except Exception as e:
-                                current_app.logger.error(f'解析图片URL失败: {e}')
-                                # 如果解析失败，尝试直接使用
-                                if isinstance(asset.images, str) and asset.images.startswith('/'):
-                                    image_url = asset.images
-                            
-                        # 计算平均成本和当前价值
-                        avg_cost = holding_data['total_value'] / holding_data['holding_amount'] if holding_data['holding_amount'] > 0 else 0
-                        current_value = holding_data['holding_amount'] * float(asset.token_price)
-                        
-                        user_assets.append({
-                            'asset_id': asset_id,
-                            'name': asset.name,
-                            'image_url': image_url,
-                            'token_symbol': asset.token_symbol,
-                            'holding_amount': holding_data['holding_amount'],
-                            'total_supply': asset.token_supply,
-                            'holding_percentage': (holding_data['holding_amount'] / asset.token_supply) * 100 if asset.token_supply > 0 else 0,
-                            'avg_cost': round(avg_cost, 6),
-                            'current_price': float(asset.token_price),
-                            'total_value': current_value,
-                            'profit_loss': current_value - holding_data['total_value'],
-                            'profit_loss_percentage': ((current_value / holding_data['total_value']) - 1) * 100 if holding_data['total_value'] > 0 else 0
-                        })
-                    except Exception as asset_error:
-                        current_app.logger.error(f'处理资产 {asset_id} 时发生错误: {str(asset_error)}', exc_info=True)
-                        continue
-                
-                # 按持有价值降序排序
-                user_assets.sort(key=lambda x: x['total_value'], reverse=True)
-                
-                current_app.logger.info(f'通过交易记录找到了 {len(user_assets)} 个资产')
-                return jsonify(user_assets), 200
-            except Exception as trade_error:
-                current_app.logger.error(f'通过交易记录查询失败: {str(trade_error)}', exc_info=True)
-                return jsonify([]), 200
-            
-        current_app.logger.info(f'找到用户 ID: {user.id}，查询其资产')
-        
-        # 查询用户持有的资产
-        holdings = Holding.query.filter_by(user_id=user.id).all()
-        
-        # 如果没有持有资产，返回空数组
-        if not holdings:
-            current_app.logger.info(f'用户 {user.id} 没有持有资产，返回空数组')
-            return jsonify([]), 200
-            
-        # 准备返回的资产数据
-        result = []
-        
-        for holding in holdings:
-            # 查询资产详情
-            asset = Asset.query.get(holding.asset_id)
-            if not asset:
-                continue
-                
-            # 构建资产数据
-            # 安全处理image_url
-            image_url = None
-            if hasattr(asset, 'images') and asset.images:
-                try:
-                    # 解析JSON字符串
-                    if isinstance(asset.images, str):
-                        images = json.loads(asset.images)
-                        if images and len(images) > 0:
-                            image_url = images[0]
-                    # 已经是列表的情况
-                    elif isinstance(asset.images, list) and len(asset.images) > 0:
-                        image_url = asset.images[0]
-                except Exception as e:
-                    current_app.logger.error(f'解析图片URL失败: {e}')
-                    # 如果解析失败，尝试直接使用
-                    if isinstance(asset.images, str) and asset.images.startswith('/'):
-                        image_url = asset.images
-                
-            asset_data = {
-                'asset_id': asset.id,
-                'name': asset.name,
-                'image_url': image_url,
-                'token_symbol': asset.token_symbol,
-                'holding_amount': holding.quantity,
-                'total_supply': asset.token_supply,
-                'holding_percentage': (holding.quantity / asset.token_supply) * 100 if asset.token_supply > 0 else 0,
-                'avg_cost': float(holding.purchase_price) if holding.purchase_price else 0,
-                'current_price': float(asset.token_price),
-                'total_value': holding.quantity * float(asset.token_price),
-                'profit_loss': (holding.quantity * float(asset.token_price)) - (holding.quantity * float(holding.purchase_price or 0)),
-                'profit_loss_percentage': ((float(asset.token_price) / float(holding.purchase_price)) - 1) * 100 if holding.purchase_price and float(holding.purchase_price) > 0 else 0
-            }
-            result.append(asset_data)
-            
-        current_app.logger.info(f'返回用户 {user.id} 的 {len(result)} 个资产')
-        return jsonify(result), 200
+    wallet_type = 'ethereum' if address.startswith('0x') else 'solana'
+    current_app.logger.info(f'通过路径参数获取资产 - 地址: {address}, 类型: {wallet_type}')
+    return _get_user_assets(address, wallet_type)
 
-    except Exception as e:
-        current_app.logger.error(f'获取用户资产失败: {str(e)}', exc_info=True)
-        return jsonify([]), 200
 
 @api_bp.route('/trades', methods=['GET'])
 def get_trade_history():
     """获取资产交易历史"""
     try:
-        # 获取查询参数
         asset_id = request.args.get('asset_id', type=int)
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 5, type=int)
         
-        # 验证参数
         if not asset_id:
-            return jsonify({
-                'success': False, 
-                'error': '缺少资产ID参数'
-            }), 400
+            return create_error_response('VALIDATION_ERROR', '缺少资产ID参数', field='asset_id')
 
-        # 限制每页数量，避免过大查询
         if per_page > 100:
             per_page = 100
             
-        # 查询交易记录
         from app.models.trade import Trade, TradeStatus
         
-        # 筛选条件：指定资产ID和已完成状态
         trades_query = Trade.query.filter_by(
             asset_id=asset_id
         ).order_by(Trade.created_at.desc())
         
-        # 计算总记录数和总页数
         total_count = trades_query.count()
         total_pages = (total_count + per_page - 1) // per_page if total_count > 0 else 1
         
-        # 分页
         trades = trades_query.offset((page - 1) * per_page).limit(per_page).all()
         
-        # 格式化交易记录
         trade_list = []
         for trade in trades:
             trade_list.append({
@@ -785,7 +474,6 @@ def get_trade_history():
                 'tx_hash': trade.tx_hash
             })
             
-        # 构建分页信息
         pagination = {
             'total': total_count,
             'pages': total_pages,
@@ -793,7 +481,6 @@ def get_trade_history():
             'per_page': per_page
         }
             
-        # 返回结果
         return jsonify({
             'trades': trade_list,
             'pagination': pagination
@@ -801,30 +488,22 @@ def get_trade_history():
             
     except Exception as e:
         current_app.logger.error(f"获取交易历史失败: {str(e)}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': f"获取交易历史失败: {str(e)}"
-        }), 500
+        return create_error_response('INTERNAL_SERVER_ERROR', f'获取交易历史失败: {str(e)}')
 
 @api_bp.route('/v2/trades/<string:asset_identifier>', methods=['GET'])
 def get_trade_history_v2(asset_identifier):
     """获取资产交易历史 - V2版本，支持RESTful风格URL"""
     try:
-        # 获取查询参数
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 5, type=int)
         
-        # 处理资产标识符，支持数字ID或RH-XXXXX格式
         from app.models.asset import Asset
         asset = None
         
-        # 如果是数字，直接按ID查询
         if asset_identifier.isdigit():
             asset = Asset.query.get(int(asset_identifier))
-        # 如果是RH-格式，按token_symbol查询
         elif asset_identifier.startswith('RH-'):
             asset = Asset.query.filter_by(token_symbol=asset_identifier).first()
-        # 其他情况尝试提取数字ID
         else:
             import re
             match = re.search(r'(\d+)', asset_identifier)
@@ -834,31 +513,22 @@ def get_trade_history_v2(asset_identifier):
         
         if not asset:
             current_app.logger.warning(f"V2 API: 找不到资产 {asset_identifier}")
-            return jsonify({
-                'success': False,
-                'error': f'找不到资产: {asset_identifier}'
-            }), 404
+            return create_error_response('ASSET_NOT_FOUND', f'找不到资产: {asset_identifier}')
 
-        # 限制每页数量，避免过大查询
         if per_page > 100:
             per_page = 100
             
-        # 查询交易记录
         from app.models.trade import Trade, TradeStatus
         
-        # 筛选条件：指定资产ID和已完成状态
         trades_query = Trade.query.filter_by(
             asset_id=asset.id
         ).order_by(Trade.created_at.desc())
         
-        # 计算总记录数和总页数
         total_count = trades_query.count()
         total_pages = (total_count + per_page - 1) // per_page if total_count > 0 else 1
         
-        # 分页
         trades = trades_query.offset((page - 1) * per_page).limit(per_page).all()
         
-        # 格式化交易记录
         trade_list = []
         for trade in trades:
             trade_list.append({
@@ -873,7 +543,6 @@ def get_trade_history_v2(asset_identifier):
                 'tx_hash': trade.tx_hash
             })
             
-        # 构建分页信息
         pagination = {
             'total': total_count,
             'pages': total_pages,
@@ -883,7 +552,6 @@ def get_trade_history_v2(asset_identifier):
             
         current_app.logger.info(f"V2 API: 成功获取资产 {asset_identifier} 的交易历史，共 {len(trade_list)} 条")
         
-        # 返回结果
         return jsonify({
             'success': True,
             'trades': trade_list,
@@ -892,10 +560,7 @@ def get_trade_history_v2(asset_identifier):
             
     except Exception as e:
         current_app.logger.error(f"V2 API: 获取交易历史失败: {str(e)}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': f"API服务暂时不可用，请稍后重试"
-        }), 500
+        return create_error_response('INTERNAL_SERVER_ERROR', f"API服务暂时不可用，请稍后重试: {str(e)}")
 
 @api_bp.route('/assets/symbol/<string:symbol>', methods=['GET'])
 @api_endpoint(log_calls=True, measure_perf=True)
@@ -926,122 +591,82 @@ def get_asset_by_symbol(symbol):
 def prepare_purchase():
     """准备购买交易"""
     try:
-        # 获取请求数据
         data = request.get_json()
         if not data:
-            return jsonify({
-                'success': False,
-                'error': '无效的请求数据'
-            }), 400
+            return create_error_response('INVALID_REQUEST', '无效的请求数据')
         
-        # 验证必要字段
         asset_id = data.get('asset_id')
         amount = data.get('amount')
         wallet_address = data.get('wallet_address')
         
         if not asset_id:
-            return jsonify({
-                'success': False,
-                'error': '缺少资产ID'
-            }), 400
+            return create_error_response('VALIDATION_ERROR', '缺少资产ID', field='asset_id')
             
         if not amount:
-            return jsonify({
-                'success': False,
-                'error': '缺少购买数量'
-            }), 400
+            return create_error_response('VALIDATION_ERROR', '缺少购买数量', field='amount')
             
         if not wallet_address:
-            return jsonify({
-                'success': False,
-                'error': '缺少钱包地址'
-            }), 400
+            return create_error_response('VALIDATION_ERROR', '缺少钱包地址', field='wallet_address')
         
-        # 处理资产ID，支持RH-XXXXXX格式
         from app.models.asset import Asset
         
         asset = None
         try:
-            # 如果资产ID是数字，直接查询
             if isinstance(asset_id, int) or (isinstance(asset_id, str) and asset_id.isdigit()):
                 asset = Asset.query.get(int(asset_id))
-            # 如果资产ID是符号格式，通过符号查询
             elif isinstance(asset_id, str) and asset_id.startswith('RH-'):
                 asset = Asset.query.filter_by(token_symbol=asset_id).first()
             
-            # 如果上述查询都失败，尝试其他格式处理
             if not asset and isinstance(asset_id, str):
-                # 尝试提取数字部分
                 match = re.search(r'(\d+)', asset_id)
                 if match:
                     numeric_id = int(match.group(1))
                     asset = Asset.query.get(numeric_id)
                     
-                    # 如果仍未找到，尝试通过token_symbol模糊匹配
                     if not asset:
                         asset = Asset.query.filter(Asset.token_symbol.like(f"%{numeric_id}%")).first()
         except Exception as e:
             current_app.logger.error(f"查询资产失败: {str(e)}", exc_info=True)
             
-        # 如果找不到资产，返回错误
         if not asset:
-            return jsonify({
-                'success': False,
-                'error': f'找不到资产: {asset_id}'
-            }), 404
+            return create_error_response('ASSET_NOT_FOUND', f'找不到资产: {asset_id}')
             
-        # 将数量转换为整数
         try:
             amount = int(float(amount))
             if amount <= 0:
-                return jsonify({
-                    'success': False,
-                    'error': '购买数量必须大于0'
-                }), 400
-        except ValueError:
-            return jsonify({
-                'success': False,
-                'error': '无效的购买数量'
-            }), 400
+                return create_error_response('VALIDATION_ERROR', '购买数量必须大于0')
+        except (ValueError, TypeError):
+            return create_error_response('INVALID_DATA_FORMAT', '无效的购买数量')
             
-        # 检查资产是否有足够的剩余供应量
         if asset.remaining_supply is not None and amount > asset.remaining_supply:
-            return jsonify({
-                'success': False,
-                'error': f'购买数量超过可用供应量: {asset.remaining_supply}'
-            }), 400
+            return create_error_response('INSUFFICIENT_SUPPLY', f'购买数量超过可用供应量: {asset.remaining_supply}')
             
-        # 计算总价格
         price = float(asset.token_price)
         total = price * amount
         
-        # 从系统配置获取平台收款地址
         from app.models.admin import SystemConfig
         from app.utils.config_manager import ConfigManager
         platform_address = ConfigManager.get_platform_fee_address()
         
-        # 生成交易ID
         import uuid
         trade_id = str(uuid.uuid4())
         
-        # 准备响应数据 - 添加前端期望的字段
         response = {
             'success': True,
             'trade_id': trade_id,
-            'purchase_id': trade_id,  # 添加purchase_id别名
+            'purchase_id': trade_id,
             'asset_id': asset.id,
             'token_symbol': asset.token_symbol,
-            'name': asset.name,  # 添加资产名称
+            'name': asset.name,
             'amount': amount,
             'price': price,
             'total': total,
-            'total_amount': total,  # 添加前端期望的total_amount字段
-            'recipient_address': platform_address,  # 添加前端期望的recipient_address字段
-            'platform_address': platform_address,  # 保留平台地址字段
+            'total_amount': total,
+            'recipient_address': platform_address,
+            'platform_address': platform_address,
             'wallet_address': wallet_address
         }
         
-        # 在会话中存储待确认的交易数据，有效期10分钟
         from datetime import datetime, timedelta
         session_key = f'purchase_tx_{trade_id}'
         
@@ -1049,7 +674,7 @@ def prepare_purchase():
             'trade_id': trade_id,
             'asset_id': asset.id,
             'token_symbol': asset.token_symbol,
-            'name': asset.name,  # 添加资产名称
+            'name': asset.name,
             'amount': amount,
             'price': price,
             'total': total,
@@ -1062,39 +687,26 @@ def prepare_purchase():
         
     except Exception as e:
         current_app.logger.error(f"准备购买失败: {str(e)}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': f"准备购买失败: {str(e)}"
-        }), 500
+        return create_error_response('INTERNAL_SERVER_ERROR', f"准备购买失败: {str(e)}")
 
 @api_bp.route('/trades/confirm_purchase', methods=['POST'])
 def confirm_purchase():
     """确认购买交易"""
     try:
-        # 获取请求数据
         data = request.get_json()
         if not data:
-            return jsonify({
-                'success': False,
-                'error': '无效的请求数据'
-            }), 400
+            return create_error_response('INVALID_REQUEST', '无效的请求数据')
             
-        # 验证必要字段 - 兼容前端发送的purchase_id和trade_id
         trade_id = data.get('trade_id') or data.get('purchase_id')
-        signature = data.get('signature')  # 获取交易签名
+        signature = data.get('signature')
         
         if not trade_id:
-            return jsonify({
-                'success': False,
-                'error': '缺少交易ID'
-            }), 400
+            return create_error_response('VALIDATION_ERROR', '缺少交易ID')
             
-        # 从会话中获取交易数据
         session_key = f'purchase_tx_{trade_id}'
         tx_data = session.get(session_key)
         
         if not tx_data:
-            # 检查此交易ID是否已经完成过
             from app.models.trade import Trade
             existing_trade = Trade.query.filter_by(payment_details=trade_id).first()
             if existing_trade:
@@ -1113,27 +725,17 @@ def confirm_purchase():
                     }
                 }), 200
             
-            return jsonify({
-                'success': False,
-                'error': '找不到交易数据或交易已过期'
-            }), 404
+            return create_error_response('TRANSACTION_NOT_FOUND', '找不到交易数据或交易已过期')
             
-        # 检查交易是否已过期
         from datetime import datetime
         if datetime.utcnow().timestamp() > tx_data.get('expires_at', 0):
-            # 删除过期交易数据
             session.pop(session_key, None)
-            return jsonify({
-                'success': False,
-                'error': '交易已过期'
-            }), 400
+            return create_error_response('TRANSACTION_EXPIRED', '交易已过期')
             
-        # 创建新交易记录
         from app.models.trade import Trade, TradeType, TradeStatus
         from app.models.asset import Asset
         import json
         
-        # 获取交易相关数据
         asset_id = tx_data['asset_id']
         amount = tx_data['amount']
         price = tx_data['price']
@@ -1142,22 +744,13 @@ def confirm_purchase():
         token_symbol = tx_data.get('token_symbol', '')
         
         try:
-            # 查询资产
             asset = Asset.query.get(asset_id)
             if not asset:
-                return jsonify({
-                    'success': False,
-                    'error': f'找不到资产: {asset_id}'
-                }), 404
+                return create_error_response('ASSET_NOT_FOUND', f'找不到资产: {asset_id}')
                 
-            # 检查资产是否有足够的剩余供应量
             if asset.remaining_supply is not None and amount > asset.remaining_supply:
-                return jsonify({
-                    'success': False,
-                    'error': f'购买数量超过可用供应量: {asset.remaining_supply}'
-                }), 400
+                return create_error_response('INSUFFICIENT_SUPPLY', f'购买数量超过可用供应量: {asset.remaining_supply}')
                 
-            # 创建交易记录
             payment_details = {
                 'method': 'api',
                 'trade_id': trade_id,
@@ -1172,23 +765,19 @@ def confirm_purchase():
                 price=price,
                 total=total,
                 trader_address=wallet_address,
-                status=TradeStatus.COMPLETED.value,  # 直接设为已完成
-                tx_hash=signature,  # 保存交易签名作为交易哈希
+                status=TradeStatus.COMPLETED.value,
+                tx_hash=signature,
                 payment_details=json.dumps(payment_details)
             )
             
-            # 更新资产剩余供应量
             if asset.remaining_supply is not None:
                 asset.remaining_supply = max(0, asset.remaining_supply - amount)
                 
-            # 保存到数据库
             db.session.add(new_trade)
             db.session.commit()
             
-            # 清除会话中的交易数据
             session.pop(session_key, None)
             
-            # 准备响应数据
             response = {
                 'success': True,
                 'trade_id': trade_id,
@@ -1203,7 +792,7 @@ def confirm_purchase():
                     'price': price,
                     'total': total,
                     'status': new_trade.status,
-                    'tx_hash': signature,  # 包含交易哈希
+                    'tx_hash': signature,
                     'created_at': new_trade.created_at.isoformat()
                 }
             }
@@ -1213,17 +802,11 @@ def confirm_purchase():
         except Exception as db_error:
             db.session.rollback()
             current_app.logger.error(f"数据库操作失败: {str(db_error)}", exc_info=True)
-            return jsonify({
-                'success': False,
-                'error': f"数据库操作失败: {str(db_error)}"
-            }), 500
+            return create_error_response('DATABASE_ERROR', f"数据库操作失败: {str(db_error)}")
             
     except Exception as e:
         current_app.logger.error(f"确认购买失败: {str(e)}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': f"确认购买失败: {str(e)}"
-        }), 500
+        return create_error_response('INTERNAL_SERVER_ERROR', f"确认购买失败: {str(e)}")
 
 @api_bp.route('/dividend/stats/<string:asset_id>')
 def get_dividend_stats_api(asset_id):
@@ -1231,6 +814,7 @@ def get_dividend_stats_api(asset_id):
     try:
         current_app.logger.info(f"请求资产分红统计: {asset_id}")
         from app.models.asset import Asset
+        from app.models.dividend import Dividend, DividendRecord
         
         # 处理资产ID格式，支持RH-XXXXX和数字ID
         asset = None
@@ -1250,48 +834,49 @@ def get_dividend_stats_api(asset_id):
                 'success': False,
                 'error': f'找不到资产: {asset_id}'
             }), 404
-            
-        # 这里返回定制的分红数据，由于原分红API不可用，提供默认值
-        # 这些值可以根据实际需求自定义
-        default_dividend_data = {
+
+        # 获取总分红
+        total_dividends = DividendRecord.get_total_amount_by_asset(asset.id)
+
+        # 获取最近一次分红
+        last_dividend_record = DividendRecord.query.filter_by(asset_id=asset.id).order_by(DividendRecord.created_at.desc()).first()
+        last_dividend = None
+        if last_dividend_record:
+            last_dividend = {
+                'amount': float(last_dividend_record.amount),
+                'date': last_dividend_record.created_at.strftime('%Y-%m-%d'),
+                'status': 'completed'
+            }
+
+        # 获取下一次计划分红
+        next_dividend_record = Dividend.query.filter_by(asset_id=asset.id, status='scheduled').order_by(Dividend.dividend_date.asc()).first()
+        next_dividend = None
+        if next_dividend_record:
+            next_dividend = {
+                'amount': float(next_dividend_record.amount),
+                'date': next_dividend_record.dividend_date.strftime('%Y-%m-%d'),
+                'status': 'scheduled'
+            }
+
+        dividend_data = {
             'success': True,
-            'total_dividends': 450000,
-            'last_dividend': {
-                'amount': 120000,
-                'date': "2023-09-30",
-                'status': "completed"
-            },
-            'next_dividend': {
-                'amount': 125000,
-                'date': "2023-12-31",
-                'status': "scheduled"
-            },
+            'total_dividends': float(total_dividends),
+            'last_dividend': last_dividend,
+            'next_dividend': next_dividend,
             'asset_id': asset_id,
             'token_symbol': asset.token_symbol,
             'name': asset.name
         }
         
         current_app.logger.info(f"返回资产 {asset_id} 的分红数据")
-        return jsonify(default_dividend_data), 200
+        return jsonify(dividend_data), 200
         
     except Exception as e:
         current_app.logger.error(f"获取分红统计失败: {str(e)}", exc_info=True)
-        # 即使出错也返回默认数据，确保前端能正常显示
         return jsonify({
-            'success': True,
-            'total_dividends': 450000,
-            'last_dividend': {
-                'amount': 120000,
-                'date': "2023-09-30",
-                'status': "completed"
-            },
-            'next_dividend': {
-                'amount': 125000,
-                'date': "2023-12-31",
-                'status': "scheduled"
-            },
-            'asset_id': asset_id
-        }), 200
+            'success': False,
+            'error': f'获取分红统计失败: {str(e)}'
+        }), 500
 
 @api_bp.route('/assets/<string:asset_id>/dividend')
 def get_asset_dividend_api(asset_id):
@@ -1311,23 +896,16 @@ def get_asset_dividends_total(token_symbol):
         from app.models.asset import Asset
         from app.models.dividend import DividendRecord
         
-        # 查找资产
         asset = Asset.query.filter_by(token_symbol=token_symbol).first()
         if not asset:
             current_app.logger.warning(f"找不到资产: {token_symbol}")
-            return jsonify({
-                'success': False,
-                'error': f'找不到资产: {token_symbol}',
-                'total_amount': 0
-            }), 404
+            return create_error_response('ASSET_NOT_FOUND', f'找不到资产: {token_symbol}')
         
-        # 计算总分红金额
+        total_amount = 0
         try:
-            # 尝试从DividendRecord表中计算总分红
-            total_amount = db.session.query(db.func.sum(DividendRecord.amount)).filter_by(asset_id=asset.id).scalar() or 0
+            total_amount = DividendRecord.get_total_amount_by_asset(asset.id)
         except Exception as e:
             current_app.logger.warning(f"无法从DividendRecord计算分红，使用默认值: {str(e)}")
-            # 如果分红表不存在或有问题，返回0
             total_amount = 0
         
         current_app.logger.info(f"资产 {token_symbol} 的总分红金额: {total_amount}")
@@ -1340,12 +918,8 @@ def get_asset_dividends_total(token_symbol):
         }), 200
         
     except Exception as e:
-        current_app.logger.error(f"获取资产分红总额失败: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'total_amount': 0
-        }), 500
+        current_app.logger.error(f"获取资产分红总额失败: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f"获取资产分红总额失败: {str(e)}")
 
 @api_bp.route('/solana/execute_transfer_v2', methods=['POST'])
 def api_execute_transfer_v2():
@@ -1354,10 +928,8 @@ def api_execute_transfer_v2():
         data = request.json
         logger.info(f"API路由收到转账请求: {data}")
         
-        # 验证必要参数
         required_fields = ['from_address', 'to_address', 'amount', 'token_symbol']
         
-        # 前端传来的参数名称可能有所不同，进行兼容处理
         mapped_data = {
             'from_address': data.get('from_address') or data.get('fromAddress'),
             'to_address': data.get('to_address') or data.get('toAddress'),
@@ -1367,7 +939,6 @@ def api_execute_transfer_v2():
             'metadata': data.get('metadata')
         }
         
-        # 检查必填字段
         missing_fields = []
         for field in required_fields:
             if not mapped_data.get(field):
@@ -1375,12 +946,8 @@ def api_execute_transfer_v2():
         
         if missing_fields:
             logger.error(f"转账请求缺少必要参数: {missing_fields}")
-            return jsonify({
-                'success': False,
-                'message': f"缺少必要参数: {', '.join(missing_fields)}"
-            }), 400
+            return create_error_response('VALIDATION_ERROR', f"缺少必要参数: {', '.join(missing_fields)}")
             
-        # 通知前端需要使用钱包来执行交易，而不是由服务器代替执行
         return jsonify({
             'success': False,
             'message': "请使用钱包直接执行交易，服务器不代替执行转账操作",
@@ -1388,17 +955,13 @@ def api_execute_transfer_v2():
         }), 200
             
     except Exception as e:
-        logger.error(f"API异常: {str(e)}")
-        return jsonify({
-            'success': False, 
-            'message': f"处理请求时发生异常: {str(e)}"
-        }), 500
+        logger.error(f"API异常: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f"处理请求时发生异常: {str(e)}")
 
 @api_bp.route('/solana/build_transfer', methods=['GET'])
 def api_build_transfer():
     """构建Solana转账交易，返回序列化的交易数据"""
     try:
-        # 获取查询参数
         from_address = request.args.get('from')
         to_address = request.args.get('to')
         amount = request.args.get('amount')
@@ -1406,7 +969,6 @@ def api_build_transfer():
         
         logger.info(f"收到构建转账请求 - from: {from_address}, to: {to_address}, amount: {amount}, token: {token_mint}")
         
-        # 验证参数完整性
         if not all([from_address, to_address, amount, token_mint]):
             missing_fields = []
             if not from_address:
@@ -1418,14 +980,9 @@ def api_build_transfer():
             if not token_mint:
                 missing_fields.append('token')
                 
-            logger.error(f"构建转账请求缺少必要参数: {', '.join(missing_fields)}")
-            return jsonify({
-                'success': False,
-                'error': f"缺少必要参数: {', '.join(missing_fields)}"
-            }), 400
+            logger.error(f"构建转账请求缺少必要参数: {missing_fields}")
+            return create_error_response('VALIDATION_ERROR', f"缺少必要参数: {', '.join(missing_fields)}")
         
-        # 简化处理 - 直接返回简化版的交易参数
-        # 在实际应用中，这里会构建真实的Solana交易
         return jsonify({
             'success': True,
             'transaction_data': {
@@ -1438,27 +995,21 @@ def api_build_transfer():
         })
     except Exception as e:
         logger.exception(f"构建Solana转账交易失败: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': f"构建转账交易失败: {str(e)}"
-        }), 500
+        return create_error_response('INTERNAL_SERVER_ERROR', f"构建转账交易失败: {str(e)}")
 
 @api_bp.route('/solana/relay', methods=['POST'])
 def solana_relay():
     """Solana网络中继API - 让前端通过服务器连接Solana网络"""
     try:
-        # 获取请求数据
         relay_data = request.json
         logger.info("收到Solana网络中继请求")
         
         if not relay_data:
             logger.error("中继请求缺少数据")
-            return jsonify({'error': 'No data provided'}), 400
+            return create_error_response('INVALID_REQUEST', 'No data provided')
             
-        # 设置Solana RPC节点URL
         solana_rpc_url = os.environ.get("SOLANA_NETWORK_URL", "https://api.mainnet-beta.solana.com")
         
-        # 转发请求到Solana网络
         import requests
         
         solana_response = requests.post(
@@ -1467,26 +1018,18 @@ def solana_relay():
             headers={
                 'Content-Type': 'application/json'
             },
-            timeout=30  # 增加超时时间
+            timeout=30
         )
         
-        # 返回Solana网络响应
         if solana_response.status_code == 200:
             return jsonify(solana_response.json()), 200
         else:
             logger.error(f"Solana网络返回错误: {solana_response.status_code} - {solana_response.text}")
-            return jsonify({
-                'error': f"Solana网络返回错误: {solana_response.status_code}",
-                'details': solana_response.text
-            }), 502
+            return create_error_response('SOLANA_RPC_ERROR', f"Solana网络返回错误: {solana_response.status_code}", details=solana_response.text)
             
     except Exception as e:
-        logger.error(f"处理Solana中继请求时出错: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return jsonify({
-            'error': f"处理中继请求时出错: {str(e)}"
-        }), 500
+        logger.error(f"处理Solana中继请求时出错: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f"处理中继请求时出错: {str(e)}")
 
 @api_bp.route('/solana/direct_transfer', methods=['POST'])
 def solana_direct_transfer():
@@ -1495,10 +1038,8 @@ def solana_direct_transfer():
         data = request.json
         logger.info(f"收到真实链上转账请求: {data}")
         
-        # 验证基本参数
         required_fields = ['from_address', 'to_address', 'amount', 'token_symbol']
         
-        # 前端传来的参数名称可能有所不同，进行兼容处理
         mapped_data = {
             'from_address': data.get('from_address') or data.get('fromAddress'),
             'to_address': data.get('to_address') or data.get('toAddress'),
@@ -1508,7 +1049,6 @@ def solana_direct_transfer():
             'metadata': data.get('metadata')
         }
         
-        # 检查必填字段
         missing_fields = []
         for field in required_fields:
             if not mapped_data.get(field):
@@ -1516,31 +1056,22 @@ def solana_direct_transfer():
         
         if missing_fields:
             logger.error(f"转账请求缺少必要参数: {missing_fields}")
-            return jsonify({
-                'success': False,
-                'message': f"缺少必要参数: {', '.join(missing_fields)}"
-            }), 400
+            return create_error_response('VALIDATION_ERROR', f"缺少必要参数: {', '.join(missing_fields)}")
         
-        # 记录交易信息到数据库 (这步可以根据实际需要实现)
         logger.info(f"记录支付交易: {mapped_data['from_address']} -> {mapped_data['to_address']}, 金额: {mapped_data['amount']} {mapped_data['token_symbol']}")
         
-        # 使用区块链服务执行交易
         from app.blockchain.solana_service import execute_transfer_transaction
         
-        # 这里应该是实际执行区块链交易的代码
         result = {
             'success': True,
             'message': "支付请求已提交至区块链",
-            'signature': None,  # 实际交易签名将从区块链返回
+            'signature': None,
         }
         
         return jsonify(result)
     except Exception as e:
         logger.exception(f"执行Solana转账失败: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': f"执行转账失败: {str(e)}"
-        }), 500
+        return create_error_response('INTERNAL_SERVER_ERROR', f"执行转账失败: {str(e)}")
 
 @api_bp.route('/execute_transfer', methods=['POST'])
 def execute_transfer():
@@ -1549,10 +1080,8 @@ def execute_transfer():
         data = request.json
         logger.info(f"收到转账请求: {data}")
         
-        # 验证基本参数
         required_fields = ['from_address', 'to_address', 'amount', 'token_symbol']
         
-        # 检查必填字段
         missing_fields = []
         for field in required_fields:
             if not data.get(field):
@@ -1560,34 +1089,26 @@ def execute_transfer():
         
         if missing_fields:
             logger.error(f"转账请求缺少必要参数: {missing_fields}")
-            return jsonify({
-                'success': False,
-                'message': f"缺少必要参数: {', '.join(missing_fields)}"
-            }), 400
+            return create_error_response('VALIDATION_ERROR', f"缺少必要参数: {', '.join(missing_fields)}")
         
         from_address = data.get('from_address')
         to_address = data.get('to_address')
-        amount = float(data.get('amount'))
+        
+        try:
+            amount = float(data.get('amount'))
+        except (ValueError, TypeError):
+            return create_error_response('INVALID_DATA_FORMAT', '无效的转账金额')
+
         token_symbol = data.get('token_symbol')
         
-        # 验证地址格式
         if len(from_address) < 32 or len(to_address) < 32:
-            return jsonify({
-                'success': False,
-                'message': '无效的钱包地址格式'
-            }), 400
+            return create_error_response('VALIDATION_ERROR', '无效的钱包地址格式')
         
-        # 验证金额
         if amount <= 0:
-            return jsonify({
-                'success': False,
-                'message': '转账金额必须大于0'
-            }), 400
+            return create_error_response('VALIDATION_ERROR', '转账金额必须大于0')
         
-        # 记录交易信息
         logger.info(f"执行转账: {from_address} -> {to_address}, 金额: {amount} {token_symbol}")
         
-        # 使用区块链服务执行交易
         try:
             result = execute_transfer_transaction(
                 token_symbol=token_symbol,
@@ -1604,24 +1125,15 @@ def execute_transfer():
                     'transaction_id': result.get('signature')
                 })
             else:
-                return jsonify({
-                    'success': False,
-                    'message': result.get('error', '转账失败')
-                }), 500
+                return create_error_response('BLOCKCHAIN_TRANSACTION_FAILED', result.get('error', '转账失败'))
                 
         except Exception as e:
-            logger.error(f"区块链转账执行失败: {str(e)}")
-            return jsonify({
-                'success': False,
-                'message': f"转账执行失败: {str(e)}"
-            }), 500
+            logger.error(f"区块链转账执行失败: {str(e)}", exc_info=True)
+            return create_error_response('INTERNAL_SERVER_ERROR', f"转账执行失败: {str(e)}")
         
     except Exception as e:
         logger.exception(f"执行转账失败: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': f"转账失败: {str(e)}"
-        }), 500
+        return create_error_response('INTERNAL_SERVER_ERROR', f"转账失败: {str(e)}")
 
 @api_bp.route('/solana/record_payment', methods=['POST'])
 def record_payment():
@@ -1630,33 +1142,22 @@ def record_payment():
         data = request.json
         logger.info(f"收到记录支付请求: {data}")
         
-        # 验证基本参数
         required_fields = ['from_address', 'to_address', 'amount', 'token_symbol', 'message']
         missing_fields = [field for field in required_fields if not data.get(field)]
         
         if missing_fields:
-            return jsonify({
-                'success': False,
-                'message': f"缺少必要参数: {', '.join(missing_fields)}"
-            }), 400
+            return create_error_response('VALIDATION_ERROR', f"缺少必要参数: {', '.join(missing_fields)}")
             
-        # 获取资产信息
         asset_id = data.get('asset_id')
         signature = data.get('signature')
         
-        # 如果未提供签名，则无法进行验证
         if not signature:
-            return jsonify({
-                'success': False,
-                'message': f"缺少交易签名，无法验证交易"
-            }), 400
+            return create_error_response('VALIDATION_ERROR', '缺少交易签名，无法验证交易')
         
-        # 记录支付信息
         try:
-            # 如果提供了资产ID，更新资产的支付信息
             if asset_id:
                 from app.models import Asset
-                from app.models.asset import AssetStatus  # 引入状态枚举
+                from app.models.asset import AssetStatus
                 from app.tasks import monitor_creation_payment
                 
                 asset = Asset.query.get(asset_id)
@@ -1671,48 +1172,33 @@ def record_payment():
                         'status': 'pending'
                     })
                     
-                    # 更新状态为待确认
                     if asset.status == AssetStatus.PENDING.value:
                         logger.info(f"资产状态从PENDING更新为PENDING(保持不变): AssetID={asset_id}")
                     
                     db.session.commit()
                     logger.info(f"更新资产支付交易哈希: AssetID={asset_id}, TxHash={signature}")
                     
-                    # 触发支付确认监控任务
                     try:
                         logger.info(f"触发支付确认监控任务: AssetID={asset_id}, TxHash={signature}")
                         monitor_task = monitor_creation_payment.delay(asset_id, signature)
                         logger.info(f"支付确认监控任务已触发: {monitor_task}")
                     except Exception as task_error:
-                        logger.error(f"触发支付确认监控任务失败: {str(task_error)}")
-                        # 记录详细的错误堆栈
-                        import traceback
-                        logger.error(traceback.format_exc())
+                        logger.error(f"触发支付确认监控任务失败: {str(task_error)}", exc_info=True)
                 else:
                     logger.warning(f"未找到要更新的资产: AssetID={asset_id}")
         except Exception as record_error:
-            logger.error(f"记录支付信息失败: {str(record_error)}")
-            # 记录详细的错误堆栈
-            import traceback
-            logger.error(traceback.format_exc())
+            logger.error(f"记录支付信息失败: {str(record_error)}", exc_info=True)
             
-        # 返回成功结果
         return jsonify({
             'success': True,
             'signature': signature,
             'message': '支付已记录',
-            'payment_monitoring_started': bool(asset_id)  # 表明是否启动了支付监控
+            'payment_monitoring_started': bool(asset_id)
         })
         
     except Exception as e:
-        logger.error(f"记录支付失败: {str(e)}")
-        # 记录详细的错误堆栈
-        import traceback
-        logger.error(traceback.format_exc())
-        return jsonify({
-            'success': False,
-            'message': f"记录支付失败: {str(e)}"
-        }), 500
+        logger.error(f"记录支付失败: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f"记录支付失败: {str(e)}")
 
 @api_bp.route('/admin/fix_asset_total_values', methods=['POST'])
 def fix_asset_total_values():
@@ -1720,17 +1206,14 @@ def fix_asset_total_values():
     try:
         from app.models.asset import Asset
         
-        # 查找所有total_value为null的资产
         assets_to_fix = Asset.query.filter(Asset.total_value.is_(None)).all()
         
         fixed_count = 0
         for asset in assets_to_fix:
             if asset.token_price and asset.token_supply:
-                # 计算total_value = token_price * token_supply
                 asset.total_value = asset.token_price * asset.token_supply
                 fixed_count += 1
         
-        # 提交更改
         db.session.commit()
         
         current_app.logger.info(f"修复了 {fixed_count} 个资产的total_value字段")
@@ -1743,11 +1226,8 @@ def fix_asset_total_values():
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"修复资产total_value失败: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        current_app.logger.error(f"修复资产total_value失败: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f"修复资产total_value失败: {str(e)}")
 
 @api_bp.route('/payment/config', methods=['GET'])
 def get_payment_config():
@@ -1755,14 +1235,13 @@ def get_payment_config():
     try:
         from app.utils.config_manager import ConfigManager
         
-        # 使用统一的配置管理器获取支付设置
         settings = ConfigManager.get_payment_settings()
         
         current_app.logger.info(f"返回支付设置: {settings}")
         return jsonify(settings)
     except Exception as e:
-        logger.error(f"获取支付设置失败: {str(e)}")
-        return jsonify({'success': False, 'message': f'获取支付设置失败: {str(e)}'}), 500
+        logger.error(f"获取支付设置失败: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f'获取支付设置失败: {str(e)}')
 
 @api_bp.route('/share-messages/random', methods=['GET'])
 def get_random_share_message():
@@ -1770,10 +1249,8 @@ def get_random_share_message():
     try:
         from app.models.share_message import ShareMessage
         
-        # 获取消息类型参数，默认为分享内容
         message_type = request.args.get('type', 'share_content')
         
-        # 获取随机消息
         message = ShareMessage.get_random_message(message_type)
         
         return jsonify({
@@ -1783,11 +1260,8 @@ def get_random_share_message():
         })
         
     except Exception as e:
-        current_app.logger.error(f'获取随机分享消息失败: {str(e)}')
-        return jsonify({
-            'success': False,
-            'error': '获取分享消息失败'
-        }), 500
+        current_app.logger.error(f'获取随机分享消息失败: {str(e)}', exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', '获取分享消息失败')
 
 @api_bp.route('/share-reward-plan/random', methods=['GET'])
 def get_random_reward_plan():
@@ -1795,7 +1269,6 @@ def get_random_reward_plan():
     try:
         from app.models.share_message import ShareMessage
         
-        # 获取奖励计划类型的随机消息
         message = ShareMessage.get_random_message('reward_plan')
         
         return jsonify({
@@ -1805,11 +1278,8 @@ def get_random_reward_plan():
         })
         
     except Exception as e:
-        current_app.logger.error(f'获取随机奖励计划文案失败: {str(e)}')
-        return jsonify({
-            'success': False,
-            'error': '获取奖励计划文案失败'
-        }), 500
+        current_app.logger.error(f'获取随机奖励计划文案失败: {str(e)}', exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', '获取奖励计划文案失败')
 
 @api_bp.route('/shortlink/create', methods=['POST'])
 def create_shortlink():
@@ -1820,25 +1290,22 @@ def create_shortlink():
         
         data = request.get_json()
         if not data:
-            return jsonify({'success': False, 'error': '缺少请求数据'}), 400
+            return create_error_response('INVALID_REQUEST', '缺少请求数据')
             
         original_url = data.get('url')
         expires_days = data.get('expires_days', 365)
         
         if not original_url:
-            return jsonify({'success': False, 'error': '缺少原始URL'}), 400
+            return create_error_response('VALIDATION_ERROR', '缺少原始URL', field='url')
         
-        # 获取创建者钱包地址
         creator_address = request.headers.get('X-Eth-Address')
         
-        # 创建短链接
         short_link = ShortLink.create_short_link(
             original_url=original_url,
             creator_address=creator_address,
             expires_days=expires_days
         )
         
-        # 生成完整的短链接URL
         short_url = url_for('main.shortlink_redirect', code=short_link.code, _external=True)
         
         return jsonify({
@@ -1851,7 +1318,7 @@ def create_shortlink():
         
     except Exception as e:
         current_app.logger.error(f"创建短链接失败: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': f'创建短链接失败: {str(e)}'}), 500
+        return create_error_response('INTERNAL_SERVER_ERROR', f'创建短链接失败: {str(e)}')
 
 @api_bp.route('/share-config', methods=['GET'])
 def get_share_config():
@@ -1859,7 +1326,6 @@ def get_share_config():
     try:
         from app.models.commission_config import CommissionConfig
         
-        # 获取佣金配置
         commission_rate = CommissionConfig.get_config('commission_rate', 20.0)
         commission_rules = CommissionConfig.get_config('commission_rules', {})
         max_referral_levels = CommissionConfig.get_config('max_referral_levels', 999)
@@ -1886,7 +1352,7 @@ def get_share_config():
         
     except Exception as e:
         current_app.logger.error(f"获取分享配置失败: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return create_error_response('INTERNAL_SERVER_ERROR', f"获取分享配置失败: {str(e)}")
 
 @api_bp.route('/assets/symbol/<string:token_symbol>/dividend_stats', methods=['GET'])
 def get_asset_dividend_stats_by_symbol(token_symbol):
@@ -1897,32 +1363,23 @@ def get_asset_dividend_stats_by_symbol(token_symbol):
         from app.models.dividend import DividendRecord, Dividend
         from sqlalchemy import func
         
-        # 查找资产
         asset = Asset.query.filter_by(token_symbol=token_symbol).first()
         if not asset:
             current_app.logger.warning(f"找不到资产: {token_symbol}")
-            return jsonify({
-                'success': False,
-                'error': f'找不到资产: {token_symbol}',
-                'total_amount': 0
-            }), 404
+            return create_error_response('ASSET_NOT_FOUND', f'找不到资产: {token_symbol}')
         
-        # 计算总分红金额
         total_amount = 0
         try:
-            # 优先从DividendRecord表计算
             dividend_sum = db.session.query(func.sum(DividendRecord.amount)).filter_by(asset_id=asset.id).scalar()
             if dividend_sum:
                 total_amount = float(dividend_sum)
             else:
-                # 如果DividendRecord表没有数据，尝试从Dividend表计算
                 dividend_sum = db.session.query(func.sum(Dividend.amount)).filter_by(asset_id=asset.id).scalar()
                 if dividend_sum:
                     total_amount = float(dividend_sum)
         except Exception as e:
             current_app.logger.warning(f"无法从数据库计算分红，使用默认值: {str(e)}")
-            # 如果分红表不存在或有问题，使用默认值
-            total_amount = 50000  # 默认分红金额
+            total_amount = 50000
         
         current_app.logger.info(f"资产 {token_symbol} 的总分红金额: {total_amount}")
         
@@ -1934,9 +1391,5 @@ def get_asset_dividend_stats_by_symbol(token_symbol):
         }), 200
         
     except Exception as e:
-        current_app.logger.error(f"获取资产分红统计失败: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'total_amount': 0
-        }), 500
+        current_app.logger.error(f"获取资产分红统计失败: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f"获取资产分红统计失败: {str(e)}")

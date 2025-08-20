@@ -1138,31 +1138,13 @@ def create_asset_api():
             
             current_app.logger.info(f"资产创建API：成功创建资产 {new_asset.id}, {token_symbol}")
             
-            # 创建智能合约地址（直接分配，使资产可以被购买）
-            # 使用简化的地址生成方法，确保总是成功
+            # 暂时不生成合约地址，等待真实部署
+            # 创建区块链数据结构，准备后续部署
             try:
-                import os
-                
-                # 简单可靠的地址生成函数
-                def generate_solana_address():
-                    chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
-                    random_bytes = os.urandom(32)
-                    result = ''
-                    for i in range(44):  # Solana地址长度
-                        result += chars[random_bytes[i % 32] % len(chars)]
-                    return result
-                
-                # 生成三个地址
-                token_address = generate_solana_address()
-                contract_address = generate_solana_address()
-                vault_address = generate_solana_address()
-                
-                # 生成区块链数据
+                # 生成区块链数据结构（不包含假地址）
                 blockchain_data = {
-                    'vault_bump': 255,
                     'created_at': datetime.now().isoformat(),
-                    'program_id': 'RWAHub11111111111111111111111111111111111',
-                    'status': 'ready_for_deployment',
+                    'status': 'pending_deployment',
                     'creator_address': creator_address,
                     'asset_name': data.get('name', ''),
                     'asset_symbol': token_symbol,
@@ -1170,12 +1152,9 @@ def create_asset_api():
                     'price_per_token': float(data.get('token_price', 1.0))
                 }
                 
-                # 保存智能合约相关信息
-                new_asset.token_address = token_address
-                new_asset.contract_address = contract_address
-                new_asset.vault_address = vault_address
+                # 保存区块链数据，但不设置假地址
                 new_asset.blockchain_data = json.dumps(blockchain_data)
-                new_asset.status = 2  # 设置为已通过状态，可以被购买
+                new_asset.status = 1  # 设置为待审核状态，需要部署后才能购买
                 
                 db.session.commit()
                 current_app.logger.info(f"资产 {new_asset.id} 合约地址已分配，可以被购买")
