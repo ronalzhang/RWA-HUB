@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', initializeCreatePage);
 document.addEventListener('turbo:load', initializeCreatePage);
 
 // Example of how a reset button might be wired
-const resetButton = document.getElementById('resetFormButton');
-if(resetButton) {
-    resetButton.addEventListener('click', resetCreateForm);
+const resetFormBtn = document.getElementById('resetFormButton');
+if(resetFormBtn) {
+    resetFormBtn.addEventListener('click', resetCreateForm);
 }
