@@ -2012,7 +2012,7 @@ async function deployAssetContract(createResult) {
         console.log('请求智能合约部署数据:', deploymentData);
         
         // 请求智能合约部署交易
-        const response = await fetch('/api/blockchain/deploy_asset', {
+        const response = await fetch('/api/deploy-contract', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
