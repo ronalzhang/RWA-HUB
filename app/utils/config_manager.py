@@ -35,10 +35,11 @@ class ConfigManager:
             if key in ConfigManager.FIXED_CONFIGS:
                 return ConfigManager.FIXED_CONFIGS[key]
             
-            # 从数据库获取
-            value = SystemConfig.get_value(key)
-            if value is not None:
-                return value
+            # 仅当应用上下文存在时才查询数据库
+            if current_app:
+                value = SystemConfig.get_value(key)
+                if value is not None:
+                    return value
             
             # 使用默认配置
             if key in ConfigManager.DEFAULT_CONFIGS:

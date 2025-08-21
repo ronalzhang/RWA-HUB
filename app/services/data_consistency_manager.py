@@ -33,11 +33,16 @@ class DataConsistencyManager:
     def _init_redis(self):
         """初始化Redis连接"""
         try:
+            # 仅当应用上下文存在时才尝试初始化Redis
+            if not current_app:
+                logger.info("应用上下文不存在，暂时不初始化Redis")
+                self._redis_client = None
+                return
+
             import redis
-            from flask import current_app
             
             # 尝试从配置获取Redis URL
-            redis_url = getattr(current_app.config, 'REDIS_URL', 'redis://localhost:6379/0')
+            redis_url = current_app.config.get('REDIS_URL', 'redis://localhost:6379/0')
             self._redis_client = redis.from_url(redis_url, decode_responses=True)
             
             # 测试连接
