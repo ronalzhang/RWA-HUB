@@ -57,6 +57,7 @@ if __name__ == '__main__':
         load_encrypted_config(app.app_context())
     
     # RWA-HUB 使用默认端口 9000
+    logger = app.logger
     port = int(os.environ.get('PORT', 9000))
     logger.info(f"🚀 RWA-HUB 启动应用，访问地址: http://localhost:{port}")
     logger.info(f"📱 v6版本界面地址: http://localhost:{port}/v6")
