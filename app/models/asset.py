@@ -79,6 +79,11 @@ class Asset(db.Model):
     approved_at = db.Column(db.DateTime)  # 审核通过时间
     approved_by = db.Column(db.String(64))  # 审核人地址
 
+    # 上链进度跟踪
+    deployment_in_progress = db.Column(db.Boolean, default=False)  # 标记上链操作是否正在进行中
+    deployment_started_at = db.Column(db.DateTime, nullable=True)  # 记录上链操作开始时间
+    deployment_retry_count = db.Column(db.Integer, nullable=False, default=0, server_default='0') # 部署重试次数
+
     # 添加关联
     trades = db.relationship("Trade", back_populates="asset", lazy=True, cascade="all, delete-orphan")
     dividend_records = db.relationship("DividendRecord", back_populates="asset", lazy=True, cascade="all, delete-orphan")
@@ -260,10 +265,6 @@ class Asset(db.Model):
                 raise ValueError('证券资产必须提供代币发行量')
                 
         return Asset(**data)
-
-    # 上链进度跟踪
-    deployment_in_progress = db.Column(db.Boolean, default=False)  # 标记上链操作是否正在进行中
-    deployment_started_at = db.Column(db.DateTime, nullable=True)  # 记录上链操作开始时间
 
 class AssetStatusHistory(db.Model):
     """资产状态变更历史记录"""

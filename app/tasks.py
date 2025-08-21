@@ -593,29 +593,41 @@ def auto_monitor_pending_payments():
                         asset.error_message = f"部署超时（{time_diff}秒），已清理标记"
                         db.session.commit()
                 
-                # 3. 检查部署失败的资产，如果失败时间超过30分钟，尝试重新部署（排除已删除的资产）
+                # 3. 检查并重试部署失败的资产 (新逻辑)
+                MAX_DEPLOYMENT_RETRIES = 5
                 failed_assets = Asset.query.filter(
                     Asset.status == AssetStatus.DEPLOYMENT_FAILED.value,
                     Asset.payment_confirmed == True,
                     Asset.token_address == None,
                     Asset.deployment_in_progress != True,
-                    Asset.deleted_at.is_(None)  # 排除已删除的资产
-                ).limit(5).all()  # 限制重试数量
-                
+                    Asset.deployment_retry_count < MAX_DEPLOYMENT_RETRIES,
+                    Asset.deleted_at.is_(None)
+                ).limit(5).all()
+
                 for asset in failed_assets:
-                    # 检查失败时间（如果有记录的话）
-                    should_retry = True
-                    if hasattr(asset, 'updated_at') and asset.updated_at:
-                        time_since_failure = (current_time - asset.updated_at).total_seconds()
-                        if time_since_failure < 1800:  # 30分钟内不重试
-                            should_retry = False
-                    
-                    if should_retry:
-                        logger.info(f"尝试重新部署失败的资产: AssetID={asset.id}")
-                        # 重置状态为CONFIRMED，让正常流程处理
+                    # 指数退避策略: 第一次10分钟, 第二次20分钟, 第三次40分钟...
+                    retry_delay = 600 * (2 ** asset.deployment_retry_count)
+                    time_since_failure = (current_time - asset.updated_at).total_seconds()
+
+                    if time_since_failure > retry_delay:
+                        logger.info(f"资产 {asset.id} 符合重试条件 (第 {asset.deployment_retry_count + 1} 次)，准备重试。")
+                        
+                        # 增加重试计数并重置状态以供再次处理
+                        asset.deployment_retry_count += 1
                         asset.status = AssetStatus.CONFIRMED.value
-                        asset.error_message = None
+                        asset.error_message = f"准备进行第 {asset.deployment_retry_count} 次重新部署"
                         db.session.commit()
+                    else:
+                        logger.debug(f"资产 {asset.id} 部署失败，正在等待下一个重试周期 (还需等待 {int(retry_delay - time_since_failure)} 秒)")
+
+                # 检查已耗尽重试次数的资产
+                exhausted_assets = Asset.query.filter(
+                    Asset.status == AssetStatus.DEPLOYMENT_FAILED.value,
+                    Asset.deployment_retry_count >= MAX_DEPLOYMENT_RETRIES
+                ).all()
+
+                for asset in exhausted_assets:
+                    logger.warning(f"资产 {asset.id} 已达到最大重试次数 ({MAX_DEPLOYMENT_RETRIES})，不再自动重试。请人工检查。")
                     
             except Exception as e:
                 logger.error(f"周期性任务执行内部失败: {str(e)}")
@@ -705,4 +717,4 @@ monitor_creation_payment_task = DelayedTask(_original_monitor_creation_payment)
 # 如果还需要监控购买交易确认，可以添加类似的任务
 # def monitor_purchase_confirmation(trade_id, tx_hash, ...):
 #     ...
-# monitor_purchase_confirmation = DelayedTask(monitor_purchase_confirmation) 
+# monitor_purchase_confirmation = DelayedTask(monitor_purchase_confirmation)
