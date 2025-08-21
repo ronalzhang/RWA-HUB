@@ -577,3 +577,4 @@ deploy.config
 deploy_*.sh
 !deploy.sh
 *.md
+GEMINI.md
