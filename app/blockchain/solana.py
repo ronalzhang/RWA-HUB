@@ -76,6 +76,7 @@ class SolanaClient:
                 from app.utils.solana_compat.publickey import PublicKey
                 self.public_key = PublicKey(wallet_address)
                 self.keypair = None
+                self.readonly_mode = True
                 logger.info(f"使用只读模式初始化Solana客户端，钱包地址: {wallet_address}")
                 return
             except Exception as e:
@@ -146,6 +147,7 @@ class SolanaClient:
             try:
                 self.keypair = Keypair.from_seed(private_key_bytes)
                 self.public_key = self.keypair.public_key
+                self.readonly_mode = False
                 logger.info(f"Solana服务钱包初始化成功 - 验证方式: {auth_method}")
                 logger.info(f"Solana服务钱包地址: {self.public_key}")
             except Exception as e:
@@ -156,6 +158,7 @@ class SolanaClient:
             logger.warning("未提供有效的Solana私钥或助记词，客户端仅能查询，无法执行交易")
             self.keypair = None
             self.public_key = None
+            self.readonly_mode = True
             
         try:
             self.client = SolanaRpcClient(self.endpoint)
