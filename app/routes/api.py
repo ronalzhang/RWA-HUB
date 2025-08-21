@@ -1179,11 +1179,11 @@ def record_payment():
                     logger.info(f"更新资产支付交易哈希: AssetID={asset_id}, TxHash={signature}")
                     
                     try:
-                        logger.info(f"触发支付确认监控任务: AssetID={asset_id}, TxHash={signature}")
-                        monitor_task = monitor_creation_payment.delay(asset_id, signature)
-                        logger.info(f"支付确认监控任务已触发: {monitor_task}")
+                        from app.tasks import schedule_task
+                        logger.info(f"将支付确认监控任务加入队列: AssetID={asset_id}, TxHash={signature}")
+                        schedule_task('monitor_creation_payment', asset_id=asset.id, tx_hash=signature)
                     except Exception as task_error:
-                        logger.error(f"触发支付确认监控任务失败: {str(task_error)}", exc_info=True)
+                        logger.error(f"任务入队失败: {str(task_error)}", exc_info=True)
                 else:
                     logger.warning(f"未找到要更新的资产: AssetID={asset_id}")
         except Exception as record_error:

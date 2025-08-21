@@ -35,6 +35,7 @@ from .ip_visit import IPVisit
 
 # 导入新的模型
 from .share_message import ShareMessage
+from .task import TaskQueue, TaskStatus
 
 # 导出所有模型
 __all__ = [
@@ -44,5 +45,5 @@ __all__ = [
     'DistributionLevel', 'UserReferral', 'CommissionRecord', 'AdminOperationLog',
     'DashboardStats', 'OnchainHistory', 'OnchainStatus', 'ShortLink', 'Transaction', 'TransactionType', 'TransactionStatus',
     'Holding', 'CommissionConfig', 'UserCommissionBalance', 'CommissionWithdrawal', 'IPVisit',
-    'ShareMessage'
+    'ShareMessage', 'TaskQueue', 'TaskStatus'
 ]
