@@ -9,12 +9,15 @@ from flask import Blueprint, jsonify, request
 from app.blockchain.solana_service import (
     get_network_health_report, get_connection_metrics,
     force_node_switch, test_all_nodes, estimate_transaction_fee,
-    get_account_balance
+    get_account_balance, check_transaction_status
 )
 from app.blockchain.transaction_manager import transaction_manager
 from app.blockchain.transaction_rollback import rollback_manager
 from app.services.transaction_monitor import transaction_monitor
 from app.utils.decorators import handle_api_errors
+from app.models import Asset
+from app.blockchain.asset_service import AssetService
+from app.utils.error_handler import create_error_response
 import logging
 
 logger = logging.getLogger(__name__)
@@ -183,6 +186,69 @@ def get_system_status():
             'system_time': transaction_monitor.get_monitoring_statistics()['last_updated']
         }
     })
+
+@blockchain_api.route('/deploy_asset', methods=['POST'])
+@handle_api_errors
+def deploy_asset():
+    """部署资产智能合约"""
+    data = request.get_json()
+    if not data:
+        return create_error_response('INVALID_REQUEST', '无效的请求数据')
+
+    asset_id = data.get('asset_id')
+    blockchain = data.get('blockchain', 'solana')
+    
+    if not asset_id:
+        return create_error_response('VALIDATION_ERROR', '缺少资产ID', field='asset_id')
+    
+    asset = Asset.query.get(asset_id)
+    if not asset:
+        return create_error_response('ASSET_NOT_FOUND', f'资产 {asset_id} 不存在')
+    
+    if asset.contract_address:
+        return jsonify({
+            'success': True, 
+            'contract_address': asset.contract_address,
+            'message': '智能合约已部署'
+        })
+    
+    if blockchain == 'solana':
+        asset_service = AssetService()
+        logger.info(f"开始部署资产智能合约到Solana: 资产ID={asset_id}")
+        deployment_result = asset_service.deploy_asset_to_blockchain(asset_id)
+        
+        if deployment_result.get('success', False):
+            return jsonify({
+                'success': True,
+                'contract_address': deployment_result.get('token_address'),
+                'tx_hash': deployment_result.get('tx_hash'),
+                'message': '智能合约部署成功',
+                'details': deployment_result.get('details', {})
+            })
+        else:
+            error_msg = deployment_result.get('error', '部署失败')
+            logger.error(f"智能合约部署失败: 资产ID={asset_id}, 错误={error_msg}")
+            return create_error_response('CONTRACT_DEPLOYMENT_FAILED', f'部署失败: {error_msg}')
+    else:
+        return create_error_response('UNSUPPORTED_BLOCKCHAIN', '暂不支持该区块链')
+
+@blockchain_api.route('/solana/check-transaction', methods=['GET'])
+@handle_api_errors
+def solana_check_transaction():
+    """检查Solana交易状态"""
+    signature = request.args.get('signature')
+    if not signature:
+        return create_error_response('VALIDATION_ERROR', '缺少交易签名', field='signature')
+
+    try:
+        status = check_transaction_status(signature)
+        return jsonify({
+            'success': True,
+            'data': status
+        })
+    except Exception as e:
+        logger.error(f"检查交易状态失败: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f'检查交易状态失败: {str(e)}')
 
 # 启动交易监控服务
 @blockchain_api.before_app_request
