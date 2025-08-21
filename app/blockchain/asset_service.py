@@ -113,7 +113,7 @@ class AssetService:
                 }
                 
             # 检查资产状态 - 待审核或已确认的资产都可以部署
-            if asset.status not in [AssetStatus.PENDING_REVIEW.value, AssetStatus.CONFIRMED.value]:
+            if asset.status not in [AssetStatus.PENDING.value, AssetStatus.CONFIRMED.value]:
                 logger.warning(f"尝试部署状态不正确的资产: AssetID={asset_id}, Status={asset.status}. 预期状态: PENDING_REVIEW 或 CONFIRMED")
                 return {
                     "success": False,
