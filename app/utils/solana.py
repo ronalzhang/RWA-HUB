@@ -48,10 +48,7 @@ class SolanaClient:
     def __init__(self):
         # 尝试使用多个RPC节点以增加可靠性
         self.rpc_nodes = [
-            SOLANA_RPC_URL,
-            "https://api.mainnet-beta.solana.com",
-            "https://solana-api.projectserum.com",
-            "https://rpc.ankr.com/solana"
+            SOLANA_RPC_URL
         ]
         
         self.client = None

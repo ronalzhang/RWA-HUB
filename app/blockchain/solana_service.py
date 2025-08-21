@@ -93,41 +93,6 @@ class SolanaConnectionManager:
                 priority=1,
                 timeout=30,
                 max_retries=3
-            ),
-            NodeConfig(
-                url="https://api.mainnet-beta.solana.com",
-                name="Solana Labs",
-                priority=2,
-                timeout=30,
-                max_retries=3
-            ),
-            NodeConfig(
-                url="https://solana-api.projectserum.com",
-                name="Project Serum",
-                priority=3,
-                timeout=35,
-                max_retries=2
-            ),
-            NodeConfig(
-                url="https://rpc.ankr.com/solana",
-                name="Ankr",
-                priority=4,
-                timeout=35,
-                max_retries=2
-            ),
-            NodeConfig(
-                url="https://solana.public-rpc.com",
-                name="Public RPC",
-                priority=5,
-                timeout=40,
-                max_retries=2
-            ),
-            NodeConfig(
-                url="https://api.mainnet-beta.solana.com",
-                name="Backup Solana Labs",
-                priority=6,
-                timeout=45,
-                max_retries=1
             )
         ]
         

@@ -249,26 +249,10 @@ class Token:
                 if payer:
                     logger.info("开始在链上创建关联代币账户...")
                     
-                    # 创建RPC客户端 - 使用备用节点避免429错误
-                    backup_endpoints = [
-                        "https://api.mainnet-beta.solana.com",
-                        "https://solana-api.projectserum.com",
-                        "https://rpc.ankr.com/solana",
-                        "https://solana.public-rpc.com"
-                    ]
-                    
-                    client = None
-                    for endpoint in backup_endpoints:
-                        try:
-                            client = Client(endpoint)
-                            logger.info(f"使用Solana端点: {endpoint}")
-                            break
-                        except Exception as e:
-                            logger.warning(f"端点 {endpoint} 连接失败: {str(e)}")
-                            continue
-                    
-                    if not client:
-                        raise Exception("所有Solana RPC端点都无法连接")
+                    # 创建RPC客户端
+                    solana_endpoint = os.environ.get("SOLANA_NETWORK_URL", "https://api.mainnet-beta.solana.com")
+                    client = Client(solana_endpoint)
+                    logger.info(f"使用Solana端点: {solana_endpoint}")
                     
                     # 转换payer为solana-py格式
                     payer_solana = SolanaPublicKey.from_string(str(payer.public_key))

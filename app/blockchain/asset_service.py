@@ -534,12 +534,10 @@ class AssetService:
             if token_mint_address != expected_usdc_address:
                 logger.warning(f"请求的代币地址 {token_mint_address} 不是标准USDC地址 {expected_usdc_address}")
             
-            # 使用多个RPC节点进行查询
-            rpc_urls = [
-                "https://api.mainnet-beta.solana.com",
-                "https://solana-api.projectserum.com",
-                "https://rpc.ankr.com/solana"
-            ]
+            # 使用配置的RPC节点进行查询
+            from flask import current_app
+            rpc_url = current_app.config.get('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')
+            rpc_urls = [rpc_url]
             
             # 获取代理配置
             proxy_config = get_proxy_config()

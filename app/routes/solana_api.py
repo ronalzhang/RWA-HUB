@@ -29,14 +29,7 @@ solana_api = Blueprint('solana_api', __name__, url_prefix='/api/solana')
 
 # Solana RPC节点列表 (优先使用测试可用的节点)
 RPC_NODES = [
-    # 测试可用的公共节点
-    "https://solana.publicnode.com",
-    # 备用节点
-    "https://api.mainnet-beta.solana.com",
-    "https://solana-api.projectserum.com", 
-    "https://rpc.ankr.com/solana",
-    "https://solana-mainnet.g.alchemy.com/v2/demo",
-    "https://mainnet.rpcpool.com"
+    os.environ.get('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')
 ]
 
 # 节点状态缓存
