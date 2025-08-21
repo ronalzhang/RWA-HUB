@@ -228,6 +228,7 @@ def deploy_asset():
         else:
             error_msg = deployment_result.get('error', '部署失败')
             logger.error(f"智能合约部署失败: 资产ID={asset_id}, 错误={error_msg}")
+            logger.error(f"完整的部署结果: {deployment_result}")
             return create_error_response('CONTRACT_DEPLOYMENT_FAILED', f'部署失败: {error_msg}')
     else:
         return create_error_response('UNSUPPORTED_BLOCKCHAIN', '暂不支持该区块链')
