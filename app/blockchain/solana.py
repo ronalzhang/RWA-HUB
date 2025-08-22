@@ -440,7 +440,7 @@ class SolanaClient:
             }
             
         except Exception as e:
-            logger.error(f"创建SPL代币失败: {str(e)}")
+            logger.exception(f"创建SPL代币失败: {str(e)}")
             return {
                 'success': False,
                 'error': str(e)
