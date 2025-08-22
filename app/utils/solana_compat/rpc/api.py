@@ -30,7 +30,7 @@ class Client:
             logger.info(f"发送Solana RPC请求: {method} 到 {self.endpoint}")
             logger.debug(f"请求参数: {json.dumps(params) if params else 'None'}")
             
-            response = self.session.post(self.endpoint, json=data, timeout=30)
+            response = self.session.post(self.endpoint, json=data, timeout=120) # 增加超时时间以处理耗时长的操作
             
             # 检查HTTP响应状态
             if response.status_code != 200:
