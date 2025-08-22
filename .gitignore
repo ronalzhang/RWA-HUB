@@ -1,118 +1,580 @@
-.DS_Store
-.env
-.kiro/
-.vscode/
-ASSET_CREATION_COMPLETE_FIX_SUMMARY.md
-ASSET_CREATION_FIX_SUMMARY.md
-ASSET_CREATION_JSON_FIX_SUMMARY.md
-ASSET_FLOW_FINAL_FIX_SUMMARY.md
-ASSET_UPLOAD_FIX_SUMMARY.md
-CLAUDE.md
-COMPLETE_ASSET_FLOW_FIX_SUMMARY.md
-DATABASE_COMPATIBILITY_FIX_SUMMARY.md
-DEPLOYMENT_SUCCESS_SUMMARY.md
-DEPLOYMENT_VERIFICATION_RESULT.md
-FINAL_DEPLOYMENT_SOLUTION.md
-FINAL_DEPLOYMENT_STATUS.md
-GEMINI.md
-MANUAL_DEPLOYMENT_GUIDE.md
-OPTIMIZED_DEPLOYMENT_SUMMARY.md
-PAYMENT_FLOW_IMPROVEMENT_SUMMARY.md
-REFERRAL_SYSTEM_CLARIFICATION.md
-SHARE_MESSAGES_DEPLOYMENT_SUMMARY.md
-SHARE_MESSAGES_FIX_SUMMARY.md
-SMART_CONTRACT_DEPLOYMENT_FIX_SUMMARY.md
-app/__pycache__/
-app/blockchain/__pycache__/
-app/middleware/__pycache__/
-app/models/__pycache__/
-app/routes/__pycache__/
-app/routes/admin/__pycache__/
-app/services/__pycache__/
-app/static/uploads/.DS_Store
-app/static/uploads/10/RH-101409_1_1740518175_photo-1586773860363-8ec8703e6aa5.jpeg
-app/static/uploads/10/RH-101409_2_1740518175_photo-1587351021759-3e566b6af7cc.jpeg
-app/static/uploads/10/RH-101409_3_1740518162_photo-1587351021355-a479a299d2f9.jpeg
-app/static/uploads/10/RH-101409_4_1740518195_photo-1581982231900-6a1a46b744c9.jpeg
-app/static/uploads/10/RH-101409_5_1740518195_photo-1583830379747-195159d0de82.jpeg
-app/static/uploads/10/RH-101409_6_1740518175_photo-1586534738560-438efdf1d205.jpeg
-app/static/uploads/10/RH-101409_7_1740518175_photo-1583953458882-302655b5c376.jpeg
-app/static/uploads/10/RH-101409_8_1740518175_photo-1586773860363-8ec8703e6aa5.jpeg
-app/static/uploads/10/RH-101409_9_1740518175_photo-1587351021759-3e566b6af7cc.jpeg
-app/static/uploads/10/RH-101719_1_1740518175_photo-1586773860363-8ec8703e6aa5.jpeg
-app/static/uploads/10/RH-101719_2_1740518175_photo-1587351021759-3e566b6af7cc.jpeg
-app/static/uploads/10/RH-101719_3_1740518162_photo-1587351021355-a479a299d2f9.jpeg
-app/static/uploads/10/RH-101719_4_1740518195_photo-1581982231900-6a1a46b744c9.jpeg
-app/static/uploads/10/RH-101727_1_1740518175_photo-1586773860363-8ec8703e6aa5.jpeg
-app/static/uploads/10/RH-101727_2_1740518175_photo-1587351021759-3e566b6af7cc.jpeg
-app/static/uploads/10/RH-101727_3_1740518162_photo-1587351021355-a479a299d2f9.jpeg
-app/static/uploads/10/RH-101727_4_1740518195_photo-1581982231900-6a1a46b744c9.jpeg
-app/static/uploads/10/RH-102535_1_1740518175_photo-1586773860363-8ec8703e6aa5.jpeg
-app/static/uploads/10/RH-102535_2_1740518175_photo-1587351021759-3e566b6af7cc.jpeg
-app/static/uploads/10/RH-102535_3_1740518162_photo-1587351021355-a479a299d2f9.jpeg
-app/static/uploads/10/RH-102535_4_1740518195_photo-1581982231900-6a1a46b744c9.jpeg
-app/static/uploads/10/RH-106046_1_1740518175_photo-1586773860363-8ec8703e6aa5.jpeg
-app/static/uploads/10/RH-106046_2_1740518175_photo-1587351021759-3e566b6af7cc.jpeg
-app/static/uploads/10/RH-106046_3_1740518162_photo-1587351021355-a479a299d2f9.jpeg
-app/static/uploads/10/RH-106046_4_1740518195_photo-1581982231900-6a1a46b744c9.jpeg
-app/static/uploads/10/RH-106451_1_1740518175_photo-1586773860363-8ec8703e6aa5.jpeg
-app/static/uploads/10/RH-106451_2_1740518175_photo-1587351021759-3e566b6af7cc.jpeg
-app/static/uploads/10/RH-106451_3_1740518162_photo-1587351021355-a479a299d2f9.jpeg
-app/static/uploads/10/RH-106451_4_1740518195_photo-1581982231900-6a1a46b744c9.jpeg
-app/static/uploads_backup_20250805_010311/
-app/templates/.DS_Store
-app/templates/assets/create.html.backup.20250818_151645
-app/templates/assets/detail.html.backup.20250818_151645
-app/utils/__pycache__/
-app/utils/solana_compat/__pycache__/
-app/utils/solana_compat/rpc/__pycache__/
-app/utils/solana_compat/token/__pycache__/
-check_balance.py
-check_server_structure.py
-deploy.config
-deploy_smart_contract_fix.sh
-"docs/RWA-HUB_6.0_\345\215\207\347\272\247\346\212\245\345\221\212.md"
-fix_asset_creation_complete.py
-fix_asset_creation_issues.py
-fix_asset_detail_data_loading.py
-fix_asset_detail_simple.py
-fix_asset_flow_issues.py
-fix_complete_asset_flow.py
-fix_database_schema.py
-fix_frontend_issues.py
-fix_git_conflict_and_deploy.py
-fix_server_restart_issue.py
-fix_share_messages.py
-fix_share_messages_migration.py
-fix_smart_contract_deployment_scripts.py
-fix_trade_timestamps.py
-force_deploy_templates.py
-logs/
-manual_server_deployment_guide.md
-migrations/__pycache__/
-migrations/versions/__pycache__/
-server_commands.md
-test_asset_creation_flow.py
-test_complete_asset_flow.py
-test_share_messages_api.py
-test_share_messages_fix.py
-test_token_symbol_generation.py
-test_trade_time_fix.py
-tests/README.md
-tests/__pycache__/
-tests/conftest.py
-tests/run_tests.py
-tests/test_admin_authentication.py
-tests/test_api_integration.py
-tests/test_data_consistency.py
-tests/test_integration_asset_lifecycle.py
-tests/test_payment_flow.py
-tests/test_performance.py
-tests/test_security.py
-tests/test_token_creation.py
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+.venv/
+.venv-*/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# virtualenv
 venv/
-verify_postgresql_migration.py
-"\344\272\244\346\230\223\346\227\266\351\227\264\346\230\276\347\244\272\344\277\256\345\244\215\346\200\273\347\273\223.md"
-"\345\256\242\346\210\267\347\253\257\351\205\215\347\275\256\350\257\264\346\230\216.md"
-"\347\256\200\345\214\226\351\203\250\347\275\262\350\204\232\346\234\254\350\257\264\346\230\216.md"
-"\351\227\256\351\242\230\344\277\256\345\244\215\346\200\273\347\273\223.md"
+.venv/
+ENV/
+.venv-solana/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Rust/Cargo
+target/
+**/*.rs.bk
+Cargo.lock
+
+# Platform specific
+platform-tools*/
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 编译产物
+*.o
+*.a
+*.dylib
+*.so
+*.dll
+*.exe
+
+# 局部配置及敏感信息
+.env
+.env.local
+*.pem
+*.key
+keypair.json
+*-keypair.json
+deployer-keypair.json
+
+# 数据库相关
+*.db
+*.db-journal
+*.sqlite3
+*.sqlite3-journal
+*.db.backup
+
+# 日志
+logs/
+*.log
+
+# 备份文件
+*.bak
+*backup*
+*.old
+*.orig
+*.tmp
+archived_restore_files/
+
+# 临时文件
+temp/
+tmp/
+*.tmp
+**/temp/**
+instance/
+*.temp
+
+# 上传文件
+app/static/uploads/
+
+# 其他二进制文件
+*.bin
+*.dat
+*.tar
+*.gz
+*.tgz
+*.zip
+*.rar
+*.7z
+*.pdf
+*.docx
+*.xlsx
+
+# Debug文件
+*debug*
+
+# 项目文档和设计文件（不推送到仓库）
+*.md
+*方案.md
+*需求.md
+*设计.md
+*说明.md
+*.doc
+*.docx
+*.pdf
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+
+# PM2配置文件
+ecosystem.config.js
+ecosystem.config.json
+
+# 虚拟环境
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 数据库
+*.db
+*.sqlite3
+
+# 日志
+*.log
+logs/
+
+# 上传文件
+static/uploads/
+app/static/uploads/
+
+# 环境变量和密钥文件
+.env
+*.env
+*.pem
+*key*
+*private*
+*secret*
+*mnemonic*
+set_env.py
+
+# 系统文件
+.DS_Store
+Thumbs.db 
+
+# 测试文件
+test_*.py
+tests/
+check_*.py
+summary.py
+setup_*.py
+force_*.py
+cleanup_*.py
+create_test_*.py
+fix.py
+
+# Node.js
+node_modules/
+
+# Hardhat files
+/cache
+/artifacts
+
+# TypeChain files
+/typechain
+/typechain-types
+
+# solidity-coverage files
+/coverage
+/coverage.json
+
+# Hardhat Ignition default folder for deployments against a local node
+ignition/deployments/chain-31337
+
+# 其他无关文件
+fix_instructions.md
+
+# 文档文件
+docs/
+app/docs/
+*.md
+!README.md
+!SCRIPTS_README.md
+
+# 允许docs目录
+!docs/
+!docs/*
+
+# 备份目录
+/backups/
+/archived_backups/
+
+# 临时脚本和工具
+/load_db_config.py
+server_service.py
+
+# 临时服务文件
+app/routes/service.py.temp
+
+# 本地环境文件
+.env.local
+.env.development
+
+# 允许工具脚本
+!query_asset.py
+!issue_asset.py
+!update_asset_onchain.py
+!deploy_tools.sh
+archive/
+
+# 安全敏感文件
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*private*
+*secret*
+*password*
+deployer-keypair.json
+wallet-keypair.json
+
+# 加密相关
+*.encrypted
+crypto_keys/
+secrets/
+
+# === 安全敏感文件 ===
+# SSL证书和私钥
+*.pem
+*.crt
+*.key
+*.p12
+*.pfx
+
+# 各种密钥文件
+*keypair*
+*private*
+*secret*
+*mnemonic*
+
+# 环境配置
+.env*
+!.env.example
+
+# 数据库文件
+*.db
+*.sqlite*
+*.db.backup
+
+# 临时和测试文件
+test_*.py
+check_*.py
+debug_*.py
+fix_*.py
+cleanup_*.py
+setup_*.py
+verify_*.py
+monitor_*.py
+calculate_*.py
+emergency_*.py
+generate_*.py
+security_*.py
+
+# 文档和说明文件
+*.md
+!README.md
+docs/
+*.doc
+*.docx
+*.pdf
+
+# PM2和部署配置
+ecosystem.config.*
+
+# 备份文件
+*.backup
+*.bak
+*.old
+backup/
+backups/
+
+# 上传和临时文件
+uploads/
+temp/
+tmp/
+*.tmp
+
+# IDE和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+logs/
+app.log*
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+Pipfile.lock
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+app.db*
+
+# 日志文件
+*.log
+logs/
+
+# 上传文件
+uploads/
+static/uploads/
+
+# 临时文件
+*.tmp
+*.temp
+temp/
+tmp/
+
+# IDE文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 配置文件
+config.local.py
+.env.local
+.env.production
+
+# 密钥和证书文件
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
+# 各种密钥文件
+*keypair*
+*private*
+*secret*
+*mnemonic*
+
+# 备份文件
+*.backup
+*.bak
+*.old
+backup/
+backups/
+
+# PM2和部署配置
+ecosystem.config.*
+
+# 测试和调试文件
+test_*.py
+check_*.py
+debug_*.py
+fix_*.py
+cleanup_*.py
+setup_*.py
+verify_*.py
+monitor_*.py
+calculate_*.py
+emergency_*.py
+generate_*.py
+security_*.py
+analyze_*.py
+crypto_password_solution.py
+
+# 文档和说明文件（保留README.md和部署指南）
+*.md
+!README.md
+!DEPLOYMENT_GUIDE.md
+docs/
+*.doc
+*.docx
+*.pdf
+
+# 合约编译文件
+contracts/artifacts/
+contracts/cache/
+contracts/typechain/
+
+# Hardhat files
+cache/
+artifacts/
+
+*.pem
+# 安全加固 - 敏感文件
+*.pem
+*.key
+*private*
+.env
+*.log
+deployer-keypair.json
+instance/
+logs/
+security_*.log
+*_backup*
+# 报告和分析文档（仅本地保留）
+*REPORT*.md
+*COMPLETE*.md
+*ANALYSIS*.md
+*VERIFICATION*.md
+*INSTRUCTIONS*.md
+*CHECKLIST*.md
+*OPTIMIZATION*.md
+*POLICY*.md
+
+# 部署配置文件（包含敏感信息）
+deploy.config
+*.config
+deploy_*.sh
+!deploy.sh
+*.md
+GEMINI.md
