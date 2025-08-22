@@ -2,8 +2,8 @@
   "apps": [
     {
       "name": "rwa-hub",
-      "script": "app_wsgi.py",
-      "interpreter": "/root/RWA-HUB/venv/bin/python",
+      "script": "/root/RWA-HUB/venv/bin/python",
+      "args": "app_wsgi.py",
       "env": {
         "FLASK_ENV": "production",
         "PORT": 9000
