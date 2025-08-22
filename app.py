@@ -1,3 +1,14 @@
+import sys
+import os
+import logging
+logger = logging.getLogger(__name__)
+logger.critical("!!! GEMINI DEBUG START !!!")
+logger.critical(f"Python Executable: {sys.executable}")
+logger.critical(f"sys.path: {sys.path}")
+logger.critical(f"Current Working Directory: {os.getcwd()}")
+logger.critical(f"PYTHONPATH: {os.environ.get('PYTHONPATH')}")
+logger.critical("!!! GEMINI DEBUG END !!!")
+
 import logging
 import os
 import sys
