@@ -112,12 +112,12 @@ class AssetService:
                     "in_progress": True
                 }
                 
-            # 检查资产状态 - 待审核或已确认的资产都可以部署
-            if asset.status not in [AssetStatus.PENDING.value, AssetStatus.CONFIRMED.value]:
-                logger.warning(f"尝试部署状态不正确的资产: AssetID={asset_id}, Status={asset.status}. 预期状态: PENDING_REVIEW 或 CONFIRMED")
+            # 检查资产状态 - 待审核、已确认或部署失败的资产都可以重新部署
+            if asset.status not in [AssetStatus.PENDING.value, AssetStatus.CONFIRMED.value, AssetStatus.DEPLOYMENT_FAILED.value]:
+                logger.warning(f"尝试部署状态不正确的资产: AssetID={asset_id}, Status={asset.status}. 预期状态: PENDING, CONFIRMED, 或 DEPLOYMENT_FAILED")
                 return {
                     "success": False,
-                    "error": f"资产状态不正确 ({asset.status})，无法部署。资产必须处于待审核或已确认状态"
+                    "error": f"资产状态不正确 ({asset.status})，无法部署。资产必须处于待审核、已确认或部署失败状态"
                 }
                 
             # 如果已经有token_address，说明已经部署过 (再次检查，以防万一)
