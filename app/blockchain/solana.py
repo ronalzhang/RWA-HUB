@@ -396,6 +396,9 @@ class SolanaClient:
             dict: 包含代币地址和mint交易ID的字典
         """
 
+        if not self.client:
+            raise ValueError("Solana client is not initialized. Check RPC configuration and wallet keys.")
+
         if not self.keypair:
             if self.readonly_mode:
                 raise ValueError("钱包处于只读模式，无法创建代币。只读模式仅支持查询操作，不支持交易操作。")
