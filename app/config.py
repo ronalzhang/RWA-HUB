@@ -112,6 +112,9 @@ class ProductionConfig(Config):
     SQLALCHEMY_DATABASE_URI = 'postgresql://rwa_hub_user:password@localhost/rwa_hub'
     print(f"生产环境使用本地数据库: {SQLALCHEMY_DATABASE_URI}")
     
+    # 明确从环境变量获取SOLANA_RPC_URL
+    SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')
+    
     @staticmethod
     def init_app(app):
         Config.init_app(app)
