@@ -26,22 +26,30 @@ logger = logging.getLogger(__name__)
 @api_endpoint(log_calls=True, measure_perf=True)
 def deploy_contract():
     """部署智能合约"""
+    logger.info("进入 /api/deploy-contract 端点")
     try:
+        logger.info("开始解析请求数据")
         data = request.get_json()
         if not data:
+            logger.error("请求数据为空")
             return create_error_response('INVALID_REQUEST', '无效的请求数据')
 
         asset_id = data.get('asset_id')
         blockchain = data.get('blockchain', 'solana')
+        logger.info(f"请求参数: asset_id={asset_id}, blockchain={blockchain}")
         
         if not asset_id:
+            logger.error("缺少资产ID")
             return create_error_response('VALIDATION_ERROR', '缺少资产ID', field='asset_id')
         
+        logger.info(f"查询资产: {asset_id}")
         asset = Asset.query.get(asset_id)
         if not asset:
+            logger.error(f"资产 {asset_id} 不存在")
             return create_error_response('ASSET_NOT_FOUND', f'资产 {asset_id} 不存在')
         
         if asset.contract_address:
+            logger.info(f"资产 {asset_id} 已有合约地址: {asset.contract_address}")
             return jsonify({
                 'success': True, 
                 'contract_address': asset.contract_address,
@@ -49,12 +57,17 @@ def deploy_contract():
             })
         
         if blockchain == 'solana':
+            logger.info("选择Solana区块链，准备初始化AssetService")
             from app.blockchain.asset_service import AssetService
             asset_service = AssetService()
-            logger.info(f"开始真实部署智能合约到Solana: 资产ID={asset_id}")
+            logger.info("AssetService 初始化完成")
+
+            logger.info(f"调用 asset_service.deploy_asset_to_blockchain，资产ID={asset_id}")
             deployment_result = asset_service.deploy_asset_to_blockchain(asset_id)
+            logger.info(f"asset_service.deploy_asset_to_blockchain 调用完成，结果: {deployment_result}")
             
             if deployment_result.get('success', False):
+                logger.info(f"部署成功: {deployment_result}")
                 return jsonify({
                     'success': True,
                     'contract_address': deployment_result.get('token_address'),
@@ -67,10 +80,11 @@ def deploy_contract():
                 logger.error(f"智能合约部署失败: 资产ID={asset_id}, 错误={error_msg}")
                 return create_error_response('CONTRACT_DEPLOYMENT_FAILED', f'部署失败: {error_msg}')
         else:
+            logger.error(f"不支持的区块链: {blockchain}")
             return create_error_response('UNSUPPORTED_BLOCKCHAIN', '暂不支持该区块链')
             
     except Exception as e:
-        logger.error(f"智能合约部署失败: {str(e)}", exc_info=True)
+        logger.error(f"在 /api/deploy-contract 端点发生未知异常: {str(e)}", exc_info=True)
         return create_error_response('INTERNAL_SERVER_ERROR', f'部署失败: {str(e)}')
 
 @api_bp.route('/assets/<int:asset_id>/status', methods=['GET'])
