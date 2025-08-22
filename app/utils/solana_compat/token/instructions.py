@@ -139,15 +139,14 @@ class Token:
                 transaction.recent_blockhash = recent_blockhash_response.value.blockhash
                 
                 # 将自定义Keypair转换为solders.keypair.Keypair
-                # 注意：Keypair.from_bytes()期望64字节（32字节私钥 + 32字节公钥）
-                if len(payer.secret_key) == 64:
-                    # 如果已经是64字节，直接使用
+                # 我们的自定义Keypair的secret_key属性实际上是32字节的种子
+                if len(payer.secret_key) == 32:
+                    logger.info("从32字节种子创建solders.Keypair")
+                    payer_solana_keypair = Keypair.from_seed(payer.secret_key)
+                elif len(payer.secret_key) == 64:
+                    # 如果是64字节的完整密钥对，直接使用
+                    logger.info("从64字节密钥对创建solders.Keypair")
                     payer_solana_keypair = Keypair.from_bytes(payer.secret_key)
-                elif len(payer.secret_key) == 32:
-                    # 如果是32字节，需要添加公钥部分
-                    public_key_bytes = base58.b58decode(str(payer.public_key))
-                    full_keypair_bytes = payer.secret_key + public_key_bytes
-                    payer_solana_keypair = Keypair.from_bytes(full_keypair_bytes)
                 else:
                     raise ValueError(f"不支持的私钥长度: {len(payer.secret_key)}")
                 
