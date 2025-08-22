@@ -43,3 +43,7 @@ APScheduler==3.10.4
 
 # 开发工具（可选）
 # schedule==1.2.0  # 如果需要使用schedule模块，取消注释
+
+# WSGI Server
+gunicorn==23.0.0
+gevent==25.5.1
