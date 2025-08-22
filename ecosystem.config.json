@@ -3,7 +3,7 @@
     {
       "name": "rwa-hub",
       "script": "/root/RWA-HUB/venv/bin/python",
-      "args": "app_wsgi.py",
+      "args": "app.py",
       "env": {
         "FLASK_ENV": "production",
         "PORT": 9000
