@@ -13,7 +13,7 @@ SQLAlchemy==2.0.21
 
 # 区块链相关
 solana==0.30.2
-solders==0.18.1
+solders==0.26.0
 base58==2.1.1
 
 # 加密和安全
