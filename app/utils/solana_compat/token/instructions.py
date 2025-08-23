@@ -275,7 +275,7 @@ class Token:
                 
             except ImportError:
                 raise NotImplementedError(
-                    "真实的代币账户创建需要solana-py库。"\
+                    "真实的代币账户创建需要solana-py库。"
                     "请安装: pip install solana"
                 )
             
@@ -416,7 +416,7 @@ class Token:
                 
             except ImportError:
                 raise NotImplementedError(
-                    "真实的代币铸造需要solana-py库。"\
+                    "真实的代币铸造需要solana-py库。"
                     "请安装: pip install solana"
                 )
             
@@ -439,7 +439,7 @@ class Token:
         try:
             from solana.rpc.api import Client
             from spl.token.instructions import transfer, TransferParams
-            from solana.transaction import Transaction as SolanaTransaction
+            from solders.transaction import Transaction as SolanaTransaction
             
             logger.info("✅ 使用真实的solana-py库进行代币转账")
             
@@ -538,4 +538,4 @@ def get_accounts(owner: PublicKey) -> List[PublicKey]:
         logger.info("✅ 使用真实的solana-py库查询账户")
         return []  # 临时实现
     except ImportError:
-        return []
+        return 0

@@ -155,4 +155,4 @@ class Client:
     
     def get_signature_statuses(self, signatures: List[str], commitment: str) -> Dict[str, Any]:
         """获取交易签名状态"""
-        return self._make_request("getSignatureStatuses", [signatures, {"commitment": commitment}]) 
+        return self._make_request("getSignatureStatuses", [signatures, {"commitment": commitment}])

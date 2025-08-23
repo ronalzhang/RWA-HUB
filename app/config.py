@@ -113,7 +113,7 @@ class ProductionConfig(Config):
     print(f"生产环境使用本地数据库: {SQLALCHEMY_DATABASE_URI}")
     
     # 明确从环境变量获取SOLANA_RPC_URL
-    SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')
+    SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL', 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea')
     
     @staticmethod
     def init_app(app):
