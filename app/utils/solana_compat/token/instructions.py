@@ -67,10 +67,9 @@ class Token:
         try:
             logger.info(f"创建真实SPL代币铸造 - 支付者: {payer.public_key}, 权限: {mint_authority}, 小数位: {decimals}")
             
-            # 获取Solana网络配置
-            solana_endpoint = os.environ.get("SOLANA_NETWORK_URL", "https://api.mainnet-beta.solana.com")
+            solana_endpoint = os.environ.get("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
             logger.info(f"使用Solana端点: {solana_endpoint}")
-            
+
             try:
                 # 1. Import necessary components from modern libraries
                 from solana.rpc.api import Client
@@ -276,7 +275,7 @@ class Token:
                 
             except ImportError:
                 raise NotImplementedError(
-                    "真实的代币账户创建需要solana-py库。"
+                    "真实的代币账户创建需要solana-py库。"\
                     "请安装: pip install solana"
                 )
             
@@ -417,7 +416,7 @@ class Token:
                 
             except ImportError:
                 raise NotImplementedError(
-                    "真实的代币铸造需要solana-py库。"
+                    "真实的代币铸造需要solana-py库。"\
                     "请安装: pip install solana"
                 )
             
@@ -442,7 +441,7 @@ class Token:
             from spl.token.instructions import transfer, TransferParams
             from solana.transaction import Transaction as SolanaTransaction
             
-            logger.info(f"✅ 使用真实的solana-py库进行代币转账")
+            logger.info("✅ 使用真实的solana-py库进行代币转账")
             
             # 创建交易
             transaction = SolanaTransaction()
@@ -517,7 +516,7 @@ def create_account(owner: PublicKey) -> PublicKey:
 def transfer(source: PublicKey, dest: PublicKey, owner: PublicKey, amount: int) -> Transaction:
     """转移Token - 真实实现"""
     try:
-        from solana.transaction import Transaction as SolanaTransaction
+        from solders.transaction import Transaction as SolanaTransaction
         logger.info("✅ 使用真实的solana-py库进行Token转移")
         return SolanaTransaction()
     except ImportError:
