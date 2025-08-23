@@ -82,6 +82,7 @@ class Token:
                 from solders.message import Message
                 from solders.transaction import VersionedTransaction
                 from solana.rpc.commitment import Confirmed
+                import solana.rpc.types as rpc_types
 
                 logger.info("✅ Using modern solana-py libraries for SPL token creation.")
 
