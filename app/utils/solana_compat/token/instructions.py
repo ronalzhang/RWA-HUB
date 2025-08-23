@@ -78,7 +78,7 @@ class Token:
                 from solders.pubkey import Pubkey as SolanaPublicKey
                 from spl.token.instructions import initialize_mint, mint_to as spl_mint_to, InitializeMintParams
                 from spl.token.constants import TOKEN_PROGRAM_ID as SPL_TOKEN_PROGRAM_ID
-                from solana.transaction import Transaction as SolanaTransaction
+                from solders.transaction import Transaction as SolanaTransaction
                 from solders.system_program import create_account, CreateAccountParams
                 from solana.rpc.commitment import Confirmed
                 import solana.rpc.types as rpc_types
@@ -214,8 +214,11 @@ class Token:
                     raise Exception(f"交易发送失败: {result}")
                     
             except ImportError as e:
-                logger.error(f"solana-py库导入失败: {repr(e)}")
-                raise NotImplementedError(f"导入solana-py子依赖时出错: {repr(e)}")
+                logger.error(f"solana-py库导入失败: {str(e)}")
+                raise NotImplementedError(
+                    "真实的SPL代币创建需要solana-py库。"
+                    "请安装: pip install solana"
+                )
             
         except Exception as e:
             logger.error(f"创建真实SPL代币铸造失败: {str(e)}")
@@ -229,7 +232,7 @@ class Token:
             try:
                 from solana.rpc.api import Client
                 from spl.token.instructions import create_associated_token_account, get_associated_token_address
-                from solana.transaction import Transaction as SolanaTransaction
+                from solders.transaction import Transaction as SolanaTransaction
                 from solders.pubkey import Pubkey as SolanaPublicKey
                 from solders.keypair import Keypair
                 
@@ -356,7 +359,7 @@ class Token:
             try:
                 from solana.rpc.api import Client
                 from spl.token.instructions import mint_to, MintToParams
-                from solana.transaction import Transaction as SolanaTransaction
+                from solders.transaction import Transaction as SolanaTransaction
                 from solders.pubkey import Pubkey as SolanaPublicKey
                 from solders.keypair import Keypair
                 
