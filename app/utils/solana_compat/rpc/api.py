@@ -31,7 +31,7 @@ class Client:
             logger.debug(f"请求参数: {json.dumps(params) if params else 'None'}")
             
             logger.info(f"--> [RPC_DEBUG] Preparing to send request to {self.endpoint}")
-            response = self.session.post(self.endpoint, json=data, timeout=120) # 增加超时时间以处理耗时长的操作
+            response = self.session.post(self.endpoint, json=data, timeout=120, verify=False) # 增加超时时间并禁用SSL验证
             logger.info(f"<-- [RPC_DEBUG] Received response. Status: {response.status_code}, Text: {response.text[:500]}")
             
             # 检查HTTP响应状态
