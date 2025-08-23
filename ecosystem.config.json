@@ -2,9 +2,12 @@
   "apps": [
     {
       "name": "rwa-hub",
-      "script": "/root/RWA-HUB/start_server.sh",
+      "script": "app_wsgi.py",
+      "interpreter": "/root/RWA-HUB/venv/bin/python3",
+      "cwd": "/root/RWA-HUB",
       "env": {
         "FLASK_ENV": "production",
+        "PORT": 9000,
         "SOLANA_NETWORK_URL": "https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea",
         "SOLANA_PRIVATE_KEY_ENCRYPTED": "Z0FBQUFBQm9xTE9lSmZSQkxmZEVGTVdQYWdjZEF0TnhGMk1yalZyeEhNaXVCemJ4SjRRNmhHRVpJaFZGdzFLMzFhOGY2WlR1bC15Y2ZHSFlESVNFQlFYd3hZNVR0WU1nZWY4X285d085d1BOcWZjQzVwZ2FLNGwyM08xU3h5Y1JlcFBHaFQ5bkY1OGdaT0dhZ0E0Rjg3SjRMekpWWll5Vk5DbTVycG5OclU1UWg0Sy1WX1duQVFhTnpxVXBocDJ6Y0pybEJ5UnZCX3pP",
         "CRYPTO_PASSWORD": "123abc74531"
