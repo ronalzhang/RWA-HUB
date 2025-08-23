@@ -72,153 +72,85 @@ class Token:
             logger.info(f"使用Solana端点: {solana_endpoint}")
             
             try:
-                # 尝试使用真实的solana-py库
+                # 1. Import necessary components from modern libraries
                 from solana.rpc.api import Client
                 from solders.keypair import Keypair
                 from solders.pubkey import Pubkey as SolanaPublicKey
-                from spl.token.instructions import initialize_mint, mint_to as spl_mint_to, InitializeMintParams
+                from spl.token.instructions import initialize_mint, InitializeMintParams
                 from spl.token.constants import TOKEN_PROGRAM_ID as SPL_TOKEN_PROGRAM_ID
-                from solders.transaction import Transaction as SolanaTransaction
                 from solders.system_program import create_account, CreateAccountParams
+                from solders.message import Message
+                from solders.transaction import VersionedTransaction
                 from solana.rpc.commitment import Confirmed
-                import solana.rpc.types as rpc_types
-                
-                logger.info("✅ 使用真实的solana-py库进行SPL代币创建")
-                
-                # 创建RPC客户端
+
+                logger.info("✅ Using modern solana-py libraries for SPL token creation.")
+
+                # 2. Setup clients and keys
                 client = Client(solana_endpoint)
-                
-                # 生成新的mint keypair
                 mint_keypair = Keypair()
                 mint_pubkey = mint_keypair.pubkey()
-                
-                logger.info(f"生成的mint地址: {mint_pubkey}")
-                
-                # 获取最小租金豁免余额 - 使用正确的Mint账户大小
-                # 标准SPL Token Mint账户大小是82字节
+                payer_pubkey = SolanaPublicKey.from_string(str(payer.public_key))
+                mint_authority_pubkey = SolanaPublicKey.from_string(str(mint_authority))
+
+                if len(payer.secret_key) == 64:
+                    payer_keypair = Keypair.from_bytes(payer.secret_key)
+                elif len(payer.secret_key) == 32:
+                    payer_keypair = Keypair.from_seed(payer.secret_key)
+                else:
+                    raise ValueError(f"Unsupported payer secret key length: {len(payer.secret_key)}")
+
+                logger.info(f"New mint address: {mint_pubkey}")
+                logger.info(f"Payer address: {payer_pubkey}")
+
+                # 3. Get rent exemption and latest blockhash
                 MINT_SIZE = 82
-                mint_rent_response = client.get_minimum_balance_for_rent_exemption(MINT_SIZE)
-                mint_rent = mint_rent_response.value
-                logger.info(f"Mint账户租金豁免余额: {mint_rent} lamports (账户大小: {MINT_SIZE} 字节)")
+                rent_response = client.get_minimum_balance_for_rent_exemption(MINT_SIZE)
+                mint_rent = rent_response.value
                 
-                # 创建交易
-                transaction = SolanaTransaction()
-                
-                # 转换PublicKey对象为solana-py格式
-                from_pubkey_solana = SolanaPublicKey.from_string(str(payer.public_key))
-                mint_authority_solana = SolanaPublicKey.from_string(str(mint_authority))
-                
-                # 添加创建账户指令
-                # 确保mint_pubkey是正确的类型
-                mint_pubkey_solana = mint_pubkey  # mint_keypair.pubkey()已经是SolanaPublicKey类型
-                
-                create_account_ix = create_account(
-                    CreateAccountParams(
-                        from_pubkey=from_pubkey_solana,
-                        to_pubkey=mint_pubkey_solana,
-                        lamports=mint_rent,
-                        space=MINT_SIZE,  # 使用正确的Mint账户大小
-                        owner=SPL_TOKEN_PROGRAM_ID
-                    )
-                )
-                transaction.add(create_account_ix)
-                
-                # 添加初始化mint指令
-                init_mint_params = InitializeMintParams(
-                    decimals=decimals,
-                    mint=mint_pubkey_solana,
-                    mint_authority=mint_authority_solana,
-                    freeze_authority=mint_authority_solana,
-                    program_id=SPL_TOKEN_PROGRAM_ID
-                )
-                init_mint_ix = initialize_mint(init_mint_params)
-                transaction.add(init_mint_ix)
-                
-                # 获取最新区块哈希
-                recent_blockhash_response = client.get_latest_blockhash()
-                transaction.recent_blockhash = recent_blockhash_response.value.blockhash
-                
-                # 将自定义Keypair转换为solders.keypair.Keypair
-                # 我们的自定义Keypair的secret_key属性实际上是32字节的种子
-                if len(payer.secret_key) == 32:
-                    logger.info("从32字节种子创建solders.Keypair")
-                    payer_solana_keypair = Keypair.from_seed(payer.secret_key)
-                elif len(payer.secret_key) == 64:
-                    # 如果是64字节的完整密钥对，直接使用
-                    logger.info("从64字节密钥对创建solders.Keypair")
-                    payer_solana_keypair = Keypair.from_bytes(payer.secret_key)
-                else:
-                    raise ValueError(f"不支持的私钥长度: {len(payer.secret_key)}")
-                
-                logger.info(f"成功创建payer keypair，公钥: {payer_solana_keypair.pubkey()}")
-                
-                # 签名交易 - 确保所有必要的签名者都签名
-                logger.info(f"开始签名交易，签名者: payer({payer_solana_keypair.pubkey()}), mint({mint_keypair.pubkey()})")
-                transaction.sign(payer_solana_keypair, mint_keypair)
-                logger.info(f"交易签名完成，签名数量: {len(transaction.signatures)}")
-                
-                # 发送交易 - 添加重试机制
-                logger.info("发送SPL代币创建交易...")
-                import time
-                max_retries = 3
-                retry_delay = 2
-                
-                for attempt in range(max_retries):
-                    try:
-                        if attempt > 0:
-                            logger.info(f"第 {attempt + 1} 次尝试发送SPL代币创建交易...")
-                            time.sleep(retry_delay * attempt)
-                            # 重新获取最新的blockhash
-                            recent_blockhash_response = client.get_latest_blockhash()
-                            transaction.recent_blockhash = recent_blockhash_response.value.blockhash
-                            logger.info(f"重新获取blockhash: {recent_blockhash_response.value.blockhash}")
-                        
-                        # 尝试使用不同的发送方法
-                        try:
-                            result = client.send_transaction(transaction)
-                            break  # 成功则跳出重试循环
-                        except Exception as e:
-                            if "not enough signers" in str(e):
-                                logger.info("尝试使用显式签名者发送交易...")
-                                result = client.send_transaction(transaction, payer_solana_keypair, mint_keypair)
-                                break  # 成功则跳出重试循环
-                            else:
-                                raise
-                    except Exception as e:
-                        if "Blockhash not found" in str(e):
-                            logger.warning(f"遇到Blockhash not found错误，第 {attempt + 1} 次重试...")
-                            if attempt == max_retries - 1:
-                                logger.error(f"重试 {max_retries} 次后仍然失败: {str(e)}")
-                                raise
-                        elif "429" in str(e) or "Too Many Requests" in str(e):
-                            logger.warning(f"遇到429错误，第 {attempt + 1} 次重试...")
-                            if attempt == max_retries - 1:
-                                logger.error(f"重试 {max_retries} 次后仍然失败: {str(e)}")
-                                raise
-                        else:
-                            logger.error(f"发送SPL代币创建交易时出错: {str(e)}")
-                            if attempt == max_retries - 1:
-                                raise
-                
-                if result.value:
-                    tx_hash = result.value
-                    logger.info(f"✅ SPL代币创建成功！交易哈希: {tx_hash}")
-                    
-                    # 创建Token实例并设置mint地址
-                    token = cls(conn, program_id)
-                    token.pubkey = mint_pubkey_solana
-                    
-                    return token
-                else:
-                    logger.error(f"❌ SPL代币创建失败: {result}")
-                    raise Exception(f"交易发送失败: {result}")
-                    
+                latest_blockhash_response = client.get_latest_blockhash()
+                latest_blockhash = latest_blockhash_response.value.blockhash
+
+                # 4. Create instructions
+                instructions = [
+                    create_account(
+                        CreateAccountParams(
+                            from_pubkey=payer_pubkey,
+                            to_pubkey=mint_pubkey,
+                            lamports=mint_rent,
+                            space=MINT_SIZE,
+                            owner=SPL_TOKEN_PROGRAM_ID,
+                        )
+                    ),
+                    initialize_mint(
+                        InitializeMintParams(
+                            decimals=decimals,
+                            mint=mint_pubkey,
+                            mint_authority=mint_authority_pubkey,
+                            freeze_authority=mint_authority_pubkey,
+                            program_id=SPL_TOKEN_PROGRAM_ID,
+                        )
+                    ),
+                ]
+
+                # 5. Compile message and create transaction
+                message = Message.new_with_blockhash(instructions, payer_pubkey, latest_blockhash)
+                transaction = VersionedTransaction(message, [payer_keypair, mint_keypair])
+
+                # 6. Send the transaction
+                logger.info("Sending transaction to create new SPL token mint...")
+                result = client.send_transaction(transaction, opts=rpc_types.TxOpts(skip_confirmation=False, preflight_commitment=Confirmed))
+                tx_hash = result.value
+                logger.info(f"✅ SPL token mint created successfully! Transaction hash: {tx_hash}")
+
+                # 7. Return the token object
+                token = cls(conn, program_id)
+                token.pubkey = mint_pubkey
+                return token
+
             except ImportError as e:
-                logger.error(f"solana-py库导入失败: {str(e)}")
-                raise NotImplementedError(
-                    "真实的SPL代币创建需要solana-py库。"
-                    "请安装: pip install solana"
-                )
+                # This block should now only catch genuine missing library errors
+                logger.error(f"A required library is missing: {repr(e)}")
+                raise NotImplementedError(f"A required library is missing to create SPL tokens: {repr(e)}")
             
         except Exception as e:
             logger.error(f"创建真实SPL代币铸造失败: {str(e)}")
