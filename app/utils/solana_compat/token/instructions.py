@@ -214,11 +214,8 @@ class Token:
                     raise Exception(f"交易发送失败: {result}")
                     
             except ImportError as e:
-                logger.error(f"solana-py库导入失败: {str(e)}")
-                raise NotImplementedError(
-                    "真实的SPL代币创建需要solana-py库。"
-                    "请安装: pip install solana"
-                )
+                logger.error(f"solana-py库导入失败: {repr(e)}")
+                raise NotImplementedError(f"导入solana-py子依赖时出错: {repr(e)}")
             
         except Exception as e:
             logger.error(f"创建真实SPL代币铸造失败: {str(e)}")
