@@ -84,6 +84,7 @@ def deploy_contract():
             return create_error_response('UNSUPPORTED_BLOCKCHAIN', '暂不支持该区块链')
             
     except Exception as e:
+        db.session.rollback()
         logger.error(f"在 /api/deploy-contract 端点发生未知异常: {str(e)}", exc_info=True)
         return create_error_response('INTERNAL_SERVER_ERROR', f'部署失败: {str(e)}')
 
