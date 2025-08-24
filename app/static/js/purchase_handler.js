@@ -1,6 +1,155 @@
+'''
+// Manually integrated SPL-Token functions to avoid CDN/bundler issues.
+// Version: @solana/spl-token@0.4.13
+
+const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+const ASSOCIATED_TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+
+// Errors
+class TokenError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = 'TokenError';
+    }
+}
+class TokenAccountNotFoundError extends TokenError { constructor() { super('Token account not found'); this.name = 'TokenAccountNotFoundError'; } }
+class TokenInvalidAccountOwnerError extends TokenError { constructor() { super('Token invalid account owner'); this.name = 'TokenInvalidAccountOwnerError'; } }
+class TokenInvalidAccountSizeError extends TokenError { constructor() { super('Token invalid account size'); this.name = 'TokenInvalidAccountSizeError'; } }
+class TokenInvalidMintError extends TokenError { constructor() { super('Token invalid mint'); this.name = 'TokenInvalidMintError'; } }
+class TokenInvalidOwnerError extends TokenError { constructor() { super('Token invalid owner'); this.name = 'TokenInvalidOwnerError'; } }
+class TokenOwnerOffCurveError extends TokenError { constructor() { super('Token owner off curve'); this.name = 'TokenOwnerOffCurveError'; } }
+
+
+// state/mint.js
+function getAssociatedTokenAddressSync(
+    mint,
+    owner,
+    allowOwnerOffCurve = false,
+    programId = TOKEN_PROGRAM_ID,
+    associatedTokenProgramId = ASSOCIATED_TOKEN_PROGRAM_ID
+) {
+    if (!allowOwnerOffCurve && !solanaWeb3.PublicKey.isOnCurve(owner.toBuffer())) {
+        throw new TokenOwnerOffCurveError();
+    }
+
+    const [address] = solanaWeb3.PublicKey.findProgramAddressSync(
+        [owner.toBuffer(), programId.toBuffer(), mint.toBuffer()],
+        associatedTokenProgramId
+    );
+    return address;
+}
+
+// state/account.js
+const AccountLayout = solana.bufferLayout.struct([
+    solana.bufferLayout.blob(32, 'mint'),
+    solana.bufferLayout.blob(32, 'owner'),
+    solana.bufferLayout.u64('amount'),
+    solana.bufferLayout.u32('delegateOption'),
+    solana.bufferLayout.blob(32, 'delegate'),
+    solana.bufferLayout.u8('state'),
+    solana.bufferLayout.u32('isNativeOption'),
+    solana.bufferLayout.u64('isNative'),
+    solana.bufferLayout.u64('delegatedAmount'),
+    solana.bufferLayout.u32('closeAuthorityOption'),
+    solana.bufferLayout.blob(32, 'closeAuthority'),
+]);
+
+const ACCOUNT_SIZE = AccountLayout.span;
+
+function unpackAccount(address, info, programId = TOKEN_PROGRAM_ID) {
+    if (!info) throw new TokenAccountNotFoundError();
+    if (!info.owner.equals(programId)) throw new TokenInvalidAccountOwnerError();
+    if (info.data.length < ACCOUNT_SIZE) throw new TokenInvalidAccountSizeError();
+
+    const rawAccount = AccountLayout.decode(info.data.slice(0, ACCOUNT_SIZE));
+
+    return {
+        address,
+        mint: new solanaWeb3.PublicKey(rawAccount.mint),
+        owner: new solanaWeb3.PublicKey(rawAccount.owner),
+        amount: rawAccount.amount,
+        delegate: rawAccount.delegateOption ? new solanaWeb3.PublicKey(rawAccount.delegate) : null,
+        delegatedAmount: rawAccount.delegatedAmount,
+        isInitialized: rawAccount.state !== 0,
+        isFrozen: rawAccount.state === 2,
+        isNative: !!rawAccount.isNativeOption,
+        rentExemptReserve: rawAccount.isNativeOption ? rawAccount.isNative : null,
+        closeAuthority: rawAccount.closeAuthorityOption ? new solanaWeb3.PublicKey(rawAccount.closeAuthority) : null,
+    };
+}
+
+async function getAccount(connection, address, commitment, programId = TOKEN_PROGRAM_ID) {
+    const info = await connection.getAccountInfo(address, commitment);
+    return unpackAccount(address, info, programId);
+}
+
+
+// instructions/associatedTokenAccount.js
+function createAssociatedTokenAccountInstruction(
+    payer,
+    associatedToken,
+    owner,
+    mint,
+    programId = TOKEN_PROGRAM_ID,
+    associatedTokenProgramId = ASSOCIATED_TOKEN_PROGRAM_ID
+) {
+    const keys = [
+        { pubkey: payer, isSigner: true, isWritable: true },
+        { pubkey: associatedToken, isSigner: false, isWritable: true },
+        { pubkey: owner, isSigner: false, isWritable: false },
+        { pubkey: mint, isSigner: false, isWritable: false },
+        { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false },
+        { pubkey: programId, isSigner: false, isWritable: false },
+    ];
+
+    return new solanaWeb3.TransactionInstruction({
+        keys,
+        programId: associatedTokenProgramId,
+        data: Buffer.alloc(0),
+    });
+}
+
+// instructions/transfer.js
+const transferInstructionData = solana.bufferLayout.struct([solana.bufferLayout.u8('instruction'), solana.bufferLayout.u64('amount')]);
+
+function createTransferInstruction(
+    source,
+    destination,
+    owner,
+    amount,
+    multiSigners = [],
+    programId = TOKEN_PROGRAM_ID
+) {
+    const keys = [
+        { pubkey: source, isSigner: false, isWritable: true },
+        { pubkey: destination, isSigner: false, isWritable: true },
+    ];
+
+    if (multiSigners.length > 0) {
+        keys.push({ pubkey: owner, isSigner: false, isWritable: false });
+        for (const signer of multiSigners) {
+            keys.push({ pubkey: signer.publicKey, isSigner: true, isWritable: false });
+        }
+    } else {
+        keys.push({ pubkey: owner, isSigner: true, isWritable: false });
+    }
+
+    const data = Buffer.alloc(transferInstructionData.span);
+    transferInstructionData.encode(
+        {
+            instruction: 3, // Transfer instruction
+            amount: BigInt(amount),
+        },
+        data
+    );
+
+    return new solanaWeb3.TransactionInstruction({ keys, programId, data });
+}
+
+
 /**
  * 统一的购买处理器
- * 版本: 2.0.0 - 完全重构，统一所有购买逻辑
+ * 版本: 2.1.0 - 集成SPL-Token功能，移除外部依赖
  */
 
 class PurchaseHandler {
@@ -243,47 +392,48 @@ class PurchaseHandler {
     
     async executeWalletPayment(prepareData) {
         // This function creates and sends a real Solana transaction
-        // Assumes solanaWeb3 is available in the global scope
         if (!window.solana || !window.solana.isPhantom) {
             throw new Error("Solana wallet (Phantom) not found.");
         }
         if (!window.solana.isConnected) {
             await window.solana.connect();
         }
+        if (!window.solanaWeb3) {
+            throw new Error("solanaWeb3 is not available. Please ensure the Solana Web3 library is loaded.");
+        }
 
         const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'));
         const fromPubkey = new solanaWeb3.PublicKey(this.getWalletAddress());
         const toPubkey = new solanaWeb3.PublicKey(prepareData.recipient_address);
-        
-        // This assumes USDC transfer. The mint address should ideally come from config.
         const usdcMint = new solanaWeb3.PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 
-        // Get the sender's and receiver's associated token accounts
-        const fromTokenAccount = await splToken.getAssociatedTokenAddress(usdcMint, fromPubkey);
-        const toTokenAccount = await splToken.getAssociatedTokenAddress(usdcMint, toPubkey);
+        const fromTokenAccountAddress = getAssociatedTokenAddressSync(usdcMint, fromPubkey);
+        const toTokenAccountAddress = getAssociatedTokenAddressSync(usdcMint, toPubkey);
 
-        // Check if the receiver's token account exists, if not, create it.
-        const toTokenAccountInfo = await connection.getAccountInfo(toTokenAccount);
-        
         const transaction = new solanaWeb3.Transaction();
-
-        if (!toTokenAccountInfo) {
-            console.log("Recipient's token account does not exist. Creating it.");
-            transaction.add(
-                solanaWeb3.createAssociatedTokenAccountInstruction(
-                    fromPubkey, // payer
-                    toTokenAccount,
-                    toPubkey,
-                    usdcMint
-                )
-            );
+        
+        // Check if the receiver's token account exists, if not, create it.
+        try {
+            await getAccount(connection, toTokenAccountAddress);
+        } catch (error) {
+            if (error instanceof TokenAccountNotFoundError || error instanceof TokenInvalidAccountOwnerError) {
+                transaction.add(
+                    createAssociatedTokenAccountInstruction(
+                        fromPubkey,
+                        toTokenAccountAddress,
+                        toPubkey,
+                        usdcMint
+                    )
+                );
+            } else {
+                throw error;
+            }
         }
 
-        // Add the transfer instruction
         transaction.add(
-            solanaWeb3.createTransferInstruction(
-                fromTokenAccount,
-                toTokenAccount,
+            createTransferInstruction(
+                fromTokenAccountAddress,
+                toTokenAccountAddress,
                 fromPubkey,
                 prepareData.total_amount * 1000000 // USDC has 6 decimals
             )
@@ -531,3 +681,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 导出给其他脚本使用
 window.PurchaseHandler = PurchaseHandler;
+''
