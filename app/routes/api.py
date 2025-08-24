@@ -11,7 +11,7 @@ import re
 import requests
 from app.models import Asset, User, Trade, AssetType
 from app.extensions import db
-from app.blockchain.solana_service import execute_transfer_transaction, prepare_transaction
+from app.blockchain.solana_service import prepare_transaction
 from app.utils.error_handler import error_handler, create_error_response
 from app.utils.decorators import api_endpoint
 from app.utils.data_converters import AssetDataConverter, DataConverter
