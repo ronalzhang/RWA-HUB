@@ -112,6 +112,7 @@ class PurchaseHandler {
 
         // Add purchase type identifier for smart contract flow
         data.purchase_type = 'smart_contract';
+        data.asset_id = assetId; // THIS IS THE FIX
         
         // Fetch asset details to show in the modal
         const assetResponse = await fetch(`/api/assets/${assetId}`);
