@@ -85,11 +85,9 @@ class PurchaseHandler {
 
     async preparePurchase(assetId, amount) {
         const walletAddress = this.getWalletAddress();
-        
-        console.log('Using traditional purchase preparation method.');
+        console.log('Using smart contract purchase preparation method.');
 
-        // 使用有效的API端点
-        const response = await fetch('/api/trades/prepare_purchase', {
+        const response = await fetch('/api/create-purchase-transaction', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -98,21 +96,35 @@ class PurchaseHandler {
             body: JSON.stringify({
                 asset_id: assetId,
                 amount: amount,
-                wallet_address: walletAddress
+                buyer_address: walletAddress
             })
         });
 
         if (!response.ok) {
-            throw new Error(`Preparation failed: ${response.status}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `Preparation failed: ${response.status}`);
         }
 
         const data = await response.json();
         if (!data.success) {
-            throw new Error(data.message || 'Purchase preparation failed');
+            throw new Error(data.error || 'Purchase preparation failed');
         }
 
-        // 添加购买类型标识
-        data.purchase_type = 'traditional';
+        // Add purchase type identifier for smart contract flow
+        data.purchase_type = 'smart_contract';
+        
+        // Fetch asset details to show in the modal
+        const assetResponse = await fetch(`/api/assets/${assetId}`);
+        if (assetResponse.ok) {
+            const assetData = await assetResponse.json();
+            if (assetData.success) {
+                data.name = assetData.asset.name;
+                data.price = assetData.asset.token_price;
+                data.total_price = data.amount * data.price;
+                data.platform_address = 'Platform'; // Placeholder
+            }
+        }
+
         return data;
     }
 
@@ -150,9 +162,7 @@ class PurchaseHandler {
                             <div class="mb-3">
                                 <div class="alert alert-info">
                                     <strong>Smart Contract Purchase</strong><br>
-                                    <small>Automatic fee distribution:</small><br>
-                                    <small>• Platform fee: ${prepareData.platform_fee.toFixed(2)} USDC (3.5%)</small><br>
-                                    <small>• Creator amount: ${prepareData.creator_amount.toFixed(2)} USDC</small>
+                                    <small>This transaction will be processed on the blockchain.</small>
                                 </div>
                             </div>
                             ` : `
@@ -211,122 +221,83 @@ class PurchaseHandler {
 
     async executeSmartContractPurchase(prepareData, modal, confirmBtn, walletAddress) {
         console.log('Executing smart contract purchase for asset:', prepareData.asset_id);
-
-        // 使用预准备的智能合约数据
-        const contractData = prepareData.contract_data;
-        
-        // 请求用户在钱包中签名智能合约交易
         this.setButtonState(confirmBtn, 'Please confirm in wallet...', true);
 
-        const transactionData = contractData.transaction_data;
-        const totalPrice = contractData.total_price;
+        try {
+            const transactionData = prepareData.transaction;
+            if (!transactionData) {
+                throw new Error('Transaction data not found in preparation response.');
+            }
 
-        console.log(`Executing smart contract purchase: ${prepareData.amount} tokens, total: ${totalPrice} USDC`);
-        console.log('Platform fee:', contractData.platform_fee, 'Creator amount:', contractData.creator_amount);
-
-            // 检查Solana钱包API
             if (!window.solana || !window.solana.signAndSendTransaction) {
                 throw new Error('Solana wallet API not available');
             }
 
-            // 解码交易数据
-            let transactionBuffer;
-            try {
-                const binaryString = atob(transactionData);
-                transactionBuffer = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    transactionBuffer[i] = binaryString.charCodeAt(i);
-                }
-                console.log('Transaction data decoded successfully, length:', transactionBuffer.length);
-            } catch (error) {
-                throw new Error(`Transaction data decode failed: ${error.message}`);
-            }
+            // Decode the base64 transaction data
+            const transactionBuffer = Uint8Array.from(atob(transactionData), c => c.charCodeAt(0));
 
-            // 创建兼容的Transaction对象
-            const compatibleTransaction = {
-                serialize: function() {
-                    console.log('Transaction.serialize() called');
-                    return transactionBuffer;
-                },
-                serializeMessage: function() {
-                    console.log('Transaction.serializeMessage() called');
-                    return transactionBuffer;
-                },
+            // Create a transaction object that the wallet can understand
+            const transaction = {
+                serialize: () => transactionBuffer,
+                serializeMessage: () => transactionBuffer,
                 signatures: [],
                 feePayer: null,
                 recentBlockhash: null,
                 instructions: [],
-                _message: transactionBuffer,
-                _serialized: transactionBuffer
             };
 
-        // 执行智能合约交易
-        console.log('Sending transaction to wallet for signing...');
-        
-        const walletResult = await window.solana.signAndSendTransaction(compatibleTransaction);
-        console.log('Wallet transaction result:', walletResult);
+            const { signature } = await window.solana.signAndSendTransaction(transaction);
 
-        // 处理钱包返回结果
-        let signature;
-        if (walletResult && walletResult.signature) {
-            signature = walletResult.signature;
-        } else if (typeof walletResult === 'string') {
-            signature = walletResult;
-        } else {
-            throw new Error('Invalid wallet response format');
+            if (!signature) {
+                throw new Error('Transaction was not signed or sent.');
+            }
+
+            console.log('Transaction successful, signature:', signature);
+
+            this.setButtonState(confirmBtn, 'Finalizing purchase...', true);
+
+            const executeResult = await fetch('/api/submit-transaction', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Wallet-Address': walletAddress
+                },
+                body: JSON.stringify({
+                    asset_id: prepareData.asset_id,
+                    amount: prepareData.amount,
+                    signed_transaction: signature,
+                    trade_id: prepareData.trade_id // Pass the trade_id back
+                })
+            });
+
+            if (!executeResult.ok) {
+                const errorData = await executeResult.json().catch(() => ({}));
+                throw new Error(errorData.error || `Purchase finalization failed: ${executeResult.status}`);
+            }
+
+            const executeData = await executeResult.json();
+            if (!executeData.success) {
+                throw new Error(executeData.error || 'Purchase finalization failed on backend.');
+            }
+
+            console.log('Smart contract purchase completed successfully');
+            this.showSuccess('Purchase successful! Your transaction has been submitted.');
+            modal.hide();
+            this.refreshAssetInfo(prepareData.asset_id);
+
+            return {
+                success: true,
+                transaction_signature: signature,
+                trade_id: executeData.trade_id,
+                message: 'Smart contract purchase confirmed.'
+            };
+
+        } catch (error) {
+            console.error('Error during smart contract purchase execution:', error);
+            this.showModalError(error.message);
+            this.setButtonState(confirmBtn, 'Confirm Purchase', false);
+            throw error;
         }
-
-        if (!signature) {
-            throw new Error('No transaction signature returned from wallet');
-        }
-
-        console.log('Smart contract transaction successful, signature:', signature);
-
-        // 确认智能合约购买
-        this.setButtonState(confirmBtn, 'Confirming purchase...', true);
-
-        const executeResult = await fetch('/api/blockchain/execute_purchase', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Wallet-Address': walletAddress
-            },
-            body: JSON.stringify({
-                asset_id: prepareData.asset_id,
-                buyer_address: walletAddress,
-                amount: prepareData.amount,
-                signed_transaction: signature
-            })
-        });
-
-        if (!executeResult.ok) {
-            throw new Error(`Smart contract execution failed: ${executeResult.status}`);
-        }
-
-        const executeData = await executeResult.json();
-        console.log('Smart contract execution result:', executeData);
-
-        if (!executeData.success) {
-            throw new Error(executeData.error || 'Smart contract execution failed');
-        }
-
-        console.log('Smart contract purchase completed successfully');
-
-        // 显示成功消息
-        this.showSuccess(`Smart Contract Purchase Successful! You have purchased ${prepareData.amount} tokens. USDC payment and token transfer completed with automatic fee distribution. Transaction: ${signature.slice(0, 8)}...`);
-
-        // 关闭模态框
-        modal.hide();
-
-        // 刷新资产信息
-        this.refreshAssetInfo(prepareData.asset_id);
-
-        return {
-            success: true,
-            transaction_signature: signature,
-            trade_id: executeData.trade_id,
-            message: 'Smart contract purchase confirmed with automatic fee distribution'
-        };
     }
 
     async executeTraditionalPurchase(prepareData, modal, confirmBtn, walletAddress) {

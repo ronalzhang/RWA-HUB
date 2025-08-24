@@ -531,7 +531,6 @@ function initializePage() {
     loadTradeHistory();
     loadTotalDividends();
     checkDividendAccess();
-    // 购买按钮状态由handle_buy.js自动处理
     
     // 设置定期更新
     setInterval(loadRealTimeAssetData, 30000); // 每30秒更新一次资产数据
@@ -668,9 +667,7 @@ function setupTradeForm() {
     }
 }
 
-// 钱包连接状态检查由handle_buy.js处理
 
-// 购买按钮点击处理由handle_buy.js处理
 
 // 获取钱包地址（简化版本）
 function getWalletAddress() {
@@ -902,18 +899,6 @@ async function copyToClipboard(elementId, button) {
     }
 }
 
-// 钱包事件监听
-window.addEventListener('walletConnected', function() {
-    // 购买按钮状态由handle_buy.js自动处理
-    checkDividendAccess();
-});
-
-window.addEventListener('walletDisconnected', function() {
-    // 购买按钮状态由handle_buy.js自动处理
-});
-
-// 购买按钮事件绑定由handle_buy.js处理
-
 // 复制分享链接
 window.copyShareLink = async function() {
     console.log('复制分享链接被调用');
@@ -1034,6 +1019,5 @@ document.addEventListener('keydown', function(event) {
 </script>
 
 <!-- 购买和智能合约部署脚本 -->
-<script src="{{ url_for('static', filename='js/handle_buy.js') }}"></script>
 <script src="{{ url_for('static', filename='js/smart_contract_deployment.js') }}"></script>
 {% endblock %}
