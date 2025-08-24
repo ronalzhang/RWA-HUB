@@ -86,46 +86,9 @@ class PurchaseHandler {
     async preparePurchase(assetId, amount) {
         const walletAddress = this.getWalletAddress();
         
-        // 首先尝试智能合约准备，如果失败则回退到传统方式
-        try {
-            const response = await fetch('/api/blockchain/prepare_purchase', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Wallet-Address': walletAddress,
-                    'X-Wallet-Type': this.getWalletType() || 'unknown'
-                },
-                body: JSON.stringify({
-                    asset_id: assetId,
-                    buyer_address: walletAddress,
-                    amount: amount
-                })
-            });
+        console.log('Using traditional purchase preparation method.');
 
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    // 转换为统一格式
-                    return {
-                        success: true,
-                        asset_id: assetId,
-                        amount: amount,
-                        price: data.asset_info.token_price,
-                        name: data.asset_info.name,
-                        total_price: data.total_price,
-                        platform_fee: data.platform_fee,
-                        creator_amount: data.creator_amount,
-                        platform_address: 'Smart Contract', // 智能合约自动分账
-                        purchase_type: 'smart_contract',
-                        contract_data: data
-                    };
-                }
-            }
-        } catch (error) {
-            console.log('Smart contract preparation failed, trying traditional method:', error.message);
-        }
-
-        // 回退到传统准备方式
+        // 使用有效的API端点
         const response = await fetch('/api/trades/prepare_purchase', {
             method: 'POST',
             headers: {
