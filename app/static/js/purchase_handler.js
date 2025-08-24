@@ -259,8 +259,8 @@ class PurchaseHandler {
         const usdcMint = new solanaWeb3.PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 
         // Get the sender's and receiver's associated token accounts
-        const fromTokenAccount = await solanaWeb3.getAssociatedTokenAddress(usdcMint, fromPubkey);
-        const toTokenAccount = await solanaWeb3.getAssociatedTokenAddress(usdcMint, toPubkey);
+        const fromTokenAccount = await splToken.getAssociatedTokenAddress(usdcMint, fromPubkey);
+        const toTokenAccount = await splToken.getAssociatedTokenAddress(usdcMint, toPubkey);
 
         // Check if the receiver's token account exists, if not, create it.
         const toTokenAccountInfo = await connection.getAccountInfo(toTokenAccount);
