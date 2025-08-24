@@ -11,7 +11,7 @@ import re
 import requests
 from app.models import Asset, User, Trade, AssetType
 from app.extensions import db
-from app.blockchain.solana_service import prepare_transaction
+
 from app.utils.error_handler import error_handler, create_error_response
 from app.utils.decorators import api_endpoint
 from app.utils.data_converters import AssetDataConverter, DataConverter
@@ -122,87 +122,7 @@ def get_asset_status(asset_id):
         logger.error(f"获取资产状态失败: {str(e)}", exc_info=True)
         return create_error_response('INTERNAL_SERVER_ERROR', f'获取状态失败: {str(e)}')
 
-@api_bp.route('/create-purchase-transaction', methods=['POST'])
-@api_endpoint(log_calls=True, measure_perf=True)
-def create_purchase_transaction():
-    """创建购买交易"""
-    try:
-        data = request.get_json()
-        if not data:
-            return create_error_response('INVALID_REQUEST', '无效的请求数据')
 
-        asset_id = data.get('asset_id')
-        amount = data.get('amount')
-        buyer_address = data.get('buyer_address')
-        
-        if not all([asset_id, amount, buyer_address]):
-            return create_error_response('VALIDATION_ERROR', '缺少必要参数')
-        
-        asset = Asset.query.get(asset_id)
-        if not asset:
-            return create_error_response('ASSET_NOT_FOUND', f'资产 {asset_id} 不存在')
-        
-        if not asset.contract_address:
-            return create_error_response('CONTRACT_NOT_DEPLOYED', '资产尚未部署智能合约')
-        
-        try:
-            amount = int(amount)
-            if amount <= 0:
-                return create_error_response('VALIDATION_ERROR', '购买数量必须大于0')
-        except (ValueError, TypeError):
-            return create_error_response('INVALID_DATA_FORMAT', '无效的购买数量')
-        
-        total_sold = db.session.query(func.sum(Trade.amount)).filter(
-            Trade.asset_id == asset_id,
-            Trade.status.in_(['pending', 'completed'])
-        ).scalar() or 0
-        
-        remaining_supply = asset.token_supply - total_sold
-        if amount > remaining_supply:
-            return create_error_response('INSUFFICIENT_SUPPLY', f'购买数量超过剩余供应量 ({remaining_supply})')
-        
-        total_price = amount * asset.token_price
-        
-        trade = Trade(
-            asset_id=asset_id,
-            trader_address=buyer_address,
-            amount=amount,
-            price=asset.token_price,
-            total=total_price,
-            type='buy',
-            status='pending',
-            created_at=datetime.utcnow()
-        )
-        
-        db.session.add(trade)
-        db.session.commit()
-        
-        # Prepare the real Solana transaction
-        prepared_tx = prepare_transaction(
-            user_address=buyer_address,
-            asset_id=asset.id,
-            token_symbol=asset.token_symbol,
-            amount=amount,
-            price=asset.token_price,
-            trade_id=trade.id
-        )
-
-        if not prepared_tx.get('success'):
-            return create_error_response('TRANSACTION_PREPARATION_FAILED', prepared_tx.get('error', 'Failed to prepare transaction'))
-
-        logger.info(f"购买交易创建成功: 交易ID={trade.id}, 资产ID={asset_id}, 数量={amount}")
-        
-        return jsonify({
-            'success': True,
-            'transaction': prepared_tx.get('serialized_transaction'),
-            'trade_id': trade.id,
-            'message': '购买交易创建成功'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"创建购买交易失败: {str(e)}", exc_info=True)
-        return create_error_response('INTERNAL_SERVER_ERROR', f'创建交易失败: {str(e)}')
 
 @api_bp.route('/submit-transaction', methods=['POST'])
 @api_endpoint(log_calls=True, measure_perf=True)

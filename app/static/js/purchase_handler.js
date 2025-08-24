@@ -85,9 +85,9 @@ class PurchaseHandler {
 
     async preparePurchase(assetId, amount) {
         const walletAddress = this.getWalletAddress();
-        console.log('Using smart contract purchase preparation method.');
+        console.log('Using session-based purchase preparation method.');
 
-        const response = await fetch('/api/create-purchase-transaction', {
+        const response = await fetch('/api/trades/prepare_purchase', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -96,12 +96,12 @@ class PurchaseHandler {
             body: JSON.stringify({
                 asset_id: assetId,
                 amount: amount,
-                buyer_address: walletAddress
+                wallet_address: walletAddress
             })
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
+            const errorData = await response.json().catch(() => ({ "error": "An unknown error occurred" }));
             throw new Error(errorData.error || `Preparation failed: ${response.status}`);
         }
 
@@ -109,23 +109,8 @@ class PurchaseHandler {
         if (!data.success) {
             throw new Error(data.error || 'Purchase preparation failed');
         }
-
-        // Add purchase type identifier for smart contract flow
-        data.purchase_type = 'smart_contract';
-        data.asset_id = assetId; // THIS IS THE FIX
         
-        // Fetch asset details to show in the modal
-        const assetResponse = await fetch(`/api/assets/${assetId}`);
-        if (assetResponse.ok) {
-            const assetData = await assetResponse.json();
-            if (assetData.success) {
-                data.name = assetData.asset.name;
-                data.price = assetData.asset.token_price;
-                data.total_price = data.amount * data.price;
-                data.platform_address = 'Platform'; // Placeholder
-            }
-        }
-
+        console.log("Purchase prepared successfully:", data);
         return data;
     }
 
@@ -157,26 +142,20 @@ class PurchaseHandler {
                                 <strong>Price per token:</strong> ${prepareData.price} USDC
                             </div>
                             <div class="mb-3">
-                                <strong>Total:</strong> ${(prepareData.total_price || prepareData.amount * prepareData.price).toFixed(2)} USDC
+                                <strong>Total:</strong> ${(prepareData.total_amount).toFixed(2)} USDC
                             </div>
-                            ${prepareData.purchase_type === 'smart_contract' ? `
-                            <div class="mb-3">
+                             <div class="mb-3">
                                 <div class="alert alert-info">
-                                    <strong>Smart Contract Purchase</strong><br>
-                                    <small>This transaction will be processed on the blockchain.</small>
+                                    <strong>Pay to:</strong><br>
+                                    <small>${prepareData.recipient_address}</small>
                                 </div>
                             </div>
-                            ` : `
-                            <div class="mb-3">
-                                <strong>Platform:</strong> ${prepareData.platform_address}
-                            </div>
-                            `}
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                             <button type="button" class="btn btn-primary" id="confirmPurchaseBtn">
                                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
-                                Confirm Purchase
+                                Confirm & Pay
                             </button>
                         </div>
                     </div>
@@ -200,88 +179,49 @@ class PurchaseHandler {
 
     async executePurchase(prepareData, modal, confirmBtn) {
         try {
-            this.setButtonState(confirmBtn, 'Processing...', true);
+            this.setButtonState(confirmBtn, 'Processing Payment...', true);
             this.hideModalError();
 
             const walletAddress = this.getWalletAddress();
 
-            // 根据购买类型选择不同的执行方式
-            if (prepareData.purchase_type === 'smart_contract') {
-                return await this.executeSmartContractPurchase(prepareData, modal, confirmBtn, walletAddress);
-            } else {
-                return await this.executeTraditionalPurchase(prepareData, modal, confirmBtn, walletAddress);
-            }
-
-        } catch (error) {
-            console.error('Error during purchase execution:', error);
-            this.showModalError(error.message);
-            this.setButtonState(confirmBtn, 'Confirm Purchase', false);
-            throw error;
-        }
-    }
-
-    async executeSmartContractPurchase(prepareData, modal, confirmBtn, walletAddress) {
-        console.log('Executing smart contract purchase for asset:', prepareData.asset_id);
-        this.setButtonState(confirmBtn, 'Please confirm in wallet...', true);
-
-        try {
-            const transactionData = prepareData.transaction;
-            if (!transactionData) {
-                throw new Error('Transaction data not found in preparation response.');
-            }
-
-            if (!window.solana || !window.solana.signAndSendTransaction) {
-                throw new Error('Solana wallet API not available');
-            }
-
-            // Decode the base64 transaction data
-            const transactionBuffer = Uint8Array.from(atob(transactionData), c => c.charCodeAt(0));
-
-            // Create a transaction object that the wallet can understand
-            const transaction = {
-                serialize: () => transactionBuffer,
-                serializeMessage: () => transactionBuffer,
-                signatures: [],
-                feePayer: null,
-                recentBlockhash: null,
-                instructions: [],
-            };
-
-            const { signature } = await window.solana.signAndSendTransaction(transaction);
-
+            // Step 1: Execute payment via wallet
+            this.setButtonState(confirmBtn, 'Please confirm in wallet...', true);
+            const signature = await this.executeWalletPayment(prepareData);
+            
             if (!signature) {
-                throw new Error('Transaction was not signed or sent.');
+                throw new Error("Payment was cancelled or failed in the wallet.");
             }
 
-            console.log('Transaction successful, signature:', signature);
-
+            console.log('Payment transaction successful, signature:', signature);
             this.setButtonState(confirmBtn, 'Finalizing purchase...', true);
 
-            const executeResult = await fetch('/api/submit-transaction', {
+            // Step 2: Confirm purchase with the backend
+            const confirmResult = await fetch('/api/trades/confirm_purchase', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Wallet-Address': walletAddress
                 },
                 body: JSON.stringify({
+                    purchase_id: prepareData.purchase_id,
+                    signature: signature,
                     asset_id: prepareData.asset_id,
-                    amount: prepareData.amount,
-                    signed_transaction: signature,
-                    trade_id: prepareData.trade_id // Pass the trade_id back
+                    wallet_address: walletAddress,
+                    amount: prepareData.amount
                 })
             });
 
-            if (!executeResult.ok) {
-                const errorData = await executeResult.json().catch(() => ({}));
-                throw new Error(errorData.error || `Purchase finalization failed: ${executeResult.status}`);
+            if (!confirmResult.ok) {
+                const errorData = await confirmResult.json().catch(() => ({}));
+                throw new Error(errorData.error || `Purchase confirmation failed: ${confirmResult.status}`);
             }
 
-            const executeData = await executeResult.json();
-            if (!executeData.success) {
-                throw new Error(executeData.error || 'Purchase finalization failed on backend.');
+            const confirmData = await confirmResult.json();
+            if (!confirmData.success) {
+                throw new Error(confirmData.error || 'Purchase confirmation failed on backend.');
             }
 
-            console.log('Smart contract purchase completed successfully');
+            console.log('Purchase completed successfully');
             this.showSuccess('Purchase successful! Your transaction has been submitted.');
             modal.hide();
             this.refreshAssetInfo(prepareData.asset_id);
@@ -289,16 +229,73 @@ class PurchaseHandler {
             return {
                 success: true,
                 transaction_signature: signature,
-                trade_id: executeData.trade_id,
-                message: 'Smart contract purchase confirmed.'
+                trade_id: confirmData.trade_id,
+                message: 'Purchase confirmed.'
             };
 
         } catch (error) {
-            console.error('Error during smart contract purchase execution:', error);
+            console.error('Error during purchase execution:', error);
             this.showModalError(error.message);
-            this.setButtonState(confirmBtn, 'Confirm Purchase', false);
+            this.setButtonState(confirmBtn, 'Confirm & Pay', false);
             throw error;
         }
+    }
+    
+    async executeWalletPayment(prepareData) {
+        // This function creates and sends a real Solana transaction
+        // Assumes solanaWeb3 is available in the global scope
+        if (!window.solana || !window.solana.isPhantom) {
+            throw new Error("Solana wallet (Phantom) not found.");
+        }
+        if (!window.solana.isConnected) {
+            await window.solana.connect();
+        }
+
+        const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'));
+        const fromPubkey = new solanaWeb3.PublicKey(this.getWalletAddress());
+        const toPubkey = new solanaWeb3.PublicKey(prepareData.recipient_address);
+        
+        // This assumes USDC transfer. The mint address should ideally come from config.
+        const usdcMint = new solanaWeb3.PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+
+        // Get the sender's and receiver's associated token accounts
+        const fromTokenAccount = await solanaWeb3.getAssociatedTokenAddress(usdcMint, fromPubkey);
+        const toTokenAccount = await solanaWeb3.getAssociatedTokenAddress(usdcMint, toPubkey);
+
+        // Check if the receiver's token account exists, if not, create it.
+        const toTokenAccountInfo = await connection.getAccountInfo(toTokenAccount);
+        
+        const transaction = new solanaWeb3.Transaction();
+
+        if (!toTokenAccountInfo) {
+            console.log("Recipient's token account does not exist. Creating it.");
+            transaction.add(
+                solanaWeb3.createAssociatedTokenAccountInstruction(
+                    fromPubkey, // payer
+                    toTokenAccount,
+                    toPubkey,
+                    usdcMint
+                )
+            );
+        }
+
+        // Add the transfer instruction
+        transaction.add(
+            solanaWeb3.createTransferInstruction(
+                fromTokenAccount,
+                toTokenAccount,
+                fromPubkey,
+                prepareData.total_amount * 1000000 // USDC has 6 decimals
+            )
+        );
+
+        transaction.feePayer = fromPubkey;
+        transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+        const { signature } = await window.solana.signAndSendTransaction(transaction);
+        await connection.confirmTransaction(signature);
+
+        return signature;
     }
 
     async executeTraditionalPurchase(prepareData, modal, confirmBtn, walletAddress) {
