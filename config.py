@@ -34,7 +34,7 @@ class Config:
     MAX_CONTENT_LENGTH = 20 * 1024 * 1024  # 最大上传文件大小: 20MB
     
     # Solana配置
-    SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL') or 'https://api.mainnet-beta.solana.com'
+    SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL') or 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea'
     SOLANA_ENDPOINT = os.environ.get('SOLANA_ENDPOINT') or 'https://api.mainnet-beta.solana.com'
     SOLANA_PROGRAM_ID = os.environ.get('SOLANA_PROGRAM_ID') or 'RWAxxx111111111111111111111111111111111111'
     SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT') or 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
