@@ -2,7 +2,7 @@ import os
 from flask import jsonify, current_app, Blueprint, request
 from app.blockchain.asset_service import AssetService
 from app.blockchain.solana import SolanaClient
-from app.blockchain.solana_service import execute_transfer_transaction, validate_solana_address, check_transaction
+from app.blockchain.solana_service import validate_solana_address, check_transaction
 from . import service_bp  # 从__init__.py导入正确的蓝图
 import json
 import logging
@@ -230,66 +230,7 @@ def get_payment_settings():
         logger.error(f"获取支付设置失败: {str(e)}")
         return jsonify({'success': False, 'message': f'获取支付设置失败: {str(e)}'}), 500
 
-@service_bp.route('/solana/execute_transfer_v2', methods=['POST'])
-def execute_transfer_v2():
-    """执行代币转账"""
-    try:
-        data = request.json
-        logger.info(f"收到转账请求: {data}")
-        
-        # 验证必要参数 - 修复参数名称不匹配问题
-        required_fields = ['from_address', 'to_address', 'amount', 'token_symbol']
-        
-        # 前端传来的参数名称可能有所不同，进行兼容处理
-        mapped_data = {
-            'from_address': data.get('from_address') or data.get('fromAddress'),
-            'to_address': data.get('to_address') or data.get('toAddress'),
-            'amount': data.get('amount'),
-            'token_symbol': data.get('token_symbol') or data.get('token'),
-            'purpose': data.get('purpose'),
-            'metadata': data.get('metadata')
-        }
-        
-        # 检查必填字段
-        missing_fields = []
-        for field in required_fields:
-            if not mapped_data.get(field):
-                missing_fields.append(field)
-        
-        if missing_fields:
-            return jsonify({
-                'success': False,
-                'message': f'缺少必要字段: {", ".join(missing_fields)}'
-            }), 400
-        
-        # 执行转账
-        signature = execute_transfer_transaction(
-            token_symbol=mapped_data['token_symbol'],
-            from_address=mapped_data['from_address'],
-            to_address=mapped_data['to_address'],
-            amount=float(mapped_data['amount'])
-        )
-        
-        if signature:
-            return jsonify({
-                'success': True,
-                'signature': signature,
-                'message': '转账已提交到Solana网络'
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'message': '转账执行失败，未获取到签名'
-            }), 500
-            
-    except Exception as e:
-        error_msg = f"执行转账失败: {str(e)}"
-        logger.error(error_msg)
-        logger.error(traceback.format_exc())
-        return jsonify({
-            'success': False,
-            'message': error_msg
-        }), 500
+
 
 @service_bp.route('/blockchain/solana/check-transaction', methods=['GET'])
 def check_solana_transaction():
