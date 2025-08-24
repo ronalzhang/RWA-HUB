@@ -267,18 +267,23 @@ body {
                         
                         <div id="buy-error" class="alert alert-danger" style="display: none;"></div>
                         
-                        {% if asset.contract_address %}
+                        {% if asset.contract_address and asset.status == 2 %}
                         <button type="button" id="buy-button" class="btn btn-primary w-100 py-2" 
                                 data-token-price="{{ asset.token_price }}" data-asset-id="{{ asset.id }}"
                                 onclick="handlePurchaseClick()">
                             <i class="fas fa-shopping-cart me-2"></i>Buy Tokens
                         </button>
-                        {% else %}
+                        {% elif asset.status != 2 %}
                         <button type="button" class="btn btn-warning w-100 py-2" 
                                 onclick="deploySmartContract({{ asset.id }})">
                             <i class="fas fa-rocket me-2"></i>Deploy Smart Contract
                         </button>
                         <small class="text-muted mt-2 d-block">Smart contract must be deployed before trading</small>
+                        {% else %}
+                        <button type="button" class="btn btn-secondary w-100 py-2" disabled>
+                            <i class="fas fa-hourglass-half me-2"></i>Processing...
+                        </button>
+                        <small class="text-muted mt-2 d-block">Asset is being processed. Please refresh shortly.</small>
                         {% endif %}
                     </div>
                 </div>
