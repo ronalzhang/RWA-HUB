@@ -98,6 +98,8 @@ class DataConsistencyManager:
                 'location': asset.location,
                 'creator_address': asset.creator_address,
                 'owner_address': asset.owner_address,
+                'token_address': asset.token_address,
+                'contract_address': asset.contract_address,
                 'created_at': asset.created_at.isoformat() if asset.created_at else None,
                 'updated_at': asset.updated_at.isoformat() if asset.updated_at else None,
                 
