@@ -229,10 +229,7 @@ def submit_transaction():
         if not trade:
             return create_error_response('TRADE_NOT_FOUND', '找不到对应的交易记录')
         
-        import hashlib
-        tx_hash = hashlib.sha256(f"{trade.id}_{datetime.utcnow().timestamp()}".encode()).hexdigest()
-        
-        trade.tx_hash = tx_hash
+        trade.tx_hash = signed_transaction
         trade.status = 'completed'
         
         db.session.commit()
