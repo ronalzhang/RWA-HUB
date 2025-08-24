@@ -173,7 +173,7 @@ class SolanaConnectionManager:
             result = connection.get_slot()
             response_time = time.time() - start_time
             
-            if isinstance(result, int):
+            if isinstance(result, dict) and 'result' in result and isinstance(result['result'], int):
                 node.status = NetworkStatus.HEALTHY
                 node.response_time = response_time
                 node.consecutive_failures = 0
