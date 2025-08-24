@@ -165,6 +165,7 @@ class AssetService:
                     details = token_result.get('details', {})
                     
                     asset.token_address = token_address
+                    asset.contract_address = token_address # 确保合约地址也被更新
                     asset.deployment_tx_hash = tx_hash
                     asset.status = AssetStatus.ON_CHAIN.value # 更新状态为 ON_CHAIN
                     asset.deployment_time = datetime.utcnow()
