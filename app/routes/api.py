@@ -11,7 +11,7 @@ import re
 import requests
 from app.models import Asset, User, Trade, AssetType
 from app.extensions import db
-from app.blockchain.solana_service import execute_transfer_transaction
+from app.blockchain.solana_service import execute_transfer_transaction, prepare_transaction
 from app.utils.error_handler import error_handler, create_error_response
 from app.utils.decorators import api_endpoint
 from app.utils.data_converters import AssetDataConverter, DataConverter
@@ -177,14 +177,24 @@ def create_purchase_transaction():
         db.session.add(trade)
         db.session.commit()
         
-        import base64
-        transaction_data = base64.b64encode(f"purchase_{trade.id}_{amount}_{buyer_address}".encode()).decode()
-        
+        # Prepare the real Solana transaction
+        prepared_tx = prepare_transaction(
+            user_address=buyer_address,
+            asset_id=asset.id,
+            token_symbol=asset.token_symbol,
+            amount=amount,
+            price=asset.token_price,
+            trade_id=trade.id
+        )
+
+        if not prepared_tx.get('success'):
+            return create_error_response('TRANSACTION_PREPARATION_FAILED', prepared_tx.get('error', 'Failed to prepare transaction'))
+
         logger.info(f"购买交易创建成功: 交易ID={trade.id}, 资产ID={asset_id}, 数量={amount}")
         
         return jsonify({
             'success': True,
-            'transaction': transaction_data,
+            'transaction': prepared_tx.get('serialized_transaction'),
             'trade_id': trade.id,
             'message': '购买交易创建成功'
         })
