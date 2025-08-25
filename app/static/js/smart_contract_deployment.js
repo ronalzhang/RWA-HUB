@@ -277,22 +277,35 @@ class CompletePurchaseFlow {
     async signTransaction(transaction) {
         this.updateProgressModal('请在钱包中确认交易...');
         
-        try {
-            // 将交易数据转换为Transaction对象
-            const transactionObj = window.solanaWeb3.Transaction.from(
-                Buffer.from(transaction, 'base64')
-            );
-            
-            const signedTransaction = await window.solana.signTransaction(transactionObj);
-            console.log('交易签名成功');
-            
-            return signedTransaction.serialize();
-        } catch (error) {
-            if (error.message.includes('User rejected')) {
-                throw new Error('用户取消了交易签名');
-            }
-            throw new Error('交易签名失败: ' + error.message);
-        }
+        return new Promise((resolve, reject) => {
+            const checkSolanaWeb3 = () => {
+                if (typeof window.solanaWeb3 !== 'undefined') {
+                    console.log('solanaWeb3 is loaded, proceeding with signing.');
+                    try {
+                        // 将交易数据转换为Transaction对象
+                        const transactionObj = window.solanaWeb3.Transaction.from(
+                            Buffer.from(transaction, 'base64')
+                        );
+                        
+                        window.solana.signTransaction(transactionObj).then(signedTransaction => {
+                            console.log('交易签名成功');
+                            resolve(signedTransaction.serialize());
+                        }).catch(error => {
+                            if (error.message.includes('User rejected')) {
+                                reject(new Error('用户取消了交易签名'));
+                            }
+                            reject(new Error('交易签名失败: ' + error.message));
+                        });
+                    } catch (error) {
+                        reject(new Error('创建交易对象失败: ' + error.message));
+                    }
+                } else {
+                    console.log('Waiting for solanaWeb3 to load...');
+                    setTimeout(checkSolanaWeb3, 100);
+                }
+            };
+            checkSolanaWeb3();
+        });
     }
 
     // 提交交易到区块链
