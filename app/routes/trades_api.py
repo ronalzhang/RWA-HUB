@@ -29,20 +29,26 @@ def prepare_purchase():
     """
     准备购买流程，创建临时购买记录并返回给前端
     """
+    logger.info("[DEBUG] /prepare_purchase called")
     try:
         data = request.json
+        logger.info(f"[DEBUG] request data: {data}")
         asset_id = data.get('asset_id')
         amount = data.get('amount')
         wallet_address = request.headers.get('X-Wallet-Address')
+        logger.info(f"[DEBUG] asset_id: {asset_id}, amount: {amount}, wallet_address: {wallet_address}")
 
         if not all([asset_id, amount, wallet_address]):
+            logger.error("[DEBUG] Missing required parameters")
             return jsonify({'success': False, 'error': 'Missing required parameters'}), 400
 
         asset = Asset.query.get(asset_id)
         if not asset:
+            logger.error(f"[DEBUG] Asset not found: {asset_id}")
             return jsonify({'success': False, 'error': 'Asset not found'}), 404
 
         if asset.status != AssetStatus.ON_CHAIN.value:
+            logger.error(f"[DEBUG] Asset not available for purchase: {asset_id}")
             return jsonify({'success': False, 'error': 'Asset is not available for purchase'}), 400
 
         # 确保 amount 是整数
@@ -51,11 +57,13 @@ def prepare_purchase():
             if amount <= 0:
                 raise ValueError("Amount must be positive")
         except (ValueError, TypeError):
+            logger.error(f"[DEBUG] Invalid amount: {amount}")
             return jsonify({'success': False, 'error': 'Invalid amount specified'}), 400
 
         # 检查剩余供应量
         remaining_supply = asset.token_supply - asset.sold_supply
         if amount > remaining_supply:
+            logger.error(f"[DEBUG] Not enough tokens available: {amount} > {remaining_supply}")
             return jsonify({'success': False, 'error': 'Not enough tokens available'}), 400
 
         total_price = asset.token_price * amount
@@ -99,24 +107,31 @@ def confirm_purchase():
     """
     确认购买，验证交易并创建正式交易记录
     """
+    logger.info("[DEBUG] /confirm_purchase called")
     try:
         data = request.json
+        logger.info(f"[DEBUG] request data: {data}")
         purchase_id = data.get('purchase_id')
         signature = data.get('signature')
         wallet_address = data.get('wallet_address')
+        logger.info(f"[DEBUG] purchase_id: {purchase_id}, signature: {signature}, wallet_address: {wallet_address}")
 
         if not all([purchase_id, signature, wallet_address]):
+            logger.error("[DEBUG] Missing required parameters")
             return jsonify({'success': False, 'error': 'Missing required parameters'}), 400
 
         # 从缓存中获取购买数据
         purchase_data_raw = cache.get(f'purchase:{purchase_id}')
         if not purchase_data_raw:
+            logger.error(f"[DEBUG] Purchase session not found or expired: {purchase_id}")
             return jsonify({'success': False, 'error': 'Purchase session expired or invalid'}), 404
 
         purchase_data = json.loads(purchase_data_raw)
+        logger.info(f"[DEBUG] purchase_data: {purchase_data}")
 
         # 验证请求方是否是购买者
         if purchase_data['buyer_address'] != wallet_address:
+            logger.error(f"[DEBUG] Wallet address mismatch: {purchase_data['buyer_address']} != {wallet_address}")
             return jsonify({'success': False, 'error': 'Wallet address does not match purchase session'}), 403
 
         # (模拟) 验证Solana交易签名
@@ -128,10 +143,12 @@ def confirm_purchase():
 
         asset = Asset.query.get(purchase_data['asset_id'])
         if not asset:
+            logger.error(f"[DEBUG] Asset not found: {purchase_data['asset_id']}")
             return jsonify({'success': False, 'error': 'Asset not found'}), 404
         
         buyer = User.query.filter_by(wallet_address=wallet_address).first()
         if not buyer:
+            logger.info(f"[DEBUG] User not found, creating new user for wallet: {wallet_address}")
             # 如果用户不存在，可以创建一个新用户
             buyer = User(wallet_address=wallet_address, wallet_type='solana', username=f"user_{wallet_address[:6]}")
             db.session.add(buyer)

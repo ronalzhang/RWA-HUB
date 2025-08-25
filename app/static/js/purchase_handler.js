@@ -153,39 +153,47 @@ function createTransferInstruction(
 
 class PurchaseHandler {
     constructor() {
+        console.log('[DEBUG] PurchaseHandler constructor called');
         this.isProcessing = false;
         this.currentModal = null;
         this.init();
     }
 
     init() {
+        console.log('[DEBUG] PurchaseHandler init');
         this.bindEvents();
         this.updateButtonStates();
     }
 
     bindEvents() {
+        console.log('[DEBUG] PurchaseHandler bindEvents');
         document.addEventListener('click', (event) => {
             const button = event.target.closest('#buy-button, .buy-button, [data-action="buy"]');
             if (button && !button.disabled) {
+                console.log('[DEBUG] Buy button clicked');
                 event.preventDefault();
                 this.handleBuyClick(button);
             }
         });
 
         document.addEventListener('walletStateChanged', () => {
+            console.log('[DEBUG] walletStateChanged event detected');
             this.updateButtonStates();
         });
 
         document.addEventListener('walletConnected', () => {
+            console.log('[DEBUG] walletConnected event detected');
             this.updateButtonStates();
         });
 
         document.addEventListener('walletDisconnected', () => {
+            console.log('[DEBUG] walletDisconnected event detected');
             this.updateButtonStates();
         });
     }
 
     async handleBuyClick(button) {
+        console.log('[DEBUG] handleBuyClick called');
         if (this.isProcessing) {
             console.log('Purchase already in progress, ignoring click');
             return;
@@ -199,6 +207,7 @@ class PurchaseHandler {
             const assetId = button.getAttribute('data-asset-id');
             const amountInput = document.getElementById('purchase-amount');
             const amount = amountInput ? parseInt(amountInput.value) : 1;
+            console.log(`[DEBUG] assetId: ${assetId}, amount: ${amount}`);
 
             if (!assetId) {
                 throw new Error('Asset ID not found');
@@ -212,6 +221,7 @@ class PurchaseHandler {
             if (!this.isWalletConnected()) {
                 throw new Error('Please connect your wallet first');
             }
+            console.log('[DEBUG] Wallet is connected');
 
             // 准备购买
             const prepareData = await this.preparePurchase(assetId, amount);
@@ -229,8 +239,9 @@ class PurchaseHandler {
     }
 
     async preparePurchase(assetId, amount) {
+        console.log('[DEBUG] preparePurchase called');
         const walletAddress = this.getWalletAddress();
-        console.log('Using session-based purchase preparation method.');
+        console.log(`[DEBUG] Preparing purchase for asset ${assetId}, amount ${amount}, wallet ${walletAddress}`);
 
         const response = await fetch('/api/trades/prepare_purchase', {
             method: 'POST',
@@ -243,13 +254,16 @@ class PurchaseHandler {
                 amount: amount
             })
         });
+        console.log('[DEBUG] prepare_purchase response status:', response.status);
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ "error": "An unknown error occurred" }));
+            console.error('[DEBUG] prepare_purchase error data:', errorData);
             throw new Error(errorData.error || `Preparation failed: ${response.status}`);
         }
 
         const data = await response.json();
+        console.log('[DEBUG] prepare_purchase success data:', data);
         if (!data.success) {
             throw new Error(data.error || 'Purchase preparation failed');
         }
@@ -259,6 +273,7 @@ class PurchaseHandler {
     }
 
     showPurchaseModal(prepareData) {
+        console.log('[DEBUG] showPurchaseModal called');
         // 移除现有模态框
         const existingModal = document.getElementById('buyModal');
         if (existingModal) {
@@ -314,6 +329,7 @@ class PurchaseHandler {
         
         // 绑定确认按钮事件
         confirmBtn.addEventListener('click', () => {
+            console.log('[DEBUG] Confirm & Pay button clicked');
             this.executePurchase(prepareData, modal, confirmBtn);
         });
 
@@ -322,6 +338,7 @@ class PurchaseHandler {
     }
 
     async executePurchase(prepareData, modal, confirmBtn) {
+        console.log('[DEBUG] executePurchase called');
         try {
             this.setButtonState(confirmBtn, 'Processing Payment...', true);
             this.hideModalError();
@@ -330,6 +347,7 @@ class PurchaseHandler {
 
             // Step 1: Execute payment via wallet
             this.setButtonState(confirmBtn, 'Please confirm in wallet...', true);
+            console.log('[DEBUG] Executing wallet payment');
             const signature = await this.executeWalletPayment(prepareData);
             
             if (!signature) {
@@ -340,6 +358,7 @@ class PurchaseHandler {
             this.setButtonState(confirmBtn, 'Finalizing purchase...', true);
 
             // Step 2: Confirm purchase with the backend
+            console.log('[DEBUG] Confirming purchase with backend');
             const confirmResult = await fetch('/api/trades/confirm_purchase', {
                 method: 'POST',
                 headers: {
@@ -354,13 +373,16 @@ class PurchaseHandler {
                     amount: prepareData.amount
                 })
             });
+            console.log('[DEBUG] confirm_purchase response status:', confirmResult.status);
 
             if (!confirmResult.ok) {
                 const errorData = await confirmResult.json().catch(() => ({}));
+                console.error('[DEBUG] confirm_purchase error data:', errorData);
                 throw new Error(errorData.error || `Purchase confirmation failed: ${confirmResult.status}`);
             }
 
             const confirmData = await confirmResult.json();
+            console.log('[DEBUG] confirm_purchase success data:', confirmData);
             if (!confirmData.success) {
                 throw new Error(confirmData.error || 'Purchase confirmation failed on backend.');
             }
