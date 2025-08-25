@@ -1,4 +1,3 @@
-'''
 // Manually integrated SPL-Token functions to avoid CDN/bundler issues.
 // Version: @solana/spl-token@0.4.13
 
@@ -154,36 +153,25 @@ function createTransferInstruction(
 
 class PurchaseHandler {
     constructor() {
-        console.log('[Debug] PurchaseHandler constructor called.');
         this.isProcessing = false;
         this.currentModal = null;
         this.init();
     }
 
     init() {
-        console.log('[Debug] PurchaseHandler init() called.');
-        console.log('Initializing unified purchase handler...');
         this.bindEvents();
         this.updateButtonStates();
     }
 
     bindEvents() {
-        console.log('[Debug] PurchaseHandler bindEvents() called.');
-        // 绑定购买按钮点击事件
-        const buyButtons = document.querySelectorAll('#buy-button, .buy-button, [data-action="buy"]');
-        console.log(`[Debug] Found ${buyButtons.length} buy buttons.`);
-        buyButtons.forEach(button => {
-            console.log('[Debug] Adding click listener to a buy button.');
-            button.addEventListener('click', (event) => {
-                console.log('[Debug] Buy button clicked.');
-                if (!button.disabled) {
-                    event.preventDefault();
-                    this.handleBuyClick(button);
-                }
-            });
+        document.addEventListener('click', (event) => {
+            const button = event.target.closest('#buy-button, .buy-button, [data-action="buy"]');
+            if (button && !button.disabled) {
+                event.preventDefault();
+                this.handleBuyClick(button);
+            }
         });
 
-        // 监听钱包状态变化
         document.addEventListener('walletStateChanged', () => {
             this.updateButtonStates();
         });
@@ -244,18 +232,7 @@ class PurchaseHandler {
         const walletAddress = this.getWalletAddress();
         console.log('Using session-based purchase preparation method.');
 
-        const response = await fetch('/api/trades/prepare_purchase', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Wallet-Address': walletAddress
-            },
-            body: JSON.stringify({
-                asset_id: assetId,
-                amount: amount,
-                wallet_address: walletAddress
-            })
-        });
+                const response = await fetch('/api/trades/prepare_purchase', {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ "error": "An unknown error occurred" }));
