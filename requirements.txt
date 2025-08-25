@@ -6,6 +6,7 @@ Flask-Babel==3.1.0
 Flask-Limiter==3.5.0
 Flask-CORS==4.0.0
 Flask-APScheduler==1.13.0
+Flask-Caching==2.1.0
 
 # 数据库
 psycopg2-binary==2.9.7
