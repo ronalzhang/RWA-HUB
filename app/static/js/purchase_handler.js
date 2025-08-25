@@ -674,11 +674,5 @@ class PurchaseHandler {
     }
 }
 
-// 初始化购买处理器
-document.addEventListener('DOMContentLoaded', () => {
-    window.purchaseHandler = new PurchaseHandler();
-});
-
 // 导出给其他脚本使用
 window.PurchaseHandler = PurchaseHandler;
-''

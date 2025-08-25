@@ -39,6 +39,7 @@ console.log('✅ 创建了简化的solanaWeb3对象');
 
 <!-- 钱包和购买处理 -->
 <script src="{{ url_for('static', filename='js/wallet.js') }}"></script>
+<script src="{{ url_for('static', filename='js/purchase_handler.js') }}"></script>
 
 <style>
 /* 固定宽度布局样式 */
@@ -517,6 +518,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof SolanaToken !== 'undefined') {
         window.spl_token = SolanaToken;
         window.splToken = SolanaToken;
+    }
+
+    // 初始化购买处理器
+    if (typeof PurchaseHandler !== 'undefined') {
+        window.purchaseHandler = new PurchaseHandler();
     }
     
     // 初始化页面功能
