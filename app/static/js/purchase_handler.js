@@ -167,12 +167,14 @@ class PurchaseHandler {
 
     bindEvents() {
         // 绑定购买按钮点击事件
-        document.addEventListener('click', (event) => {
-            const button = event.target.closest('#buy-button, .buy-button, [data-action="buy"]');
-            if (button && !button.disabled) {
-                event.preventDefault();
-                this.handleBuyClick(button);
-            }
+        const buyButtons = document.querySelectorAll('#buy-button, .buy-button, [data-action="buy"]');
+        buyButtons.forEach(button => {
+            button.addEventListener('click', (event) => {
+                if (!button.disabled) {
+                    event.preventDefault();
+                    this.handleBuyClick(button);
+                }
+            });
         });
 
         // 监听钱包状态变化
