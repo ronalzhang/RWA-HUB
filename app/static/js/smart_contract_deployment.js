@@ -171,6 +171,7 @@ class CompletePurchaseFlow {
 
     // 初始化购买流程
     async initiatePurchase(assetId, amount) {
+        console.log('[DEBUG] initiatePurchase called');
         if (this.isPurchasing) {
             console.log('购买流程正在进行中...');
             return;
@@ -541,9 +542,11 @@ function showToast(message) {
 
 // 购买按钮点击处理
 window.handlePurchaseClick = function() {
+    console.log('[DEBUG] handlePurchaseClick called');
     const assetId = window.ASSET_CONFIG?.id;
     const amountInput = document.getElementById('purchase-amount');
     const amount = parseInt(amountInput?.value || 0);
+    console.log(`[DEBUG] assetId: ${assetId}, amount: ${amount}`);
     
     if (!assetId) {
         showToast('资产信息错误');
