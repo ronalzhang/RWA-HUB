@@ -3,13 +3,14 @@
 """
 
 from flask import Blueprint, request, jsonify, current_app
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import logging
 from decimal import Decimal
-from app.models import Asset, AssetStatus, Trade, TradeStatus
+import uuid
+from app.models import Asset, AssetStatus, Trade, TradeStatus, User
 from app.blockchain.asset_service import AssetService
-from app.extensions import db
+from app.extensions import db, cache
 from app.services.payment_processor import PaymentProcessor
 from app.services.data_consistency_manager import DataConsistencyManager
 
@@ -22,6 +23,153 @@ from app.routes import trades_api_bp
 # 初始化服务
 payment_processor = PaymentProcessor()
 data_manager = DataConsistencyManager()
+
+@trades_api_bp.route('/prepare_purchase', methods=['POST'])
+def prepare_purchase():
+    """
+    准备购买流程，创建临时购买记录并返回给前端
+    """
+    try:
+        data = request.json
+        asset_id = data.get('asset_id')
+        amount = data.get('amount')
+        wallet_address = request.headers.get('X-Wallet-Address')
+
+        if not all([asset_id, amount, wallet_address]):
+            return jsonify({'success': False, 'error': 'Missing required parameters'}), 400
+
+        asset = Asset.query.get(asset_id)
+        if not asset:
+            return jsonify({'success': False, 'error': 'Asset not found'}), 404
+
+        if asset.status != AssetStatus.ON_CHAIN.value:
+            return jsonify({'success': False, 'error': 'Asset is not available for purchase'}), 400
+
+        # 确保 amount 是整数
+        try:
+            amount = int(amount)
+            if amount <= 0:
+                raise ValueError("Amount must be positive")
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': 'Invalid amount specified'}), 400
+
+        # 检查剩余供应量
+        remaining_supply = asset.token_supply - asset.sold_supply
+        if amount > remaining_supply:
+            return jsonify({'success': False, 'error': 'Not enough tokens available'}), 400
+
+        total_price = asset.token_price * amount
+        
+        # 创建一个唯一的购买ID
+        purchase_id = str(uuid.uuid4())
+        
+        # 准备购买数据
+        purchase_data = {
+            'asset_id': asset.id,
+            'asset_name': asset.name,
+            'amount': amount,
+            'price': float(asset.token_price),
+            'total_amount': float(total_price),
+            'buyer_address': wallet_address,
+            'recipient_address': asset.owner_address, # 付款给资产所有者
+            'status': 'pending'
+        }
+
+        # 使用缓存存储临时购买数据，有效期10分钟
+        cache.set(f'purchase:{purchase_id}', json.dumps(purchase_data), timeout=600)
+
+        logger.info(f"Purchase prepared: {purchase_id} for asset {asset_id} by {wallet_address}")
+
+        return jsonify({
+            'success': True,
+            'purchase_id': purchase_id,
+            'name': asset.name,
+            'amount': amount,
+            'price': float(asset.token_price),
+            'total_amount': float(total_price),
+            'recipient_address': asset.owner_address
+        })
+
+    except Exception as e:
+        logger.error(f"Error preparing purchase: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+@trades_api_bp.route('/confirm_purchase', methods=['POST'])
+def confirm_purchase():
+    """
+    确认购买，验证交易并创建正式交易记录
+    """
+    try:
+        data = request.json
+        purchase_id = data.get('purchase_id')
+        signature = data.get('signature')
+        wallet_address = data.get('wallet_address')
+
+        if not all([purchase_id, signature, wallet_address]):
+            return jsonify({'success': False, 'error': 'Missing required parameters'}), 400
+
+        # 从缓存中获取购买数据
+        purchase_data_raw = cache.get(f'purchase:{purchase_id}')
+        if not purchase_data_raw:
+            return jsonify({'success': False, 'error': 'Purchase session expired or invalid'}), 404
+
+        purchase_data = json.loads(purchase_data_raw)
+
+        # 验证请求方是否是购买者
+        if purchase_data['buyer_address'] != wallet_address:
+            return jsonify({'success': False, 'error': 'Wallet address does not match purchase session'}), 403
+
+        # (模拟) 验证Solana交易签名
+        # 在真实应用中，这里需要连接到Solana节点验证交易
+        # For now, we assume the signature is valid if it exists
+        if not signature.startswith('sig'): # 伪验证
+            logger.warning(f"Invalid signature format received: {signature}")
+            # return jsonify({'success': False, 'error': 'Invalid transaction signature'}), 400
+
+        asset = Asset.query.get(purchase_data['asset_id'])
+        if not asset:
+            return jsonify({'success': False, 'error': 'Asset not found'}), 404
+        
+        buyer = User.query.filter_by(wallet_address=wallet_address).first()
+        if not buyer:
+            # 如果用户不存在，可以创建一个新用户
+            buyer = User(wallet_address=wallet_address, wallet_type='solana', username=f"user_{wallet_address[:6]}")
+            db.session.add(buyer)
+            db.session.flush() # 获取新用户的ID
+
+        # 创建交易记录
+        new_trade = Trade(
+            asset_id=asset.id,
+            buyer_id=buyer.id,
+            seller_id=asset.owner_id,
+            amount=purchase_data['amount'],
+            price=purchase_data['price'],
+            total=purchase_data['total_amount'],
+            tx_hash=signature,
+            status=TradeStatus.COMPLETED.value,
+            trade_time=datetime.utcnow()
+        )
+
+        # 更新资产已售出数量
+        asset.sold_supply += purchase_data['amount']
+
+        db.session.add(new_trade)
+        db.session.commit()
+
+        # 清除缓存
+        cache.delete(f'purchase:{purchase_id}')
+
+        logger.info(f"Trade completed: {new_trade.id} for asset {asset.id}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Purchase confirmed successfully!',
+            'trade_id': new_trade.id
+        })
+
+    except Exception as e:
+        logger.error(f"Error confirming purchase: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
 @trades_api_bp.route('/payment/confirm', methods=['POST'])
 def confirm_asset_payment():

@@ -4,6 +4,7 @@ from flask_login import LoginManager
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_babel import Babel
+from flask_caching import Cache
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -11,6 +12,9 @@ import logging
 
 # 初始化数据库
 db = SQLAlchemy()
+
+# 初始化缓存
+cache = Cache()
 
 # 初始化数据库迁移
 migrate = Migrate()
@@ -55,6 +59,9 @@ def init_extensions(app):
     # 初始化数据库
     db.init_app(app)
     
+    # 初始化缓存
+    cache.init_app(app)
+
     # 绑定数据库模型到应用
     bind_db_to_app(app)
     

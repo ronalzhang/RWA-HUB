@@ -148,7 +148,7 @@ function createTransferInstruction(
 
 /**
  * 统一的购买处理器
- * 版本: 2.1.0 - 集成SPL-Token功能，移除外部依赖
+ * 版本: 2.2.0 - 修复初始化和API调用问题
  */
 
 class PurchaseHandler {
@@ -232,7 +232,17 @@ class PurchaseHandler {
         const walletAddress = this.getWalletAddress();
         console.log('Using session-based purchase preparation method.');
 
-                const response = await fetch('/api/trades/prepare_purchase', {
+        const response = await fetch('/api/trades/prepare_purchase', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Wallet-Address': walletAddress
+            },
+            body: JSON.stringify({
+                asset_id: assetId,
+                amount: amount
+            })
+        });
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ "error": "An unknown error occurred" }));
@@ -661,3 +671,8 @@ class PurchaseHandler {
 
 // 导出给其他脚本使用
 window.PurchaseHandler = PurchaseHandler;
+
+// 初始化购买处理器
+document.addEventListener('DOMContentLoaded', () => {
+    new PurchaseHandler();
+});
