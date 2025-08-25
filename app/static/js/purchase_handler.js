@@ -10,6 +10,7 @@ let transferInstructionData;
 function initializePurchaseHandler() {
     if (typeof window.solanaWeb3 === 'undefined' || typeof window.solana === 'undefined' || typeof window.solana.bufferLayout === 'undefined') {
         console.log('Waiting for Solana libraries to load...');
+        console.log('window.solana:', window.solana);
         setTimeout(initializePurchaseHandler, 100);
         return;
     }
