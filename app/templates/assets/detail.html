@@ -511,18 +511,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 页面初始化函数
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('[Debug] DOMContentLoaded event fired.');
     // 初始化Solana库
     if (typeof SolanaWeb3 !== 'undefined') {
+        console.log('[Debug] SolanaWeb3 found, initializing.');
         window.solanaWeb3 = SolanaWeb3;
     }
     if (typeof SolanaToken !== 'undefined') {
+        console.log('[Debug] SolanaToken found, initializing splToken.');
         window.spl_token = SolanaToken;
         window.splToken = SolanaToken;
     }
 
     // 初始化购买处理器
     if (typeof PurchaseHandler !== 'undefined') {
+        console.log('[Debug] PurchaseHandler found, instantiating.');
         window.purchaseHandler = new PurchaseHandler();
+    } else {
+        console.error('[Debug] PurchaseHandler is not defined!');
     }
     
     // 初始化页面功能

@@ -154,22 +154,28 @@ function createTransferInstruction(
 
 class PurchaseHandler {
     constructor() {
+        console.log('[Debug] PurchaseHandler constructor called.');
         this.isProcessing = false;
         this.currentModal = null;
         this.init();
     }
 
     init() {
+        console.log('[Debug] PurchaseHandler init() called.');
         console.log('Initializing unified purchase handler...');
         this.bindEvents();
         this.updateButtonStates();
     }
 
     bindEvents() {
+        console.log('[Debug] PurchaseHandler bindEvents() called.');
         // 绑定购买按钮点击事件
         const buyButtons = document.querySelectorAll('#buy-button, .buy-button, [data-action="buy"]');
+        console.log(`[Debug] Found ${buyButtons.length} buy buttons.`);
         buyButtons.forEach(button => {
+            console.log('[Debug] Adding click listener to a buy button.');
             button.addEventListener('click', (event) => {
+                console.log('[Debug] Buy button clicked.');
                 if (!button.disabled) {
                     event.preventDefault();
                     this.handleBuyClick(button);
