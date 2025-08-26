@@ -395,10 +395,8 @@ def prepare_transfer_transaction(
         if not validate_solana_address(to_address):
             raise ValueError(f"无效的接收方地址: {to_address}")
         
-        # 创建交易
-        transaction = Transaction()
-        
-        # 获取区块哈希
+        # 获取区块哈希（在函数参数中声明为nonlocal）
+        nonlocal blockhash
         if not blockhash:
             logger.info("获取最新区块哈希")
             try:
@@ -408,13 +406,7 @@ def prepare_transfer_transaction(
                 # 使用模拟区块哈希
                 blockhash = "11111111111111111111111111111111"
         
-        transaction.recent_blockhash = blockhash
         logger.info(f"使用区块哈希: {blockhash}")
-        
-        # 获取代币铸造地址
-        token_mint = PublicKey(USDC_MINT)
-        sender = PublicKey(from_address)
-        recipient = PublicKey(to_address)
         
         # 简化版本：直接返回交易数据而不进行复杂的区块链交互
         logger.info("使用简化版本的交易准备")
