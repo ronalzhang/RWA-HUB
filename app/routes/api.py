@@ -978,3 +978,83 @@ def get_asset_dividend_stats_by_symbol(token_symbol):
     except Exception as e:
         current_app.logger.error(f"获取资产分红统计失败: {str(e)}", exc_info=True)
         return create_error_response('INTERNAL_SERVER_ERROR', f"获取资产分红统计失败: {str(e)}")
+
+
+# ==================== 完整购买流程API ====================
+
+@api_bp.route('/v2/trades/create', methods=['POST'])
+@api_endpoint(log_calls=True, measure_perf=True)
+def create_purchase_trade():
+    """
+    创建购买交易 - 完整购买流程的第一步
+    """
+    try:
+        # 获取钱包地址
+        wallet_address = request.headers.get('X-Wallet-Address')
+        if not wallet_address:
+            # 尝试从请求体获取
+            data = request.get_json()
+            if data:
+                wallet_address = data.get('user_address')
+        
+        if not wallet_address:
+            return create_error_response('WALLET_REQUIRED', '需要钱包地址')
+
+        data = request.get_json()
+        if not data:
+            return create_error_response('INVALID_INPUT', '请求体不能为空')
+
+        asset_id = data.get('asset_id')
+        amount = data.get('amount')
+
+        if not asset_id or not amount:
+            return create_error_response('MISSING_PARAMETERS', '缺少必要参数：asset_id 和 amount')
+
+        # 使用TradeService创建购买交易
+        from app.services.trade_service import TradeService
+        trade_service = TradeService()
+        
+        result = trade_service.create_purchase(wallet_address, asset_id, amount)
+        
+        logger.info(f"成功创建购买交易: 用户={wallet_address}, 资产={asset_id}, 数量={amount}")
+        return jsonify(result), 201
+
+    except Exception as e:
+        logger.error(f"创建购买交易失败: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f'创建购买交易失败: {str(e)}')
+
+
+@api_bp.route('/v2/trades/confirm', methods=['POST'])
+@api_endpoint(log_calls=True, measure_perf=True)
+def confirm_purchase_trade():
+    """
+    确认购买交易 - 完整购买流程的第二步
+    """
+    try:
+        # 获取钱包地址
+        wallet_address = request.headers.get('X-Wallet-Address')
+        if not wallet_address:
+            return create_error_response('WALLET_REQUIRED', '需要钱包地址')
+
+        data = request.get_json()
+        if not data:
+            return create_error_response('INVALID_INPUT', '请求体不能为空')
+
+        trade_id = data.get('trade_id')
+        tx_hash = data.get('tx_hash')
+
+        if not trade_id or not tx_hash:
+            return create_error_response('MISSING_PARAMETERS', '缺少必要参数：trade_id 和 tx_hash')
+
+        # 使用TradeService确认购买交易
+        from app.services.trade_service import TradeService
+        trade_service = TradeService()
+        
+        result = trade_service.confirm_purchase(trade_id, tx_hash)
+        
+        logger.info(f"成功确认购买交易: 交易ID={trade_id}, 哈希={tx_hash}")
+        return jsonify(result), 200
+
+    except Exception as e:
+        logger.error(f"确认购买交易失败: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f'确认购买交易失败: {str(e)}')

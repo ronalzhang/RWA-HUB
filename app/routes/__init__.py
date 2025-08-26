@@ -62,8 +62,7 @@ from .language_api import language_api
 # 导入健康检查API
 from .health_api import health_bp
 
-# 导入V2交易API
-from .v2.trades import trades_v2_bp
+# V2交易API已整合到主API中
 
 # 导入交易历史API
 from .trades_api import trades_api_bp
@@ -108,8 +107,7 @@ def register_blueprints(app):
     app.register_blueprint(assets_api_bp)
     app.register_blueprint(service_bp)
     
-    # 注册V2交易API蓝图
-    app.register_blueprint(trades_v2_bp)
+    # V2交易API已整合到主API蓝图中
     
     # 注册交易历史API蓝图
     app.register_blueprint(trades_api_bp)
