@@ -154,6 +154,6 @@ class User(db.Model):
             return new_user
         except Exception as e:
             db.session.rollback()
-            # Consider logging the error
-            # current_app.logger.error(f"Failed to create user: {e}")
+            from flask import current_app
+            current_app.logger.error(f"Failed to create user {address}: {e}", exc_info=True)
             return None
