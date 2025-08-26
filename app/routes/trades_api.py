@@ -111,12 +111,12 @@ def get_asset_realtime_data(asset_id):
         ).first()
         
         # 获取当前价格（从最新交易或资产默认价格）
-        current_price = float(latest_trade.price) if latest_trade and latest_trade.price else float(asset.price_per_token or 0)
+        current_price = float(latest_trade.price) if latest_trade and latest_trade.price else float(asset.token_price or 0)
         
         # 构建实时数据
         realtime_data = {
             'asset_id': asset_id,
-            'asset_symbol': asset.symbol,
+            'asset_symbol': asset.token_symbol,
             'current_price': current_price,
             'last_trade_time': latest_trade.created_at.isoformat() if latest_trade else None,
             'daily_stats': {
@@ -125,9 +125,9 @@ def get_asset_realtime_data(asset_id):
                 'total_value': float(daily_stats.total_value or 0)
             },
             'asset_info': {
-                'total_supply': float(asset.total_supply or 0),
-                'available_supply': float(asset.available_supply or 0),
-                'market_cap': float(asset.total_supply or 0) * current_price if asset.total_supply else 0
+                'total_supply': float(asset.token_supply or 0),
+                'available_supply': float(asset.remaining_supply or 0),
+                'market_cap': float(asset.token_supply or 0) * current_price if asset.token_supply else 0
             },
             'timestamp': datetime.utcnow().isoformat()
         }
@@ -185,7 +185,7 @@ def get_trades():
             trades_data.append({
                 'id': trade.id,
                 'asset_id': trade.asset_id,
-                'asset_symbol': asset.symbol if asset else None,
+                'asset_symbol': asset.token_symbol if asset else None,
                 'amount': float(trade.amount) if trade.amount else 0,
                 'price': float(trade.price) if trade.price else 0,
                 'total_value': float(trade.total) if trade.total else 0,
