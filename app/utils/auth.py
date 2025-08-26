@@ -15,12 +15,9 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         # 简化的管理员认证逻辑
-        # 检查session中是否有管理员标识
         if not session.get('is_admin'):
-            # 检查是否有管理员密码参数
             admin_password = request.args.get('admin_password') or request.form.get('admin_password')
             if admin_password:
-                # 简单的密码验证（实际应用中应该使用更安全的方式）
                 expected_password = current_app.config.get('ADMIN_PASSWORD', 'admin123')
                 if admin_password == expected_password:
                     session['is_admin'] = True
@@ -38,18 +35,32 @@ def eth_address_required(f):
     """以太坊地址验证装饰器（简化版）"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 从请求头获取以太坊地址
         eth_address = request.headers.get('X-Eth-Address')
         
         if not eth_address:
             return jsonify({'error': '缺少以太坊地址'}), 400
         
-        # 简单的地址格式验证（可以根据需要增强）
-        if len(eth_address) < 10:  # 基本长度检查
+        if len(eth_address) < 10:
             return jsonify({'error': '无效的以太坊地址格式'}), 400
         
-        # 将地址存储到Flask的g对象中
         g.eth_address = eth_address
         
         return f(*args, **kwargs)
+    return decorated_function
+
+def wallet_address_required(f):
+    """通用钱包地址验证装饰器"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        wallet_address = request.headers.get('X-Wallet-Address')
+        
+        if not wallet_address:
+            # 兼容旧的 X-Eth-Address
+            wallet_address = request.headers.get('X-Eth-Address')
+
+        if not wallet_address:
+            return jsonify({'success': False, 'error': '请求头中缺少 X-Wallet-Address'}), 401
+        
+        # 将地址传递给视图函数
+        return f(wallet_address, *args, **kwargs)
     return decorated_function
