@@ -900,4 +900,112 @@ def validate_solana_address(address):
             return False
             
     except Exception:
-        return False 
+        return False
+
+class SolanaService:
+    """
+    封装与Solana区块链交互的服务
+    """
+    def __init__(self):
+        self.connection = get_solana_connection()
+        if not self.connection:
+            raise AppError("SOLANA_CONNECTION_FAILED", "无法连接到Solana节点。")
+
+    def build_purchase_transaction(self, buyer_address: str, seller_address: str, token_mint_address: str, amount: int, total_price: 'Decimal') -> dict:
+        """
+        构建购买资产的交易。
+        这个交易包含两个主要部分：
+        1. 买家向卖家（或平台）支付USDC。
+        2. (可选，可由后台处理) 平台向买家转移资产代币。
+        为了简化前端操作，此交易仅处理支付部分。
+
+        Args:
+            buyer_address (str): 买家钱包地址。
+            seller_address (str): 卖家/平台收款地址。
+            token_mint_address (str): (未使用，但保留) 资产代币的Mint地址。
+            amount (int): (未使用，但保留) 购买的资产代币数量。
+            total_price (Decimal): 需要支付的USDC总价。
+
+        Returns:
+            dict: 包含序列化交易信息的字典，可直接由前端使用。
+        """
+        try:
+            logger.info(f"构建购买交易: 从 {buyer_address} 到 {seller_address}, 金额: {total_price} USDC")
+            
+            # 1. 获取必要的公钥
+            buyer_pk = PublicKey(buyer_address)
+            seller_pk = PublicKey(seller_address)
+            usdc_mint_pk = PublicKey(USDC_MINT) # 使用全局USDC地址
+
+            # 2. 获取发送方和接收方的USDC代币账户
+            # 注意：这里假设买卖双方都已经有关联的USDC代币账户
+            from spl.token.client import Token
+            token_client = Token(self.connection, usdc_mint_pk, TOKEN_PROGRAM_ID, None)
+            
+            buyer_usdc_account = token_client.get_associated_token_address(buyer_pk)
+            seller_usdc_account = token_client.get_associated_token_address(seller_pk)
+            
+            logger.info(f"买家USDC账户: {buyer_usdc_account}")
+            logger.info(f"卖家USDC账户: {seller_usdc_account}")
+
+            # 3. 创建转账指令
+            # USDC有6位小数
+            amount_in_smallest_unit = int(total_price * Decimal('1_000_000'))
+
+            instruction = Token.create_transfer_instruction(
+                source=buyer_usdc_account,
+                dest=seller_usdc_account,
+                owner=buyer_pk,
+                amount=amount_in_smallest_unit,
+                program_id=TOKEN_PROGRAM_ID
+            )
+
+            # 4. 创建并序列化交易
+            transaction = Transaction(fee_payer=buyer_pk)
+            transaction.add(instruction)
+            transaction.recent_blockhash = self.connection.get_recent_blockhash()['result']['value']['blockhash']
+            
+            # 序列化交易但不签名
+            serialized_tx = transaction.serialize(verify_signatures=False)
+            
+            return {
+                "serialized_transaction": base64.b64encode(serialized_tx).decode('utf-8')
+            }
+
+        except Exception as e:
+            logger.error(f"构建购买交易失败: {e}", exc_info=True)
+            raise AppError("TRANSACTION_BUILD_FAILED", f"构建交易失败: {e}")
+
+    def verify_transaction(self, tx_hash: str, max_retries: int = 5, delay: int = 3) -> bool:
+        """
+        验证交易是否在链上成功确认。
+
+        Args:
+            tx_hash (str): 交易签名/哈希。
+            max_retries (int): 最大重试次数。
+            delay (int): 每次重试的间隔（秒）。
+
+        Returns:
+            bool: 如果交易成功确认则返回True，否则返回False。
+        """
+        logger.info(f"开始验证交易: {tx_hash}")
+        for i in range(max_retries):
+            try:
+                status = check_transaction_status(tx_hash)
+                if status.get('confirmed'):
+                    if status.get('error') is None:
+                        logger.info(f"交易 {tx_hash} 已成功确认。")
+                        return True
+                    else:
+                        logger.error(f"交易 {tx_hash} 已确认但包含错误: {status['error']}")
+                        return False
+                
+                logger.info(f"交易 {tx_hash} 尚未确认，状态: {status.get('status')}。将在 {delay} 秒后重试... ({i+1}/{max_retries})")
+                time.sleep(delay)
+
+            except Exception as e:
+                logger.warning(f"验证交易 {tx_hash} 时发生错误: {e}。将在 {delay} 秒后重试... ({i+1}/{max_retries})")
+                time.sleep(delay)
+        
+        logger.error(f"交易 {tx_hash} 在 {max_retries} 次尝试后仍未确认。")
+        return False

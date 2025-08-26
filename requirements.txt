@@ -48,3 +48,7 @@ APScheduler==3.10.4
 # WSGI Server
 gunicorn==23.0.0
 gevent==25.5.1
+
+# Testing Fix
+web3==6.10.0
+eth-typing==4.1.1

@@ -124,49 +124,7 @@ def get_asset_status(asset_id):
 
 
 
-@api_bp.route('/submit-transaction', methods=['POST'])
-@api_endpoint(log_calls=True, measure_perf=True)
-def submit_transaction():
-    """提交交易到区块链"""
-    try:
-        data = request.get_json()
-        if not data:
-            return create_error_response('INVALID_REQUEST', '无效的请求数据')
 
-        signed_transaction = data.get('signed_transaction')
-        asset_id = data.get('asset_id')
-        amount = data.get('amount')
-        
-        if not all([signed_transaction, asset_id, amount]):
-            return create_error_response('VALIDATION_ERROR', '缺少必要参数')
-        
-        trade = Trade.query.filter(
-            Trade.asset_id == asset_id,
-            Trade.amount == amount,
-            Trade.status == 'pending'
-        ).order_by(desc(Trade.created_at)).first()
-        
-        if not trade:
-            return create_error_response('TRADE_NOT_FOUND', '找不到对应的交易记录')
-        
-        trade.tx_hash = signed_transaction
-        trade.status = 'completed'
-        
-        db.session.commit()
-        
-        logger.info(f"交易提交成功: 交易ID={trade.id}, 哈希={tx_hash}")
-        
-        return jsonify({
-            'success': True,
-            'transaction_hash': tx_hash,
-            'trade_id': trade.id,
-            'message': '交易提交成功'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"提交交易失败: {str(e)}", exc_info=True)
-        return create_error_response('INTERNAL_SERVER_ERROR', f'交易提交失败: {str(e)}')
 
 # 日志记录器
 logger = logging.getLogger(__name__)

@@ -7,7 +7,6 @@ assets_bp = Blueprint('assets', __name__, url_prefix='/assets')
 # API蓝图
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 assets_api_bp = Blueprint('assets_api', __name__, url_prefix='/api/assets')
-trades_api_bp = Blueprint('trades_api', __name__, url_prefix='/api/trades')
 service_bp = Blueprint('service', __name__, url_prefix='/api/service')
 
 # 添加新的代理蓝图，用于处理外部资源代理
@@ -23,9 +22,6 @@ from . import api
 from . import assets
 from . import service
 from . import proxy
-
-# 导入交易API视图
-from . import trades_api
 
 # 导入全局处理器
 from .assets import register_global_handlers
@@ -66,6 +62,9 @@ from .language_api import language_api
 # 导入健康检查API
 from .health_api import health_bp
 
+# 导入V2交易API
+from .v2.trades import trades_v2_bp
+
 # 注册蓝图到app
 def register_blueprints(app):
     """初始化所有路由"""
@@ -104,8 +103,10 @@ def register_blueprints(app):
     # 注册API蓝图
     app.register_blueprint(api_bp)
     app.register_blueprint(assets_api_bp)
-    app.register_blueprint(trades_api_bp)
     app.register_blueprint(service_bp)
+    
+    # 注册V2交易API蓝图
+    app.register_blueprint(trades_v2_bp)
     
     # 注册代理蓝图
     app.register_blueprint(proxy_bp)
@@ -127,4 +128,4 @@ def register_blueprints(app):
     register_global_handlers(app)
     app.logger.info('已注册全局URL前缀修正处理器')
     
-    print("所有路由已注册（使用新模块化admin系统，临时禁用冲突蓝图）") 
+    print("所有路由已注册（使用新模块化admin系统，临时禁用冲突蓝图）")

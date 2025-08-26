@@ -252,32 +252,35 @@ class CompletePurchaseFlow {
     async createPurchaseTransaction(assetId, amount) {
         this.showProgressModal('创建购买交易...');
         
-        const response = await fetch('/api/create-purchase-transaction', {
+        const response = await fetch('/api/v2/trades/create', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-Wallet-Address': window.solana.publicKey.toString()
             },
             body: JSON.stringify({
                 asset_id: assetId,
-                amount: amount,
-                buyer_address: window.solana.publicKey.toString()
+                amount: amount
             })
         });
 
         const result = await response.json();
         
         if (!result.success) {
-            throw new Error(result.message || '创建交易失败');
+            throw new Error(result.error || '创建交易失败');
         }
 
-        console.log('购买交易创建成功');
-        return result.transaction;
+        console.log('V2 购买交易创建成功');
+        // 返回整个结果，因为它包含了 trade_id 和 transaction_to_sign
+        return result;
     }
 
     // 签名交易
-    async signTransaction(transaction) {
+    async signTransaction(transactionData) {
         this.updateProgressModal('请在钱包中确认交易...');
         
+        const { transaction_to_sign } = transactionData;
+
         return new Promise((resolve, reject) => {
             const checkSolanaWeb3 = () => {
                 if (typeof window.solanaWeb3 !== 'undefined') {
@@ -285,12 +288,16 @@ class CompletePurchaseFlow {
                     try {
                         // 将交易数据转换为Transaction对象
                         const transactionObj = window.solanaWeb3.Transaction.from(
-                            Buffer.from(transaction, 'base64')
+                            Buffer.from(transaction_to_sign.serialized_transaction, 'base64')
                         );
                         
                         window.solana.signTransaction(transactionObj).then(signedTransaction => {
                             console.log('交易签名成功');
-                            resolve(signedTransaction.serialize());
+                            // 返回签名后的交易哈希和原始的trade_id
+                            resolve({ 
+                                signature: signedTransaction.signature.toString('base64'),
+                                trade_id: transactionData.trade_id
+                            });
                         }).catch(error => {
                             if (error.message.includes('User rejected')) {
                                 reject(new Error('用户取消了交易签名'));
@@ -310,28 +317,32 @@ class CompletePurchaseFlow {
     }
 
     // 提交交易到区块链
-    async submitTransaction(signedTransaction, assetId, amount) {
+    async submitTransaction(signedData) {
         this.updateProgressModal('提交交易到区块链...');
         
-        const response = await fetch('/api/submit-transaction', {
+        const { signature, trade_id } = signedData;
+
+        const response = await fetch('/api/v2/trades/confirm', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-Wallet-Address': window.solana.publicKey.toString()
             },
             body: JSON.stringify({
-                signed_transaction: Array.from(signedTransaction),
-                asset_id: assetId,
-                amount: amount
+                trade_id: trade_id,
+                tx_hash: signature
             })
         });
 
         const result = await response.json();
         
         if (!result.success) {
-            throw new Error(result.message || '交易提交失败');
+            throw new Error(result.error || '交易提交失败');
         }
 
-        console.log('交易提交成功:', result.transaction_hash);
+        console.log('V2 交易提交成功:', result);
+        // 添加 tx_hash 到结果中以便显示
+        result.transaction_hash = signature;
         return result;
     }
 
