@@ -509,7 +509,7 @@ class PaymentProcessor:
                 )
             
             # 2. 验证交易状态
-            if trade.status != TradeStatus.PENDING_PAYMENT.value:
+            if trade.status not in [TradeStatus.PENDING.value, TradeStatus.PENDING_PAYMENT.value]:
                 return PaymentResult(
                     success=False,
                     error_message=f"交易状态错误，当前状态: {trade.status}"
