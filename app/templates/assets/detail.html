@@ -536,7 +536,7 @@ async function loadRealTimeAssetData() {
     try {
         console.log(`开始加载实时资产数据，资产ID: ${window.ASSET_CONFIG.id}`);
         
-        const response = await fetch(`/api/trades/asset/${window.ASSET_CONFIG.id}/data/realtime`, {
+        const response = await fetch(`/api/assets/${window.ASSET_CONFIG.id}/status`, {
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
@@ -695,11 +695,11 @@ async function loadTradeHistory(page = 1) {
     }
     
     try {
-        console.log(`开始加载交易历史，页码: ${page}, 资产ID: ${window.ASSET_CONFIG.id}`);
+        console.log(`开始加载交易历史，页码: ${page}, 资产: ${window.ASSET_CONFIG.tokenSymbol}`);
         container.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p class="mt-2">Loading trading history...</p></div>';
         
-        // 使用新的实时数据API
-        const response = await fetch(`/api/trades/asset/${window.ASSET_CONFIG.id}/trades/history?page=${page}&per_page=5`, {
+        // 使用新的V2 API
+        const response = await fetch(`/api/v2/trades/${window.ASSET_CONFIG.tokenSymbol}?page=${page}&per_page=5`, {
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
