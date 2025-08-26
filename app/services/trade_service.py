@@ -11,7 +11,7 @@ from app.models import Asset, User, Trade, Holding
 from app.models.asset import AssetStatus
 from app.models.trade import TradeStatus, TradeType
 from app.models.holding import HoldingStatus
-from app.services.commission_service import CommissionService
+# from app.services.commission_service import CommissionService
 from app.blockchain.solana_service import SolanaService
 from app.utils.error_handler import AppError
 
