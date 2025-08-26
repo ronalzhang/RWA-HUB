@@ -24,6 +24,7 @@
         <h3>1. 基础环境检查</h3>
         <button onclick="checkEnvironment()">检查环境</button>
         <button onclick="loadPurchaseHandler()">加载购买处理器</button>
+        <button onclick="loadSimplePurchaseHandler()">加载简化购买处理器</button>
     </div>
     
     <div class="debug-section">
@@ -114,6 +115,25 @@
             };
             script.onerror = function() {
                 log('购买处理器脚本加载失败', 'error');
+            };
+            document.head.appendChild(script);
+        }
+        
+        // 加载简化购买处理器
+        function loadSimplePurchaseHandler() {
+            log('=== 开始加载简化购买处理器 ===');
+            
+            const script = document.createElement('script');
+            script.src = '/static/js/purchase_handler_simple.js';
+            script.onload = function() {
+                log('简化购买处理器脚本加载成功', 'success');
+                setTimeout(() => {
+                    log(`window.simplePurchaseHandlerLoaded: ${window.simplePurchaseHandlerLoaded || '未加载'}`);
+                    log(`window.debugPurchase: ${typeof window.debugPurchase !== 'undefined' ? '存在' : '不存在'}`);
+                }, 100);
+            };
+            script.onerror = function() {
+                log('简化购买处理器脚本加载失败', 'error');
             };
             document.head.appendChild(script);
         }
