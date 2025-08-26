@@ -560,7 +560,12 @@ class PaymentProcessor:
                     'total_amount': float(trade.total),
                     'token_amount': trade.amount,
                     'token_price': float(trade.price),
-                    'commission_breakdown': commission_breakdown.__dict__,
+                    'commission_breakdown': {
+                        'seller_amount': float(commission_breakdown.seller_amount),
+                        'platform_fee': float(commission_breakdown.platform_fee),
+                        'referral_commissions': commission_breakdown.referral_commissions,
+                        'total_referral_amount': float(commission_breakdown.total_referral_amount)
+                    },
                     'tx_hash': transaction_hash,
                     'confirmed_at': datetime.utcnow().isoformat(),
                     'status': 'confirmed'
