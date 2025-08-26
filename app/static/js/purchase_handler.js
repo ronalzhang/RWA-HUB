@@ -63,7 +63,9 @@ if (window.purchaseHandlerInitialized) {
 
                     // 执行购买逻辑
                     const executePurchase = () => {
-                        const assetId = document.querySelector('meta[name="asset-id"]')?.content || window.ASSET_CONFIG?.id;
+                        const assetId = document.querySelector('meta[name="asset-id"]')?.content || 
+                                       document.querySelector('[data-asset-id]')?.getAttribute('data-asset-id') ||
+                                       window.ASSET_CONFIG?.id;
                         
                         // 检查是否有完整的购买流程
                         if (window.completePurchaseFlow && typeof window.completePurchaseFlow.initiatePurchase === 'function') {
