@@ -30,7 +30,7 @@ def get_asset_trade_history(asset_id):
         # 检查资产是否存在
         asset = Asset.query.get(asset_id)
         if not asset:
-            return create_error_response('ASSET_NOT_FOUND', f'资产 {asset_id} 不存在'), 404
+            return create_error_response('ASSET_NOT_FOUND', f'资产 {asset_id} 不存在')
         
         # 查询交易历史
         trades_query = Trade.query.filter(
@@ -78,7 +78,7 @@ def get_asset_trade_history(asset_id):
         
     except Exception as e:
         logger.error(f"获取资产 {asset_id} 交易历史失败: {e}", exc_info=True)
-        return create_error_response('INTERNAL_ERROR', '获取交易历史失败'), 500
+        return create_error_response('INTERNAL_ERROR', '获取交易历史失败')
 
 @trades_api_bp.route('/asset/<int:asset_id>/data/realtime', methods=['GET'])
 @api_endpoint(log_calls=True)
@@ -88,7 +88,7 @@ def get_asset_realtime_data(asset_id):
         # 检查资产是否存在
         asset = Asset.query.get(asset_id)
         if not asset:
-            return create_error_response('ASSET_NOT_FOUND', f'资产 {asset_id} 不存在'), 404
+            return create_error_response('ASSET_NOT_FOUND', f'资产 {asset_id} 不存在')
         
         # 获取最新交易数据
         latest_trade = Trade.query.filter(
@@ -139,7 +139,7 @@ def get_asset_realtime_data(asset_id):
         
     except Exception as e:
         logger.error(f"获取资产 {asset_id} 实时数据失败: {e}", exc_info=True)
-        return create_error_response('INTERNAL_ERROR', '获取实时数据失败'), 500
+        return create_error_response('INTERNAL_ERROR', '获取实时数据失败')
 
 @trades_api_bp.route('/', methods=['GET'])
 @api_endpoint(log_calls=True)
@@ -214,4 +214,4 @@ def get_trades():
         
     except Exception as e:
         logger.error(f"获取交易列表失败: {e}", exc_info=True)
-        return create_error_response('INTERNAL_ERROR', '获取交易列表失败'), 500
+        return create_error_response('INTERNAL_ERROR', '获取交易列表失败')
