@@ -54,7 +54,17 @@ class TradeService:
         ).first()
         if not user:
             wallet_type = 'solana' if len(user_address) < 50 else 'ethereum'
-            user = User(username=f"user_{user_address[:6]}", email=f"{user_address}@auto.rwa", wallet_address=user_address, wallet_type=wallet_type)
+            user = User(
+                username=f"user_{user_address[:6]}", 
+                email=f"{user_address}@auto.rwa", 
+                wallet_type=wallet_type
+            )
+            # 根据钱包类型设置相应的地址字段
+            if wallet_type == 'solana':
+                user.solana_address = user_address
+            else:
+                user.eth_address = user_address
+                
             self.session.add(user)
             self.session.flush()  # 为了获取 user.id
             logger.info(f"为地址 {user_address} 创建了新用户: ID={user.id}")
