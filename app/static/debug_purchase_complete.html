@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>购买按钮完整诊断</title>
+    <meta name="asset-id" content="9">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        button { padding: 10px 20px; margin: 5px; }
+        input { padding: 8px; margin: 5px; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; font-family: monospace; max-height: 300px; overflow-y: auto; }
+        .error { color: red; }
+        .success { color: green; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>购买按钮完整诊断页面</h1>
+    
+    <div class="debug-section">
+        <h3>1. 基础环境检查</h3>
+        <button onclick="checkEnvironment()">检查环境</button>
+        <button onclick="loadPurchaseHandler()">加载购买处理器</button>
+    </div>
+    
+    <div class="debug-section">
+        <h3>2. 模拟资产页面结构</h3>
+        <input type="number" id="purchase-amount" value="100" min="1" placeholder="购买数量">
+        <button id="buy-button" data-asset-id="9" data-token-price="1.0">Buy Tokens</button>
+    </div>
+    
+    <div class="debug-section">
+        <h3>3. API测试</h3>
+        <button onclick="testCreateAPI()">测试创建交易API</button>
+        <button onclick="testConfirmAPI()">测试确认交易API</button>
+    </div>
+    
+    <div class="debug-section">
+        <h3>4. 钱包模拟</h3>
+        <button onclick="mockWallet()">模拟钱包连接</button>
+        <button onclick="clearWallet()">清除钱包</button>
+    </div>
+    
+    <div class="debug-section">
+        <h3>5. 调试日志</h3>
+        <div id="debug-log" class="log"></div>
+        <button onclick="clearLog()">清除日志</button>
+    </div>
+
+    <script>
+        // 全局配置
+        window.ASSET_CONFIG = {
+            id: 9,
+            tokenSymbol: "RH-101719",
+            tokenPrice: 1.0,
+            totalSupply: 1000000,
+            remainingSupply: 500000,
+            platformFeeRate: 0.035
+        };
+
+        // 日志函数
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        function clearLog() {
+            document.getElementById('debug-log').innerHTML = '';
+        }
+        
+        // 环境检查
+        function checkEnvironment() {
+            log('=== 环境检查开始 ===');
+            log(`User Agent: ${navigator.userAgent}`);
+            log(`URL: ${window.location.href}`);
+            log(`SweetAlert: ${typeof Swal !== 'undefined' ? '已加载' : '未加载'}`);
+            log(`jQuery: ${typeof $ !== 'undefined' ? '已加载' : '未加载'}`);
+            log(`window.solana: ${typeof window.solana !== 'undefined' ? '存在' : '不存在'}`);
+            log(`window.purchaseHandlerInitialized: ${window.purchaseHandlerInitialized || '未初始化'}`);
+            log(`window.purchaseFlowManager: ${typeof window.purchaseFlowManager !== 'undefined' ? '存在' : '不存在'}`);
+            
+            // 检查DOM元素
+            const buyButton = document.getElementById('buy-button');
+            const amountInput = document.getElementById('purchase-amount');
+            log(`购买按钮: ${buyButton ? '存在' : '不存在'}`);
+            log(`数量输入框: ${amountInput ? '存在' : '不存在'}`);
+            
+            // 检查meta标签
+            const assetIdMeta = document.querySelector('meta[name="asset-id"]');
+            log(`asset-id meta标签: ${assetIdMeta ? assetIdMeta.content : '不存在'}`);
+            
+            log('=== 环境检查完成 ===');
+        }
+        
+        // 加载购买处理器
+        function loadPurchaseHandler() {
+            log('=== 开始加载购买处理器 ===');
+            
+            const script = document.createElement('script');
+            script.src = '/static/js/purchase_handler.js';
+            script.onload = function() {
+                log('购买处理器脚本加载成功', 'success');
+                setTimeout(() => {
+                    log(`window.purchaseHandlerInitialized: ${window.purchaseHandlerInitialized || '未初始化'}`);
+                    log(`window.purchaseFlowManager: ${typeof window.purchaseFlowManager !== 'undefined' ? '存在' : '不存在'}`);
+                }, 100);
+            };
+            script.onerror = function() {
+                log('购买处理器脚本加载失败', 'error');
+            };
+            document.head.appendChild(script);
+        }
+        
+        // 模拟钱包
+        function mockWallet() {
+            log('=== 模拟钱包连接 ===');
+            const mockAddress = 'mock_wallet_' + Math.random().toString(36).substr(2, 9);
+            
+            window.walletState = {
+                address: mockAddress,
+                connected: true
+            };
+            
+            localStorage.setItem('walletAddress', mockAddress);
+            localStorage.setItem('eth_address', mockAddress);
+            
+            // 模拟Solana钱包
+            window.solana = {
+                isConnected: true,
+                publicKey: {
+                    toString: () => mockAddress
+                },
+                signTransaction: async (transaction) => {
+                    log('模拟钱包签名交易');
+                    return { signature: 'mock_signature_' + Date.now() };
+                },
+                sendTransaction: async (transaction) => {
+                    log('模拟发送交易到区块链');
+                    return 'mock_tx_hash_' + Date.now();
+                }
+            };
+            
+            log(`模拟钱包地址: ${mockAddress}`, 'success');
+        }
+        
+        function clearWallet() {
+            log('=== 清除钱包连接 ===');
+            window.walletState = null;
+            localStorage.removeItem('walletAddress');
+            localStorage.removeItem('eth_address');
+            window.solana = null;
+            log('钱包连接已清除', 'success');
+        }
+        
+        // API测试
+        async function testCreateAPI() {
+            log('=== 测试创建交易API ===');
+            
+            const walletAddress = window.walletState?.address || 'test_wallet_address';
+            
+            try {
+                const response = await fetch('/api/v2/trades/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Wallet-Address': walletAddress
+                    },
+                    body: JSON.stringify({
+                        asset_id: 9,
+                        amount: 100
+                    })
+                });
+                
+                log(`API响应状态: ${response.status}`);
+                const data = await response.json();
+                log(`API响应数据: ${JSON.stringify(data, null, 2)}`);
+                
+                if (data.success) {
+                    log('创建交易API测试成功', 'success');
+                    window.testTradeId = data.trade_id;
+                } else {
+                    log(`创建交易API测试失败: ${data.error?.message || '未知错误'}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`API调用异常: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testConfirmAPI() {
+            log('=== 测试确认交易API ===');
+            
+            if (!window.testTradeId) {
+                log('请先测试创建交易API', 'error');
+                return;
+            }
+            
+            const walletAddress = window.walletState?.address || 'test_wallet_address';
+            
+            try {
+                const response = await fetch('/api/v2/trades/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Wallet-Address': walletAddress
+                    },
+                    body: JSON.stringify({
+                        trade_id: window.testTradeId,
+                        tx_hash: 'test_tx_hash_' + Date.now()
+                    })
+                });
+                
+                log(`API响应状态: ${response.status}`);
+                const data = await response.json();
+                log(`API响应数据: ${JSON.stringify(data, null, 2)}`);
+                
+                if (data.success) {
+                    log('确认交易API测试成功', 'success');
+                } else {
+                    log(`确认交易API测试失败: ${data.error?.message || '未知错误'}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`API调用异常: ${error.message}`, 'error');
+            }
+        }
+        
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            log('页面DOM加载完成');
+            
+            // 监听购买按钮点击（原生事件）
+            const buyButton = document.getElementById('buy-button');
+            if (buyButton) {
+                buyButton.addEventListener('click', function(event) {
+                    log('=== 原生购买按钮点击事件 ===');
+                    log(`事件类型: ${event.type}`);
+                    log(`目标元素: ${event.target.id}`);
+                    log(`按钮属性: data-asset-id=${event.target.getAttribute('data-asset-id')}`);
+                    
+                    // 检查购买处理器是否存在
+                    if (typeof window.purchaseFlowManager !== 'undefined') {
+                        log('购买流程管理器存在，尝试调用');
+                        // 这里可以手动调用购买流程
+                    } else {
+                        log('购买流程管理器不存在', 'error');
+                    }
+                });
+                log('原生购买按钮事件监听器已设置');
+            }
+        });
+        
+        // 初始日志
+        log('调试页面初始化完成');
+    </script>
+</body>
+</html>
