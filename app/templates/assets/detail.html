@@ -39,6 +39,7 @@ console.log('✅ 创建了简化的solanaWeb3对象');
 
 <!-- 钱包和购买处理 -->
 <script src="{{ url_for('static', filename='js/wallet.js') }}"></script>
+<script src="{{ url_for('static', filename='js/smart_contract_deployment.js') }}"></script>
 <script src="{{ url_for('static', filename='js/purchase_handler.js') }}"></script>
 
 <style>
@@ -511,9 +512,77 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 页面初始化函数
 document.addEventListener('DOMContentLoaded', function() {
-    // 初始化页面功能
-    initializePage();
+    // 等待所有脚本加载完成后再初始化
+    setTimeout(() => {
+        // 初始化页面功能
+        initializePage();
+        
+        // 确保购买按钮处理器已正确设置
+        ensurePurchaseButtonHandler();
+    }, 200); // 给脚本200ms的加载时间
 });
+
+// 确保购买按钮处理器正确设置
+function ensurePurchaseButtonHandler() {
+    const buyButton = document.getElementById('buy-button');
+    if (buyButton && !buyButton.hasAttribute('data-handler-set')) {
+        console.log('检测到购买按钮但未设置处理器，手动设置...');
+        
+        // 标记已设置处理器，避免重复设置
+        buyButton.setAttribute('data-handler-set', 'true');
+        
+        buyButton.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            console.log('购买按钮点击 - 备用处理器');
+            
+            // 检查钱包连接
+            const walletAddress = getWalletAddress();
+            if (!walletAddress) {
+                alert('请先连接您的钱包');
+                return;
+            }
+            
+            // 获取购买数量
+            const amountInput = document.getElementById('purchase-amount');
+            const amount = parseInt(amountInput?.value || 0);
+            
+            if (!amount || amount <= 0) {
+                alert('请输入有效的购买数量');
+                amountInput?.focus();
+                return;
+            }
+            
+            // 检查剩余供应量
+            const remainingSupply = window.ASSET_CONFIG?.remainingSupply || 0;
+            if (amount > remainingSupply) {
+                alert(`购买数量不能超过剩余供应量 (${remainingSupply.toLocaleString()})`);
+                amountInput?.focus();
+                return;
+            }
+            
+            // 确认购买
+            const confirmed = confirm(`确认购买 ${amount} 个代币？`);
+            if (!confirmed) return;
+            
+            // 执行购买
+            const assetId = window.ASSET_CONFIG?.id;
+            if (window.completePurchaseFlow && typeof window.completePurchaseFlow.initiatePurchase === 'function') {
+                console.log('使用完整购买流程');
+                window.completePurchaseFlow.initiatePurchase(assetId, amount);
+            } else if (typeof window.handlePurchaseClick === 'function') {
+                console.log('使用全局购买处理器');
+                window.handlePurchaseClick();
+            } else {
+                console.error('没有找到可用的购买处理器');
+                alert('购买功能暂时不可用，请刷新页面重试');
+            }
+        });
+        
+        console.log('购买按钮备用处理器已设置');
+    }
+}
 
 // 页面初始化函数
 function initializePage() {
@@ -1014,6 +1083,5 @@ document.addEventListener('keydown', function(event) {
 });
 </script>
 
-<!-- 购买和智能合约部署脚本 -->
-<script src="{{ url_for('static', filename='js/smart_contract_deployment.js') }}"></script>
+
 {% endblock %}

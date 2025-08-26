@@ -551,9 +551,17 @@ function showToast(message) {
     }, 3000);
 }
 
-// 购买按钮点击处理
+// 购买按钮点击处理 - 全局可访问
 window.handlePurchaseClick = function() {
     console.log('[DEBUG] handlePurchaseClick called');
+    
+    // 检查钱包连接
+    const walletAddress = getWalletAddress();
+    if (!walletAddress) {
+        showToast('请先连接您的钱包');
+        return;
+    }
+    
     const assetId = window.ASSET_CONFIG?.id;
     const amountInput = document.getElementById('purchase-amount');
     const amount = parseInt(amountInput?.value || 0);
@@ -579,5 +587,48 @@ window.handlePurchaseClick = function() {
     // 启动完整购买流程
     window.completePurchaseFlow.initiatePurchase(assetId, amount);
 };
+
+// 获取钱包地址的辅助函数
+function getWalletAddress() {
+    if (window.walletState && window.walletState.address) {
+        return window.walletState.address;
+    }
+    
+    if (localStorage.getItem('walletAddress')) {
+        return localStorage.getItem('walletAddress');
+    }
+    
+    if (window.solana && window.solana.publicKey) {
+        return window.solana.publicKey.toString();
+    }
+    
+    if (window.ethereum && window.ethereum.selectedAddress) {
+        return window.ethereum.selectedAddress;
+    }
+    
+    return null;
+}
+
+// 调试：检查购买按钮状态
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        const buyButton = document.getElementById('buy-button');
+        if (buyButton) {
+            console.log('✅ 购买按钮存在');
+            console.log('✅ 购买按钮事件监听器数量:', getEventListeners ? getEventListeners(buyButton) : '无法检测');
+            
+            // 添加调试点击事件
+            buyButton.addEventListener('click', function(e) {
+                console.log('🔍 购买按钮被点击 - 调试信息:');
+                console.log('- 事件对象:', e);
+                console.log('- 钱包状态:', window.walletState);
+                console.log('- 资产配置:', window.ASSET_CONFIG);
+                console.log('- completePurchaseFlow 可用:', !!window.completePurchaseFlow);
+            }, true); // 使用捕获阶段，确保最先执行
+        } else {
+            console.warn('⚠️ 购买按钮不存在');
+        }
+    }, 500);
+});
 
 console.log('✅ 智能合约部署和购买流程模块已加载');
