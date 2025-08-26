@@ -1,6 +1,11 @@
 from app.extensions import db
 from datetime import datetime
 from sqlalchemy import Index, UniqueConstraint
+import enum
+
+class HoldingStatus(enum.Enum):
+    ACTIVE = 'active'
+    INACTIVE = 'inactive'
 
 class Holding(db.Model):
     """用户资产持有记录"""
@@ -24,6 +29,9 @@ class Holding(db.Model):
     blockchain = db.Column(db.String(20), default='solana')
     is_on_chain = db.Column(db.Boolean, default=False)
     
+    # 状态
+    status = db.Column(db.String(20), default=HoldingStatus.ACTIVE.value, nullable=False)
+
     # 时间信息
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -53,6 +61,7 @@ class Holding(db.Model):
             'token_address': self.token_address,
             'blockchain': self.blockchain,
             'is_on_chain': self.is_on_chain,
+            'status': self.status,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         } 
