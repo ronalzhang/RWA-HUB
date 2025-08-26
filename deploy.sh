@@ -18,7 +18,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
 # 请根据实际情况修改以下配置
 
 # 服务器配置
-SERVER_HOST="156.236.74.200"
+SERVER_HOST="156.232.13.240"
 SERVER_USER="root"
 SERVER_PASSWORD="Pr971V3j"
 SERVER_PATH="/root/RWA-HUB"

@@ -6,7 +6,7 @@
 set -e  # 遇到错误立即退出
 
 # 配置
-SERVER_HOST="156.236.74.200"
+SERVER_HOST="156.232.13.240"
 SERVER_USER="root"
 SERVER_PASS="Pr971V3j"
 PROJECT_PATH="/root/RWA-HUB"

@@ -65,6 +65,9 @@ from .health_api import health_bp
 # 导入V2交易API
 from .v2.trades import trades_v2_bp
 
+# 导入交易历史API
+from .trades_api import trades_api_bp
+
 # 注册蓝图到app
 def register_blueprints(app):
     """初始化所有路由"""
@@ -107,6 +110,9 @@ def register_blueprints(app):
     
     # 注册V2交易API蓝图
     app.register_blueprint(trades_v2_bp)
+    
+    # 注册交易历史API蓝图
+    app.register_blueprint(trades_api_bp)
     
     # 注册代理蓝图
     app.register_blueprint(proxy_bp)

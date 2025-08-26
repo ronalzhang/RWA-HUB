@@ -5,7 +5,7 @@
 echo "🔧 开始修复服务器图片和部署流程..."
 
 # 服务器信息
-SERVER_HOST="156.236.74.200"
+SERVER_HOST="156.232.13.240"
 SERVER_USER="root"
 SERVER_PASS="Pr971V3j"
 PROJECT_PATH="/root/RWA-HUB"

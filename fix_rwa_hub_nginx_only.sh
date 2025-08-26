@@ -4,7 +4,7 @@
 
 echo "🔧 只修复admin.lawsker.com的nginx配置..."
 
-SERVER_HOST="156.236.74.200"
+SERVER_HOST="156.232.13.240"
 SERVER_USER="root"
 SERVER_PASS="Pr971V3j"
 
