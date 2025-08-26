@@ -1,3 +1,6 @@
+import logging
+
+logger = logging.getLogger(__name__)
 import enum
 from datetime import datetime
 from app.extensions import db
@@ -154,6 +157,5 @@ class User(db.Model):
             return new_user
         except Exception as e:
             db.session.rollback()
-            from flask import current_app
-            current_app.logger.error(f"Failed to create user {address}: {e}", exc_info=True)
+            logger.error(f"Failed to create user {address}: {e}", exc_info=True)
             return None
