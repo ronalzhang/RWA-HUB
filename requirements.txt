@@ -51,4 +51,4 @@ gevent==25.5.1
 
 # Testing Fix
 web3==6.10.0
-eth-typing==4.1.1
+eth-typing==4.1.0
