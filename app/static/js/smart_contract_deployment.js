@@ -609,26 +609,4 @@ function getWalletAddress() {
     return null;
 }
 
-// 调试：检查购买按钮状态
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => {
-        const buyButton = document.getElementById('buy-button');
-        if (buyButton) {
-            console.log('✅ 购买按钮存在');
-            console.log('✅ 购买按钮事件监听器数量:', getEventListeners ? getEventListeners(buyButton) : '无法检测');
-            
-            // 添加调试点击事件
-            buyButton.addEventListener('click', function(e) {
-                console.log('🔍 购买按钮被点击 - 调试信息:');
-                console.log('- 事件对象:', e);
-                console.log('- 钱包状态:', window.walletState);
-                console.log('- 资产配置:', window.ASSET_CONFIG);
-                console.log('- completePurchaseFlow 可用:', !!window.completePurchaseFlow);
-            }, true); // 使用捕获阶段，确保最先执行
-        } else {
-            console.warn('⚠️ 购买按钮不存在');
-        }
-    }, 500);
-});
-
 console.log('✅ 智能合约部署和购买流程模块已加载');
