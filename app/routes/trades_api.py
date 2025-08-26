@@ -48,18 +48,17 @@ def get_asset_trade_history(asset_id):
         # 格式化交易数据
         trades_data = []
         for trade in trades_pagination.items:
-            user = User.query.get(trade.user_id) if trade.user_id else None
             trades_data.append({
                 'id': trade.id,
                 'amount': float(trade.amount) if trade.amount else 0,
                 'price': float(trade.price) if trade.price else 0,
-                'total_value': float(trade.total_value) if trade.total_value else 0,
+                'total_value': float(trade.total) if trade.total else 0,
                 'status': trade.status,
                 'created_at': trade.created_at.isoformat() if trade.created_at else None,
-                'updated_at': trade.updated_at.isoformat() if trade.updated_at else None,
+                'updated_at': trade.status_updated_at.isoformat() if trade.status_updated_at else None,
                 'tx_hash': trade.tx_hash,
-                'user_address': user.wallet_address if user else None,
-                'trade_type': getattr(trade, 'trade_type', 'buy')
+                'user_address': trade.trader_address,
+                'trade_type': getattr(trade, 'type', 'buy')
             })
         
         return jsonify({
@@ -104,7 +103,7 @@ def get_asset_realtime_data(asset_id):
         daily_stats = db.session.query(
             db.func.count(Trade.id).label('trade_count'),
             db.func.sum(Trade.amount).label('total_amount'),
-            db.func.sum(Trade.total_value).label('total_value')
+            db.func.sum(Trade.total).label('total_value')
         ).filter(
             Trade.asset_id == asset_id,
             Trade.status.in_(['completed', 'confirmed']),
@@ -182,7 +181,6 @@ def get_trades():
         trades_data = []
         for trade in trades_pagination.items:
             asset = Asset.query.get(trade.asset_id) if trade.asset_id else None
-            user = User.query.get(trade.user_id) if trade.user_id else None
             
             trades_data.append({
                 'id': trade.id,
@@ -190,13 +188,13 @@ def get_trades():
                 'asset_symbol': asset.symbol if asset else None,
                 'amount': float(trade.amount) if trade.amount else 0,
                 'price': float(trade.price) if trade.price else 0,
-                'total_value': float(trade.total_value) if trade.total_value else 0,
+                'total_value': float(trade.total) if trade.total else 0,
                 'status': trade.status,
                 'created_at': trade.created_at.isoformat() if trade.created_at else None,
-                'updated_at': trade.updated_at.isoformat() if trade.updated_at else None,
+                'updated_at': trade.status_updated_at.isoformat() if trade.status_updated_at else None,
                 'tx_hash': trade.tx_hash,
-                'user_address': user.wallet_address if user else None,
-                'trade_type': getattr(trade, 'trade_type', 'buy')
+                'user_address': trade.trader_address,
+                'trade_type': getattr(trade, 'type', 'buy')
             })
         
         return jsonify({
