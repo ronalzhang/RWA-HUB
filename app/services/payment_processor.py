@@ -1021,3 +1021,140 @@ class PaymentProcessor:
         except Exception as e:
             logger.error(f"获取佣金统计失败: {str(e)}")
             return {'success': False, 'error': str(e)}
+    
+    def _calculate_purchase_commission(self, trade) -> CommissionBreakdown:
+        """
+        计算购买佣金分配
+        
+        Args:
+            trade: 交易记录
+            
+        Returns:
+            CommissionBreakdown: 佣金分配明细
+        """
+        try:
+            total_amount = Decimal(str(trade.total))
+            platform_fee = total_amount * self.platform_fee_rate
+            seller_amount = total_amount - platform_fee
+            
+            # 简化版本：暂不处理推荐佣金
+            referral_commissions = []
+            total_referral_amount = Decimal('0')
+            
+            return CommissionBreakdown(
+                seller_amount=seller_amount,
+                platform_fee=platform_fee,
+                referral_commissions=referral_commissions,
+                total_referral_amount=total_referral_amount
+            )
+            
+        except Exception as e:
+            logger.error(f"计算购买佣金失败: {str(e)}")
+            # 返回默认分配
+            total_amount = Decimal(str(trade.total))
+            platform_fee = total_amount * self.platform_fee_rate
+            seller_amount = total_amount - platform_fee
+            
+            return CommissionBreakdown(
+                seller_amount=seller_amount,
+                platform_fee=platform_fee,
+                referral_commissions=[],
+                total_referral_amount=Decimal('0')
+            )
+    
+    def _prepare_multi_party_transfer_transaction(self, trade, commission_breakdown) -> Dict[str, Any]:
+        """
+        准备多方转账交易（买家支付，多方收款）
+        
+        Args:
+            trade: 交易记录
+            commission_breakdown: 佣金分配
+            
+        Returns:
+            dict: 多方转账交易数据
+        """
+        try:
+            logger.info(f"准备多方转账交易: trade_id={trade.id}")
+            
+            # 获取资产信息
+            asset = Asset.query.get(trade.asset_id)
+            if not asset:
+                return {'success': False, 'error': '资产不存在'}
+            
+            # 构建转账列表
+            transfers = []
+            
+            # 1. 买家向卖家转账（扣除平台费用后的金额）
+            transfers.append({
+                'from_address': trade.trader_address,
+                'to_address': asset.creator_address,
+                'amount': float(commission_breakdown.seller_amount),
+                'token': 'USDC',
+                'purpose': 'asset_purchase'
+            })
+            
+            # 2. 买家向平台转账（平台费用）
+            transfers.append({
+                'from_address': trade.trader_address,
+                'to_address': self.platform_address,
+                'amount': float(commission_breakdown.platform_fee),
+                'token': 'USDC',
+                'purpose': 'platform_fee'
+            })
+            
+            # 3. 推荐佣金转账（如果有）
+            for referral_commission in commission_breakdown.referral_commissions:
+                transfers.append({
+                    'from_address': trade.trader_address,
+                    'to_address': referral_commission['address'],
+                    'amount': float(referral_commission['amount']),
+                    'token': 'USDC',
+                    'purpose': f"referral_commission_L{referral_commission['level']}"
+                })
+            
+            # 使用Solana服务准备多方转账交易
+            from app.blockchain.solana_service import prepare_transfer_transaction
+            
+            # 目前简化为单笔转账（买家向平台支付总金额）
+            # 后续可以扩展为真正的多方转账
+            total_amount = float(trade.total)
+            
+            transaction_data, message_data = prepare_transfer_transaction(
+                token_symbol="USDC",
+                from_address=trade.trader_address,
+                to_address=self.platform_address,
+                amount=total_amount
+            )
+            
+            return {
+                'success': True,
+                'transaction_data': transaction_data,
+                'message_data': message_data,
+                'transfers': transfers,
+                'total_amount': total_amount
+            }
+            
+        except Exception as e:
+            logger.error(f"准备多方转账交易失败: {str(e)}")
+            return {'success': False, 'error': str(e)}
+    
+    def _process_referral_commissions(self, trade_id: int, trader_address: str, total_amount: Decimal):
+        """
+        处理推荐佣金分配
+        
+        Args:
+            trade_id: 交易ID
+            trader_address: 交易者地址
+            total_amount: 交易总金额
+        """
+        try:
+            logger.info(f"处理推荐佣金: trade_id={trade_id}, amount={total_amount}")
+            
+            # 这里可以集成推荐系统逻辑
+            # 目前先记录日志，后续可以扩展
+            
+            logger.info(f"推荐佣金处理完成: trade_id={trade_id}")
+            
+        except Exception as e:
+            logger.error(f"处理推荐佣金失败: {str(e)}")
+            # 不抛出异常，避免影响主要交易流程
