@@ -77,8 +77,8 @@ class TradeService:
             raise AppError("ASSET_NOT_AVAILABLE", "该资产当前不可交易。")
         
         # 4. 检查库存
-        # 使用 sold_supply 字段来计算剩余量
-        remaining_supply = asset.token_supply - (asset.sold_supply or 0)
+        # 使用 sold_amount 字段来计算剩余量
+        remaining_supply = asset.token_supply - (asset.sold_amount or 0)
         if amount > remaining_supply:
             raise AppError("INSUFFICIENT_SUPPLY", f"资产库存不足，剩余: {remaining_supply}")
 
@@ -177,8 +177,8 @@ class TradeService:
             if not asset:
                  raise AppError("ASSET_NOT_FOUND", f"交易关联的资产 {trade.asset_id} 不存在。")
             
-            asset.sold_supply = (asset.sold_supply or 0) + trade.amount
-            logger.info(f"资产 {asset.id} 已售出数量更新为: {asset.sold_supply}")
+            asset.sold_amount = (asset.sold_amount or 0) + trade.amount
+            logger.info(f"资产 {asset.id} 已售出数量更新为: {asset.sold_amount}")
 
             # 6. 更新或创建用户持仓 (Holding)
             self.update_user_holding(trade.trader_address, trade.asset_id, trade.amount)

@@ -283,9 +283,27 @@ body {
                         
                         <div id="buy-error" class="alert alert-danger" style="display: none;"></div>
                         
+                        <!-- 钱包连接状态 -->
+                        <div id="wallet-status" class="mb-3">
+                            <div id="wallet-disconnected" class="alert alert-warning" style="display: block;">
+                                <i class="fas fa-wallet me-2"></i>
+                                <span>Wallet not connected</span>
+                            </div>
+                            <div id="wallet-connected" class="alert alert-success" style="display: none;">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <span>Wallet connected: <span id="connected-address"></span></span>
+                            </div>
+                        </div>
+                        
                         {% if asset.contract_address and asset.status == 2 %}
+                        <!-- 钱包连接按钮 -->
+                        <button type="button" id="connect-wallet-button" class="btn btn-outline-primary w-100 py-2 mb-2" style="display: block;">
+                            <i class="fas fa-wallet me-2"></i>Connect Wallet
+                        </button>
+                        
+                        <!-- 购买按钮 -->
                         <button type="button" id="buy-button" class="btn btn-primary w-100 py-2" 
-                                data-token-price="{{ asset.token_price }}" data-asset-id="{{ asset.id }}">
+                                data-token-price="{{ asset.token_price }}" data-asset-id="{{ asset.id }}" style="display: none;">
                             <i class="fas fa-shopping-cart me-2"></i>Buy Tokens
                         </button>
                         {% elif asset.status != 2 %}
