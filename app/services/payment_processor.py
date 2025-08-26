@@ -545,30 +545,29 @@ class PaymentProcessor:
             
             # 7. 更新交易状态和资产数据（使用DataConsistencyManager确保数据一致性）
             try:
-                with db.session.begin():
-                    # 更新交易状态
-                    trade.status = TradeStatus.COMPLETED.value
-                    trade.tx_hash = transaction_hash
-                    trade.updated_at = datetime.utcnow()
-                    
-                    # 保存支付详情
-                    payment_details = {
-                        'type': 'asset_purchase',
-                        'trade_id': trade_id,
-                        'asset_id': trade.asset_id,
-                        'buyer_address': trade.trader_address,
-                        'seller_address': asset.creator_address,
-                        'total_amount': float(trade.total),
-                        'token_amount': trade.amount,
-                        'token_price': float(trade.price),
-                        'commission_breakdown': commission_breakdown.__dict__,
-                        'tx_hash': transaction_hash,
-                        'confirmed_at': datetime.utcnow().isoformat(),
-                        'status': 'confirmed'
-                    }
-                    trade.payment_details = json.dumps(payment_details)
-                    
-                    db.session.commit()
+                # 更新交易状态
+                trade.status = TradeStatus.COMPLETED.value
+                trade.tx_hash = transaction_hash
+                trade.updated_at = datetime.utcnow()
+                
+                # 保存支付详情
+                payment_details = {
+                    'type': 'asset_purchase',
+                    'trade_id': trade_id,
+                    'asset_id': trade.asset_id,
+                    'buyer_address': trade.trader_address,
+                    'seller_address': asset.creator_address,
+                    'total_amount': float(trade.total),
+                    'token_amount': trade.amount,
+                    'token_price': float(trade.price),
+                    'commission_breakdown': commission_breakdown.__dict__,
+                    'tx_hash': transaction_hash,
+                    'confirmed_at': datetime.utcnow().isoformat(),
+                    'status': 'confirmed'
+                }
+                trade.payment_details = json.dumps(payment_details)
+                
+                db.session.commit()
                     
                 logger.info(f"资产购买支付状态已更新: trade_id={trade_id}, status=COMPLETED")
                 
