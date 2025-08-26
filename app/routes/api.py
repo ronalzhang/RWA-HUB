@@ -845,11 +845,28 @@ def create_trade():
             logger.error(f"准备支付交易失败: {payment_result.error_message}")
             return create_error_response('PAYMENT_PREPARATION_FAILED', payment_result.error_message)
         
+        # 处理bytes数据的序列化
+        import base64
+        transaction_data_b64 = None
+        message_data_b64 = None
+        
+        if payment_result.transaction_data:
+            if isinstance(payment_result.transaction_data, bytes):
+                transaction_data_b64 = base64.b64encode(payment_result.transaction_data).decode('utf-8')
+            else:
+                transaction_data_b64 = str(payment_result.transaction_data)
+        
+        if payment_result.message_data:
+            if isinstance(payment_result.message_data, bytes):
+                message_data_b64 = base64.b64encode(payment_result.message_data).decode('utf-8')
+            else:
+                message_data_b64 = str(payment_result.message_data)
+        
         return jsonify({
             'success': True,
             'trade_id': trade.id,
-            'transaction_to_sign': payment_result.transaction_data,
-            'message_data': payment_result.message_data,
+            'transaction_to_sign': transaction_data_b64,
+            'message_data': message_data_b64,
             'payment_details': payment_result.payment_details
         })
         
