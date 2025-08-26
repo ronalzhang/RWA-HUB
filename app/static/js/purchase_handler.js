@@ -61,6 +61,21 @@ if (window.purchaseHandlerInitialized) {
                         return;
                     }
 
+                    // 执行购买逻辑
+                    const executePurchase = () => {
+                        const assetId = document.querySelector('meta[name="asset-id"]')?.content || window.ASSET_CONFIG?.id;
+                        
+                        // 检查是否有完整的购买流程
+                        if (window.completePurchaseFlow && typeof window.completePurchaseFlow.initiatePurchase === 'function') {
+                            console.log('调用完整购买流程');
+                            window.completePurchaseFlow.initiatePurchase(parseInt(assetId), amount);
+                        } else {
+                            console.warn('completePurchaseFlow 不可用，使用简化购买流程');
+                            // 简化的购买流程
+                            simplePurchaseFlow(parseInt(assetId), amount);
+                        }
+                    };
+
                     // Show confirmation dialog
                     if (typeof Swal !== 'undefined') {
                         Swal.fire({
@@ -72,34 +87,14 @@ if (window.purchaseHandlerInitialized) {
                             cancelButtonText: '取消'
                         }).then((result) => {
                             if (result.isConfirmed) {
-                                // Execute purchase using the consolidated flow
-                                const assetId = document.querySelector('meta[name="asset-id"]')?.content || window.ASSET_CONFIG?.id;
-                                if (window.completePurchaseFlow && typeof window.completePurchaseFlow.initiatePurchase === 'function') {
-                                    console.log('调用完整购买流程');
-                                    window.completePurchaseFlow.initiatePurchase(parseInt(assetId), amount);
-                                } else {
-                                    console.error('completePurchaseFlow 不可用');
-                                    Swal.fire({
-                                        title: '系统错误',
-                                        text: '购买功能暂时不可用，请刷新页面重试',
-                                        icon: 'error',
-                                        confirmButtonText: '确定'
-                                    });
-                                }
+                                executePurchase();
                             }
                         });
                     } else {
                         // 如果没有SweetAlert，使用原生确认对话框
                         const confirmed = confirm(`您确定要购买 ${amount} 个代币吗？`);
                         if (confirmed) {
-                            const assetId = document.querySelector('meta[name="asset-id"]')?.content || window.ASSET_CONFIG?.id;
-                            if (window.completePurchaseFlow && typeof window.completePurchaseFlow.initiatePurchase === 'function') {
-                                console.log('调用完整购买流程');
-                                window.completePurchaseFlow.initiatePurchase(parseInt(assetId), amount);
-                            } else {
-                                console.error('completePurchaseFlow 不可用');
-                                alert('购买功能暂时不可用，请刷新页面重试');
-                            }
+                            executePurchase();
                         }
                     }
                 });
@@ -112,6 +107,94 @@ if (window.purchaseHandlerInitialized) {
     });
     
     console.log('购买处理器模块已加载');
+}
+
+// 简化的购买流程（当完整流程不可用时使用）
+function simplePurchaseFlow(assetId, amount) {
+    console.log(`开始简化购买流程: 资产ID=${assetId}, 数量=${amount}`);
+    
+    // 获取钱包地址
+    const walletAddress = window.walletState?.address || 
+                         localStorage.getItem('walletAddress') || 
+                         (window.solana && window.solana.publicKey ? window.solana.publicKey.toString() : null);
+    
+    if (!walletAddress) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: '钱包未连接',
+                text: '请先连接您的钱包',
+                icon: 'warning',
+                confirmButtonText: '确定'
+            });
+        } else {
+            alert('请先连接您的钱包');
+        }
+        return;
+    }
+    
+    // 显示处理中状态
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            title: '处理中...',
+            text: '正在创建购买交易',
+            icon: 'info',
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+    }
+    
+    // 调用V2交易API创建购买
+    fetch('/api/v2/trades/create', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            user_address: walletAddress,
+            asset_id: assetId,
+            amount: amount
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('购买API响应:', data);
+        
+        if (data.success) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: '交易创建成功',
+                    text: `交易ID: ${data.trade_id}`,
+                    icon: 'success',
+                    confirmButtonText: '确定'
+                }).then(() => {
+                    // 刷新页面显示最新状态
+                    window.location.reload();
+                });
+            } else {
+                alert(`交易创建成功！交易ID: ${data.trade_id}`);
+                window.location.reload();
+            }
+        } else {
+            throw new Error(data.message || '创建交易失败');
+        }
+    })
+    .catch(error => {
+        console.error('购买失败:', error);
+        
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: '购买失败',
+                text: error.message || '请稍后重试',
+                icon: 'error',
+                confirmButtonText: '确定'
+            });
+        } else {
+            alert(`购买失败: ${error.message || '请稍后重试'}`);
+        }
+    });
 }
 
 
