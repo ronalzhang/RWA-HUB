@@ -977,7 +977,12 @@ class SolanaService:
             return encoded_tx
 
         except Exception as e:
-            logger.error(f"构建购买交易过程中发生严重错误: {e}", exc_info=True)
+            import traceback
+            tb_str = traceback.format_exc()
+            logger.error(f"!!!!!!!!!! CATASTROPHIC ERROR IN build_purchase_transaction !!!!!!!!!!!")
+            logger.error(f"ERROR TYPE: {type(e)}")
+            logger.error(f"ERROR DETAILS: {e}")
+            logger.error(f"FULL TRACEBACK: {tb_str}")
             raise AppError("TRANSACTION_BUILD_FAILED", f"构建交易失败: {e}")
 
     def verify_transaction(self, tx_hash: str, max_retries: int = 5, delay: int = 3) -> bool:
