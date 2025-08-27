@@ -341,6 +341,12 @@ if (window.purchaseHandlerInitialized) {
 
     // Initialize purchase button after DOM is loaded
     document.addEventListener('DOMContentLoaded', function () {
+        // Only proceed if the buy button exists on the page.
+        if (!document.getElementById('buy-button')) {
+            console.log('购买按钮不存在，购买处理器不执行初始化。');
+            return;
+        }
+
         setTimeout(function () {
             if (!initializePurchaseButton()) {
                 // If first initialization fails, retry a few times
