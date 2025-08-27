@@ -154,7 +154,7 @@ def encrypt_private_key():
             # 直接验证私钥格式，不依赖环境变量
             import base58
             import base64
-            from app.utils.solana_compat.keypair import Keypair
+            from solders.keypair import Keypair # <-- FIXED
             
             # 检测私钥格式并转换
             try:
@@ -186,7 +186,7 @@ def encrypt_private_key():
                 
                 # 创建密钥对验证
                 keypair = Keypair.from_seed(seed)
-                wallet_address = str(keypair.public_key)
+                wallet_address = str(keypair.pubkey()) # <-- FIXED
                 
             except Exception as e:
                 return jsonify({'success': False, 'error': f'私钥格式错误: {str(e)}'}), 400
@@ -238,7 +238,7 @@ def load_encrypted_key():
     try:
         from app.models.admin import SystemConfig
         from app.utils.crypto_manager import get_crypto_manager
-        from app.utils.solana_compat.keypair import Keypair
+        from solders.keypair import Keypair # <-- FIXED
         import base58
         import base64
         
@@ -296,7 +296,7 @@ def load_encrypted_key():
             
             # 创建密钥对验证
             keypair = Keypair.from_seed(seed)
-            wallet_address = str(keypair.public_key)
+            wallet_address = str(keypair.pubkey()) # <-- FIXED
             
         except Exception as e:
             return jsonify({'success': False, 'error': f'私钥格式错误: {str(e)}'}), 400
@@ -551,14 +551,8 @@ def export_onchain_history():
 
 
 
-
-
-
-
-
-
 # 注意：dashboard、assets、users、trades等路由已在各自模块中定义
-# 避免重复定义导致路由冲突
+# 避免重复定义导致路由冲突 
 
 # 添加钱包相关API
 @admin_bp.route('/api/wallet-info', methods=['GET'])
@@ -568,7 +562,7 @@ def get_wallet_info():
     try:
         from app.models.admin import SystemConfig
         from app.utils.crypto_manager import get_crypto_manager
-        from app.utils.solana_compat.keypair import Keypair
+        from solders.keypair import Keypair # <-- FIXED
         import base58
         import base64
         
@@ -620,17 +614,16 @@ def get_wallet_info():
                 raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}字节")
             
             keypair = Keypair.from_seed(seed)
-            wallet_address = str(keypair.public_key)
+            wallet_address = str(keypair.pubkey()) # <-- FIXED
             
             # 查询SOL余额
             try:
-                import requests
-                from solana.rpc.api import Client
-                from solana.publickey import PublicKey
+                from app.blockchain.solana_service import get_solana_client # <-- FIXED
+                from solders.pubkey import Pubkey # <-- FIXED
                 
                 # 使用主网RPC端点，设置较短的超时时间
-                client = Client("https://api.mainnet-beta.solana.com", timeout=5)
-                public_key = PublicKey(wallet_address)
+                client = get_solana_client() # <-- FIXED
+                public_key = Pubkey.from_string(wallet_address) # <-- FIXED
                 
                 # 获取余额（以lamports为单位）
                 balance_response = client.get_balance(public_key)
@@ -681,7 +674,7 @@ def test_wallet_connection():
     try:
         from app.models.admin import SystemConfig
         from app.utils.crypto_manager import get_crypto_manager
-        from app.utils.solana_compat.keypair import Keypair
+        from solders.keypair import Keypair # <-- FIXED
         import base58
         import base64
         
@@ -732,7 +725,7 @@ def test_wallet_connection():
                 raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}字节")
             
             keypair = Keypair.from_seed(seed)
-            wallet_address = str(keypair.public_key)
+            wallet_address = str(keypair.pubkey()) # <-- FIXED
             
             # 恢复原始密码
             if original_password:
@@ -935,8 +928,6 @@ def delete_admin_user(wallet_address):
         db.session.delete(admin)
         db.session.commit()
         
-        current_app.logger.info(f"删除管理员: {wallet_address}")
-        
         return jsonify({
             'success': True,
             'message': '管理员删除成功'
@@ -1120,4 +1111,4 @@ def delete_share_message_v2(message_id):
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"删除分享消息失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500 
+        return jsonify({'success': False, 'error': str(e)}), 500
