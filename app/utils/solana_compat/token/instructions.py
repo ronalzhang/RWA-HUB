@@ -12,6 +12,24 @@ import os
 # 获取日志记录器
 logger = logging.getLogger(__name__)
 
+from ..transaction import TransactionInstruction as Instruction, AccountMeta
+
+def create_transfer_instruction(
+    source: PublicKey,
+    dest: PublicKey,
+    owner: PublicKey,
+    amount: int,
+    program_id: PublicKey = TOKEN_PROGRAM_ID,
+) -> Instruction:
+    """Creates a transfer instruction."""
+    keys = [
+        AccountMeta(pubkey=source, is_signer=False, is_writable=True),
+        AccountMeta(pubkey=dest, is_signer=False, is_writable=True),
+        AccountMeta(pubkey=owner, is_signer=True, is_writable=False),
+    ]
+    data = b"\x03" + amount.to_bytes(8, "little")
+    return Instruction(program_id, data, keys)
+
 def get_associated_token_address(owner: PublicKey, mint: PublicKey) -> PublicKey:
     """获取关联代币账户地址 - 真实实现"""
     try:
