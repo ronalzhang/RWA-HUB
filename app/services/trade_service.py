@@ -76,24 +76,29 @@ class TradeService:
             raise AppError("ASSET_NOT_FOUND", f"资产 {asset_id} 不存在。")
         if asset.status != AssetStatus.ON_CHAIN.value:
             raise AppError("ASSET_NOT_AVAILABLE", "该资产当前不可交易。")
+
+        # 4. 检查价格有效性
+        if not asset.token_price or asset.token_price <= 0:
+            logger.error(f"资产 {asset_id} 的价格无效: {asset.token_price}")
+            raise AppError("INVALID_ASSET_PRICE", f"资产 {asset_id} 价格无效或未设置。")
         
-        # 4. 检查库存
-        # 使用 remaining_supply 字段或计算剩余量
+        # 5. 检查库存
         remaining_supply = asset.remaining_supply if asset.remaining_supply is not None else asset.token_supply
         if amount > remaining_supply:
             raise AppError("INSUFFICIENT_SUPPLY", f"资产库存不足，剩余: {remaining_supply}")
 
-        # 5. 计算总价
-        total_price = Decimal(str(asset.token_price)) * Decimal(amount)
+        # 6. 计算总价
+        price = Decimal(str(asset.token_price))
+        total_price = price * Decimal(amount)
 
-        # 6. 创建并保存交易记录
+        # 7. 创建并保存交易记录
         try:
             new_trade = Trade(
                 asset_id=asset.id,
                 trader_address=user_address,
                 type=TradeType.BUY.value,
                 amount=amount,
-                price=Decimal(str(asset.token_price)),
+                price=price,
                 total=total_price,
                 status=TradeStatus.PENDING.value,
                 created_at=datetime.utcnow()
