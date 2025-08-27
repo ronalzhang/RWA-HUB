@@ -47,7 +47,7 @@ from app.utils.query_helpers import (
 
 # 服务类
 from app.services.authentication_service import AuthenticationService
-from app.services.payment_processor import PaymentProcessor
+
 from app.services.unlimited_referral_system import UnlimitedReferralSystem
 from app.services.data_consistency_manager import DataConsistencyManager
 
