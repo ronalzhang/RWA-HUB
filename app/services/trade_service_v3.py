@@ -6,9 +6,10 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.extensions import db
 from app.models import Asset, User, Trade, Holding, TradeStatus
-from app.blockchain.solana_service import get_solana_client, get_latest_blockhash
+from app.blockchain.solana_service import get_solana_client, get_latest_blockhash, validate_solana_address
 
 from solders.pubkey import Pubkey
+from solders.hash import Hash
 from solders.transaction import Transaction
 from solders.signature import Signature
 from spl.token.instructions import transfer, TransferParams
@@ -66,11 +67,26 @@ class TradeServiceV3:
             # 3. 构建SPL代币转账交易
             buyer_pubkey = Pubkey.from_string(wallet_address)
             
+            # 使用正确的配置参数名称
             platform_treasury_address = current_app.config.get('PLATFORM_TREASURY_WALLET')
             payment_token_mint_address = current_app.config.get('PAYMENT_TOKEN_MINT_ADDRESS') # e.g., USDC mint
 
-            if not platform_treasury_address or not payment_token_mint_address:
-                raise ValueError("平台收款地址或支付代币地址未配置")
+            if not platform_treasury_address:
+                logger.error("PLATFORM_TREASURY_WALLET配置参数缺失")
+                return {'success': False, 'message': '平台收款钱包地址未配置', 'error_code': 'CONFIGURATION_ERROR'}
+            
+            if not payment_token_mint_address:
+                logger.error("PAYMENT_TOKEN_MINT_ADDRESS配置参数缺失")
+                return {'success': False, 'message': '支付代币铸造地址未配置', 'error_code': 'CONFIGURATION_ERROR'}
+            
+            # 验证配置的地址格式
+            if not validate_solana_address(platform_treasury_address):
+                logger.error(f"PLATFORM_TREASURY_WALLET地址格式无效: {platform_treasury_address}")
+                return {'success': False, 'message': '平台收款钱包地址格式无效', 'error_code': 'CONFIGURATION_ERROR'}
+            
+            if not validate_solana_address(payment_token_mint_address):
+                logger.error(f"PAYMENT_TOKEN_MINT_ADDRESS地址格式无效: {payment_token_mint_address}")
+                return {'success': False, 'message': '支付代币铸造地址格式无效', 'error_code': 'CONFIGURATION_ERROR'}
 
             platform_pubkey = Pubkey.from_string(platform_treasury_address)
             payment_mint_pubkey = Pubkey.from_string(payment_token_mint_address)
@@ -83,6 +99,11 @@ class TradeServiceV3:
             payment_token_decimals = current_app.config.get('PAYMENT_TOKEN_DECIMALS', 6)
             amount_in_smallest_unit = int(total_price * (10**payment_token_decimals))
 
+            # 验证转账指令参数
+            if amount_in_smallest_unit <= 0:
+                logger.error(f"无效的转账金额: {amount_in_smallest_unit}")
+                return {'success': False, 'message': '无效的转账金额', 'error_code': 'INVALID_AMOUNT'}
+
             instruction = transfer(
                 TransferParams(
                     program_id=Pubkey.from_string('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
@@ -93,16 +114,28 @@ class TradeServiceV3:
                 )
             )
 
-            recent_blockhash = get_latest_blockhash()
+            # 获取最新区块哈希并使用正确的Hash类型
+            recent_blockhash_str = get_latest_blockhash()
+            recent_blockhash = Hash.from_string(recent_blockhash_str)
             
             tx = Transaction.new_with_payer(
                 [instruction],
                 buyer_pubkey,
             )
-            tx.recent_blockhash = Pubkey.from_string(recent_blockhash)
+            # 使用正确的Hash类型而不是Pubkey
+            tx.recent_blockhash = recent_blockhash
 
+            # 在序列化前添加交易验证
+            if not TradeServiceV3._validate_transaction(tx):
+                logger.error("交易验证失败")
+                return {'success': False, 'message': '交易验证失败', 'error_code': 'TRANSACTION_VALIDATION_ERROR'}
+
+            # 确保交易序列化正确使用verify_signatures=False参数
             serialized_tx = tx.serialize(verify_signatures=False)
             encoded_tx = base64.b64encode(serialized_tx).decode('utf-8')
+
+            logger.info(f"交易创建成功，TradeID={new_trade.id}, 序列化长度={len(serialized_tx)}")
+            logger.debug(f"交易详情: 买方={wallet_address}, 金额={amount_in_smallest_unit}, 区块哈希={recent_blockhash_str[:8]}...")
 
             return {
                 'success': True,
@@ -195,3 +228,36 @@ class TradeServiceV3:
             db.session.rollback()
             logger.error(f"[V3] 确认购买交易未知错误: {e}", exc_info=True)
             return {'success': False, 'message': f'内部服务器错误: {e}', 'error_code': 'INTERNAL_SERVER_ERROR'}
+
+    @staticmethod
+    def _validate_transaction(transaction: Transaction) -> bool:
+        """
+        在序列化前验证交易是否具有所有必需组件
+        """
+        try:
+            # 检查交易是否有付款人
+            if not transaction.message.account_keys:
+                logger.error("交易验证失败: 缺少账户密钥")
+                return False
+            
+            # 检查交易是否有指令
+            if not transaction.message.instructions:
+                logger.error("交易验证失败: 缺少指令")
+                return False
+            
+            # 检查交易是否有最新区块哈希
+            if not transaction.message.recent_blockhash:
+                logger.error("交易验证失败: 缺少最新区块哈希")
+                return False
+            
+            # 验证指令数量合理
+            if len(transaction.message.instructions) > 10:  # 合理的指令数量限制
+                logger.error(f"交易验证失败: 指令数量过多 ({len(transaction.message.instructions)})")
+                return False
+            
+            logger.debug(f"交易验证通过: {len(transaction.message.instructions)}个指令, {len(transaction.message.account_keys)}个账户")
+            return True
+            
+        except Exception as e:
+            logger.error(f"交易验证过程中发生错误: {e}", exc_info=True)
+            return False

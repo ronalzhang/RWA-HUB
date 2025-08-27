@@ -301,9 +301,14 @@ def async_update_cache(cache_key: str, data: Any, timeout: int = 300):
 def async_blockchain_sync(asset_id: int):
     """异步区块链同步"""
     try:
-        from app.services.blockchain_sync_service import get_sync_service
-        sync_service = get_sync_service()
-        return sync_service.sync_asset_data(asset_id)
+        # TODO: Implement blockchain_sync_service
+        # from app.services.blockchain_sync_service import get_sync_service
+        # sync_service = get_sync_service()
+        # return sync_service.sync_asset_data(asset_id)
+        
+        # Placeholder implementation
+        logger.warning(f"区块链同步服务未实现，跳过资产 {asset_id} 的同步")
+        return {'success': False, 'message': '区块链同步服务未实现'}
     except Exception as e:
         logger.error(f"异步区块链同步失败: {e}")
         raise

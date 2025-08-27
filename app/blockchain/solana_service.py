@@ -11,6 +11,7 @@ from flask import current_app
 
 from solana.rpc.api import Client
 from solders.pubkey import Pubkey
+from solders.hash import Hash
 from solana.exceptions import SolanaRpcException
 import base58
 
@@ -46,14 +47,56 @@ def validate_solana_address(address: str) -> bool:
 def get_latest_blockhash() -> str:
     """
     获取最新的区块哈希，用于交易。
+    返回字符串格式，由调用方转换为Hash类型。
     """
     try:
         client = get_solana_client()
         resp = client.get_latest_blockhash()
         if resp.value and resp.value.blockhash:
-            return str(resp.value.blockhash)
+            blockhash_str = str(resp.value.blockhash)
+            logger.debug(f"获取到最新区块哈希: {blockhash_str[:8]}...")
+            return blockhash_str
         else:
             raise SolanaRpcException(f"未能从节点获取有效的区块哈希: {resp}")
     except Exception as e:
         logger.error(f"获取最新区块哈希失败: {e}", exc_info=True)
+        raise
+
+def get_latest_blockhash_with_cache(cache_duration: int = 30) -> str:
+    """
+    获取最新的区块哈希，带缓存功能以减少RPC调用。
+    
+    Args:
+        cache_duration: 缓存持续时间（秒），默认30秒
+    
+    Returns:
+        str: 区块哈希字符串
+    """
+    import time
+    
+    # 简单的内存缓存实现
+    if not hasattr(get_latest_blockhash_with_cache, '_cache'):
+        get_latest_blockhash_with_cache._cache = {}
+    
+    cache = get_latest_blockhash_with_cache._cache
+    current_time = time.time()
+    
+    # 检查缓存是否有效
+    if 'blockhash' in cache and 'timestamp' in cache:
+        if current_time - cache['timestamp'] < cache_duration:
+            logger.debug(f"使用缓存的区块哈希: {cache['blockhash'][:8]}...")
+            return cache['blockhash']
+    
+    # 获取新的区块哈希
+    try:
+        blockhash = get_latest_blockhash()
+        cache['blockhash'] = blockhash
+        cache['timestamp'] = current_time
+        logger.debug(f"缓存新的区块哈希: {blockhash[:8]}...")
+        return blockhash
+    except Exception as e:
+        # 如果获取失败且有缓存，使用过期的缓存作为回退
+        if 'blockhash' in cache:
+            logger.warning(f"获取区块哈希失败，使用过期缓存: {e}")
+            return cache['blockhash']
         raise
