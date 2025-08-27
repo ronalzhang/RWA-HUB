@@ -42,10 +42,11 @@ class TradeService:
         Raises:
             AppError: 如果验证失败或发生任何业务逻辑错误。
         """
-        logger.info(f"开始创建购买交易: 用户={user_address}, 资产ID={asset_id}, 数量={amount}")
+        logger.info(f"[DIAGNOSTIC] Entering create_purchase for user={user_address}, asset_id={asset_id}")
 
         # 1. 验证输入
         if not user_address or not asset_id or not isinstance(amount, int) or amount <= 0:
+            logger.error(f"[DIAGNOSTIC] Validation failed: user_address={user_address}, asset_id={asset_id}, amount={amount}")
             raise AppError("INVALID_INPUT", "无效的输入参数。")
 
         # 2. 查找用户，如果不存在则创建
