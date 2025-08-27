@@ -895,55 +895,58 @@ def validate_solana_address(address):
 
 class SolanaService:
     """
-    封装与Solana区块链交互的服务
+    封装与Solana区块链交互的服务。
+    此版本已移除所有模拟代码和不安全的备用逻辑，强制执行真实交易。
     """
     def __init__(self):
         self.connection = get_solana_connection()
         if not self.connection:
             raise AppError("SOLANA_CONNECTION_FAILED", "无法连接到Solana节点。")
 
-    def build_purchase_transaction(self, buyer_address: str, seller_address: str, token_mint_address: str, amount: int, total_price: 'Decimal') -> dict:
+    def build_purchase_transaction(self, buyer_address: str, seller_address: str, token_mint_address: str, amount: int, total_price: 'Decimal') -> str:
         """
-        构建购买资产的交易。
-        这个交易包含两个主要部分：
-        1. 买家向卖家（或平台）支付USDC。
-        2. (可选，可由后台处理) 平台向买家转移资产代币。
-        为了简化前端操作，此交易仅处理支付部分。
+        构建购买资产的真实支付交易。
+        此函数构建一个SPL代币转账交易，用于买家向平台支付USDC。
+        它会获取最新的区块哈希，并返回一个序列化的、待签名的交易（Base64编码）。
+        失败时会直接抛出异常，不产生模拟数据。
 
         Args:
             buyer_address (str): 买家钱包地址。
             seller_address (str): 卖家/平台收款地址。
-            token_mint_address (str): (未使用，但保留) 资产代币的Mint地址。
-            amount (int): (未使用，但保留) 购买的资产代币数量。
+            token_mint_address (str): (未使用) 资产代币的Mint地址。
+            amount (int): (未使用) 购买的资产代币数量。
             total_price (Decimal): 需要支付的USDC总价。
 
         Returns:
-            dict: 包含序列化交易信息的字典，可直接由前端使用。
+            str: Base64编码的、待签名的序列化交易。
+        
+        Raises:
+            AppError: 如果任何步骤失败（如获取区块哈希、构建交易等）。
         """
+        logger.info(f"开始构建真实购买交易: 从 {buyer_address} 到 {seller_address}, 金额: {total_price} USDC")
+        
         try:
-            logger.info(f"构建购买交易: 从 {buyer_address} 到 {seller_address}, 金额: {total_price} USDC")
-            
-            # 1. 获取必要的公钥
+            from app.utils.solana_compat.publickey import PublicKey
+            from app.utils.solana_compat.transaction import Transaction
+            from spl.token.instructions import create_transfer_instruction, get_associated_token_address
+            from decimal import Decimal
+            import time
+
+            # 1. 获取公钥
             buyer_pk = PublicKey(buyer_address)
             seller_pk = PublicKey(seller_address)
-            usdc_mint_pk = PublicKey(USDC_MINT) # 使用全局USDC地址
+            usdc_mint_pk = PublicKey(USDC_MINT)
 
-            # 2. 获取发送方和接收方的USDC代币账户
-            # 注意：这里假设买卖双方都已经有关联的USDC代币账户
-            from spl.token.client import Token
-            token_client = Token(self.connection, usdc_mint_pk, TOKEN_PROGRAM_ID, None)
+            # 2. 获取关联代币账户
+            buyer_usdc_account = get_associated_token_address(buyer_pk, usdc_mint_pk)
+            seller_usdc_account = get_associated_token_address(seller_pk, usdc_mint_pk)
             
-            buyer_usdc_account = token_client.get_associated_token_address(buyer_pk)
-            seller_usdc_account = token_client.get_associated_token_address(seller_pk)
+            logger.debug(f"买家USDC账户: {buyer_usdc_account}, 卖家USDC账户: {seller_usdc_account}")
+
+            # 3. 创建转账指令 (USDC有6位小数)
+            amount_in_smallest_unit = int(total_price * Decimal('1000000'))
             
-            logger.info(f"买家USDC账户: {buyer_usdc_account}")
-            logger.info(f"卖家USDC账户: {seller_usdc_account}")
-
-            # 3. 创建转账指令
-            # USDC有6位小数
-            amount_in_smallest_unit = int(total_price * Decimal('1_000_000'))
-
-            instruction = Token.create_transfer_instruction(
+            instruction = create_transfer_instruction(
                 source=buyer_usdc_account,
                 dest=seller_usdc_account,
                 owner=buyer_pk,
@@ -951,20 +954,44 @@ class SolanaService:
                 program_id=TOKEN_PROGRAM_ID
             )
 
-            # 4. 创建并序列化交易
-            transaction = Transaction(fee_payer=buyer_pk)
-            transaction.add(instruction)
-            transaction.recent_blockhash = self.connection.get_recent_blockhash()['result']['value']['blockhash']
+            # 4. 获取真实的、最新的区块哈希 (带重试机制)
+            blockhash = None
+            last_exception = None
+            for attempt in range(3):
+                try:
+                    # 使用基础连接对象的方法
+                    result = self.connection.get_latest_blockhash()
+                    if result and result.value and result.value.blockhash:
+                        blockhash = str(result.value.blockhash)
+                        logger.info(f"成功获取区块哈希: {blockhash} (尝试 {attempt + 1})")
+                        break
+                    raise ValueError(f"无效的区块哈希响应: {result}")
+                except Exception as e:
+                    last_exception = e
+                    logger.warning(f"获取区块哈希失败 (尝试 {attempt + 1}/3): {e}")
+                    if attempt < 2:
+                        time.sleep(1)  # 等待1秒后重试
             
-            # 序列化交易但不签名
+            if not blockhash:
+                logger.error(f"重试3次后仍无法获取区块哈希。最后错误: {last_exception}")
+                raise AppError("BLOCKCHAIN_NODE_ERROR", f"无法获取最新的区块哈希: {last_exception}")
+
+            # 5. 创建并序列化交易
+            transaction = Transaction(fee_payer=buyer_pk, recent_blockhash=blockhash)
+            transaction.add(instruction)
+            
+            # 序列化交易以供前端签名
             serialized_tx = transaction.serialize(verify_signatures=False)
             
-            return {
-                "serialized_transaction": base64.b64encode(serialized_tx).decode('utf-8')
-            }
+            # 返回Base64编码的字符串
+            encoded_tx = base64.b64encode(serialized_tx).decode('utf-8')
+            logger.info("成功构建并序列化购买交易。")
+            
+            return encoded_tx
 
         except Exception as e:
-            logger.error(f"构建购买交易失败: {e}", exc_info=True)
+            logger.error(f"构建购买交易过程中发生严重错误: {e}", exc_info=True)
+            # 重新抛出为应用级异常
             raise AppError("TRANSACTION_BUILD_FAILED", f"构建交易失败: {e}")
 
     def verify_transaction(self, tx_hash: str, max_retries: int = 5, delay: int = 3) -> bool:

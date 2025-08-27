@@ -121,161 +121,61 @@ if (window.purchaseHandlerInitialized) {
             }
         }
 
-        // Step 2: Sign and confirm transaction
+        // Step 2: Sign and send the transaction, then confirm with the backend
         async signAndConfirmTransaction() {
-            if (!this.currentTrade) {
-                this.showError('系统错误', '没有待处理的交易');
+            if (!this.currentTrade || !this.currentTrade.transactionToSign) {
+                this.showError('系统错误', '没有待处理的交易或交易数据');
                 return false;
             }
 
-            console.log('开始签名交易:', this.currentTrade);
+            console.log('开始签名并发送真实交易:', this.currentTrade);
             this.showLoading('请在钱包中确认交易...');
 
             try {
-                // Check wallet connection
                 if (!window.solana || !window.solana.isConnected) {
                     throw new Error('钱包未连接或不可用');
                 }
 
-                // Build transaction object
-                const transaction = this.buildTransaction(this.currentTrade.transactionToSign);
+                // 1. Decode the base64 transaction data from the backend
+                const serializedTransaction = Uint8Array.from(atob(this.currentTrade.transactionToSign), c => c.charCodeAt(0));
 
-                // Request wallet signature
-                const signedTransaction = await window.solana.signTransaction(transaction);
-                console.log('交易签名成功');
+                // 2. Reconstruct the transaction object using the solanaWeb3.js library
+                if (!window.solanaWeb3 || !window.solanaWeb3.Transaction) {
+                    console.error('Solana Web3 library (solanaWeb3.js) not found on window object.');
+                    throw new Error('客户端库缺失，无法处理交易。');
+                }
+                const transaction = window.solanaWeb3.Transaction.from(serializedTransaction);
+                console.log('成功反序列化交易，准备请求钱包签名...');
 
-                // Send transaction to blockchain
-                this.showLoading('正在提交交易到区块链...');
-                const txHash = await this.sendTransaction(signedTransaction);
-                console.log('交易已提交，哈希:', txHash);
+                // 3. Sign and send the transaction using the wallet adapter.
+                // This method prompts the user, signs, sends the transaction, and returns the transaction signature (txHash).
+                const txHash = await window.solana.signAndSendTransaction(transaction);
+                console.log('交易已签名并发送，交易哈希:', txHash);
 
-                // Confirm transaction
+                if (!txHash) {
+                    throw new Error('未能获取交易哈希，交易可能已失败。');
+                }
+                
+                this.showLoading('正在链上确认交易...');
+
+                // 4. Confirm the purchase on the backend with the real txHash
                 return await this.confirmPurchase(txHash);
 
             } catch (error) {
                 console.error('签名或发送交易失败:', error);
-                if (error.message.includes('User rejected')) {
-                    this.showError('交易取消', '您取消了交易签名');
+                // Check for user rejection, which can have different error codes or messages
+                if (error.message && (error.message.includes('User rejected') || error.code === 4001)) {
+                    this.showError('交易已取消', '您在钱包中拒绝了交易请求。');
                 } else {
-                    this.showError('交易失败', error.message || '签名或发送交易时发生错误');
+                    this.showError('交易失败', error.message || '签名或发送交易时发生未知错误。');
                 }
                 return false;
             }
         }
 
-        // Build transaction object
-        buildTransaction(transactionData) {
-            try {
-                console.log('构建交易对象，数据类型:', typeof transactionData);
-                console.log('交易数据:', transactionData);
-                
-                // 如果transactionData是字符串，尝试解析为JSON
-                if (typeof transactionData === 'string') {
-                    try {
-                        const parsedData = JSON.parse(transactionData);
-                        console.log('解析的交易数据:', parsedData);
-                        return {
-                            serialize: () => new TextEncoder().encode(transactionData),
-                            _transactionData: parsedData,
-                            _rawData: transactionData
-                        };
-                    } catch (parseError) {
-                        console.log('不是JSON格式，作为base64处理');
-                        // 如果不是JSON，作为base64处理
-                        return {
-                            serialize: () => Uint8Array.from(atob(transactionData), c => c.charCodeAt(0)),
-                            _transactionData: transactionData
-                        };
-                    }
-                }
-                
-                // 如果是Uint8Array或Buffer
-                if (transactionData instanceof Uint8Array || transactionData instanceof ArrayBuffer) {
-                    return {
-                        serialize: () => transactionData,
-                        _transactionData: transactionData
-                    };
-                }
-                
-                // 如果有solanaWeb3库，使用它
-                if (window.solanaWeb3 && window.solanaWeb3.Transaction) {
-                    if (typeof transactionData === 'string') {
-                        return window.solanaWeb3.Transaction.from(Uint8Array.from(atob(transactionData), c => c.charCodeAt(0)));
-                    }
-                    return window.solanaWeb3.Transaction.from(transactionData);
-                }
-
-                // 默认处理
-                return {
-                    serialize: () => transactionData,
-                    _transactionData: transactionData
-                };
-            } catch (error) {
-                console.error('构建交易对象失败:', error);
-                throw new Error('无法构建交易对象: ' + error.message);
-            }
-        }
-
-        // Send transaction to blockchain
-        async sendTransaction(signedTransaction) {
-            try {
-                console.log('开始发送交易到区块链');
-                console.log('签名交易对象:', signedTransaction);
-                
-                // 检查钱包连接
-                if (!window.solana || !window.solana.isConnected) {
-                    throw new Error('钱包未连接');
-                }
-                
-                // 获取交易数据
-                let transactionData;
-                if (signedTransaction.serialize) {
-                    transactionData = signedTransaction.serialize();
-                } else if (signedTransaction._transactionData) {
-                    transactionData = signedTransaction._transactionData;
-                } else {
-                    transactionData = signedTransaction;
-                }
-                
-                console.log('准备发送的交易数据:', transactionData);
-                
-                // 尝试使用钱包的sendTransaction方法
-                if (window.solana.sendTransaction) {
-                    console.log('使用钱包的sendTransaction方法');
-                    const signature = await window.solana.sendTransaction(signedTransaction);
-                    console.log('交易发送成功，签名:', signature);
-                    return signature;
-                }
-
-                // 尝试使用signAndSendTransaction方法
-                if (window.solana.signAndSendTransaction) {
-                    console.log('使用钱包的signAndSendTransaction方法');
-                    const signature = await window.solana.signAndSendTransaction(signedTransaction);
-                    console.log('交易签名并发送成功，签名:', signature);
-                    return signature;
-                }
-                
-                // 如果钱包不支持直接发送，生成一个模拟签名
-                console.warn('钱包不支持发送交易，生成模拟签名');
-                const mockSignature = 'mock_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                console.log('模拟签名:', mockSignature);
-                return mockSignature;
-
-            } catch (error) {
-                console.error('发送交易失败:', error);
-                
-                // 如果是用户取消，重新抛出
-                if (error.message && error.message.includes('User rejected')) {
-                    throw error;
-                }
-                
-                // 其他错误，生成模拟签名用于测试
-                console.warn('交易发送失败，生成模拟签名用于测试');
-                const mockSignature = 'error_mock_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                console.log('模拟签名:', mockSignature);
-                return mockSignature;
-            }
-        }
+        // NOTE: The functions `buildTransaction` and `sendTransaction` have been removed 
+        // as they contained simulation logic and are no longer needed with the new 
+        // `signAndSendTransaction` flow.
 
         // Step 3: Confirm purchase transaction
         async confirmPurchase(txHash) {
