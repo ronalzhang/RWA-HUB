@@ -35,6 +35,8 @@ import base58
 TOKEN_PROGRAM_ID = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
 
 # 获取日志记录器
+from app.utils.error_handler import AppError
+
 logger = logging.getLogger(__name__)
 
 # 通用常量
@@ -1024,6 +1026,10 @@ class SolanaService:
             except Exception as e:
                 logger.warning(f"验证交易 {tx_hash} 时发生错误: {e}。将在 {delay} 秒后重试... ({i+1}/{max_retries})")
                 time.sleep(delay)
+        
+        logger.error(f"交易 {tx_hash} 在 {max_retries} 次尝试后仍未确认。")
+        return False
+               time.sleep(delay)
         
         logger.error(f"交易 {tx_hash} 在 {max_retries} 次尝试后仍未确认。")
         return False
