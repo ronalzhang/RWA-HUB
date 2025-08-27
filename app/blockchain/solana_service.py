@@ -909,36 +909,44 @@ class SolanaService:
         """
         构建购买资产的真实支付交易。
         此函数构建一个SPL代币转账交易，用于买家向平台支付USDC。
-        它会获取最新的区块哈希，并返回一个序列化的、待签名的交易（Base64编码）。
-        使用了项目内部兼容性路径来导入函数，确保环境一致性。
         """
-        logger.info(f"[FINAL FIX] 开始构建真实购买交易: 从 {buyer_address} 到 {seller_address}, 金额: {total_price} USDC")
+        # 关键修复：收款方应为平台地址，而不是资产所有者地址
+        platform_address = Config.PLATFORM_FEE_ADDRESS
+        if not platform_address:
+            raise AppError("CONFIGURATION_ERROR", "平台收款地址未配置。")
+
+        logger.info(f"开始构建购买交易: 从 {buyer_address} 到平台 {platform_address}, 金额: {total_price} USDC")
         
         try:
-            # 使用项目内部的兼容性库路径，这是关键修复
             from app.utils.solana_compat.publickey import PublicKey
             from app.utils.solana_compat.transaction import Transaction
             from app.utils.solana_compat.token.instructions import create_transfer_instruction, get_associated_token_address
             from decimal import Decimal
-            import time
+            import requests
+            import base64
 
             # 1. 获取公钥
             buyer_pk = PublicKey(buyer_address)
-            seller_pk = PublicKey(seller_address)
+            platform_pk = PublicKey(platform_address)
             usdc_mint_pk = PublicKey(USDC_MINT)
 
-            # 2. 获取关联代币账户 (使用兼容的函数)
+            # 2. 获取关联代币账户
             buyer_usdc_account = get_associated_token_address(buyer_pk, usdc_mint_pk)
-            seller_usdc_account = get_associated_token_address(seller_pk, usdc_mint_pk)
+            platform_usdc_account = get_associated_token_address(platform_pk, usdc_mint_pk)
             
-            logger.debug(f"买家USDC账户: {buyer_usdc_account}, 卖家USDC账户: {seller_usdc_account}")
+            # 关键防御性检查
+            if not buyer_usdc_account or not platform_usdc_account:
+                logger.error(f"无法找到关联代币账户: buyer={buyer_usdc_account}, platform={platform_usdc_account}")
+                raise AppError("ACCOUNT_NOT_FOUND", "无法找到用户或平台的USDC代币账户。")
+
+            logger.debug(f"买家USDC账户: {buyer_usdc_account}, 平台USDC账户: {platform_usdc_account}")
 
             # 3. 创建转账指令 (USDC有6位小数)
             amount_in_smallest_unit = int(total_price * Decimal('1000000'))
             
             instruction = create_transfer_instruction(
                 source=buyer_usdc_account,
-                dest=seller_usdc_account,
+                dest=platform_usdc_account,
                 owner=buyer_pk,
                 amount=amount_in_smallest_unit,
                 program_id=TOKEN_PROGRAM_ID
@@ -946,23 +954,17 @@ class SolanaService:
 
             # 4. 获取真实的、最新的区块哈希 (直接调用，绕过兼容层)
             blockhash = None
-            last_exception = None
             try:
-                import requests
-                # 直接从RPC客户端获取节点URL
                 rpc_url = self.connection.rpc_client.endpoint
                 headers = {'Content-Type': 'application/json'}
                 data = {
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "method": "getRecentBlockhash",
+                    "jsonrpc": "2.0", "id": 1, "method": "getRecentBlockhash",
                     "params": [{"commitment": "confirmed"}]
                 }
                 logger.info(f"绕过兼容层，直接调用RPC: {rpc_url}")
                 
-                # 直接发送请求，并加入 verify=False 来绕过环境问题
                 response = requests.post(rpc_url, json=data, timeout=30, verify=False)
-                response.raise_for_status()  # 如果HTTP状态码不是2xx，则抛出异常
+                response.raise_for_status()
                 
                 result = response.json()
                 if "error" in result:
@@ -975,10 +977,8 @@ class SolanaService:
                 logger.info(f"成功获取区块哈希: {blockhash}")
 
             except Exception as e:
-                last_exception = e
                 logger.error(f"直接调用RPC获取区块哈希失败: {e}", exc_info=True)
-                # 向上抛出统一的AppError
-                raise AppError("BLOCKCHAIN_NODE_ERROR", f"无法获取最新的区块哈希: {last_exception}")
+                raise AppError("BLOCKCHAIN_NODE_ERROR", f"无法获取最新的区块哈希: {e}")
 
             # 5. 创建并序列化交易
             transaction = Transaction(fee_payer=buyer_pk, recent_blockhash=blockhash)
@@ -991,14 +991,13 @@ class SolanaService:
             
             return encoded_tx
 
+        except AppError as e:
+            raise e
         except Exception as e:
             import traceback
             tb_str = traceback.format_exc()
-            logger.error(f"!!!!!!!!!! CATASTROPHIC ERROR IN build_purchase_transaction !!!!!!!!!!!")
-            logger.error(f"ERROR TYPE: {type(e)}")
-            logger.error(f"ERROR DETAILS: {e}")
-            logger.error(f"FULL TRACEBACK: {tb_str}")
-            raise AppError("TRANSACTION_BUILD_FAILED", f"构建交易失败: {e}")
+            logger.error(f"构建购买交易时发生未知严重错误: {e}\n{tb_str}")
+            raise AppError("TRANSACTION_BUILD_FAILED", f"构建交易时发生未知错误: {e}")
 
     def verify_transaction(self, tx_hash: str, max_retries: int = 5, delay: int = 3) -> bool:
         """
