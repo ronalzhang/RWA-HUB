@@ -56,8 +56,8 @@ class Client:
             logger.error(f"解析Solana RPC响应时发生JSON解析错误: {str(e)}")
             return {"error": {"message": f"JSON解析错误: {str(e)}"}}
         except Exception as e:
-            logger.error(f"处理Solana RPC请求时发生未知错误: {str(e)}")
-            return {"error": {"message": f"未知错误: {str(e)}"}}
+            logger.error(f"处理Solana RPC请求时发生未知错误: {repr(e)}")
+            return {"error": {"message": f"未知错误: {repr(e)}"}}
     
     def get_account_info(self, pubkey: str, commitment: Optional[str] = None) -> Dict[str, Any]:
         """Get account info."""
