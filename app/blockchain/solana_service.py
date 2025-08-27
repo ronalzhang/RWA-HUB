@@ -1029,7 +1029,3 @@ class SolanaService:
         
         logger.error(f"交易 {tx_hash} 在 {max_retries} 次尝试后仍未确认。")
         return False
-               time.sleep(delay)
-        
-        logger.error(f"交易 {tx_hash} 在 {max_retries} 次尝试后仍未确认。")
-        return False
