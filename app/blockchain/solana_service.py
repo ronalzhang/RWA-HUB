@@ -910,28 +910,15 @@ class SolanaService:
         构建购买资产的真实支付交易。
         此函数构建一个SPL代币转账交易，用于买家向平台支付USDC。
         它会获取最新的区块哈希，并返回一个序列化的、待签名的交易（Base64编码）。
-        失败时会直接抛出异常，不产生模拟数据。
-
-        Args:
-            buyer_address (str): 买家钱包地址。
-            seller_address (str): 卖家/平台收款地址。
-            token_mint_address (str): (未使用) 资产代币的Mint地址。
-            amount (int): (未使用) 购买的资产代币数量。
-            total_price (Decimal): 需要支付的USDC总价。
-
-        Returns:
-            str: Base64编码的、待签名的序列化交易。
-        
-        Raises:
-            AppError: 如果任何步骤失败（如获取区块哈希、构建交易等）。
+        使用了项目内部兼容性路径来导入函数，确保环境一致性。
         """
-        logger.info(f"开始构建真实购买交易: 从 {buyer_address} 到 {seller_address}, 金额: {total_price} USDC")
+        logger.info(f"[FINAL FIX] 开始构建真实购买交易: 从 {buyer_address} 到 {seller_address}, 金额: {total_price} USDC")
         
         try:
-            # 正确的导入
+            # 使用项目内部的兼容性库路径，这是关键修复
             from app.utils.solana_compat.publickey import PublicKey
             from app.utils.solana_compat.transaction import Transaction
-            from spl.token.client import Token
+            from app.utils.solana_compat.token.instructions import create_transfer_instruction, get_associated_token_address
             from decimal import Decimal
             import time
 
@@ -940,23 +927,21 @@ class SolanaService:
             seller_pk = PublicKey(seller_address)
             usdc_mint_pk = PublicKey(USDC_MINT)
 
-            # 2. 获取关联代币账户 (使用兼容的方式)
-            token_client = Token(self.connection, usdc_mint_pk, TOKEN_PROGRAM_ID, None)
-            buyer_usdc_account = token_client.get_associated_token_address(buyer_pk)
-            seller_usdc_account = token_client.get_associated_token_address(seller_pk)
+            # 2. 获取关联代币账户 (使用兼容的函数)
+            buyer_usdc_account = get_associated_token_address(buyer_pk, usdc_mint_pk)
+            seller_usdc_account = get_associated_token_address(seller_pk, usdc_mint_pk)
             
             logger.debug(f"买家USDC账户: {buyer_usdc_account}, 卖家USDC账户: {seller_usdc_account}")
 
             # 3. 创建转账指令 (USDC有6位小数)
             amount_in_smallest_unit = int(total_price * Decimal('1000000'))
             
-            # 使用兼容的静态方法调用
-            instruction = Token.create_transfer_instruction(
-                program_id=TOKEN_PROGRAM_ID,
+            instruction = create_transfer_instruction(
                 source=buyer_usdc_account,
                 dest=seller_usdc_account,
                 owner=buyer_pk,
-                amount=amount_in_smallest_unit
+                amount=amount_in_smallest_unit,
+                program_id=TOKEN_PROGRAM_ID
             )
 
             # 4. 获取真实的、最新的区块哈希 (带重试机制)
