@@ -9,7 +9,7 @@ if (window.purchaseHandlerInitialized) {
 } else {
     window.purchaseHandlerInitialized = true;
 
-    // Purchase flow manager
+    // Purchase flow manager (V3 Refactored)
     class PurchaseFlowManager {
         constructor() {
             this.currentTrade = null;
@@ -73,9 +73,9 @@ if (window.purchaseHandlerInitialized) {
             }
         }
 
-        // Step 1: Create purchase transaction
+        // Step 1: Create purchase transaction (V3)
         async createPurchase(assetId, amount) {
-            console.log(`开始创建购买交易: 资产ID=${assetId}, 数量=${amount}`);
+            console.log(`[V3] 开始创建购买交易: 资产ID=${assetId}, 数量=${amount}`);
 
             const walletAddress = this.getWalletAddress();
             if (!walletAddress) {
@@ -83,30 +83,30 @@ if (window.purchaseHandlerInitialized) {
                 return false;
             }
 
-            this.showLoading('正在创建购买交易...');
+            this.showLoading('正在向服务器请求交易...');
 
             try {
-                const response = await fetch('/api/v2/trades/create', {
+                const response = await fetch('/api/trades/v3/create', { // <-- V3 Endpoint
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Wallet-Address': walletAddress
                     },
                     body: JSON.stringify({
                         asset_id: assetId,
-                        amount: amount
+                        amount: amount,
+                        wallet_address: walletAddress // <-- V3 Payload
                     })
                 });
 
                 const data = await response.json();
-                console.log('创建交易API响应:', data);
+                console.log('[V3] 创建交易API响应:', data);
 
                 if (data.success) {
                     this.currentTrade = {
                         id: data.trade_id,
                         assetId: assetId,
                         amount: amount,
-                        transactionToSign: data.transaction_to_sign
+                        transactionToSign: data.transaction // <-- V3 response field
                     };
 
                     // Step 2: Sign transaction
@@ -115,20 +115,20 @@ if (window.purchaseHandlerInitialized) {
                     throw new Error(data.message || '创建交易失败');
                 }
             } catch (error) {
-                console.error('创建购买交易失败:', error);
+                console.error('[V3] 创建购买交易失败:', error);
                 this.showError('创建交易失败', error.message || '请稍后重试');
                 return false;
             }
         }
 
-        // Step 2: Sign and send the transaction, then confirm with the backend
+        // Step 2: Sign and send the transaction, then confirm with the backend (V3)
         async signAndConfirmTransaction() {
             if (!this.currentTrade || !this.currentTrade.transactionToSign) {
                 this.showError('系统错误', '没有待处理的交易或交易数据');
                 return false;
             }
 
-            console.log('开始签名并发送真实交易:', this.currentTrade);
+            console.log('[V3] 开始签名并发送真实交易:', this.currentTrade);
             this.showLoading('请在钱包中确认交易...');
 
             try {
@@ -145,12 +145,11 @@ if (window.purchaseHandlerInitialized) {
                     throw new Error('客户端库缺失，无法处理交易。');
                 }
                 const transaction = window.solanaWeb3.Transaction.from(serializedTransaction);
-                console.log('成功反序列化交易，准备请求钱包签名...');
+                console.log('[V3] 成功反序列化交易，准备请求钱包签名...');
 
                 // 3. Sign and send the transaction using the wallet adapter.
-                // This method prompts the user, signs, sends the transaction, and returns the transaction signature (txHash).
                 const txHash = await window.solana.signAndSendTransaction(transaction);
-                console.log('交易已签名并发送，交易哈希:', txHash);
+                console.log('[V3] 交易已签名并发送，交易哈希:', txHash);
 
                 if (!txHash) {
                     throw new Error('未能获取交易哈希，交易可能已失败。');
@@ -162,8 +161,7 @@ if (window.purchaseHandlerInitialized) {
                 return await this.confirmPurchase(txHash);
 
             } catch (error) {
-                console.error('签名或发送交易失败:', error);
-                // Check for user rejection, which can have different error codes or messages
+                console.error('[V3] 签名或发送交易失败:', error);
                 if (error.message && (error.message.includes('User rejected') || error.code === 4001)) {
                     this.showError('交易已取消', '您在钱包中拒绝了交易请求。');
                 } else {
@@ -173,23 +171,17 @@ if (window.purchaseHandlerInitialized) {
             }
         }
 
-        // NOTE: The functions `buildTransaction` and `sendTransaction` have been removed 
-        // as they contained simulation logic and are no longer needed with the new 
-        // `signAndSendTransaction` flow.
-
-        // Step 3: Confirm purchase transaction
+        // Step 3: Confirm purchase transaction (V3)
         async confirmPurchase(txHash) {
-            console.log(`开始确认购买交易: 交易ID=${this.currentTrade.id}, 哈希=${txHash}`);
+            console.log(`[V3] 开始确认购买交易: 交易ID=${this.currentTrade.id}, 哈希=${txHash}`);
 
-            this.showLoading('正在确认交易...');
+            this.showLoading('正在向服务器确认交易...');
 
             try {
-                const walletAddress = this.getWalletAddress();
-                const response = await fetch('/api/v2/trades/confirm', {
+                const response = await fetch('/api/trades/v3/confirm', { // <-- V3 Endpoint
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Wallet-Address': walletAddress
                     },
                     body: JSON.stringify({
                         trade_id: this.currentTrade.id,
@@ -198,14 +190,13 @@ if (window.purchaseHandlerInitialized) {
                 });
 
                 const data = await response.json();
-                console.log('确认交易API响应:', data);
+                console.log('[V3] 确认交易API响应:', data);
 
                 if (data.success) {
                     this.showSuccess(
                         '购买成功！',
                         `您已成功购买 ${this.currentTrade.amount} 个代币`,
                         () => {
-                            // Refresh page to show latest status
                             window.location.reload();
                         }
                     );
@@ -215,7 +206,7 @@ if (window.purchaseHandlerInitialized) {
                     throw new Error(data.message || '确认交易失败');
                 }
             } catch (error) {
-                console.error('确认购买交易失败:', error);
+                console.error('[V3] 确认购买交易失败:', error);
                 this.showError('确认交易失败', error.message || '请稍后重试');
                 return false;
             }
