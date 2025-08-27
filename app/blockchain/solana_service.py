@@ -960,8 +960,8 @@ class SolanaService:
                 }
                 logger.info(f"绕过兼容层，直接调用RPC: {rpc_url}")
                 
-                # 直接发送请求
-                response = requests.post(rpc_url, json=data, timeout=30)
+                # 直接发送请求，并加入 verify=False 来绕过环境问题
+                response = requests.post(rpc_url, json=data, timeout=30, verify=False)
                 response.raise_for_status()  # 如果HTTP状态码不是2xx，则抛出异常
                 
                 result = response.json()
