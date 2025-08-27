@@ -944,27 +944,40 @@ class SolanaService:
                 program_id=TOKEN_PROGRAM_ID
             )
 
-            # 4. 获取真实的、最新的区块哈希 (带重试机制)
+            # 4. 获取真实的、最新的区块哈希 (直接调用，绕过兼容层)
             blockhash = None
             last_exception = None
-            for attempt in range(3):
-                try:
-                    # 使用 get_recent_blockhash 并处理字典响应
-                    result = self.connection.get_recent_blockhash()
-                    if isinstance(result, dict) and 'result' in result and 'value' in result['result']:
-                        blockhash = result['result']['value']['blockhash']
-                        if blockhash:
-                            logger.info(f"成功获取区块哈希: {blockhash} (尝试 {attempt + 1})")
-                            break
-                    raise ValueError(f"无效的区块哈希响应: {result}")
-                except Exception as e:
-                    last_exception = e
-                    logger.warning(f"获取区块哈希失败 (尝试 {attempt + 1}/3): {e}")
-                    if attempt < 2:
-                        time.sleep(1)
-            
-            if not blockhash:
-                logger.error(f"重试3次后仍无法获取区块哈希。最后错误: {last_exception}")
+            try:
+                import requests
+                # 直接从RPC客户端获取节点URL
+                rpc_url = self.connection.rpc_client.endpoint
+                headers = {'Content-Type': 'application/json'}
+                data = {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "getRecentBlockhash",
+                    "params": [{"commitment": "confirmed"}]
+                }
+                logger.info(f"绕过兼容层，直接调用RPC: {rpc_url}")
+                
+                # 直接发送请求
+                response = requests.post(rpc_url, json=data, timeout=30)
+                response.raise_for_status()  # 如果HTTP状态码不是2xx，则抛出异常
+                
+                result = response.json()
+                if "error" in result:
+                    raise ValueError(f"RPC节点返回错误: {result['error']}")
+                
+                blockhash = result.get('result', {}).get('value', {}).get('blockhash')
+                if not blockhash:
+                    raise ValueError("RPC响应中缺少blockhash")
+                
+                logger.info(f"成功获取区块哈希: {blockhash}")
+
+            except Exception as e:
+                last_exception = e
+                logger.error(f"直接调用RPC获取区块哈希失败: {e}", exc_info=True)
+                # 向上抛出统一的AppError
                 raise AppError("BLOCKCHAIN_NODE_ERROR", f"无法获取最新的区块哈希: {last_exception}")
 
             # 5. 创建并序列化交易
