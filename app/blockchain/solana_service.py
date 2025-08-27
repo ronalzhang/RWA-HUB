@@ -949,11 +949,13 @@ class SolanaService:
             last_exception = None
             for attempt in range(3):
                 try:
-                    result = self.connection.get_latest_blockhash()
-                    if result and result.value and result.value.blockhash:
-                        blockhash = str(result.value.blockhash)
-                        logger.info(f"成功获取区块哈希: {blockhash} (尝试 {attempt + 1})")
-                        break
+                    # 使用 get_recent_blockhash 并处理字典响应
+                    result = self.connection.get_recent_blockhash()
+                    if isinstance(result, dict) and 'result' in result and 'value' in result['result']:
+                        blockhash = result['result']['value']['blockhash']
+                        if blockhash:
+                            logger.info(f"成功获取区块哈希: {blockhash} (尝试 {attempt + 1})")
+                            break
                     raise ValueError(f"无效的区块哈希响应: {result}")
                 except Exception as e:
                     last_exception = e
