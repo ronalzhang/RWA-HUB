@@ -450,8 +450,9 @@ class TradeServiceV3:
                         '交易不存在'
                     )
 
-                if trade.status != TradeStatus.PENDING.value:
-                    logger.warning(f"[{confirmation_id}] 交易状态不正确: {trade.status}, 期望: {TradeStatus.PENDING.value}")
+                # 允许重新确认失败的交易（可能是RPC延迟导致的误判）
+                if trade.status not in [TradeStatus.PENDING.value, TradeStatus.FAILED.value]:
+                    logger.warning(f"[{confirmation_id}] 交易状态不正确: {trade.status}, 期望: {TradeStatus.PENDING.value} 或 {TradeStatus.FAILED.value}")
                     return TradeServiceV3._create_error_response(
                         TradeServiceV3.ErrorCodes.INVALID_TRADE_STATUS, 
                         f'交易状态不正确 ({trade.status})，无法确认'
