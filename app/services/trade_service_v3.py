@@ -252,12 +252,10 @@ class TradeServiceV3:
             
             try:
                 buyer_pubkey = Pubkey.from_string(wallet_address)
-                tx = Transaction()
-                tx.add(instruction)
+                tx = Transaction.new_with_payer([instruction], buyer_pubkey)
                 tx.recent_blockhash = recent_blockhash
-                tx.fee_payer = buyer_pubkey
                 
-                logger.debug(f"[{transaction_id}] 交易构建成功: 指令数={len(tx.instructions)}")
+                logger.debug(f"[{transaction_id}] 交易构建成功: 指令数={len(tx.message.instructions)}, 账户数={len(tx.message.account_keys)}")
                 
             except Exception as e:
                 logger.error(f"[{transaction_id}] 交易构建失败: {e}", exc_info=True)
