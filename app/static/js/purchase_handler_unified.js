@@ -491,5 +491,42 @@ if (window.purchaseHandlerInitialized) {
         return window.purchaseFlowManager.initiatePurchase(assetId, amount);
     };
 
+    // 绑定购买按钮事件
+    function bindPurchaseButton() {
+        const buyButton = document.getElementById('buy-button');
+        if (buyButton && !buyButton.hasAttribute('data-event-bound')) {
+            buyButton.setAttribute('data-event-bound', 'true');
+            buyButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                console.log('购买按钮被点击');
+                
+                // 获取资产ID和购买数量
+                const assetId = parseInt(this.getAttribute('data-asset-id'));
+                const amountInput = document.getElementById('purchase-amount');
+                const amount = parseInt(amountInput ? amountInput.value : 1);
+                
+                console.log('购买参数:', { assetId, amount });
+                
+                if (!assetId || !amount || amount <= 0) {
+                    alert('请输入有效的购买数量');
+                    return;
+                }
+                
+                // 调用购买流程
+                window.initiatePurchase(assetId, amount);
+            });
+            
+            console.log('✅ 购买按钮事件已绑定');
+        }
+    }
+
+    // DOM加载完成后绑定事件
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bindPurchaseButton);
+    } else {
+        bindPurchaseButton();
+    }
+
     console.log('✅ 统一购买处理器初始化完成');
 }
