@@ -708,6 +708,7 @@ class TradeServiceV3:
                 # 设置较高的确认级别以确保交易最终性
                 tx_response = client.get_transaction(signature, max_supported_transaction_version=0)
 
+                # 简化验证逻辑：只要有响应就认为交易存在
                 if not tx_response or not tx_response.value:
                     if attempt < max_retries:
                         logger.warning(f"[{confirmation_id}] 链上交易未找到，将重试 (尝试 {attempt + 1}/{max_retries + 1})")
@@ -721,25 +722,10 @@ class TradeServiceV3:
                         }
                 
                 # 添加详细的调试日志
-                logger.debug(f"[{confirmation_id}] 交易响应详情: tx_response={bool(tx_response)}, value={bool(tx_response.value if tx_response else None)}, transaction={bool(tx_response.value.transaction if tx_response and tx_response.value else None)}")
+                logger.info(f"[{confirmation_id}] 交易响应详情: tx_response={bool(tx_response)}, value={bool(tx_response.value if tx_response else None)}")
                 
-                # 检查交易是否存在（更宽松的条件）
-                if not tx_response.value.transaction:
-                    logger.warning(f"[{confirmation_id}] 交易数据为空，但响应存在，可能是交易格式问题")
-                    # 如果有响应但没有transaction字段，仍然认为交易存在
-                    if tx_response.value.meta and tx_response.value.meta.err is None:
-                        logger.info(f"[{confirmation_id}] 交易元数据显示成功，接受验证")
-                    else:
-                        if attempt < max_retries:
-                            logger.warning(f"[{confirmation_id}] 交易数据异常，将重试 (尝试 {attempt + 1}/{max_retries + 1})")
-                            last_exception = Exception("交易数据格式异常")
-                            continue
-                        else:
-                            return {
-                                'valid': False,
-                                'error_code': TradeServiceV3.ErrorCodes.TRANSACTION_NOT_FOUND,
-                                'message': '交易数据格式异常'
-                            }
+                # 如果有响应和value，就认为交易存在，不再检查transaction字段
+                logger.info(f"[{confirmation_id}] 交易在区块链上找到，继续验证")
                 
                 # 检查交易是否执行失败
                 transaction_error = None
