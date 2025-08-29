@@ -127,7 +127,7 @@ class TradeServiceV3:
             try:
                 logger.debug(f"[{transaction_id}] 数据库事务开始: 查询用户和创建交易记录")
                 
-                user = User.query.filter_by(wallet_address=wallet_address).first()
+                user = User.query.filter_by(solana_address=wallet_address).first()
                 TradeServiceV3._log_database_operation(transaction_id, "QUERY_USER", {
                     "wallet_address": wallet_address,
                     "found": user is not None
