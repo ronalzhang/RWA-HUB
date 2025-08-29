@@ -109,72 +109,56 @@ echo ""
 # 连接服务器并执行部署
 echo "🔗 连接服务器并执行部署..."
 
-sshpass -p "$SERVER_PASSWORD" ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_HOST" << EOF
+
+REMOTE_SCRIPT="
 set -e
-
-echo "🔧 在服务器上执行部署..."
-
-# 进入项目目录
-cd $SERVER_PATH
-
-# 拉取最新代码
-echo "📥 拉取最新代码..."
-git pull origin $GITHUB_BRANCH
-
-# 检查PM2是否安装
+echo '🔧 在服务器上执行部署...'
+cd \$SERVER_PATH
+echo '📥 拉取最新代码...'
+git pull origin \$GITHUB_BRANCH
 if ! command -v pm2 &> /dev/null; then
-    echo "❌ PM2未安装，请先安装PM2"
+    echo '❌ PM2未安装，请先安装PM2'
     exit 1
 fi
-
-# 重启指定的PM2应用
-echo "🔄 重启PM2应用: $PM2_APP_NAME"
-if pm2 list | grep -q "$PM2_APP_NAME"; then
-    pm2 restart $PM2_APP_NAME
-    echo "✅ PM2应用 $PM2_APP_NAME 重启成功"
+echo '🔄 重启PM2应用: \$PM2_APP_NAME'
+if pm2 list | grep -q '\$PM2_APP_NAME'; then
+    pm2 restart \$PM2_APP_NAME
+    echo '✅ PM2应用 \$PM2_APP_NAME 重启成功'
 else
-    echo "❌ PM2应用 $PM2_APP_NAME 不存在"
-    echo "📋 当前PM2应用列表:"
+    echo '❌ PM2应用 \$PM2_APP_NAME 不存在'
+    echo '📋 当前PM2应用列表:'
     pm2 list
     exit 1
 fi
-
-# 保存PM2配置，确保重启后自动启动
-echo "💾 保存PM2配置..."
+echo '💾 保存PM2配置...'
 pm2 save
-
-# 等待应用启动
-echo "⏳ 等待应用启动..."
+echo '⏳ 等待应用启动...'
 sleep 3
-
-# 检查应用状态
-echo "🔍 检查应用状态..."
-if pm2 list | grep -q "$PM2_APP_NAME.*online"; then
-    echo "✅ 应用运行正常"
-    
-    # 测试API连接
-    echo "🧪 测试API连接..."
-    if curl -s --max-time 10 http://localhost:$APP_PORT/api/health/ > /dev/null; then
-        echo "✅ API连接正常"
+echo '🔍 检查应用状态...'
+if pm2 list | grep -q '\$PM2_APP_NAME.*online'; then
+    echo '✅ 应用运行正常'
+    echo '🧪 测试API连接...'
+    if curl -s --max-time 10 http://localhost:\$APP_PORT/api/health/ > /dev/null; then
+        echo '✅ API连接正常'
     else
-        echo "⚠️  API连接测试超时，但应用已启动"
+        echo '⚠️  API连接测试超时，但应用已启动'
     fi
-    
-    # 显示应用信息
-    echo "📊 应用状态:"
-    pm2 list | grep "$PM2_APP_NAME" || true
-    
+    echo '📊 应用状态:'
+    pm2 list | grep '\$PM2_APP_NAME' || true
 else
-    echo "❌ 应用启动失败"
-    echo "📋 PM2状态:"
+    echo '❌ 应用启动失败'
+    echo '📋 PM2状态:'
     pm2 list
-    echo "📝 最近日志:"
-    pm2 logs $PM2_APP_NAME --lines 10 --nostream || true
+    echo '📝 最近日志:'
+    pm2 logs \$PM2_APP_NAME --lines 10 --nostream || true
     exit 1
 fi
+echo '🎉 部署完成！'
+"
 
-echo "🎉 部署完成！"
-EOF
+sshpass -p "\$SERVER_PASSWORD" ssh -T -o StrictHostKeyChecking=no "\$SERVER_USER@\$SERVER_HOST" "\$REMOTE_SCRIPT"
+
+
 
 # 检查部署结果
 if [ $? -eq 0 ]; then
