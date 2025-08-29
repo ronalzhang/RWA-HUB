@@ -59,7 +59,7 @@ class SolanaConfigValidator:
             return False, None
     
     @classmethod
-    def validate_configuration(cls) -> Dict:
+    def validate_configuration(cls, app) -> Dict:
         """验证所有必需的Solana配置参数"""
         missing_params = []
         invalid_params = []
@@ -68,7 +68,7 @@ class SolanaConfigValidator:
         # 检查必需参数是否存在
         config_values = {}
         for param in cls.REQUIRED_PARAMS:
-            value = current_app.config.get(param)
+            value = app.config.get(param)
             config_values[param] = value
             
             if not value:
@@ -125,9 +125,9 @@ class SolanaConfigValidator:
         return result
     
     @classmethod
-    def get_configuration_status(cls) -> Dict:
+    def get_configuration_status(cls, app) -> Dict:
         """获取配置状态，包含详细信息用于调试"""
-        validation_result = cls.validate_configuration()
+        validation_result = cls.validate_configuration(app)
         
         status = {
             'timestamp': None,  # 可以添加时间戳
@@ -144,9 +144,9 @@ class SolanaConfigValidator:
         return status
     
     @classmethod
-    def log_configuration_status(cls) -> None:
+    def log_configuration_status(cls, app) -> None:
         """记录配置状态到日志"""
-        status = cls.get_configuration_status()
+        status = cls.get_configuration_status(app)
         
         if status['status'] == 'valid':
             logger.info(f"Solana配置验证: {status['summary']}")
@@ -163,9 +163,9 @@ class SolanaConfigValidator:
                 logger.error(f"无效配置参数: {param}")
     
     @classmethod
-    def raise_for_invalid_config(cls) -> None:
+    def raise_for_invalid_config(cls, app) -> None:
         """如果配置无效则抛出异常"""
-        validation_result = cls.validate_configuration()
+        validation_result = cls.validate_configuration(app)
         
         if not validation_result['valid']:
             error_details = []

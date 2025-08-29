@@ -200,7 +200,7 @@ class Config:
             # 使用SolanaConfigValidator进行详细日志记录
             try:
                 from app.services.solana_config_validator import SolanaConfigValidator
-                SolanaConfigValidator.log_configuration_status()
+                SolanaConfigValidator.log_configuration_status(app)
             except ImportError:
                 pass  # 如果导入失败，继续使用基本验证
                 
@@ -216,7 +216,7 @@ class Config:
             # 尝试使用SolanaConfigValidator记录详细错误
             try:
                 from app.services.solana_config_validator import SolanaConfigValidator
-                SolanaConfigValidator.log_configuration_status()
+                SolanaConfigValidator.log_configuration_status(app)
             except ImportError:
                 pass
         
