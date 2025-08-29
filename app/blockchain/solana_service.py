@@ -352,7 +352,9 @@ def get_usdc_balance(wallet_address: str) -> float:
             raise ValueError(f"无效的钱包地址格式: {wallet_address}")
         
         # USDC代币铸造地址（Devnet）
-        usdc_mint_address = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        # Devnet USDC: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+        # Mainnet USDC: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+        usdc_mint_address = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
         
         # 转换地址为PublicKey
         wallet_pubkey = Pubkey.from_string(wallet_address)

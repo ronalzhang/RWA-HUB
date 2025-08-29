@@ -1155,26 +1155,33 @@ def check_usdc_balance():
         from app.blockchain.solana_service import get_usdc_balance
         
         try:
+            current_app.logger.info(f"开始检查USDC余额 - 钱包: {wallet_address}")
             balance = get_usdc_balance(wallet_address)
             
-            current_app.logger.info(f"USDC余额查询成功 - 钱包: {wallet_address}, 余额: {balance}")
+            current_app.logger.info(f"USDC余额查询成功 - 钱包: {wallet_address}, 余额: {balance} USDC")
             
             return jsonify({
                 'success': True,
                 'balance': balance,
                 'wallet_address': wallet_address,
-                'message': '余额查询成功'
+                'usdc_mint': '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',  # Devnet USDC
+                'network': 'devnet',
+                'message': f'余额查询成功: {balance} USDC'
             }), 200
             
         except Exception as balance_error:
-            current_app.logger.warning(f"USDC余额查询失败 - 钱包: {wallet_address}, 错误: {str(balance_error)}")
+            error_msg = str(balance_error)
+            current_app.logger.error(f"USDC余额查询失败 - 钱包: {wallet_address}, 错误: {error_msg}", exc_info=True)
             
-            # 如果余额查询失败，返回0余额但不阻止交易（让区块链自己处理）
+            # 返回详细的错误信息用于调试
             return jsonify({
-                'success': True,
+                'success': False,
                 'balance': 0,
                 'wallet_address': wallet_address,
-                'message': '无法获取余额，可能是新钱包或网络问题'
+                'usdc_mint': '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
+                'network': 'devnet',
+                'error': error_msg,
+                'message': f'余额查询失败: {error_msg}'
             }), 200
 
     except Exception as e:

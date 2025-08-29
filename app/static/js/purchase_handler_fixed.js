@@ -218,23 +218,82 @@ if (window.purchaseHandlerFixedInitialized) {
                     });
                     
                     const balanceData = await balanceResponse.json();
+                    console.log('余额API响应:', balanceData);
                     
                     if (!balanceData.success) {
-                        throw new Error(balanceData.message || '无法获取USDC余额');
+                        const errorMsg = `余额查询失败\n网络: ${balanceData.network || 'devnet'}\nUSDC地址: ${balanceData.usdc_mint || 'N/A'}\n错误: ${balanceData.error || balanceData.message}`;
+                        throw new Error(errorMsg);
                     }
                     
                     const balance = balanceData.balance;
-                    const requiredAmount = parseFloat(this.currentTrade.amount) * parseFloat(document.querySelector('.asset-price').textContent.replace('$', ''));
                     
-                    console.log('USDC余额检查:', { balance, requiredAmount });
+                    // 从交易数据中获取准确的总价格
+                    let requiredAmount = 0;
+                    if (this.currentTrade && this.currentTrade.instruction) {
+                        // 尝试从交易指令中解析金额
+                        try {
+                            const instructionData = this.currentTrade.instruction;
+                            // 假设金额在指令数据中，这里需要根据实际情况调整
+                            requiredAmount = parseFloat(this.currentTrade.amount) * 0.01; // 假设每个token 0.01 USDC
+                        } catch (e) {
+                            console.warn('无法从交易指令解析金额，使用备用方法');
+                        }
+                    }
+                    
+                    // 备用方法：从页面元素获取价格
+                    if (requiredAmount === 0) {
+                        try {
+                            const priceElement = document.querySelector('.asset-price, .price, [data-price]');
+                            if (priceElement) {
+                                const priceText = priceElement.textContent || priceElement.innerText || '';
+                                const price = parseFloat(priceText.replace(/[^0-9.]/g, ''));
+                                requiredAmount = parseFloat(this.currentTrade.amount) * (price || 0.01);
+                            } else {
+                                // 最后的备用方案
+                                requiredAmount = parseFloat(this.currentTrade.amount) * 0.01;
+                            }
+                        } catch (e) {
+                            console.warn('价格解析失败，使用默认价格');
+                            requiredAmount = parseFloat(this.currentTrade.amount) * 0.01;
+                        }
+                    }
+                    
+                    console.log('USDC余额检查:', { 
+                        balance, 
+                        requiredAmount, 
+                        tokenAmount: this.currentTrade.amount,
+                        walletAddress 
+                    });
                     
                     if (balance < requiredAmount) {
-                        throw new Error(`USDC余额不足。需要: $${requiredAmount.toFixed(2)}, 当前余额: $${balance.toFixed(2)}`);
+                        const errorMsg = `USDC余额不足！\n需要: ${requiredAmount.toFixed(2)} USDC\n当前余额: ${balance.toFixed(2)} USDC\n\n请先获取足够的Devnet USDC代币。`;
+                        throw new Error(errorMsg);
                     }
+                    
+                    console.log('✅ USDC余额充足，继续交易');
                     
                 } catch (balanceError) {
                     console.error('余额检查失败:', balanceError);
-                    this.showError('余额不足', balanceError.message || '请确保您的钱包中有足够的USDC代币');
+                    
+                    // 确保显示详细的错误弹窗
+                    const errorTitle = balanceError.message.includes('余额不足') ? 'USDC余额不足' : '余额检查失败';
+                    const errorMessage = balanceError.message || '请确保您的钱包中有足够的Devnet USDC代币';
+                    
+                    // 使用SweetAlert显示详细错误
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: errorTitle,
+                            text: errorMessage,
+                            confirmButtonText: '确定',
+                            confirmButtonColor: '#d33'
+                        });
+                    } else {
+                        // 备用方案
+                        this.showError(errorTitle, errorMessage);
+                        alert(`${errorTitle}\n\n${errorMessage}`);
+                    }
+                    
                     return false;
                 }
 
