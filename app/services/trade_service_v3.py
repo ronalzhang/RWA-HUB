@@ -327,7 +327,7 @@ class TradeServiceV3:
                     'transaction_id': transaction_id,
                     'asset_id': asset_id,
                     'amount': float(amount),
-                    'total_cost': float(total_cost),
+                    'total_cost': float(total_price),
                     'wallet_address': wallet_address,
                     'fee_payer': wallet_address,
                     'status': 'pending_signature',
