@@ -88,56 +88,12 @@ class Config:
     }
 
     @staticmethod
-    def validate_solana_configuration():
-        """验证所有必需的Solana配置参数是否存在 - 使用SolanaConfigValidator"""
+    def validate_solana_configuration(app):
+        """验证所有必需的Solana配置参数 - 使用SolanaConfigValidator"""
         # Import here to avoid circular imports
         from app.services.solana_config_validator import SolanaConfigValidator
         
-        # Create a mock Flask app context for validation if not in app context
-        try:
-            from flask import current_app
-            # If we're in app context, use the validator directly
-            result = SolanaConfigValidator.validate_configuration()
-        except RuntimeError:
-            # If not in app context, create a temporary config dict
-            config_dict = {
-                'SOLANA_RPC_URL': os.environ.get('SOLANA_RPC_URL'),
-                'PLATFORM_TREASURY_WALLET': os.environ.get('PLATFORM_TREASURY_WALLET'),
-                'PAYMENT_TOKEN_MINT_ADDRESS': os.environ.get('PAYMENT_TOKEN_MINT_ADDRESS'),
-                'PAYMENT_TOKEN_DECIMALS': os.environ.get('PAYMENT_TOKEN_DECIMALS'),
-                'SOLANA_PROGRAM_ID': os.environ.get('SOLANA_PROGRAM_ID')
-            }
-            
-            # Validate manually when not in app context
-            missing_params = []
-            invalid_params = []
-            
-            for param_name, param_value in config_dict.items():
-                if not param_value:
-                    missing_params.append(param_name)
-                elif param_name == 'SOLANA_RPC_URL':
-                    if not SolanaConfigValidator.validate_rpc_url(param_value):
-                        invalid_params.append(f"{param_name}: 无效的RPC URL格式")
-                elif param_name in ['PLATFORM_TREASURY_WALLET', 'SOLANA_PROGRAM_ID']:
-                    if not SolanaConfigValidator.validate_wallet_address(param_value):
-                        invalid_params.append(f"{param_name}: 无效的地址格式")
-                elif param_name == 'PAYMENT_TOKEN_MINT_ADDRESS':
-                    if not SolanaConfigValidator.validate_token_mint_address(param_value):
-                        invalid_params.append(f"{param_name}: 无效的代币铸造地址格式")
-                elif param_name == 'PAYMENT_TOKEN_DECIMALS':
-                    is_valid, _ = SolanaConfigValidator.validate_decimals(str(param_value))
-                    if not is_valid:
-                        invalid_params.append(f"{param_name}: 必须是0-18之间的整数")
-            
-            if missing_params or invalid_params:
-                error_msg = "Solana配置验证失败:\n"
-                if missing_params:
-                    error_msg += f"缺失参数: {', '.join(missing_params)}\n"
-                if invalid_params:
-                    error_msg += f"无效参数: {', '.join(invalid_params)}\n"
-                raise ValueError(error_msg)
-            
-            return True
+        result = SolanaConfigValidator.validate_configuration(app)
         
         if not result['valid']:
             error_parts = []
@@ -194,7 +150,7 @@ class Config:
         
         # 验证Solana配置
         try:
-            Config.validate_solana_configuration()
+            Config.validate_solana_configuration(app)
             print("✓ Solana配置验证通过")
             
             # 使用SolanaConfigValidator进行详细日志记录
