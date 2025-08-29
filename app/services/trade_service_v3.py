@@ -49,6 +49,7 @@ class TradeServiceV3:
         INVALID_TRADE_STATUS = 'INVALID_TRADE_STATUS'
         TRANSACTION_NOT_FOUND = 'TRANSACTION_NOT_FOUND'
         TRANSACTION_FAILED_ON_CHAIN = 'TRANSACTION_FAILED_ON_CHAIN'
+        USER_NOT_FOUND = 'USER_NOT_FOUND'
 
     @staticmethod
     def create_purchase(wallet_address: str, asset_id: int, amount: int):
@@ -135,7 +136,12 @@ class TradeServiceV3:
                 })
                 if not user:
                     logger.debug(f"[{transaction_id}] 用户不存在，创建新用户: {wallet_address}")
-                    user = User(wallet_address=wallet_address, wallet_type='solana')
+                    user = User(
+                        username=f'user_{wallet_address[:8]}',
+                        email=f'{wallet_address[:8]}@wallet.generated',
+                        solana_address=wallet_address,
+                        wallet_type='solana'
+                    )
                     db.session.add(user)
                     TradeServiceV3._log_database_operation(transaction_id, "CREATE_USER", {
                         "wallet_address": wallet_address,
