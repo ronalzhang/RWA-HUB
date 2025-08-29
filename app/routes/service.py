@@ -1,8 +1,8 @@
 import os
 from flask import jsonify, current_app, Blueprint, request
 from app.blockchain.asset_service import AssetService
-from app.blockchain.solana import SolanaClient
 from app.blockchain.solana_service import validate_solana_address, check_transaction
+# from app.blockchain.solana_service import SolanaClient  # 暂时注释掉，类不存在
 from . import service_bp  # 从__init__.py导入正确的蓝图
 import json
 import logging
@@ -40,14 +40,13 @@ def service_wallet_status_with_address(wallet_address):
         }), 400
         
     try:
-        # 初始化Solana客户端
-        solana_client = SolanaClient(wallet_address=wallet_address)
-        
-        # 获取钱包状态
-        status = solana_client.get_wallet_status()
-        
-        # 添加成功标志
-        status['success'] = True
+        # 暂时返回基本的钱包状态信息
+        # TODO: 实现完整的SolanaClient类
+        status = {
+            'wallet_address': wallet_address,
+            'is_valid': validate_solana_address(wallet_address),
+            'success': True
+        }
         
         return jsonify(status)
     except Exception as e:
