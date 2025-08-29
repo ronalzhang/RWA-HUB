@@ -567,10 +567,19 @@ class TradeServiceV3:
                 })
                 logger.debug(f"[{confirmation_id}] 交易状态更新: {old_trade_status} -> {TradeStatus.COMPLETED.value}, TxHash={tx_hash}")
                 
+                # 通过trader_address查找用户
+                user = User.query.filter_by(wallet_address=trade.trader_address).first()
+                if not user:
+                    logger.error(f"[{confirmation_id}] 无法找到交易者用户: {trade.trader_address}")
+                    return TradeServiceV3._create_error_response(
+                        TradeServiceV3.ErrorCodes.USER_NOT_FOUND, 
+                        '无法找到交易者用户'
+                    )
+                
                 # 更新或创建用户持仓
-                holding = Holding.query.filter_by(user_id=trade.user_id, asset_id=trade.asset_id).first()
+                holding = Holding.query.filter_by(user_id=user.id, asset_id=trade.asset_id).first()
                 TradeServiceV3._log_database_operation(confirmation_id, "QUERY_HOLDING", {
-                    "user_id": trade.user_id,
+                    "user_id": user.id,
                     "asset_id": trade.asset_id,
                     "found": holding is not None
                 })
@@ -578,28 +587,28 @@ class TradeServiceV3:
                     old_amount = holding.amount
                     holding.amount += trade.amount
                     TradeServiceV3._log_database_operation(confirmation_id, "UPDATE_HOLDING", {
-                        "user_id": trade.user_id,
+                        "user_id": user.id,
                         "asset_id": trade.asset_id,
                         "old_amount": old_amount,
                         "new_amount": holding.amount,
                         "added_amount": trade.amount
                     })
-                    logger.debug(f"[{confirmation_id}] 更新现有用户持仓: UserID={trade.user_id}, AssetID={trade.asset_id}, {old_amount} -> {holding.amount}")
+                    logger.debug(f"[{confirmation_id}] 更新现有用户持仓: UserID={user.id}, AssetID={trade.asset_id}, {old_amount} -> {holding.amount}")
                 else:
                     holding = Holding(
-                        user_id=trade.user_id,
+                        user_id=user.id,
                         asset_id=trade.asset_id,
                         amount=trade.amount,
                         purchase_price=trade.price
                     )
                     db.session.add(holding)
                     TradeServiceV3._log_database_operation(confirmation_id, "CREATE_HOLDING", {
-                        "user_id": trade.user_id,
+                        "user_id": user.id,
                         "asset_id": trade.asset_id,
                         "amount": trade.amount,
                         "purchase_price": trade.price
                     })
-                    logger.debug(f"[{confirmation_id}] 创建新用户持仓: UserID={trade.user_id}, AssetID={trade.asset_id}, 数量={trade.amount}, 价格={trade.price}")
+                    logger.debug(f"[{confirmation_id}] 创建新用户持仓: UserID={user.id}, AssetID={trade.asset_id}, 数量={trade.amount}, 价格={trade.price}")
                 
                 # 提交前记录即将提交的更改
                 logger.debug(f"[{confirmation_id}] 准备提交数据库事务: 资产库存更新 + 交易状态更新 + 用户持仓更新")
