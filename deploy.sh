@@ -123,6 +123,8 @@ REMOTE_SCRIPT="
 set -e
 echo '🔧 在服务器上执行部署...'
 cd $SERVER_PATH
+echo '📦 暂存服务器上的任何本地更改...'
+git stash
 echo '📥 拉取最新代码...'
 git pull origin $GITHUB_BRANCH
 if ! command -v pm2 &> /dev/null; then
