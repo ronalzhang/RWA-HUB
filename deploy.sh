@@ -39,8 +39,14 @@ fi
 # 加载配置文件
 echo "📋 加载配置文件..."
 source "$CONFIG_FILE"
-# 清理可能存在的字符
-SERVER_HOST=$(echo $SERVER_HOST | tr -d '\r')
+# 积极清理所有配置变量中的空白字符
+SERVER_HOST=$(echo "$SERVER_HOST" | tr -d '[:space:]')
+SERVER_USER=$(echo "$SERVER_USER" | tr -d '[:space:]')
+SERVER_PASSWORD=$(echo "$SERVER_PASSWORD" | tr -d '[:space:]')
+SERVER_PATH=$(echo "$SERVER_PATH" | tr -d '[:space:]')
+GITHUB_BRANCH=$(echo "$GITHUB_BRANCH" | tr -d '[:space:]')
+PM2_APP_NAME=$(echo "$PM2_APP_NAME" | tr -d '[:space:]')
+APP_PORT=$(echo "$APP_PORT" | tr -d '[:space:]')
 
 
 # 验证必要配置
@@ -159,7 +165,6 @@ fi
 echo '🎉 部署完成！'
 "
 
-echo "Executing: sshpass -p '********' ssh -T -o StrictHostKeyChecking=no \"$SERVER_USER@$SERVER_HOST\" ..."
 sshpass -p "\$SERVER_PASSWORD" ssh -T -o StrictHostKeyChecking=no "\$SERVER_USER@\$SERVER_HOST" "\$REMOTE_SCRIPT"
 
 
