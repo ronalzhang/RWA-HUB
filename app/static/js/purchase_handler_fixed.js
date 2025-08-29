@@ -195,10 +195,21 @@ if (window.purchaseHandlerFixedInitialized) {
                     data: new Uint8Array(this.currentTrade.instruction.data.match(/.{1,2}/g).map(byte => parseInt(byte, 16)))
                 });
 
+                // 创建连接
+                const connection = new solanaWeb3.Connection(
+                    'https://api.devnet.solana.com',
+                    'confirmed'
+                );
+
+                // 获取最新的区块哈希
+                this.showLoading('正在获取最新区块哈希...');
+                const { blockhash } = await connection.getLatestBlockhash();
+                console.log('获取到最新区块哈希:', blockhash);
+
                 // 创建交易
                 const transaction = new solanaWeb3.Transaction();
                 transaction.add(instruction);
-                transaction.recentBlockhash = this.currentTrade.recentBlockhash;
+                transaction.recentBlockhash = blockhash;  // 使用最新的区块哈希
                 transaction.feePayer = new solanaWeb3.PublicKey(this.currentTrade.feePayer);
 
                 console.log('构建的交易:', transaction);
@@ -212,11 +223,6 @@ if (window.purchaseHandlerFixedInitialized) {
                 this.showLoading('正在提交交易到区块链...');
 
                 // 发送交易到区块链
-                const connection = new solanaWeb3.Connection(
-                    'https://api.devnet.solana.com',
-                    'confirmed'
-                );
-
                 const txHash = await connection.sendRawTransaction(signedTransaction.serialize());
                 console.log('交易已提交，哈希:', txHash);
 
