@@ -148,7 +148,7 @@ class TradeServiceV3:
                         "wallet_address": wallet_address
                     })
 
-                total_price = asset.token_price * Decimal(amount)
+                total_price = Decimal(str(asset.token_price)) * Decimal(amount)
                 logger.debug(f"[{transaction_id}] 计算交易总价: {asset.token_price} × {amount} = {total_price}")
                 
                 new_trade = Trade(
@@ -307,7 +307,7 @@ class TradeServiceV3:
 
             # 成功完成
             duration_ms = int((time.time() - start_time) * 1000)
-            amount_in_smallest_unit = int(total_price * (10**payment_token_decimals))
+            amount_in_smallest_unit = int(total_price * Decimal(10**payment_token_decimals))
             logger.info(f"[{transaction_id}] 交易创建完全成功: TradeID={new_trade.id}, 买方={wallet_address}, USDC金额={amount_in_smallest_unit}")
             
             # Record successful transaction creation
