@@ -14,7 +14,7 @@ from app.services.log_aggregator import transaction_log_aggregator
 from solders.pubkey import Pubkey
 from solders.hash import Hash
 from solders.signature import Signature
-from solana.transaction import Transaction
+from solders.transaction import Transaction
 from spl.token.instructions import transfer, TransferParams
 from spl.token.client import get_associated_token_address
 from solana.exceptions import SolanaRpcException
