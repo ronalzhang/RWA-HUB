@@ -274,3 +274,55 @@ def get_blockhash_cache_status() -> dict:
         'is_fresh': cache_age < 30,  # 默认缓存时间
         'is_valid': _validate_blockhash(cached_hash)
     }
+
+def check_transaction(signature: str) -> dict:
+    """
+    检查Solana交易状态
+    
+    Args:
+        signature: 交易签名
+        
+    Returns:
+        dict: 包含交易状态信息的字典
+    """
+    try:
+        from solana.rpc.api import Client
+        
+        client = get_solana_client()
+        
+        # 获取交易状态
+        response = client.get_signature_statuses([signature], search_transaction_history=True)
+        
+        if response.value and len(response.value) > 0:
+            status_info = response.value[0]
+            
+            if status_info is None:
+                return {
+                    "success": True, 
+                    "confirmed": False,
+                    "status": "not_found",
+                    "message": "交易未找到或尚未处理"
+                }
+            
+            confirmed = status_info.confirmation_status in ["confirmed", "finalized"]
+            
+            return {
+                "success": True,
+                "confirmed": confirmed,
+                "status": status_info.confirmation_status,
+                "slot": status_info.slot,
+                "err": status_info.err,
+                "message": "交易已确认" if confirmed else "交易待确认"
+            }
+        else:
+            return {
+                "success": False,
+                "error": "无法获取交易状态"
+            }
+            
+    except Exception as e:
+        logger.error(f"检查交易状态失败: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
