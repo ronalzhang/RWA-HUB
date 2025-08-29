@@ -131,7 +131,8 @@ git fetch origin
 git reset --hard origin/$GITHUB_BRANCH
 
 echo '清除旧的pyc缓存文件...'
-find /root/RWA-HUB -type f -name '*.pyc' -delete
+find /root/RWA-HUB -type d -name '__pycache__' -exec rm -rf {} +
+
 echo '🔍 检查服务器上的最新提交...'
 git log -1
 if ! command -v pm2 &> /dev/null; then
