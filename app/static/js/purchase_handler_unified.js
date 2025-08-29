@@ -418,18 +418,52 @@ if (window.purchaseHandlerInitialized) {
         async checkUSDCBalance() {
             try {
                 const walletAddress = this.getWalletAddress();
-                if (!walletAddress) return 0;
+                if (!walletAddress) {
+                    console.log('钱包地址不存在');
+                    return 0;
+                }
+
+                // 检查必要的库是否加载
+                if (!window.solanaWeb3) {
+                    console.error('Solana Web3.js 库未加载');
+                    return 0;
+                }
+
+                if (!window.splToken) {
+                    console.error('SPL Token 库未加载');
+                    return 0;
+                }
+
+                if (!window.solanaConnection) {
+                    console.error('Solana 连接未初始化');
+                    return 0;
+                }
 
                 // USDC代币地址 (mainnet)
                 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
                 const walletPubkey = new window.solanaWeb3.PublicKey(walletAddress);
                 const usdcMint = new window.solanaWeb3.PublicKey(USDC_MINT);
 
+                console.log('开始检查USDC余额:', {
+                    walletAddress,
+                    usdcMint: USDC_MINT,
+                    splTokenAvailable: !!window.splToken,
+                    getAssociatedTokenAddressAvailable: !!window.splToken.getAssociatedTokenAddress
+                });
+
                 // 获取关联代币账户地址
-                const associatedTokenAddress = await window.splToken.getAssociatedTokenAddress(
-                    usdcMint,
-                    walletPubkey
-                );
+                let associatedTokenAddress;
+                if (window.splToken.getAssociatedTokenAddress) {
+                    associatedTokenAddress = await window.splToken.getAssociatedTokenAddress(
+                        usdcMint,
+                        walletPubkey
+                    );
+                } else {
+                    console.error('getAssociatedTokenAddress 函数不可用');
+                    return 0;
+                }
+
+                console.log('关联代币账户地址:', associatedTokenAddress.toString());
 
                 // 获取账户信息
                 const accountInfo = await window.solanaConnection.getAccountInfo(associatedTokenAddress);
@@ -440,13 +474,30 @@ if (window.purchaseHandlerInitialized) {
                 }
 
                 // 解析代币账户数据
+                if (!window.splToken.AccountLayout) {
+                    console.error('AccountLayout 不可用');
+                    return 0;
+                }
+
                 const accountData = window.splToken.AccountLayout.decode(accountInfo.data);
                 const balance = Number(accountData.amount) / Math.pow(10, 6); // USDC有6位小数
                 
-                console.log('USDC余额:', balance);
+                console.log('USDC余额检查完成:', {
+                    rawAmount: accountData.amount.toString(),
+                    balance: balance,
+                    decimals: 6
+                });
+                
                 return balance;
             } catch (error) {
                 console.error('检查USDC余额失败:', error);
+                console.error('错误详情:', {
+                    message: error.message,
+                    stack: error.stack,
+                    splTokenAvailable: !!window.splToken,
+                    solanaWeb3Available: !!window.solanaWeb3,
+                    connectionAvailable: !!window.solanaConnection
+                });
                 return 0;
             }
         }
@@ -483,11 +534,39 @@ if (window.purchaseHandlerInitialized) {
         }
     }
 
+    // 检查库初始化状态
+    function checkLibrariesInitialization() {
+        const checks = {
+            solanaWeb3: !!window.solanaWeb3,
+            splToken: !!window.splToken,
+            splTokenGetAssociatedTokenAddress: !!(window.splToken && window.splToken.getAssociatedTokenAddress),
+            splTokenAccountLayout: !!(window.splToken && window.splToken.AccountLayout),
+            solanaConnection: !!window.solanaConnection
+        };
+        
+        console.log('库初始化检查:', checks);
+        
+        const allLoaded = Object.values(checks).every(check => check);
+        if (!allLoaded) {
+            console.warn('部分库未正确加载，可能影响购买功能');
+        }
+        
+        return checks;
+    }
+
     // 创建全局实例
     window.purchaseFlowManager = new UnifiedPurchaseFlowManager();
 
     // 全局购买函数
     window.initiatePurchase = function(assetId, amount) {
+        // 在购买前检查库状态
+        const libStatus = checkLibrariesInitialization();
+        if (!libStatus.splToken || !libStatus.splTokenGetAssociatedTokenAddress) {
+            console.error('SPL Token库未正确初始化，无法进行购买');
+            alert('系统初始化中，请稍后再试');
+            return Promise.resolve(false);
+        }
+        
         return window.purchaseFlowManager.initiatePurchase(assetId, amount);
     };
 
@@ -523,9 +602,15 @@ if (window.purchaseHandlerInitialized) {
 
     // DOM加载完成后绑定事件
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', bindPurchaseButton);
+        document.addEventListener('DOMContentLoaded', function() {
+            bindPurchaseButton();
+            // 延迟检查库状态，给其他脚本时间加载
+            setTimeout(checkLibrariesInitialization, 1000);
+        });
     } else {
         bindPurchaseButton();
+        // 延迟检查库状态，给其他脚本时间加载
+        setTimeout(checkLibrariesInitialization, 1000);
     }
 
     console.log('✅ 统一购买处理器初始化完成');
