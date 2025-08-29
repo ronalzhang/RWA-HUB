@@ -270,7 +270,7 @@ if (window.purchaseHandlerInitialized) {
                 // 检查USDC余额
                 this.showLoading('正在检查USDC余额...');
                 const balance = await this.checkUSDCBalance();
-                const requiredAmount = this.currentTrade.amount * 0.01; // 假设每个代币0.01 USDC
+                const requiredAmount = this.currentTrade.amount * 0.1; // 每个代币0.1 USDC
                 
                 console.log('USDC余额检查:', {
                     balance: balance,
@@ -288,14 +288,13 @@ if (window.purchaseHandlerInitialized) {
 
                 console.log('✅ USDC余额充足，继续交易');
 
-                // 获取最新区块哈希
-                this.showLoading('正在获取最新区块哈希...');
-                const { blockhash } = await window.solanaConnection.getLatestBlockhash();
-                console.log('获取到最新区块哈希:', blockhash);
+                // 使用后端返回的区块哈希
+                this.showLoading('正在构建交易...');
+                console.log('使用后端返回的区块哈希:', this.currentTrade.recentBlockhash);
 
                 // 构建交易
                 const transaction = new window.solanaWeb3.Transaction({
-                    recentBlockhash: blockhash,
+                    recentBlockhash: this.currentTrade.recentBlockhash,
                     feePayer: new window.solanaWeb3.PublicKey(this.currentTrade.feePayer)
                 });
 
