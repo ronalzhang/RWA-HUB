@@ -153,7 +153,6 @@ class TradeServiceV3:
                 
                 new_trade = Trade(
                     asset_id=asset_id,
-                    user_id=user.id,
                     trader_address=wallet_address,
                     type='buy',
                     amount=amount,
