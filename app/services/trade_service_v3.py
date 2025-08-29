@@ -594,28 +594,30 @@ class TradeServiceV3:
                     "found": holding is not None
                 })
                 if holding:
-                    old_amount = holding.amount
-                    holding.amount += trade.amount
+                    old_quantity = holding.quantity
+                    holding.quantity += trade.amount
+                    holding.available_quantity += trade.amount
                     TradeServiceV3._log_database_operation(confirmation_id, "UPDATE_HOLDING", {
                         "user_id": user.id,
                         "asset_id": trade.asset_id,
-                        "old_amount": old_amount,
-                        "new_amount": holding.amount,
+                        "old_quantity": old_quantity,
+                        "new_quantity": holding.quantity,
                         "added_amount": trade.amount
                     })
-                    logger.debug(f"[{confirmation_id}] 更新现有用户持仓: UserID={user.id}, AssetID={trade.asset_id}, {old_amount} -> {holding.amount}")
+                    logger.debug(f"[{confirmation_id}] 更新现有用户持仓: UserID={user.id}, AssetID={trade.asset_id}, {old_quantity} -> {holding.quantity}")
                 else:
                     holding = Holding(
                         user_id=user.id,
                         asset_id=trade.asset_id,
-                        amount=trade.amount,
+                        quantity=trade.amount,
+                        available_quantity=trade.amount,
                         purchase_price=trade.price
                     )
                     db.session.add(holding)
                     TradeServiceV3._log_database_operation(confirmation_id, "CREATE_HOLDING", {
                         "user_id": user.id,
                         "asset_id": trade.asset_id,
-                        "amount": trade.amount,
+                        "quantity": trade.amount,
                         "purchase_price": trade.price
                     })
                     logger.debug(f"[{confirmation_id}] 创建新用户持仓: UserID={user.id}, AssetID={trade.asset_id}, 数量={trade.amount}, 价格={trade.price}")
@@ -623,7 +625,7 @@ class TradeServiceV3:
                 # 提交前记录即将提交的更改
                 logger.debug(f"[{confirmation_id}] 准备提交数据库事务: 资产库存更新 + 交易状态更新 + 用户持仓更新")
                 db.session.commit()
-                logger.info(f"[{confirmation_id}] 数据库事务提交成功: TradeID={trade.id} 已完成，资产库存={asset.remaining_supply}，用户持仓={holding.amount}")
+                logger.info(f"[{confirmation_id}] 数据库事务提交成功: TradeID={trade.id} 已完成，资产库存={asset.remaining_supply}，用户持仓={holding.quantity}")
                 
             except SQLAlchemyError as e:
                 logger.error(f"[{confirmation_id}] 数据库SQLAlchemy错误，执行回滚: {e}", exc_info=True)
