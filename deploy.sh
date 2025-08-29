@@ -39,6 +39,9 @@ fi
 # 加载配置文件
 echo "📋 加载配置文件..."
 source "$CONFIG_FILE"
+# 清理可能存在的字符
+SERVER_HOST=$(echo $SERVER_HOST | tr -d '\r')
+
 
 # 验证必要配置
 required_vars=("SERVER_HOST" "SERVER_USER" "SERVER_PASSWORD" "SERVER_PATH" "PM2_APP_NAME")
