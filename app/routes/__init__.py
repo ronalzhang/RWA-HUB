@@ -70,9 +70,6 @@ from .health_api import health_bp
 # 导入交易历史API
 from .trades_api import trades_api_bp
 
-# 导入交易确认API
-from .trade_confirm_api import trade_confirm_bp
-
 # 注册蓝图到app
 def register_blueprints(app):
     """初始化所有路由"""
@@ -120,9 +117,6 @@ def register_blueprints(app):
     
     # 注册交易历史API蓝图
     app.register_blueprint(trades_api_bp)
-    
-    # 注册交易确认API蓝图
-    app.register_blueprint(trade_confirm_bp)
     
     # 注册代理蓝图
     app.register_blueprint(proxy_bp)
