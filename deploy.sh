@@ -127,6 +127,8 @@ echo '📦 暂存服务器上的任何本地更改...'
 git stash
 echo '📥 拉取最新代码...'
 git pull origin $GITHUB_BRANCH
+echo '🔍 检查服务器上的最新提交...'
+git log -1
 if ! command -v pm2 &> /dev/null; then
     echo '❌ PM2未安装，请先安装PM2'
     exit 1
