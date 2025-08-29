@@ -554,7 +554,7 @@ async function processSinglePayment(paymentId) {
         const signedTransaction = await window.solana.signTransaction(transaction);
         
         // 发送交易
-        const connection = new solanaWeb3.Connection('https://api.mainnet-beta.solana.com');
+        const connection = new solanaWeb3.Connection(window.SOLANA_NETWORK_URL || 'https://api.mainnet-beta.solana.com');
         const signature = await connection.sendRawTransaction(signedTransaction.serialize());
         
         // 等待确认
@@ -576,7 +576,7 @@ async function processSinglePayment(paymentId) {
 async function buildSolanaTransaction(payment) {
     // 这里需要根据实际的代币类型构建交易
     // 示例代码，实际需要根据USDC转账逻辑实现
-    const connection = new solanaWeb3.Connection('https://api.mainnet-beta.solana.com');
+    const connection = new solanaWeb3.Connection(window.SOLANA_NETWORK_URL || 'https://api.mainnet-beta.solana.com');
     const transaction = new solanaWeb3.Transaction();
     
     // 添加转账指令

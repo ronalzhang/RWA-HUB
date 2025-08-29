@@ -197,7 +197,7 @@ if (window.purchaseHandlerFixedInitialized) {
 
                 // 创建连接到Mainnet生产环境
                 const connection = new solanaWeb3.Connection(
-                    'https://api.mainnet-beta.solana.com',
+                    window.SOLANA_NETWORK_URL || 'https://api.mainnet-beta.solana.com',
                     'confirmed'
                 );
 
