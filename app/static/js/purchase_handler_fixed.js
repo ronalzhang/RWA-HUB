@@ -192,7 +192,7 @@ if (window.purchaseHandlerFixedInitialized) {
                         isWritable: acc.is_writable
                     })),
                     programId: new solanaWeb3.PublicKey(this.currentTrade.instruction.program_id),
-                    data: Buffer.from(this.currentTrade.instruction.data, 'hex')
+                    data: new Uint8Array(this.currentTrade.instruction.data.match(/.{1,2}/g).map(byte => parseInt(byte, 16)))
                 });
 
                 // 创建交易
