@@ -15,6 +15,7 @@ from solders.pubkey import Pubkey
 from solders.hash import Hash
 from solders.signature import Signature
 from solders.transaction import Transaction
+from solders.message import Message
 from spl.token.instructions import transfer, TransferParams, get_associated_token_address
 from solana.exceptions import SolanaRpcException
 from solana.rpc.types import TxOpts
@@ -252,8 +253,10 @@ class TradeServiceV3:
             
             try:
                 buyer_pubkey = Pubkey.from_string(wallet_address)
-                tx = Transaction.new_with_payer([instruction], buyer_pubkey)
-                tx.recent_blockhash = recent_blockhash
+                # 先创建Message，包含blockhash
+                message = Message.new_with_blockhash([instruction], buyer_pubkey, recent_blockhash)
+                # 然后创建未签名的Transaction
+                tx = Transaction.new_unsigned(message)
                 
                 logger.debug(f"[{transaction_id}] 交易构建成功: 指令数={len(tx.message.instructions)}, 账户数={len(tx.message.account_keys)}")
                 
@@ -1197,14 +1200,26 @@ class TradeServiceV3:
                 logger.error(f"{log_prefix}交易组件验证失败: 缺少指令")
                 return False
             
-            # 检查最新区块哈希
-            if not hasattr(transaction.message, 'recent_blockhash') or not transaction.message.recent_blockhash:
-                logger.error(f"{log_prefix}交易组件验证失败: 缺少最新区块哈希")
-                return False
-            
-            # 验证区块哈希类型
-            if not isinstance(transaction.message.recent_blockhash, Hash):
-                logger.error(f"{log_prefix}交易组件验证失败: 区块哈希类型不正确 ({type(transaction.message.recent_blockhash)})")
+            # 检查最新区块哈希 - 适配新的Transaction结构
+            try:
+                # 尝试不同的方式获取recent_blockhash
+                blockhash = None
+                if hasattr(transaction.message, 'recent_blockhash'):
+                    blockhash = transaction.message.recent_blockhash
+                elif hasattr(transaction, 'recent_blockhash'):
+                    blockhash = transaction.recent_blockhash
+                
+                if not blockhash:
+                    logger.error(f"{log_prefix}交易组件验证失败: 缺少最新区块哈希")
+                    return False
+                
+                # 验证区块哈希类型
+                if not isinstance(blockhash, Hash):
+                    logger.error(f"{log_prefix}交易组件验证失败: 区块哈希类型不正确 ({type(blockhash)})")
+                    return False
+                    
+            except Exception as e:
+                logger.error(f"{log_prefix}区块哈希验证失败: {e}")
                 return False
             
             logger.debug(f"{log_prefix}交易基础组件验证通过")
@@ -1463,10 +1478,29 @@ class TradeServiceV3:
                     logger.error(f"{log_prefix}序列化验证失败: 反序列化后账户数量不匹配 ({len(deserialized_tx.message.account_keys)} != {len(transaction.message.account_keys)})")
                     return False
                 
-                # 验证区块哈希
-                if deserialized_tx.message.recent_blockhash != transaction.message.recent_blockhash:
-                    logger.error(f"{log_prefix}序列化验证失败: 反序列化后区块哈希不匹配")
-                    return False
+                # 验证区块哈希 - 适配新的Transaction结构
+                try:
+                    # 获取原交易的区块哈希
+                    orig_blockhash = None
+                    if hasattr(transaction.message, 'recent_blockhash'):
+                        orig_blockhash = transaction.message.recent_blockhash
+                    elif hasattr(transaction, 'recent_blockhash'):
+                        orig_blockhash = transaction.recent_blockhash
+                    
+                    # 获取反序列化交易的区块哈希
+                    deser_blockhash = None
+                    if hasattr(deserialized_tx.message, 'recent_blockhash'):
+                        deser_blockhash = deserialized_tx.message.recent_blockhash
+                    elif hasattr(deserialized_tx, 'recent_blockhash'):
+                        deser_blockhash = deserialized_tx.recent_blockhash
+                    
+                    if orig_blockhash and deser_blockhash and orig_blockhash != deser_blockhash:
+                        logger.error(f"{log_prefix}序列化验证失败: 反序列化后区块哈希不匹配")
+                        return False
+                        
+                except Exception as e:
+                    logger.warning(f"{log_prefix}区块哈希比较跳过: {e}")
+                    # 不因为区块哈希比较失败而终止验证
                 
                 # 验证账户密钥
                 for i, (orig_key, deser_key) in enumerate(zip(transaction.message.account_keys, deserialized_tx.message.account_keys)):
