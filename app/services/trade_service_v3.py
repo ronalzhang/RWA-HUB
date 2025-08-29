@@ -251,9 +251,7 @@ class TradeServiceV3:
             logger.debug(f"[{transaction_id}] 步骤6: 开始交易构建")
             
             try:
-                from solana.publickey import PublicKey
-                
-                buyer_pubkey = PublicKey(wallet_address)
+                buyer_pubkey = Pubkey.from_string(wallet_address)
                 tx = Transaction()
                 tx.add(instruction)
                 tx.recent_blockhash = recent_blockhash
@@ -942,9 +940,7 @@ class TradeServiceV3:
             
             # 2. 转换地址为PublicKey并验证格式
             try:
-                from solana.publickey import PublicKey
-                
-                buyer_pubkey = PublicKey(buyer_address)
+                buyer_pubkey = Pubkey.from_string(buyer_address)
                 platform_pubkey = PublicKey(platform_address)
                 payment_mint_pubkey = PublicKey(token_mint_address)
                 
