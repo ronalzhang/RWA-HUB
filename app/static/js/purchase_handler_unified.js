@@ -534,6 +534,36 @@ if (window.purchaseHandlerInitialized) {
         }
     }
 
+    // 动态加载SPL Token库
+    async function loadSPLTokenLibrary() {
+        return new Promise((resolve, reject) => {
+            if (window.splToken) {
+                console.log('SPL Token库已存在');
+                resolve(true);
+                return;
+            }
+            
+            console.log('动态加载SPL Token库...');
+            const script = document.createElement('script');
+            script.src = '/static/js/contracts/spl-token.iife.min.js?v=' + Date.now();
+            script.onload = function() {
+                console.log('SPL Token库动态加载完成');
+                // 等待一下让库初始化
+                setTimeout(() => {
+                    if (window.splToken) {
+                        resolve(true);
+                    } else {
+                        reject(new Error('SPL Token库加载后仍不可用'));
+                    }
+                }, 500);
+            };
+            script.onerror = function() {
+                reject(new Error('SPL Token库加载失败'));
+            };
+            document.head.appendChild(script);
+        });
+    }
+
     // 检查库初始化状态
     function checkLibrariesInitialization() {
         const checks = {
@@ -558,13 +588,28 @@ if (window.purchaseHandlerInitialized) {
     window.purchaseFlowManager = new UnifiedPurchaseFlowManager();
 
     // 全局购买函数
-    window.initiatePurchase = function(assetId, amount) {
+    window.initiatePurchase = async function(assetId, amount) {
         // 在购买前检查库状态
         const libStatus = checkLibrariesInitialization();
+        
+        // 如果SPL Token库未加载，尝试动态加载
         if (!libStatus.splToken || !libStatus.splTokenGetAssociatedTokenAddress) {
-            console.error('SPL Token库未正确初始化，无法进行购买');
-            alert('系统初始化中，请稍后再试');
-            return Promise.resolve(false);
+            console.log('SPL Token库未加载，尝试动态加载...');
+            
+            try {
+                await loadSPLTokenLibrary();
+                console.log('SPL Token库动态加载成功');
+                
+                // 重新检查库状态
+                const newLibStatus = checkLibrariesInitialization();
+                if (!newLibStatus.splToken || !newLibStatus.splTokenGetAssociatedTokenAddress) {
+                    throw new Error('动态加载后SPL Token库仍不可用');
+                }
+            } catch (error) {
+                console.error('动态加载SPL Token库失败:', error);
+                alert('系统初始化失败，请刷新页面重试');
+                return false;
+            }
         }
         
         return window.purchaseFlowManager.initiatePurchase(assetId, amount);
@@ -605,12 +650,38 @@ if (window.purchaseHandlerInitialized) {
         document.addEventListener('DOMContentLoaded', function() {
             bindPurchaseButton();
             // 延迟检查库状态，给其他脚本时间加载
-            setTimeout(checkLibrariesInitialization, 1000);
+            setTimeout(async function() {
+                const libStatus = checkLibrariesInitialization();
+                // 如果SPL Token库未加载，尝试预加载
+                if (!libStatus.splToken) {
+                    console.log('预加载SPL Token库...');
+                    try {
+                        await loadSPLTokenLibrary();
+                        console.log('SPL Token库预加载成功');
+                        checkLibrariesInitialization(); // 重新检查
+                    } catch (error) {
+                        console.warn('SPL Token库预加载失败:', error);
+                    }
+                }
+            }, 1000);
         });
     } else {
         bindPurchaseButton();
         // 延迟检查库状态，给其他脚本时间加载
-        setTimeout(checkLibrariesInitialization, 1000);
+        setTimeout(async function() {
+            const libStatus = checkLibrariesInitialization();
+            // 如果SPL Token库未加载，尝试预加载
+            if (!libStatus.splToken) {
+                console.log('预加载SPL Token库...');
+                try {
+                    await loadSPLTokenLibrary();
+                    console.log('SPL Token库预加载成功');
+                    checkLibrariesInitialization(); // 重新检查
+                } catch (error) {
+                    console.warn('SPL Token库预加载失败:', error);
+                }
+            }
+        }, 1000);
     }
 
     console.log('✅ 统一购买处理器初始化完成');
