@@ -720,8 +720,15 @@ class TradeServiceV3:
                             'message': '无法在链上找到该交易'
                         }
                 
-                if tx_response.value.err:
-                    error_msg = f"链上交易执行失败: {tx_response.value.err}"
+                # 检查交易是否执行失败
+                transaction_error = None
+                if hasattr(tx_response.value, 'err') and tx_response.value.err:
+                    transaction_error = tx_response.value.err
+                elif hasattr(tx_response.value, 'meta') and hasattr(tx_response.value.meta, 'err') and tx_response.value.meta.err:
+                    transaction_error = tx_response.value.meta.err
+                
+                if transaction_error:
+                    error_msg = f"链上交易执行失败: {transaction_error}"
                     logger.error(f"[{confirmation_id}] {error_msg}")
                     return {
                         'valid': False,
