@@ -286,30 +286,11 @@ class TradeServiceV3:
                     f'交易验证失败: {str(e)}'
                 )
 
-            # 8. 交易序列化阶段
-            logger.debug(f"[{transaction_id}] 步骤8: 开始交易序列化")
+            # 8. 跳过交易序列化，直接返回指令数据
+            logger.debug(f"[{transaction_id}] 步骤8: 准备返回交易指令数据")
             
-            try:
-                # 尝试不同的序列化方法
-                serialized_tx = None
-                if hasattr(tx, 'serialize'):
-                    serialized_tx = tx.serialize()
-                elif hasattr(tx, 'to_bytes'):
-                    serialized_tx = tx.to_bytes()
-                else:
-                    raise Exception("Transaction对象不支持序列化")
-                
-                encoded_tx = base64.b64encode(serialized_tx).decode('utf-8')
-                
-                logger.info(f"[{transaction_id}] 交易序列化成功: 长度={len(serialized_tx)}, Base64长度={len(encoded_tx)}")
-                logger.debug(f"[{transaction_id}] 序列化交易前8字节: {serialized_tx[:8].hex()}")
-                
-            except Exception as e:
-                logger.error(f"[{transaction_id}] 交易序列化失败: {e}", exc_info=True)
-                return TradeServiceV3._create_error_response(
-                    TradeServiceV3.ErrorCodes.TRANSACTION_SERIALIZATION_ERROR, 
-                    f'交易序列化失败: {str(e)}'
-                )
+            # 不进行序列化，直接使用指令数据
+            logger.info(f"[{transaction_id}] 跳过交易序列化，使用指令数据方式")
 
             # 成功完成
             duration_ms = int((time.time() - start_time) * 1000)
@@ -337,12 +318,33 @@ class TradeServiceV3:
                 }
             )
             
+            # 构建返回数据 - 使用指令数据而不是序列化交易
             return {
                 'success': True,
-                'message': '交易已创建，等待签名',
-                'trade_id': new_trade.id,
-                'transaction': encoded_tx,
-                'transaction_id': transaction_id
+                'message': '购买交易创建成功',
+                'data': {
+                    'id': new_trade.id,
+                    'transaction_id': transaction_id,
+                    'asset_id': asset_id,
+                    'amount': float(amount),
+                    'total_cost': float(total_cost),
+                    'wallet_address': wallet_address,
+                    'fee_payer': wallet_address,
+                    'status': 'pending_signature',
+                    'created_at': new_trade.created_at.isoformat(),
+                    'instruction': {
+                        'program_id': str(instruction.program_id),
+                        'accounts': [
+                            {
+                                'pubkey': str(acc.pubkey),
+                                'is_signer': acc.is_signer,
+                                'is_writable': acc.is_writable
+                            } for acc in instruction.accounts
+                        ],
+                        'data': instruction.data.hex()
+                    },
+                    'recent_blockhash': str(recent_blockhash)
+                }
             }
 
         except SQLAlchemyError as e:
