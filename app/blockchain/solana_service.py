@@ -351,10 +351,10 @@ def get_usdc_balance(wallet_address: str) -> float:
         if not validate_solana_address(wallet_address):
             raise ValueError(f"无效的钱包地址格式: {wallet_address}")
         
-        # USDC代币铸造地址（Devnet）
-        # Devnet USDC: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+        # USDC代币铸造地址（Mainnet生产环境）
         # Mainnet USDC: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
-        usdc_mint_address = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+        # Devnet USDC: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+        usdc_mint_address = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
         
         # 转换地址为PublicKey
         wallet_pubkey = Pubkey.from_string(wallet_address)

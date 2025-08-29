@@ -1164,8 +1164,8 @@ def check_usdc_balance():
                 'success': True,
                 'balance': balance,
                 'wallet_address': wallet_address,
-                'usdc_mint': '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',  # Devnet USDC
-                'network': 'devnet',
+                'usdc_mint': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',  # Mainnet USDC
+                'network': 'mainnet',
                 'message': f'余额查询成功: {balance} USDC'
             }), 200
             
@@ -1178,8 +1178,8 @@ def check_usdc_balance():
                 'success': False,
                 'balance': 0,
                 'wallet_address': wallet_address,
-                'usdc_mint': '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
-                'network': 'devnet',
+                'usdc_mint': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+                'network': 'mainnet',
                 'error': error_msg,
                 'message': f'余额查询失败: {error_msg}'
             }), 200

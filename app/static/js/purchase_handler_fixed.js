@@ -195,9 +195,9 @@ if (window.purchaseHandlerFixedInitialized) {
                     data: new Uint8Array(this.currentTrade.instruction.data.match(/.{1,2}/g).map(byte => parseInt(byte, 16)))
                 });
 
-                // 创建连接
+                // 创建连接到Mainnet生产环境
                 const connection = new solanaWeb3.Connection(
-                    'https://api.devnet.solana.com',
+                    'https://api.mainnet-beta.solana.com',
                     'confirmed'
                 );
 
