@@ -72,7 +72,7 @@ if (window.purchaseHandlerFixedInitialized) {
             }
         }
 
-        // 步骤1：创建购买交易
+        // 步骤1: 创建购买交易
         async createPurchase(assetId, amount) {
             console.log(`开始创建购买交易: 资产ID=${assetId}, 数量=${amount}`);
 
@@ -85,15 +85,15 @@ if (window.purchaseHandlerFixedInitialized) {
             this.showLoading('正在创建购买交易...');
 
             try {
-                const response = await fetch('/api/v2/trades/create', {
+                const response = await fetch('/api/trades/v3/create', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Wallet-Address': walletAddress
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         asset_id: assetId,
-                        amount: amount
+                        amount: amount,
+                        wallet_address: walletAddress
                     })
                 });
 
@@ -102,14 +102,17 @@ if (window.purchaseHandlerFixedInitialized) {
 
                 if (data.success) {
                     this.currentTrade = {
-                        id: data.trade_id,
+                        id: data.data.id,
+                        transactionId: data.data.transaction_id,
                         assetId: assetId,
                         amount: amount,
-                        transactionToSign: data.transaction_to_sign
+                        instruction: data.data.instruction,
+                        recentBlockhash: data.data.recent_blockhash,
+                        feePayer: data.data.fee_payer
                     };
 
-                    // 步骤2：模拟签名和确认交易
-                    return await this.simulateSignAndConfirmTransaction();
+                    // 步骤2：使用真实的Solana交易
+                    return await this.signAndConfirmTransaction();
                 } else {
                     throw new Error(data.message || '创建交易失败');
                 }
@@ -120,14 +123,14 @@ if (window.purchaseHandlerFixedInitialized) {
             }
         }
 
-        // 步骤2：模拟签名和确认交易
-        async simulateSignAndConfirmTransaction() {
+        // 步骤2: 签名和确认真实的Solana交易
+        async signAndConfirmTransaction() {
             if (!this.currentTrade) {
                 this.showError('系统错误', '没有待处理的交易');
                 return false;
             }
 
-            console.log('开始模拟签名交易:', this.currentTrade);
+            console.log('开始签名Solana交易:', this.currentTrade);
 
             try {
                 // 检查钱包连接
@@ -135,29 +138,22 @@ if (window.purchaseHandlerFixedInitialized) {
                     throw new Error('钱包未连接或不可用');
                 }
 
-                // 解析交易数据
-                let transactionInfo;
-                try {
-                    const transactionDataStr = atob(this.currentTrade.transactionToSign);
-                    transactionInfo = JSON.parse(transactionDataStr);
-                    console.log('解析的交易信息:', transactionInfo);
-                } catch (parseError) {
-                    console.error('解析交易数据失败:', parseError);
-                    throw new Error('无效的交易数据格式');
+                // 检查Web3.js是否可用
+                if (typeof solanaWeb3 === 'undefined') {
+                    throw new Error('Solana Web3.js 库未加载');
                 }
 
                 // 显示交易确认信息
                 const confirmMessage = `
                     <div style="text-align: left;">
-                        <h4>确认交易详情：</h4>
-                        <p><strong>代币:</strong> ${transactionInfo.token_symbol}</p>
-                        <p><strong>金额:</strong> ${transactionInfo.amount} USDC</p>
-                        <p><strong>数量:</strong> ${this.currentTrade.amount} 个代币</p>
-                        <p><strong>接收方:</strong> ${transactionInfo.to_address.substring(0, 12)}...</p>
+                        <h4>确认购买交易：</h4>
+                        <p><strong>购买数量:</strong> ${this.currentTrade.amount} 个代币</p>
+                        <p><strong>交易ID:</strong> ${this.currentTrade.transactionId}</p>
+                        <p><strong>费用支付方:</strong> ${this.currentTrade.feePayer.substring(0, 12)}...</p>
                         <br>
                         <p style="color: #666; font-size: 14px;">
                             <i class="fas fa-info-circle"></i> 
-                            这是一个模拟交易，用于演示购买流程
+                            这将创建一个真实的Solana区块链交易
                         </p>
                     </div>
                 `;
@@ -180,25 +176,65 @@ if (window.purchaseHandlerFixedInitialized) {
                         throw new Error('User rejected the request.');
                     }
                 } else {
-                    const confirmed = confirm(`确认购买 ${this.currentTrade.amount} 个代币，金额 ${transactionInfo.amount} USDC？`);
+                    const confirmed = confirm(`确认购买 ${this.currentTrade.amount} 个代币？`);
                     if (!confirmed) {
                         throw new Error('User rejected the request.');
                     }
                 }
 
-                // 生成模拟交易哈希
-                const txHash = 'sim_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                console.log('生成模拟交易哈希:', txHash);
+                this.showLoading('正在构建交易...');
 
-                // 模拟交易处理延迟
-                this.showLoading('正在处理交易...');
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                // 从指令数据重新构建交易
+                const instruction = new solanaWeb3.TransactionInstruction({
+                    keys: this.currentTrade.instruction.accounts.map(acc => ({
+                        pubkey: new solanaWeb3.PublicKey(acc.pubkey),
+                        isSigner: acc.is_signer,
+                        isWritable: acc.is_writable
+                    })),
+                    programId: new solanaWeb3.PublicKey(this.currentTrade.instruction.program_id),
+                    data: Buffer.from(this.currentTrade.instruction.data, 'hex')
+                });
+
+                // 创建交易
+                const transaction = new solanaWeb3.Transaction();
+                transaction.add(instruction);
+                transaction.recentBlockhash = this.currentTrade.recentBlockhash;
+                transaction.feePayer = new solanaWeb3.PublicKey(this.currentTrade.feePayer);
+
+                console.log('构建的交易:', transaction);
+
+                this.showLoading('正在请求钱包签名...');
+
+                // 请求钱包签名
+                const signedTransaction = await window.solana.signTransaction(transaction);
+                console.log('交易已签名:', signedTransaction);
+
+                this.showLoading('正在提交交易到区块链...');
+
+                // 发送交易到区块链
+                const connection = new solanaWeb3.Connection(
+                    'https://api.devnet.solana.com',
+                    'confirmed'
+                );
+
+                const txHash = await connection.sendRawTransaction(signedTransaction.serialize());
+                console.log('交易已提交，哈希:', txHash);
+
+                this.showLoading('正在等待交易确认...');
+
+                // 等待交易确认
+                const confirmation = await connection.confirmTransaction(txHash, 'confirmed');
+                console.log('交易确认结果:', confirmation);
+
+                if (confirmation.value.err) {
+                    throw new Error(`交易失败: ${JSON.stringify(confirmation.value.err)}`);
+                }
 
                 // 确认交易
                 return await this.confirmPurchase(txHash);
 
             } catch (error) {
-                console.error('模拟签名交易失败:', error);
+                console.error('签名交易失败:', error);
                 if (error.message.includes('User rejected')) {
                     this.showError('交易取消', '您取消了交易');
                 } else {
@@ -208,7 +244,7 @@ if (window.purchaseHandlerFixedInitialized) {
             }
         }
 
-        // 步骤3：确认购买交易
+        // 步骤3: 确认购买交易
         async confirmPurchase(txHash) {
             console.log(`开始确认购买交易: 交易ID=${this.currentTrade.id}, 哈希=${txHash}`);
 
@@ -216,11 +252,10 @@ if (window.purchaseHandlerFixedInitialized) {
 
             try {
                 const walletAddress = this.getWalletAddress();
-                const response = await fetch('/api/v2/trades/confirm', {
+                const response = await fetch('/api/trades/v3/confirm', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Wallet-Address': walletAddress
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         trade_id: this.currentTrade.id,
