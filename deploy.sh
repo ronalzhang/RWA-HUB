@@ -126,7 +126,9 @@ cd $SERVER_PATH
 echo '📦 暂存服务器上的任何本地更改...'
 git stash
 echo '📥 拉取最新代码...'
-git pull origin $GITHUB_BRANCH
+echo '强制同步服务器代码至最新版本...'
+git fetch origin
+git reset --hard origin/$GITHUB_BRANCH
 echo '🔍 检查服务器上的最新提交...'
 git log -1
 if ! command -v pm2 &> /dev/null; then
