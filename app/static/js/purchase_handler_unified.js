@@ -221,6 +221,7 @@ if (window.purchaseHandlerInitialized) {
                         transactionId: data.data.transaction_id,
                         assetId: assetId,
                         amount: amount,
+                        totalCost: data.data.total_cost,
                         instruction: data.data.instruction,
                         recentBlockhash: data.data.recent_blockhash,
                         feePayer: data.data.fee_payer
@@ -270,12 +271,13 @@ if (window.purchaseHandlerInitialized) {
                 // 检查USDC余额
                 this.showLoading('正在检查USDC余额...');
                 const balance = await this.checkUSDCBalance();
-                const requiredAmount = this.currentTrade.amount * 0.1; // 每个代币0.1 USDC
+                const requiredAmount = this.currentTrade.totalCost; // 使用后端计算的总价
                 
                 console.log('USDC余额检查:', {
                     balance: balance,
                     requiredAmount: requiredAmount,
                     tokenAmount: this.currentTrade.amount,
+                    totalCost: this.currentTrade.totalCost,
                     walletAddress: this.getWalletAddress()
                 });
 
