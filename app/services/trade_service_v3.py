@@ -941,8 +941,8 @@ class TradeServiceV3:
             # 2. 转换地址为PublicKey并验证格式
             try:
                 buyer_pubkey = Pubkey.from_string(buyer_address)
-                platform_pubkey = PublicKey(platform_address)
-                payment_mint_pubkey = PublicKey(token_mint_address)
+                platform_pubkey = Pubkey.from_string(platform_address)
+                payment_mint_pubkey = Pubkey.from_string(token_mint_address)
                 
                 # 验证地址不能相同
                 if str(buyer_pubkey) == str(platform_pubkey):
@@ -954,7 +954,7 @@ class TradeServiceV3:
                 raise ValueError(f"地址格式无效: {str(e)}")
             
             # 3. 验证使用正确的SPL代币程序ID
-            spl_token_program_id = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+            spl_token_program_id = Pubkey.from_string('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
             logger.debug(f"[{transaction_id}] 使用正确的SPL代币程序ID: {spl_token_program_id}")
             
             # 4. 获取关联代币账户 (ATA) - 确保使用正确的买方和平台钱包地址
@@ -1051,7 +1051,7 @@ class TradeServiceV3:
         
         try:
             # 验证程序ID
-            expected_program_id = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+            expected_program_id = Pubkey.from_string('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
             if str(transfer_params.program_id) != str(expected_program_id):
                 raise ValueError(f"程序ID不正确: 期望 {expected_program_id}, 实际 {transfer_params.program_id}")
             
@@ -1097,7 +1097,7 @@ class TradeServiceV3:
                 raise ValueError("指令缺少程序ID")
             
             # 验证程序ID是正确的SPL代币程序
-            expected_program_id = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+            expected_program_id = Pubkey.from_string('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
             if str(instruction.program_id) != str(expected_program_id):
                 raise ValueError(f"指令程序ID不正确: 期望 {expected_program_id}, 实际 {instruction.program_id}")
             
@@ -1334,7 +1334,7 @@ class TradeServiceV3:
                     return False
                 
                 # 对于SPL代币转账指令，进行特殊验证
-                expected_spl_program_id = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+                expected_spl_program_id = Pubkey.from_string('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
                 if str(program_id) == str(expected_spl_program_id):
                     if not TradeServiceV3._validate_spl_transfer_instruction(instruction, transaction.message.account_keys, transaction_id, i):
                         return False
