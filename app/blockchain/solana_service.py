@@ -326,3 +326,68 @@ def check_transaction(signature: str) -> dict:
             "success": False,
             "error": str(e)
         }
+
+
+def get_usdc_balance(wallet_address: str) -> float:
+    """
+    获取钱包的USDC代币余额
+    
+    Args:
+        wallet_address: 钱包地址
+        
+    Returns:
+        float: USDC余额（以美元为单位）
+        
+    Raises:
+        Exception: 获取余额失败时抛出异常
+    """
+    try:
+        from solders.pubkey import Pubkey
+        from spl.token.instructions import get_associated_token_address
+        
+        logger.debug(f"开始获取钱包 {wallet_address} 的USDC余额")
+        
+        # 验证钱包地址格式
+        if not validate_solana_address(wallet_address):
+            raise ValueError(f"无效的钱包地址格式: {wallet_address}")
+        
+        # USDC代币铸造地址（Devnet）
+        usdc_mint_address = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        
+        # 转换地址为PublicKey
+        wallet_pubkey = Pubkey.from_string(wallet_address)
+        usdc_mint_pubkey = Pubkey.from_string(usdc_mint_address)
+        
+        # 计算关联代币账户地址
+        associated_token_address = get_associated_token_address(wallet_pubkey, usdc_mint_pubkey)
+        
+        logger.debug(f"计算的关联代币账户地址: {associated_token_address}")
+        
+        # 获取Solana客户端
+        client = get_solana_client()
+        
+        # 获取代币账户信息
+        account_info = client.get_account_info(associated_token_address)
+        
+        if not account_info.value:
+            logger.warning(f"钱包 {wallet_address} 没有USDC代币账户")
+            return 0.0
+        
+        # 获取代币账户余额
+        balance_response = client.get_token_account_balance(associated_token_address)
+        
+        if not balance_response.value:
+            logger.warning(f"无法获取钱包 {wallet_address} 的USDC余额")
+            return 0.0
+        
+        # 解析余额（USDC有6位小数）
+        balance_info = balance_response.value
+        balance = float(balance_info.ui_amount or 0)
+        
+        logger.info(f"钱包 {wallet_address} 的USDC余额: {balance}")
+        
+        return balance
+        
+    except Exception as e:
+        logger.error(f"获取USDC余额失败 - 钱包: {wallet_address}, 错误: {str(e)}")
+        raise Exception(f"获取USDC余额失败: {str(e)}")

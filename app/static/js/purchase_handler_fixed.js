@@ -201,6 +201,43 @@ if (window.purchaseHandlerFixedInitialized) {
                     'confirmed'
                 );
 
+                // 检查USDC余额
+                this.showLoading('正在检查USDC余额...');
+                const walletAddress = this.getWalletAddress();
+                
+                try {
+                    // 通过API检查用户的USDC余额
+                    const balanceResponse = await fetch('/api/wallet/usdc-balance', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            wallet_address: walletAddress
+                        })
+                    });
+                    
+                    const balanceData = await balanceResponse.json();
+                    
+                    if (!balanceData.success) {
+                        throw new Error(balanceData.message || '无法获取USDC余额');
+                    }
+                    
+                    const balance = balanceData.balance;
+                    const requiredAmount = parseFloat(this.currentTrade.amount) * parseFloat(document.querySelector('.asset-price').textContent.replace('$', ''));
+                    
+                    console.log('USDC余额检查:', { balance, requiredAmount });
+                    
+                    if (balance < requiredAmount) {
+                        throw new Error(`USDC余额不足。需要: $${requiredAmount.toFixed(2)}, 当前余额: $${balance.toFixed(2)}`);
+                    }
+                    
+                } catch (balanceError) {
+                    console.error('余额检查失败:', balanceError);
+                    this.showError('余额不足', balanceError.message || '请确保您的钱包中有足够的USDC代币');
+                    return false;
+                }
+
                 // 获取最新的区块哈希
                 this.showLoading('正在获取最新区块哈希...');
                 const { blockhash } = await connection.getLatestBlockhash();

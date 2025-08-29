@@ -1137,3 +1137,47 @@ def confirm_trade_v2():
         current_app.logger.error(f"V2: 确认购买交易失败: {str(e)}", exc_info=True)
         return create_error_response('INTERNAL_SERVER_ERROR', f'确认购买交易失败: {str(e)}')
 
+
+@api_bp.route('/wallet/usdc-balance', methods=['POST'])
+@api_endpoint(log_calls=True, measure_perf=True)
+def check_usdc_balance():
+    """检查钱包USDC余额"""
+    try:
+        data = request.get_json()
+        if not data:
+            return create_error_response('INVALID_INPUT', '请求体不能为空')
+
+        wallet_address = data.get('wallet_address')
+        if not wallet_address:
+            return create_error_response('MISSING_PARAMETERS', '缺少钱包地址参数')
+
+        # 使用Solana服务检查USDC余额
+        from app.blockchain.solana_service import get_usdc_balance
+        
+        try:
+            balance = get_usdc_balance(wallet_address)
+            
+            current_app.logger.info(f"USDC余额查询成功 - 钱包: {wallet_address}, 余额: {balance}")
+            
+            return jsonify({
+                'success': True,
+                'balance': balance,
+                'wallet_address': wallet_address,
+                'message': '余额查询成功'
+            }), 200
+            
+        except Exception as balance_error:
+            current_app.logger.warning(f"USDC余额查询失败 - 钱包: {wallet_address}, 错误: {str(balance_error)}")
+            
+            # 如果余额查询失败，返回0余额但不阻止交易（让区块链自己处理）
+            return jsonify({
+                'success': True,
+                'balance': 0,
+                'wallet_address': wallet_address,
+                'message': '无法获取余额，可能是新钱包或网络问题'
+            }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"检查USDC余额失败: {str(e)}", exc_info=True)
+        return create_error_response('INTERNAL_SERVER_ERROR', f'检查USDC余额失败: {str(e)}')
+
