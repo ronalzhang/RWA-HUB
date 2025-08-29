@@ -159,7 +159,7 @@ class TradeServiceV3:
                     price=asset.token_price,
                     total=total_price,
                     status=TradeStatus.PENDING.value,
-                    blockchain='solana'  # 固定为Solana区块链
+                    blockchain_network='solana'  # 固定为Solana区块链
                 )
                 db.session.add(new_trade)
                 TradeServiceV3._log_database_operation(transaction_id, "CREATE_TRADE", {
@@ -169,7 +169,7 @@ class TradeServiceV3:
                     "price": asset.token_price,
                     "total": total_price,
                     "status": TradeStatus.PENDING.value,
-                    "blockchain": 'solana'  # 固定为Solana区块链
+                    "blockchain_network": 'solana'  # 固定为Solana区块链
                 })
                 logger.debug(f"[{transaction_id}] 交易记录已添加到会话: 资产ID={asset_id}, 数量={amount}, 状态={TradeStatus.PENDING.value}")
                 
