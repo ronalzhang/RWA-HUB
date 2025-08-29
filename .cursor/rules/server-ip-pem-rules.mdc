@@ -8,3 +8,4 @@ alwaysApply: true
 用pm2管理应用，应用都运行在各自的虚拟环境下，确保每次安装和运行都要在虚拟环境中进行
 服务器上运行的操作要用sshpass 登陆命令+具体命令，比如登陆命令+ “pm2 status”
 命令里有--lines 50的时候一定加上 --nostream才完整。
+例如：sshpass -p "Pr971V3j" ssh -o StrictHostKeyChecking=no root@156.232.13.240 "pm2 logs rwa-hub --lines 30 --nostream"

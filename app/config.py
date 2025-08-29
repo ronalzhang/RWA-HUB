@@ -54,6 +54,12 @@ class Config:
     SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL', 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea')
     SOLANA_PROGRAM_ID = os.environ.get('SOLANA_PROGRAM_ID', '2TsURTNQXyqHLB2bfbzFME7HkSMLWueYPjqXBBy2u1wP')
     SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')  # Mainnet USDC
+    
+    # Solana交易参数配置
+    PLATFORM_TREASURY_WALLET = os.environ.get('PLATFORM_TREASURY_WALLET', '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b')
+    PAYMENT_TOKEN_MINT_ADDRESS = os.environ.get('PAYMENT_TOKEN_MINT_ADDRESS', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')  # USDC mint address
+    PAYMENT_TOKEN_DECIMALS = int(os.environ.get('PAYMENT_TOKEN_DECIMALS', 6))  # USDC has 6 decimals
+    
     # 平台费用地址现在通过ConfigManager动态获取，不再使用硬编码
     # PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b')
     PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b')
@@ -82,10 +88,137 @@ class Config:
     }
 
     @staticmethod
+    def validate_solana_configuration():
+        """验证所有必需的Solana配置参数是否存在 - 使用SolanaConfigValidator"""
+        # Import here to avoid circular imports
+        from app.services.solana_config_validator import SolanaConfigValidator
+        
+        # Create a mock Flask app context for validation if not in app context
+        try:
+            from flask import current_app
+            # If we're in app context, use the validator directly
+            result = SolanaConfigValidator.validate_configuration()
+        except RuntimeError:
+            # If not in app context, create a temporary config dict
+            config_dict = {
+                'SOLANA_RPC_URL': os.environ.get('SOLANA_RPC_URL'),
+                'PLATFORM_TREASURY_WALLET': os.environ.get('PLATFORM_TREASURY_WALLET'),
+                'PAYMENT_TOKEN_MINT_ADDRESS': os.environ.get('PAYMENT_TOKEN_MINT_ADDRESS'),
+                'PAYMENT_TOKEN_DECIMALS': os.environ.get('PAYMENT_TOKEN_DECIMALS'),
+                'SOLANA_PROGRAM_ID': os.environ.get('SOLANA_PROGRAM_ID')
+            }
+            
+            # Validate manually when not in app context
+            missing_params = []
+            invalid_params = []
+            
+            for param_name, param_value in config_dict.items():
+                if not param_value:
+                    missing_params.append(param_name)
+                elif param_name == 'SOLANA_RPC_URL':
+                    if not SolanaConfigValidator.validate_rpc_url(param_value):
+                        invalid_params.append(f"{param_name}: 无效的RPC URL格式")
+                elif param_name in ['PLATFORM_TREASURY_WALLET', 'SOLANA_PROGRAM_ID']:
+                    if not SolanaConfigValidator.validate_wallet_address(param_value):
+                        invalid_params.append(f"{param_name}: 无效的地址格式")
+                elif param_name == 'PAYMENT_TOKEN_MINT_ADDRESS':
+                    if not SolanaConfigValidator.validate_token_mint_address(param_value):
+                        invalid_params.append(f"{param_name}: 无效的代币铸造地址格式")
+                elif param_name == 'PAYMENT_TOKEN_DECIMALS':
+                    is_valid, _ = SolanaConfigValidator.validate_decimals(str(param_value))
+                    if not is_valid:
+                        invalid_params.append(f"{param_name}: 必须是0-18之间的整数")
+            
+            if missing_params or invalid_params:
+                error_msg = "Solana配置验证失败:\n"
+                if missing_params:
+                    error_msg += f"缺失参数: {', '.join(missing_params)}\n"
+                if invalid_params:
+                    error_msg += f"无效参数: {', '.join(invalid_params)}\n"
+                raise ValueError(error_msg)
+            
+            return True
+        
+        if not result['valid']:
+            error_parts = []
+            if result['missing_params']:
+                error_parts.append(f"缺失参数: {', '.join(result['missing_params'])}")
+            if result['invalid_params']:
+                error_parts.append(f"无效参数: {', '.join(result['invalid_params'])}")
+            raise ValueError(f"Solana配置验证失败: {'; '.join(error_parts)}")
+        
+        return True
+    
+    @staticmethod
+    def get_solana_config_status():
+        """获取Solana配置状态，用于调试和监控 - 使用SolanaConfigValidator"""
+        try:
+            from app.services.solana_config_validator import SolanaConfigValidator
+            from flask import current_app
+            
+            # Try to use the validator if in app context
+            return SolanaConfigValidator.get_configuration_status()
+        except (RuntimeError, ImportError):
+            # Fallback to basic status check
+            try:
+                Config.validate_solana_configuration()
+                return {
+                    'status': 'valid',
+                    'message': '所有Solana配置参数已正确设置',
+                    'config': {
+                        'SOLANA_RPC_URL': os.environ.get('SOLANA_RPC_URL', 'NOT_SET'),
+                        'PLATFORM_TREASURY_WALLET': os.environ.get('PLATFORM_TREASURY_WALLET', 'NOT_SET'),
+                        'PAYMENT_TOKEN_MINT_ADDRESS': os.environ.get('PAYMENT_TOKEN_MINT_ADDRESS', 'NOT_SET'),
+                        'PAYMENT_TOKEN_DECIMALS': os.environ.get('PAYMENT_TOKEN_DECIMALS', 'NOT_SET'),
+                        'SOLANA_PROGRAM_ID': os.environ.get('SOLANA_PROGRAM_ID', 'NOT_SET')
+                    }
+                }
+            except ValueError as e:
+                return {
+                    'status': 'invalid',
+                    'message': str(e),
+                    'config': {
+                        'SOLANA_RPC_URL': os.environ.get('SOLANA_RPC_URL', 'NOT_SET'),
+                        'PLATFORM_TREASURY_WALLET': os.environ.get('PLATFORM_TREASURY_WALLET', 'NOT_SET'),
+                        'PAYMENT_TOKEN_MINT_ADDRESS': os.environ.get('PAYMENT_TOKEN_MINT_ADDRESS', 'NOT_SET'),
+                        'PAYMENT_TOKEN_DECIMALS': os.environ.get('PAYMENT_TOKEN_DECIMALS', 'NOT_SET'),
+                        'SOLANA_PROGRAM_ID': os.environ.get('SOLANA_PROGRAM_ID', 'NOT_SET')
+                    }
+                }
+
+    @staticmethod
     def init_app(app):
         # 基础配置初始化
         from app.services.database_optimizer import get_database_optimizer
         from app.services.cache_service import get_cache_manager
+        
+        # 验证Solana配置
+        try:
+            Config.validate_solana_configuration()
+            print("✓ Solana配置验证通过")
+            
+            # 使用SolanaConfigValidator进行详细日志记录
+            try:
+                from app.services.solana_config_validator import SolanaConfigValidator
+                SolanaConfigValidator.log_configuration_status()
+            except ImportError:
+                pass  # 如果导入失败，继续使用基本验证
+                
+        except ValueError as e:
+            print(f"⚠ Solana配置验证失败: {e}")
+            # 在开发环境中，我们可以继续运行，但会记录警告
+            # 在生产环境中，可能需要停止应用启动
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Solana配置验证失败，但应用将继续启动: {e}")
+            logger.warning("请检查环境变量或配置文件中的Solana相关参数")
+            
+            # 尝试使用SolanaConfigValidator记录详细错误
+            try:
+                from app.services.solana_config_validator import SolanaConfigValidator
+                SolanaConfigValidator.log_configuration_status()
+            except ImportError:
+                pass
         
         # 初始化数据库优化
         db_optimizer = get_database_optimizer()

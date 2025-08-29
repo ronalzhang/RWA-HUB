@@ -20,6 +20,7 @@ from . import dashboard
 from . import commission
 from . import trades
 from . import utils
+from . import monitoring
 
 # 导出常用函数，保持向后兼容
 from .auth import admin_required, api_admin_required, admin_page_required, permission_required

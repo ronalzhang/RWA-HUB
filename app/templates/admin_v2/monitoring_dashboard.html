@@ -1,0 +1,511 @@
+{% extends "admin_v2/base_cyberpunk.html" %}
+
+{% block title %}Transaction Monitoring Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+.monitoring-dashboard {
+    padding: 20px;
+}
+
+.status-card {
+    background: rgba(0, 255, 255, 0.1);
+    border: 1px solid #00ffff;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+.status-healthy {
+    border-color: #00ff00;
+    background: rgba(0, 255, 0, 0.1);
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+}
+
+.status-warning {
+    border-color: #ffff00;
+    background: rgba(255, 255, 0, 0.1);
+    box-shadow: 0 0 10px rgba(255, 255, 0, 0.3);
+}
+
+.status-critical {
+    border-color: #ff0000;
+    background: rgba(255, 0, 0, 0.1);
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.3);
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.metric-card {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.metric-title {
+    color: #00ffff;
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.metric-value {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.metric-description {
+    color: #cccccc;
+    font-size: 12px;
+}
+
+.alert-item {
+    background: rgba(0, 0, 0, 0.5);
+    border-left: 4px solid;
+    padding: 10px 15px;
+    margin-bottom: 10px;
+    border-radius: 0 4px 4px 0;
+}
+
+.alert-critical {
+    border-left-color: #ff0000;
+}
+
+.alert-warning {
+    border-left-color: #ffff00;
+}
+
+.alert-info {
+    border-left-color: #00ffff;
+}
+
+.logs-container {
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 15px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.log-entry {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    margin-bottom: 5px;
+    padding: 5px;
+    border-radius: 3px;
+}
+
+.log-error {
+    background: rgba(255, 0, 0, 0.1);
+    color: #ff6666;
+}
+
+.log-warning {
+    background: rgba(255, 255, 0, 0.1);
+    color: #ffff66;
+}
+
+.log-info {
+    color: #cccccc;
+}
+
+.refresh-controls {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.btn-refresh {
+    background: #00ffff;
+    color: #000;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-refresh:hover {
+    background: #66ffff;
+}
+
+.auto-refresh-indicator {
+    color: #00ff00;
+    font-size: 12px;
+}
+
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.chart-container {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    height: 300px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="monitoring-dashboard">
+    <h1 class="text-center mb-4" style="color: #00ffff;">Transaction Monitoring Dashboard</h1>
+    
+    <!-- Refresh Controls -->
+    <div class="refresh-controls">
+        <button class="btn-refresh" onclick="refreshAllData()">Refresh All</button>
+        <label style="color: #cccccc;">
+            <input type="checkbox" id="autoRefresh" checked> Auto-refresh (30s)
+        </label>
+        <span class="auto-refresh-indicator" id="refreshIndicator">●</span>
+        <span style="color: #cccccc; margin-left: 20px;">Last updated: <span id="lastUpdated">-</span></span>
+    </div>
+
+    <!-- Overall Health Status -->
+    <div class="status-card" id="overallStatus">
+        <h2 style="color: #00ffff; margin-bottom: 15px;">System Health Status</h2>
+        <div id="healthStatus">Loading...</div>
+    </div>
+
+    <!-- Key Metrics Grid -->
+    <div class="metric-grid">
+        <div class="metric-card">
+            <div class="metric-title">Transaction Success Rate (24h)</div>
+            <div class="metric-value" id="successRate">-</div>
+            <div class="metric-description" id="successRateDesc">-</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-title">Blockchain Connection</div>
+            <div class="metric-value" id="blockchainStatus">-</div>
+            <div class="metric-description" id="blockchainDesc">-</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-title">Average Response Time</div>
+            <div class="metric-value" id="responseTime">-</div>
+            <div class="metric-description">RPC response time</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-title">Transaction Throughput</div>
+            <div class="metric-value" id="throughput">-</div>
+            <div class="metric-description">Transactions in last 24h</div>
+        </div>
+    </div>
+
+    <!-- Alerts Section -->
+    <div class="status-card">
+        <h3 style="color: #00ffff; margin-bottom: 15px;">Active Alerts</h3>
+        <div id="alertsContainer">Loading alerts...</div>
+    </div>
+
+    <!-- Error Analysis -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="status-card">
+                <h3 style="color: #00ffff; margin-bottom: 15px;">Error Breakdown (24h)</h3>
+                <div id="errorBreakdown">Loading...</div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="status-card">
+                <h3 style="color: #00ffff; margin-bottom: 15px;">Critical Errors</h3>
+                <div id="criticalErrors">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Transaction Logs -->
+    <div class="status-card">
+        <h3 style="color: #00ffff; margin-bottom: 15px;">Recent Transaction Logs</h3>
+        <div class="logs-container" id="recentLogs">
+            Loading logs...
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let autoRefreshInterval;
+let isLoading = false;
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    refreshAllData();
+    setupAutoRefresh();
+});
+
+function setupAutoRefresh() {
+    const autoRefreshCheckbox = document.getElementById('autoRefresh');
+    
+    function startAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+        }
+        
+        if (autoRefreshCheckbox.checked) {
+            autoRefreshInterval = setInterval(() => {
+                if (!isLoading) {
+                    refreshAllData();
+                }
+            }, 30000); // 30 seconds
+        }
+    }
+    
+    autoRefreshCheckbox.addEventListener('change', startAutoRefresh);
+    startAutoRefresh();
+}
+
+function refreshAllData() {
+    if (isLoading) return;
+    
+    isLoading = true;
+    document.body.classList.add('loading');
+    
+    Promise.all([
+        loadHealthStatus(),
+        loadTransactionMetrics(),
+        loadBlockchainStatus(),
+        loadAlerts(),
+        loadErrorAnalysis(),
+        loadCriticalErrors(),
+        loadRecentLogs()
+    ]).finally(() => {
+        isLoading = false;
+        document.body.classList.remove('loading');
+        updateLastUpdatedTime();
+    });
+}
+
+function updateLastUpdatedTime() {
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+}
+
+async function loadHealthStatus() {
+    try {
+        const response = await fetch('/admin/monitoring/api/health-check');
+        const result = await response.json();
+        
+        if (result.success) {
+            const data = result.data;
+            const statusCard = document.getElementById('overallStatus');
+            
+            // Update status card class
+            statusCard.className = `status-card status-${data.overall_status}`;
+            
+            // Update health status content
+            document.getElementById('healthStatus').innerHTML = `
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="font-size: 24px; font-weight: bold; color: ${getStatusColor(data.overall_status)};">
+                        ${data.overall_status.toUpperCase()}
+                    </div>
+                    <div style="color: #cccccc;">
+                        <div>Components: Transactions (${data.components.transactions}), Blockchain (${data.components.blockchain})</div>
+                        <div>Alerts: ${data.alerts.critical} critical, ${data.alerts.warning} warning</div>
+                    </div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading health status:', error);
+        document.getElementById('healthStatus').innerHTML = '<span style="color: #ff0000;">Error loading health status</span>';
+    }
+}
+
+async function loadTransactionMetrics() {
+    try {
+        const response = await fetch('/admin/monitoring/api/transaction-metrics?hours=24');
+        const result = await response.json();
+        
+        if (result.success) {
+            const data = result.data;
+            
+            document.getElementById('successRate').textContent = `${(data.success_rate * 100).toFixed(1)}%`;
+            document.getElementById('successRateDesc').textContent = `${data.successful}/${data.total_attempts} transactions`;
+            document.getElementById('throughput').textContent = data.total_attempts;
+        }
+    } catch (error) {
+        console.error('Error loading transaction metrics:', error);
+    }
+}
+
+async function loadBlockchainStatus() {
+    try {
+        const response = await fetch('/admin/monitoring/api/blockchain-status');
+        const result = await response.json();
+        
+        if (result.success) {
+            const data = result.data;
+            
+            document.getElementById('blockchainStatus').textContent = data.is_healthy ? 'Connected' : 'Issues';
+            document.getElementById('blockchainDesc').textContent = 
+                data.consecutive_failures > 0 ? `${data.consecutive_failures} failures` : 'Healthy';
+            document.getElementById('responseTime').textContent = 
+                data.average_response_time_ms > 0 ? `${data.average_response_time_ms.toFixed(0)}ms` : 'No data';
+        }
+    } catch (error) {
+        console.error('Error loading blockchain status:', error);
+    }
+}
+
+async function loadAlerts() {
+    try {
+        const response = await fetch('/admin/monitoring/api/alerts');
+        const result = await response.json();
+        
+        if (result.success) {
+            const alerts = result.data;
+            const container = document.getElementById('alertsContainer');
+            
+            if (alerts.length === 0) {
+                container.innerHTML = '<div style="color: #00ff00;">No active alerts</div>';
+            } else {
+                container.innerHTML = alerts.map(alert => `
+                    <div class="alert-item alert-${alert.level}">
+                        <div style="font-weight: bold; color: ${getAlertColor(alert.level)};">
+                            ${alert.level.toUpperCase()}: ${alert.type}
+                        </div>
+                        <div style="color: #cccccc; margin-top: 5px;">
+                            ${alert.message}
+                        </div>
+                        <div style="color: #999; font-size: 11px; margin-top: 5px;">
+                            ${new Date(alert.timestamp).toLocaleString()}
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+    } catch (error) {
+        console.error('Error loading alerts:', error);
+        document.getElementById('alertsContainer').innerHTML = '<span style="color: #ff0000;">Error loading alerts</span>';
+    }
+}
+
+async function loadErrorAnalysis() {
+    try {
+        const response = await fetch('/admin/monitoring/api/error-analysis?hours=24');
+        const result = await response.json();
+        
+        if (result.success) {
+            const data = result.data;
+            const container = document.getElementById('errorBreakdown');
+            
+            if (Object.keys(data.monitor_errors).length === 0) {
+                container.innerHTML = '<div style="color: #00ff00;">No errors in last 24h</div>';
+            } else {
+                const errorList = Object.entries(data.monitor_errors)
+                    .sort(([,a], [,b]) => b - a)
+                    .map(([type, count]) => `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="color: #cccccc;">${type}</span>
+                            <span style="color: #ff6666; font-weight: bold;">${count}</span>
+                        </div>
+                    `).join('');
+                
+                container.innerHTML = errorList;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading error analysis:', error);
+        document.getElementById('errorBreakdown').innerHTML = '<span style="color: #ff0000;">Error loading data</span>';
+    }
+}
+
+async function loadCriticalErrors() {
+    try {
+        const response = await fetch('/admin/monitoring/api/logs/critical?hours=24');
+        const result = await response.json();
+        
+        if (result.success) {
+            const errors = result.data;
+            const container = document.getElementById('criticalErrors');
+            
+            if (errors.length === 0) {
+                container.innerHTML = '<div style="color: #00ff00;">No critical errors</div>';
+            } else {
+                container.innerHTML = errors.map(error => `
+                    <div style="margin-bottom: 10px; padding: 8px; background: rgba(255, 0, 0, 0.1); border-radius: 4px;">
+                        <div style="font-weight: bold; color: #ff6666;">${error.error_type}</div>
+                        <div style="color: #cccccc; font-size: 12px;">Count: ${error.count}</div>
+                        <div style="color: #999; font-size: 11px;">Latest: ${new Date(error.latest_occurrence).toLocaleString()}</div>
+                    </div>
+                `).join('');
+            }
+        }
+    } catch (error) {
+        console.error('Error loading critical errors:', error);
+        document.getElementById('criticalErrors').innerHTML = '<span style="color: #ff0000;">Error loading data</span>';
+    }
+}
+
+async function loadRecentLogs() {
+    try {
+        const response = await fetch('/admin/monitoring/api/logs/search?hours=1&query=');
+        const result = await response.json();
+        
+        if (result.success) {
+            const logs = result.data.slice(0, 20); // Show last 20 logs
+            const container = document.getElementById('recentLogs');
+            
+            if (logs.length === 0) {
+                container.innerHTML = '<div style="color: #cccccc;">No recent transaction logs</div>';
+            } else {
+                container.innerHTML = logs.map(log => `
+                    <div class="log-entry log-${log.level.toLowerCase()}">
+                        <span style="color: #666;">[${new Date(log.timestamp).toLocaleTimeString()}]</span>
+                        <span style="color: #999;">[${log.level}]</span>
+                        ${log.message}
+                        ${log.trade_id ? `<span style="color: #00ffff;"> (Trade: ${log.trade_id})</span>` : ''}
+                    </div>
+                `).join('');
+            }
+        }
+    } catch (error) {
+        console.error('Error loading recent logs:', error);
+        document.getElementById('recentLogs').innerHTML = '<span style="color: #ff0000;">Error loading logs</span>';
+    }
+}
+
+function getStatusColor(status) {
+    switch (status) {
+        case 'healthy': return '#00ff00';
+        case 'warning': return '#ffff00';
+        case 'critical': return '#ff0000';
+        default: return '#cccccc';
+    }
+}
+
+function getAlertColor(level) {
+    switch (level) {
+        case 'critical': return '#ff0000';
+        case 'warning': return '#ffff00';
+        case 'info': return '#00ffff';
+        default: return '#cccccc';
+    }
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+    }
+});
+</script>
+{% endblock %}

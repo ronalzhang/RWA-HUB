@@ -38,6 +38,9 @@ from .admin_api import admin_compat_routes_bp, admin_v2_bp, admin_compat_bp, adm
 # 导入新的模块化admin系统
 from .admin import admin_bp, admin_api_bp
 
+# 导入监控管理
+from .admin.monitoring import monitoring_bp
+
 # 导入佣金配置管理
 from .admin.commission_config import commission_config_bp
 
@@ -77,6 +80,9 @@ def register_blueprints(app):
     # 注册新的模块化admin蓝图
     app.register_blueprint(admin_bp)
     app.register_blueprint(admin_api_bp)
+    
+    # 注册监控管理蓝图
+    app.register_blueprint(monitoring_bp)
     
     # 注册佣金配置管理蓝图
     app.register_blueprint(commission_config_bp)

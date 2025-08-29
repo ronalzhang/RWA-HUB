@@ -40,12 +40,19 @@ class ErrorHandler {
             1402: '交易失败',
             1403: '网络连接错误',
             1404: '智能合约错误',
+            1405: '交易创建失败',
+            1406: '交易序列化失败',
+            1407: '交易确认超时',
+            1408: '钱包签名失败',
+            1409: '区块链连接失败',
             
             // 系统错误
             1501: '数据库操作失败',
             1502: '服务器内部错误',
             1503: '服务暂时不可用',
             1504: '请求频率超限',
+            1505: '配置错误',
+            1506: '交易处理超时',
             
             // 权限相关错误
             1601: '权限不足',
@@ -437,6 +444,112 @@ class ErrorHandler {
     }
     
     /**
+     * 处理购买流程特定错误
+     * @param {Object} error - 错误对象
+     * @param {Object} options - 选项
+     */
+    handlePurchaseError(error, options = {}) {
+        const {
+            showRetryButton = true,
+            retryCallback = null,
+            maxRetries = 3,
+            currentRetry = 0
+        } = options;
+        
+        let errorInfo = this.parseError(error);
+        
+        // 购买流程特定错误映射
+        const purchaseErrorMap = {
+            'CONFIGURATION_ERROR': {
+                title: '系统配置错误',
+                message: '系统配置不完整，请联系管理员',
+                retryable: false
+            },
+            'BLOCKCHAIN_CONNECTION_ERROR': {
+                title: '区块链连接失败',
+                message: '无法连接到区块链网络，请稍后重试',
+                retryable: true
+            },
+            'TRANSACTION_CREATION_ERROR': {
+                title: '交易创建失败',
+                message: '创建交易时发生错误，请重试',
+                retryable: true
+            },
+            'SERIALIZATION_ERROR': {
+                title: '交易数据错误',
+                message: '交易数据处理失败，请重新创建交易',
+                retryable: true
+            },
+            'WALLET_CONNECTION_ERROR': {
+                title: '钱包连接错误',
+                message: '钱包连接异常，请重新连接钱包',
+                retryable: false
+            },
+            'USER_REJECTED': {
+                title: '交易已取消',
+                message: '您在钱包中拒绝了交易请求',
+                retryable: false
+            },
+            'INSUFFICIENT_BALANCE': {
+                title: '余额不足',
+                message: '您的钱包余额不足以完成此交易',
+                retryable: false
+            },
+            'TRANSACTION_TIMEOUT': {
+                title: '交易超时',
+                message: '交易处理超时，请稍后重试',
+                retryable: true
+            }
+        };
+        
+        const errorConfig = purchaseErrorMap[errorInfo.type] || {
+            title: '购买失败',
+            message: errorInfo.message || '购买过程中发生未知错误',
+            retryable: true
+        };
+        
+        // 显示错误信息
+        if (errorConfig.retryable && showRetryButton && currentRetry < maxRetries && retryCallback) {
+            this.showRetryableError(errorConfig, retryCallback, currentRetry, maxRetries);
+        } else {
+            this.showErrorToast(errorInfo);
+        }
+        
+        return errorInfo;
+    }
+    
+    /**
+     * 显示可重试的错误
+     * @param {Object} errorConfig - 错误配置
+     * @param {Function} retryCallback - 重试回调
+     * @param {number} currentRetry - 当前重试次数
+     * @param {number} maxRetries - 最大重试次数
+     */
+    showRetryableError(errorConfig, retryCallback, currentRetry, maxRetries) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: errorConfig.title,
+                text: `${errorConfig.message}\n\n重试次数: ${currentRetry}/${maxRetries}`,
+                icon: 'error',
+                showCancelButton: true,
+                confirmButtonText: '重试',
+                cancelButtonText: '取消',
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33'
+            }).then((result) => {
+                if (result.isConfirmed && retryCallback) {
+                    retryCallback();
+                }
+            });
+        } else {
+            const retry = confirm(`${errorConfig.title}: ${errorConfig.message}\n\n重试次数: ${currentRetry}/${maxRetries}\n\n是否重试？`);
+            if (retry && retryCallback) {
+                retryCallback();
+            }
+        }
+    }
+
+    /**
      * 清除所有错误提示
      */
     clearAllErrors() {
@@ -461,6 +574,10 @@ window.errorHandler = new ErrorHandler();
 // 便捷函数
 window.showError = function(error, options = {}) {
     return window.errorHandler.handleApiError(error, options);
+};
+
+window.showPurchaseError = function(error, options = {}) {
+    return window.errorHandler.handlePurchaseError(error, options);
 };
 
 window.clearErrors = function() {

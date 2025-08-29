@@ -204,62 +204,63 @@ def asset_detail_by_symbol(token_symbol):
                 is_owner = current_user_address == asset.owner_address
             
         # 使用DataConsistencyManager获取实时资产数据
-        from app.services.data_consistency_manager import DataConsistencyManager
-        data_manager = DataConsistencyManager()
-        
-        # 获取实时资产数据
-        real_time_data = data_manager.get_real_time_asset_data(asset.id)
-        
-        # 计算剩余供应量（优先使用实时数据）
-        if real_time_data and 'remaining_supply' in real_time_data:
-            remaining_supply = real_time_data['remaining_supply']
-        elif asset.remaining_supply is not None:
-            remaining_supply = asset.remaining_supply
-        else:
-            remaining_supply = asset.token_supply
-        
-        # 获取资产累计分红数据（优先使用实时数据）
-        if real_time_data and 'total_dividends' in real_time_data:
-            total_dividends = real_time_data['total_dividends']
-        else:
-            total_dividends = 0
-            try:
-                # 直接使用SQL查询，避免payment_token字段不存在的问题
-                sql = text("SELECT SUM(amount) FROM dividends WHERE asset_id = :asset_id AND status = 'confirmed'")
-                result = db.session.execute(sql, {"asset_id": asset.id}).fetchone()
-                total_dividends = result[0] if result[0] else 0
-            except Exception as div_e:
-                current_app.logger.error(f'[DETAIL_PAGE_DIVIDEND_ERROR] 获取累计分红数据失败: {str(div_e)}')
-        
-        # Log right before rendering
-        current_app.logger.info(f'[DETAIL_PAGE_RENDER_START] 准备渲染模板 detail.html for {token_symbol}.')
-        context = {
-            'asset': asset,
-            'remaining_supply': remaining_supply,
-            'is_owner': is_owner,
-            'is_admin_user': is_admin_user,
-            'current_user_address': current_user_address,
-            'total_dividends': total_dividends,
-            'real_time_data': real_time_data,  # 添加实时数据到模板上下文
-            'platform_fee_address': ConfigManager.get_platform_fee_address(),
-            'PLATFORM_FEE_RATE': getattr(Config, 'PLATFORM_FEE_RATE', 0.035)
-        }
-        current_app.logger.info(f'[DETAIL_PAGE_CONTEXT] Context keys: {list(context.keys())}')
+# from app.services.data_consistency_manager import DataConsistencyManager # <-- 已删除
+# data_manager = DataConsistencyManager()
 
-        # 直接返回渲染的HTML，避免任何重定向
-        return render_template('assets/detail.html', **context)
-                              
-    except Exception as e:
-        # Log the exception
-        current_app.logger.error(f'[DETAIL_PAGE_EXCEPTION] 访问资产详情页面 {token_symbol} 时捕获到异常!')
-        current_app.logger.exception(e)
-        
-        # 添加具体错误信息到日志中
-        tb_info = traceback.format_exc()
-        current_app.logger.error(f'[DETAIL_PAGE_ERROR] 详细错误信息:\n{tb_info}')
-        
-        # 渲染错误页面而不是重定向
-        return render_template('error.html', error=_('Error accessing asset details')), 500
+# 获取实时资产数据
+# real_time_data = data_manager.get_real_time_asset_data(asset.id)
+real_time_data = {} # 临时禁用实时数据获取
+
+# 计算剩余供应量（优先使用实时数据）
+if real_time_data and 'remaining_supply' in real_time_data:
+    remaining_supply = real_time_data['remaining_supply']
+elif asset.remaining_supply is not None:
+    remaining_supply = asset.remaining_supply
+else:
+    remaining_supply = asset.token_supply
+
+# 获取资产累计分红数据（优先使用实时数据）
+if real_time_data and 'total_dividends' in real_time_data:
+    total_dividends = real_time_data['total_dividends']
+else:
+    total_dividends = 0
+    try:
+        # 直接使用SQL查询，避免payment_token字段不存在的问题
+        sql = text("SELECT SUM(amount) FROM dividends WHERE asset_id = :asset_id AND status = 'confirmed'")
+        result = db.session.execute(sql, {"asset_id": asset.id}).fetchone()
+        total_dividends = result[0] if result[0] else 0
+    except Exception as div_e:
+        current_app.logger.error(f'[DETAIL_PAGE_DIVIDEND_ERROR] 获取累计分红数据失败: {str(div_e)}')
+
+# Log right before rendering
+current_app.logger.info(f'[DETAIL_PAGE_RENDER_START] 准备渲染模板 detail.html for {token_symbol}.')
+context = {
+    'asset': asset,
+    'remaining_supply': remaining_supply,
+    'is_owner': is_owner,
+    'is_admin_user': is_admin_user,
+    'current_user_address': current_user_address,
+    'total_dividends': total_dividends,
+    'real_time_data': real_time_data,  # 添加实时数据到模板上下文
+    'platform_fee_address': ConfigManager.get_platform_fee_address(),
+    'PLATFORM_FEE_RATE': getattr(Config, 'PLATFORM_FEE_RATE', 0.035)
+}
+current_app.logger.info(f'[DETAIL_PAGE_CONTEXT] Context keys: {list(context.keys())}')
+
+# 直接返回渲染的HTML，避免任何重定向
+return render_template('assets/detail.html', **context)
+                  
+except Exception as e:
+    # Log the exception
+    current_app.logger.error(f'[DETAIL_PAGE_EXCEPTION] 访问资产详情页面 {token_symbol} 时捕获到异常!')
+    current_app.logger.exception(e)
+    
+    # 添加具体错误信息到日志中
+    tb_info = traceback.format_exc()
+    current_app.logger.error(f'[DETAIL_PAGE_ERROR] 详细错误信息:\n{tb_info}')
+    
+    # 渲染错误页面而不是重定向
+    return render_template('error.html', error=_('Error accessing asset details')), 500
 
 @assets_bp.route('/create')
 @eth_address_required

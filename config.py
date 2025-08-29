@@ -38,4 +38,9 @@ class Config:
     SOLANA_ENDPOINT = os.environ.get('SOLANA_ENDPOINT') or 'https://api.mainnet-beta.solana.com'
     SOLANA_PROGRAM_ID = os.environ.get('SOLANA_PROGRAM_ID') or 'RWAxxx111111111111111111111111111111111111'
     SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT') or 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
-    SOLANA_USDC_DECIMALS = 6 
+    SOLANA_USDC_DECIMALS = 6
+    
+    # Solana交易参数配置
+    PLATFORM_TREASURY_WALLET = os.environ.get('PLATFORM_TREASURY_WALLET') or '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b'
+    PAYMENT_TOKEN_MINT_ADDRESS = os.environ.get('PAYMENT_TOKEN_MINT_ADDRESS') or 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+    PAYMENT_TOKEN_DECIMALS = int(os.environ.get('PAYMENT_TOKEN_DECIMALS', 6)) 
