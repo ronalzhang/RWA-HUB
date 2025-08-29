@@ -97,8 +97,9 @@ class TradeServiceV3:
                         '资产不存在'
                     )
 
-                if not asset.is_active or asset.status != 'ON_CHAIN':
-                    logger.warning(f"[{transaction_id}] 数据验证失败: 资产不可交易 {asset_id}, 状态={asset.status}, 活跃={asset.is_active}")
+                # 检查资产状态是否为活跃状态（ACTIVE=2, ON_CHAIN=2, APPROVED=2）
+                if asset.status != 2:  # AssetStatus.ACTIVE.value = 2
+                    logger.warning(f"[{transaction_id}] 数据验证失败: 资产不可交易 {asset_id}, 状态={asset.status}")
                     return TradeServiceV3._create_error_response(
                         TradeServiceV3.ErrorCodes.ASSET_NOT_TRADEABLE, 
                         '资产当前不可交易'
