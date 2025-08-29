@@ -156,6 +156,7 @@ fi
 echo '🎉 部署完成！'
 "
 
+echo "Executing: sshpass -p '********' ssh -T -o StrictHostKeyChecking=no \"$SERVER_USER@$SERVER_HOST\" ..."
 sshpass -p "\$SERVER_PASSWORD" ssh -T -o StrictHostKeyChecking=no "\$SERVER_USER@\$SERVER_HOST" "\$REMOTE_SCRIPT"
 
 
