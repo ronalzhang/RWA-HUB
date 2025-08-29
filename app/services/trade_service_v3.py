@@ -13,8 +13,8 @@ from app.services.log_aggregator import transaction_log_aggregator
 
 from solders.pubkey import Pubkey
 from solders.hash import Hash
-from solders.transaction import Transaction
 from solders.signature import Signature
+from solana.transaction import Transaction
 from spl.token.instructions import transfer, TransferParams
 from spl.token.client import get_associated_token_address
 from solana.exceptions import SolanaRpcException
@@ -252,11 +252,15 @@ class TradeServiceV3:
             logger.debug(f"[{transaction_id}] 步骤6: 开始交易构建")
             
             try:
-                buyer_pubkey = Pubkey.from_string(wallet_address)
-                tx = Transaction.new_with_payer([instruction], buyer_pubkey)
-                tx.recent_blockhash = recent_blockhash
+                from solana.publickey import PublicKey
                 
-                logger.debug(f"[{transaction_id}] 交易构建成功: 指令数={len(tx.message.instructions)}, 账户数={len(tx.message.account_keys)}")
+                buyer_pubkey = PublicKey(wallet_address)
+                tx = Transaction()
+                tx.add(instruction)
+                tx.recent_blockhash = recent_blockhash
+                tx.fee_payer = buyer_pubkey
+                
+                logger.debug(f"[{transaction_id}] 交易构建成功: 指令数={len(tx.instructions)}")
                 
             except Exception as e:
                 logger.error(f"[{transaction_id}] 交易构建失败: {e}", exc_info=True)
@@ -288,7 +292,7 @@ class TradeServiceV3:
             logger.debug(f"[{transaction_id}] 步骤8: 开始交易序列化")
             
             try:
-                serialized_tx = tx.serialize(verify_signatures=False)
+                serialized_tx = tx.serialize()
                 encoded_tx = base64.b64encode(serialized_tx).decode('utf-8')
                 
                 logger.info(f"[{transaction_id}] 交易序列化成功: 长度={len(serialized_tx)}, Base64长度={len(encoded_tx)}")
@@ -937,14 +941,16 @@ class TradeServiceV3:
             
             logger.debug(f"[{transaction_id}] 输入参数验证通过")
             
-            # 2. 转换地址为Pubkey并验证格式
+            # 2. 转换地址为PublicKey并验证格式
             try:
-                buyer_pubkey = Pubkey.from_string(buyer_address)
-                platform_pubkey = Pubkey.from_string(platform_address)
-                payment_mint_pubkey = Pubkey.from_string(token_mint_address)
+                from solana.publickey import PublicKey
+                
+                buyer_pubkey = PublicKey(buyer_address)
+                platform_pubkey = PublicKey(platform_address)
+                payment_mint_pubkey = PublicKey(token_mint_address)
                 
                 # 验证地址不能相同
-                if buyer_pubkey == platform_pubkey:
+                if str(buyer_pubkey) == str(platform_pubkey):
                     raise ValueError("买方地址和平台地址不能相同")
                 
                 logger.debug(f"[{transaction_id}] 地址转换和验证成功")
@@ -953,7 +959,7 @@ class TradeServiceV3:
                 raise ValueError(f"地址格式无效: {str(e)}")
             
             # 3. 验证使用正确的SPL代币程序ID
-            spl_token_program_id = Pubkey.from_string('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+            spl_token_program_id = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
             logger.debug(f"[{transaction_id}] 使用正确的SPL代币程序ID: {spl_token_program_id}")
             
             # 4. 获取关联代币账户 (ATA) - 确保使用正确的买方和平台钱包地址
@@ -1050,8 +1056,8 @@ class TradeServiceV3:
         
         try:
             # 验证程序ID
-            expected_program_id = Pubkey.from_string('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-            if transfer_params.program_id != expected_program_id:
+            expected_program_id = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+            if str(transfer_params.program_id) != str(expected_program_id):
                 raise ValueError(f"程序ID不正确: 期望 {expected_program_id}, 实际 {transfer_params.program_id}")
             
             # 验证源账户和目标账户不能相同
@@ -1096,8 +1102,8 @@ class TradeServiceV3:
                 raise ValueError("指令缺少程序ID")
             
             # 验证程序ID是正确的SPL代币程序
-            expected_program_id = Pubkey.from_string('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-            if instruction.program_id != expected_program_id:
+            expected_program_id = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+            if str(instruction.program_id) != str(expected_program_id):
                 raise ValueError(f"指令程序ID不正确: 期望 {expected_program_id}, 实际 {instruction.program_id}")
             
             # 验证指令有账户列表
@@ -1333,8 +1339,8 @@ class TradeServiceV3:
                     return False
                 
                 # 对于SPL代币转账指令，进行特殊验证
-                expected_spl_program_id = Pubkey.from_string('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-                if program_id == expected_spl_program_id:
+                expected_spl_program_id = PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+                if str(program_id) == str(expected_spl_program_id):
                     if not TradeServiceV3._validate_spl_transfer_instruction(instruction, transaction.message.account_keys, transaction_id, i):
                         return False
                 

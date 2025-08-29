@@ -17,23 +17,16 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- Solana库 -->
+<!-- Solana Web3.js 库 -->
+<script src="https://unpkg.com/@solana/web3.js@1.78.0/lib/index.iife.min.js"></script>
 <script>
-// 创建一个简化的Transaction类来处理交易数据
-window.solanaWeb3 = {
-    Transaction: {
-        from: function(buffer) {
-            // 简化的Transaction对象，只需要能被钱包处理
-            return {
-                serialize: function() {
-                    return buffer;
-                },
-                _buffer: buffer
-            };
-        }
-    }
-};
-console.log('✅ 创建了简化的solanaWeb3对象');
+// 确保 Solana Web3.js 库正确加载
+if (typeof solanaWeb3 !== 'undefined') {
+    window.solanaWeb3 = solanaWeb3;
+    console.log('✅ Solana Web3.js 库已加载');
+} else {
+    console.error('❌ Solana Web3.js 库加载失败');
+}
 </script>
 <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
 
