@@ -203,13 +203,17 @@ def asset_detail_by_symbol(token_symbol):
             else:
                 is_owner = current_user_address == asset.owner_address
             
-        # 使用DataConsistencyManager获取实时资产数据
-# from app.services.data_consistency_manager import DataConsistencyManager # <-- 已删除
-# data_manager = DataConsistencyManager()
+        try:
+            # 使用DataConsistencyManager获取实时资产数据
+            # from app.services.data_consistency_manager import DataConsistencyManager # <-- 已删除
+            # data_manager = DataConsistencyManager()
 
-# 获取实时资产数据
-# real_time_data = data_manager.get_real_time_asset_data(asset.id)
-real_time_data = {} # 临时禁用实时数据获取
+            # 获取实时资产数据
+            # real_time_data = data_manager.get_real_time_asset_data(asset.id)
+            real_time_data = {} # 临时禁用实时数据获取
+        except Exception as data_e:
+            current_app.logger.error(f"获取实时数据失败: {data_e}")
+            real_time_data = {}
 
 # 计算剩余供应量（优先使用实时数据）
 if real_time_data and 'remaining_supply' in real_time_data:
