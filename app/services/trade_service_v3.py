@@ -15,8 +15,7 @@ from solders.pubkey import Pubkey
 from solders.hash import Hash
 from solders.signature import Signature
 from solders.transaction import Transaction
-from spl.token.instructions import transfer, TransferParams
-from spl.token.client import get_associated_token_address
+from spl.token.instructions import transfer, TransferParams, get_associated_token_address
 from solana.exceptions import SolanaRpcException
 from solana.rpc.types import TxOpts
 
