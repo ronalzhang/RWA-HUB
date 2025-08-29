@@ -31,8 +31,8 @@ def create_trade_v3():
         if not asset_id:
             return create_error_response('VALIDATION_ERROR', '缺少资产ID')
         
-        if not amount:
-            return create_error_response('VALIDATION_ERROR', '缺少购买数量')
+        if not amount or amount <= 0:
+            return create_error_response('INVALID_AMOUNT', '无效的购买数量')
         
         if not wallet_address:
             return create_error_response('VALIDATION_ERROR', '缺少钱包地址')
@@ -42,13 +42,22 @@ def create_trade_v3():
         if not asset:
             return create_error_response('ASSET_NOT_FOUND', f'资产 {asset_id} 不存在')
         
+        # 验证钱包地址格式
+        from app.utils.validation_utils import ValidationUtils
+        if not ValidationUtils.validate_wallet_address(wallet_address):
+            return create_error_response('VALIDATION_ERROR', '无效的钱包地址格式')
+        
+        # 标准化地址
+        normalized_address = ValidationUtils.normalize_address(wallet_address)
+        
         # 创建交易记录
         trade = Trade(
             asset_id=asset_id,
-            amount=Decimal(str(amount)),
-            price=asset.price_per_token,
-            total=Decimal(str(amount)) * asset.price_per_token,
-            trader_address=wallet_address,
+            type='buy',  # 设置交易类型
+            amount=int(amount),  # Trade模型期望整数
+            price=float(asset.price_per_token),
+            total=float(amount) * float(asset.price_per_token),
+            trader_address=normalized_address,
             status='pending'
         )
         
@@ -60,7 +69,7 @@ def create_trade_v3():
             'trade_id': trade.id,
             'asset_id': asset_id,
             'amount': amount,
-            'wallet_address': wallet_address
+            'wallet_address': normalized_address
         }
         
         # 模拟序列化交易（实际应该是真实的区块链交易）
@@ -78,7 +87,7 @@ def create_trade_v3():
     except Exception as e:
         logger.error(f"创建交易失败: {e}", exc_info=True)
         db.session.rollback()
-        return create_error_response('INTERNAL_ERROR', '创建交易失败')
+        return create_error_response('INTERNAL_ERROR', f'创建交易失败: {str(e)}')
 
 @trade_confirm_bp.route('/v3/confirm', methods=['POST'])
 @api_endpoint(log_calls=True)
