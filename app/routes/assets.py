@@ -215,31 +215,6 @@ def asset_detail_by_symbol(token_symbol):
             current_app.logger.error(f"获取实时数据失败: {data_e}")
             real_time_data = {}
 
-# 计算剩余供应量（优先使用实时数据）
-if real_time_data and 'remaining_supply' in real_time_data:
-    remaining_supply = real_time_data['remaining_supply']
-elif asset.remaining_supply is not None:
-    remaining_supply = asset.remaining_supply
-else:
-    remaining_supply = asset.token_supply
-
-# 获取资产累计分红数据（优先使用实时数据）
-if real_time_data and 'total_dividends' in real_time_data:
-    total_dividends = real_time_data['total_dividends']
-else:
-    total_dividends = 0
-    try:
-        # 直接使用SQL查询，避免payment_token字段不存在的问题
-        sql = text("SELECT SUM(amount) FROM dividends WHERE asset_id = :asset_id AND status = 'confirmed'")
-        result = db.session.execute(sql, {"asset_id": asset.id}).fetchone()
-        total_dividends = result[0] if result[0] else 0
-    except Exception as div_e:
-        current_app.logger.error(f'[DETAIL_PAGE_DIVIDEND_ERROR] 获取累计分红数据失败: {str(div_e)}')
-
-        except Exception as data_e:
-            current_app.logger.error(f"获取实时数据失败: {data_e}")
-            real_time_data = {}
-
         # 计算剩余供应量（优先使用实时数据）
         if real_time_data and 'remaining_supply' in real_time_data:
             remaining_supply = real_time_data['remaining_supply']
@@ -279,17 +254,17 @@ else:
         # 直接返回渲染的HTML，避免任何重定向
         return render_template('assets/detail.html', **context)
                   
-except Exception as e:
-    # Log the exception
-    current_app.logger.error(f'[DETAIL_PAGE_EXCEPTION] 访问资产详情页面 {token_symbol} 时捕获到异常!')
-    current_app.logger.exception(e)
-    
-    # 添加具体错误信息到日志中
-    tb_info = traceback.format_exc()
-    current_app.logger.error(f'[DETAIL_PAGE_ERROR] 详细错误信息:\n{tb_info}')
-    
-    # 渲染错误页面而不是重定向
-    return render_template('error.html', error=_('Error accessing asset details')), 500
+    except Exception as e:
+        # Log the exception
+        current_app.logger.error(f'[DETAIL_PAGE_EXCEPTION] 访问资产详情页面 {token_symbol} 时捕获到异常!')
+        current_app.logger.exception(e)
+        
+        # 添加具体错误信息到日志中
+        tb_info = traceback.format_exc()
+        current_app.logger.error(f'[DETAIL_PAGE_ERROR] 详细错误信息:\n{tb_info}')
+        
+        # 渲染错误页面而不是重定向
+        return render_template('error.html', error=_('Asset not found')), 500
 
 @assets_bp.route('/create')
 @eth_address_required
