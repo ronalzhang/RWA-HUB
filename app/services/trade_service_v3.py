@@ -694,7 +694,7 @@ class TradeServiceV3:
                     time.sleep(1.0 * attempt)  # 指数退避
                 
                 # 检查是否为测试哈希
-                if tx_hash.startswith('test_') or tx_hash.startswith('sim_'):
+                if tx_hash.startswith('test_') or tx_hash.startswith('sim_') or tx_hash.startswith('TEST_'):
                     logger.info(f"[{confirmation_id}] 检测到测试交易哈希，跳过区块链验证: {tx_hash}")
                     return {
                         'valid': True,
