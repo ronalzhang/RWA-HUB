@@ -52,6 +52,7 @@ class Config:
 
     # 区块链网络配置
     SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL', 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea')
+    SOLANA_NETWORK_URL = os.environ.get('SOLANA_NETWORK_URL', os.environ.get('SOLANA_RPC_URL', 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea'))
     SOLANA_PROGRAM_ID = os.environ.get('SOLANA_PROGRAM_ID', '2TsURTNQXyqHLB2bfbzFME7HkSMLWueYPjqXBBy2u1wP')
     SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')  # Mainnet USDC
     
