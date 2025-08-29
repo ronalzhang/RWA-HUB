@@ -3624,7 +3624,10 @@ checkIfReturningFromWalletApp(walletType) {
             localStorage.setItem('lastWalletType', walletType);
             localStorage.setItem('lastWalletAddress', address);
             
-            console.log(`[afterSuccessfulConnection] 钱包状态已保存到localStorage`);
+            // 设置cookie以便后端可以获取钱包地址
+            document.cookie = `eth_address=${address}; path=/; max-age=86400`; // 24小时过期
+            
+            console.log(`[afterSuccessfulConnection] 钱包状态已保存到localStorage和cookie`);
             
             // 自动注册/更新用户信息到数据库
             try {

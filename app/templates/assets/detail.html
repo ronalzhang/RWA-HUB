@@ -391,9 +391,9 @@ console.log('asset.owner_address:', "{{ asset.owner_address|default('None') }}")
 
 // 详细的权限检查调试
 console.log('权限检查详情:');
-console.log('- is_admin_user类型:', typeof("{{ is_admin_user|default('None') }}"));
-console.log('- is_owner类型:', typeof("{{ is_owner|default('None') }}"));
-console.log('- 分红按钮应该显示:', "{{ (is_admin_user or is_owner)|string }}");
+console.log('- is_admin_user类型:', typeof({{ is_admin_user|lower }}));
+console.log('- is_owner类型:', typeof({{ is_owner|lower }}));
+console.log('- 分红按钮应该显示:', {{ (is_admin_user or is_owner)|lower }});
 
 // 分享功能
 window.shareAsset = function() {

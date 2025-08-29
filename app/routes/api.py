@@ -99,7 +99,7 @@ def get_asset_status(asset_id):
         
         total_sold = db.session.query(func.sum(Trade.amount)).filter(
             Trade.asset_id == asset_id,
-            Trade.status.in_(['pending', 'completed'])
+            Trade.status == 'completed'  # 只计算已完成的交易
         ).scalar() or 0
         
         remaining_supply = asset.token_supply - total_sold
