@@ -567,8 +567,12 @@ class TradeServiceV3:
                 })
                 logger.debug(f"[{confirmation_id}] 交易状态更新: {old_trade_status} -> {TradeStatus.COMPLETED.value}, TxHash={tx_hash}")
                 
-                # 通过trader_address查找用户
-                user = User.query.filter_by(wallet_address=trade.trader_address).first()
+                # 通过trader_address查找用户 - 支持多种钱包类型
+                user = User.query.filter(
+                    (User.eth_address == trade.trader_address) | 
+                    (User.solana_address == trade.trader_address)
+                ).first()
+                
                 if not user:
                     logger.error(f"[{confirmation_id}] 无法找到交易者用户: {trade.trader_address}")
                     return TradeServiceV3._create_error_response(
