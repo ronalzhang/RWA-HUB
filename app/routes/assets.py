@@ -236,23 +236,48 @@ else:
     except Exception as div_e:
         current_app.logger.error(f'[DETAIL_PAGE_DIVIDEND_ERROR] 获取累计分红数据失败: {str(div_e)}')
 
-# Log right before rendering
-current_app.logger.info(f'[DETAIL_PAGE_RENDER_START] 准备渲染模板 detail.html for {token_symbol}.')
-context = {
-    'asset': asset,
-    'remaining_supply': remaining_supply,
-    'is_owner': is_owner,
-    'is_admin_user': is_admin_user,
-    'current_user_address': current_user_address,
-    'total_dividends': total_dividends,
-    'real_time_data': real_time_data,  # 添加实时数据到模板上下文
-    'platform_fee_address': ConfigManager.get_platform_fee_address(),
-    'PLATFORM_FEE_RATE': getattr(Config, 'PLATFORM_FEE_RATE', 0.035)
-}
-current_app.logger.info(f'[DETAIL_PAGE_CONTEXT] Context keys: {list(context.keys())}')
+        except Exception as data_e:
+            current_app.logger.error(f"获取实时数据失败: {data_e}")
+            real_time_data = {}
 
-# 直接返回渲染的HTML，避免任何重定向
-return render_template('assets/detail.html', **context)
+        # 计算剩余供应量（优先使用实时数据）
+        if real_time_data and 'remaining_supply' in real_time_data:
+            remaining_supply = real_time_data['remaining_supply']
+        elif asset.remaining_supply is not None:
+            remaining_supply = asset.remaining_supply
+        else:
+            remaining_supply = asset.token_supply
+
+        # 获取资产累计分红数据（优先使用实时数据）
+        if real_time_data and 'total_dividends' in real_time_data:
+            total_dividends = real_time_data['total_dividends']
+        else:
+            total_dividends = 0
+            try:
+                # 直接使用SQL查询，避免payment_token字段不存在的问题
+                sql = text("SELECT SUM(amount) FROM dividends WHERE asset_id = :asset_id AND status = 'confirmed'")
+                result = db.session.execute(sql, {"asset_id": asset.id}).fetchone()
+                total_dividends = result[0] if result[0] else 0
+            except Exception as div_e:
+                current_app.logger.error(f'[DETAIL_PAGE_DIVIDEND_ERROR] 获取累计分红数据失败: {str(div_e)}')
+
+        # Log right before rendering
+        current_app.logger.info(f'[DETAIL_PAGE_RENDER_START] 准备渲染模板 detail.html for {token_symbol}.')
+        context = {
+            'asset': asset,
+            'remaining_supply': remaining_supply,
+            'is_owner': is_owner,
+            'is_admin_user': is_admin_user,
+            'current_user_address': current_user_address,
+            'total_dividends': total_dividends,
+            'real_time_data': real_time_data,  # 添加实时数据到模板上下文
+            'platform_fee_address': ConfigManager.get_platform_fee_address(),
+            'PLATFORM_FEE_RATE': getattr(Config, 'PLATFORM_FEE_RATE', 0.035)
+        }
+        current_app.logger.info(f'[DETAIL_PAGE_CONTEXT] Context keys: {list(context.keys())}')
+
+        # 直接返回渲染的HTML，避免任何重定向
+        return render_template('assets/detail.html', **context)
                   
 except Exception as e:
     # Log the exception
