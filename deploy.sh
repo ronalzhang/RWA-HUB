@@ -39,6 +39,14 @@ fi
 # 加载配置文件
 echo "📋 加载配置文件..."
 source "$CONFIG_FILE"
+# 积极清理所有配置变量中的空白字符
+SERVER_HOST=$(echo "$SERVER_HOST" | tr -d '[:space:]')
+SERVER_USER=$(echo "$SERVER_USER" | tr -d '[:space:]')
+SERVER_PASSWORD=$(echo "$SERVER_PASSWORD" | tr -d '[:space:]')
+SERVER_PATH=$(echo "$SERVER_PATH" | tr -d '[:space:]')
+GITHUB_BRANCH=$(echo "$GITHUB_BRANCH" | tr -d '[:space:]')
+PM2_APP_NAME=$(echo "$PM2_APP_NAME" | tr -d '[:space:]')
+APP_PORT=$(echo "$APP_PORT" | tr -d '[:space:]')
 
 
 # 验证必要配置
@@ -114,19 +122,19 @@ echo "🔗 连接服务器并执行部署..."
 REMOTE_SCRIPT="
 set -e
 echo '🔧 在服务器上执行部署...'
-cd \$SERVER_PATH
+cd $SERVER_PATH
 echo '📥 拉取最新代码...'
-git pull origin \$GITHUB_BRANCH
+git pull origin $GITHUB_BRANCH
 if ! command -v pm2 &> /dev/null; then
     echo '❌ PM2未安装，请先安装PM2'
     exit 1
 fi
-echo '🔄 重启PM2应用: \$PM2_APP_NAME'
-if pm2 list | grep -q '\$PM2_APP_NAME'; then
-    pm2 restart \$PM2_APP_NAME
-    echo '✅ PM2应用 \$PM2_APP_NAME 重启成功'
+echo '🔄 重启PM2应用: $PM2_APP_NAME'
+if pm2 list | grep -q '$PM2_APP_NAME'; then
+    pm2 restart $PM2_APP_NAME
+    echo '✅ PM2应用 $PM2_APP_NAME 重启成功'
 else
-    echo '❌ PM2应用 \$PM2_APP_NAME 不存在'
+    echo '❌ PM2应用 $PM2_APP_NAME 不存在'
     echo '📋 当前PM2应用列表:'
     pm2 list
     exit 1
@@ -136,28 +144,28 @@ pm2 save
 echo '⏳ 等待应用启动...'
 sleep 3
 echo '🔍 检查应用状态...'
-if pm2 list | grep -q '\$PM2_APP_NAME.*online'; then
+if pm2 list | grep -q '$PM2_APP_NAME.*online'; then
     echo '✅ 应用运行正常'
     echo '🧪 测试API连接...'
-    if curl -s --max-time 10 http://localhost:\$APP_PORT/api/health/ > /dev/null; then
+    if curl -s --max-time 10 http://localhost:$APP_PORT/api/health/ > /dev/null; then
         echo '✅ API连接正常'
     else
         echo '⚠️  API连接测试超时，但应用已启动'
     fi
     echo '📊 应用状态:'
-    pm2 list | grep '\$PM2_APP_NAME' || true
+    pm2 list | grep '$PM2_APP_NAME' || true
 else
     echo '❌ 应用启动失败'
     echo '📋 PM2状态:'
     pm2 list
     echo '📝 最近日志:'
-    pm2 logs \$PM2_APP_NAME --lines 10 --nostream || true
+    pm2 logs $PM2_APP_NAME --lines 10 --nostream || true
     exit 1
 fi
 echo '🎉 部署完成！'
 "
 
-sshpass -p 'Pr971V3j' ssh -T -o StrictHostKeyChecking=no 'root@156.232.13.240' "$REMOTE_SCRIPT"
+sshpass -p "$SERVER_PASSWORD" ssh -T -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_HOST" "$REMOTE_SCRIPT"
 
 
 
