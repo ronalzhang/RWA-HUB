@@ -222,7 +222,7 @@ if (window.purchaseHandlerInitialized) {
                         assetId: assetId,
                         amount: amount,
                         totalCost: data.data.total_cost,
-                        instruction: data.data.instruction,
+                        instructions: data.data.instructions,
                         recentBlockhash: data.data.recent_blockhash,
                         feePayer: data.data.fee_payer
                     };
