@@ -308,6 +308,8 @@ if (window.purchaseHandlerInitialized) {
                 });
 
                 // 添加指令
+                console.log('后端返回的指令数据:', this.currentTrade.instruction);
+                
                 const instruction = new window.solanaWeb3.TransactionInstruction({
                     keys: this.currentTrade.instruction.accounts.map(acc => ({
                         pubkey: new window.solanaWeb3.PublicKey(acc.pubkey),
@@ -316,6 +318,17 @@ if (window.purchaseHandlerInitialized) {
                     })),
                     programId: new window.solanaWeb3.PublicKey(this.currentTrade.instruction.program_id),
                     data: Buffer.from(this.currentTrade.instruction.data, 'hex')
+                });
+
+                console.log('创建的指令详情:', {
+                    programId: instruction.programId.toString(),
+                    accounts: instruction.keys.map(key => ({
+                        pubkey: key.pubkey.toString(),
+                        isSigner: key.isSigner,
+                        isWritable: key.isWritable
+                    })),
+                    dataLength: instruction.data.length,
+                    dataHex: this.currentTrade.instruction.data
                 });
 
                 transaction.add(instruction);
@@ -648,9 +661,17 @@ if (window.purchaseHandlerInitialized) {
         
         console.log('库初始化检查:', checks);
         
-        const allLoaded = Object.values(checks).every(check => check);
-        if (!allLoaded) {
-            console.warn('部分库未正确加载，可能影响购买功能');
+        // 计算实际必需的库检查（忽略AccountLayout因为它是手动添加的）
+        const requiredChecks = {
+            solanaWeb3: checks.solanaWeb3,
+            splToken: checks.splToken,
+            splTokenGetAssociatedTokenAddress: checks.splTokenGetAssociatedTokenAddress,
+            solanaConnection: checks.solanaConnection
+        };
+        
+        const allRequiredLoaded = Object.values(requiredChecks).every(check => check);
+        if (!allRequiredLoaded) {
+            console.warn('关键库未正确加载，可能影响购买功能');
             
             // 如果SPL Token库中缺少AccountLayout，尝试手动添加
             if (window.splToken && !window.splToken.AccountLayout) {
