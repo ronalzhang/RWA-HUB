@@ -241,23 +241,37 @@ class TradeServiceV3:
                 asset_owner_address = asset.owner_address
                 logger.info(f"[{transaction_id}] 获取到资产发布者地址: {asset_owner_address}")
                 
-                # 计算分润：80%给发布者，20%给平台
-                owner_amount = total_price * Decimal('0.8')  # 发布者获得80%
-                platform_amount = total_price * Decimal('0.2')  # 平台获得20%
-                
-                logger.info(f"[{transaction_id}] 分润计算: 总价={total_price}, 发布者={owner_amount}, 平台={platform_amount}")
-                
-                instructions = TradeServiceV3._create_dual_transfer_instructions(
-                    wallet_address, 
-                    asset_owner_address,
-                    platform_treasury_address, 
-                    payment_token_mint_address, 
-                    owner_amount,
-                    platform_amount,
-                    payment_token_decimals,
-                    transaction_id
-                )
-                logger.debug(f"[{transaction_id}] 双转账指令创建成功，指令数量: {len(instructions)}")
+                # 检查是否是发布者购买自己的资产
+                if wallet_address.lower() == asset_owner_address.lower():
+                    logger.info(f"[{transaction_id}] 发布者购买自己的资产，只转账给平台")
+                    # 发布者购买自己的资产时，全额转给平台（不给自己转账）
+                    instructions = [TradeServiceV3._create_single_transfer_instruction(
+                        wallet_address, 
+                        platform_treasury_address, 
+                        payment_token_mint_address, 
+                        total_price,  # 全额给平台
+                        payment_token_decimals,
+                        f"{transaction_id}_platform_only"
+                    )]
+                    logger.debug(f"[{transaction_id}] 发布者自购单转账指令创建成功")
+                else:
+                    # 普通用户购买：80%给发布者，20%给平台
+                    owner_amount = total_price * Decimal('0.8')  # 发布者获得80%
+                    platform_amount = total_price * Decimal('0.2')  # 平台获得20%
+                    
+                    logger.info(f"[{transaction_id}] 分润计算: 总价={total_price}, 发布者={owner_amount}, 平台={platform_amount}")
+                    
+                    instructions = TradeServiceV3._create_dual_transfer_instructions(
+                        wallet_address, 
+                        asset_owner_address,
+                        platform_treasury_address, 
+                        payment_token_mint_address, 
+                        owner_amount,
+                        platform_amount,
+                        payment_token_decimals,
+                        transaction_id
+                    )
+                    logger.debug(f"[{transaction_id}] 双转账指令创建成功，指令数量: {len(instructions)}")
                 
             except Exception as e:
                 logger.error(f"[{transaction_id}] 指令创建失败: {e}", exc_info=True)
@@ -1062,9 +1076,10 @@ class TradeServiceV3:
                 recipient_pubkey = Pubkey.from_string(recipient_address)
                 payment_mint_pubkey = Pubkey.from_string(token_mint_address)
                 
-                # 验证地址不能相同
+                # 注意：允许发布者购买自己的资产（此时buyer和recipient可能相同）
+                # 但记录这种特殊情况到日志
                 if str(buyer_pubkey) == str(recipient_pubkey):
-                    raise ValueError("买方地址和接收方地址不能相同")
+                    logger.info(f"[{transaction_id}] 检测到自转账情况（发布者购买自己的资产）")
                 
                 logger.debug(f"[{transaction_id}] 地址转换和验证成功")
                 
