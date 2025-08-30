@@ -347,7 +347,7 @@ class TradeServiceV3:
                                 'is_writable': acc.is_writable
                             } for acc in instruction.accounts
                         ],
-                        'data': instruction.data.hex()
+                        'data': bytes(instruction.data).hex()
                     },
                     'recent_blockhash': str(recent_blockhash)
                 }
