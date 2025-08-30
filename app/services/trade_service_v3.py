@@ -693,20 +693,7 @@ class TradeServiceV3:
                     logger.info(f"[{confirmation_id}] 区块链交易验证重试 {attempt}/{max_retries}")
                     time.sleep(1.0 * attempt)  # 指数退避
                 
-                # 检查是否为测试哈希
-                if (tx_hash.startswith('test_') or tx_hash.startswith('sim_') or 
-                    tx_hash.startswith('TEST_') or tx_hash.startswith('mock_') or
-                    tx_hash.startswith('MOCK_') or 'TEST_' in tx_hash):
-                    logger.info(f"[{confirmation_id}] 🧪 检测到测试交易哈希，跳过区块链验证: {tx_hash}")
-                    return {
-                        'valid': True,
-                        'message': '🧪 测试交易验证通过 - 模拟模式',
-                        'transaction_data': {
-                            'test_mode': True,
-                            'tx_hash': tx_hash,
-                            'confirmation_status': 'simulated'
-                        }
-                    }
+                
                 
                 client = get_solana_client()
                 signature = Signature.from_string(tx_hash)
