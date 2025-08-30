@@ -1062,16 +1062,46 @@ class TradeServiceV3:
             except Exception as e:
                 raise ValueError(f"转账参数创建或验证失败: {str(e)}")
             
-            # 7. 创建转账指令
+            # 7. 手动创建转账指令（确保账户权限正确）
             try:
-                instruction = transfer(transfer_params)
+                from solders.instruction import Instruction, AccountMeta
+                import struct
+                
+                # 构建指令数据：Transfer指令 + amount (u64 little-endian)
+                instruction_data = struct.pack('<BQ', 3, amount_in_smallest_unit)  # 3=Transfer, Q=unsigned long long (u64)
+                
+                # 手动构建账户列表，确保权限设置正确
+                accounts = [
+                    AccountMeta(
+                        pubkey=buyer_payment_token_ata,    # 源代币账户
+                        is_signer=False,
+                        is_writable=True                   # 需要写入（扣除代币）
+                    ),
+                    AccountMeta(
+                        pubkey=platform_payment_token_ata, # 目标代币账户  
+                        is_signer=False,
+                        is_writable=True                   # 需要写入（接收代币）
+                    ),
+                    AccountMeta(
+                        pubkey=buyer_pubkey,               # 源账户所有者
+                        is_signer=True,                    # 必须签名
+                        is_writable=False                  # 不需要写入
+                    )
+                ]
+                
+                # 创建指令
+                instruction = Instruction(
+                    program_id=spl_token_program_id,
+                    data=instruction_data,
+                    accounts=accounts
+                )
                 
                 # 验证指令创建成功
                 if not instruction:
                     raise ValueError("转账指令创建失败，返回空指令")
                 
                 # 详细调试日志
-                logger.info(f"[{transaction_id}] 转账指令创建成功")
+                logger.info(f"[{transaction_id}] 手动构建转账指令成功")
                 logger.info(f"[{transaction_id}] 指令程序ID: {instruction.program_id}")
                 logger.info(f"[{transaction_id}] 指令数据长度: {len(instruction.data)}")
                 logger.info(f"[{transaction_id}] 指令数据: {instruction.data.hex() if hasattr(instruction.data, 'hex') else bytes(instruction.data).hex()}")
@@ -1079,9 +1109,6 @@ class TradeServiceV3:
                 # 详细账户信息
                 for i, account in enumerate(instruction.accounts):
                     logger.info(f"[{transaction_id}] 账户{i}: {account.pubkey}, is_signer={account.is_signer}, is_writable={account.is_writable}")
-                
-                # 8. 在添加到交易前验证转账指令参数
-                TradeServiceV3._validate_transfer_instruction(instruction, transaction_id)
                 
                 return instruction
                 
