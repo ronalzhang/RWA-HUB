@@ -294,15 +294,24 @@ if (window.purchaseHandlerInitialized) {
 
                 // 使用后端返回的区块哈希
                 this.showLoading('正在构建交易...');
-                console.log('使用后端返回的区块哈希:', this.currentTrade.recentBlockhash);
+                // 获取最新的区块哈希以避免"Blockhash not found"错误
+                this.showLoading('正在获取最新区块信息...');
+                console.log('原始后端区块哈希:', this.currentTrade.recentBlockhash);
+                
+                // 获取最新的区块哈希
+                const latestBlockhash = await window.solanaConnection.getLatestBlockhash();
+                console.log('获取最新区块哈希:', latestBlockhash.blockhash);
 
                 // 构建交易
+                this.showLoading('正在构建交易...');
                 const transaction = new window.solanaWeb3.Transaction({
-                    recentBlockhash: this.currentTrade.recentBlockhash,
+                    recentBlockhash: latestBlockhash.blockhash,
                     feePayer: new window.solanaWeb3.PublicKey(this.currentTrade.feePayer)
                 });
 
                 // 添加指令
+                console.log('后端返回的指令数据:', this.currentTrade.instruction);
+                
                 const instruction = new window.solanaWeb3.TransactionInstruction({
                     keys: this.currentTrade.instruction.accounts.map(acc => ({
                         pubkey: new window.solanaWeb3.PublicKey(acc.pubkey),
@@ -313,6 +322,17 @@ if (window.purchaseHandlerInitialized) {
                     data: Buffer.from(this.currentTrade.instruction.data, 'hex')
                 });
 
+                console.log('创建的指令详情:', {
+                    programId: instruction.programId.toString(),
+                    accounts: instruction.keys.map(key => ({
+                        pubkey: key.pubkey.toString(),
+                        isSigner: key.isSigner,
+                        isWritable: key.isWritable
+                    })),
+                    dataLength: instruction.data.length,
+                    dataHex: this.currentTrade.instruction.data
+                });
+
                 transaction.add(instruction);
                 console.log('构建的交易:', transaction);
 
@@ -321,14 +341,54 @@ if (window.purchaseHandlerInitialized) {
                 const signedTransaction = await window.solana.signTransaction(transaction);
                 console.log('交易已签名:', signedTransaction);
 
-                // 发送交易
+                // 发送交易（带重试机制）
                 this.showLoading('正在提交交易到区块链...');
-                const txHash = await window.solanaConnection.sendRawTransaction(signedTransaction.serialize());
-                console.log('交易已提交，哈希:', txHash);
+                let txHash;
+                let retryCount = 0;
+                const maxRetries = 3;
 
-                // 等待确认
+                while (retryCount < maxRetries) {
+                    try {
+                        txHash = await window.solanaConnection.sendRawTransaction(
+                            signedTransaction.serialize(),
+                            {
+                                skipPreflight: false,
+                                preflightCommitment: 'confirmed'
+                            }
+                        );
+                        console.log('交易已提交，哈希:', txHash);
+                        break;
+                    } catch (error) {
+                        retryCount++;
+                        console.log(`交易提交失败，重试 ${retryCount}/${maxRetries}:`, error.message);
+
+                        if (retryCount >= maxRetries) {
+                            throw error;
+                        }
+
+                        // 如果是区块哈希相关错误，重新获取最新区块哈希
+                        if (error.message.includes('Blockhash not found') || error.message.includes('blockhash')) {
+                            console.log('检测到区块哈希过期，重新获取...');
+                            const newBlockhash = await window.solanaConnection.getLatestBlockhash();
+                            transaction.recentBlockhash = newBlockhash.blockhash;
+
+                            // 重新签名交易
+                            const newSignedTransaction = await window.solana.signTransaction(transaction);
+                            signedTransaction.signatures = newSignedTransaction.signatures;
+                        }
+
+                        // 等待1秒后重试
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+
+                // 等待确认（使用最新的区块高度信息）
                 this.showLoading('正在等待交易确认...');
-                const confirmation = await window.solanaConnection.confirmTransaction(txHash);
+                const confirmation = await window.solanaConnection.confirmTransaction({
+                    signature: txHash,
+                    blockhash: latestBlockhash.blockhash,
+                    lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+                });
                 console.log('交易确认结果:', confirmation);
 
                 if (confirmation.value.err) {
@@ -579,7 +639,7 @@ if (window.purchaseHandlerInitialized) {
         if (!window.solanaConnection && window.solanaWeb3) {
             console.log('初始化Solana连接...');
             try {
-                const solanaEndpoint = 'https://api.mainnet-beta.solana.com';
+                const solanaEndpoint = 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea';
                 window.solanaConnection = new window.solanaWeb3.Connection(solanaEndpoint, 'confirmed');
                 console.log(`✅ Solana 连接已初始化: ${solanaEndpoint}`);
             } catch (error) {
@@ -603,9 +663,17 @@ if (window.purchaseHandlerInitialized) {
         
         console.log('库初始化检查:', checks);
         
-        const allLoaded = Object.values(checks).every(check => check);
-        if (!allLoaded) {
-            console.warn('部分库未正确加载，可能影响购买功能');
+        // 计算实际必需的库检查（忽略AccountLayout因为它是手动添加的）
+        const requiredChecks = {
+            solanaWeb3: checks.solanaWeb3,
+            splToken: checks.splToken,
+            splTokenGetAssociatedTokenAddress: checks.splTokenGetAssociatedTokenAddress,
+            solanaConnection: checks.solanaConnection
+        };
+        
+        const allRequiredLoaded = Object.values(requiredChecks).every(check => check);
+        if (!allRequiredLoaded) {
+            console.warn('关键库未正确加载，可能影响购买功能');
             
             // 如果SPL Token库中缺少AccountLayout，尝试手动添加
             if (window.splToken && !window.splToken.AccountLayout) {
