@@ -364,17 +364,19 @@ class TradeServiceV3:
                     'fee_payer': wallet_address,
                     'status': 'pending_signature',
                     'created_at': new_trade.created_at.isoformat(),
-                    'instruction': {
-                        'program_id': str(instruction.program_id),
-                        'accounts': [
-                            {
-                                'pubkey': str(acc.pubkey),
-                                'is_signer': acc.is_signer,
-                                'is_writable': acc.is_writable
-                            } for acc in instruction.accounts
-                        ],
-                        'data': instruction.data.hex() if hasattr(instruction.data, 'hex') else bytes(instruction.data).hex()
-                    },
+                    'instructions': [
+                        {
+                            'program_id': str(instr.program_id),
+                            'accounts': [
+                                {
+                                    'pubkey': str(acc.pubkey),
+                                    'is_signer': acc.is_signer,
+                                    'is_writable': acc.is_writable
+                                } for acc in instr.accounts
+                            ],
+                            'data': instr.data.hex() if hasattr(instr.data, 'hex') else bytes(instr.data).hex()
+                        } for instr in instructions
+                    ],
                     'recent_blockhash': str(recent_blockhash)
                 }
             }

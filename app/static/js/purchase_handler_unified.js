@@ -309,31 +309,34 @@ if (window.purchaseHandlerInitialized) {
                     feePayer: new window.solanaWeb3.PublicKey(this.currentTrade.feePayer)
                 });
 
-                // 添加指令
-                console.log('后端返回的指令数据:', this.currentTrade.instruction);
+                // 添加多个指令
+                console.log('后端返回的指令数据:', this.currentTrade.instructions);
                 
-                const instruction = new window.solanaWeb3.TransactionInstruction({
-                    keys: this.currentTrade.instruction.accounts.map(acc => ({
-                        pubkey: new window.solanaWeb3.PublicKey(acc.pubkey),
-                        isSigner: acc.is_signer,
-                        isWritable: acc.is_writable
-                    })),
-                    programId: new window.solanaWeb3.PublicKey(this.currentTrade.instruction.program_id),
-                    data: new Uint8Array(Buffer.from(this.currentTrade.instruction.data, 'hex'))
-                });
+                // 处理多个指令（用于分润转账）
+                this.currentTrade.instructions.forEach((instrData, index) => {
+                    const instruction = new window.solanaWeb3.TransactionInstruction({
+                        keys: instrData.accounts.map(acc => ({
+                            pubkey: new window.solanaWeb3.PublicKey(acc.pubkey),
+                            isSigner: acc.is_signer,
+                            isWritable: acc.is_writable
+                        })),
+                        programId: new window.solanaWeb3.PublicKey(instrData.program_id),
+                        data: new Uint8Array(Buffer.from(instrData.data, 'hex'))
+                    });
 
-                console.log('创建的指令详情:', {
-                    programId: instruction.programId.toString(),
-                    accounts: instruction.keys.map(key => ({
-                        pubkey: key.pubkey.toString(),
-                        isSigner: key.isSigner,
-                        isWritable: key.isWritable
-                    })),
-                    dataLength: instruction.data.length,
-                    dataHex: this.currentTrade.instruction.data
-                });
+                    console.log(`创建的指令${index}详情:`, {
+                        programId: instruction.programId.toString(),
+                        accounts: instruction.keys.map(key => ({
+                            pubkey: key.pubkey.toString(),
+                            isSigner: key.isSigner,
+                            isWritable: key.isWritable
+                        })),
+                        dataLength: instruction.data.length,
+                        dataHex: instrData.data
+                    });
 
-                transaction.add(instruction);
+                    transaction.add(instruction);
+                });
                 console.log('构建的交易:', transaction);
 
                 // 请求钱包签名
