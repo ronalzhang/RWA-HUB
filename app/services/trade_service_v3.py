@@ -16,7 +16,7 @@ from solders.hash import Hash
 from solders.signature import Signature
 from solders.transaction import Transaction
 from solders.message import Message
-from spl.token.instructions import get_associated_token_address
+from spl.token.instructions import get_associated_token_address, transfer, TransferParams
 from solana.exceptions import SolanaRpcException
 from solana.rpc.types import TxOpts
 
@@ -1044,46 +1044,26 @@ class TradeServiceV3:
             except Exception as e:
                 raise ValueError(f"金额计算失败: {str(e)}")
             
-            # 6. 手动创建转账指令（确保账户权限正确）
+            # 6. 使用官方库创建转账指令，然后手动验证账户权限
             try:
-                from solders.instruction import Instruction, AccountMeta
-                import struct
                 
-                # 构建指令数据：Transfer指令 + amount (u64 little-endian)
-                instruction_data = struct.pack('<BQ', 3, amount_in_smallest_unit)  # 3=Transfer, Q=unsigned long long (u64)
-                
-                # 手动构建账户列表，确保权限设置正确
-                accounts = [
-                    AccountMeta(
-                        pubkey=buyer_payment_token_ata,    # 源代币账户
-                        is_signer=False,
-                        is_writable=True                   # 需要写入（扣除代币）
-                    ),
-                    AccountMeta(
-                        pubkey=platform_payment_token_ata, # 目标代币账户  
-                        is_signer=False,
-                        is_writable=True                   # 需要写入（接收代币）
-                    ),
-                    AccountMeta(
-                        pubkey=buyer_pubkey,               # 源账户所有者
-                        is_signer=True,                    # 必须签名
-                        is_writable=False                  # 不需要写入
-                    )
-                ]
-                
-                # 创建指令
-                instruction = Instruction(
+                # 首先使用官方库创建正确的指令
+                transfer_params = TransferParams(
                     program_id=spl_token_program_id,
-                    data=instruction_data,
-                    accounts=accounts
+                    source=buyer_payment_token_ata,
+                    dest=platform_payment_token_ata,
+                    owner=buyer_pubkey,
+                    amount=amount_in_smallest_unit
                 )
+                
+                instruction = transfer(transfer_params)
                 
                 # 验证指令创建成功
                 if not instruction:
                     raise ValueError("转账指令创建失败，返回空指令")
                 
                 # 详细调试日志
-                logger.info(f"[{transaction_id}] 手动构建转账指令成功")
+                logger.info(f"[{transaction_id}] 官方库转账指令创建成功")
                 logger.info(f"[{transaction_id}] 指令程序ID: {instruction.program_id}")
                 logger.info(f"[{transaction_id}] 指令数据长度: {len(instruction.data)}")
                 logger.info(f"[{transaction_id}] 指令数据: {instruction.data.hex() if hasattr(instruction.data, 'hex') else bytes(instruction.data).hex()}")
