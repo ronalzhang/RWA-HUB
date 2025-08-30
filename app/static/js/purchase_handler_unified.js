@@ -309,6 +309,22 @@ if (window.purchaseHandlerInitialized) {
                     feePayer: new window.solanaWeb3.PublicKey(this.currentTrade.feePayer)
                 });
 
+                // 明确设置ComputeBudget以防止钱包自动添加冲突指令
+                try {
+                    const computeUnitLimitInstruction = window.solanaWeb3.ComputeBudgetProgram.setComputeUnitLimit({
+                        units: 200000
+                    });
+                    const computeUnitPriceInstruction = window.solanaWeb3.ComputeBudgetProgram.setComputeUnitPrice({
+                        microLamports: 1
+                    });
+                    
+                    transaction.add(computeUnitLimitInstruction);
+                    transaction.add(computeUnitPriceInstruction);
+                    console.log('已添加ComputeBudget指令');
+                } catch (error) {
+                    console.log('ComputeBudgetProgram不可用，跳过:', error.message);
+                }
+
                 // 添加多个指令
                 console.log('后端返回的指令数据:', this.currentTrade.instructions);
                 
@@ -341,7 +357,7 @@ if (window.purchaseHandlerInitialized) {
 
                 // 请求钱包签名
                 this.showLoading('正在请求钱包签名...');
-                const signedTransaction = await window.solana.signTransaction(transaction);
+                let signedTransaction = await window.solana.signTransaction(transaction);
                 console.log('交易已签名:', signedTransaction);
 
                 // 发送交易（带重试机制）
