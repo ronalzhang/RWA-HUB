@@ -431,6 +431,7 @@ if (window.purchaseHandlerInitialized) {
                         console.log('重新初始化Solana连接...');
                         const solanaEndpoint = 'https://api.mainnet-beta.solana.com';
                         window.solanaConnection = new window.solanaWeb3.Connection(solanaEndpoint, 'confirmed');
+                        console.log('✅ Solana连接重新初始化成功');
                     } else {
                         console.error('Solana Web3.js 库未加载');
                         return 0;
@@ -471,6 +472,10 @@ if (window.purchaseHandlerInitialized) {
                 console.log('关联代币账户地址:', associatedTokenAddress.toString());
 
                 // 获取账户信息
+                if (!window.solanaConnection) {
+                    console.error('Solana连接未初始化，无法获取账户信息');
+                    return 0;
+                }
                 const accountInfo = await window.solanaConnection.getAccountInfo(associatedTokenAddress);
                 
                 if (!accountInfo) {
