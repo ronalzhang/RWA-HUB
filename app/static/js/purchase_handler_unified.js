@@ -375,9 +375,13 @@ if (window.purchaseHandlerInitialized) {
                             const newBlockhash = await window.solanaConnection.getLatestBlockhash();
                             transaction.recentBlockhash = newBlockhash.blockhash;
 
-                            // 重新签名交易
-                            const newSignedTransaction = await window.solana.signTransaction(transaction);
-                            signedTransaction.signatures = newSignedTransaction.signatures;
+                            // 重新签名交易并完全替换签名的交易对象
+                            signedTransaction = await window.solana.signTransaction(transaction);
+                            console.log('区块哈希已更新并重新签名:', {
+                                oldBlockhash: newBlockhash.blockhash,
+                                newBlockhash: transaction.recentBlockhash,
+                                hasSignature: signedTransaction.signatures.length > 0
+                            });
                         }
 
                         // 等待1秒后重试
