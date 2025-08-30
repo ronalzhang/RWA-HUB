@@ -1070,7 +1070,15 @@ class TradeServiceV3:
                 if not instruction:
                     raise ValueError("转账指令创建失败，返回空指令")
                 
-                logger.debug(f"[{transaction_id}] 转账指令创建成功")
+                # 详细调试日志
+                logger.info(f"[{transaction_id}] 转账指令创建成功")
+                logger.info(f"[{transaction_id}] 指令程序ID: {instruction.program_id}")
+                logger.info(f"[{transaction_id}] 指令数据长度: {len(instruction.data)}")
+                logger.info(f"[{transaction_id}] 指令数据: {instruction.data.hex() if hasattr(instruction.data, 'hex') else bytes(instruction.data).hex()}")
+                
+                # 详细账户信息
+                for i, account in enumerate(instruction.accounts):
+                    logger.info(f"[{transaction_id}] 账户{i}: {account.pubkey}, is_signer={account.is_signer}, is_writable={account.is_writable}")
                 
                 # 8. 在添加到交易前验证转账指令参数
                 TradeServiceV3._validate_transfer_instruction(instruction, transaction_id)
