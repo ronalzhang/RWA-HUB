@@ -233,19 +233,31 @@ class TradeServiceV3:
                     f'无法获取区块哈希: {str(e)}'
                 )
 
-            # 5. 指令创建阶段
+            # 5. 指令创建阶段 - 双账户转账（发布者 + 平台）
             logger.debug(f"[{transaction_id}] 步骤5: 开始指令创建")
             
             try:
-                instruction = TradeServiceV3._create_transfer_instruction(
+                # 获取资产发布者地址
+                asset_owner_address = asset.owner_address
+                logger.info(f"[{transaction_id}] 获取到资产发布者地址: {asset_owner_address}")
+                
+                # 计算分润：80%给发布者，20%给平台
+                owner_amount = total_price * Decimal('0.8')  # 发布者获得80%
+                platform_amount = total_price * Decimal('0.2')  # 平台获得20%
+                
+                logger.info(f"[{transaction_id}] 分润计算: 总价={total_price}, 发布者={owner_amount}, 平台={platform_amount}")
+                
+                instructions = TradeServiceV3._create_dual_transfer_instructions(
                     wallet_address, 
+                    asset_owner_address,
                     platform_treasury_address, 
                     payment_token_mint_address, 
-                    total_price, 
+                    owner_amount,
+                    platform_amount,
                     payment_token_decimals,
                     transaction_id
                 )
-                logger.debug(f"[{transaction_id}] 指令创建成功")
+                logger.debug(f"[{transaction_id}] 双转账指令创建成功，指令数量: {len(instructions)}")
                 
             except Exception as e:
                 logger.error(f"[{transaction_id}] 指令创建失败: {e}", exc_info=True)
@@ -260,7 +272,7 @@ class TradeServiceV3:
             try:
                 buyer_pubkey = Pubkey.from_string(wallet_address)
                 # 先创建Message，包含blockhash
-                message = Message.new_with_blockhash([instruction], buyer_pubkey, recent_blockhash)
+                message = Message.new_with_blockhash(instructions, buyer_pubkey, recent_blockhash)
                 # 然后创建未签名的Transaction
                 tx = Transaction.new_unsigned(message)
                 
@@ -949,11 +961,68 @@ class TradeServiceV3:
 
 
     @staticmethod
-    def _create_transfer_instruction(
-        buyer_address: str, 
+    def _create_dual_transfer_instructions(
+        buyer_address: str,
+        asset_owner_address: str,
         platform_address: str, 
         token_mint_address: str, 
-        total_price: Decimal, 
+        owner_amount: Decimal,
+        platform_amount: Decimal,
+        token_decimals: int,
+        transaction_id: str
+    ):
+        """
+        创建双转账指令：买家 -> 发布者 + 买家 -> 平台
+        
+        Args:
+            buyer_address: 买家地址
+            asset_owner_address: 资产发布者地址
+            platform_address: 平台地址
+            token_mint_address: 代币合约地址
+            owner_amount: 发布者收到的金额
+            platform_amount: 平台收到的金额
+            token_decimals: 代币精度
+            transaction_id: 交易ID
+            
+        Returns:
+            List[Instruction]: 两个转账指令列表
+        """
+        try:
+            logger.info(f"[{transaction_id}] 开始创建双转账指令")
+            
+            # 创建发布者转账指令
+            owner_instruction = TradeServiceV3._create_single_transfer_instruction(
+                buyer_address, 
+                asset_owner_address, 
+                token_mint_address, 
+                owner_amount, 
+                token_decimals,
+                f"{transaction_id}_owner"
+            )
+            
+            # 创建平台转账指令
+            platform_instruction = TradeServiceV3._create_single_transfer_instruction(
+                buyer_address, 
+                platform_address, 
+                token_mint_address, 
+                platform_amount, 
+                token_decimals,
+                f"{transaction_id}_platform"
+            )
+            
+            logger.info(f"[{transaction_id}] 双转账指令创建成功")
+            return [owner_instruction, platform_instruction]
+            
+        except Exception as e:
+            logger.error(f"[{transaction_id}] 双转账指令创建失败: {e}", exc_info=True)
+            raise Exception(f"双转账指令创建失败: {str(e)}")
+
+    @staticmethod
+    def _create_single_transfer_instruction(
+        buyer_address: str, 
+        recipient_address: str, 
+        token_mint_address: str, 
+        amount: Decimal, 
         token_decimals: int,
         transaction_id: str
     ):
@@ -962,9 +1031,9 @@ class TradeServiceV3:
         
         Args:
             buyer_address: 买方钱包地址
-            platform_address: 平台收款地址
+            recipient_address: 接收方钱包地址
             token_mint_address: 代币铸造地址
-            total_price: 总价格
+            amount: 转账金额
             token_decimals: 代币小数位数
             transaction_id: 交易ID用于日志关联
             
@@ -976,11 +1045,11 @@ class TradeServiceV3:
         """
         try:
             # 1. 验证输入参数
-            if not buyer_address or not platform_address or not token_mint_address:
+            if not buyer_address or not recipient_address or not token_mint_address:
                 raise ValueError("缺少必需的地址参数")
             
-            if total_price <= 0:
-                raise ValueError(f"无效的总价格: {total_price}")
+            if amount <= 0:
+                raise ValueError(f"无效的转账金额: {amount}")
             
             if token_decimals < 0 or token_decimals > 18:
                 raise ValueError(f"无效的代币小数位数: {token_decimals}")
@@ -990,12 +1059,12 @@ class TradeServiceV3:
             # 2. 转换地址为PublicKey并验证格式
             try:
                 buyer_pubkey = Pubkey.from_string(buyer_address)
-                platform_pubkey = Pubkey.from_string(platform_address)
+                recipient_pubkey = Pubkey.from_string(recipient_address)
                 payment_mint_pubkey = Pubkey.from_string(token_mint_address)
                 
                 # 验证地址不能相同
-                if str(buyer_pubkey) == str(platform_pubkey):
-                    raise ValueError("买方地址和平台地址不能相同")
+                if str(buyer_pubkey) == str(recipient_pubkey):
+                    raise ValueError("买方地址和接收方地址不能相同")
                 
                 logger.debug(f"[{transaction_id}] 地址转换和验证成功")
                 
@@ -1006,16 +1075,16 @@ class TradeServiceV3:
             spl_token_program_id = Pubkey.from_string('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
             logger.debug(f"[{transaction_id}] 使用正确的SPL代币程序ID: {spl_token_program_id}")
             
-            # 4. 获取关联代币账户 (ATA) - 确保使用正确的买方和平台钱包地址
+            # 4. 获取关联代币账户 (ATA) - 确保使用正确的买方和接收方钱包地址
             try:
                 buyer_payment_token_ata = get_associated_token_address(buyer_pubkey, payment_mint_pubkey)
-                platform_payment_token_ata = get_associated_token_address(platform_pubkey, payment_mint_pubkey)
+                recipient_payment_token_ata = get_associated_token_address(recipient_pubkey, payment_mint_pubkey)
                 
                 # 验证ATA地址不能相同
-                if buyer_payment_token_ata == platform_payment_token_ata:
-                    raise ValueError("买方和平台的关联代币账户地址不能相同")
+                if buyer_payment_token_ata == recipient_payment_token_ata:
+                    raise ValueError("买方和接收方的关联代币账户地址不能相同")
                 
-                logger.debug(f"[{transaction_id}] ATA计算成功: 买方={str(buyer_payment_token_ata)[:8]}..., 平台={str(platform_payment_token_ata)[:8]}...")
+                logger.debug(f"[{transaction_id}] ATA计算成功: 买方={str(buyer_payment_token_ata)[:8]}..., 接收方={str(recipient_payment_token_ata)[:8]}...")
                 
             except Exception as e:
                 raise ValueError(f"关联代币账户计算失败: {str(e)}")
@@ -1028,7 +1097,7 @@ class TradeServiceV3:
                 
                 # 使用Decimal进行精确计算，避免浮点数精度问题
                 multiplier = Decimal(10) ** token_decimals
-                amount_in_smallest_unit = int(total_price * multiplier)
+                amount_in_smallest_unit = int(amount * multiplier)
                 
                 # 验证计算结果
                 if amount_in_smallest_unit <= 0:
@@ -1039,7 +1108,7 @@ class TradeServiceV3:
                 if amount_in_smallest_unit > max_u64:
                     raise ValueError(f"转账金额超出u64最大值: {amount_in_smallest_unit} > {max_u64}")
                 
-                logger.debug(f"[{transaction_id}] 金额计算: 原始={total_price}, 最小单位={amount_in_smallest_unit}, 小数位数={token_decimals}, 乘数={multiplier}")
+                logger.debug(f"[{transaction_id}] 金额计算: 原始={amount}, 最小单位={amount_in_smallest_unit}, 小数位数={token_decimals}, 乘数={multiplier}")
                 
             except Exception as e:
                 raise ValueError(f"金额计算失败: {str(e)}")
@@ -1051,7 +1120,7 @@ class TradeServiceV3:
                 transfer_params = TransferParams(
                     program_id=spl_token_program_id,
                     source=buyer_payment_token_ata,
-                    dest=platform_payment_token_ata,
+                    dest=recipient_payment_token_ata,
                     owner=buyer_pubkey,
                     amount=amount_in_smallest_unit
                 )
