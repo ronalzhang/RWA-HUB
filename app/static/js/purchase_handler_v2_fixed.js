@@ -429,7 +429,7 @@ if (window.purchaseHandlerInitialized) {
                 if (!window.solanaConnection) {
                     if (window.solanaWeb3) {
                         console.log('重新初始化Solana连接...');
-                        const solanaEndpoint = 'https://api.mainnet-beta.solana.com';
+                        const solanaEndpoint = 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea';
                         window.solanaConnection = new window.solanaWeb3.Connection(solanaEndpoint, 'confirmed');
                         console.log('✅ Solana连接重新初始化成功');
                     } else {
@@ -579,7 +579,7 @@ if (window.purchaseHandlerInitialized) {
         if (!window.solanaConnection && window.solanaWeb3) {
             console.log('初始化Solana连接...');
             try {
-                const solanaEndpoint = 'https://api.mainnet-beta.solana.com';
+                const solanaEndpoint = 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea';
                 window.solanaConnection = new window.solanaWeb3.Connection(solanaEndpoint, 'confirmed');
                 console.log(`✅ Solana 连接已初始化: ${solanaEndpoint}`);
             } catch (error) {

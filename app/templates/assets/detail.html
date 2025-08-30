@@ -26,7 +26,7 @@ if (typeof solanaWeb3 !== 'undefined') {
     console.log('✅ Solana Web3.js 库已加载');
 
     // 直接使用公开的、稳定的Solana RPC节点，避免后端配置问题
-    const solanaEndpoint = 'https://api.mainnet-beta.solana.com';
+    const solanaEndpoint = '{{ config.get("SOLANA_NETWORK_URL", "https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea") }}';
     window.solanaConnection = new solanaWeb3.Connection(solanaEndpoint, 'confirmed');
     console.log(`✅ Solana 连接已初始化: ${solanaEndpoint}`);
 } else {
