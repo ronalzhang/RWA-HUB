@@ -489,7 +489,7 @@ if (window.purchaseHandlerInitialized) {
                 if (!window.solanaConnection) {
                     if (window.solanaWeb3) {
                         console.log('重新初始化Solana连接...');
-                        const solanaEndpoint = 'https://api.mainnet-beta.solana.com';
+                        const solanaEndpoint = 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea';
                         window.solanaConnection = new window.solanaWeb3.Connection(solanaEndpoint, 'confirmed');
                         console.log('✅ Solana连接重新初始化成功');
                     } else {
@@ -544,18 +544,59 @@ if (window.purchaseHandlerInitialized) {
                 }
 
                 // 解析代币账户数据
-                if (!window.splToken?.AccountLayout) {
-                    console.error('AccountLayout 不可用');
-                    return 0;
+                let balance = 0;
+                
+                try {
+                    if (window.splToken?.AccountLayout) {
+                        console.log('使用SPL Token AccountLayout解码');
+                        const accountData = window.splToken.AccountLayout.decode(accountInfo.data);
+                        balance = Number(accountData.amount) / Math.pow(10, 6);
+                    } else {
+                        console.log('AccountLayout不可用，使用手动解码');
+                        // 手动解码SPL Token账户数据
+                        const data = accountInfo.data;
+                        if (data.length >= 72) {
+                            // amount字段在偏移量64处，为8字节的little-endian数字
+                            const view = new DataView(data.buffer, data.byteOffset + 64, 8);
+                            const rawAmount = view.getBigUint64(0, true); // little-endian
+                            balance = Number(rawAmount) / Math.pow(10, 6);
+                            console.log('手动解码成功:', {
+                                rawAmount: rawAmount.toString(),
+                                balance: balance
+                            });
+                        } else {
+                            console.error('账户数据长度不足:', data.length);
+                            return 0;
+                        }
+                    }
+                } catch (decodeError) {
+                    console.error('解码账户数据失败:', decodeError);
+                    console.log('尝试备用解码方法...');
+                    
+                    // 备用解码方法
+                    const data = accountInfo.data;
+                    if (data && data.length >= 72) {
+                        try {
+                            // 直接从buffer读取
+                            const buffer = data instanceof Uint8Array ? data : new Uint8Array(data);
+                            const view = new DataView(buffer.buffer, buffer.byteOffset + 64, 8);
+                            const rawAmount = view.getBigUint64(0, true);
+                            balance = Number(rawAmount) / Math.pow(10, 6);
+                            console.log('备用解码成功:', balance);
+                        } catch (backupError) {
+                            console.error('备用解码也失败:', backupError);
+                            return 0;
+                        }
+                    } else {
+                        console.error('数据无效，无法解码');
+                        return 0;
+                    }
                 }
-
-                const accountData = window.splToken.AccountLayout.decode(accountInfo.data);
-                const balance = Number(accountData.amount) / Math.pow(10, 6); // USDC有6位小数
                 
                 console.log('USDC余额检查完成:', {
-                    rawAmount: accountData.amount.toString(),
                     balance: balance,
-                    decimals: 6
+                    decimals: 6,
+                    walletAddress: walletAddress
                 });
                 
                 return balance;
