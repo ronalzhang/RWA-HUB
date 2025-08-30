@@ -319,7 +319,7 @@ if (window.purchaseHandlerInitialized) {
                         isWritable: acc.is_writable
                     })),
                     programId: new window.solanaWeb3.PublicKey(this.currentTrade.instruction.program_id),
-                    data: Buffer.from(this.currentTrade.instruction.data, 'hex')
+                    data: new Uint8Array(Buffer.from(this.currentTrade.instruction.data, 'hex'))
                 });
 
                 console.log('创建的指令详情:', {
