@@ -425,15 +425,23 @@ if (window.purchaseHandlerInitialized) {
                     return 0;
                 }
 
+                // 确保Solana连接已初始化
+                if (!window.solanaConnection) {
+                    if (window.solanaWeb3) {
+                        console.log('重新初始化Solana连接...');
+                        const solanaEndpoint = 'https://api.mainnet-beta.solana.com';
+                        window.solanaConnection = new window.solanaWeb3.Connection(solanaEndpoint, 'confirmed');
+                    } else {
+                        console.error('Solana Web3.js 库未加载');
+                        return 0;
+                    }
+                }
+
                 // 检查必要的库是否加载
                 if (!window.solanaWeb3) {
                     console.error('Solana Web3.js 库未加载');
                     return 0;
                 }
-
-                
-
-                
 
                 // USDC代币地址 (mainnet)
                 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
@@ -444,12 +452,13 @@ if (window.purchaseHandlerInitialized) {
                     walletAddress,
                     usdcMint: USDC_MINT,
                     splTokenAvailable: !!window.splToken,
-                    getAssociatedTokenAddressAvailable: !!window.splToken.getAssociatedTokenAddress
+                    getAssociatedTokenAddressAvailable: !!window.splToken?.getAssociatedTokenAddress,
+                    connectionAvailable: !!window.solanaConnection
                 });
 
                 // 获取关联代币账户地址
                 let associatedTokenAddress;
-                if (window.splToken.getAssociatedTokenAddress) {
+                if (window.splToken?.getAssociatedTokenAddress) {
                     associatedTokenAddress = await window.splToken.getAssociatedTokenAddress(
                         usdcMint,
                         walletPubkey
@@ -470,7 +479,7 @@ if (window.purchaseHandlerInitialized) {
                 }
 
                 // 解析代币账户数据
-                if (!window.splToken.AccountLayout) {
+                if (!window.splToken?.AccountLayout) {
                     console.error('AccountLayout 不可用');
                     return 0;
                 }
@@ -560,8 +569,25 @@ if (window.purchaseHandlerInitialized) {
         });
     }
 
+    // 初始化Solana连接（如果未初始化）
+    function ensureSolanaConnection() {
+        if (!window.solanaConnection && window.solanaWeb3) {
+            console.log('初始化Solana连接...');
+            try {
+                const solanaEndpoint = 'https://api.mainnet-beta.solana.com';
+                window.solanaConnection = new window.solanaWeb3.Connection(solanaEndpoint, 'confirmed');
+                console.log(`✅ Solana 连接已初始化: ${solanaEndpoint}`);
+            } catch (error) {
+                console.error('Solana连接初始化失败:', error);
+            }
+        }
+    }
+
     // 检查库初始化状态
     function checkLibrariesInitialization() {
+        // 确保Solana连接已初始化
+        ensureSolanaConnection();
+        
         const checks = {
             solanaWeb3: !!window.solanaWeb3,
             splToken: !!window.splToken,
@@ -575,6 +601,46 @@ if (window.purchaseHandlerInitialized) {
         const allLoaded = Object.values(checks).every(check => check);
         if (!allLoaded) {
             console.warn('部分库未正确加载，可能影响购买功能');
+            
+            // 如果SPL Token库中缺少AccountLayout，尝试手动添加
+            if (window.splToken && !window.splToken.AccountLayout) {
+                console.log('尝试添加SPL Token AccountLayout...');
+                // AccountLayout是一个简单的数据结构，我们可以提供一个基本实现
+                window.splToken.AccountLayout = {
+                    decode: function(data) {
+                        // 简化的SPL Token账户数据解析
+                        if (data.length < 165) {
+                            throw new Error('Invalid account data length');
+                        }
+                        
+                        // SPL Token账户结构：
+                        // - mint: 32 bytes (0-31)
+                        // - owner: 32 bytes (32-63) 
+                        // - amount: 8 bytes (64-71)
+                        // - delegate: 32 bytes (72-103)
+                        // - state: 1 byte (104)
+                        // - isNative: 8 bytes (105-112)
+                        // - delegatedAmount: 8 bytes (113-120)
+                        // - closeAuthority: 32 bytes (121-152)
+                        
+                        const amount = data.slice(64, 72);
+                        // 转换为BigInt然后转为字符串
+                        const amountBigInt = new DataView(amount.buffer, amount.byteOffset).getBigUint64(0, true);
+                        
+                        return {
+                            mint: data.slice(0, 32),
+                            owner: data.slice(32, 64),
+                            amount: amountBigInt,
+                            delegate: data.slice(72, 104),
+                            state: data[104],
+                            isNative: data.slice(105, 113),
+                            delegatedAmount: data.slice(113, 121),
+                            closeAuthority: data.slice(121, 153)
+                        };
+                    }
+                };
+                console.log('✅ SPL Token AccountLayout已添加');
+            }
         }
         
         return checks;
