@@ -16,7 +16,7 @@ from solders.hash import Hash
 from solders.signature import Signature
 from solders.transaction import Transaction
 from solders.message import Message
-from spl.token.instructions import transfer, TransferParams, get_associated_token_address
+from spl.token.instructions import get_associated_token_address
 from solana.exceptions import SolanaRpcException
 from solana.rpc.types import TxOpts
 
@@ -1044,25 +1044,7 @@ class TradeServiceV3:
             except Exception as e:
                 raise ValueError(f"金额计算失败: {str(e)}")
             
-            # 6. 创建转账指令参数并验证
-            try:
-                transfer_params = TransferParams(
-                    program_id=spl_token_program_id,
-                    source=buyer_payment_token_ata,
-                    dest=platform_payment_token_ata,
-                    owner=buyer_pubkey,
-                    amount=amount_in_smallest_unit
-                )
-                
-                # 验证转账参数
-                TradeServiceV3._validate_transfer_params(transfer_params, transaction_id)
-                
-                logger.debug(f"[{transaction_id}] 转账参数验证通过")
-                
-            except Exception as e:
-                raise ValueError(f"转账参数创建或验证失败: {str(e)}")
-            
-            # 7. 手动创建转账指令（确保账户权限正确）
+            # 6. 手动创建转账指令（确保账户权限正确）
             try:
                 from solders.instruction import Instruction, AccountMeta
                 import struct
@@ -1119,43 +1101,7 @@ class TradeServiceV3:
             logger.error(f"[{transaction_id}] 指令创建失败: {e}", exc_info=True)
             raise Exception(f"指令创建失败: {str(e)}")
 
-    @staticmethod
-    def _validate_transfer_params(transfer_params: TransferParams, transaction_id: str = None) -> None:
-        """
-        验证SPL代币转账参数
-        
-        Args:
-            transfer_params: 转账参数
-            transaction_id: 可选的交易ID用于日志关联
-            
-        Raises:
-            ValueError: 参数验证失败时抛出异常
-        """
-        log_prefix = f"[{transaction_id}] " if transaction_id else ""
-        
-        try:
-            # 验证程序ID
-            expected_program_id = Pubkey.from_string('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-            if str(transfer_params.program_id) != str(expected_program_id):
-                raise ValueError(f"程序ID不正确: 期望 {expected_program_id}, 实际 {transfer_params.program_id}")
-            
-            # 验证源账户和目标账户不能相同
-            if transfer_params.source == transfer_params.dest:
-                raise ValueError("源账户和目标账户不能相同")
-            
-            # 验证金额大于0
-            if transfer_params.amount <= 0:
-                raise ValueError(f"转账金额必须大于0: {transfer_params.amount}")
-            
-            # 验证所有必需的Pubkey都存在
-            if not transfer_params.source or not transfer_params.dest or not transfer_params.owner:
-                raise ValueError("缺少必需的账户地址")
-            
-            logger.debug(f"{log_prefix}转账参数验证通过: 金额={transfer_params.amount}, 源={str(transfer_params.source)[:8]}..., 目标={str(transfer_params.dest)[:8]}...")
-            
-        except Exception as e:
-            logger.error(f"{log_prefix}转账参数验证失败: {e}")
-            raise ValueError(f"转账参数验证失败: {str(e)}")
+
 
     @staticmethod
     def _validate_transfer_instruction(instruction, transaction_id: str = None) -> None:
