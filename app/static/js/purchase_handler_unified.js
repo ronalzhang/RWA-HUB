@@ -309,21 +309,8 @@ if (window.purchaseHandlerInitialized) {
                     feePayer: new window.solanaWeb3.PublicKey(this.currentTrade.feePayer)
                 });
 
-                // 明确设置ComputeBudget以防止钱包自动添加冲突指令
-                try {
-                    const computeUnitLimitInstruction = window.solanaWeb3.ComputeBudgetProgram.setComputeUnitLimit({
-                        units: 200000
-                    });
-                    const computeUnitPriceInstruction = window.solanaWeb3.ComputeBudgetProgram.setComputeUnitPrice({
-                        microLamports: 1
-                    });
-                    
-                    transaction.add(computeUnitLimitInstruction);
-                    transaction.add(computeUnitPriceInstruction);
-                    console.log('已添加ComputeBudget指令');
-                } catch (error) {
-                    console.log('ComputeBudgetProgram不可用，跳过:', error.message);
-                }
+                // 不预先添加ComputeBudget指令，让钱包自动处理
+                console.log('跳过ComputeBudget指令预添加，让钱包自动管理');
 
                 // 添加多个指令
                 console.log('后端返回的指令数据:', this.currentTrade.instructions);
