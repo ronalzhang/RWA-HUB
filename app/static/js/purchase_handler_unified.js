@@ -724,7 +724,7 @@ if (window.purchaseHandlerInitialized) {
         
         const allRequiredLoaded = Object.values(requiredChecks).every(check => check);
         if (!allRequiredLoaded) {
-            console.warn('关键库未正确加载，可能影响购买功能');
+            console.warn('部分库未完全加载，但已有备用方案');
             
             // 如果SPL Token库中缺少AccountLayout，尝试手动添加
             if (window.splToken && !window.splToken.AccountLayout) {

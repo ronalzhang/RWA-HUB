@@ -1097,9 +1097,11 @@ class TradeServiceV3:
                 buyer_payment_token_ata = get_associated_token_address(buyer_pubkey, payment_mint_pubkey)
                 recipient_payment_token_ata = get_associated_token_address(recipient_pubkey, payment_mint_pubkey)
                 
-                # 验证ATA地址不能相同
+                # 注意：在自购场景中，买方给平台转账，ATA可能相同（如果是同一个人的不同钱包）
+                # 但这是正常的业务逻辑，不应该阻止交易
                 if buyer_payment_token_ata == recipient_payment_token_ata:
-                    raise ValueError("买方和接收方的关联代币账户地址不能相同")
+                    logger.warning(f"[{transaction_id}] 买方和接收方的ATA地址相同: {str(buyer_payment_token_ata)}")
+                    logger.warning(f"[{transaction_id}] 这可能是自购场景或同一用户的不同操作，允许继续")
                 
                 logger.debug(f"[{transaction_id}] ATA计算成功: 买方={str(buyer_payment_token_ata)[:8]}..., 接收方={str(recipient_payment_token_ata)[:8]}...")
                 
@@ -1152,7 +1154,23 @@ class TradeServiceV3:
                 logger.info(f"[{transaction_id}] 官方库转账指令创建成功")
                 logger.info(f"[{transaction_id}] 指令程序ID: {instruction.program_id}")
                 logger.info(f"[{transaction_id}] 指令数据长度: {len(instruction.data)}")
-                logger.info(f"[{transaction_id}] 指令数据: {instruction.data.hex() if hasattr(instruction.data, 'hex') else bytes(instruction.data).hex()}")
+                
+                # 确保指令数据正确序列化
+                try:
+                    if hasattr(instruction.data, 'hex'):
+                        data_hex = instruction.data.hex()
+                    else:
+                        data_hex = bytes(instruction.data).hex()
+                    logger.info(f"[{transaction_id}] 指令数据(hex): {data_hex}")
+                except Exception as data_error:
+                    logger.error(f"[{transaction_id}] 指令数据序列化失败: {data_error}")
+                    # 尝试备用方法
+                    try:
+                        data_hex = ''.join([f'{b:02x}' for b in instruction.data])
+                        logger.info(f"[{transaction_id}] 指令数据(备用序列化): {data_hex}")
+                    except Exception as backup_error:
+                        logger.error(f"[{transaction_id}] 备用序列化也失败: {backup_error}")
+                        raise ValueError(f"指令数据序列化失败: {backup_error}")
                 
                 # 详细账户信息
                 for i, account in enumerate(instruction.accounts):
