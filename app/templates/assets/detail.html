@@ -24,6 +24,11 @@
 if (typeof solanaWeb3 !== 'undefined') {
     window.solanaWeb3 = solanaWeb3;
     console.log('✅ Solana Web3.js 库已加载');
+
+    // 初始化Solana连接并挂载到window对象
+    const solanaEndpoint = "{{ config.get('SOLANA_RPC_URL') or 'https://api.mainnet-beta.solana.com' }}";
+    window.solanaConnection = new solanaWeb3.Connection(solanaEndpoint, 'confirmed');
+    console.log(`✅ Solana 连接已初始化: ${solanaEndpoint}`);
 } else {
     console.error('❌ Solana Web3.js 库加载失败');
 }
@@ -33,7 +38,7 @@ if (typeof solanaWeb3 !== 'undefined') {
 <!-- 钱包和购买处理 -->
 <script src="{{ url_for('static', filename='js/wallet.js') }}"></script>
 <script src="{{ url_for('static', filename='js/smart_contract_deployment.js') }}"></script>
-<script src="{{ url_for('static', filename='js/purchase_handler_unified.js') }}?v=20250829-final-fix"></script>
+<script src="{{ url_for('static', filename='js/purchase_handler_unified.js') }}?v=20250829-final-fix" defer></script>
 
 <style>
 /* 固定宽度布局样式 */
