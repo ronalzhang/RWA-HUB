@@ -36,6 +36,10 @@ def create_app(config_name='development'):
     app.config.from_object(config[config_name])
     config[config_name].init_app(app)
 
+    # 加载配置
+    app.config.from_object(config[config_name])
+    config[config_name].init_app(app)
+
     # 记录关键配置信息
     dotenv_path = os.path.join(os.path.dirname(__file__), '..' '.env')
     if os.path.exists(dotenv_path):
