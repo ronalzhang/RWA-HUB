@@ -28,20 +28,22 @@ class StandaloneApplication(BaseApplication):
     def load(self):
         return self.application
 
-    def post_fork(self, server, worker):
-        # 在工作进程被创建后，销毁从主进程继承的数据库连接池
-        # 这可以防止因连接被意外关闭而导致的 "SSL SYSCALL error: EOF detected" 错误
-        # SQLAlchemy 会在需要时为每个工作进程创建新的、独立的连接
-        with self.application.app_context():
-            from app.extensions import db
-            db.engine.dispose()
-            server.log.info(f"Worker {worker.pid} re-initialized database connection pool.")
-
 def main():
     # --- 1. 创建并配置应用 ---
     logging.info("主进程：开始创建Flask应用...")
     flask_app = create_app(os.environ.get('FLASK_CONFIG') or 'production')
     logging.info("主进程：Flask应用创建完成。")
+
+    # --- Gunicorn post_fork 钩子 ---
+    def post_fork(server, worker):
+        # 在工作进程被创建后，销毁从主进程继承的数据库连接池
+        # 这可以防止因连接被意外关闭而导致的 "SSL SYSCALL error: EOF detected" 错误
+        # SQLAlchemy 会在需要时为每个工作进程创建新的、独立的连接
+        server.log.info(f"Worker {worker.pid} re-initializing database connection pool.")
+        with flask_app.app_context():
+            from app.extensions import db
+            db.engine.dispose()
+        server.log.info(f"Worker {worker.pid} database connection pool re-initialized.")
 
     # --- 2. 记录关键配置（只在主进程执行一次） ---
     with flask_app.app_context():
@@ -82,6 +84,7 @@ def main():
         'accesslog': '-',
         'errorlog': '-',
         'preload_app': True,
+        'post_fork': post_fork, # 在这里注册钩子
     }
 
     logging.info(f"主进程：🚀 即将启动 Gunicorn，Workers: {workers}, 端口: {port}")
