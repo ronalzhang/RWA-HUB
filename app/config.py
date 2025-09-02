@@ -149,30 +149,12 @@ class Config:
         # 验证Solana配置
         try:
             Config.validate_solana_configuration(app)
-            app.logger.info("✓ Solana配置验证通过")
-            
-            # 使用SolanaConfigValidator进行详细日志记录
-            try:
-                from app.services.solana_config_validator import SolanaConfigValidator
-                SolanaConfigValidator.log_configuration_status(app)
-            except ImportError:
-                pass  # 如果导入失败，继续使用基本验证
-                
         except ValueError as e:
-            app.logger.warning(f"⚠ Solana配置验证失败: {e}")
-            # 在开发环境中，我们可以继续运行，但会记录警告
-            # 在生产环境中，可能需要停止应用启动
+            # 允许应用在开发或测试环境中继续，但在日志中记录严重警告
             import logging
             logger = logging.getLogger(__name__)
-            logger.warning(f"Solana配置验证失败，但应用将继续启动: {e}")
-            logger.warning("请检查环境变量或配置文件中的Solana相关参数")
-            
-            # 尝试使用SolanaConfigValidator记录详细错误
-            try:
-                from app.services.solana_config_validator import SolanaConfigValidator
-                SolanaConfigValidator.log_configuration_status(app)
-            except ImportError:
-                pass
+            logger.critical(f"Solana配置验证失败，这在生产环境中是致命错误: {e}")
+            logger.critical("请立即检查您的环境变量或配置文件！")
         
         # 初始化数据库优化
         db_optimizer = get_database_optimizer()

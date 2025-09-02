@@ -39,13 +39,6 @@ def create_app(config_name='development'):
     # 加载配置
     app.config.from_object(config[config_name])
     config[config_name].init_app(app)
-
-    # 记录关键配置信息
-    dotenv_path = os.path.join(os.path.dirname(__file__), '..' '.env')
-    if os.path.exists(dotenv_path):
-        app.logger.info(f"已加载环境变量文件: {dotenv_path}")
-    if config_name == 'production':
-        app.logger.info(f"生产环境使用数据库: {app.config.get('SQLALCHEMY_DATABASE_URI')}")
     
     # 确保 SECRET_KEY 已设置
     if not app.config.get('SECRET_KEY'):
