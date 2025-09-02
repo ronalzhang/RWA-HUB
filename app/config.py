@@ -6,9 +6,6 @@ from dotenv import load_dotenv
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
-    print(f"已加载环境变量文件: {dotenv_path}")
-else:
-    print(f"未找到环境变量文件: {dotenv_path}")
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
@@ -152,7 +149,7 @@ class Config:
         # 验证Solana配置
         try:
             Config.validate_solana_configuration(app)
-            print("✓ Solana配置验证通过")
+            app.logger.info("✓ Solana配置验证通过")
             
             # 使用SolanaConfigValidator进行详细日志记录
             try:
@@ -162,7 +159,7 @@ class Config:
                 pass  # 如果导入失败，继续使用基本验证
                 
         except ValueError as e:
-            print(f"⚠ Solana配置验证失败: {e}")
+            app.logger.warning(f"⚠ Solana配置验证失败: {e}")
             # 在开发环境中，我们可以继续运行，但会记录警告
             # 在生产环境中，可能需要停止应用启动
             import logging
@@ -200,7 +197,6 @@ class ProductionConfig(Config):
     
     # 生产环境数据库配置 - 本地开发环境不需要SSL
     SQLALCHEMY_DATABASE_URI = 'postgresql://rwa_hub_user:password@localhost/rwa_hub'
-    print(f"生产环境使用本地数据库: {SQLALCHEMY_DATABASE_URI}")
     
     # 明确从环境变量获取SOLANA_RPC_URL
     SOLANA_RPC_URL = os.environ.get('SOLANA_RPC_URL', 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea')
