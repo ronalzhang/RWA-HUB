@@ -113,13 +113,11 @@ def create_app(config_name='development'):
         except:
             return []
     
-    # -- 修改：在扩展初始化前设置好Limiter的存储URI --
-    db_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
-    if db_uri:
-        app.config['RATELIMIT_STORAGE_URI'] = db_uri
-        app.logger.info(f"设置 Flask-Limiter 存储 URI: {db_uri}")
-    else:
-        app.logger.warning("未找到数据库 URI，Flask-Limiter 将使用内存存储")
+    # -- 为 Flask-Limiter 配置 Redis 存储 --
+    # 使用在 cache_service.py 中定义的默认 Redis URL
+    redis_url = 'redis://localhost:6379/0'
+    app.config['RATELIMIT_STORAGE_URI'] = redis_url
+    app.logger.info(f"为 Flask-Limiter 设置 Redis 存储 URI: {redis_url}")
 
     # 初始化扩展
     from .extensions import init_extensions, bind_db_to_app
