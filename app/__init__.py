@@ -113,6 +113,14 @@ def create_app(config_name='development'):
         except:
             return []
     
+    # -- 修改：在扩展初始化前设置好Limiter的存储URI --
+    db_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
+    if db_uri:
+        app.config['RATELIMIT_STORAGE_URI'] = db_uri
+        app.logger.info(f"设置 Flask-Limiter 存储 URI: {db_uri}")
+    else:
+        app.logger.warning("未找到数据库 URI，Flask-Limiter 将使用内存存储")
+
     # 初始化扩展
     from .extensions import init_extensions, bind_db_to_app
     init_extensions(app)
@@ -196,14 +204,7 @@ def create_app(config_name='development'):
         except Exception as e:
             app.logger.error(f"初始化后台任务处理系统失败: {str(e)}")
     
-    # -- 修改：使用正确的配置键 RATELIMIT_STORAGE_URI --
-    db_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
-    if db_uri:
-        # app.config['RATELIMIT_STORAGE_URL'] = db_uri # 错误键名
-        app.config['RATELIMIT_STORAGE_URI'] = db_uri # 正确键名
-        app.logger.info(f"设置 Flask-Limiter 存储 URI: {db_uri}")
-    else:
-        app.logger.warning("未找到数据库 URI，Flask-Limiter 将使用内存存储")
+    
     
     return app
 

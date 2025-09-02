@@ -138,4 +138,4 @@ def register_blueprints(app):
     register_global_handlers(app)
     app.logger.info('已注册全局URL前缀修正处理器')
     
-    print("所有路由已注册（使用新模块化admin系统，临时禁用冲突蓝图）")
+    app.logger.info("所有路由已注册（使用新模块化admin系统，临时禁用冲突蓝图）")
