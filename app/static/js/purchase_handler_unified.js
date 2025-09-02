@@ -497,15 +497,7 @@ if (window.purchaseHandlerInitialized) {
 
                 // 确保Solana连接已初始化
                 if (!window.solanaConnection) {
-                    if (window.solanaWeb3) {
-                        console.log('重新初始化Solana连接...');
-                        const solanaEndpoint = 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea';
-                        window.solanaConnection = new window.solanaWeb3.Connection(solanaEndpoint, 'confirmed');
-                        console.log('✅ Solana连接重新初始化成功');
-                    } else {
-                        console.error('Solana Web3.js 库未加载');
-                        return 0;
-                    }
+                    ensureSolanaConnection();
                 }
 
                 // 检查必要的库是否加载
@@ -541,12 +533,36 @@ if (window.purchaseHandlerInitialized) {
 
                 console.log('关联代币账户地址:', associatedTokenAddress.toString());
 
-                // 获取账户信息
+                // 获取账户信息（带重试机制）
                 if (!window.solanaConnection) {
                     console.error('Solana连接未初始化，无法获取账户信息');
                     return 0;
                 }
-                const accountInfo = await window.solanaConnection.getAccountInfo(associatedTokenAddress);
+                
+                let accountInfo = null;
+                let lastError = null;
+                
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    try {
+                        accountInfo = await window.solanaConnection.getAccountInfo(associatedTokenAddress);
+                        console.log(`✅ 第${attempt + 1}次尝试获取账户信息成功`);
+                        break;
+                    } catch (error) {
+                        lastError = error;
+                        console.warn(`第${attempt + 1}次获取账户信息失败:`, error.message);
+                        
+                        if (attempt < 2) {
+                            // 重新初始化连接并重试
+                            console.log('重新初始化Solana连接...');
+                            ensureSolanaConnection();
+                            await new Promise(resolve => setTimeout(resolve, 1000)); // 等待1秒
+                        }
+                    }
+                }
+                
+                if (!accountInfo && lastError) {
+                    throw lastError;
+                }
                 
                 if (!accountInfo) {
                     console.log('USDC代币账户不存在，余额为0');
@@ -655,46 +671,33 @@ if (window.purchaseHandlerInitialized) {
         }
     }
 
-    // 动态加载SPL Token库
-    async function loadSPLTokenLibrary() {
-        return new Promise((resolve, reject) => {
-            if (window.splToken) {
-                console.log('SPL Token库已存在');
-                resolve(true);
-                return;
-            }
-            
-            console.log('动态加载SPL Token库...');
-            const script = document.createElement('script');
-            script.src = '/static/js/contracts/spl-token.iife.min.js?v=' + Date.now();
-            script.onload = function() {
-                console.log('SPL Token库动态加载完成');
-                // 等待一下让库初始化
-                setTimeout(() => {
-                    if (window.splToken) {
-                        resolve(true);
-                    } else {
-                        reject(new Error('SPL Token库加载后仍不可用'));
-                    }
-                }, 500);
-            };
-            script.onerror = function() {
-                reject(new Error('SPL Token库加载失败'));
-            };
-            document.head.appendChild(script);
-        });
-    }
+    
 
     // 初始化Solana连接（如果未初始化）
     function ensureSolanaConnection() {
         if (!window.solanaConnection && window.solanaWeb3) {
             console.log('初始化Solana连接...');
-            try {
-                const solanaEndpoint = 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea';
-                window.solanaConnection = new window.solanaWeb3.Connection(solanaEndpoint, 'confirmed');
-                console.log(`✅ Solana 连接已初始化: ${solanaEndpoint}`);
-            } catch (error) {
-                console.error('Solana连接初始化失败:', error);
+            
+            // RPC端点配置（主要和备用）
+            const rpcEndpoints = [
+                'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea',
+                'https://api.mainnet-beta.solana.com',
+                'https://solana-api.projectserum.com'
+            ];
+            
+            for (let i = 0; i < rpcEndpoints.length; i++) {
+                try {
+                    const endpoint = rpcEndpoints[i];
+                    window.solanaConnection = new window.solanaWeb3.Connection(endpoint, 'confirmed');
+                    console.log(`✅ Solana连接已初始化: ${endpoint}`);
+                    break;
+                } catch (error) {
+                    console.error(`RPC端点 ${rpcEndpoints[i]} 连接失败:`, error);
+                    if (i === rpcEndpoints.length - 1) {
+                        console.error('❌ 所有RPC端点连接失败');
+                        throw new Error('无法连接到Solana网络');
+                    }
+                }
             }
         }
     }
@@ -714,57 +717,9 @@ if (window.purchaseHandlerInitialized) {
         
         console.log('库初始化检查:', checks);
         
-        // 计算实际必需的库检查（忽略AccountLayout因为它是手动添加的）
-        const requiredChecks = {
-            solanaWeb3: checks.solanaWeb3,
-            splToken: checks.splToken,
-            splTokenGetAssociatedTokenAddress: checks.splTokenGetAssociatedTokenAddress,
-            solanaConnection: checks.solanaConnection
-        };
-        
-        const allRequiredLoaded = Object.values(requiredChecks).every(check => check);
-        if (!allRequiredLoaded) {
-            console.warn('部分库未完全加载，但已有备用方案');
-            
-            // 如果SPL Token库中缺少AccountLayout，尝试手动添加
-            if (window.splToken && !window.splToken.AccountLayout) {
-                console.log('尝试添加SPL Token AccountLayout...');
-                // AccountLayout是一个简单的数据结构，我们可以提供一个基本实现
-                window.splToken.AccountLayout = {
-                    decode: function(data) {
-                        // 简化的SPL Token账户数据解析
-                        if (data.length < 165) {
-                            throw new Error('Invalid account data length');
-                        }
-                        
-                        // SPL Token账户结构：
-                        // - mint: 32 bytes (0-31)
-                        // - owner: 32 bytes (32-63) 
-                        // - amount: 8 bytes (64-71)
-                        // - delegate: 32 bytes (72-103)
-                        // - state: 1 byte (104)
-                        // - isNative: 8 bytes (105-112)
-                        // - delegatedAmount: 8 bytes (113-120)
-                        // - closeAuthority: 32 bytes (121-152)
-                        
-                        const amount = data.slice(64, 72);
-                        // 转换为BigInt然后转为字符串
-                        const amountBigInt = new DataView(amount.buffer, amount.byteOffset).getBigUint64(0, true);
-                        
-                        return {
-                            mint: data.slice(0, 32),
-                            owner: data.slice(32, 64),
-                            amount: amountBigInt,
-                            delegate: data.slice(72, 104),
-                            state: data[104],
-                            isNative: data.slice(105, 113),
-                            delegatedAmount: data.slice(113, 121),
-                            closeAuthority: data.slice(121, 153)
-                        };
-                    }
-                };
-                console.log('✅ SPL Token AccountLayout已添加');
-            }
+        const allLoaded = Object.values(checks).every(check => check);
+        if (!allLoaded) {
+            console.error('一个或多个核心Solana库未能加载，购买功能可能无法正常使用。');
         }
         
         return checks;
@@ -776,33 +731,7 @@ if (window.purchaseHandlerInitialized) {
     // 全局购买函数
     window.initiatePurchase = async function(assetId, amount) {
         // 在购买前检查库状态
-        const libStatus = checkLibrariesInitialization();
-        
-        // 如果SPL Token库未加载，尝试动态加载
-        if (!libStatus.splToken || !libStatus.splTokenGetAssociatedTokenAddress) {
-            console.log('SPL Token库未加载，尝试动态加载...');
-            
-            try {
-                await loadSPLTokenLibrary();
-                console.log('SPL Token库动态加载成功');
-                
-                // 重新检查库状态
-                const newLibStatus = checkLibrariesInitialization();
-                if (!newLibStatus.splToken || !newLibStatus.splTokenGetAssociatedTokenAddress) {
-                    throw new Error('动态加载后SPL Token库仍不可用');
-                }
-            } catch (error) {
-                console.error('动态加载SPL Token库失败:', error);
-                // Display an error message to the user and stop the process.
-                if (window.purchaseFlowManager && typeof window.purchaseFlowManager.showError === 'function') {
-                    window.purchaseFlowManager.showError('初始化失败', '交易依赖库加载失败，请刷新页面或联系管理员。');
-                } else {
-                    alert('初始化失败: 交易依赖库加载失败，请刷新页面或联系管理员。');
-                }
-                return false; // Stop the purchase process
-            }
-        }
-        
+        checkLibrariesInitialization();
         return window.purchaseFlowManager.initiatePurchase(assetId, amount);
     };
 
@@ -841,38 +770,12 @@ if (window.purchaseHandlerInitialized) {
         document.addEventListener('DOMContentLoaded', function() {
             bindPurchaseButton();
             // 延迟检查库状态，给其他脚本时间加载
-            setTimeout(async function() {
-                const libStatus = checkLibrariesInitialization();
-                // 如果SPL Token库未加载，尝试预加载
-                if (!libStatus.splToken) {
-                    console.log('预加载SPL Token库...');
-                    try {
-                        await loadSPLTokenLibrary();
-                        console.log('SPL Token库预加载成功');
-                        checkLibrariesInitialization(); // 重新检查
-                    } catch (error) {
-                        console.warn('SPL Token库预加载失败:', error);
-                    }
-                }
-            }, 1000);
+            setTimeout(checkLibrariesInitialization, 1000);
         });
     } else {
         bindPurchaseButton();
         // 延迟检查库状态，给其他脚本时间加载
-        setTimeout(async function() {
-            const libStatus = checkLibrariesInitialization();
-            // 如果SPL Token库未加载，尝试预加载
-            if (!libStatus.splToken) {
-                console.log('预加载SPL Token库...');
-                try {
-                    await loadSPLTokenLibrary();
-                    console.log('SPL Token库预加载成功');
-                    checkLibrariesInitialization(); // 重新检查
-                } catch (error) {
-                    console.warn('SPL Token库预加载失败:', error);
-                }
-            }
-        }, 1000);
+        setTimeout(checkLibrariesInitialization, 1000);
     }
 
     console.log('✅ 统一购买处理器初始化完成');
