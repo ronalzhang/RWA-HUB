@@ -28,6 +28,15 @@ class StandaloneApplication(BaseApplication):
     def load(self):
         return self.application
 
+    def post_fork(self, server, worker):
+        # 在工作进程被创建后，销毁从主进程继承的数据库连接池
+        # 这可以防止因连接被意外关闭而导致的 "SSL SYSCALL error: EOF detected" 错误
+        # SQLAlchemy 会在需要时为每个工作进程创建新的、独立的连接
+        with self.application.app_context():
+            from app.extensions import db
+            db.engine.dispose()
+            server.log.info(f"Worker {worker.pid} re-initialized database connection pool.")
+
 def main():
     # --- 1. 创建并配置应用 ---
     logging.info("主进程：开始创建Flask应用...")
