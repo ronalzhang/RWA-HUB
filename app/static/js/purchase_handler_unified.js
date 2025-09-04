@@ -711,7 +711,6 @@ if (window.purchaseHandlerInitialized) {
             solanaWeb3: !!window.solanaWeb3,
             splToken: !!window.splToken,
             splTokenGetAssociatedTokenAddress: !!(window.splToken && window.splToken.getAssociatedTokenAddress),
-            splTokenAccountLayout: !!(window.splToken && window.splToken.AccountLayout),
             solanaConnection: !!window.solanaConnection
         };
         
