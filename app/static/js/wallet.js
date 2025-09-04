@@ -4433,8 +4433,6 @@ window.wallet = {
             let universalLinkUrl = '';
             let appStoreUrl = '';
             
-            // 获取当前页面URL，用于回调
-            const currentUrl = encodeURIComponent(window.location.href);
             const baseUrl = window.location.origin;
             
             // 根据钱包类型设置不同的链接
@@ -4444,7 +4442,7 @@ window.wallet = {
                     dapp_encryption_public_key: this.generateRandomKey(),
                     cluster: 'mainnet-beta',
                     app_url: baseUrl,
-                    redirect_link: currentUrl
+                    redirect_link: window.location.href // 修复：直接使用原始URL，防止双重编码
                 }).toString();
                 
                 deepLinkUrl = `phantom://v1/connect?${connectParams}`;
