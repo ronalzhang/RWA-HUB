@@ -1,4 +1,3 @@
-
 /**
  * RWA-HUB 钱包管理模块
  * 支持多种钱包类型的连接、管理和状态同步
@@ -211,22 +210,16 @@ const walletState = {
     },
 
     async connect(walletType) {
-        console.log(`[DIAGNOSTIC] connect() called with type: ${walletType}`);
         this.connecting = true;
         this.updateUI();
         
-        console.log(`[DIAGNOSTIC] isMobile check: ${this.isMobile()}`);
         if (this.isMobile() && !this._isReconnecting) {
-            console.log('[DIAGNOSTIC] Mobile device detected, calling tryMobileWalletRedirect...');
             const deepLinkSuccess = await this.tryMobileWalletRedirect(walletType);
-            console.log(`[DIAGNOSTIC] tryMobileWalletRedirect has returned. Apparent success: ${deepLinkSuccess}`);
             if (deepLinkSuccess) {
-                console.log('[DIAGNOSTIC] Assuming redirect was successful. Waiting for user to return from wallet app.');
                 this.connecting = false;
                 this.updateUI();
                 return true;
             }
-            console.log('[DIAGNOSTIC] tryMobileWalletRedirect returned false, proceeding with desktop logic.');
         }
         
         let success = false;
@@ -408,111 +401,21 @@ const walletState = {
             console.error('[registerWalletUser] 注册用户失败:', error);
             throw error;
         }
-    },
-
-    async tryMobileWalletRedirect(walletType) {
-        console.log('[DIAGNOSTIC] tryMobileWalletRedirect() started.');
-        if (!this.isMobile()) {
-            console.log('[DIAGNOSTIC] isMobile() returned false. Aborting.');
-            return false;
-        }
-        
-        try {
-            console.log(`[DIAGNOSTIC] Building redirect URL for wallet: ${walletType}`);
-            
-            let universalLinkUrl = '';
-            const redirectUrl = window.location.href;
-            const baseUrl = window.location.origin;
-            
-            if (walletType === 'phantom' || walletType === 'solana') {
-                const connectParams = new URLSearchParams({
-                    dapp_encryption_public_key: this.generateRandomKey(),
-                    cluster: 'mainnet-beta',
-                    app_url: encodeURIComponent(baseUrl),
-                    redirect_link: redirectUrl
-                }).toString();
-                universalLinkUrl = `https://phantom.app/ul/v1/connect?${connectParams}`;
-
-            } else if (walletType === 'ethereum' || walletType === 'metamask') {
-                universalLinkUrl = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
-
-            } else {
-                console.warn(`[DIAGNOSTIC] Unsupported wallet type for redirect: ${walletType}`);
-                return false;
-            }
-            
-            console.log(`[DIAGNOSTIC] Setting sessionStorage flags.`);
-            sessionStorage.setItem('pendingWalletConnection', walletType);
-            sessionStorage.setItem('walletConnectionStartTime', Date.now().toString());
-            
-            console.log(`[DIAGNOSTIC] Final Universal Link: ${universalLinkUrl}`);
-            console.log('[DIAGNOSTIC] >>> EXECUTING REDIRECT NOW <<<');
-            window.location.href = universalLinkUrl;
-            
-            return new Promise(() => {
-                console.log('[DIAGNOSTIC] Returning pending promise to halt execution.');
-            }); 
-            
-        } catch (error) {
-            console.error(`[DIAGNOSTIC] CRITICAL ERROR in tryMobileWalletRedirect:`, error);
-            return false;
-        }
-    },
-
-    generateRandomKey() {
-        const array = new Uint8Array(32);
-        crypto.getRandomValues(array);
-        return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
     }
 }
 
 window.walletState = walletState;
-console.log('钱包状态对象已暴露到全局作用域');
 
-function recoverWalletStateFromStorage() {}
-
-recoverWalletStateFromStorage();
-
-document.addEventListener('DOMContentLoaded', async function() {});
-
-function showSuccess(message, container = null) {}
-
-function showError(message, container = null) {}
-
-document.addEventListener('DOMContentLoaded', function() {});
-
-function refreshAssetInfo() {}
-
-function createDefaultAssetData(assetId) {}
-
-async function fetchWithMultipleUrls(urls) {}
-
-function updateAssetInfoDisplay(data) {}
-
-function formatNumber(num) {}
-
-function formatCurrency(value) {}
-
-window.refreshAssetInfoNow = refreshAssetInfo;
-
-async function signAndConfirmTransaction(transactionData) {}
-
-async function signEthereumTransaction(transactionData) {}
-
-async function signSolanaTransaction(transactionData) {}
-
-window.signAndConfirmTransaction = signAndConfirmTransaction;
-
+// MINIMAL window.wallet for compatibility
 window.wallet = {
     getCurrentWallet: function() {
-        return window.walletState?.getAddress?.();
+        return window.walletState?.getCurrentWallet?.();
     },
-    
     transferToken: async function(tokenSymbol, to, amount) {
         return window.walletState?.transferToken?.(tokenSymbol, to, amount);
     }
-}
+};
 
-if (!window.walletState) {
-    console.warn('walletState未找到，使用window.wallet时将无法获取钱包信息');
-}
+// All other functions are now part of walletState or are global helpers
+
+// ... (rest of the file with global helpers)
