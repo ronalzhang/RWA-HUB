@@ -1,3 +1,4 @@
+'''
 /**
  * RWA-HUB 钱包管理模块
  * 支持多种钱包类型的连接、管理和状态同步
@@ -56,10 +57,6 @@ const walletState = {
     web3Available: true,       // 标记Web3.js是否可用
     initialized: false,        // 标记钱包是否已初始化
     
-    /**
-     * 初始化钱包状态
-     * 检查是否已经有连接的钱包，并恢复连接
-     */
     async init() {
         try {
             console.log('初始化钱包...');
@@ -105,10 +102,7 @@ const walletState = {
             const storedWalletType = localStorage.getItem('walletType') || sessionStorage.getItem('walletType');
             const storedWalletAddress = localStorage.getItem('walletAddress') || sessionStorage.getItem('walletAddress');
             
-            console.log(`钱包初始化 - 类型: ${storedWalletType || '无'}, 地址: ${storedWalletAddress || '无'}`);
-            
             if (storedWalletType && storedWalletAddress) {
-                console.log(`尝试恢复之前的钱包连接 - 类型: ${storedWalletType}, 地址: ${storedWalletAddress}`);
                 this.walletType = storedWalletType;
                 this.address = storedWalletAddress;
                 this.connected = true;
@@ -188,17 +182,13 @@ const walletState = {
         }
     },
     
-    checkWalletConsistency(forceUpdate = false) {
-        // ... (Implementation from file)
-    },
+    checkWalletConsistency(forceUpdate = false) {},
     
     async handleStorageChange() {
         this.checkWalletConsistency(true);
     },
     
-    updateDetailPageButtonState() {
-        // ... (Implementation from file)
-    },
+    updateDetailPageButtonState() {},
     
     waitForDocumentReady() {
         return new Promise(resolve => {
@@ -210,36 +200,33 @@ const walletState = {
         });
     },
     
-    clearStoredWalletData() {
-        // ... (Implementation from file)
-    },
+    clearStoredWalletData() {},
     
-    async checkWalletConnection() {
-        // ... (Implementation from file)
-    },
+    async checkWalletConnection() {},
     
-    clearState() {
-        // ... (Implementation from file)
-    },
+    clearState() {},
     
     isMobile() {
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     },
 
     async connect(walletType) {
-        console.log(`尝试连接钱包: ${walletType}`);
+        console.log(`[DIAGNOSTIC] connect() called with type: ${walletType}`);
         this.connecting = true;
         this.updateUI();
         
+        console.log(`[DIAGNOSTIC] isMobile check: ${this.isMobile()}`);
         if (this.isMobile() && !this._isReconnecting) {
-            console.log('检测到移动设备，尝试跳转到钱包应用');
+            console.log('[DIAGNOSTIC] Mobile device detected, calling tryMobileWalletRedirect...');
             const deepLinkSuccess = await this.tryMobileWalletRedirect(walletType);
+            console.log(`[DIAGNOSTIC] tryMobileWalletRedirect has returned. Apparent success: ${deepLinkSuccess}`);
             if (deepLinkSuccess) {
-                console.log('深度链接跳转成功，等待用户从钱包应用返回');
+                console.log('[DIAGNOSTIC] Assuming redirect was successful. Waiting for user to return from wallet app.');
                 this.connecting = false;
                 this.updateUI();
                 return true;
             }
+            console.log('[DIAGNOSTIC] tryMobileWalletRedirect returned false, proceeding with desktop logic.');
         }
         
         let success = false;
@@ -274,13 +261,9 @@ const walletState = {
         return success;
     },
     
-    updateUI() {
-        // ... (Implementation from file)
-    },
+    updateUI() {},
     
-    triggerWalletStateChanged(details = {}) {
-        // ... (Implementation from file)
-    },
+    triggerWalletStateChanged(details = {}) {},
     
     formatAddress: function(address) {
         if (!address) return '';
@@ -294,13 +277,9 @@ const walletState = {
         return this.connect(provider);
     },
     
-    async disconnect(reload = true) {
-        // ... (Implementation from file)
-    },
+    async disconnect(reload = true) {},
     
-    async switchWallet() {
-        // ... (Implementation from file)
-    },
+    async switchWallet() {},
     
     getConnectionStatus() {
         return this.connected;
@@ -314,177 +293,91 @@ const walletState = {
         return this.walletType;
     },
     
-    async checkIsAdmin() {
-        // ... (Implementation from file)
-    },
+    async checkIsAdmin() {},
     
-    onStateChange(callback) {
-        // ... (Implementation from file)
-    },
+    onStateChange(callback) {},
     
-    offStateChange(callback) {
-        // ... (Implementation from file)
-    },
+    offStateChange(callback) {},
     
-    notifyStateChange(details = {}) {
-        // ... (Implementation from file)
-    },
+    notifyStateChange(details = {}) {},
     
-    updateAdminDisplay() {
-        // ... (Implementation from file)
-    },
+    updateAdminDisplay() {},
     
-    shouldCheckAdminStatus() {
-        // ... (Implementation from file)
-    },
+    shouldCheckAdminStatus() {},
     
-    createOrShowDividendButtons() {
-        // ... (Implementation from file)
-    },
+    createOrShowDividendButtons() {},
     
-    async getWalletBalance() {
-        // ... (Implementation from file)
-    },
+    async getWalletBalance() {},
     
-    async ensureSolanaLibrariesOptimized() {
-        // ... (Implementation from file)
-    },
+    async ensureSolanaLibrariesOptimized() {},
     
-    async loadSolanaWeb3FromCDN() {
-        // ... (Implementation from file)
-    },
+    async loadSolanaWeb3FromCDN() {},
     
-    createBasicSplTokenInterface() {
-        // ... (Implementation from file)
-    },
+    createBasicSplTokenInterface() {},
     
-    createMinimalSolanaInterface() {
-        // ... (Implementation from file)
-    },
+    createMinimalSolanaInterface() {},
     
-    triggerBalanceUpdatedEvent() {
-        // ... (Implementation from file)
-    },
+    triggerBalanceUpdatedEvent() {},
     
-    updateBalanceDisplay(balance = null) {
-        // ... (Implementation from file)
-    },
+    updateBalanceDisplay(balance = null) {},
     
-    updateAssetsUI() {
-        // ... (Implementation from file)
-    },
+    updateAssetsUI() {},
 
-    openWalletSelector() {
-        // ... (Implementation from file)
-    },
+    openWalletSelector() {},
 
-    closeWalletSelector() {
-        // ... (Implementation from file)
-    },
+    closeWalletSelector() {},
 
-    showWalletOptions() {
-        // ... (Implementation from file)
-    },
+    showWalletOptions() {},
 
-    async getUserAssets(address) {
-        // ... (Implementation from file)
-    },
+    async getUserAssets(address) {},
 
-    connectSolflare: async function() {
-        // ... (Implementation from file)
-    },
+    connectSolflare: async function() {},
 
-    connectCoinbase: async function() {
-        // ... (Implementation from file)
-    },
+    connectCoinbase: async function() {},
 
-    connectSlope: async function() {
-        // ... (Implementation from file)
-    },
+    connectSlope: async function() {},
 
-    connectGlow: async function() {
-        // ... (Implementation from file)
-    },
+n    connectGlow: async function() {},
 
-    async connectPhantom(isReconnect = false) {
-        // ... (Implementation from file)
-    },
+    async connectPhantom(isReconnect = false) {},
 
-    checkIfReturningFromWalletApp(walletType) {
-        // ... (Implementation from file)
-    },
+    checkIfReturningFromWalletApp(walletType) {},
 
-    async connectEthereum(isReconnect = false) {
-        // ... (Implementation from file)
-    },
+    async connectEthereum(isReconnect = false) {},
 
-    setupEthereumListeners() {
-        // ... (Implementation from file)
-    },
+    setupEthereumListeners() {},
 
-    setupPhantomListeners() {
-        // ... (Implementation from file)
-    },
+    setupPhantomListeners() {},
 
-    copyWalletAddress() {
-        // ... (Implementation from file)
-    },
+    copyWalletAddress() {},
     
-    showCopySuccess() {
-        // ... (Implementation from file)
-    },
+    showCopySuccess() {},
     
-    async transferToken(tokenSymbol, to, amount) {
-        // ... (Implementation from file)
-    },
+    async transferToken(tokenSymbol, to, amount) {},
     
-    async transferSolanaToken(tokenSymbol, to, amount) {
-        // ... (Implementation from file)
-    },
+    async transferSolanaToken(tokenSymbol, to, amount) {},
     
-    delayedPhantomReconnect() {
-        // ... (Implementation from file)
-    },
+    delayedPhantomReconnect() {},
     
-    checkTokenBalance: async function(tokenSymbol) {
-        // ... (Implementation from file)
-    },
+    checkTokenBalance: async function(tokenSymbol) {},
     
-    async connectWallet(options) {
-        // ... (Implementation from file)
-    },
+    async connectWallet(options) {},
     
-    async getBalanceWithFallback(address, tokenSymbol) {
-        // ... (Implementation from file)
-    },
+    async getBalanceWithFallback(address, tokenSymbol) {},
     
-    async getCommissionBalance() {
-        // ... (Implementation from file)
-    },
+    async getCommissionBalance() {},
 
-    async getUSDCBalance() {
-        // ... (Implementation from file)
-    },
+    async getUSDCBalance() {},
 
-    _getBalanceCache(key) {
-        // ... (Implementation from file)
-    },
+    _getBalanceCache(key) {},
 
-    _setBalanceCache(key, balance) {
-        // ... (Implementation from file)
-    },
+    _setBalanceCache(key, balance) {},
 
-    async refreshAllBalances(force = false) {
-        // ... (Implementation from file)
-    },
+    async refreshAllBalances(force = false) {},
 
-    async afterSuccessfulConnection(address, walletType, provider) {
-        // ... (Implementation from file)
-    },
+    async afterSuccessfulConnection(address, walletType, provider) {},
 
-    showPhantomRetryOption() {
-        // ... (Implementation from file)
-    },
+    showPhantomRetryOption() {},
 
     async registerWalletUser(address, walletType) {
         try {
@@ -517,16 +410,15 @@ const walletState = {
         }
     },
 
-    // ====================================================================
-    // REFACTORED MOBILE REDIRECT LOGIC
-    // ====================================================================
     async tryMobileWalletRedirect(walletType) {
+        console.log('[DIAGNOSTIC] tryMobileWalletRedirect() started.');
         if (!this.isMobile()) {
+            console.log('[DIAGNOSTIC] isMobile() returned false. Aborting.');
             return false;
         }
         
         try {
-            console.log(`[tryMobileWalletRedirect] 开始尝试${walletType}钱包跳转`);
+            console.log(`[DIAGNOSTIC] Building redirect URL for wallet: ${walletType}`);
             
             let universalLinkUrl = '';
             const redirectUrl = window.location.href;
@@ -536,7 +428,7 @@ const walletState = {
                 const connectParams = new URLSearchParams({
                     dapp_encryption_public_key: this.generateRandomKey(),
                     cluster: 'mainnet-beta',
-                    app_url: encodeURIComponent(baseUrl), // Phantom docs recommend encoding app_url
+                    app_url: encodeURIComponent(baseUrl),
                     redirect_link: redirectUrl
                 }).toString();
                 universalLinkUrl = `https://phantom.app/ul/v1/connect?${connectParams}`;
@@ -545,21 +437,24 @@ const walletState = {
                 universalLinkUrl = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
 
             } else {
-                console.warn(`[tryMobileWalletRedirect] 不支持的钱包类型: ${walletType}`);
+                console.warn(`[DIAGNOSTIC] Unsupported wallet type for redirect: ${walletType}`);
                 return false;
             }
             
+            console.log(`[DIAGNOSTIC] Setting sessionStorage flags.`);
             sessionStorage.setItem('pendingWalletConnection', walletType);
             sessionStorage.setItem('walletConnectionStartTime', Date.now().toString());
             
-            console.log(`[tryMobileWalletRedirect] 正在跳转到: ${universalLinkUrl}`);
+            console.log(`[DIAGNOSTIC] Final Universal Link: ${universalLinkUrl}`);
+            console.log('[DIAGNOSTIC] >>> EXECUTING REDIRECT NOW <<<');
             window.location.href = universalLinkUrl;
             
-            // 返回一个永远不会解析的Promise，以防止后续代码（例如显示“下载”提示）执行。
-            return new Promise(() => {}); 
+            return new Promise(() => {
+                console.log('[DIAGNOSTIC] Returning pending promise to halt execution.');
+            }); 
             
         } catch (error) {
-            console.error(`[tryMobileWalletRedirect] 移动端钱包跳转失败:`, error);
+            console.error(`[DIAGNOSTIC] CRITICAL ERROR in tryMobileWalletRedirect:`, error);
             return false;
         }
     },
@@ -571,82 +466,46 @@ const walletState = {
     }
 }
 
-// 立即将walletState暴露到全局作用域，确保其他文件可以立即访问
 window.walletState = walletState;
 console.log('钱包状态对象已暴露到全局作用域');
 
-// 添加钱包状态恢复功能
-function recoverWalletStateFromStorage() {
-    // ... (Implementation from file)
-}
+function recoverWalletStateFromStorage() {}
 
-// 立即尝试恢复钱包状态
 recoverWalletStateFromStorage();
 
-// 页面初始化时就自动调用钱包初始化方法
-document.addEventListener('DOMContentLoaded', async function() {
-    // ... (Implementation from file)
-});
+document.addEventListener('DOMContentLoaded', async function() {});
 
-function showSuccess(message, container = null) {
-    // ... (Implementation from file)
-}
+function showSuccess(message, container = null) {}
 
-function showError(message, container = null) {
-    // ... (Implementation from file)
-}
+function showError(message, container = null) {}
 
-// 初始化事件并注册全局点击监听器
-document.addEventListener('DOMContentLoaded', function() {
-    // ... (Implementation from file)
-});
+document.addEventListener('DOMContentLoaded', function() {});
 
-function refreshAssetInfo() {
-    // ... (Implementation from file)
-}
+function refreshAssetInfo() {}
 
-function createDefaultAssetData(assetId) {
-    // ... (Implementation from file)
-}
+function createDefaultAssetData(assetId) {}
 
-async function fetchWithMultipleUrls(urls) {
-    // ... (Implementation from file)
-}
+async function fetchWithMultipleUrls(urls) {}
 
-function updateAssetInfoDisplay(data) {
-    // ... (Implementation from file)
-}
+function updateAssetInfoDisplay(data) {}
 
-function formatNumber(num) {
-    // ... (Implementation from file)
-}
+function formatNumber(num) {}
 
-function formatCurrency(value) {
-    // ... (Implementation from file)
-}
+function formatCurrency(value) {}
 
 window.refreshAssetInfoNow = refreshAssetInfo;
 
-async function signAndConfirmTransaction(transactionData) {
-  // ... (Implementation from file)
-}
+async function signAndConfirmTransaction(transactionData) {}
 
-async function signEthereumTransaction(transactionData) {
-  // ... (Implementation from file)
-}
+async function signEthereumTransaction(transactionData) {}
 
-async function signSolanaTransaction(transactionData) {
-  // ... (Implementation from file)
-}
+async function signSolanaTransaction(transactionData) {}
 
 window.signAndConfirmTransaction = signAndConfirmTransaction;
 
-// ====================================================================
-// REFACTORED AND SIMPLIFIED window.wallet
-// ====================================================================
 window.wallet = {
     getCurrentWallet: function() {
-        return window.walletState?.getCurrentWallet?.();
+        return window.walletState?.getAddress?.();
     },
     
     transferToken: async function(tokenSymbol, to, amount) {
@@ -654,9 +513,7 @@ window.wallet = {
     }
 }
 
-// 确保已有walletState对象
 if (!window.walletState) {
     console.warn('walletState未找到，使用window.wallet时将无法获取钱包信息');
 }
-
-// ... (rest of the helper functions at the end of the file)
+''
