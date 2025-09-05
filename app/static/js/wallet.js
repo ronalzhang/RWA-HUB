@@ -1,3 +1,4 @@
+
 /**
  * RWA-HUB 钱包管理模块
  * 支持多种钱包类型的连接、管理和状态同步
@@ -419,3 +420,4 @@ window.wallet = {
 // All other functions are now part of walletState or are global helpers
 
 // ... (rest of the file with global helpers)
+
