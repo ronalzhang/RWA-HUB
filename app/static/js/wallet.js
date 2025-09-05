@@ -1,4 +1,4 @@
-'''
+
 /**
  * RWA-HUB 钱包管理模块
  * 支持多种钱包类型的连接、管理和状态同步
@@ -337,7 +337,7 @@ const walletState = {
 
     connectSlope: async function() {},
 
-n    connectGlow: async function() {},
+    connectGlow: async function() {},
 
     async connectPhantom(isReconnect = false) {},
 
@@ -516,4 +516,3 @@ window.wallet = {
 if (!window.walletState) {
     console.warn('walletState未找到，使用window.wallet时将无法获取钱包信息');
 }
-''
