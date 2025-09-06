@@ -1005,11 +1005,10 @@
     <!-- Solana Web3.js -->
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
     
-    <!-- 钱包主脚本 -->
-        <!-- 钱包主脚本 -->
-    <!-- 钱包主脚本 -->
-    <!-- 钱包主脚本 -->
-    <script src="{{ url_for('static', filename='js/wallet_v2.js') }}?v=20241231-finalfix&t={{ now }}"></script>
+    <!-- 统一钱包管理器 -->
+    <script src="{{ url_for('static', filename='js/wallet_manager.js') }}?v=2.0.0&t={{ now }}"></script>
+    <!-- 移动端钱包增强器 -->
+    <script src="{{ url_for('static', filename='js/mobile-wallet-enhancer.js') }}?v=1.0.0&t={{ now }}"></script>
     <!-- SPL Token 库（预加载以解决竞态条件） -->
     <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
     <!-- 统一购买处理器 -->
@@ -1097,12 +1096,15 @@
         // 打开钱包选择器
         function openWalletSelector() {
             console.log('尝试打开钱包选择器...');
+            console.log('walletManager:', window.walletManager);
             console.log('walletState:', window.walletState);
-            console.log('openWalletSelector function:', typeof window.walletState?.openWalletSelector);
             
-            // 优先尝试使用wallet.js的钱包选择器
-            if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
-                console.log('调用钱包选择器...');
+            // 使用新的钱包管理器
+            if (window.walletManager && typeof window.walletManager.openWalletSelector === 'function') {
+                console.log('调用钱包管理器选择器...');
+                window.walletManager.openWalletSelector();
+            } else if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
+                console.log('调用兼容性钱包选择器...');
                 window.walletState.openWalletSelector();
             } else {
                 console.log('钱包选择器不可用，显示简单选择弹窗');
@@ -1190,11 +1192,15 @@
                 }
             }
             
-            // 调用wallet.js中的连接方法
-            if (window.walletState && typeof window.walletState.connect === 'function') {
+            // 优先使用新的钱包管理器
+            if (window.walletManager && typeof window.walletManager.connect === 'function') {
+                console.log('使用钱包管理器连接');
+                window.walletManager.connect(walletType);
+            } else if (window.walletState && typeof window.walletState.connect === 'function') {
+                console.log('使用兼容性钱包连接');
                 window.walletState.connect(walletType);
             } else {
-                console.error('walletState.connect function not available');
+                console.error('钱包连接功能不可用');
                 alert('钱包连接功能暂时不可用，请刷新页面重试');
             }
         }

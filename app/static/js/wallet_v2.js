@@ -530,7 +530,7 @@ const walletState = {
             console.error('[openWalletSelector] 打开钱包选择器失败:', error);
             return null;
         }
-    },,
+    },
 
     async tryMobileWalletRedirect(walletType) {
         if (!walletState.isMobile()) { // FIX: Use explicit reference to walletState
