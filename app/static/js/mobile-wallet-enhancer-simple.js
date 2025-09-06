@@ -58,6 +58,7 @@
             document.addEventListener('visibilitychange', () => {
                 if (!document.hidden && this.pendingConnection) {
                     this.log('用户从钱包App返回，检查连接状态');
+                    this.log(`当前钱包状态: solana=${!!window.solana}, isConnected=${window.solana?.isConnected}, publicKey=${!!window.solana?.publicKey}`);
                     setTimeout(() => this.checkConnectionAfterReturn(), 1000);
                 }
             });
@@ -66,9 +67,24 @@
             window.addEventListener('focus', () => {
                 if (this.pendingConnection) {
                     this.log('页面获得焦点，检查连接状态');
+                    this.log(`当前钱包状态: solana=${!!window.solana}, isConnected=${window.solana?.isConnected}, publicKey=${!!window.solana?.publicKey}`);
                     setTimeout(() => this.checkConnectionAfterReturn(), 1000);
                 }
             });
+
+            // 监听钱包连接事件
+            if (window.solana) {
+                window.solana.on('connect', (publicKey) => {
+                    this.log('钱包连接事件触发', publicKey);
+                    if (this.pendingConnection) {
+                        this.onConnectionSuccess();
+                    }
+                });
+                
+                window.solana.on('disconnect', () => {
+                    this.log('钱包断开连接事件触发');
+                });
+            }
 
             this.log('移动端钱包增强器-简化版初始化完成');
         }
@@ -122,7 +138,21 @@
                     // Safari优先使用通用链接
                     const universalUrl = connectUrl.replace(config.deepLink, config.universalLink);
                     this.log(`Safari环境，使用通用链接: ${universalUrl}`);
-                    window.location.href = universalUrl;
+                    
+                    // 尝试深度链接，如果失败则使用通用链接
+                    try {
+                        window.location.href = connectUrl;
+                        // 等待一下，如果没有跳转成功则使用通用链接
+                        setTimeout(() => {
+                            if (!document.hidden) {
+                                this.log('深度链接可能失败，尝试通用链接');
+                                window.location.href = universalUrl;
+                            }
+                        }, 1000);
+                    } catch (error) {
+                        this.log('深度链接失败，使用通用链接');
+                        window.location.href = universalUrl;
+                    }
                 } else {
                     // 其他环境优先使用深度链接
                     this.log(`使用深度链接: ${connectUrl}`);
@@ -144,20 +174,21 @@
         // 构建连接URL
         buildConnectUrl(walletType) {
             const config = this.walletConfigs[walletType];
-            const currentUrl = window.location.href;
-            const appUrl = window.location.origin;
+            const currentUrl = encodeURIComponent(window.location.href);
+            const appUrl = encodeURIComponent(window.location.origin);
             
             // 生成加密公钥（简化版本）
             const dappEncryptionPublicKey = this.generatePublicKey();
             
-            const params = new URLSearchParams({
-                dapp_encryption_public_key: dappEncryptionPublicKey,
-                cluster: 'mainnet-beta',
-                app_url: appUrl,
-                redirect_link: currentUrl
-            });
+            // 手动构建URL以确保正确编码
+            const params = [
+                `dapp_encryption_public_key=${dappEncryptionPublicKey}`,
+                `cluster=mainnet-beta`,
+                `app_url=${appUrl}`,
+                `redirect_link=${currentUrl}`
+            ].join('&');
 
-            return `${config.deepLink}?${params.toString()}`;
+            return `${config.deepLink}?${params}`;
         }
 
         // 生成简单的公钥（用于演示）
@@ -248,10 +279,18 @@
                     this.log('钱包已连接成功');
                     this.onConnectionSuccess();
                     return;
+                } else if (window.solana && window.solana.publicKey) {
+                    // 有些情况下isConnected可能为false但publicKey存在
+                    this.log('检测到钱包公钥，认为连接成功');
+                    this.onConnectionSuccess();
+                    return;
                 }
                 
                 // 钱包存在但未连接，尝试连接
                 this.attemptConnection();
+            } else {
+                // 钱包对象不存在，可能还在加载
+                this.log('钱包对象未检测到，继续等待...');
             }
         }
 
@@ -266,22 +305,31 @@
             const config = this.pendingConnection.config;
             
             // 等待一下让钱包对象加载
-            await this.sleep(2000);
+            await this.sleep(1000);
             
-            if (config.checkFunction && config.checkFunction()) {
-                this.log(`${config.name}钱包对象已加载`);
-                
-                if (window.solana && window.solana.isConnected) {
-                    this.log('钱包已连接');
-                    this.onConnectionSuccess();
+            // 多次检查，因为钱包对象可能需要时间加载
+            for (let i = 0; i < 5; i++) {
+                if (config.checkFunction && config.checkFunction()) {
+                    this.log(`${config.name}钱包对象已加载 (尝试 ${i + 1}/5)`);
+                    
+                    if (window.solana && (window.solana.isConnected || window.solana.publicKey)) {
+                        this.log('钱包已连接');
+                        this.onConnectionSuccess();
+                        return;
+                    } else {
+                        this.log('钱包对象存在但未连接，尝试连接');
+                        await this.attemptConnection();
+                        return;
+                    }
                 } else {
-                    this.log('钱包未连接，尝试连接');
-                    this.attemptConnection();
+                    this.log(`钱包对象未检测到 (尝试 ${i + 1}/5)，等待...`);
+                    await this.sleep(1000);
                 }
-            } else {
-                this.log('钱包对象未检测到，可能用户取消了连接');
-                this.showRetryOption();
             }
+            
+            // 5次尝试后仍未检测到钱包
+            this.log('多次尝试后仍未检测到钱包，可能用户取消了连接或钱包未安装');
+            this.showRetryOption();
         }
 
         // 尝试连接钱包
@@ -294,16 +342,39 @@
                 this.log('尝试连接钱包...');
                 
                 if (window.solana && window.solana.connect) {
-                    const response = await window.solana.connect();
+                    // 设置连接选项
+                    const connectOptions = {
+                        onlyIfTrusted: false // 允许显示连接提示
+                    };
+                    
+                    const response = await window.solana.connect(connectOptions);
                     this.log('钱包连接成功', response);
+                    this.onConnectionSuccess();
+                } else if (window.solana && window.solana.isConnected) {
+                    // 钱包已经连接但没有connect方法
+                    this.log('钱包已连接，无需重新连接');
                     this.onConnectionSuccess();
                 } else {
                     this.log('钱包连接方法不可用');
-                    this.showRetryOption();
+                    // 等待一下再重试
+                    setTimeout(() => {
+                        if (window.solana && (window.solana.isConnected || window.solana.publicKey)) {
+                            this.onConnectionSuccess();
+                        } else {
+                            this.showRetryOption();
+                        }
+                    }, 2000);
                 }
             } catch (error) {
                 this.log(`钱包连接失败: ${error.message}`);
-                this.showRetryOption();
+                
+                // 检查是否是用户取消
+                if (error.message.includes('User rejected') || error.code === 4001) {
+                    this.log('用户取消了连接');
+                    this.pendingConnection = null;
+                } else {
+                    this.showRetryOption();
+                }
             }
         }
 
