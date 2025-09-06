@@ -1,4 +1,3 @@
-
 /**
  * RWA-HUB 钱包管理模块
  * 支持多种钱包类型的连接、管理和状态同步
@@ -402,6 +401,177 @@ const walletState = {
             console.error('[registerWalletUser] 注册用户失败:', error);
             throw error;
         }
+    },
+
+    async tryMobileWalletRedirect(walletType) {
+        if (!walletState.isMobile()) { // FIX: Use explicit reference to walletState
+            return false;
+        }
+        
+        try {
+            console.log(`[tryMobileWalletRedirect] 开始尝试${walletType}钱包跳转`);
+            
+            let deepLinkUrl = '';
+            let universalLinkUrl = '';
+            let appStoreUrl = '';
+            
+            const baseUrl = window.location.origin;
+            
+            // 根据钱包类型设置不同的链接
+            if (walletType === 'phantom' || walletType === 'solana') {
+                // Phantom钱包的深度链接和通用链接
+                const connectParams = new URLSearchParams({
+                    dapp_encryption_public_key: this.generateRandomKey(),
+                    cluster: 'mainnet-beta',
+                    app_url: baseUrl,
+                    redirect_link: window.location.href // FIX: Use raw URL to prevent double-encoding
+                }).toString();
+                
+                deepLinkUrl = `phantom://v1/connect?${connectParams}`;
+                universalLinkUrl = `https://phantom.app/ul/v1/connect?${connectParams}`;
+                
+                // 应用商店链接
+                if (navigator.userAgent.toLowerCase().includes('iphone') || 
+                    navigator.userAgent.toLowerCase().includes('ipad')) {
+                    appStoreUrl = 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977';
+                } else {
+                    appStoreUrl = 'https://play.google.com/store/apps/details?id=app.phantom';
+                }
+            } else if (walletType === 'ethereum' || walletType === 'metamask') {
+                // MetaMask的深度链接
+                deepLinkUrl = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
+                universalLinkUrl = deepLinkUrl;
+                
+                // 应用商店链接
+                if (navigator.userAgent.toLowerCase().includes('iphone') || 
+                    navigator.userAgent.toLowerCase().includes('ipad')) {
+                    appStoreUrl = 'https://apps.apple.com/app/metamask/id1438144202';
+                } else {
+                    appStoreUrl = 'https://play.google.com/store/apps/details?id=io.metamask';
+                }
+            } else {
+                console.warn(`[tryMobileWalletRedirect] 不支持的钱包类型: ${walletType}`);
+                return false;
+            }
+            
+            // 设置钱包返回检测标记
+            sessionStorage.setItem('pendingWalletConnection', walletType);
+            sessionStorage.setItem('walletConnectionStartTime', Date.now().toString());
+            
+            // 尝试深度链接跳转
+            console.log(`[tryMobileWalletRedirect] 尝试深度链接: ${deepLinkUrl}`);
+            const deepLinkSuccess = await this.attemptDeepLink(deepLinkUrl);
+            
+            if (deepLinkSuccess) {
+                console.log(`[tryMobileWalletRedirect] 深度链接跳转成功`);
+                return true;
+            }
+            
+            // 深度链接失败，尝试通用链接
+            console.log(`[tryMobileWalletRedirect] 深度链接失败，尝试通用链接: ${universalLinkUrl}`);
+            const universalLinkSuccess = await this.attemptUniversalLink(universalLinkUrl);
+            
+            if (universalLinkSuccess) {
+                console.log(`[tryMobileWalletRedirect] 通用链接跳转成功`);
+                return true;
+            }
+            
+            // 所有跳转都失败，提示用户下载应用
+            console.log(`[tryMobileWalletRedirect] 所有跳转失败，提示下载应用`);
+            const shouldDownload = confirm(`${walletType === 'phantom' ? 'Phantom' : 'MetaMask'} wallet app not detected. Would you like to download it?`);
+            
+            if (shouldDownload && appStoreUrl) {
+                window.open(appStoreUrl, '_blank');
+            }
+            
+            return false;
+            
+        } catch (error) {
+            console.error(`[tryMobileWalletRedirect] 移动端钱包跳转失败:`, error);
+            return false;
+        }
+    },
+
+    async attemptDeepLink(deepLinkUrl) {
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                resolve(false);
+            }, 2500); // 2.5秒超时
+            
+            // 创建隐藏的iframe尝试跳转
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = deepLinkUrl;
+            
+            document.body.appendChild(iframe);
+            
+            // 检测页面是否失去焦点（表示跳转成功）
+            const startTime = Date.now();
+            const checkVisibility = () => {
+                if (document.hidden || Date.now() - startTime > 1000) {
+                    clearTimeout(timeout);
+                    document.body.removeChild(iframe);
+                    resolve(true);
+                } else {
+                    setTimeout(checkVisibility, 100);
+                }
+            };
+            
+            setTimeout(() => {
+                checkVisibility();
+                // 清理iframe
+                setTimeout(() => {
+                    if (iframe && iframe.parentNode) {
+                        document.body.removeChild(iframe);
+                    }
+                }, 1000);
+            }, 500);
+        });
+    },
+
+    async attemptUniversalLink(universalLinkUrl) {
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                resolve(false);
+            }, 3000); // 3秒超时
+            
+            // 创建隐藏的链接并点击
+            const link = document.createElement('a');
+            link.href = universalLinkUrl;
+            link.target = '_blank';
+            link.style.display = 'none';
+            
+            document.body.appendChild(link);
+            link.click();
+            
+            // 检测页面是否失去焦点
+            const startTime = Date.now();
+            const checkVisibility = () => {
+                if (document.hidden || Date.now() - startTime > 1500) {
+                    clearTimeout(timeout);
+                    document.body.removeChild(link);
+                    resolve(true);
+                } else if (Date.now() - startTime < 2500) {
+                    setTimeout(checkVisibility, 100);
+                }
+            };
+            
+            setTimeout(() => {
+                checkVisibility();
+                // 清理链接
+                setTimeout(() => {
+                    if (link && link.parentNode) {
+                        document.body.removeChild(link);
+                    }
+                }, 1000);
+            }, 500);
+        });
+    },
+
+    generateRandomKey() {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
     }
 }
 
@@ -420,4 +590,3 @@ window.wallet = {
 // All other functions are now part of walletState or are global helpers
 
 // ... (rest of the file with global helpers)
-
