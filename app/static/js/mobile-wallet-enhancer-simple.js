@@ -32,8 +32,8 @@
             this.walletConfigs = {
                 phantom: {
                     name: 'Phantom',
-                    deepLink: 'phantom://v1/connect',
-                    universalLink: 'https://phantom.app/ul/v1/connect',
+                    deepLink: 'phantom://browse',
+                    universalLink: 'https://phantom.app/ul/browse',
                     downloadUrls: {
                         ios: 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977',
                         android: 'https://play.google.com/store/apps/details?id=app.phantom'
@@ -57,8 +57,41 @@
             }
         }
 
+        // 检查是否从钱包返回
+        checkWalletReturn() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const phantomConnect = urlParams.get('phantom_connect');
+            const walletRequest = urlParams.get('wallet_request');
+            
+            if (phantomConnect === '1' && walletRequest === 'phantom') {
+                this.log('检测到从Phantom钱包返回');
+                
+                // 清理URL参数
+                const url = new URL(window.location);
+                url.searchParams.delete('phantom_connect');
+                url.searchParams.delete('wallet_request');
+                window.history.replaceState({}, document.title, url.toString());
+                
+                // 设置待处理连接
+                this.pendingConnection = {
+                    walletType: 'phantom',
+                    timestamp: Date.now(),
+                    config: this.walletConfigs.phantom,
+                    fromReturn: true
+                };
+                
+                // 延迟检查连接状态，给钱包对象时间加载
+                setTimeout(() => {
+                    this.checkConnectionAfterReturn();
+                }, 1000);
+            }
+        }
+
         init() {
             this.log('初始化移动端钱包增强器-简化版');
+            
+            // 检查是否从钱包返回
+            this.checkWalletReturn();
             
             // 监听页面可见性变化（用户从钱包App返回时触发）
             document.addEventListener('visibilitychange', () => {
@@ -181,24 +214,39 @@
         buildConnectUrl(walletType) {
             const config = this.walletConfigs[walletType];
             
-            // 不要对整个URL进行编码，只对参数值进行编码
-            const currentUrl = window.location.href;
-            const appUrl = window.location.origin;
-            
-            // 生成加密公钥（简化版本）
-            const dappEncryptionPublicKey = this.generatePublicKey();
-            
-            // 使用URLSearchParams正确构建参数
-            const searchParams = new URLSearchParams();
-            searchParams.set('dapp_encryption_public_key', dappEncryptionPublicKey);
-            searchParams.set('cluster', 'mainnet-beta');
-            searchParams.set('app_url', appUrl);
-            searchParams.set('redirect_link', currentUrl);
+            if (walletType === 'phantom') {
+                // Phantom移动端使用browse模式，直接访问网站让钱包检测
+                const currentUrl = window.location.href;
+                
+                // 添加特殊参数让页面知道这是从钱包返回的
+                const url = new URL(currentUrl);
+                url.searchParams.set('phantom_connect', '1');
+                url.searchParams.set('wallet_request', 'phantom');
+                
+                const finalUrl = `${config.deepLink}?url=${encodeURIComponent(url.toString())}`;
+                this.log(`构建的Phantom连接URL: ${finalUrl}`);
+                
+                return finalUrl;
+            } else {
+                // 其他钱包使用原有逻辑
+                const currentUrl = window.location.href;
+                const appUrl = window.location.origin;
+                
+                // 生成加密公钥（简化版本）
+                const dappEncryptionPublicKey = this.generatePublicKey();
+                
+                // 使用URLSearchParams正确构建参数
+                const searchParams = new URLSearchParams();
+                searchParams.set('dapp_encryption_public_key', dappEncryptionPublicKey);
+                searchParams.set('cluster', 'mainnet-beta');
+                searchParams.set('app_url', appUrl);
+                searchParams.set('redirect_link', currentUrl);
 
-            const finalUrl = `${config.deepLink}?${searchParams.toString()}`;
-            this.log(`构建的连接URL: ${finalUrl}`);
-            
-            return finalUrl;
+                const finalUrl = `${config.deepLink}?${searchParams.toString()}`;
+                this.log(`构建的连接URL: ${finalUrl}`);
+                
+                return finalUrl;
+            }
         }
 
         // 生成简单的公钥（用于演示）

@@ -314,7 +314,7 @@
             return originalConnect(walletType);
         }
 
-        // 增强的管理器连接方法
+        // 增强的管理器连接方法 - 简化版本
         async enhancedManagerConnect(walletType, isReconnect, originalConnect) {
             if (!isMobile || isReconnect) {
                 return originalConnect(walletType, isReconnect);
@@ -325,56 +325,59 @@
             // 设置连接标记
             this.setPendingConnection(walletType);
             
-            // 尝试深度链接
-            const deepLinkSuccess = await this.tryDeepLink(walletType);
-            if (deepLinkSuccess) {
-                return true;
+            // 显示提示信息
+            this.showConnectionStatus('正在跳转到钱包App，请在钱包中确认连接...', 'info');
+            
+            // 直接尝试深度链接，不等待复杂的检测
+            try {
+                await this.tryDeepLink(walletType);
+                // 跳转后不立即返回，让用户在钱包App中操作
+                this.log('已跳转到钱包App，等待用户操作...');
+                return false; // 不立即返回成功，等待用户从钱包App返回
+            } catch (error) {
+                this.error('跳转到钱包App失败:', error);
+                this.showConnectionStatus('跳转失败，请确保已安装钱包App', 'error');
+                return false;
             }
-
-            // 回退到原始方法
-            return originalConnect(walletType, isReconnect);
         }
 
-        // 尝试深度链接
+        // 尝试深度链接 - 简化版本，直接跳转
         async tryDeepLink(walletType) {
             const config = this.walletConfigs[walletType];
             if (!config) {
                 this.log(`不支持的钱包类型: ${walletType}`);
-                return false;
+                throw new Error(`不支持的钱包类型: ${walletType}`);
             }
 
             try {
-                this.log(`尝试${config.name}深度链接`);
+                this.log(`跳转到${config.name}钱包App`);
                 
                 // 构建连接参数
                 const params = this.buildConnectionParams(walletType);
                 const deepLinkUrl = this.buildDeepLinkUrl(walletType, params);
-                const universalLinkUrl = this.buildUniversalLinkUrl(walletType, params);
                 
-                this.log('深度链接URL:', deepLinkUrl);
-                this.log('通用链接URL:', universalLinkUrl);
+                this.log('跳转URL:', deepLinkUrl);
                 
-                // 尝试深度链接
-                let success = await this.attemptDeepLink(deepLinkUrl);
-                if (success) {
-                    this.log('深度链接成功');
-                    return true;
-                }
+                // 直接跳转，不等待复杂检测
+                await this.attemptDeepLink(deepLinkUrl);
                 
-                // 尝试通用链接
-                success = await this.attemptUniversalLink(universalLinkUrl);
-                if (success) {
-                    this.log('通用链接成功');
-                    return true;
-                }
-                
-                // 提示下载
-                this.promptAppDownload(walletType);
-                return false;
+                this.log('已发起跳转，用户应该在钱包App中看到连接请求');
+                return true;
                 
             } catch (error) {
-                this.error(`深度链接失败:`, error);
-                return false;
+                this.error(`跳转失败:`, error);
+                // 如果深度链接失败，尝试通用链接
+                try {
+                    const params = this.buildConnectionParams(walletType);
+                    const universalLinkUrl = this.buildUniversalLinkUrl(walletType, params);
+                    this.log('尝试通用链接:', universalLinkUrl);
+                    await this.attemptUniversalLink(universalLinkUrl);
+                    return true;
+                } catch (universalError) {
+                    this.error('通用链接也失败:', universalError);
+                    this.promptAppDownload(walletType);
+                    throw new Error('无法跳转到钱包App');
+                }
             }
         }
 
@@ -427,54 +430,23 @@
             return config.universalLink;
         }
 
-        // 尝试深度链接
+        // 尝试深度链接 - 简化版本，直接跳转
         attemptDeepLink(url) {
             return new Promise((resolve) => {
                 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-                const timeout = setTimeout(() => {
-                    this.log('深度链接超时');
-                    resolve(false);
-                }, this.deepLinkTimeout);
                 
-                let resolved = false;
-                const resolveOnce = (success) => {
-                    if (!resolved) {
-                        resolved = true;
-                        clearTimeout(timeout);
-                        resolve(success);
-                    }
-                };
+                this.log(`直接跳转到钱包App: ${url}`);
                 
-                // Safari和Chrome使用不同的方法
                 if (isSafari) {
-                    // Safari使用window.location
-                    this.log('Safari环境，使用window.location跳转');
-                    
-                    const startTime = Date.now();
-                    const beforeUnload = () => {
-                        this.log('Safari检测到页面即将跳转');
-                        resolveOnce(true);
-                    };
-                    
-                    window.addEventListener('beforeunload', beforeUnload);
-                    window.addEventListener('pagehide', beforeUnload);
-                    
-                    // 尝试跳转
+                    // Safari直接跳转
+                    this.log('Safari环境，直接跳转到钱包App');
                     window.location.href = url;
-                    
-                    // 如果3秒内没有跳转，认为失败
-                    setTimeout(() => {
-                        window.removeEventListener('beforeunload', beforeUnload);
-                        window.removeEventListener('pagehide', beforeUnload);
-                        if (!resolved) {
-                            this.log('Safari深度链接可能失败，未检测到页面跳转');
-                            resolveOnce(false);
-                        }
-                    }, 3000);
+                    // Safari跳转后认为成功
+                    resolve(true);
                     
                 } else {
                     // Chrome使用iframe方法
-                    this.log('Chrome环境，使用iframe方法');
+                    this.log('Chrome环境，使用iframe跳转');
                     
                     const iframe = document.createElement('iframe');
                     iframe.style.display = 'none';
@@ -482,98 +454,36 @@
                     
                     document.body.appendChild(iframe);
                     
-                    // 检测页面焦点变化
-                    const startTime = Date.now();
-                    const checkVisibility = () => {
-                        if (document.hidden || Date.now() - startTime > 1500) {
-                            this.log('Chrome检测到页面失去焦点，深度链接可能成功');
-                            this.cleanupElement(iframe);
-                            resolveOnce(true);
-                        } else if (Date.now() - startTime < 3000) {
-                            setTimeout(checkVisibility, 200);
-                        } else {
-                            this.log('Chrome深度链接超时');
-                            this.cleanupElement(iframe);
-                            resolveOnce(false);
-                        }
-                    };
-                    
-                    setTimeout(checkVisibility, 500);
+                    // 简单等待后认为成功
+                    setTimeout(() => {
+                        this.cleanupElement(iframe);
+                        this.log('Chrome跳转完成');
+                        resolve(true);
+                    }, 1000);
                 }
             });
         }
 
-        // 尝试通用链接
+        // 尝试通用链接 - 简化版本
         attemptUniversalLink(url) {
             return new Promise((resolve) => {
-                const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-                const timeout = setTimeout(() => {
-                    this.log('通用链接超时');
-                    resolve(false);
-                }, this.deepLinkTimeout);
+                this.log(`直接打开通用链接: ${url}`);
                 
-                let resolved = false;
-                const resolveOnce = (success) => {
-                    if (!resolved) {
-                        resolved = true;
-                        clearTimeout(timeout);
-                        resolve(success);
-                    }
-                };
-                
-                this.log(`尝试通用链接: ${url}`);
-                
-                // 创建链接元素
+                // 创建链接元素并点击
                 const link = document.createElement('a');
                 link.href = url;
                 link.target = '_blank';
                 link.style.display = 'none';
                 
                 document.body.appendChild(link);
+                link.click();
                 
-                if (isSafari) {
-                    // Safari特殊处理
-                    const beforeUnload = () => {
-                        this.log('Safari检测到通用链接跳转');
-                        resolveOnce(true);
-                    };
-                    
-                    window.addEventListener('beforeunload', beforeUnload);
-                    window.addEventListener('pagehide', beforeUnload);
-                    
-                    link.click();
-                    
-                    setTimeout(() => {
-                        window.removeEventListener('beforeunload', beforeUnload);
-                        window.removeEventListener('pagehide', beforeUnload);
-                        this.cleanupElement(link);
-                        if (!resolved) {
-                            this.log('Safari通用链接可能失败');
-                            resolveOnce(false);
-                        }
-                    }, 2000);
-                    
-                } else {
-                    // Chrome处理
-                    link.click();
-                    
-                    const startTime = Date.now();
-                    const checkVisibility = () => {
-                        if (document.hidden || Date.now() - startTime > 1500) {
-                            this.log('Chrome检测到通用链接跳转');
-                            this.cleanupElement(link);
-                            resolveOnce(true);
-                        } else if (Date.now() - startTime < 3000) {
-                            setTimeout(checkVisibility, 200);
-                        } else {
-                            this.log('Chrome通用链接超时');
-                            this.cleanupElement(link);
-                            resolveOnce(false);
-                        }
-                    };
-                    
-                    setTimeout(checkVisibility, 500);
-                }
+                // 清理并返回成功
+                setTimeout(() => {
+                    this.cleanupElement(link);
+                    this.log('通用链接跳转完成');
+                    resolve(true);
+                }, 500);
             });
         }
 
