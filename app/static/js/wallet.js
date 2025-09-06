@@ -1,3 +1,4 @@
+
 /**
  * RWA-HUB 钱包管理模块
  * 支持多种钱包类型的连接、管理和状态同步
@@ -316,9 +317,220 @@ const walletState = {
     
     updateAssetsUI() {},
 
-    openWalletSelector() {},
+    closeWalletSelector() {
+        try {
+            const walletSelector = document.getElementById('walletSelector');
+            if (walletSelector) {
+                walletSelector.remove();
+                console.log('钱包选择器已关闭');
+                return true;
+            }
+            return false;
+           } catch (error) {
+            console.error('关闭钱包选择器时出错:', error);
+            return false;
+       }
+    },
 
-    closeWalletSelector() {},
+    openWalletSelector() {
+        try {
+            console.log('[openWalletSelector] 打开钱包选择器');
+            
+            // 如果已有钱包选择器打开，先关闭
+            this.closeWalletSelector();
+            
+            // 如果已经连接了钱包，先断开连接
+            if (this.connected) {
+                console.log('[openWalletSelector] 已连接钱包，先断开现有连接');
+                // 只断开连接但不刷新页面
+                this.disconnect(false); 
+            }
+            
+            // 创建钱包选择器
+            const walletSelector = document.createElement('div');
+            walletSelector.id = 'walletSelector';
+            walletSelector.className = 'wallet-selector-modal';
+            walletSelector.setAttribute('data-bs-backdrop', 'static');
+            walletSelector.style.position = 'fixed';
+            walletSelector.style.top = '0';
+            walletSelector.style.left = '0';
+            walletSelector.style.width = '100%';
+            walletSelector.style.height = '100%';
+            walletSelector.style.backgroundColor = 'rgba(0,0,0,0.5)';
+            walletSelector.style.zIndex = '9999';
+            walletSelector.style.display = 'flex';
+            walletSelector.style.alignItems = 'center';
+            walletSelector.style.justifyContent = 'center';
+            
+            // 创建钱包选择器内容
+            const walletSelectorContent = document.createElement('div');
+            walletSelectorContent.className = 'wallet-selector-content';
+            walletSelectorContent.style.backgroundColor = '#fff';
+            walletSelectorContent.style.borderRadius = '10px';
+            walletSelectorContent.style.padding = '20px';
+            walletSelectorContent.style.width = '90%';
+            walletSelectorContent.style.maxWidth = '450px';
+            walletSelectorContent.style.maxHeight = '90vh';
+            walletSelectorContent.style.overflow = 'auto';
+            
+            // 添加标题
+            const title = document.createElement('h5');
+            title.textContent = window._('Select Wallet') || '选择钱包';
+            title.style.marginBottom = '15px';
+            title.style.display = 'flex';
+            title.style.justifyContent = 'space-between';
+            title.style.alignItems = 'center';
+            
+            // 添加关闭按钮
+            const closeButton = document.createElement('button');
+            closeButton.innerHTML = '&times;';
+            closeButton.style.background = 'none';
+            closeButton.style.border = 'none';
+            closeButton.style.fontSize = '24px';
+            closeButton.style.cursor = 'pointer';
+            closeButton.onclick = () => {
+                this.closeWalletSelector();
+            };
+            
+            title.appendChild(closeButton);
+            walletSelectorContent.appendChild(title);
+            
+            // 添加钱包选项 - 使用wallet-grid样式
+            const walletGrid = document.createElement('div');
+            walletGrid.className = 'wallet-grid';
+            walletGrid.style.display = 'grid';
+            walletGrid.style.gridTemplateColumns = 'repeat(2, 1fr)';
+            walletGrid.style.gap = '15px';
+            
+            // 定义钱包列表
+            const wallets = [
+                {
+                    name: 'Phantom',
+                    icon: '/static/images/wallets/phantom.png',
+                    class: 'phantom',
+                    type: 'phantom',
+                    onClick: () => this.connect('phantom')
+                },
+                {
+                    name: 'MetaMask',
+                    icon: '/static/images/wallets/MetaMask.png', // 使用正确的文件名大小写
+                    class: 'ethereum',
+                    type: 'ethereum',
+                    onClick: () => this.connect('ethereum')
+                }
+            ];
+            
+            // 创建钱包选项
+            wallets.forEach(wallet => {
+                const option = document.createElement('div');
+                option.className = 'wallet-option';
+                option.setAttribute('data-wallet-type', wallet.type);
+                option.style.display = 'flex';
+                option.style.flexDirection = 'column';
+                option.style.alignItems = 'center';
+                option.style.padding = '10px';
+                option.style.borderRadius = '8px';
+                option.style.cursor = 'pointer';
+                option.style.transition = 'all 0.2s ease';
+                option.style.border = '1px solid #eee';
+                
+                // 悬停效果
+                option.onmouseover = function() {
+                    this.style.backgroundColor = '#f5f8ff';
+                    this.style.transform = 'translateY(-2px)';
+                    this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.05)';
+                };
+                
+                option.onmouseout = function() {
+                    this.style.backgroundColor = '#fff';
+                    this.style.transform = 'translateY(0)';
+                    this.style.boxShadow = 'none';
+                };
+                
+                // 创建图标容器
+                const iconContainer = document.createElement('div');
+                iconContainer.className = 'wallet-icon-container';
+                iconContainer.style.marginBottom = '8px';
+                
+                // 创建图标包装器
+                const iconWrapper = document.createElement('div');
+                iconWrapper.className = `wallet-icon-wrapper ${wallet.class}`;
+                iconWrapper.style.width = '40px';
+                iconWrapper.style.height = '40px';
+                iconWrapper.style.display = 'flex';
+                iconWrapper.style.alignItems = 'center';
+                iconWrapper.style.justifyContent = 'center';
+                
+                // 添加图标
+                const icon = document.createElement('img');
+                icon.src = wallet.icon;
+                icon.alt = wallet.name;
+                icon.style.width = '32px';
+                icon.style.height = '32px';
+                
+                // 添加钱包名称
+                const name = document.createElement('span');
+                name.className = 'wallet-name';
+                name.textContent = wallet.name;
+                name.style.fontSize = '12px';
+                name.style.fontWeight = '500';
+                
+                // 组装选项
+                iconWrapper.appendChild(icon);
+                iconContainer.appendChild(iconWrapper);
+                option.appendChild(iconContainer);
+                option.appendChild(name);
+                
+                // 添加点击事件
+                option.onclick = () => {
+                    // 记录点击的钱包类型，用于跟踪钱包应用返回情况
+                    localStorage.setItem('pendingWalletType', wallet.type);
+                    
+                    // 移除钱包选择器
+                    this.closeWalletSelector();
+                    
+                    // 在移动设备上设置从钱包应用返回的标记
+                    if (this.isMobile()) {
+                        sessionStorage.setItem('returningFromWalletApp', 'true');
+                        this.pendingWalletAppOpen = true;
+                        this.pendingWalletType = wallet.type;
+                    }
+                    
+                    // 调用连接方法
+                    this.connect(wallet.type);
+                };
+                
+                // 添加到网格
+                walletGrid.appendChild(option);
+            });
+            
+            // 添加选项到钱包选择器
+            walletSelectorContent.appendChild(walletGrid);
+            
+            // 添加内容到选择器
+            walletSelector.appendChild(walletSelectorContent);
+            
+            // 添加选择器到页面
+            document.body.appendChild(walletSelector);
+            
+            // 点击选择器背景关闭
+            walletSelector.addEventListener('click', (e) => {
+                if (e.target === walletSelector) {
+                    this.closeWalletSelector();
+                }
+            });
+            
+            console.log('[openWalletSelector] 钱包选择器已显示');
+            
+            // 发送钱包选择器打开事件
+            document.dispatchEvent(new CustomEvent('walletSelectorOpened'));
+            
+            return walletSelector;
+        } catch (error) {
+            console.error('[openWalletSelector] 打开钱包选择器失败:', error);
+            return null;
+        }
+    },
 
     showWalletOptions() {},
 
