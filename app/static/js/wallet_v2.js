@@ -317,92 +317,9 @@ const walletState = {
     
     updateAssetsUI() {},
 
-    openWalletSelector() {},
-
-    closeWalletSelector() {},
-
-    showWalletOptions() {},
-
-    async getUserAssets(address) {},
-
-    connectSolflare: async function() {},
-
-    connectCoinbase: async function() {},
-
-    connectSlope: async function() {},
-
-    connectGlow: async function() {},
-
-    async connectPhantom(isReconnect = false) {},
-
-    checkIfReturningFromWalletApp(walletType) {},
-
-    async connectEthereum(isReconnect = false) {},
-
-    setupEthereumListeners() {},
-
-    setupPhantomListeners() {},
-
-    copyWalletAddress() {},
-    
-    showCopySuccess() {},
-    
-    async transferToken(tokenSymbol, to, amount) {},
-    
-    async transferSolanaToken(tokenSymbol, to, amount) {},
-    
-    delayedPhantomReconnect() {},
-    
-    checkTokenBalance: async function(tokenSymbol) {},
-    
-    async connectWallet(options) {},
-    
-    async getBalanceWithFallback(address, tokenSymbol) {},
-    
-    async getCommissionBalance() {},
-
-    async getUSDCBalance() {},
-
-    _getBalanceCache(key) {},
-
-    _setBalanceCache(key, balance) {},
-
-    async refreshAllBalances(force = false) {},
-
-    async afterSuccessfulConnection(address, walletType, provider) {},
-
-    showPhantomRetryOption() {},
-
-    async registerWalletUser(address, walletType) {
-        try {
-            console.log(`[registerWalletUser] 注册用户: ${address}, 钱包类型: ${walletType}`);
-            const response = await fetch('/api/service/user/register_wallet', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Wallet-Address': address,
-                    'X-Wallet-Type': walletType
-                },
-                body: JSON.stringify({
-                    address: address,
-                    wallet_type: walletType
-                })
-            });
-            if (!response.ok) {
-                throw new Error(`注册用户API响应错误: ${response.status}`);
-            }
-            const data = await response.json();
-            if (data.success) {
-                console.log(`[registerWalletUser] 用户注册成功:`, data.user);
-                return data.user;
-            } else {
-                throw new Error(data.error || '用户注册失败');
-            }
-        } catch (error) {
-            console.error('[registerWalletUser] 注册用户失败:', error);
-            throw error;
-        }
-    },
+    openWalletSelector() {
+        alert('钱包选择器已调用！');
+    },,
 
     async tryMobileWalletRedirect(walletType) {
         if (!walletState.isMobile()) { // FIX: Use explicit reference to walletState
