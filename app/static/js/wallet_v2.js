@@ -317,12 +317,27 @@ const walletState = {
     
     updateAssetsUI() {},
 
+    closeWalletSelector() {
+        try {
+            const walletSelector = document.getElementById('walletSelector');
+            if (walletSelector) {
+                walletSelector.remove();
+                console.log('钱包选择器已关闭');
+                return true;
+            }
+            return false;
+           } catch (error) {
+            console.error('关闭钱包选择器时出错:', error);
+            return false;
+       }
+    },
+
     openWalletSelector() {
         try {
             console.log('[openWalletSelector] 打开钱包选择器');
             
             // 如果已有钱包选择器打开，先关闭
-            walletState.closeWalletSelector();
+            this.closeWalletSelector();
             
             // 如果已经连接了钱包，先断开连接
             if (this.connected) {
@@ -374,7 +389,7 @@ const walletState = {
             closeButton.style.fontSize = '24px';
             closeButton.style.cursor = 'pointer';
             closeButton.onclick = () => {
-                walletState.closeWalletSelector();
+                this.closeWalletSelector();
             };
             
             title.appendChild(closeButton);
@@ -472,7 +487,7 @@ const walletState = {
                     localStorage.setItem('pendingWalletType', wallet.type);
                     
                     // 移除钱包选择器
-                    walletState.closeWalletSelector();
+                    this.closeWalletSelector();
                     
                     // 在移动设备上设置从钱包应用返回的标记
                     if (this.isMobile()) {
@@ -501,7 +516,7 @@ const walletState = {
             // 点击选择器背景关闭
             walletSelector.addEventListener('click', (e) => {
                 if (e.target === walletSelector) {
-                    walletState.closeWalletSelector();
+                    this.closeWalletSelector();
                 }
             });
             
@@ -515,7 +530,7 @@ const walletState = {
             console.error('[openWalletSelector] 打开钱包选择器失败:', error);
             return null;
         }
-    },
+    },,
 
     async tryMobileWalletRedirect(walletType) {
         if (!walletState.isMobile()) { // FIX: Use explicit reference to walletState
