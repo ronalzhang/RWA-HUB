@@ -322,7 +322,7 @@ const walletState = {
             console.log('[openWalletSelector] 打开钱包选择器');
             
             // 如果已有钱包选择器打开，先关闭
-            this.closeWalletSelector();
+            walletState.closeWalletSelector();
             
             // 如果已经连接了钱包，先断开连接
             if (this.connected) {
@@ -374,7 +374,7 @@ const walletState = {
             closeButton.style.fontSize = '24px';
             closeButton.style.cursor = 'pointer';
             closeButton.onclick = () => {
-                this.closeWalletSelector();
+                walletState.closeWalletSelector();
             };
             
             title.appendChild(closeButton);
@@ -472,7 +472,7 @@ const walletState = {
                     localStorage.setItem('pendingWalletType', wallet.type);
                     
                     // 移除钱包选择器
-                    this.closeWalletSelector();
+                    walletState.closeWalletSelector();
                     
                     // 在移动设备上设置从钱包应用返回的标记
                     if (this.isMobile()) {
@@ -501,7 +501,7 @@ const walletState = {
             // 点击选择器背景关闭
             walletSelector.addEventListener('click', (e) => {
                 if (e.target === walletSelector) {
-                    this.closeWalletSelector();
+                    walletState.closeWalletSelector();
                 }
             });
             
