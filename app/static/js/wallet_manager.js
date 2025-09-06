@@ -470,24 +470,44 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
         }
 
         // 等待Phantom加载
-        waitForPhantom(timeout = 5000) {
+        waitForPhantom(timeout = 15000) {
             return new Promise((resolve, reject) => {
                 if (window.solana && window.solana.isPhantom) {
                     resolve();
                     return;
                 }
 
+                let attempts = 0;
+                const maxAttempts = timeout / 200;
+
                 const checkInterval = setInterval(() => {
+                    attempts++;
+                    
                     if (window.solana && window.solana.isPhantom) {
                         clearInterval(checkInterval);
                         clearTimeout(timeoutId);
+                        debugLog('Phantom钱包检测成功，尝试次数:', attempts);
                         resolve();
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(checkInterval);
+                        clearTimeout(timeoutId);
+                        
+                        // 移动端给出更友好的提示
+                        if (this.isMobile()) {
+                            reject(new Error('请确保已安装Phantom钱包App，并从钱包App返回后重试'));
+                        } else {
+                            reject(new Error('Phantom钱包扩展未检测到，请安装Phantom浏览器扩展'));
+                        }
                     }
-                }, 100);
+                }, 200);
 
                 const timeoutId = setTimeout(() => {
                     clearInterval(checkInterval);
-                    reject(new Error('Phantom钱包加载超时'));
+                    if (this.isMobile()) {
+                        reject(new Error('钱包连接超时，请确保已安装Phantom App'));
+                    } else {
+                        reject(new Error('Phantom钱包加载超时'));
+                    }
                 }, timeout);
             });
         }

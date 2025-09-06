@@ -94,14 +94,17 @@
             if (pendingConnection && connectionStartTime) {
                 const timeDiff = Date.now() - parseInt(connectionStartTime);
                 
-                // 如果在5分钟内返回
-                if (timeDiff < 300000) {
+                // 如果在10分钟内返回
+                if (timeDiff < 600000) {
                     this.log(`检测到从${pendingConnection}钱包App返回，时间差: ${timeDiff}ms`);
                     
-                    // 延迟处理，等待页面完全加载
+                    // 显示连接状态
+                    this.showConnectionStatus('正在检测钱包连接...', 'info');
+                    
+                    // 延迟处理，等待页面完全加载和钱包对象初始化
                     setTimeout(() => {
                         this.handleWalletAppReturn(pendingConnection);
-                    }, 1000);
+                    }, 2000); // 增加延迟时间
                 } else {
                     this.log('钱包连接超时，清除临时数据');
                     this.clearPendingConnection();
@@ -115,7 +118,7 @@
                 this.log(`处理从${walletType}钱包App返回`);
                 
                 // 显示连接状态
-                this.showConnectionStatus('正在连接钱包...');
+                this.showConnectionStatus('正在连接钱包...', 'info');
                 
                 // 等待钱包对象加载
                 const walletAvailable = await this.waitForWallet(walletType);
@@ -123,57 +126,87 @@
                 if (walletAvailable) {
                     this.log(`${walletType}钱包对象已加载，尝试连接`);
                     
-                    // 尝试连接
-                    const connected = await this.attemptConnection(walletType);
+                    // 尝试连接，增加重试机制
+                    let connected = false;
+                    let retryCount = 0;
+                    const maxRetries = 3;
                     
-                    if (connected) {
-                        this.log('钱包连接成功');
-                        this.showConnectionStatus('钱包连接成功！', 'success');
-                        this.clearPendingConnection();
+                    while (!connected && retryCount < maxRetries) {
+                        retryCount++;
+                        this.log(`第${retryCount}次尝试连接${walletType}钱包`);
                         
-                        // 通知主应用
-                        this.notifyConnectionSuccess(walletType);
-                    } else {
-                        this.log('钱包连接失败');
-                        this.showConnectionStatus('连接失败，请重试', 'error');
+                        try {
+                            connected = await this.attemptConnection(walletType);
+                            if (connected) {
+                                this.log('钱包连接成功');
+                                this.showConnectionStatus('钱包连接成功！', 'success');
+                                this.clearPendingConnection();
+                                
+                                // 通知主应用
+                                this.notifyConnectionSuccess(walletType);
+                                return;
+                            }
+                        } catch (error) {
+                            this.log(`第${retryCount}次连接失败:`, error.message);
+                        }
+                        
+                        if (retryCount < maxRetries) {
+                            this.showConnectionStatus(`连接失败，正在重试 (${retryCount}/${maxRetries})...`, 'warning');
+                            await new Promise(resolve => setTimeout(resolve, 1000)); // 等待1秒后重试
+                        }
                     }
+                    
+                    // 所有重试都失败
+                    this.log('所有连接尝试都失败');
+                    this.showConnectionStatus('连接失败，请手动重试或检查钱包设置', 'error');
+                    this.showRetryButton(walletType);
+                    
                 } else {
                     this.log(`${walletType}钱包对象加载失败`);
-                    this.showConnectionStatus('钱包未检测到，请确保已安装钱包应用', 'error');
+                    this.showConnectionStatus('钱包未检测到，请确保已安装钱包应用并重新尝试', 'error');
+                    this.showRetryButton(walletType);
                 }
                 
             } catch (error) {
                 this.error('处理钱包App返回失败:', error);
-                this.showConnectionStatus('连接过程中发生错误', 'error');
+                this.showConnectionStatus('连接过程中发生错误，请重试', 'error');
+                this.showRetryButton(walletType);
             }
         }
 
         // 等待钱包对象加载
-        waitForWallet(walletType, timeout = 10000) {
+        waitForWallet(walletType, timeout = 20000) {
             return new Promise((resolve) => {
                 const config = this.walletConfigs[walletType];
                 if (!config) {
+                    this.log(`未知的钱包类型: ${walletType}`);
                     resolve(false);
                     return;
                 }
 
                 // 检查钱包是否已经可用
                 if (config.checkFunction()) {
+                    this.log(`${walletType}钱包对象已可用`);
                     resolve(true);
                     return;
                 }
 
                 // 轮询检查
                 const startTime = Date.now();
+                let attempts = 0;
                 const checkInterval = setInterval(() => {
+                    attempts++;
+                    
                     if (config.checkFunction()) {
                         clearInterval(checkInterval);
+                        this.log(`${walletType}钱包对象加载成功，尝试次数: ${attempts}, 耗时: ${Date.now() - startTime}ms`);
                         resolve(true);
                     } else if (Date.now() - startTime > timeout) {
                         clearInterval(checkInterval);
+                        this.log(`${walletType}钱包对象加载超时，已尝试 ${attempts} 次，耗时: ${Date.now() - startTime}ms`);
                         resolve(false);
                     }
-                }, 100);
+                }, 300); // 增加检查间隔，减少CPU占用
             });
         }
 
@@ -397,65 +430,174 @@
         // 尝试深度链接
         attemptDeepLink(url) {
             return new Promise((resolve) => {
-                const timeout = setTimeout(() => resolve(false), this.deepLinkTimeout);
+                const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+                const timeout = setTimeout(() => {
+                    this.log('深度链接超时');
+                    resolve(false);
+                }, this.deepLinkTimeout);
                 
-                // 创建隐藏iframe
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = url;
-                
-                document.body.appendChild(iframe);
-                
-                // 检测页面焦点变化
-                const startTime = Date.now();
-                const checkVisibility = () => {
-                    if (document.hidden || Date.now() - startTime > 1000) {
+                let resolved = false;
+                const resolveOnce = (success) => {
+                    if (!resolved) {
+                        resolved = true;
                         clearTimeout(timeout);
-                        this.cleanupElement(iframe);
-                        resolve(true);
-                    } else {
-                        setTimeout(checkVisibility, 100);
+                        resolve(success);
                     }
                 };
                 
-                setTimeout(() => {
-                    checkVisibility();
-                    setTimeout(() => this.cleanupElement(iframe), 1000);
-                }, 500);
+                // Safari和Chrome使用不同的方法
+                if (isSafari) {
+                    // Safari使用window.location
+                    this.log('Safari环境，使用window.location跳转');
+                    
+                    const startTime = Date.now();
+                    const beforeUnload = () => {
+                        this.log('Safari检测到页面即将跳转');
+                        resolveOnce(true);
+                    };
+                    
+                    window.addEventListener('beforeunload', beforeUnload);
+                    window.addEventListener('pagehide', beforeUnload);
+                    
+                    // 尝试跳转
+                    window.location.href = url;
+                    
+                    // 如果3秒内没有跳转，认为失败
+                    setTimeout(() => {
+                        window.removeEventListener('beforeunload', beforeUnload);
+                        window.removeEventListener('pagehide', beforeUnload);
+                        if (!resolved) {
+                            this.log('Safari深度链接可能失败，未检测到页面跳转');
+                            resolveOnce(false);
+                        }
+                    }, 3000);
+                    
+                } else {
+                    // Chrome使用iframe方法
+                    this.log('Chrome环境，使用iframe方法');
+                    
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = url;
+                    
+                    document.body.appendChild(iframe);
+                    
+                    // 检测页面焦点变化
+                    const startTime = Date.now();
+                    const checkVisibility = () => {
+                        if (document.hidden || Date.now() - startTime > 1500) {
+                            this.log('Chrome检测到页面失去焦点，深度链接可能成功');
+                            this.cleanupElement(iframe);
+                            resolveOnce(true);
+                        } else if (Date.now() - startTime < 3000) {
+                            setTimeout(checkVisibility, 200);
+                        } else {
+                            this.log('Chrome深度链接超时');
+                            this.cleanupElement(iframe);
+                            resolveOnce(false);
+                        }
+                    };
+                    
+                    setTimeout(checkVisibility, 500);
+                }
             });
         }
 
         // 尝试通用链接
         attemptUniversalLink(url) {
             return new Promise((resolve) => {
-                const timeout = setTimeout(() => resolve(false), this.deepLinkTimeout);
+                const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+                const timeout = setTimeout(() => {
+                    this.log('通用链接超时');
+                    resolve(false);
+                }, this.deepLinkTimeout);
                 
-                // 创建隐藏链接
+                let resolved = false;
+                const resolveOnce = (success) => {
+                    if (!resolved) {
+                        resolved = true;
+                        clearTimeout(timeout);
+                        resolve(success);
+                    }
+                };
+                
+                this.log(`尝试通用链接: ${url}`);
+                
+                // 创建链接元素
                 const link = document.createElement('a');
                 link.href = url;
                 link.target = '_blank';
                 link.style.display = 'none';
                 
                 document.body.appendChild(link);
-                link.click();
                 
-                // 检测页面焦点变化
-                const startTime = Date.now();
-                const checkVisibility = () => {
-                    if (document.hidden || Date.now() - startTime > 1500) {
-                        clearTimeout(timeout);
+                if (isSafari) {
+                    // Safari特殊处理
+                    const beforeUnload = () => {
+                        this.log('Safari检测到通用链接跳转');
+                        resolveOnce(true);
+                    };
+                    
+                    window.addEventListener('beforeunload', beforeUnload);
+                    window.addEventListener('pagehide', beforeUnload);
+                    
+                    link.click();
+                    
+                    setTimeout(() => {
+                        window.removeEventListener('beforeunload', beforeUnload);
+                        window.removeEventListener('pagehide', beforeUnload);
                         this.cleanupElement(link);
-                        resolve(true);
-                    } else if (Date.now() - startTime < 2500) {
-                        setTimeout(checkVisibility, 100);
-                    }
-                };
-                
-                setTimeout(() => {
-                    checkVisibility();
-                    setTimeout(() => this.cleanupElement(link), 1000);
-                }, 500);
+                        if (!resolved) {
+                            this.log('Safari通用链接可能失败');
+                            resolveOnce(false);
+                        }
+                    }, 2000);
+                    
+                } else {
+                    // Chrome处理
+                    link.click();
+                    
+                    const startTime = Date.now();
+                    const checkVisibility = () => {
+                        if (document.hidden || Date.now() - startTime > 1500) {
+                            this.log('Chrome检测到通用链接跳转');
+                            this.cleanupElement(link);
+                            resolveOnce(true);
+                        } else if (Date.now() - startTime < 3000) {
+                            setTimeout(checkVisibility, 200);
+                        } else {
+                            this.log('Chrome通用链接超时');
+                            this.cleanupElement(link);
+                            resolveOnce(false);
+                        }
+                    };
+                    
+                    setTimeout(checkVisibility, 500);
+                }
             });
+        }
+
+        // 显示重试按钮
+        showRetryButton(walletType) {
+            // 查找现有的连接状态容器
+            let statusContainer = document.getElementById('wallet-connection-status');
+            if (!statusContainer) {
+                return; // 如果没有状态容器，就不显示重试按钮
+            }
+            
+            // 创建重试按钮
+            const retryButton = document.createElement('button');
+            retryButton.textContent = '重新连接钱包';
+            retryButton.className = 'btn btn-primary btn-sm mt-2';
+            retryButton.onclick = () => {
+                this.log(`用户点击重试连接${walletType}钱包`);
+                statusContainer.innerHTML = ''; // 清除状态显示
+                this.setPendingConnection(walletType);
+                this.tryDeepLink(walletType);
+            };
+            
+            // 添加到状态容器
+            statusContainer.appendChild(retryButton);
         }
 
         // 清理DOM元素
