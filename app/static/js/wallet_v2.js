@@ -319,7 +319,7 @@ const walletState = {
 
     openWalletSelector() {
         alert('钱包选择器已调用！');
-    },,
+    },
 
     async tryMobileWalletRedirect(walletType) {
         if (!walletState.isMobile()) { // FIX: Use explicit reference to walletState
