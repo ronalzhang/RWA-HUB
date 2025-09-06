@@ -38,7 +38,13 @@
                         ios: 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977',
                         android: 'https://play.google.com/store/apps/details?id=app.phantom'
                     },
-                    checkFunction: () => window.solana && window.solana.isPhantom
+                    checkFunction: () => {
+                        // 更全面的钱包检测
+                        return (window.solana && window.solana.isPhantom) || 
+                               (window.phantom && window.phantom.solana) ||
+                               (window.solana && window.solana.publicKey) ||
+                               (window.solana && typeof window.solana.connect === 'function');
+                    }
                 }
             };
 
@@ -174,21 +180,25 @@
         // 构建连接URL
         buildConnectUrl(walletType) {
             const config = this.walletConfigs[walletType];
-            const currentUrl = encodeURIComponent(window.location.href);
-            const appUrl = encodeURIComponent(window.location.origin);
+            
+            // 不要对整个URL进行编码，只对参数值进行编码
+            const currentUrl = window.location.href;
+            const appUrl = window.location.origin;
             
             // 生成加密公钥（简化版本）
             const dappEncryptionPublicKey = this.generatePublicKey();
             
-            // 手动构建URL以确保正确编码
-            const params = [
-                `dapp_encryption_public_key=${dappEncryptionPublicKey}`,
-                `cluster=mainnet-beta`,
-                `app_url=${appUrl}`,
-                `redirect_link=${currentUrl}`
-            ].join('&');
+            // 使用URLSearchParams正确构建参数
+            const searchParams = new URLSearchParams();
+            searchParams.set('dapp_encryption_public_key', dappEncryptionPublicKey);
+            searchParams.set('cluster', 'mainnet-beta');
+            searchParams.set('app_url', appUrl);
+            searchParams.set('redirect_link', currentUrl);
 
-            return `${config.deepLink}?${params}`;
+            const finalUrl = `${config.deepLink}?${searchParams.toString()}`;
+            this.log(`构建的连接URL: ${finalUrl}`);
+            
+            return finalUrl;
         }
 
         // 生成简单的公钥（用于演示）
@@ -270,16 +280,38 @@
 
             const config = this.pendingConnection.config;
             
+            // 详细的钱包状态日志
+            this.log('=== 钱包状态检查 ===');
+            this.log(`window.solana: ${!!window.solana}`);
+            this.log(`window.phantom: ${!!window.phantom}`);
+            if (window.solana) {
+                this.log(`solana.isPhantom: ${window.solana.isPhantom}`);
+                this.log(`solana.isConnected: ${window.solana.isConnected}`);
+                this.log(`solana.publicKey: ${!!window.solana.publicKey}`);
+                this.log(`solana.connect: ${typeof window.solana.connect}`);
+            }
+            if (window.phantom && window.phantom.solana) {
+                this.log(`phantom.solana.isConnected: ${window.phantom.solana.isConnected}`);
+                this.log(`phantom.solana.publicKey: ${!!window.phantom.solana.publicKey}`);
+            }
+            
             // 检查钱包是否已连接
             if (config.checkFunction && config.checkFunction()) {
                 this.log(`${config.name}钱包已检测到`);
                 
+                // 获取钱包对象
+                let walletObj = window.solana;
+                if (window.phantom && window.phantom.solana) {
+                    walletObj = window.phantom.solana;
+                    this.log('使用 phantom.solana 对象');
+                }
+                
                 // 尝试获取连接状态
-                if (window.solana && window.solana.isConnected) {
+                if (walletObj && walletObj.isConnected) {
                     this.log('钱包已连接成功');
                     this.onConnectionSuccess();
                     return;
-                } else if (window.solana && window.solana.publicKey) {
+                } else if (walletObj && walletObj.publicKey) {
                     // 有些情况下isConnected可能为false但publicKey存在
                     this.log('检测到钱包公钥，认为连接成功');
                     this.onConnectionSuccess();
@@ -287,10 +319,12 @@
                 }
                 
                 // 钱包存在但未连接，尝试连接
+                this.log('钱包对象存在但未连接，尝试连接');
                 this.attemptConnection();
             } else {
                 // 钱包对象不存在，可能还在加载
                 this.log('钱包对象未检测到，继续等待...');
+                this.log(`checkFunction结果: ${config.checkFunction ? config.checkFunction() : 'checkFunction不存在'}`);
             }
         }
 
@@ -339,40 +373,87 @@
             }
 
             try {
-                this.log('尝试连接钱包...');
+                this.log('=== 尝试连接钱包 ===');
                 
-                if (window.solana && window.solana.connect) {
+                // 获取钱包对象
+                let walletObj = window.solana;
+                if (window.phantom && window.phantom.solana) {
+                    walletObj = window.phantom.solana;
+                    this.log('使用 phantom.solana 对象进行连接');
+                } else if (window.solana) {
+                    this.log('使用 window.solana 对象进行连接');
+                }
+                
+                this.log(`钱包对象: ${!!walletObj}`);
+                this.log(`connect方法: ${typeof walletObj?.connect}`);
+                this.log(`isConnected: ${walletObj?.isConnected}`);
+                this.log(`publicKey: ${!!walletObj?.publicKey}`);
+                
+                if (walletObj && walletObj.connect) {
                     // 设置连接选项
                     const connectOptions = {
                         onlyIfTrusted: false // 允许显示连接提示
                     };
                     
-                    const response = await window.solana.connect(connectOptions);
-                    this.log('钱包连接成功', response);
-                    this.onConnectionSuccess();
-                } else if (window.solana && window.solana.isConnected) {
+                    this.log('调用钱包连接方法...');
+                    const response = await walletObj.connect(connectOptions);
+                    this.log('钱包连接响应:', response);
+                    
+                    if (response && (response.publicKey || walletObj.publicKey)) {
+                        this.log('钱包连接成功');
+                        this.onConnectionSuccess();
+                    } else {
+                        this.log('钱包连接响应无效，等待状态更新...');
+                        // 等待一下让状态更新
+                        setTimeout(() => {
+                            if (walletObj && (walletObj.isConnected || walletObj.publicKey)) {
+                                this.log('延迟检测到钱包连接成功');
+                                this.onConnectionSuccess();
+                            } else {
+                                this.log('延迟检测仍未连接，显示重试选项');
+                                this.showRetryOption();
+                            }
+                        }, 3000);
+                    }
+                } else if (walletObj && walletObj.isConnected) {
                     // 钱包已经连接但没有connect方法
                     this.log('钱包已连接，无需重新连接');
                     this.onConnectionSuccess();
+                } else if (walletObj && walletObj.publicKey) {
+                    // 有公钥但isConnected为false
+                    this.log('检测到钱包公钥，认为已连接');
+                    this.onConnectionSuccess();
                 } else {
-                    this.log('钱包连接方法不可用');
+                    this.log('钱包连接方法不可用或钱包对象不存在');
+                    this.log(`walletObj: ${!!walletObj}`);
+                    this.log(`connect方法: ${typeof walletObj?.connect}`);
+                    
                     // 等待一下再重试
                     setTimeout(() => {
-                        if (window.solana && (window.solana.isConnected || window.solana.publicKey)) {
+                        // 重新检查钱包状态
+                        const currentWallet = window.phantom?.solana || window.solana;
+                        if (currentWallet && (currentWallet.isConnected || currentWallet.publicKey)) {
+                            this.log('延迟检测到钱包连接');
                             this.onConnectionSuccess();
                         } else {
+                            this.log('延迟检测仍未发现钱包连接，显示重试选项');
                             this.showRetryOption();
                         }
-                    }, 2000);
+                    }, 3000);
                 }
             } catch (error) {
                 this.log(`钱包连接失败: ${error.message}`);
+                this.log('错误详情:', error);
                 
                 // 检查是否是用户取消
-                if (error.message.includes('User rejected') || error.code === 4001) {
+                if (error.message.includes('User rejected') || 
+                    error.message.includes('User cancelled') ||
+                    error.code === 4001) {
                     this.log('用户取消了连接');
                     this.pendingConnection = null;
+                    this.closeRetryMessage();
                 } else {
+                    this.log('连接错误，显示重试选项');
                     this.showRetryOption();
                 }
             }
@@ -498,13 +579,13 @@
         console.log('[移动端钱包增强器-简化版] 移动端环境，初始化增强器');
         window.simpleMobileWalletEnhancer = new SimpleMobileWalletEnhancer();
         
-        // 增强现有的钱包管理器
+        // 增强现有的钱包管理器 - 直接拦截连接请求
         if (window.walletManager) {
             const originalConnect = window.walletManager.connect;
             window.walletManager.connect = async function(walletType) {
                 console.log(`[移动端钱包增强器-简化版] 拦截钱包连接请求: ${walletType}`);
                 
-                // 先尝试移动端增强连接
+                // 直接使用移动端增强连接，不显示选择器
                 const enhanced = await window.simpleMobileWalletEnhancer.enhanceWalletConnection(walletType);
                 if (enhanced) {
                     console.log('[移动端钱包增强器-简化版] 使用增强连接方式');
@@ -515,7 +596,66 @@
                 console.log('[移动端钱包增强器-简化版] 回退到原始连接方法');
                 return originalConnect.call(this, walletType);
             };
+            
+            // 拦截openWalletSelector方法，直接连接Phantom
+            const originalOpenWalletSelector = window.walletManager.openWalletSelector;
+            window.walletManager.openWalletSelector = async function() {
+                console.log('[移动端钱包增强器-简化版] 拦截钱包选择器，直接连接Phantom');
+                // 直接连接Phantom，不显示选择器
+                return await this.connect('phantom');
+            };
         }
+        
+        // 等待钱包管理器加载后再进行拦截
+        const waitForWalletManager = () => {
+            if (window.walletManager) {
+                console.log('[移动端钱包增强器-简化版] 钱包管理器已加载，进行拦截设置');
+                
+                const originalConnect = window.walletManager.connect;
+                window.walletManager.connect = async function(walletType) {
+                    console.log(`[移动端钱包增强器-简化版] 拦截钱包连接请求: ${walletType}`);
+                    
+                    // 直接使用移动端增强连接
+                    const enhanced = await window.simpleMobileWalletEnhancer.enhanceWalletConnection(walletType);
+                    if (enhanced) {
+                        console.log('[移动端钱包增强器-简化版] 使用增强连接方式');
+                        return true;
+                    }
+                    
+                    // 回退到原始连接方法
+                    console.log('[移动端钱包增强器-简化版] 回退到原始连接方法');
+                    return originalConnect.call(this, walletType);
+                };
+                
+                // 拦截openWalletSelector方法
+                const originalOpenWalletSelector = window.walletManager.openWalletSelector;
+                window.walletManager.openWalletSelector = async function() {
+                    console.log('[移动端钱包增强器-简化版] 拦截钱包选择器，直接连接Phantom');
+                    // 直接连接Phantom，不显示选择器
+                    return await this.connect('phantom');
+                };
+                
+                // 拦截所有可能触发选择器的方法
+                if (window.connectWallet) {
+                    const originalConnectWallet = window.connectWallet;
+                    window.connectWallet = async function(walletType) {
+                        console.log(`[移动端钱包增强器-简化版] 拦截全局connectWallet: ${walletType}`);
+                        if (walletType) {
+                            return await window.walletManager.connect(walletType);
+                        } else {
+                            // 没有指定钱包类型，直接连接Phantom
+                            return await window.walletManager.connect('phantom');
+                        }
+                    };
+                }
+            } else {
+                // 钱包管理器还未加载，继续等待
+                setTimeout(waitForWalletManager, 100);
+            }
+        };
+        
+        // 开始等待钱包管理器
+        waitForWalletManager();
     } else {
         console.log('[移动端钱包增强器-简化版] 桌面端环境，跳过初始化');
     }
