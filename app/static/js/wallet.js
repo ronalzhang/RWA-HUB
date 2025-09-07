@@ -799,6 +799,34 @@ window.wallet = {
     }
 };
 
+// 添加缺失的全局函数以修复桌面端钱包功能
+window.disconnectAndCloseMenu = async function() {
+    try {
+        await walletState.disconnect();
+        // 关闭下拉菜单
+        const dropdown = document.querySelector('.wallet-dropdown');
+        if (dropdown) {
+            dropdown.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('断开钱包失败:', error);
+    }
+};
+
+window.switchWalletAndCloseMenu = function() {
+    // 关闭下拉菜单
+    const dropdown = document.querySelector('.wallet-dropdown');
+    if (dropdown) {
+        dropdown.style.display = 'none';
+    }
+    // 打开钱包选择器
+    const selector = document.getElementById('walletSelector');
+    if (selector) {
+        selector.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+};
+
 // All other functions are now part of walletState or are global helpers
 
 // ... (rest of the file with global helpers)
