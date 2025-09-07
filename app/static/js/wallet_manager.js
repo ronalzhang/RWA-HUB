@@ -44,7 +44,6 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                 initialized: false
             };
 
-            this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             this.callbacks = [];
             this.retryCount = 0;
             this.maxRetries = 3;
@@ -193,7 +192,7 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                 this.updateUI();
 
                 // 移动端处理 - 但不跳过钱包选择器，只是标记为移动端
-                if (this.isMobile && !isReconnect) {
+                if (this.isMobile() && !isReconnect) {
                     // 移动端也需要显示钱包选择器，然后再处理深度链接
                     debugLog('移动端钱包连接，将在选择器中处理深度链接');
                 }
@@ -1002,6 +1001,10 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
         }
 
         // 工具方法
+        isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
         isIOS() {
             return /iPad|iPhone|iPod/.test(navigator.userAgent);
         }
@@ -1057,6 +1060,49 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
     document.addEventListener('DOMContentLoaded', () => {
         window.walletManager.init();
     });
+
+    // 全局函数定义 - 桌面端兼容性
+    window.disconnectAndCloseMenu = function() {
+        debugLog('全局函数: disconnectAndCloseMenu 被调用');
+        if (window.walletManager) {
+            return window.walletManager.disconnect(false);
+        }
+        return false;
+    };
+
+    window.switchWalletAndCloseMenu = function() {
+        debugLog('全局函数: switchWalletAndCloseMenu 被调用');
+        if (window.walletManager) {
+            window.walletManager.disconnect(false);
+            setTimeout(() => {
+                window.walletManager.openWalletSelector();
+            }, 100);
+        }
+    };
+
+    window.connectWallet = function(walletType) {
+        debugLog('全局函数: connectWallet 被调用，钱包类型:', walletType);
+        if (window.walletManager) {
+            return window.walletManager.connect(walletType);
+        }
+        return false;
+    };
+
+    window.openWalletSelector = function() {
+        debugLog('全局函数: openWalletSelector 被调用');
+        if (window.walletManager) {
+            return window.walletManager.openWalletSelector();
+        }
+        return false;
+    };
+
+    window.closeWalletSelector = function() {
+        debugLog('全局函数: closeWalletSelector 被调用');
+        if (window.walletManager) {
+            return window.walletManager.closeWalletSelector();
+        }
+        return false;
+    };
 
     debugLog('钱包管理器加载完成');
 }
