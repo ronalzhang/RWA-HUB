@@ -192,14 +192,10 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                 this.state.connecting = true;
                 this.updateUI();
 
-                // 移动端处理
+                // 移动端处理 - 但不跳过钱包选择器，只是标记为移动端
                 if (this.isMobile && !isReconnect) {
-                    const deepLinkSuccess = await this.handleMobileWalletConnection(walletType);
-                    if (deepLinkSuccess) {
-                        this.state.connecting = false;
-                        this.updateUI();
-                        return true;
-                    }
+                    // 移动端也需要显示钱包选择器，然后再处理深度链接
+                    debugLog('移动端钱包连接，将在选择器中处理深度链接');
                 }
 
                 let success = false;
@@ -251,16 +247,17 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                 const currentUrl = window.location.href;
                 
                 if (walletType === 'phantom' || walletType === 'solana') {
-                    // Phantom钱包链接
+                    // Phantom钱包链接 - 使用正确的参数格式
                     const connectParams = new URLSearchParams({
                         dapp_encryption_public_key: this.generateRandomKey(),
                         cluster: 'mainnet-beta',
-                        app_url: baseUrl,
-                        redirect_link: currentUrl
+                        app_url: encodeURIComponent(baseUrl),
+                        redirect_link: encodeURIComponent(currentUrl)
                     }).toString();
                     
-                    deepLinkUrl = `phantom://v1/connect?${connectParams}`;
-                    universalLinkUrl = `https://phantom.app/ul/v1/connect?${connectParams}`;
+                    // 使用browse端点而不是connect，这样更稳定
+                    deepLinkUrl = `phantom://browse/${encodeURIComponent(currentUrl)}?ref=${encodeURIComponent(baseUrl)}`;
+                    universalLinkUrl = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}?ref=${encodeURIComponent(baseUrl)}`;
                     
                     if (this.isIOS()) {
                         appStoreUrl = 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977';
@@ -314,38 +311,86 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
             }
         }
 
-        // 尝试深度链接
+        // 检测浏览器类型
+        getBrowserType() {
+            const userAgent = navigator.userAgent.toLowerCase();
+            if (userAgent.includes('safari') && !userAgent.includes('chrome')) {
+                return 'safari';
+            } else if (userAgent.includes('chrome')) {
+                return 'chrome';
+            } else if (userAgent.includes('firefox')) {
+                return 'firefox';
+            }
+            return 'unknown';
+        }
+
+        // 尝试深度链接 - 防止跨浏览器跳转
         async attemptDeepLink(deepLinkUrl) {
             return new Promise((resolve) => {
                 const timeout = setTimeout(() => resolve(false), 2500);
                 
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = deepLinkUrl;
+                // 检测当前浏览器
+                const currentBrowser = this.getBrowserType();
+                debugLog(`当前浏览器: ${currentBrowser}`);
                 
-                document.body.appendChild(iframe);
-                
-                const startTime = Date.now();
-                const checkVisibility = () => {
-                    if (document.hidden || Date.now() - startTime > 1000) {
-                        clearTimeout(timeout);
-                        if (iframe.parentNode) {
-                            document.body.removeChild(iframe);
+                // 在Safari中，使用window.location而不是iframe，防止跳转到Chrome
+                if (currentBrowser === 'safari') {
+                    debugLog('Safari浏览器，使用window.location跳转');
+                    const startTime = Date.now();
+                    
+                    // 监听页面可见性变化
+                    const visibilityHandler = () => {
+                        if (document.hidden) {
+                            clearTimeout(timeout);
+                            document.removeEventListener('visibilitychange', visibilityHandler);
+                            resolve(true);
                         }
-                        resolve(true);
-                    } else {
-                        setTimeout(checkVisibility, 100);
-                    }
-                };
-                
-                setTimeout(() => {
-                    checkVisibility();
+                    };
+                    
+                    document.addEventListener('visibilitychange', visibilityHandler);
+                    
+                    // 尝试跳转
+                    window.location.href = deepLinkUrl;
+                    
+                    // 如果3秒后还在当前页面，说明跳转失败
                     setTimeout(() => {
-                        if (iframe.parentNode) {
-                            document.body.removeChild(iframe);
+                        if (!document.hidden) {
+                            clearTimeout(timeout);
+                            document.removeEventListener('visibilitychange', visibilityHandler);
+                            resolve(false);
                         }
-                    }, 1000);
-                }, 500);
+                    }, 3000);
+                    
+                } else {
+                    // 其他浏览器使用iframe方式
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = deepLinkUrl;
+                    
+                    document.body.appendChild(iframe);
+                    
+                    const startTime = Date.now();
+                    const checkVisibility = () => {
+                        if (document.hidden || Date.now() - startTime > 1000) {
+                            clearTimeout(timeout);
+                            if (iframe.parentNode) {
+                                document.body.removeChild(iframe);
+                            }
+                            resolve(true);
+                        } else {
+                            setTimeout(checkVisibility, 100);
+                        }
+                    };
+                    
+                    setTimeout(() => {
+                        checkVisibility();
+                        setTimeout(() => {
+                            if (iframe.parentNode) {
+                                document.body.removeChild(iframe);
+                            }
+                        }, 1000);
+                    }, 500);
+                }
             });
         }
 
@@ -771,15 +816,27 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
             option.appendChild(name);
 
             // 点击事件
-            option.onclick = () => {
-                // 设置移动端标记
+            option.onclick = async () => {
+                this.closeWalletSelector();
+                
+                // 移动端处理深度链接
                 if (this.isMobile) {
+                    debugLog(`移动端点击${wallet.type}钱包选项`);
+                    
+                    // 设置移动端标记
                     sessionStorage.setItem('pendingWalletConnection', wallet.type);
                     sessionStorage.setItem('walletConnectionStartTime', Date.now().toString());
+                    
+                    // 直接处理移动端钱包连接
+                    const deepLinkSuccess = await this.handleMobileWalletConnection(wallet.type);
+                    if (!deepLinkSuccess) {
+                        debugLog('深度链接失败，回退到普通连接');
+                        this.connect(wallet.type);
+                    }
+                } else {
+                    // 桌面端正常连接
+                    this.connect(wallet.type);
                 }
-
-                this.closeWalletSelector();
-                this.connect(wallet.type);
             };
 
             return option;
