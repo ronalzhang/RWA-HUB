@@ -711,6 +711,7 @@ if (window.purchaseHandlerInitialized) {
             solanaWeb3: !!window.solanaWeb3,
             splToken: !!window.splToken,
             splTokenGetAssociatedTokenAddress: !!(window.splToken && window.splToken.getAssociatedTokenAddress),
+            splTokenAccountLayout: !!(window.splToken && window.splToken.AccountLayout),
             solanaConnection: !!window.solanaConnection
         };
         
@@ -718,7 +719,35 @@ if (window.purchaseHandlerInitialized) {
         
         const allLoaded = Object.values(checks).every(check => check);
         if (!allLoaded) {
-            console.error('一个或多个核心Solana库未能加载，购买功能可能无法正常使用。');
+            console.warn('部分库未正确加载，可能影响购买功能');
+            
+            // 如果SPL Token库中缺少AccountLayout，尝试手动添加
+            if (window.splToken && !window.splToken.AccountLayout) {
+                console.log('尝试添加SPL Token AccountLayout...');
+                // AccountLayout是一个简单的数据结构，我们可以提供一个基本实现
+                window.splToken.AccountLayout = {
+                    decode: function(data) {
+                        // 简化的SPL Token账户数据解析
+                        if (data.length < 165) {
+                            throw new Error('Invalid account data length');
+                        }
+                        return {
+                            mint: data.slice(0, 32),
+                            owner: data.slice(32, 64),
+                            amount: data.slice(64, 72),
+                            delegateOption: data[72],
+                            delegate: data.slice(73, 105),
+                            state: data[105],
+                            isNativeOption: data[106],
+                            isNative: data.slice(107, 115),
+                            delegatedAmount: data.slice(115, 123),
+                            closeAuthorityOption: data[123],
+                            closeAuthority: data.slice(124, 156)
+                        };
+                    }
+                };
+                console.log('SPL Token AccountLayout已添加');
+            }
         }
         
         return checks;

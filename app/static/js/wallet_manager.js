@@ -142,9 +142,19 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                 
                 // 尝试静默重连
                 try {
+                    // 检查钱包是否可用
+                    if (storedWalletType === 'ethereum' && !window.ethereum) {
+                        debugLog('MetaMask未安装，跳过静默重连');
+                        // 清除无效的存储状态
+                        this.disconnect();
+                        return;
+                    }
+                    
                     await this.connect(storedWalletType, true);
                 } catch (error) {
                     debugLog('静默重连失败:', error);
+                    // 如果重连失败，清除存储状态
+                    this.disconnect();
                 }
             }
         }
