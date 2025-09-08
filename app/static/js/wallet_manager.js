@@ -162,8 +162,13 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
         setupEventListeners() {
             // 页面可见性变化
             document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible' && this.state.connected) {
-                    this.checkConnection();
+                if (document.visibilityState === 'visible') {
+                    // 检查是否是从钱包app返回
+                    this.handleWalletReturn();
+                    
+                    if (this.state.connected) {
+                        this.checkConnection();
+                    }
                 }
             });
 
@@ -183,6 +188,50 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
             });
         }
 
+        // 处理从钱包app返回
+        async handleWalletReturn() {
+            if (!this.isMobile()) return;
+            
+            const pendingWalletType = sessionStorage.getItem('pendingWalletConnection');
+            const connectionStartTime = sessionStorage.getItem('walletConnectionStartTime');
+            
+            if (pendingWalletType && connectionStartTime) {
+                const timeSinceStart = Date.now() - parseInt(connectionStartTime);
+                
+                // 如果在合理时间内返回（30秒内），尝试建立连接
+                if (timeSinceStart < 30000) {
+                    debugLog('检测到从钱包app返回，尝试建立连接:', pendingWalletType);
+                    
+                    // 清除待处理状态
+                    sessionStorage.removeItem('pendingWalletConnection');
+                    sessionStorage.removeItem('walletConnectionStartTime');
+                    
+                    // 等待一小段时间让钱包注入完成
+                    setTimeout(async () => {
+                        try {
+                            if (pendingWalletType === 'phantom' || pendingWalletType === 'solana') {
+                                const success = await this.connectPhantom(false);
+                                if (success) {
+                                    debugLog('移动端Phantom钱包连接成功');
+                                } else {
+                                    debugLog('移动端Phantom钱包连接失败');
+                                }
+                            } else if (pendingWalletType === 'ethereum' || pendingWalletType === 'metamask') {
+                                const success = await this.connectEthereum(false);
+                                if (success) {
+                                    debugLog('移动端MetaMask钱包连接成功');
+                                } else {
+                                    debugLog('移动端MetaMask钱包连接失败');
+                                }
+                            }
+                        } catch (error) {
+                            debugError('移动端钱包连接失败:', error);
+                        }
+                    }, 1000);
+                }
+            }
+        }
+
         // 连接钱包
         async connect(walletType, isReconnect = false) {
             try {
@@ -191,15 +240,18 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                 this.state.connecting = true;
                 this.updateUI();
 
-                // 移动端处理 - 但不跳过钱包选择器，只是标记为移动端
+                // 移动端处理 - 使用深度链接而不是直接连接
                 if (this.isMobile() && !isReconnect) {
-                    // 移动端也需要显示钱包选择器，然后再处理深度链接
-                    debugLog('移动端钱包连接，将在选择器中处理深度链接');
+                    debugLog('移动端检测到，使用深度链接连接');
+                    const success = await this.handleMobileWalletConnection(walletType);
+                    this.state.connecting = false;
+                    this.updateUI();
+                    return success;
                 }
 
                 let success = false;
 
-                // 根据钱包类型连接
+                // 桌面端连接逻辑
                 if (walletType === 'phantom' || walletType === 'solana') {
                     success = await this.connectPhantom(isReconnect);
                 } else if (walletType === 'ethereum' || walletType === 'metamask') {
@@ -254,9 +306,9 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                         redirect_link: encodeURIComponent(currentUrl)
                     }).toString();
                     
-                    // 使用browse端点而不是connect，这样更稳定
-                    deepLinkUrl = `phantom://browse/${encodeURIComponent(currentUrl)}?ref=${encodeURIComponent(baseUrl)}`;
-                    universalLinkUrl = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}?ref=${encodeURIComponent(baseUrl)}`;
+                    // 使用connect端点进行钱包连接
+                    deepLinkUrl = `phantom://v1/connect?${connectParams}`;
+                    universalLinkUrl = `https://phantom.app/ul/v1/connect?${connectParams}`;
                     
                     if (this.isIOS()) {
                         appStoreUrl = 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977';
@@ -819,7 +871,7 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                 this.closeWalletSelector();
                 
                 // 移动端处理深度链接
-                if (this.isMobile) {
+                if (this.isMobile()) {
                     debugLog(`移动端点击${wallet.type}钱包选项`);
                     
                     // 设置移动端标记
