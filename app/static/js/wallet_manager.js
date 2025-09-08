@@ -951,8 +951,11 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
 
         // 更新钱包下拉菜单内容
         async updateWalletDropdown() {
+            console.log('updateWalletDropdown 被调用');
+            
             // 首先检查实际的钱包连接状态
             const actualWalletState = this.checkActualWalletState();
+            console.log('实际钱包状态:', actualWalletState);
             
             if (!actualWalletState.connected || !actualWalletState.address) {
                 // 钱包未连接时，显示默认状态
