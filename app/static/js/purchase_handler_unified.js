@@ -725,6 +725,10 @@ if (window.purchaseHandlerInitialized) {
             console.warn('部分Solana库未完全加载，但系统仍可正常运行');
         } else {
             console.log('✅ 所有必要的Solana库已正确加载，系统运行正常');
+            // AccountLayout不是必需的，我们有备用解码方法
+            if (!checks.splTokenAccountLayout) {
+                console.log('ℹ️ 使用内置的代币账户解码方法（AccountLayout不可用但有备用方案）');
+            }
         }
 
         return checks;
