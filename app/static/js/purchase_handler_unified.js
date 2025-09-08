@@ -717,44 +717,16 @@ if (window.purchaseHandlerInitialized) {
         
         console.log('库初始化检查:', checks);
         
-        const allLoaded = Object.values(checks).every(check => check);
-        if (!allLoaded) {
-            // 只有真正关键的库缺失时才显示警告
-            const criticalMissing = !checks.solanaWeb3 || !checks.splToken || !checks.solanaConnection;
-            if (criticalMissing) {
-                console.warn('关键Solana库缺失，购买功能可能无法正常使用');
-            } else {
-                console.log('✅ 所有必要的Solana库已正确加载，系统运行正常');
-            }
-            
-            // 如果SPL Token库中缺少AccountLayout，尝试手动添加
-            if (window.splToken && !window.splToken.AccountLayout) {
-                console.log('尝试添加SPL Token AccountLayout...');
-                // AccountLayout是一个简单的数据结构，我们可以提供一个基本实现
-                window.splToken.AccountLayout = {
-                    decode: function(data) {
-                        // 简化的SPL Token账户数据解析
-                        if (data.length < 165) {
-                            throw new Error('Invalid account data length');
-                        }
-                        return {
-                            mint: data.slice(0, 32),
-                            owner: data.slice(32, 64),
-                            amount: data.slice(64, 72),
-                            delegateOption: data[72],
-                            delegate: data.slice(73, 105),
-                            state: data[105],
-                            isNativeOption: data[106],
-                            isNative: data.slice(107, 115),
-                            delegatedAmount: data.slice(115, 123),
-                            closeAuthorityOption: data[123],
-                            closeAuthority: data.slice(124, 156)
-                        };
-                    }
-                };
-                console.log('SPL Token AccountLayout已添加');
-            }
+        // 检查关键库是否加载
+        const criticalLibraries = ['solanaWeb3', 'splToken', 'solanaConnection'];
+        const criticalMissing = criticalLibraries.some(lib => !checks[lib]);
+        
+        if (criticalMissing) {
+            console.error('关键Solana库缺失，购买功能可能无法正常使用');
+        } else {
+            console.log('✅ 所有必要的Solana库已正确加载，系统运行正常');
         }
+
         
         return checks;
     }
