@@ -771,7 +771,7 @@
         });
     }
     
-    // 钱包连接处理已移动到wallet.js
+    // 钱包连接处理已移动到wallet_manager.js
     
     // 钱包功能由上面的简单脚本处理
     
@@ -794,7 +794,7 @@
         
         // 语言切换器已移除
         
-        // 钱包按钮事件绑定由wallet.js处理
+        // 钱包按钮事件绑定由wallet_manager.js处理
         
         // 语言切换项已移除
         
@@ -957,7 +957,7 @@
             });
     </script>
     
-    <!-- 钱包连接逻辑已移动到wallet.js -->
+    <!-- 钱包连接逻辑已移动到wallet_manager.js -->
     
     <!-- 移除Font Awesome Kit脚本，已在头部引入CDN版本 -->
     <!-- <script src="https://kit.fontawesome.com/ad3f66688a.js" crossorigin="anonymous"></script> -->
@@ -1083,13 +1083,13 @@
             }
         }
         
-        // 已删除重复的updateWalletDropdownInfo函数，统一使用wallet.js中的updateWalletMenuInfo
+        // 已删除重复的updateWalletDropdownInfo函数，统一使用wallet_manager.js中的updateWalletMenuInfo
         
-        // 余额加载功能已移至wallet.js，避免重复代码冲突
+        // 余额加载功能已移至wallet_manager.js，避免重复代码冲突
         
-        // 佣金加载功能已移至wallet.js，避免重复代码冲突
+        // 佣金加载功能已移至wallet_manager.js，避免重复代码冲突
         
-        // 用户资产加载功能已移至wallet.js，避免重复代码冲突
+        // 用户资产加载功能已移至wallet_manager.js，避免重复代码冲突
         
         // 打开钱包选择器
         function openWalletSelector() {
@@ -1115,15 +1115,15 @@
         function showSimpleWalletSelector() {
             console.log('显示钱包选择器 - 统一桌面端和移动端体验');
             
-            // 检查是否有wallet.js的钱包选择器可用
-            if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
-                console.log('调用wallet.js的钱包选择器');
-                window.walletState.openWalletSelector();
+            // 检查是否有wallet_manager.js的钱包选择器可用
+            if (window.walletManager && typeof window.walletManager.openWalletSelector === 'function') {
+                console.log('调用wallet_manager.js的钱包选择器');
+                window.walletManager.openWalletSelector();
                 return;
             }
             
-            // 如果wallet.js不可用，创建简单的模态选择器
-            console.log('wallet.js不可用，创建简单选择器');
+            // 如果wallet_manager.js不可用，创建简单的模态选择器
+            console.log('wallet_manager.js不可用，创建简单选择器');
             createSimpleWalletModal();
         }
         
@@ -1175,7 +1175,7 @@
             modal.show();
         }
         
-        // 钱包连接功能已完全移至wallet.js，避免重复代码冲突
+        // 钱包连接功能已完全移至wallet_manager.js，避免重复代码冲突
         
         // 全局连接函数，供模态框中的按钮调用
         function connectWallet(walletType) {
@@ -1235,9 +1235,9 @@
             console.log('显示佣金详情，地址:', address, '佣金:', commissionValue);
         }
         
-        // 切换钱包和断开钱包功能已移至wallet.js，避免重复代码冲突
+        // 切换钱包和断开钱包功能已移至wallet_manager.js，避免重复代码冲突
         
-        // 钱包状态监听和连接检查功能已移至wallet.js，避免重复代码冲突
+        // 钱包状态监听和连接检查功能已移至wallet_manager.js，避免重复代码冲突
     </script>
     
     <script>
