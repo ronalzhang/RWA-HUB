@@ -951,10 +951,21 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
 
         // 更新钱包下拉菜单内容
         async updateWalletDropdown() {
-            if (!this.state.connected || !this.state.address) {
+            // 首先检查实际的钱包连接状态
+            const actualWalletState = this.checkActualWalletState();
+            
+            if (!actualWalletState.connected || !actualWalletState.address) {
                 // 钱包未连接时，显示默认状态
                 this.updateDropdownDisconnectedState();
                 return;
+            }
+
+            // 如果实际状态和内部状态不一致，同步状态
+            if (!this.state.connected || this.state.address !== actualWalletState.address) {
+                console.log('同步钱包状态:', actualWalletState);
+                this.state.connected = actualWalletState.connected;
+                this.state.address = actualWalletState.address;
+                this.state.walletType = actualWalletState.walletType;
             }
 
             try {
@@ -976,6 +987,53 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
             } catch (error) {
                 console.warn('更新钱包下拉菜单失败:', error);
             }
+        }
+
+        // 检查实际的钱包连接状态
+        checkActualWalletState() {
+            // 检查全局钱包状态
+            if (window.walletState && window.walletState.address) {
+                return {
+                    connected: true,
+                    address: window.walletState.address,
+                    walletType: window.walletState.walletType || 'phantom'
+                };
+            }
+
+            // 检查Phantom钱包
+            if (window.solana && window.solana.isConnected && window.solana.publicKey) {
+                return {
+                    connected: true,
+                    address: window.solana.publicKey.toString(),
+                    walletType: 'phantom'
+                };
+            }
+
+            // 检查MetaMask钱包
+            if (window.ethereum && window.ethereum.selectedAddress) {
+                return {
+                    connected: true,
+                    address: window.ethereum.selectedAddress,
+                    walletType: 'ethereum'
+                };
+            }
+
+            // 检查localStorage中的状态
+            const storedAddress = localStorage.getItem('walletAddress');
+            const storedType = localStorage.getItem('walletType');
+            if (storedAddress && storedType) {
+                return {
+                    connected: true,
+                    address: storedAddress,
+                    walletType: storedType
+                };
+            }
+
+            return {
+                connected: false,
+                address: null,
+                walletType: null
+            };
         }
 
         // 更新断开连接状态的下拉菜单
