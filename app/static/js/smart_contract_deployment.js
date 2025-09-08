@@ -214,16 +214,21 @@ class CompletePurchaseFlow {
             throw new Error('请先安装Phantom钱包');
         }
 
-        if (!window.solana.isConnected) {
-            console.log('钱包未连接，尝试连接...');
-            await window.solana.connect();
+        // 检查钱包状态，但不输出误导性日志
+        if (!window.solana.isConnected || !window.solana.publicKey) {
+            console.log('正在连接钱包...');
+            try {
+                await window.solana.connect();
+            } catch (error) {
+                throw new Error('钱包连接失败，请重试');
+            }
         }
 
         if (!window.solana.publicKey) {
             throw new Error('钱包连接失败，请重试');
         }
 
-        console.log('钱包连接成功:', window.solana.publicKey.toString());
+        console.log('✅ 钱包连接验证成功:', window.solana.publicKey.toString());
     }
 
     // 验证购买参数
@@ -470,9 +475,8 @@ window.deploySmartContract = function(assetId) {
     window.smartContractDeployment.deployContract(assetId);
 };
 
-window.initiatePurchase = function(assetId, amount) {
-    window.completePurchaseFlow.initiatePurchase(assetId, amount);
-};
+// 移除重复的initiatePurchase定义，使用统一的购买处理器
+// window.initiatePurchase 已在 purchase_handler_unified.js 中定义
 
 // 辅助函数
 window.copyContractAddress = function() {
@@ -532,7 +536,13 @@ window.retryPurchase = function() {
     const assetId = window.ASSET_CONFIG?.id;
     const amount = document.getElementById('purchase-amount')?.value;
     if (assetId && amount) {
-        window.completePurchaseFlow.initiatePurchase(assetId, parseInt(amount));
+        // 使用统一的购买处理器
+        if (window.initiatePurchase) {
+            window.initiatePurchase(assetId, parseInt(amount));
+        } else {
+            console.error('统一购买处理器未加载');
+            showToast('系统错误，请刷新页面重试');
+        }
     }
 };
 
@@ -584,8 +594,13 @@ window.handlePurchaseClick = function() {
         return;
     }
     
-    // 启动完整购买流程
-    window.completePurchaseFlow.initiatePurchase(assetId, amount);
+    // 使用统一的购买处理器
+    if (window.initiatePurchase) {
+        window.initiatePurchase(assetId, amount);
+    } else {
+        console.error('统一购买处理器未加载');
+        showToast('系统错误，请刷新页面重试');
+    }
 };
 
 // 获取钱包地址的辅助函数
