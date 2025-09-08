@@ -719,7 +719,13 @@ if (window.purchaseHandlerInitialized) {
         
         const allLoaded = Object.values(checks).every(check => check);
         if (!allLoaded) {
-            console.warn('部分库未正确加载，可能影响购买功能');
+            // 只有真正关键的库缺失时才显示警告
+            const criticalMissing = !checks.solanaWeb3 || !checks.splToken || !checks.solanaConnection;
+            if (criticalMissing) {
+                console.warn('部分库未正确加载，可能影响购买功能');
+            } else {
+                console.log('所有必要的Solana库已正确加载');
+            }
             
             // 如果SPL Token库中缺少AccountLayout，尝试手动添加
             if (window.splToken && !window.splToken.AccountLayout) {
