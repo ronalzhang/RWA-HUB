@@ -722,9 +722,9 @@ if (window.purchaseHandlerInitialized) {
             // 只有真正关键的库缺失时才显示警告
             const criticalMissing = !checks.solanaWeb3 || !checks.splToken || !checks.solanaConnection;
             if (criticalMissing) {
-                console.warn('部分库未正确加载，可能影响购买功能');
+                console.warn('关键Solana库缺失，购买功能可能无法正常使用');
             } else {
-                console.log('所有必要的Solana库已正确加载');
+                console.log('✅ 所有必要的Solana库已正确加载，系统运行正常');
             }
             
             // 如果SPL Token库中缺少AccountLayout，尝试手动添加
