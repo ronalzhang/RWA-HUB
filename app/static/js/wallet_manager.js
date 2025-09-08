@@ -926,21 +926,167 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
         updateUI() {
             // 更新钱包按钮
             const walletBtn = document.getElementById('walletBtn');
-            if (walletBtn) {
+            const walletBtnText = document.getElementById('walletBtnText');
+            
+            if (walletBtn || walletBtnText) {
+                const btnElement = walletBtnText || walletBtn;
                 if (this.state.connected && this.state.address) {
-                    walletBtn.textContent = this.formatAddress(this.state.address);
-                    walletBtn.classList.add('connected');
+                    btnElement.textContent = this.formatAddress(this.state.address);
+                    if (walletBtn) walletBtn.classList.add('connected');
                 } else if (this.state.connecting) {
-                    walletBtn.textContent = '连接中...';
-                    walletBtn.classList.remove('connected');
+                    btnElement.textContent = '连接中...';
+                    if (walletBtn) walletBtn.classList.remove('connected');
                 } else {
-                    walletBtn.textContent = '连接钱包';
-                    walletBtn.classList.remove('connected');
+                    btnElement.textContent = '连接钱包';
+                    if (walletBtn) walletBtn.classList.remove('connected');
                 }
             }
 
+            // 更新钱包下拉菜单内容
+            this.updateWalletDropdown();
+
             // 更新购买按钮
             this.updateBuyButtons();
+        }
+
+        // 更新钱包下拉菜单内容
+        async updateWalletDropdown() {
+            if (!this.state.connected || !this.state.address) {
+                // 钱包未连接时，显示默认状态
+                this.updateDropdownDisconnectedState();
+                return;
+            }
+
+            try {
+                // 更新钱包地址显示
+                const addressDisplay = document.getElementById('walletAddressDisplay');
+                if (addressDisplay) {
+                    addressDisplay.textContent = this.formatAddress(this.state.address);
+                }
+
+                // 获取并更新USDC余额
+                await this.updateUSDCBalance();
+
+                // 更新佣金余额
+                await this.updateCommissionBalance();
+
+                // 加载并更新用户资产
+                await this.loadUserAssets();
+
+            } catch (error) {
+                console.warn('更新钱包下拉菜单失败:', error);
+            }
+        }
+
+        // 更新断开连接状态的下拉菜单
+        updateDropdownDisconnectedState() {
+            // 更新余额显示
+            const balanceElement = document.getElementById('walletBalanceInDropdown');
+            if (balanceElement) {
+                balanceElement.textContent = '0.00';
+            }
+
+            // 更新佣金显示
+            const commissionElement = document.getElementById('walletCommissionInDropdown');
+            if (commissionElement) {
+                commissionElement.textContent = '0.00';
+            }
+
+            // 清空资产列表
+            const assetsList = document.getElementById('walletAssetsList');
+            if (assetsList) {
+                assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#666; font-size:12px;">钱包未连接</li>';
+            }
+
+            // 更新地址显示
+            const addressDisplay = document.getElementById('walletAddressDisplay');
+            if (addressDisplay) {
+                addressDisplay.textContent = '未连接';
+            }
+        }
+
+        // 更新USDC余额
+        async updateUSDCBalance() {
+            try {
+                if (!this.state.address || !window.solanaConnection) {
+                    return;
+                }
+
+                // 使用购买处理器中相同的余额获取逻辑
+                if (typeof window.getUSDCBalance === 'function') {
+                    const balance = await window.getUSDCBalance(this.state.address);
+                    const balanceElement = document.getElementById('walletBalanceInDropdown');
+                    if (balanceElement && typeof balance === 'number') {
+                        balanceElement.textContent = balance.toFixed(2);
+                        this.state.balance = balance;
+                    }
+                } else {
+                    console.warn('getUSDCBalance函数不可用');
+                }
+            } catch (error) {
+                console.warn('获取USDC余额失败:', error);
+            }
+        }
+
+        // 更新佣金余额
+        async updateCommissionBalance() {
+            try {
+                // 这里可以添加获取佣金余额的逻辑
+                // 暂时保持为0.00，等待后续实现
+                const commissionElement = document.getElementById('walletCommissionInDropdown');
+                if (commissionElement) {
+                    commissionElement.textContent = '0.00';
+                }
+            } catch (error) {
+                console.warn('获取佣金余额失败:', error);
+            }
+        }
+
+        // 加载用户资产
+        async loadUserAssets() {
+            try {
+                const assetsList = document.getElementById('walletAssetsList');
+                if (!assetsList || !this.state.address) {
+                    return;
+                }
+
+                // 显示加载状态
+                assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#666; font-size:12px;">加载中...</li>';
+
+                // 发送请求获取用户资产
+                const response = await fetch(`/api/user/assets?address=${this.state.address}`);
+                if (!response.ok) {
+                    throw new Error('获取资产失败');
+                }
+
+                const data = await response.json();
+                const assets = data.assets || [];
+
+                if (assets.length === 0) {
+                    assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#666; font-size:12px;">暂无资产</li>';
+                    return;
+                }
+
+                // 渲染资产列表
+                assetsList.innerHTML = assets.map(asset => `
+                    <li class="wallet-asset-item" style="margin-bottom:1px;">
+                        <a href="/assets/${asset.symbol}" class="text-decoration-none" 
+                           style="display:flex; justify-content:space-between; align-items:center; padding:3px 4px; font-size:12px; color:#333; border-radius:4px; transition:background-color 0.2s;"
+                           onmouseover="this.style.backgroundColor='#f8f9fa'" 
+                           onmouseout="this.style.backgroundColor='transparent'">
+                            <span style="font-weight:500;">${asset.name || asset.symbol}</span>
+                            <span style="color:#666;">${asset.balance || 0}</span>
+                        </a>
+                    </li>
+                `).join('');
+
+            } catch (error) {
+                console.warn('加载用户资产失败:', error);
+                const assetsList = document.getElementById('walletAssetsList');
+                if (assetsList) {
+                    assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#dc3545; font-size:12px;">加载失败</li>';
+                }
+            }
         }
 
         // 更新购买按钮
