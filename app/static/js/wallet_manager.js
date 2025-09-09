@@ -951,27 +951,34 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
 
         // 更新钱包下拉菜单内容
         async updateWalletDropdown() {
-            console.log('🔄 开始更新钱包下拉菜单内容');
-            
-            // 首先检查实际的钱包连接状态
-            const actualWalletState = this.checkActualWalletState();
-            console.log('实际钱包状态:', actualWalletState);
-            
-            if (!actualWalletState.connected || !actualWalletState.address) {
-                // 钱包未连接时，显示默认状态
-                this.updateDropdownDisconnectedState();
+            // 防止重复调用
+            if (this.isUpdatingDropdown) {
+                console.log('钱包下拉菜单正在更新中，跳过重复调用');
                 return;
             }
-
-            // 如果实际状态和内部状态不一致，同步状态
-            if (!this.state.connected || this.state.address !== actualWalletState.address) {
-                console.log('同步钱包状态:', actualWalletState);
-                this.state.connected = actualWalletState.connected;
-                this.state.address = actualWalletState.address;
-                this.state.walletType = actualWalletState.walletType;
-            }
-
+            
+            this.isUpdatingDropdown = true;
+            console.log('🔄 开始更新钱包下拉菜单内容');
+            
             try {
+                // 首先检查实际的钱包连接状态
+                const actualWalletState = this.checkActualWalletState();
+                console.log('实际钱包状态:', actualWalletState);
+                
+                if (!actualWalletState.connected || !actualWalletState.address) {
+                    // 钱包未连接时，显示默认状态
+                    this.updateDropdownDisconnectedState();
+                    return;
+                }
+
+                // 如果实际状态和内部状态不一致，同步状态
+                if (!this.state.connected || this.state.address !== actualWalletState.address) {
+                    console.log('同步钱包状态:', actualWalletState);
+                    this.state.connected = actualWalletState.connected;
+                    this.state.address = actualWalletState.address;
+                    this.state.walletType = actualWalletState.walletType;
+                }
+
                 // 更新钱包地址显示
                 const addressDisplay = document.getElementById('walletAddressDisplay');
                 if (addressDisplay) {
@@ -989,6 +996,8 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
 
             } catch (error) {
                 console.warn('更新钱包下拉菜单失败:', error);
+            } finally {
+                this.isUpdatingDropdown = false;
             }
         }
 
@@ -1266,50 +1275,63 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
         // 从交易记录获取用户资产（备用方案）
         async loadUserAssetsFromTransactions() {
             try {
-                console.log('🔄 尝试从交易记录获取用户资产');
+                console.log('🔄 尝试从页面现有数据获取用户资产');
                 
                 const assetsList = document.getElementById('walletAssetsList');
                 if (!assetsList) return;
 
-                // 获取用户的交易记录
-                const response = await fetch(`/api/user/transactions?address=${this.state.address}&limit=100`);
-                if (!response.ok) {
-                    throw new Error('获取交易记录失败');
-                }
-
-                const data = await response.json();
-                console.log('交易记录数据:', data);
-
-                const transactions = data.trades || data.transactions || [];
-                
-                // 从交易记录中提取用户购买的资产
+                // 先尝试从页面的交易历史表格中获取数据
+                const transactionRows = document.querySelectorAll('#transactionHistory tbody tr');
                 const userAssets = new Map();
                 
-                transactions.forEach(tx => {
-                    if (tx.buyer_address === this.state.address && tx.asset_symbol) {
-                        const symbol = tx.asset_symbol;
-                        const amount = parseFloat(tx.amount) || 0;
+                console.log('找到交易记录行数:', transactionRows.length);
+                
+                transactionRows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 4) {
+                        const buyerCell = cells[1]; // 买家地址列
+                        const assetCell = cells[2]; // 资产列
+                        const amountCell = cells[3]; // 数量列
                         
-                        if (userAssets.has(symbol)) {
-                            userAssets.set(symbol, {
-                                ...userAssets.get(symbol),
-                                balance: userAssets.get(symbol).balance + amount
-                            });
-                        } else {
-                            userAssets.set(symbol, {
-                                symbol: symbol,
-                                name: tx.asset_name || symbol,
-                                balance: amount
-                            });
+                        const buyerAddress = buyerCell.textContent.trim();
+                        const assetText = assetCell.textContent.trim();
+                        const amountText = amountCell.textContent.trim();
+                        
+                        // 检查是否是当前用户的交易
+                        if (buyerAddress.includes(this.state.address.substring(0, 8)) || 
+                            buyerAddress === this.state.address) {
+                            
+                            // 解析资产信息
+                            const assetMatch = assetText.match(/([A-Z]+-\d+)/);
+                            const amountMatch = amountText.match(/(\d+(?:\.\d+)?)/);
+                            
+                            if (assetMatch && amountMatch) {
+                                const symbol = assetMatch[1];
+                                const amount = parseFloat(amountMatch[1]);
+                                
+                                if (userAssets.has(symbol)) {
+                                    userAssets.set(symbol, {
+                                        ...userAssets.get(symbol),
+                                        balance: userAssets.get(symbol).balance + amount
+                                    });
+                                } else {
+                                    userAssets.set(symbol, {
+                                        symbol: symbol,
+                                        name: assetText.split('(')[0].trim() || symbol,
+                                        balance: amount
+                                    });
+                                }
+                            }
                         }
                     }
                 });
 
                 const assets = Array.from(userAssets.values()).filter(asset => asset.balance > 0);
-                console.log('从交易记录解析到的资产:', assets);
+                console.log('从页面数据解析到的资产:', assets);
 
                 if (assets.length === 0) {
-                    assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#666; font-size:12px;">暂无资产</li>';
+                    // 如果页面没有交易数据，显示提示信息
+                    assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#666; font-size:12px;">暂无资产记录</li>';
                     return;
                 }
 
@@ -1326,13 +1348,13 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                     </li>
                 `).join('');
 
-                console.log('从交易记录渲染用户资产完成');
+                console.log('从页面数据渲染用户资产完成');
 
             } catch (error) {
-                console.warn('从交易记录获取用户资产失败:', error);
+                console.warn('从页面数据获取用户资产失败:', error);
                 const assetsList = document.getElementById('walletAssetsList');
                 if (assetsList) {
-                    assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#dc3545; font-size:12px;">加载失败</li>';
+                    assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#dc3545; font-size:12px;">暂无资产</li>';
                 }
             }
         }
