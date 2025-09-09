@@ -1190,24 +1190,51 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
         // 加载用户资产
         async loadUserAssets() {
             try {
+                console.log('📦 开始加载用户资产');
+                
                 const assetsList = document.getElementById('walletAssetsList');
-                if (!assetsList || !this.state.address) {
+                if (!assetsList) {
+                    console.log('walletAssetsList 元素不存在');
                     return;
                 }
+                
+                if (!this.state.address) {
+                    console.log('钱包地址不存在，无法加载资产');
+                    return;
+                }
+
+                console.log('请求用户资产，地址:', this.state.address);
 
                 // 显示加载状态
                 assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#666; font-size:12px;">加载中...</li>';
 
                 // 发送请求获取用户资产
-                const response = await fetch(`/api/user/assets?address=${this.state.address}`);
+                const apiUrl = `/api/user/assets?address=${this.state.address}`;
+                console.log('API请求URL:', apiUrl);
+                
+                const response = await fetch(apiUrl);
+                console.log('API响应状态:', response.status);
+                
                 if (!response.ok) {
-                    throw new Error('获取资产失败');
+                    throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
                 }
 
                 const data = await response.json();
+                console.log('API返回数据:', data);
+
+                // 检查API返回的数据格式
+                if (data.status === 'ok' && data.message) {
+                    // 这是测试响应，说明后端API还没有实现
+                    console.log('检测到测试API响应，尝试使用交易记录获取资产信息');
+                    await this.loadUserAssetsFromTransactions();
+                    return;
+                }
+
                 const assets = data.assets || [];
+                console.log('解析到的资产列表:', assets);
 
                 if (assets.length === 0) {
+                    console.log('用户暂无资产');
                     assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#666; font-size:12px;">暂无资产</li>';
                     return;
                 }
@@ -1225,8 +1252,84 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                     </li>
                 `).join('');
 
+                console.log('用户资产列表渲染完成');
+
             } catch (error) {
                 console.warn('加载用户资产失败:', error);
+                const assetsList = document.getElementById('walletAssetsList');
+                if (assetsList) {
+                    assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#dc3545; font-size:12px;">加载失败</li>';
+                }
+            }
+        }
+
+        // 从交易记录获取用户资产（备用方案）
+        async loadUserAssetsFromTransactions() {
+            try {
+                console.log('🔄 尝试从交易记录获取用户资产');
+                
+                const assetsList = document.getElementById('walletAssetsList');
+                if (!assetsList) return;
+
+                // 获取用户的交易记录
+                const response = await fetch(`/api/user/transactions?address=${this.state.address}&limit=100`);
+                if (!response.ok) {
+                    throw new Error('获取交易记录失败');
+                }
+
+                const data = await response.json();
+                console.log('交易记录数据:', data);
+
+                const transactions = data.trades || data.transactions || [];
+                
+                // 从交易记录中提取用户购买的资产
+                const userAssets = new Map();
+                
+                transactions.forEach(tx => {
+                    if (tx.buyer_address === this.state.address && tx.asset_symbol) {
+                        const symbol = tx.asset_symbol;
+                        const amount = parseFloat(tx.amount) || 0;
+                        
+                        if (userAssets.has(symbol)) {
+                            userAssets.set(symbol, {
+                                ...userAssets.get(symbol),
+                                balance: userAssets.get(symbol).balance + amount
+                            });
+                        } else {
+                            userAssets.set(symbol, {
+                                symbol: symbol,
+                                name: tx.asset_name || symbol,
+                                balance: amount
+                            });
+                        }
+                    }
+                });
+
+                const assets = Array.from(userAssets.values()).filter(asset => asset.balance > 0);
+                console.log('从交易记录解析到的资产:', assets);
+
+                if (assets.length === 0) {
+                    assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#666; font-size:12px;">暂无资产</li>';
+                    return;
+                }
+
+                // 渲染资产列表
+                assetsList.innerHTML = assets.map(asset => `
+                    <li class="wallet-asset-item" style="margin-bottom:1px;">
+                        <a href="/assets/${asset.symbol}" class="text-decoration-none" 
+                           style="display:flex; justify-content:space-between; align-items:center; padding:3px 4px; font-size:12px; color:#333; border-radius:4px; transition:background-color 0.2s;"
+                           onmouseover="this.style.backgroundColor='#f8f9fa'" 
+                           onmouseout="this.style.backgroundColor='transparent'">
+                            <span style="font-weight:500;">${asset.name}</span>
+                            <span style="color:#666;">${asset.balance}</span>
+                        </a>
+                    </li>
+                `).join('');
+
+                console.log('从交易记录渲染用户资产完成');
+
+            } catch (error) {
+                console.warn('从交易记录获取用户资产失败:', error);
                 const assetsList = document.getElementById('walletAssetsList');
                 if (assetsList) {
                     assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#dc3545; font-size:12px;">加载失败</li>';
