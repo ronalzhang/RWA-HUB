@@ -1069,23 +1069,107 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
         // 更新USDC余额
         async updateUSDCBalance() {
             try {
-                if (!this.state.address || !window.solanaConnection) {
+                console.log('🔍 开始获取USDC余额');
+                
+                if (!this.state.address) {
+                    console.log('钱包地址不存在，跳过余额获取');
                     return;
                 }
 
-                // 使用购买处理器中相同的余额获取逻辑
-                if (typeof window.getUSDCBalance === 'function') {
-                    const balance = await window.getUSDCBalance(this.state.address);
-                    const balanceElement = document.getElementById('walletBalanceInDropdown');
-                    if (balanceElement && typeof balance === 'number') {
-                        balanceElement.textContent = balance.toFixed(2);
-                        this.state.balance = balance;
+                // 确保Solana连接已初始化
+                if (!window.solanaConnection) {
+                    console.log('Solana连接未初始化，尝试初始化...');
+                    if (typeof window.ensureSolanaConnection === 'function') {
+                        window.ensureSolanaConnection();
                     }
-                } else {
-                    console.warn('getUSDCBalance函数不可用');
+                    if (!window.solanaConnection) {
+                        console.warn('无法初始化Solana连接');
+                        return;
+                    }
                 }
+
+                // 检查必要的库是否加载
+                if (!window.solanaWeb3) {
+                    console.error('Solana Web3.js 库未加载');
+                    return;
+                }
+
+                // USDC代币地址 (mainnet)
+                const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+                const walletPubkey = new window.solanaWeb3.PublicKey(this.state.address);
+                const usdcMint = new window.solanaWeb3.PublicKey(USDC_MINT);
+
+                console.log('余额检查参数:', {
+                    walletAddress: this.state.address,
+                    usdcMint: USDC_MINT,
+                    splTokenAvailable: !!window.splToken,
+                    getAssociatedTokenAddressAvailable: !!window.splToken?.getAssociatedTokenAddress,
+                    connectionAvailable: !!window.solanaConnection
+                });
+
+                // 获取关联代币账户地址
+                let associatedTokenAddress;
+                if (window.splToken?.getAssociatedTokenAddress) {
+                    associatedTokenAddress = await window.splToken.getAssociatedTokenAddress(
+                        usdcMint,
+                        walletPubkey
+                    );
+                } else {
+                    console.error('getAssociatedTokenAddress 函数不可用');
+                    return;
+                }
+
+                console.log('关联代币账户地址:', associatedTokenAddress.toString());
+
+                // 获取账户信息
+                const accountInfo = await window.solanaConnection.getAccountInfo(associatedTokenAddress);
+                
+                if (!accountInfo) {
+                    console.log('代币账户不存在，余额为0');
+                    const balanceElement = document.getElementById('walletBalanceInDropdown');
+                    if (balanceElement) {
+                        balanceElement.textContent = '0.00';
+                    }
+                    return;
+                }
+
+                // 解析账户数据获取余额
+                let balance = 0;
+                if (window.splToken?.AccountLayout) {
+                    // 使用SPL Token的AccountLayout解析
+                    const accountData = window.splToken.AccountLayout.decode(accountInfo.data);
+                    balance = Number(accountData.amount) / Math.pow(10, 6); // USDC有6位小数
+                } else {
+                    // 使用内置解码方法
+                    const data = accountInfo.data;
+                    if (data && data.length >= 64) {
+                        // 代币余额存储在偏移量64-72的位置（小端序）
+                        const amountBytes = data.slice(64, 72);
+                        let amount = 0;
+                        for (let i = 0; i < 8; i++) {
+                            amount += amountBytes[i] * Math.pow(256, i);
+                        }
+                        balance = amount / Math.pow(10, 6); // USDC有6位小数
+                    }
+                }
+
+                console.log('获取到USDC余额:', balance);
+
+                // 更新UI显示
+                const balanceElement = document.getElementById('walletBalanceInDropdown');
+                if (balanceElement) {
+                    balanceElement.textContent = balance.toFixed(2);
+                }
+                
+                // 更新状态
+                this.state.balance = balance;
+
             } catch (error) {
                 console.warn('获取USDC余额失败:', error);
+                const balanceElement = document.getElementById('walletBalanceInDropdown');
+                if (balanceElement) {
+                    balanceElement.textContent = '获取失败';
+                }
             }
         }
 
