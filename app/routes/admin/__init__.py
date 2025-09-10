@@ -115,6 +115,7 @@ def encrypt_private_key():
         data = request.get_json()
         private_key = data.get('private_key')
         crypto_password = data.get('crypto_password')
+        crypto_salt = data.get('crypto_salt')
         
         if not private_key:
             return jsonify({'success': False, 'error': '私钥不能为空'}), 400
@@ -122,10 +123,14 @@ def encrypt_private_key():
         if not crypto_password:
             return jsonify({'success': False, 'error': '加密密码不能为空'}), 400
         
-        # 临时设置加密密码
+        # 临时设置加密密码和盐值
         import os
         original_password = os.environ.get('CRYPTO_PASSWORD')
+        original_salt = os.environ.get('CRYPTO_SALT')
+        
         os.environ['CRYPTO_PASSWORD'] = crypto_password
+        if crypto_salt:
+            os.environ['CRYPTO_SALT'] = crypto_salt
         
         try:
             # 直接验证私钥格式，不依赖环境变量
@@ -186,6 +191,8 @@ def encrypt_private_key():
             # 设置环境变量以便立即生效
             os.environ['SOLANA_PRIVATE_KEY_ENCRYPTED'] = encrypted_key
             os.environ['CRYPTO_PASSWORD'] = crypto_password
+            if crypto_salt:
+                os.environ['CRYPTO_SALT'] = crypto_salt
             
             current_app.logger.info(f"私钥已加密并保存，钱包地址: {wallet_address}")
             
@@ -197,15 +204,103 @@ def encrypt_private_key():
             })
             
         finally:
-            # 恢复原始密码
+            # 恢复原始配置
             if original_password:
                 os.environ['CRYPTO_PASSWORD'] = original_password
-            elif 'CRYPTO_PASSWORD' in os.environ and crypto_password != os.environ.get('CRYPTO_PASSWORD'):
-                # 如果不是刚设置的密码，则删除
-                pass
+            if original_salt:
+                os.environ['CRYPTO_SALT'] = original_salt
         
     except Exception as e:
         current_app.logger.error(f"加密私钥失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/v2/api/crypto/security-status', methods=['GET'])
+@api_admin_required
+def get_security_status():
+    """获取安全配置状态"""
+    try:
+        import os
+        from app.models.admin import SystemConfig
+        from app.utils.crypto_manager import get_crypto_manager
+        
+        # 检查环境变量
+        crypto_password = os.environ.get('CRYPTO_PASSWORD', '')
+        crypto_salt = os.environ.get('CRYPTO_SALT', '')
+        
+        # 检查数据库配置
+        encrypted_key = SystemConfig.get_value('SOLANA_PRIVATE_KEY_ENCRYPTED')
+        
+        # 密码强度评估
+        password_score = 0
+        if len(crypto_password) >= 32:
+            password_score += 25
+        elif len(crypto_password) >= 16:
+            password_score += 15
+        
+        if any(c.isupper() for c in crypto_password) and any(c.islower() for c in crypto_password):
+            password_score += 15
+        if any(c.isdigit() for c in crypto_password):
+            password_score += 15
+        if any(c in '!@#$%^&*()_+-=[]{}|;:,.<>?-_' for c in crypto_password):
+            password_score += 15
+        
+        # 检查是否使用默认密码
+        if crypto_password.startswith('123abc'):
+            password_score = 0
+            password_strength = '极弱'
+        elif password_score >= 80:
+            password_strength = '强'
+        elif password_score >= 60:
+            password_strength = '中'
+        else:
+            password_strength = '弱'
+        
+        # 盐值检查
+        has_custom_salt = bool(crypto_salt and crypto_salt != 'rwa_hub_salt_2025'.encode().hex())
+        
+        # 私钥状态检查
+        key_status = '未配置'
+        if encrypted_key:
+            try:
+                crypto_manager = get_crypto_manager()
+                crypto_manager.decrypt_private_key(encrypted_key)
+                key_status = '正常'
+            except:
+                key_status = '解密失败'
+        
+        # 总体安全评分
+        security_score = password_score
+        if has_custom_salt:
+            security_score += 20
+        if key_status == '正常':
+            security_score += 10
+        
+        security_score = min(security_score, 100)
+        
+        if security_score >= 80:
+            security_level = '高'
+        elif security_score >= 60:
+            security_level = '中'
+        elif security_score >= 40:
+            security_level = '低'
+        else:
+            security_level = '极低'
+        
+        return jsonify({
+            'success': True,
+            'status': {
+                'password_strength': password_strength,
+                'has_custom_salt': has_custom_salt,
+                'key_status': key_status,
+                'security_level': security_level,
+                'security_score': security_score,
+                'password_length': len(crypto_password),
+                'salt_configured': bool(crypto_salt)
+            }
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取安全状态失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/v2/api/crypto/load-encrypted-key', methods=['POST'])

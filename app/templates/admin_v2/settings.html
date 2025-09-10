@@ -94,10 +94,44 @@
                 </div>
             </div>
 
+            <!-- 安全配置状态 -->
+            <div class="bg-gray-50 rounded-md p-4 mb-4">
+                <h4 class="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                    </svg>
+                    当前安全配置状态
+                </h4>
+                <div id="security-status" class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">加密密码强度:</span>
+                        <span id="password-strength" class="text-sm font-medium">检查中...</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">盐值配置:</span>
+                        <span id="salt-status" class="text-sm font-medium">检查中...</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">私钥状态:</span>
+                        <span id="key-status" class="text-sm font-medium">检查中...</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">安全等级:</span>
+                        <span id="security-level" class="text-sm font-medium">检查中...</span>
+                    </div>
+                </div>
+                <button type="button" 
+                        @click="checkSecurityStatus()"
+                        class="mt-3 px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors">
+                    刷新状态
+                </button>
+            </div>
+
             <!-- 加密密码 -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     加密密码
+                    <span class="text-xs text-gray-500 ml-1">(用于加密私钥)</span>
                 </label>
                 <div class="relative">
                     <input :type="showCryptoPassword ? 'text' : 'password'" 
@@ -116,7 +150,55 @@
                         </svg>
                     </button>
                 </div>
-                <p class="text-sm text-gray-500 mt-1">用于加密/解密私钥</p>
+                <div class="mt-2 flex space-x-2">
+                    <button type="button" 
+                            @click="generateSecurePassword()"
+                            class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors">
+                        生成强密码
+                    </button>
+                    <button type="button" 
+                            @click="checkPasswordStrength()"
+                            class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors">
+                        检查强度
+                    </button>
+                </div>
+            </div>
+
+            <!-- 盐值配置 -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    加密盐值
+                    <span class="text-xs text-gray-500 ml-1">(增强加密安全性)</span>
+                </label>
+                <div class="relative">
+                    <input type="text" 
+                           x-model="cryptoSalt"
+                           class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                           placeholder="32字节十六进制盐值"
+                           readonly>
+                    <button type="button" 
+                            @click="generateSecureSalt()"
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="mt-2">
+                    <button type="button" 
+                            @click="generateSecureSalt()"
+                            class="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors">
+                        生成新盐值
+                    </button>
+                </div>
+                <div class="mt-2 p-2 bg-yellow-50 rounded-md">
+                    <p class="text-xs text-yellow-700">
+                        <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        盐值用于增强密码加密安全性，每个系统应使用唯一的盐值
+                    </p>
+                </div>
             </div>
 
             <!-- 私钥输入 -->
@@ -165,6 +247,7 @@ function settingsManager() {
         walletInfo: null,
         cryptoPassword: '',
         privateKey: '',
+        cryptoSalt: '',
         showCryptoPassword: false,
 
         
@@ -190,6 +273,12 @@ function settingsManager() {
         init() {
             console.log('设置管理器已初始化');
             this.loadWalletInfo();
+            this.checkSecurityStatus();
+            
+            // 初始化盐值
+            if (!this.cryptoSalt) {
+                this.generateSecureSalt();
+            }
         },
         
         async loadWalletInfo() {
@@ -290,7 +379,8 @@ function settingsManager() {
                     },
                     body: JSON.stringify({
                         private_key: this.privateKey,
-                        crypto_password: this.cryptoPassword
+                        crypto_password: this.cryptoPassword,
+                        crypto_salt: this.cryptoSalt
                     })
                 });
                 
@@ -298,14 +388,122 @@ function settingsManager() {
                 if (result.success) {
                     alert('私钥加密并保存成功!\n钱包地址: ' + result.wallet_address + '\n' + result.message);
                     this.privateKey = '';
-                    this.cryptoPassword = '';
                     this.loadWalletInfo();
+                    this.checkSecurityStatus();
                 } else {
                     alert('加密失败: ' + result.error);
                 }
                 
             } catch (error) {
                 alert('加密失败: ' + error.message);
+            }
+        },
+
+        generateSecurePassword() {
+            // 生成64字符的强密码
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+            let password = '';
+            for (let i = 0; i < 64; i++) {
+                password += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            this.cryptoPassword = password;
+            this.checkPasswordStrength();
+        },
+
+        generateSecureSalt() {
+            // 生成32字节的随机盐值
+            const array = new Uint8Array(32);
+            crypto.getRandomValues(array);
+            this.cryptoSalt = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+        },
+
+        checkPasswordStrength() {
+            const password = this.cryptoPassword;
+            if (!password) return;
+
+            let score = 0;
+            let feedback = [];
+
+            // 长度检查
+            if (password.length >= 32) score += 25;
+            else if (password.length >= 16) score += 15;
+            else feedback.push('密码长度至少16字符');
+
+            // 复杂度检查
+            if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score += 15;
+            if (/[0-9]/.test(password)) score += 15;
+            if (/[^A-Za-z0-9]/.test(password)) score += 15;
+
+            // 随机性检查
+            if (password.length > 0 && new Set(password).size / password.length > 0.7) score += 15;
+
+            // 弱密码检查
+            if (password.includes('123') || password.includes('abc') || password.includes('password')) {
+                score = 0;
+                feedback.push('包含常见弱密码模式');
+            }
+
+            let level, color;
+            if (score >= 80) { level = '强'; color = 'text-green-600'; }
+            else if (score >= 60) { level = '中'; color = 'text-yellow-600'; }
+            else if (score >= 40) { level = '弱'; color = 'text-orange-600'; }
+            else { level = '极弱'; color = 'text-red-600'; }
+
+            const strengthElement = document.getElementById('password-strength');
+            if (strengthElement) {
+                strengthElement.textContent = `${level} (${score}/100)`;
+                strengthElement.className = `text-sm font-medium ${color}`;
+            }
+
+            if (feedback.length > 0) {
+                alert('密码强度建议:\n' + feedback.join('\n'));
+            }
+        },
+
+        async checkSecurityStatus() {
+            try {
+                const response = await this.authFetch('/admin/v2/api/crypto/security-status');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const status = result.status;
+                    
+                    // 更新密码强度显示
+                    const strengthElement = document.getElementById('password-strength');
+                    if (strengthElement) {
+                        let color = status.password_strength === '强' ? 'text-green-600' : 
+                                   status.password_strength === '中' ? 'text-yellow-600' : 'text-red-600';
+                        strengthElement.textContent = status.password_strength;
+                        strengthElement.className = `text-sm font-medium ${color}`;
+                    }
+                    
+                    // 更新盐值状态
+                    const saltElement = document.getElementById('salt-status');
+                    if (saltElement) {
+                        let color = status.has_custom_salt ? 'text-green-600' : 'text-red-600';
+                        saltElement.textContent = status.has_custom_salt ? '已配置' : '使用默认';
+                        saltElement.className = `text-sm font-medium ${color}`;
+                    }
+                    
+                    // 更新私钥状态
+                    const keyElement = document.getElementById('key-status');
+                    if (keyElement) {
+                        let color = status.key_status === '正常' ? 'text-green-600' : 'text-red-600';
+                        keyElement.textContent = status.key_status;
+                        keyElement.className = `text-sm font-medium ${color}`;
+                    }
+                    
+                    // 更新安全等级
+                    const levelElement = document.getElementById('security-level');
+                    if (levelElement) {
+                        let color = status.security_level === '高' ? 'text-green-600' : 
+                                   status.security_level === '中' ? 'text-yellow-600' : 'text-red-600';
+                        levelElement.textContent = `${status.security_level} (${status.security_score}/100)`;
+                        levelElement.className = `text-sm font-medium ${color}`;
+                    }
+                }
+            } catch (error) {
+                console.error('检查安全状态失败:', error);
             }
         }
     }

@@ -25,15 +25,24 @@ class CryptoManager:
         if not password:
             raise ValueError("必须设置CRYPTO_PASSWORD环境变量作为加密密码")
         
-        # 使用固定的盐值（在生产环境中应该存储在安全的地方）
-        salt = b'rwa_hub_salt_2025'  # 16字节盐值
+        # 从环境变量获取盐值，如果没有则使用默认值（向后兼容）
+        salt_hex = os.environ.get('CRYPTO_SALT')
+        if salt_hex:
+            try:
+                salt = bytes.fromhex(salt_hex)
+            except ValueError:
+                logger.warning("CRYPTO_SALT格式错误，使用默认盐值")
+                salt = b'rwa_hub_salt_2025'
+        else:
+            logger.warning("未设置CRYPTO_SALT环境变量，使用默认盐值（不安全）")
+            salt = b'rwa_hub_salt_2025'  # 向后兼容
         
-        # 生成密钥
+        # 生成密钥 - 增加迭代次数提高安全性
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=salt,
-            iterations=100000,
+            iterations=200000,  # 从100,000增加到200,000
         )
         key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
         return key
