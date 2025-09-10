@@ -268,7 +268,8 @@ def check_admin_api():
             address = data.get('address')
         
         if not address:
-            return jsonify({'is_admin': False, 'error': '缺少钱包地址'}), 400
+            # 安全要求：没有钱包地址时不显示管理员入口
+            return jsonify({'is_admin': False})
         
         # 使用统一认证服务检查是否为管理员
         auth_service = get_auth_service()
@@ -286,8 +287,10 @@ def check_admin_api():
             })
         else:
             current_app.logger.info(f"非管理员地址: {address}")
+            # 安全要求：非管理员地址不显示管理员入口
             return jsonify({'is_admin': False})
             
     except Exception as e:
         current_app.logger.error(f"检查管理员状态失败: {str(e)}")
-        return jsonify({'is_admin': False, 'error': str(e)}), 500
+        # 安全要求：出错时不显示管理员入口
+        return jsonify({'is_admin': False}), 500
