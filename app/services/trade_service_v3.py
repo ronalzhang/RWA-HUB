@@ -390,7 +390,7 @@ class TradeServiceV3:
                                     'is_writable': acc.is_writable
                                 } for acc in instr.accounts
                             ],
-                            'data': instr.data.hex() if hasattr(instr.data, 'hex') else bytes(instr.data).hex()
+                            'data': bytes(instr.data).hex()  # 统一使用bytes()转换确保格式正确
                         } for instr in instructions
                     ],
                     'recent_blockhash': str(recent_blockhash)
@@ -1148,10 +1148,38 @@ class TradeServiceV3:
             except Exception as e:
                 raise ValueError(f"金额计算失败: {str(e)}")
             
-            # 6. 使用官方库创建转账指令，然后手动验证账户权限
+            # 6. 使用官方库创建转账指令，并确保ATA账户存在
             try:
+                # 检查是否需要创建关联代币账户
+                from spl.token.instructions import create_associated_token_account, CreateAssociatedTokenAccountParams
+                from app.blockchain.solana_service import get_solana_client
                 
-                # 首先使用官方库创建正确的指令
+                instructions_list = []
+                
+                # 检查接收方ATA是否存在，如果不存在则创建
+                try:
+                    client = get_solana_client()
+                    recipient_ata_info = client.get_account_info(recipient_payment_token_ata)
+                    
+                    if not recipient_ata_info.value:
+                        logger.info(f"[{transaction_id}] 接收方ATA不存在，创建ATA指令: {str(recipient_payment_token_ata)}")
+                        
+                        # 创建关联代币账户指令
+                        create_ata_params = CreateAssociatedTokenAccountParams(
+                            funding_address=buyer_pubkey,  # 买方支付创建费用
+                            wallet_address=recipient_pubkey,  # 接收方拥有账户
+                            token_mint_address=payment_mint_pubkey
+                        )
+                        create_ata_instruction = create_associated_token_account(create_ata_params)
+                        instructions_list.append(create_ata_instruction)
+                        logger.info(f"[{transaction_id}] 已添加创建ATA指令")
+                    else:
+                        logger.debug(f"[{transaction_id}] 接收方ATA已存在: {str(recipient_payment_token_ata)}")
+                        
+                except Exception as ata_check_error:
+                    logger.warning(f"[{transaction_id}] 无法检查ATA状态，跳过ATA创建: {ata_check_error}")
+                
+                # 创建转账指令
                 transfer_params = TransferParams(
                     program_id=spl_token_program_id,
                     source=buyer_payment_token_ata,
@@ -1160,7 +1188,16 @@ class TradeServiceV3:
                     amount=amount_in_smallest_unit
                 )
                 
-                instruction = transfer(transfer_params)
+                transfer_instruction = transfer(transfer_params)
+                instructions_list.append(transfer_instruction)
+                
+                # 如果只有一个指令（转账），直接返回
+                if len(instructions_list) == 1:
+                    instruction = instructions_list[0]
+                else:
+                    # 如果有多个指令，返回转账指令（调用方会处理ATA创建）
+                    instruction = transfer_instruction
+                    logger.info(f"[{transaction_id}] 创建了 {len(instructions_list)} 个指令（包括ATA创建）")
                 
                 # 验证指令创建成功
                 if not instruction:
@@ -1171,22 +1208,42 @@ class TradeServiceV3:
                 logger.info(f"[{transaction_id}] 指令程序ID: {instruction.program_id}")
                 logger.info(f"[{transaction_id}] 指令数据长度: {len(instruction.data)}")
                 
-                # 确保指令数据正确序列化
+                # 确保指令数据正确序列化 - 修复数据格式问题
                 try:
-                    if hasattr(instruction.data, 'hex'):
-                        data_hex = instruction.data.hex()
+                    # 统一使用bytes()转换，确保数据格式正确
+                    instruction_data_bytes = bytes(instruction.data)
+                    data_hex = instruction_data_bytes.hex()
+                    
+                    # 验证SPL Token Transfer指令数据格式
+                    if len(instruction_data_bytes) == 9:
+                        # 正确的9字节格式：1字节指令类型 + 8字节金额
+                        instruction_type = instruction_data_bytes[0]
+                        amount_bytes = instruction_data_bytes[1:9]
+                        amount_value = int.from_bytes(amount_bytes, byteorder='little')
+                        
+                        logger.info(f"[{transaction_id}] 指令数据验证通过: 类型={instruction_type}, 金额={amount_value}, hex={data_hex}")
                     else:
-                        data_hex = bytes(instruction.data).hex()
-                    logger.info(f"[{transaction_id}] 指令数据(hex): {data_hex}")
+                        logger.warning(f"[{transaction_id}] 指令数据长度异常: {len(instruction_data_bytes)}字节, hex={data_hex}")
+                        
+                        # 如果数据长度不是9字节，尝试修复
+                        if len(instruction_data_bytes) > 9:
+                            # 可能是数据被重复了，取前9字节
+                            corrected_data = instruction_data_bytes[:9]
+                            logger.info(f"[{transaction_id}] 尝试修复指令数据: 原长度={len(instruction_data_bytes)}, 修复后长度={len(corrected_data)}")
+                            
+                            # 重新创建指令对象，使用修复后的数据
+                            from solders.instruction import Instruction
+                            instruction = Instruction(
+                                program_id=instruction.program_id,
+                                accounts=instruction.accounts,
+                                data=corrected_data
+                            )
+                            data_hex = corrected_data.hex()
+                            logger.info(f"[{transaction_id}] 指令数据已修复: {data_hex}")
+                        
                 except Exception as data_error:
                     logger.error(f"[{transaction_id}] 指令数据序列化失败: {data_error}")
-                    # 尝试备用方法
-                    try:
-                        data_hex = ''.join([f'{b:02x}' for b in instruction.data])
-                        logger.info(f"[{transaction_id}] 指令数据(备用序列化): {data_hex}")
-                    except Exception as backup_error:
-                        logger.error(f"[{transaction_id}] 备用序列化也失败: {backup_error}")
-                        raise ValueError(f"指令数据序列化失败: {backup_error}")
+                    raise ValueError(f"指令数据序列化失败: {data_error}")
                 
                 # 详细账户信息
                 for i, account in enumerate(instruction.accounts):

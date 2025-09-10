@@ -5,6 +5,7 @@ alwaysApply: true
 登陆使用sshpass命令
 应用在这个目录下：/root/RWA-HUB
 数据库是PostgreSQL
+域名：rwa-hub.com
 用pm2管理应用，应用都运行在各自的虚拟环境下，确保每次安装和运行都要在虚拟环境中进行
 服务器上运行的操作要用sshpass 登陆命令+具体命令，比如登陆命令+ “pm2 status”
 命令里有--lines 50的时候一定加上 --nostream才完整。
