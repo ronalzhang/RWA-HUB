@@ -255,9 +255,12 @@ class TradeServiceV3:
                     )]
                     logger.debug(f"[{transaction_id}] 发布者自购单转账指令创建成功")
                 else:
-                    # 普通用户购买：80%给发布者，20%给平台
-                    owner_amount = total_price * Decimal('0.8')  # 发布者获得80%
-                    platform_amount = total_price * Decimal('0.2')  # 平台获得20%
+                    # 普通用户购买：从系统配置获取平台分润比例
+                    platform_commission_rate = TradeServiceV3._get_platform_commission_rate()
+                    owner_rate = Decimal('1.0') - platform_commission_rate
+                    
+                    owner_amount = total_price * owner_rate  # 发布者获得剩余部分
+                    platform_amount = total_price * platform_commission_rate  # 平台获得配置的比例
                     
                     logger.info(f"[{transaction_id}] 分润计算: 总价={total_price}, 发布者={owner_amount}, 平台={platform_amount}")
                     
@@ -912,6 +915,37 @@ class TradeServiceV3:
             response['details'] = details
             
         return response
+
+    @staticmethod
+    def _get_platform_commission_rate() -> Decimal:
+        """
+        从系统配置获取平台分润比例
+        
+        Returns:
+            Decimal: 平台分润比例 (0.0-1.0)
+        """
+        try:
+            from app.models.admin import SystemConfig
+            
+            # 尝试获取平台分润比例配置
+            commission_rate_str = SystemConfig.get_value('PLATFORM_COMMISSION_RATE')
+            if commission_rate_str:
+                commission_rate = Decimal(commission_rate_str)
+                # 确保比例在合理范围内
+                if 0 <= commission_rate <= 1:
+                    logger.debug(f"使用配置的平台分润比例: {commission_rate * 100}%")
+                    return commission_rate
+                else:
+                    logger.warning(f"平台分润比例超出范围 (0-1): {commission_rate}, 使用默认值")
+            
+            # 如果没有配置或配置无效，使用默认的20%
+            default_rate = Decimal('0.20')
+            logger.info(f"使用默认平台分润比例: {default_rate * 100}%")
+            return default_rate
+            
+        except Exception as e:
+            logger.error(f"获取平台分润比例失败: {e}, 使用默认值20%")
+            return Decimal('0.20')
 
     @staticmethod
     def _validate_configuration() -> dict:

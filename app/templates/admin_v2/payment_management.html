@@ -47,7 +47,301 @@
 
 {% block content %}
 <div class="p-6">
-    <!-- 页面标题和钱包连接 -->
+    <!-- 页面标题 -->
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">支付配置管理</h1>
+            <p class="text-gray-600 mt-1">管理平台费率、分润比例和支付相关配置</p>
+        </div>
+    </div>
+
+    <!-- 费率配置卡片 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- 平台费率配置 -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">平台费率设置</h3>
+                <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">基点制</span>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        平台费率（基点）
+                        <span class="text-gray-500 text-xs ml-1">1基点 = 0.01%</span>
+                    </label>
+                    <div class="flex items-center space-x-2">
+                        <input type="number" id="platform-fee-basis-points" 
+                               class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="350" min="0" max="10000">
+                        <span class="text-sm text-gray-500">基点</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">当前设置: <span id="current-fee-percentage">3.5%</span></p>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">平台费用收取地址</label>
+                    <input type="text" id="platform-fee-address" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="Solana钱包地址">
+                </div>
+            </div>
+        </div>
+
+        <!-- 平台分润配置 -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">平台分润设置</h3>
+                <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">百分比制</span>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        平台分润比例
+                        <span class="text-gray-500 text-xs ml-1">从每笔购买交易中抽取</span>
+                    </label>
+                    <div class="flex items-center space-x-2">
+                        <input type="number" id="platform-commission-rate" 
+                               class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                               placeholder="20" min="0" max="100" step="0.1">
+                        <span class="text-sm text-gray-500">%</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">发布者获得: <span id="owner-percentage">80%</span></p>
+                </div>
+                
+                <div class="bg-gray-50 p-3 rounded-md">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">分润说明</h4>
+                    <ul class="text-xs text-gray-600 space-y-1">
+                        <li>• 用户购买资产时，平台从交易金额中抽取设定比例</li>
+                        <li>• 剩余部分转给资产发布者</li>
+                        <li>• 发布者购买自己的资产时，全额转给平台</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 资产创建费用配置 -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">资产创建费用</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">创建费用金额</label>
+                <div class="flex items-center space-x-2">
+                    <input type="number" id="asset-creation-fee-amount" 
+                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                           placeholder="0.02" min="0" step="0.001">
+                    <span class="text-sm text-gray-500">SOL</span>
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">费用收取地址</label>
+                <input type="text" id="asset-creation-fee-address" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                       placeholder="Solana钱包地址">
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="flex justify-end space-x-3">
+        <button id="reset-config-btn" 
+                class="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
+            重置配置
+        </button>
+        <button id="save-config-btn" 
+                class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+            保存配置
+        </button>
+    </div>
+
+    <!-- 配置历史记录 -->
+    <div class="mt-8 bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">配置变更历史</h3>
+        </div>
+        <div class="p-6">
+            <div id="config-history" class="space-y-3">
+                <!-- 配置历史将通过JavaScript动态加载 -->
+                <div class="text-center text-gray-500 py-8">
+                    <p>暂无配置变更记录</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 支付配置管理JavaScript
+class PaymentConfigManager {
+    constructor() {
+        this.initializeEventListeners();
+        this.loadCurrentConfig();
+    }
+
+    initializeEventListeners() {
+        // 平台分润比例变化时更新发布者比例显示
+        document.getElementById('platform-commission-rate').addEventListener('input', (e) => {
+            const platformRate = parseFloat(e.target.value) || 0;
+            const ownerRate = 100 - platformRate;
+            document.getElementById('owner-percentage').textContent = `${ownerRate}%`;
+        });
+
+        // 平台费率基点变化时更新百分比显示
+        document.getElementById('platform-fee-basis-points').addEventListener('input', (e) => {
+            const basisPoints = parseInt(e.target.value) || 0;
+            const percentage = (basisPoints / 100).toFixed(2);
+            document.getElementById('current-fee-percentage').textContent = `${percentage}%`;
+        });
+
+        // 保存配置
+        document.getElementById('save-config-btn').addEventListener('click', () => {
+            this.saveConfig();
+        });
+
+        // 重置配置
+        document.getElementById('reset-config-btn').addEventListener('click', () => {
+            this.loadCurrentConfig();
+        });
+    }
+
+    async loadCurrentConfig() {
+        try {
+            const response = await fetch('/admin/api/v2/payment-config');
+            const data = await response.json();
+            
+            if (data.success) {
+                const config = data.data;
+                
+                // 填充表单
+                document.getElementById('platform-fee-basis-points').value = config.platform_fee_basis_points || 350;
+                document.getElementById('platform-fee-address').value = config.platform_fee_address || '';
+                document.getElementById('platform-commission-rate').value = (config.platform_commission_rate * 100) || 20;
+                document.getElementById('asset-creation-fee-amount').value = config.asset_creation_fee_amount || 0.02;
+                document.getElementById('asset-creation-fee-address').value = config.asset_creation_fee_address || '';
+                
+                // 更新显示
+                this.updateDisplayValues();
+                
+                toastr.success('配置加载成功');
+            } else {
+                toastr.error('加载配置失败: ' + data.error);
+            }
+        } catch (error) {
+            console.error('加载配置失败:', error);
+            toastr.error('加载配置失败');
+        }
+    }
+
+    async saveConfig() {
+        try {
+            const config = {
+                platform_fee_basis_points: parseInt(document.getElementById('platform-fee-basis-points').value) || 350,
+                platform_fee_address: document.getElementById('platform-fee-address').value.trim(),
+                platform_commission_rate: (parseFloat(document.getElementById('platform-commission-rate').value) || 20) / 100,
+                asset_creation_fee_amount: parseFloat(document.getElementById('asset-creation-fee-amount').value) || 0.02,
+                asset_creation_fee_address: document.getElementById('asset-creation-fee-address').value.trim()
+            };
+
+            // 验证配置
+            if (!this.validateConfig(config)) {
+                return;
+            }
+
+            const response = await fetch('/admin/api/v2/payment-config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(config)
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                toastr.success('配置保存成功');
+                this.loadConfigHistory();
+            } else {
+                toastr.error('保存配置失败: ' + data.error);
+            }
+        } catch (error) {
+            console.error('保存配置失败:', error);
+            toastr.error('保存配置失败');
+        }
+    }
+
+    validateConfig(config) {
+        // 验证平台费率基点
+        if (config.platform_fee_basis_points < 0 || config.platform_fee_basis_points > 10000) {
+            toastr.error('平台费率基点必须在0-10000之间');
+            return false;
+        }
+
+        // 验证平台分润比例
+        if (config.platform_commission_rate < 0 || config.platform_commission_rate > 1) {
+            toastr.error('平台分润比例必须在0%-100%之间');
+            return false;
+        }
+
+        // 验证地址格式（简单验证）
+        if (config.platform_fee_address && config.platform_fee_address.length < 32) {
+            toastr.error('平台费用地址格式不正确');
+            return false;
+        }
+
+        if (config.asset_creation_fee_address && config.asset_creation_fee_address.length < 32) {
+            toastr.error('资产创建费用地址格式不正确');
+            return false;
+        }
+
+        return true;
+    }
+
+    updateDisplayValues() {
+        // 更新费率百分比显示
+        const basisPoints = parseInt(document.getElementById('platform-fee-basis-points').value) || 0;
+        const percentage = (basisPoints / 100).toFixed(2);
+        document.getElementById('current-fee-percentage').textContent = `${percentage}%`;
+
+        // 更新发布者比例显示
+        const platformRate = parseFloat(document.getElementById('platform-commission-rate').value) || 0;
+        const ownerRate = 100 - platformRate;
+        document.getElementById('owner-percentage').textContent = `${ownerRate}%`;
+    }
+
+    async loadConfigHistory() {
+        try {
+            const response = await fetch('/admin/api/v2/payment-config/history');
+            const data = await response.json();
+            
+            if (data.success && data.data.length > 0) {
+                const historyContainer = document.getElementById('config-history');
+                historyContainer.innerHTML = data.data.map(record => `
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                        <div>
+                            <span class="text-sm font-medium text-gray-900">${record.config_key}</span>
+                            <span class="text-sm text-gray-500 ml-2">${record.old_value} → ${record.new_value}</span>
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            ${new Date(record.updated_at).toLocaleString()}
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } catch (error) {
+            console.error('加载配置历史失败:', error);
+        }
+    }
+}
+
+// 初始化支付配置管理器
+document.addEventListener('DOMContentLoaded', () => {
+    new PaymentConfigManager();
+});
+</script>
     <div class="flex justify-between items-center mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 mb-2">支付管理中心</h1>
