@@ -232,28 +232,48 @@ def get_security_status():
         
         # 密码强度评估
         password_score = 0
-        if len(crypto_password) >= 32:
-            password_score += 25
-        elif len(crypto_password) >= 16:
-            password_score += 15
+        password_strength = '极弱'
         
-        if any(c.isupper() for c in crypto_password) and any(c.islower() for c in crypto_password):
-            password_score += 15
-        if any(c.isdigit() for c in crypto_password):
-            password_score += 15
-        if any(c in '!@#$%^&*()_+-=[]{}|;:,.<>?-_' for c in crypto_password):
-            password_score += 15
-        
-        # 检查是否使用默认密码
-        if crypto_password.startswith('123abc'):
-            password_score = 0
-            password_strength = '极弱'
-        elif password_score >= 80:
-            password_strength = '强'
-        elif password_score >= 60:
-            password_strength = '中'
-        else:
-            password_strength = '弱'
+        if crypto_password:
+            # 长度评分
+            if len(crypto_password) >= 64:
+                password_score += 30
+            elif len(crypto_password) >= 32:
+                password_score += 25
+            elif len(crypto_password) >= 16:
+                password_score += 15
+            
+            # 复杂度评分
+            if any(c.isupper() for c in crypto_password) and any(c.islower() for c in crypto_password):
+                password_score += 15
+            if any(c.isdigit() for c in crypto_password):
+                password_score += 15
+            if any(c in '!@#$%^&*()_+-=[]{}|;:,.<>?-_' for c in crypto_password):
+                password_score += 15
+            
+            # 随机性评分（字符多样性）
+            if len(crypto_password) > 0:
+                unique_chars = len(set(crypto_password))
+                diversity_ratio = unique_chars / len(crypto_password)
+                if diversity_ratio > 0.8:
+                    password_score += 20
+                elif diversity_ratio > 0.6:
+                    password_score += 15
+                elif diversity_ratio > 0.4:
+                    password_score += 10
+            
+            # 检查是否使用默认密码
+            if crypto_password.startswith('123abc'):
+                password_score = 0
+                password_strength = '极弱'
+            elif password_score >= 85:
+                password_strength = '强'
+            elif password_score >= 70:
+                password_strength = '中'
+            elif password_score >= 50:
+                password_strength = '弱'
+            else:
+                password_strength = '极弱'
         
         # 盐值检查
         has_custom_salt = bool(crypto_salt and crypto_salt != 'rwa_hub_salt_2025'.encode().hex())
@@ -269,9 +289,16 @@ def get_security_status():
                 key_status = '解密失败'
         
         # 总体安全评分
-        security_score = password_score
+        security_score = 0
+        
+        # 密码评分 (最高70分)
+        security_score += min(password_score, 70)
+        
+        # 盐值评分 (20分)
         if has_custom_salt:
             security_score += 20
+        
+        # 私钥状态评分 (10分)
         if key_status == '正常':
             security_score += 10
         
@@ -313,65 +340,51 @@ def load_encrypted_key():
         from solders.keypair import Keypair # <-- FIXED
         import base58
         import base64
+        import os
         
-        # 获取加密的私钥和密码
+        # 获取加密的私钥
         encrypted_key = SystemConfig.get_value('SOLANA_PRIVATE_KEY_ENCRYPTED')
-        encrypted_password = SystemConfig.get_value('CRYPTO_PASSWORD_ENCRYPTED')
         
-        if not encrypted_key or not encrypted_password:
+        if not encrypted_key:
             return jsonify({
                 'success': False,
                 'error': '未找到加密的私钥配置，请先设置并加密私钥'
             })
         
-        # 解密用户密码
-        import os
-        original_password = os.environ.get('CRYPTO_PASSWORD')
-        os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+        # 直接使用当前环境变量解密
+        crypto_manager = get_crypto_manager()
+        private_key = crypto_manager.decrypt_private_key(encrypted_key)
         
+        # 获取当前的加密配置
+        crypto_password = os.environ.get('CRYPTO_PASSWORD', '')
+        crypto_salt = os.environ.get('CRYPTO_SALT', '')
+
+            
+        # 解析私钥并生成地址
         try:
-            system_crypto = get_crypto_manager()
-            crypto_password = system_crypto.decrypt_private_key(encrypted_password)
-            
-            # 设置解密密码
-            os.environ['CRYPTO_PASSWORD'] = crypto_password
-            
-            # 验证私钥
-            user_crypto = get_crypto_manager()
-            private_key = user_crypto.decrypt_private_key(encrypted_key)
-            
-            # 解析私钥并生成地址
-            # 优先尝试base58解码（Solana最常用格式）
-            try:
-                private_key_bytes = base58.b58decode(private_key)
-            except:
-                # 如果base58失败，尝试其他格式
-                if len(private_key) == 128:  # 十六进制格式
-                    private_key_bytes = bytes.fromhex(private_key)
-                elif len(private_key) == 88:  # Base64格式
-                    private_key_bytes = base64.b64decode(private_key)
-                else:
-                    raise ValueError(f"无法识别的私钥格式，长度: {len(private_key)}")
-            
-            # 处理不同长度的私钥
-            if len(private_key_bytes) == 64:
-                # 标准64字节格式，前32字节是私钥
-                seed = private_key_bytes[:32]
-            elif len(private_key_bytes) == 32:
-                # 仅私钥
-                seed = private_key_bytes
-            elif len(private_key_bytes) == 66:
-                # 可能包含校验和，取前32字节作为私钥
-                seed = private_key_bytes[:32]
+            private_key_bytes = base58.b58decode(private_key)
+        except:
+            # 如果base58失败，尝试其他格式
+            if len(private_key) == 128:  # 十六进制格式
+                private_key_bytes = bytes.fromhex(private_key)
+            elif len(private_key) == 88:  # Base64格式
+                private_key_bytes = base64.b64decode(private_key)
             else:
-                raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}字节")
-            
-            # 创建密钥对验证
-            keypair = Keypair.from_seed(seed)
-            wallet_address = str(keypair.pubkey()) # <-- FIXED
-            
-        except Exception as e:
-            return jsonify({'success': False, 'error': f'私钥格式错误: {str(e)}'}), 400
+                raise ValueError(f"无法识别的私钥格式，长度: {len(private_key)}")
+        
+        # 处理不同长度的私钥
+        if len(private_key_bytes) == 64:
+            seed = private_key_bytes[:32]
+        elif len(private_key_bytes) == 32:
+            seed = private_key_bytes
+        elif len(private_key_bytes) == 66:
+            seed = private_key_bytes[:32]
+        else:
+            raise ValueError(f"无效的私钥长度: {len(private_key_bytes)}字节")
+        
+        # 创建密钥对验证
+        keypair = Keypair.from_seed(seed)
+        wallet_address = str(keypair.pubkey()) # <-- FIXED
         
         current_app.logger.info(f"成功加载加密私钥，钱包地址: {wallet_address}")
         
@@ -379,7 +392,8 @@ def load_encrypted_key():
             'success': True,
             'wallet_address': wallet_address,
             'private_key': private_key,  # 返回解密后的私钥供前端填充表单
-            'crypto_password': crypto_password,  # 返回解密后的密码供前端填充表单
+            'crypto_password': crypto_password,  # 返回当前的加密密码
+            'crypto_salt': crypto_salt,  # 返回当前的盐值
             'message': '加密私钥已成功加载'
         })
         
