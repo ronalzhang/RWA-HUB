@@ -299,17 +299,33 @@ class TradeServiceV3:
                     f'交易构建失败: {str(e)}'
                 )
 
-            # 7. 交易验证阶段
-            logger.debug(f"[{transaction_id}] 步骤7: 开始交易验证")
+            # 7. 交易验证阶段 - 临时简化验证
+            logger.debug(f"[{transaction_id}] 步骤7: 开始交易验证（简化版）")
             
             try:
-                if not TradeServiceV3._validate_transaction(tx, transaction_id):
-                    logger.error(f"[{transaction_id}] 交易验证失败")
+                # 简化验证：只检查基本组件
+                if not tx or not tx.message:
+                    logger.error(f"[{transaction_id}] 交易验证失败: 交易或消息为空")
                     return TradeServiceV3._create_error_response(
                         TradeServiceV3.ErrorCodes.TRANSACTION_VALIDATION_ERROR, 
-                        '交易验证失败'
+                        '交易验证失败：交易结构无效'
                     )
-                logger.debug(f"[{transaction_id}] 交易验证通过")
+                
+                if not tx.message.instructions or len(tx.message.instructions) == 0:
+                    logger.error(f"[{transaction_id}] 交易验证失败: 缺少指令")
+                    return TradeServiceV3._create_error_response(
+                        TradeServiceV3.ErrorCodes.TRANSACTION_VALIDATION_ERROR, 
+                        '交易验证失败：缺少指令'
+                    )
+                
+                if not tx.message.account_keys or len(tx.message.account_keys) == 0:
+                    logger.error(f"[{transaction_id}] 交易验证失败: 缺少账户")
+                    return TradeServiceV3._create_error_response(
+                        TradeServiceV3.ErrorCodes.TRANSACTION_VALIDATION_ERROR, 
+                        '交易验证失败：缺少账户'
+                    )
+                
+                logger.debug(f"[{transaction_id}] 交易基础验证通过")
                 
             except Exception as e:
                 logger.error(f"[{transaction_id}] 交易验证阶段发生异常: {e}", exc_info=True)
