@@ -10,8 +10,10 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
 } else {
     window.RWA_WALLET_MANAGER_LOADED = true;
 
-    // 调试模式 - 临时启用用于调试管理员入口问题
-    const DEBUG_MODE = true;
+    // 调试模式
+    const DEBUG_MODE = window.location.hostname === 'localhost' || 
+                       window.location.hostname === '127.0.0.1' || 
+                       window.DEBUG_MODE === true;
 
     // 调试日志函数
     function debugLog(...args) {
