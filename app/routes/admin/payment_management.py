@@ -80,10 +80,8 @@ def get_payment_config():
     try:
         from app.models.admin import SystemConfig
         
-        # 获取所有支付相关配置
+        # 获取所有支付相关配置（移除重复的平台费率配置）
         config_keys = [
-            'PLATFORM_FEE_BASIS_POINTS',
-            'PLATFORM_FEE_ADDRESS', 
             'PLATFORM_COMMISSION_RATE',
             'ASSET_CREATION_FEE_AMOUNT',
             'ASSET_CREATION_FEE_ADDRESS'
@@ -92,11 +90,7 @@ def get_payment_config():
         config_data = {}
         for key in config_keys:
             value = SystemConfig.get_value(key)
-            if key == 'PLATFORM_FEE_BASIS_POINTS':
-                config_data['platform_fee_basis_points'] = int(value) if value else 350
-            elif key == 'PLATFORM_FEE_ADDRESS':
-                config_data['platform_fee_address'] = value or ''
-            elif key == 'PLATFORM_COMMISSION_RATE':
+            if key == 'PLATFORM_COMMISSION_RATE':
                 config_data['platform_commission_rate'] = float(value) if value else 0.20
             elif key == 'ASSET_CREATION_FEE_AMOUNT':
                 config_data['asset_creation_fee_amount'] = float(value) if value else 0.02
@@ -129,10 +123,8 @@ def update_payment_config():
                 'error': '请求数据不能为空'
             }), 400
         
-        # 配置映射
+        # 配置映射（移除重复的平台费率配置）
         config_mapping = {
-            'platform_fee_basis_points': 'PLATFORM_FEE_BASIS_POINTS',
-            'platform_fee_address': 'PLATFORM_FEE_ADDRESS',
             'platform_commission_rate': 'PLATFORM_COMMISSION_RATE', 
             'asset_creation_fee_amount': 'ASSET_CREATION_FEE_AMOUNT',
             'asset_creation_fee_address': 'ASSET_CREATION_FEE_ADDRESS'
@@ -145,25 +137,18 @@ def update_payment_config():
                 value = data[field_name]
                 
                 # 数据验证
-                if field_name == 'platform_fee_basis_points':
-                    if not isinstance(value, int) or value < 0 or value > 10000:
-                        return jsonify({
-                            'success': False,
-                            'error': '平台费率基点必须在0-10000之间'
-                        }), 400
-                        
-                elif field_name == 'platform_commission_rate':
+                if field_name == 'platform_commission_rate':
                     if not isinstance(value, (int, float)) or value < 0 or value > 1:
                         return jsonify({
                             'success': False,
                             'error': '平台分润比例必须在0-1之间'
                         }), 400
                         
-                elif field_name in ['platform_fee_address', 'asset_creation_fee_address']:
+                elif field_name == 'asset_creation_fee_address':
                     if value and (not isinstance(value, str) or len(value) < 32):
                         return jsonify({
                             'success': False,
-                            'error': f'{field_name}地址格式不正确'
+                            'error': '资产创建费用地址格式不正确'
                         }), 400
                         
                 elif field_name == 'asset_creation_fee_amount':

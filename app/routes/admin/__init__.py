@@ -81,11 +81,9 @@ def settings_v2():
     """V2版本系统设置页面"""
     from app.models.admin import SystemConfig
     
-    # 获取所有配置
+    # 获取所有配置（移除重复的平台费率配置）
     configs = {}
     config_keys = [
-        'PLATFORM_FEE_BASIS_POINTS',
-        'PLATFORM_FEE_ADDRESS', 
         'PURCHASE_CONTRACT_ADDRESS',
         'ASSET_CREATION_FEE_AMOUNT',
         'ASSET_CREATION_FEE_ADDRESS'
@@ -107,10 +105,8 @@ def update_settings_v2():
         # 获取管理员地址
         admin_address = getattr(g, 'eth_address', None) or session.get('admin_wallet_address')
         
-        # 更新配置
+        # 更新配置（移除重复的平台费率配置）
         config_updates = {
-            'PLATFORM_FEE_BASIS_POINTS': request.form.get('platform_fee_basis_points'),
-            'PLATFORM_FEE_ADDRESS': request.form.get('platform_fee_address'),
             'PURCHASE_CONTRACT_ADDRESS': request.form.get('purchase_contract_address'),
             'ASSET_CREATION_FEE_AMOUNT': request.form.get('asset_creation_fee_amount'),
             'ASSET_CREATION_FEE_ADDRESS': request.form.get('asset_creation_fee_address')
@@ -574,7 +570,8 @@ def get_wallet_info():
         if not encrypted_key or not encrypted_password:
             return jsonify({
                 'address': None,
-                'balance': 0,
+                'sol_balance': '0.0',
+                'usdc_balance': '0.0',
                 'status': 'not_configured'
             })
         
@@ -617,28 +614,60 @@ def get_wallet_info():
             keypair = Keypair.from_seed(seed)
             wallet_address = str(keypair.pubkey()) # <-- FIXED
             
-            # 查询SOL余额
+            # 查询SOL和USDC余额
             try:
                 from app.blockchain.solana_service import get_solana_client # <-- FIXED
                 from solders.pubkey import Pubkey # <-- FIXED
+                from spl.token.instructions import get_associated_token_address
                 
                 # 使用主网RPC端点，设置较短的超时时间
                 client = get_solana_client() # <-- FIXED
                 public_key = Pubkey.from_string(wallet_address) # <-- FIXED
                 
-                # 获取余额（以lamports为单位）
+                # 获取SOL余额（以lamports为单位）
                 balance_response = client.get_balance(public_key)
                 if balance_response.value is not None:
                     # 转换为SOL（1 SOL = 1,000,000,000 lamports）
                     balance_sol = balance_response.value / 1_000_000_000
-                    balance_str = f"{balance_sol:.9f}"
+                    sol_balance_str = f"{balance_sol:.9f}"
                 else:
-                    balance_str = "查询失败"
+                    sol_balance_str = "查询失败"
+                
+                # 查询USDC余额
+                try:
+                    # USDC代币地址 (mainnet)
+                    USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+                    usdc_mint = Pubkey.from_string(USDC_MINT)
+                    
+                    # 获取关联代币账户地址
+                    usdc_ata = get_associated_token_address(public_key, usdc_mint)
+                    
+                    # 获取USDC账户信息
+                    usdc_account_info = client.get_account_info(usdc_ata)
+                    
+                    if usdc_account_info.value:
+                        # 解析代币账户数据
+                        data = usdc_account_info.value.data
+                        if len(data) >= 72:
+                            # amount字段在偏移量64处，为8字节的little-endian数字
+                            view = data[64:72]
+                            raw_amount = int.from_bytes(view, byteorder='little')
+                            usdc_balance = raw_amount / 1_000_000  # USDC有6位小数
+                            usdc_balance_str = f"{usdc_balance:.6f}"
+                        else:
+                            usdc_balance_str = "0.0"
+                    else:
+                        usdc_balance_str = "0.0"
+                        
+                except Exception as usdc_error:
+                    current_app.logger.warning(f"查询USDC余额失败: {usdc_error}")
+                    usdc_balance_str = "0.0"
                     
             except Exception as balance_error:
-                current_app.logger.warning(f"查询SOL余额失败: {balance_error}")
+                current_app.logger.warning(f"查询余额失败: {balance_error}")
                 # 简化错误处理，直接返回0.0
-                balance_str = "0.0"
+                sol_balance_str = "0.0"
+                usdc_balance_str = "0.0"
             
             # 恢复原始密码
             if original_password:
@@ -646,7 +675,8 @@ def get_wallet_info():
             
             return jsonify({
                 'address': wallet_address,
-                'balance': balance_str,
+                'sol_balance': sol_balance_str,
+                'usdc_balance': usdc_balance_str,
                 'status': 'configured'
             })
             
@@ -654,7 +684,8 @@ def get_wallet_info():
             current_app.logger.error(f"解密私钥失败: {decrypt_error}")
             return jsonify({
                 'address': None,
-                'balance': 0,
+                'sol_balance': '0.0',
+                'usdc_balance': '0.0',
                 'status': 'error',
                 'error': f'解密失败: {str(decrypt_error)}'
             })
@@ -663,7 +694,8 @@ def get_wallet_info():
         current_app.logger.error(f"获取钱包信息失败: {str(e)}")
         return jsonify({
             'address': None,
-            'balance': 0,
+            'sol_balance': '0.0',
+            'usdc_balance': '0.0',
             'status': 'error',
             'error': str(e)
         })

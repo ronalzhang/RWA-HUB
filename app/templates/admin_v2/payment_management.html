@@ -57,37 +57,6 @@
 
     <!-- 费率配置卡片 -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <!-- 平台费率配置 -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">平台费率设置</h3>
-                <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">基点制</span>
-            </div>
-            
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        平台费率（基点）
-                        <span class="text-gray-500 text-xs ml-1">1基点 = 0.01%</span>
-                    </label>
-                    <div class="flex items-center space-x-2">
-                        <input type="number" id="platform-fee-basis-points" 
-                               class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                               placeholder="350" min="0" max="10000">
-                        <span class="text-sm text-gray-500">基点</span>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">当前设置: <span id="current-fee-percentage">3.5%</span></p>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">平台费用收取地址</label>
-                    <input type="text" id="platform-fee-address" 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                           placeholder="Solana钱包地址">
-                </div>
-            </div>
-        </div>
-
         <!-- 平台分润配置 -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div class="flex items-center justify-between mb-4">
