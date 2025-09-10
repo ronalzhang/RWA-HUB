@@ -132,6 +132,21 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
             if (storedWalletType && storedWalletAddress) {
                 debugLog('恢复之前的钱包连接:', storedWalletType, storedWalletAddress);
                 
+                // 检查钱包是否可用
+                if (storedWalletType === 'ethereum' && !window.ethereum) {
+                    debugLog('MetaMask未安装，清除存储状态');
+                    localStorage.removeItem('walletType');
+                    localStorage.removeItem('walletAddress');
+                    return;
+                }
+                
+                if (storedWalletType === 'phantom' && (!window.solana || !window.solana.isPhantom)) {
+                    debugLog('Phantom未安装，清除存储状态');
+                    localStorage.removeItem('walletType');
+                    localStorage.removeItem('walletAddress');
+                    return;
+                }
+                
                 this.state.walletType = storedWalletType;
                 this.state.address = storedWalletAddress;
                 this.state.connected = true;
@@ -144,14 +159,6 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                 
                 // 尝试静默重连
                 try {
-                    // 检查钱包是否可用
-                    if (storedWalletType === 'ethereum' && !window.ethereum) {
-                        debugLog('MetaMask未安装，跳过静默重连');
-                        // 清除无效的存储状态
-                        this.disconnect();
-                        return;
-                    }
-                    
                     await this.connect(storedWalletType, true);
                 } catch (error) {
                     debugLog('静默重连失败:', error);
@@ -544,7 +551,8 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                 debugLog('连接以太坊钱包...');
                 
                 if (!window.ethereum) {
-                    throw new Error('MetaMask钱包未安装或不可用');
+                    debugLog('MetaMask钱包未安装或不可用');
+                    return false;
                 }
 
                 let accounts;
@@ -578,7 +586,7 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                     return false;
                 }
                 debugError('连接以太坊钱包失败:', error);
-                throw error;
+                return false;
             }
         }
 
