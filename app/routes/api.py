@@ -1077,3 +1077,56 @@ def check_usdc_balance():
         current_app.logger.error(f"检查USDC余额失败: {str(e)}", exc_info=True)
         return create_error_response('INTERNAL_SERVER_ERROR', f'检查USDC余额失败: {str(e)}')
 
+@api_bp.route('/admin/check', methods=['POST'])
+@api_endpoint(log_calls=True, measure_perf=True)
+def check_admin_status():
+    """检查钱包地址是否为管理员"""
+    try:
+        data = request.get_json()
+        wallet_address = data.get('wallet_address')
+        
+        if not wallet_address:
+            return create_error_response('VALIDATION_ERROR', '钱包地址不能为空', field='wallet_address')
+        
+        # 从配置中获取管理员地址
+        admin_addresses = []
+        
+        # 方法1: 从环境变量获取
+        admin_env = os.getenv('ADMIN_WALLET_ADDRESS')
+        if admin_env:
+            admin_addresses.extend([addr.strip() for addr in admin_env.split(',')])
+        
+        # 方法2: 从数据库配置获取
+        try:
+            from app.models.system_config import SystemConfig
+            admin_config = SystemConfig.get_config('admin_wallet_address')
+            if admin_config:
+                admin_addresses.extend([addr.strip() for addr in admin_config.split(',')])
+        except Exception as db_error:
+            logger.warning(f"从数据库获取管理员地址失败: {db_error}")
+        
+        # 方法3: 硬编码的管理员地址（作为备用）
+        default_admin_addresses = [
+            '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b'
+        ]
+        admin_addresses.extend(default_admin_addresses)
+        
+        # 去重
+        admin_addresses = list(set(admin_addresses))
+        
+        # 检查是否为管理员
+        is_admin = wallet_address in admin_addresses
+        
+        logger.info(f"管理员检查: {wallet_address}, 结果: {is_admin}")
+        
+        return jsonify({
+            'success': True,
+            'wallet_address': wallet_address,
+            'is_admin': is_admin,
+            'admin_addresses_count': len(admin_addresses)
+        })
+        
+    except Exception as e:
+        logger.error(f"管理员状态检查失败: {str(e)}")
+        return create_error_response('INTERNAL_SERVER_ERROR', f'管理员状态检查失败: {str(e)}')
+
