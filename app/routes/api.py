@@ -203,7 +203,7 @@ def list_assets():
 def _get_user_assets(address, wallet_type='ethereum'):
     """获取用户持有资产的核心逻辑"""
     try:
-        from app.models.trade import Trade, TradeStatus
+        from app.models.trade import Trade, TradeStatus, TradeType
         from app.models.asset import Asset
         from sqlalchemy import func
         
@@ -217,7 +217,7 @@ def _get_user_assets(address, wallet_type='ethereum'):
             Asset, Trade.asset_id == Asset.id
         ).filter(
             Trade.trader_address == address,
-            Trade.type == 'buy',
+            Trade.type == TradeType.BUY.value,
             Trade.status == TradeStatus.COMPLETED.value
         ).group_by(
             Trade.asset_id, Asset.name, Asset.token_symbol
