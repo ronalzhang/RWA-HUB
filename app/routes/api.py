@@ -201,9 +201,51 @@ def list_assets():
     }), 200
 
 def _get_user_assets(address, wallet_type='ethereum'):
-    """获取用户持有资产的核心逻辑 - 调试模式"""
-    # 调试：返回一个简单的JSON对象以测试序列化问题
-    return jsonify({'status': 'ok', 'message': 'This is a test from the simplified _get_user_assets'})
+    """获取用户持有资产的核心逻辑"""
+    try:
+        from app.models.trade import Trade, TradeStatus
+        from app.models.asset import Asset
+        from sqlalchemy import func
+        
+        # 查询用户所有已完成的购买交易
+        completed_trades = db.session.query(
+            Trade.asset_id,
+            func.sum(Trade.amount).label('total_amount'),
+            Asset.name,
+            Asset.token_symbol
+        ).join(
+            Asset, Trade.asset_id == Asset.id
+        ).filter(
+            Trade.trader_address == address,
+            Trade.type == 'buy',
+            Trade.status == TradeStatus.COMPLETED.value
+        ).group_by(
+            Trade.asset_id, Asset.name, Asset.token_symbol
+        ).all()
+        
+        # 构建资产列表
+        assets = []
+        for trade in completed_trades:
+            if trade.total_amount > 0:  # 只显示持有数量大于0的资产
+                assets.append({
+                    'symbol': trade.token_symbol,
+                    'name': trade.name,
+                    'balance': int(trade.total_amount)
+                })
+        
+        return jsonify({
+            'success': True,
+            'assets': assets,
+            'total_count': len(assets)
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'获取用户资产失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': '获取用户资产失败',
+            'assets': []
+        }), 500
 
 def _parse_asset_image_url(asset):
     """解析资产图片URL"""

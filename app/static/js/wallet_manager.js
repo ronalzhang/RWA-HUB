@@ -1224,7 +1224,7 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
             }
         }
 
-        // 从交易记录获取用户资产（简化版本）
+        // 从API获取用户真实资产数据
         async loadUserAssetsFromTransactions() {
             try {
                 const assetsList = document.getElementById('walletAssetsList');
@@ -1232,28 +1232,37 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                     return;
                 }
 
-                // 模拟用户资产数据（实际应该从后端API获取）
-                // 这里先用一个简单的示例，你可以根据实际需要调整
-                const userAssets = [
-                    { name: 'RWA-001', balance: 100 },
-                    { name: 'RWA-002', balance: 50 },
-                    { name: 'GOLD-TOKEN', balance: 25 }
-                ];
+                if (!this.state.address) {
+                    assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#666; font-size:12px;">钱包未连接</li>';
+                    return;
+                }
 
-                if (userAssets.length === 0) {
+                // 调用真实的用户资产API
+                const response = await fetch(`/api/user/assets?address=${encodeURIComponent(this.state.address)}`);
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || '获取资产失败');
+                }
+
+                const assets = data.assets || [];
+
+                if (assets.length === 0) {
                     assetsList.innerHTML = '<li style="padding:8px; text-align:center; color:#666; font-size:12px;">暂无资产</li>';
                     return;
                 }
 
-                // 渲染简单的资产列表
-                assetsList.innerHTML = userAssets.map(asset => `
+                // 渲染真实的资产列表
+                assetsList.innerHTML = assets.map(asset => `
                     <li style="padding:4px 8px; border-bottom:1px solid #f0f0f0; font-size:12px;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-weight:500; color:#333;">${asset.name}</span>
+                            <span style="font-weight:500; color:#333;">${asset.name || asset.symbol}</span>
                             <span style="color:#666;">${asset.balance}</span>
                         </div>
                     </li>
                 `).join('');
+
+                console.log(`用户资产加载完成，共 ${assets.length} 项资产`);
 
             } catch (error) {
                 console.warn('加载用户资产失败:', error);
