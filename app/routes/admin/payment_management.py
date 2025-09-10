@@ -80,9 +80,10 @@ def get_payment_config():
     try:
         from app.models.admin import SystemConfig
         
-        # 获取所有支付相关配置（移除重复的平台费率配置）
+        # 获取所有支付相关配置
         config_keys = [
             'PLATFORM_COMMISSION_RATE',
+            'PLATFORM_FEE_ADDRESS',
             'ASSET_CREATION_FEE_AMOUNT',
             'ASSET_CREATION_FEE_ADDRESS'
         ]
@@ -92,6 +93,8 @@ def get_payment_config():
             value = SystemConfig.get_value(key)
             if key == 'PLATFORM_COMMISSION_RATE':
                 config_data['platform_commission_rate'] = float(value) if value else 0.20
+            elif key == 'PLATFORM_FEE_ADDRESS':
+                config_data['platform_fee_address'] = value or ''
             elif key == 'ASSET_CREATION_FEE_AMOUNT':
                 config_data['asset_creation_fee_amount'] = float(value) if value else 0.02
             elif key == 'ASSET_CREATION_FEE_ADDRESS':
@@ -123,9 +126,10 @@ def update_payment_config():
                 'error': '请求数据不能为空'
             }), 400
         
-        # 配置映射（移除重复的平台费率配置）
+        # 配置映射
         config_mapping = {
-            'platform_commission_rate': 'PLATFORM_COMMISSION_RATE', 
+            'platform_commission_rate': 'PLATFORM_COMMISSION_RATE',
+            'platform_fee_address': 'PLATFORM_FEE_ADDRESS',
             'asset_creation_fee_amount': 'ASSET_CREATION_FEE_AMOUNT',
             'asset_creation_fee_address': 'ASSET_CREATION_FEE_ADDRESS'
         }
@@ -144,11 +148,11 @@ def update_payment_config():
                             'error': '平台分润比例必须在0-1之间'
                         }), 400
                         
-                elif field_name == 'asset_creation_fee_address':
+                elif field_name in ['platform_fee_address', 'asset_creation_fee_address']:
                     if value and (not isinstance(value, str) or len(value) < 32):
                         return jsonify({
                             'success': False,
-                            'error': '资产创建费用地址格式不正确'
+                            'error': f'{field_name}地址格式不正确'
                         }), 400
                         
                 elif field_name == 'asset_creation_fee_amount':

@@ -79,6 +79,14 @@
                     <p class="text-xs text-gray-500 mt-1">发布者获得: <span id="owner-percentage">80%</span></p>
                 </div>
                 
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">平台收款地址</label>
+                    <input type="text" id="platform-fee-address" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                           placeholder="Solana钱包地址">
+                    <p class="text-xs text-gray-500 mt-1">用于接收平台分润和资产创建费用</p>
+                </div>
+                
                 <div class="bg-gray-50 p-3 rounded-md">
                     <h4 class="text-sm font-medium text-gray-700 mb-2">分润说明</h4>
                     <ul class="text-xs text-gray-600 space-y-1">
@@ -153,28 +161,33 @@ class PaymentConfigManager {
 
     initializeEventListeners() {
         // 平台分润比例变化时更新发布者比例显示
-        document.getElementById('platform-commission-rate').addEventListener('input', (e) => {
-            const platformRate = parseFloat(e.target.value) || 0;
-            const ownerRate = 100 - platformRate;
-            document.getElementById('owner-percentage').textContent = `${ownerRate}%`;
-        });
-
-        // 平台费率基点变化时更新百分比显示
-        document.getElementById('platform-fee-basis-points').addEventListener('input', (e) => {
-            const basisPoints = parseInt(e.target.value) || 0;
-            const percentage = (basisPoints / 100).toFixed(2);
-            document.getElementById('current-fee-percentage').textContent = `${percentage}%`;
-        });
+        const commissionRateInput = document.getElementById('platform-commission-rate');
+        if (commissionRateInput) {
+            commissionRateInput.addEventListener('input', (e) => {
+                const platformRate = parseFloat(e.target.value) || 0;
+                const ownerRate = 100 - platformRate;
+                const ownerPercentageElement = document.getElementById('owner-percentage');
+                if (ownerPercentageElement) {
+                    ownerPercentageElement.textContent = `${ownerRate}%`;
+                }
+            });
+        }
 
         // 保存配置
-        document.getElementById('save-config-btn').addEventListener('click', () => {
-            this.saveConfig();
-        });
+        const saveBtn = document.getElementById('save-config-btn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                this.saveConfig();
+            });
+        }
 
         // 重置配置
-        document.getElementById('reset-config-btn').addEventListener('click', () => {
-            this.loadCurrentConfig();
-        });
+        const resetBtn = document.getElementById('reset-config-btn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                this.loadCurrentConfig();
+            });
+        }
     }
 
     async loadCurrentConfig() {
@@ -185,12 +198,26 @@ class PaymentConfigManager {
             if (data.success) {
                 const config = data.data;
                 
-                // 填充表单
-                document.getElementById('platform-fee-basis-points').value = config.platform_fee_basis_points || 350;
-                document.getElementById('platform-fee-address').value = config.platform_fee_address || '';
-                document.getElementById('platform-commission-rate').value = (config.platform_commission_rate * 100) || 20;
-                document.getElementById('asset-creation-fee-amount').value = config.asset_creation_fee_amount || 0.02;
-                document.getElementById('asset-creation-fee-address').value = config.asset_creation_fee_address || '';
+                // 填充表单（只填充存在的元素）
+                const commissionRateInput = document.getElementById('platform-commission-rate');
+                if (commissionRateInput) {
+                    commissionRateInput.value = (config.platform_commission_rate * 100) || 20;
+                }
+                
+                const assetFeeAmountInput = document.getElementById('asset-creation-fee-amount');
+                if (assetFeeAmountInput) {
+                    assetFeeAmountInput.value = config.asset_creation_fee_amount || 0.02;
+                }
+                
+                const assetFeeAddressInput = document.getElementById('asset-creation-fee-address');
+                if (assetFeeAddressInput) {
+                    assetFeeAddressInput.value = config.asset_creation_fee_address || '';
+                }
+                
+                const platformFeeAddressInput = document.getElementById('platform-fee-address');
+                if (platformFeeAddressInput) {
+                    platformFeeAddressInput.value = config.platform_fee_address || '';
+                }
                 
                 // 更新显示
                 this.updateDisplayValues();
@@ -207,13 +234,28 @@ class PaymentConfigManager {
 
     async saveConfig() {
         try {
-            const config = {
-                platform_fee_basis_points: parseInt(document.getElementById('platform-fee-basis-points').value) || 350,
-                platform_fee_address: document.getElementById('platform-fee-address').value.trim(),
-                platform_commission_rate: (parseFloat(document.getElementById('platform-commission-rate').value) || 20) / 100,
-                asset_creation_fee_amount: parseFloat(document.getElementById('asset-creation-fee-amount').value) || 0.02,
-                asset_creation_fee_address: document.getElementById('asset-creation-fee-address').value.trim()
-            };
+            const config = {};
+            
+            // 只获取存在的元素的值
+            const commissionRateInput = document.getElementById('platform-commission-rate');
+            if (commissionRateInput) {
+                config.platform_commission_rate = (parseFloat(commissionRateInput.value) || 20) / 100;
+            }
+            
+            const assetFeeAmountInput = document.getElementById('asset-creation-fee-amount');
+            if (assetFeeAmountInput) {
+                config.asset_creation_fee_amount = parseFloat(assetFeeAmountInput.value) || 0.02;
+            }
+            
+            const assetFeeAddressInput = document.getElementById('asset-creation-fee-address');
+            if (assetFeeAddressInput) {
+                config.asset_creation_fee_address = assetFeeAddressInput.value.trim();
+            }
+            
+            const platformFeeAddressInput = document.getElementById('platform-fee-address');
+            if (platformFeeAddressInput) {
+                config.platform_fee_address = platformFeeAddressInput.value.trim();
+            }
 
             // 验证配置
             if (!this.validateConfig(config)) {
@@ -243,24 +285,13 @@ class PaymentConfigManager {
     }
 
     validateConfig(config) {
-        // 验证平台费率基点
-        if (config.platform_fee_basis_points < 0 || config.platform_fee_basis_points > 10000) {
-            toastr.error('平台费率基点必须在0-10000之间');
-            return false;
-        }
-
         // 验证平台分润比例
-        if (config.platform_commission_rate < 0 || config.platform_commission_rate > 1) {
+        if (config.platform_commission_rate !== undefined && (config.platform_commission_rate < 0 || config.platform_commission_rate > 1)) {
             toastr.error('平台分润比例必须在0%-100%之间');
             return false;
         }
 
-        // 验证地址格式（简单验证）
-        if (config.platform_fee_address && config.platform_fee_address.length < 32) {
-            toastr.error('平台费用地址格式不正确');
-            return false;
-        }
-
+        // 验证资产创建费用地址格式（简单验证）
         if (config.asset_creation_fee_address && config.asset_creation_fee_address.length < 32) {
             toastr.error('资产创建费用地址格式不正确');
             return false;
@@ -270,15 +301,15 @@ class PaymentConfigManager {
     }
 
     updateDisplayValues() {
-        // 更新费率百分比显示
-        const basisPoints = parseInt(document.getElementById('platform-fee-basis-points').value) || 0;
-        const percentage = (basisPoints / 100).toFixed(2);
-        document.getElementById('current-fee-percentage').textContent = `${percentage}%`;
-
         // 更新发布者比例显示
-        const platformRate = parseFloat(document.getElementById('platform-commission-rate').value) || 0;
-        const ownerRate = 100 - platformRate;
-        document.getElementById('owner-percentage').textContent = `${ownerRate}%`;
+        const commissionRateInput = document.getElementById('platform-commission-rate');
+        const ownerPercentageElement = document.getElementById('owner-percentage');
+        
+        if (commissionRateInput && ownerPercentageElement) {
+            const platformRate = parseFloat(commissionRateInput.value) || 0;
+            const ownerRate = 100 - platformRate;
+            ownerPercentageElement.textContent = `${ownerRate}%`;
+        }
     }
 
     async loadConfigHistory() {
