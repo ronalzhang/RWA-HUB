@@ -136,6 +136,9 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                 this.state.address = storedWalletAddress;
                 this.state.connected = true;
                 
+                // 检查管理员状态
+                await this.checkAdminStatus();
+                
                 this.updateUI();
                 this.notifyStateChange();
                 
@@ -262,6 +265,10 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
 
                 if (success) {
                     debugLog('钱包连接成功');
+                    
+                    // 检查管理员状态
+                    await this.checkAdminStatus();
+                    
                     this.notifyStateChange();
                     
                     // 保存连接状态
@@ -920,6 +927,9 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                 assets: [],
                 provider: null
             };
+            
+            // 隐藏管理员入口
+            this.updateAdminUI(false);
         }
 
         // 更新UI
@@ -1333,6 +1343,59 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                     this.clearState();
                     this.updateUI();
                     this.notifyStateChange();
+                }
+            }
+        }
+
+        // 检查管理员状态
+        async checkAdminStatus() {
+            try {
+                if (!this.state.address) {
+                    this.state.isAdmin = false;
+                    this.updateAdminUI(false);
+                    return;
+                }
+
+                debugLog('检查管理员状态:', this.state.address);
+                
+                const response = await fetch('/api/admin/check', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        address: this.state.address
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    this.state.isAdmin = data.is_admin === true;
+                    debugLog('管理员状态检查结果:', this.state.isAdmin);
+                    this.updateAdminUI(this.state.isAdmin);
+                } else {
+                    debugLog('管理员状态检查失败:', data.error || '未知错误');
+                    this.state.isAdmin = false;
+                    this.updateAdminUI(false);
+                }
+            } catch (error) {
+                debugError('检查管理员状态失败:', error);
+                this.state.isAdmin = false;
+                this.updateAdminUI(false);
+            }
+        }
+
+        // 更新管理员UI
+        updateAdminUI(isAdmin) {
+            const adminEntry = document.getElementById('adminEntry');
+            if (adminEntry) {
+                if (isAdmin) {
+                    adminEntry.style.display = 'block';
+                    debugLog('显示管理员入口');
+                } else {
+                    adminEntry.style.display = 'none';
+                    debugLog('隐藏管理员入口');
                 }
             }
         }
