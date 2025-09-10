@@ -17,7 +17,7 @@
     
     <!-- 系统配置 -->
     <div class="bg-white shadow rounded-lg p-6">
-        <h2 class="text-xl font-semibold text-gray-800 mb-6">支付配置</h2>
+        <h2 class="text-xl font-semibold text-gray-800 mb-6">系统设置</h2>
 
         {# Display flashed messages #}
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -42,45 +42,12 @@
                 <div class="ml-3">
                     <h3 class="text-sm font-medium text-blue-800">配置说明</h3>
                     <div class="mt-2 text-sm text-blue-700">
-                        <p>平台分润配置已迁移到"支付管理"模块，请前往 <a href="/admin/payment-management" class="underline">支付管理页面</a> 进行配置。</p>
+                        <p>支付相关配置（平台分润、资产创建费用等）已迁移到 <a href="/admin/payment-management" class="underline font-semibold">支付管理页面</a> 进行统一管理。</p>
+                        <p class="mt-1">此页面仅保留私钥管理功能。</p>
                     </div>
                 </div>
             </div>
         </div>
-
-        <form method="POST" action="{{ url_for('admin.update_settings_v2') }}" class="space-y-4">
-
-            <!-- 资产创建费用 -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    资产创建费用（USDC）
-                </label>
-                <input type="number" 
-                       name="asset_creation_fee_amount" 
-                       value="{{ configs.get('ASSET_CREATION_FEE_AMOUNT', '100') }}"
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                       min="0" step="0.01">
-            </div>
-
-            <!-- 资产创建收款地址 -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    资产创建收款地址
-                </label>
-                <input type="text" 
-                       name="asset_creation_fee_address" 
-                       value="{{ configs.get('ASSET_CREATION_FEE_ADDRESS', '') }}"
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                       placeholder="Solana钱包地址">
-            </div>
-
-            <div class="flex justify-end">
-                <button type="submit" 
-                        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    保存设置
-                </button>
-            </div>
-        </form>
     </div>
 
     <!-- 私钥管理 -->

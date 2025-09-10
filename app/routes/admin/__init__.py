@@ -81,16 +81,8 @@ def settings_v2():
     """V2版本系统设置页面"""
     from app.models.admin import SystemConfig
     
-    # 获取所有配置（移除重复的平台费率配置）
+    # 系统设置页面现在只保留私钥管理，支付配置已迁移到支付管理页面
     configs = {}
-    config_keys = [
-        'PURCHASE_CONTRACT_ADDRESS',
-        'ASSET_CREATION_FEE_AMOUNT',
-        'ASSET_CREATION_FEE_ADDRESS'
-    ]
-    
-    for key in config_keys:
-        configs[key] = SystemConfig.get_value(key, '')
     
     return render_template('admin_v2/settings.html', configs=configs)
 
@@ -102,25 +94,13 @@ def update_settings_v2():
     from flask import request, flash, redirect, url_for, g
     
     try:
-        # 获取管理员地址
-        admin_address = getattr(g, 'eth_address', None) or session.get('admin_wallet_address')
-        
-        # 更新配置（移除重复的平台费率配置）
-        config_updates = {
-            'PURCHASE_CONTRACT_ADDRESS': request.form.get('purchase_contract_address'),
-            'ASSET_CREATION_FEE_AMOUNT': request.form.get('asset_creation_fee_amount'),
-            'ASSET_CREATION_FEE_ADDRESS': request.form.get('asset_creation_fee_address')
-        }
-        
-        for key, value in config_updates.items():
-            if value is not None:
-                SystemConfig.set_value(key, value, f'Updated by admin {admin_address}')
-        
-        flash('系统设置已成功更新', 'success')
+        # 系统设置页面现在只保留私钥管理功能
+        # 支付相关配置已迁移到支付管理页面
+        flash('系统设置页面现在只保留私钥管理功能，支付配置请前往支付管理页面', 'info')
         
     except Exception as e:
-        flash(f'更新设置失败: {str(e)}', 'error')
-        current_app.logger.error(f"更新系统设置失败: {str(e)}")
+        flash(f'操作失败: {str(e)}', 'error')
+        current_app.logger.error(f"系统设置操作失败: {str(e)}")
     
     return redirect(url_for('admin.settings_v2'))
 
