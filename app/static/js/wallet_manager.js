@@ -10,10 +10,8 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
 } else {
     window.RWA_WALLET_MANAGER_LOADED = true;
 
-    // 调试模式
-    const DEBUG_MODE = window.location.hostname === 'localhost' || 
-                       window.location.hostname === '127.0.0.1' || 
-                       window.DEBUG_MODE === true;
+    // 调试模式 - 临时启用用于调试管理员入口问题
+    const DEBUG_MODE = true;
 
     // 调试日志函数
     function debugLog(...args) {
@@ -1378,7 +1376,7 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
 
                 const data = await response.json();
                 
-                if (response.ok && data.success) {
+                if (response.ok) {
                     this.state.isAdmin = data.is_admin === true;
                     debugLog('管理员状态检查结果:', this.state.isAdmin);
                     this.updateAdminUI(this.state.isAdmin);
