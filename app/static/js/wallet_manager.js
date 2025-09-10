@@ -981,7 +981,14 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
             try {
                 // 首先检查实际的钱包连接状态
                 const actualWalletState = this.checkActualWalletState();
-                console.log('实际钱包状态:', actualWalletState);
+                // 生产环境不输出敏感的钱包状态信息
+                if (DEBUG_MODE) {
+                    console.log('实际钱包状态:', {
+                        connected: actualWalletState.connected,
+                        address: actualWalletState.address ? '***已连接***' : null,
+                        walletType: actualWalletState.walletType
+                    });
+                }
                 
                 if (!actualWalletState.connected || !actualWalletState.address) {
                     // 钱包未连接时，显示默认状态
@@ -1126,13 +1133,16 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                 const walletPubkey = new window.solanaWeb3.PublicKey(this.state.address);
                 const usdcMint = new window.solanaWeb3.PublicKey(USDC_MINT);
 
-                console.log('余额检查参数:', {
-                    walletAddress: this.state.address,
-                    usdcMint: USDC_MINT,
-                    splTokenAvailable: !!window.splToken,
-                    getAssociatedTokenAddressAvailable: !!window.splToken?.getAssociatedTokenAddress,
-                    connectionAvailable: !!window.solanaConnection
-                });
+                // 生产环境不输出敏感的余额检查参数
+                if (DEBUG_MODE) {
+                    console.log('余额检查参数:', {
+                        walletAddress: this.state.address ? '***已连接***' : null,
+                        usdcMint: '***已配置***',
+                        splTokenAvailable: !!window.splToken,
+                        getAssociatedTokenAddressAvailable: !!window.splToken?.getAssociatedTokenAddress,
+                        connectionAvailable: !!window.solanaConnection
+                    });
+                }
 
                 // 获取关联代币账户地址
                 let associatedTokenAddress;
@@ -1146,7 +1156,10 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                     return;
                 }
 
-                console.log('关联代币账户地址:', associatedTokenAddress.toString());
+                // 生产环境不输出敏感的代币账户地址
+                if (DEBUG_MODE) {
+                    console.log('关联代币账户地址:', associatedTokenAddress.toString());
+                }
 
                 // 获取账户信息
                 const accountInfo = await window.solanaConnection.getAccountInfo(associatedTokenAddress);
@@ -1180,7 +1193,10 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                     }
                 }
 
-                console.log('获取到USDC余额:', balance);
+                // 生产环境不输出敏感的余额信息
+                if (DEBUG_MODE) {
+                    console.log('获取到USDC余额:', balance);
+                }
 
                 // 更新UI显示
                 const balanceElement = document.getElementById('walletBalanceInDropdown');
@@ -1280,7 +1296,10 @@ if (window.RWA_WALLET_MANAGER_LOADED) {
                     </li>
                 `).join('');
 
-                console.log(`用户资产加载完成，共 ${assets.length} 项资产`);
+                // 生产环境不输出敏感的资产信息
+                if (DEBUG_MODE) {
+                    console.log(`用户资产加载完成，共 ${assets.length} 项资产`);
+                }
 
             } catch (error) {
                 console.warn('加载用户资产失败:', error);

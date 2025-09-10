@@ -689,7 +689,10 @@ if (window.purchaseHandlerInitialized) {
                 try {
                     const endpoint = rpcEndpoints[i];
                     window.solanaConnection = new window.solanaWeb3.Connection(endpoint, 'confirmed');
-                    console.log(`✅ Solana连接已初始化: ${endpoint}`);
+                    // 生产环境不输出敏感的RPC端点信息
+                    const safeEndpoint = endpoint.includes('api-key=') ? 
+                        endpoint.split('?')[0] + '?api-key=***' : endpoint;
+                    console.log(`✅ Solana连接已初始化: ${safeEndpoint}`);
                     break;
                 } catch (error) {
                     console.error(`RPC端点 ${rpcEndpoints[i]} 连接失败:`, error);

@@ -28,7 +28,10 @@ if (typeof solanaWeb3 !== 'undefined') {
     // 直接使用公开的、稳定的Solana RPC节点，避免后端配置问题
     const solanaEndpoint = '{{ config.get("SOLANA_NETWORK_URL", "https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea") }}';
     window.solanaConnection = new solanaWeb3.Connection(solanaEndpoint, 'confirmed');
-    console.log(`✅ Solana 连接已初始化: ${solanaEndpoint}`);
+    // 生产环境不输出敏感的RPC端点信息
+    const safeEndpoint = solanaEndpoint.includes('api-key=') ? 
+        solanaEndpoint.split('?')[0] + '?api-key=***' : solanaEndpoint;
+    console.log(`✅ Solana 连接已初始化: ${safeEndpoint}`);
 } else {
     console.error('❌ Solana Web3.js 库加载失败');
 }

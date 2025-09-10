@@ -1290,12 +1290,15 @@
         window.PLATFORM_FEE_WALLET_ADDRESS = null; // 将通过API获取
         window.USDC_MINT_ADDRESS = "{{ config.get('SOLANA_USDC_MINT', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') }}";
         window.RWA_TRADE_PROGRAM_ID = "{{ config.get('SOLANA_PROGRAM_ID', 'rwaHubTradeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX') }}"; // 获取合约程序ID
-        console.log('全局Solana配置已设置:', {
-            network: window.SOLANA_NETWORK_URL,
-            platformFeeWallet: window.PLATFORM_FEE_WALLET_ADDRESS,
-            usdcMint: window.USDC_MINT_ADDRESS,
-            tradeProgramId: window.RWA_TRADE_PROGRAM_ID
-        });
+        // 生产环境不输出敏感配置信息
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            console.log('全局Solana配置已设置:', {
+                network: window.SOLANA_NETWORK_URL ? '***已配置***' : null,
+                platformFeeWallet: window.PLATFORM_FEE_WALLET_ADDRESS,
+                usdcMint: window.USDC_MINT_ADDRESS ? '***已配置***' : null,
+                tradeProgramId: window.RWA_TRADE_PROGRAM_ID ? '***已配置***' : null
+            });
+        }
     </script>
     
     <!-- 添加加载状态控制函数 -->
