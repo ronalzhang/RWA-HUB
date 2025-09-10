@@ -1356,6 +1356,8 @@
     {% if not js_loaded %}
     <!-- 重复的脚本引用已删除，统一在上面引用 -->
     {% endif %}
+    <!-- 管理员检查脚本 -->
+    <script src="{{ url_for('static', filename='js/admin-check.js') }}"></script>
     <!-- 页面特定脚本可以在此添加 -->
     {% endblock %}
 
