@@ -188,6 +188,10 @@ def encrypt_private_key():
             encrypted_password = system_crypto.encrypt_private_key(crypto_password)
             SystemConfig.set_value('CRYPTO_PASSWORD_ENCRYPTED', encrypted_password, '系统加密的用户密码')
             
+            # 保存盐值到系统配置
+            if crypto_salt:
+                SystemConfig.set_value('CRYPTO_SALT', crypto_salt, '用户设置的加密盐值')
+            
             # 设置环境变量以便立即生效
             os.environ['SOLANA_PRIVATE_KEY_ENCRYPTED'] = encrypted_key
             os.environ['CRYPTO_PASSWORD'] = crypto_password
@@ -355,9 +359,31 @@ def load_encrypted_key():
         crypto_manager = get_crypto_manager()
         private_key = crypto_manager.decrypt_private_key(encrypted_key)
         
-        # 获取当前的加密配置
-        crypto_password = os.environ.get('CRYPTO_PASSWORD', '')
-        crypto_salt = os.environ.get('CRYPTO_SALT', '')
+        # 获取保存的加密配置
+        crypto_password = ''
+        crypto_salt = ''
+        
+        # 1. 尝试从数据库获取加密的密码
+        encrypted_password = SystemConfig.get_value('CRYPTO_PASSWORD_ENCRYPTED')
+        if encrypted_password:
+            try:
+                # 临时设置系统密钥来解密用户密码
+                original_password = os.environ.get('CRYPTO_PASSWORD')
+                os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+                crypto_password = crypto_manager.decrypt_private_key(encrypted_password)
+                if original_password:
+                    os.environ['CRYPTO_PASSWORD'] = original_password
+            except Exception as e:
+                current_app.logger.warning(f"无法解密保存的密码: {e}")
+        
+        # 2. 从数据库获取盐值
+        crypto_salt = SystemConfig.get_value('CRYPTO_SALT') or ''
+        
+        # 3. 如果数据库没有，回退到环境变量（兼容性）
+        if not crypto_password:
+            crypto_password = os.environ.get('CRYPTO_PASSWORD', '123abc74531')
+        if not crypto_salt:
+            crypto_salt = os.environ.get('CRYPTO_SALT', '')
 
             
         # 解析私钥并生成地址
@@ -399,6 +425,45 @@ def load_encrypted_key():
         
     except Exception as e:
         current_app.logger.error(f"加载加密私钥失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/v2/api/crypto/get-config', methods=['GET'])
+@api_admin_required
+def get_crypto_config():
+    """获取已保存的加密配置"""
+    try:
+        from app.models.admin import SystemConfig
+        from app.utils.crypto_manager import get_crypto_manager
+        import os
+        
+        crypto_password = ''
+        crypto_salt = ''
+        
+        # 1. 尝试从数据库获取加密的密码
+        encrypted_password = SystemConfig.get_value('CRYPTO_PASSWORD_ENCRYPTED')
+        if encrypted_password:
+            try:
+                # 临时设置系统密钥来解密用户密码
+                crypto_manager = get_crypto_manager()
+                original_password = os.environ.get('CRYPTO_PASSWORD')
+                os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+                crypto_password = crypto_manager.decrypt_private_key(encrypted_password)
+                if original_password:
+                    os.environ['CRYPTO_PASSWORD'] = original_password
+            except Exception as e:
+                current_app.logger.warning(f"无法解密保存的密码: {e}")
+        
+        # 2. 从数据库获取盐值
+        crypto_salt = SystemConfig.get_value('CRYPTO_SALT') or ''
+        
+        return jsonify({
+            'success': True,
+            'crypto_password': crypto_password,
+            'crypto_salt': crypto_salt
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"获取加密配置失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/v2/api/crypto/test-key', methods=['POST'])

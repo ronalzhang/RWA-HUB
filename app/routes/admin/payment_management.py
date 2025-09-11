@@ -162,9 +162,9 @@ def update_payment_config():
                             'error': '资产创建费用必须大于等于0'
                         }), 400
                 
-                # 更新配置
+                # 更新配置，记录历史
                 old_value = SystemConfig.get_value(config_key)
-                SystemConfig.set_value(config_key, str(value))
+                SystemConfig.set_value(config_key, str(value), f'管理员更新支付配置 - 从 {old_value} 变更为 {value}')
                 
                 updated_configs.append({
                     'key': config_key,
@@ -199,11 +199,50 @@ def update_payment_config():
 def get_payment_config_history():
     """获取支付配置变更历史"""
     try:
-        # 这里可以实现配置变更历史记录
-        # 暂时返回空数据，后续可以添加配置变更日志表
+        from app.models.admin import SystemConfig
+        
+        # 获取支付相关配置的历史记录
+        payment_config_keys = [
+            'PLATFORM_COMMISSION_RATE',
+            'PLATFORM_FEE_ADDRESS', 
+            'ASSET_CREATION_FEE_AMOUNT',
+            'ASSET_CREATION_FEE_ADDRESS'
+        ]
+        
+        # 查询相关配置的记录，按更新时间降序排列
+        configs = SystemConfig.query.filter(
+            SystemConfig.config_key.in_(payment_config_keys)
+        ).order_by(SystemConfig.updated_at.desc()).limit(50).all()
+        
+        history_data = []
+        for config in configs:
+            # 解析描述信息以获取变更详情
+            description = config.description or ''
+            change_type = 'update' if '变更为' in description else 'create'
+            
+            # 配置名称映射
+            config_names = {
+                'PLATFORM_COMMISSION_RATE': '平台分润比例',
+                'PLATFORM_FEE_ADDRESS': '平台费用地址',
+                'ASSET_CREATION_FEE_AMOUNT': '资产创建费用金额',
+                'ASSET_CREATION_FEE_ADDRESS': '资产创建费用地址'
+            }
+            
+            history_data.append({
+                'id': config.id,
+                'config_key': config.config_key,
+                'config_name': config_names.get(config.config_key, config.config_key),
+                'current_value': config.config_value,
+                'change_type': change_type,
+                'description': description,
+                'updated_at': config.updated_at.strftime('%Y-%m-%d %H:%M:%S') if config.updated_at else None,
+                'created_at': config.created_at.strftime('%Y-%m-%d %H:%M:%S') if config.created_at else None
+            })
+        
         return jsonify({
             'success': True,
-            'data': []
+            'data': history_data,
+            'total': len(history_data)
         })
         
     except Exception as e:
