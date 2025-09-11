@@ -34,8 +34,10 @@ def load_encrypted_config(app_context):
             
             if encrypted_key and encrypted_password:
                 # 解密用户密码
+                from app.utils.crypto_manager import get_system_master_key
                 original_password = os.environ.get('CRYPTO_PASSWORD')
-                os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+                system_key = get_system_master_key()
+                os.environ['CRYPTO_PASSWORD'] = system_key
                 
                 try:
                     system_crypto = get_crypto_manager()

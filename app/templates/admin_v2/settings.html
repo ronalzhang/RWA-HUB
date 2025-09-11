@@ -33,6 +33,90 @@
         {% endwith %}
     </div>
 
+    <!-- 系统主密钥管理 -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-6">系统主密钥管理</h2>
+        
+        <div class="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800">重要安全提醒</h3>
+                    <div class="mt-2 text-sm text-red-700">
+                        <p>系统主密钥用于加密存储用户密码，是系统安全的根基。</p>
+                        <p class="mt-1">请务必记住此密钥，丢失将导致无法访问所有已保存的私钥！</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <!-- 当前系统密钥状态 -->
+            <div class="bg-gray-50 rounded-md p-4">
+                <h3 class="text-sm font-medium text-gray-700 mb-2">系统密钥状态</h3>
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">配置状态:</span>
+                        <span id="system-key-status" class="text-sm font-medium">检查中...</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">创建时间:</span>
+                        <span id="system-key-created" class="text-sm text-gray-600">-</span>
+                    </div>
+                </div>
+                <button type="button" 
+                        @click="checkSystemKeyStatus()"
+                        class="mt-3 px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors">
+                    刷新状态
+                </button>
+            </div>
+
+            <!-- 系统密钥设置 -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    系统主密钥
+                    <span class="text-xs text-gray-500 ml-1">(用于加密用户密码)</span>
+                </label>
+                <div class="relative">
+                    <input :type="showSystemKey ? 'text' : 'password'" 
+                           x-model="systemMasterKey"
+                           class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="请输入系统主密钥">
+                    <button type="button" 
+                            @click="showSystemKey = !showSystemKey"
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+                        <svg x-show="!showSystemKey" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        <svg x-show="showSystemKey" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="mt-2 flex space-x-2">
+                    <button type="button" 
+                            @click="generateSystemKey()"
+                            class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors">
+                        生成安全密钥
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-3">
+                <button type="button" 
+                        @click="saveSystemKey()"
+                        class="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                    保存系统主密钥
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- 私钥管理 -->
     <div class="bg-white shadow rounded-lg p-6">
         <h2 class="text-xl font-semibold text-gray-800 mb-6">私钥管理</h2>
@@ -232,6 +316,8 @@ function settingsManager() {
         privateKey: '',
         cryptoSalt: '',
         showCryptoPassword: false,
+        systemMasterKey: '',
+        showSystemKey: false,
 
         
         // 获取URL参数中的钱包地址
@@ -258,6 +344,7 @@ function settingsManager() {
             this.loadWalletInfo();
             this.checkSecurityStatus();
             this.loadSavedCryptoConfig(); // 加载已保存的配置
+            this.checkSystemKeyStatus(); // 检查系统密钥状态
             
             // 只有在没有保存配置时才初始化盐值
             // 这个逻辑移到loadSavedCryptoConfig中处理
@@ -549,6 +636,82 @@ function settingsManager() {
                 }
             } catch (error) {
                 console.error('检查安全状态失败:', error);
+            }
+        },
+
+        // 系统密钥管理功能
+        async checkSystemKeyStatus() {
+            try {
+                const response = await this.authFetch('/admin/v2/api/system-key/status');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const statusElement = document.getElementById('system-key-status');
+                    const createdElement = document.getElementById('system-key-created');
+                    
+                    if (statusElement) {
+                        let color = result.configured ? 'text-green-600' : 'text-red-600';
+                        statusElement.textContent = result.configured ? '已配置' : '未配置';
+                        statusElement.className = `text-sm font-medium ${color}`;
+                    }
+                    
+                    if (createdElement && result.created_at) {
+                        createdElement.textContent = result.created_at;
+                    }
+                }
+            } catch (error) {
+                console.error('检查系统密钥状态失败:', error);
+            }
+        },
+
+        generateSystemKey() {
+            // 生成64字符的强密钥
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+';
+            let key = '';
+            for (let i = 0; i < 64; i++) {
+                key += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            this.systemMasterKey = key;
+        },
+
+        async saveSystemKey() {
+            if (!this.systemMasterKey) {
+                alert('请输入或生成系统主密钥');
+                return;
+            }
+            
+            if (this.systemMasterKey.length < 32) {
+                alert('系统主密钥长度至少需要32字符');
+                return;
+            }
+            
+            const confirmation = confirm('警告：保存系统主密钥后，请务必记住此密钥！\n\n如果忘记系统主密钥，将无法访问所有已保存的私钥！\n\n确定要保存吗？');
+            if (!confirmation) {
+                return;
+            }
+            
+            try {
+                const response = await this.authFetch('/admin/v2/api/system-key/save', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        system_key: this.systemMasterKey
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('系统主密钥保存成功！\n\n请务必将此密钥安全保存，建议：\n1. 写在纸上存放在安全地方\n2. 使用密码管理器保存\n3. 不要存储在电脑或网络上');
+                    this.systemMasterKey = ''; // 清空输入框
+                    this.checkSystemKeyStatus();
+                } else {
+                    alert('保存失败: ' + result.error);
+                }
+                
+            } catch (error) {
+                alert('保存失败: ' + error.message);
             }
         }
     }

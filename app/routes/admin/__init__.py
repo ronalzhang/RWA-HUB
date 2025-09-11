@@ -182,9 +182,11 @@ def encrypt_private_key():
             
             # 保存加密密码到系统配置（注意：这里需要进一步加密）
             # 为了安全，我们使用一个固定的系统密钥来加密用户的加密密码
+            from app.utils.crypto_manager import get_system_master_key
             system_crypto = get_crypto_manager()
             # 临时设置系统密钥
-            os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+            system_key = get_system_master_key()
+            os.environ['CRYPTO_PASSWORD'] = system_key
             encrypted_password = system_crypto.encrypt_private_key(crypto_password)
             SystemConfig.set_value('CRYPTO_PASSWORD_ENCRYPTED', encrypted_password, '系统加密的用户密码')
             
@@ -385,8 +387,10 @@ def load_encrypted_key():
         if encrypted_password:
             try:
                 # 临时设置系统密钥来解密用户密码
+                from app.utils.crypto_manager import get_system_master_key
                 original_password = os.environ.get('CRYPTO_PASSWORD')
-                os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+                system_key = get_system_master_key()
+                os.environ['CRYPTO_PASSWORD'] = system_key
                 crypto_password = crypto_manager.decrypt_private_key(encrypted_password)
                 if original_password:
                     os.environ['CRYPTO_PASSWORD'] = original_password
@@ -461,9 +465,11 @@ def get_crypto_config():
         if encrypted_password:
             try:
                 # 临时设置系统密钥来解密用户密码
+                from app.utils.crypto_manager import get_system_master_key
                 crypto_manager = get_crypto_manager()
                 original_password = os.environ.get('CRYPTO_PASSWORD')
-                os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+                system_key = get_system_master_key()
+                os.environ['CRYPTO_PASSWORD'] = system_key
                 crypto_password = crypto_manager.decrypt_private_key(encrypted_password)
                 if original_password:
                     os.environ['CRYPTO_PASSWORD'] = original_password
@@ -722,6 +728,168 @@ def export_onchain_history():
 # 注意：dashboard、assets、users、trades等路由已在各自模块中定义
 # 避免重复定义导致路由冲突 
 
+# 系统密钥管理API
+@admin_bp.route('/v2/api/system-key/status', methods=['GET'])
+@api_admin_required
+def get_system_key_status():
+    """获取系统密钥配置状态"""
+    try:
+        from app.models.admin import SystemConfig
+        
+        # 检查是否有系统密钥配置
+        system_key_configured = SystemConfig.get_value('SYSTEM_MASTER_KEY_CONFIGURED')
+        
+        if system_key_configured == 'true':
+            # 获取创建时间
+            config_record = SystemConfig.query.filter_by(config_key='SYSTEM_MASTER_KEY_CONFIGURED').first()
+            created_at = config_record.created_at.strftime('%Y-%m-%d %H:%M:%S') if config_record and config_record.created_at else None
+            
+            return jsonify({
+                'success': True,
+                'configured': True,
+                'created_at': created_at
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'configured': False,
+                'created_at': None
+            })
+            
+    except Exception as e:
+        current_app.logger.error(f"获取系统密钥状态失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': '获取系统密钥状态失败'
+        }), 500
+
+@admin_bp.route('/v2/api/system-key/save', methods=['POST'])
+@api_admin_required
+def save_system_key():
+    """保存系统主密钥"""
+    try:
+        from app.models.admin import SystemConfig
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '请求数据不能为空'
+            }), 400
+        
+        system_key = data.get('system_key', '').strip()
+        if not system_key:
+            return jsonify({
+                'success': False,
+                'error': '系统主密钥不能为空'
+            }), 400
+        
+        if len(system_key) < 32:
+            return jsonify({
+                'success': False,
+                'error': '系统主密钥长度至少需要32字符'
+            }), 400
+        
+        # 检查是否已存在系统密钥
+        existing_key = SystemConfig.get_value('SYSTEM_MASTER_KEY_CONFIGURED')
+        if existing_key == 'true':
+            return jsonify({
+                'success': False,
+                'error': '系统主密钥已存在，不能重复设置'
+            }), 400
+        
+        # 保存系统主密钥到数据库，使用加密存储
+        from app.utils.crypto_manager import get_crypto_manager
+        import os
+        
+        # 临时使用一个固定密码来加密系统密钥存储
+        original_password = os.environ.get('CRYPTO_PASSWORD')
+        os.environ['CRYPTO_PASSWORD'] = 'SYSTEM_KEY_ENCRYPTION_PASSWORD_2024'
+        
+        try:
+            crypto_manager = get_crypto_manager()
+            encrypted_system_key = crypto_manager.encrypt_private_key(system_key)
+            
+            # 保存加密后的系统密钥
+            SystemConfig.set_value(
+                'SYSTEM_MASTER_KEY_ENCRYPTED', 
+                encrypted_system_key, 
+                '系统主密钥（已加密存储）'
+            )
+            
+            # 设置一个标记表示系统密钥已配置
+            SystemConfig.set_value(
+                'SYSTEM_MASTER_KEY_CONFIGURED',
+                'true',
+                '系统主密钥配置状态标记'
+            )
+            
+            current_app.logger.info("系统主密钥已安全保存到数据库")
+            
+            return jsonify({
+                'success': True,
+                'message': '系统主密钥保存成功'
+            })
+            
+        finally:
+            # 恢复原始密码
+            if original_password:
+                os.environ['CRYPTO_PASSWORD'] = original_password
+            else:
+                os.environ.pop('CRYPTO_PASSWORD', None)
+
+@admin_bp.route('/v2/api/system-key/get', methods=['GET'])
+@api_admin_required  
+def get_system_key():
+    """获取系统主密钥（内部使用）"""
+    try:
+        from app.models.admin import SystemConfig
+        from app.utils.crypto_manager import get_crypto_manager
+        import os
+        
+        # 检查系统密钥是否已配置
+        configured = SystemConfig.get_value('SYSTEM_MASTER_KEY_CONFIGURED')
+        if configured != 'true':
+            return jsonify({
+                'success': False,
+                'error': '系统密钥未配置'
+            }), 400
+        
+        # 获取加密的系统密钥
+        encrypted_key = SystemConfig.get_value('SYSTEM_MASTER_KEY_ENCRYPTED')
+        if not encrypted_key:
+            return jsonify({
+                'success': False,
+                'error': '系统密钥数据不存在'
+            }), 400
+        
+        # 解密系统密钥
+        original_password = os.environ.get('CRYPTO_PASSWORD')
+        os.environ['CRYPTO_PASSWORD'] = 'SYSTEM_KEY_ENCRYPTION_PASSWORD_2024'
+        
+        try:
+            crypto_manager = get_crypto_manager()
+            system_key = crypto_manager.decrypt_private_key(encrypted_key)
+            
+            return jsonify({
+                'success': True,
+                'system_key': system_key
+            })
+            
+        finally:
+            # 恢复原始密码
+            if original_password:
+                os.environ['CRYPTO_PASSWORD'] = original_password
+            else:
+                os.environ.pop('CRYPTO_PASSWORD', None)
+                
+    except Exception as e:
+        current_app.logger.error(f"获取系统密钥失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'获取系统密钥失败: {str(e)}'
+        }), 500
+
 # 添加钱包相关API
 @admin_bp.route('/api/wallet-info', methods=['GET'])
 @api_admin_required
@@ -754,9 +922,11 @@ def get_wallet_info():
             system_crypto = get_crypto_manager()
             
             # 临时设置系统密钥来解密用户密码 
+            from app.utils.crypto_manager import get_system_master_key
             original_password = os.environ.get('CRYPTO_PASSWORD')
             try:
-                os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+                system_key = get_system_master_key()
+                os.environ['CRYPTO_PASSWORD'] = system_key
                 crypto_password = system_crypto.decrypt_private_key(encrypted_password)
             finally:
                 # 恢复原始密码
@@ -908,9 +1078,11 @@ def test_wallet_connection():
         
         try:
             # 解密私钥
+            from app.utils.crypto_manager import get_system_master_key
             import os
             original_password = os.environ.get('CRYPTO_PASSWORD')
-            os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+            system_key = get_system_master_key()
+            os.environ['CRYPTO_PASSWORD'] = system_key
             
             system_crypto = get_crypto_manager()
             crypto_password = system_crypto.decrypt_private_key(encrypted_password)
