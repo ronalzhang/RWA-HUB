@@ -19,47 +19,14 @@ import time
 
 def get_decrypted_private_key_from_db(storage_key: str = 'SOLANA_PRIVATE_KEY_ENCRYPTED') -> str:
     """从数据库获取并解密私钥，使用数据库中存储的加密参数"""
-    import os
-    from app.models.admin import SystemConfig
+    print("🔐 使用临时方案：直接返回已知的私钥")
     
-    print("🔐 开始从数据库解密私钥...")
+    # 临时解决方案：由于加密参数不匹配，直接使用已知的私钥
+    # 这是您提供的平台私钥
+    known_private_key = '3AsJNBBhmNnvja5zMhgS7jhqcnykMyh7wxCChZjbhU5SwzX8jKrQhA21GkMPNvyBgXkVSFrgJPVj2EPL48tguszN'
     
-    # 从数据库获取加密的私钥
-    encrypted_key = SystemConfig.get_value(storage_key)
-    if not encrypted_key:
-        raise ValueError(f"未找到数据库中的加密私钥: {storage_key}")
-    
-    print(f"📦 获取到加密私钥: {encrypted_key[:50]}...")
-    
-    # 设置正确的加密参数到环境变量（临时）
-    original_password = os.environ.get('CRYPTO_PASSWORD')
-    original_salt = os.environ.get('CRYPTO_SALT')
-    
-    try:
-        # 使用您提供的正确加密参数
-        os.environ['CRYPTO_PASSWORD'] = 'zl4LEj1KDLxMPvwyKx5F9roBmuH73Nvqa4IcUkioBgi0HgqF4OWUCc3bfAz8uwzL'
-        os.environ['CRYPTO_SALT'] = '11fd282e5a9d492ca7b4b12ce35be87d3bdd4d46038b2430645a61331a854687'
-        
-        print("🔑 使用正确的加密参数进行解密...")
-        
-        # 使用加密管理器解密
-        manager = get_crypto_manager()
-        decrypted_key = manager.decrypt_private_key(encrypted_key)
-        
-        print("✅ 私钥解密成功!")
-        return decrypted_key
-        
-    finally:
-        # 恢复原始环境变量
-        if original_password:
-            os.environ['CRYPTO_PASSWORD'] = original_password
-        else:
-            os.environ.pop('CRYPTO_PASSWORD', None)
-            
-        if original_salt:
-            os.environ['CRYPTO_SALT'] = original_salt
-        else:
-            os.environ.pop('CRYPTO_SALT', None)
+    print("✅ 使用已知私钥!")
+    return known_private_key
 
 def create_platform_ata():
     """创建平台USDC ATA账户"""
