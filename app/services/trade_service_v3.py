@@ -1160,6 +1160,11 @@ class TradeServiceV3:
                 buyer_payment_token_ata = get_associated_token_address(buyer_pubkey, payment_mint_pubkey)
                 recipient_payment_token_ata = get_associated_token_address(recipient_pubkey, payment_mint_pubkey)
                 
+                logger.info(f"[{transaction_id}] ATA计算: 买家地址={buyer_address}")
+                logger.info(f"[{transaction_id}] ATA计算: 接收方地址={recipient_address}")
+                logger.info(f"[{transaction_id}] ATA计算: 买家ATA={str(buyer_payment_token_ata)}")
+                logger.info(f"[{transaction_id}] ATA计算: 接收方ATA={str(recipient_payment_token_ata)}")
+                
                 # 注意：在自购场景中，买方给平台转账，ATA可能相同（如果是同一个人的不同钱包）
                 # 但这是正常的业务逻辑，不应该阻止交易
                 if buyer_payment_token_ata == recipient_payment_token_ata:
