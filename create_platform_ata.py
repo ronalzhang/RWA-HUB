@@ -109,7 +109,7 @@ def create_platform_ata():
             transaction = Transaction.new_unsigned(message)
             
             # 8. 签名交易
-            transaction.sign(platform_keypair)
+            transaction.sign([platform_keypair], recent_blockhash)
             
             # 9. 发送交易
             print("📡 发送创建ATA交易到区块链...")
