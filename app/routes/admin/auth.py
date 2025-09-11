@@ -88,16 +88,31 @@ def admin_page_required(f):
     """管理后台页面访问装饰器"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 检查session中的admin验证状态
-        if session.get('admin_verified') and session.get('admin_wallet_address'):
-            wallet_address = session.get('admin_wallet_address')
-            auth_service = get_auth_service()
-            if auth_service.verify_admin_wallet(wallet_address):
-                g.eth_address = wallet_address
-                return f(*args, **kwargs)
-        
-        # 如果验证失败，重定向到登录页面
-        return redirect(url_for('admin.login_v2'))
+        try:
+            # 检查session中的admin验证状态
+            if session.get('admin_verified') and session.get('admin_wallet_address'):
+                wallet_address = session.get('admin_wallet_address')
+                
+                try:
+                    auth_service = get_auth_service()
+                    if auth_service.verify_admin_wallet(wallet_address):
+                        g.eth_address = wallet_address
+                        return f(*args, **kwargs)
+                except Exception as auth_error:
+                    current_app.logger.error(f"认证服务错误: {str(auth_error)}")
+                    # 认证服务失败时，清除session并重定向
+                    session.clear()
+            
+            # 如果验证失败，重定向到登录页面
+            return redirect(url_for('admin.login_v2'))
+        except Exception as e:
+            # 如果出现任何错误，记录错误并重定向到登录页面
+            current_app.logger.error(f"admin_page_required 装饰器错误: {str(e)}")
+            try:
+                current_app.logger.error(f"会话状态: {dict(session)}")
+            except:
+                current_app.logger.error("无法获取会话状态")
+            return redirect(url_for('admin.login_v2'))
     return decorated_function
 
 

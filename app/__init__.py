@@ -179,32 +179,36 @@ def create_app(config_name='development'):
     app.cli.add_command(init_distribution_command)
     
     # 初始化智能合约监控服务
-    try:
-        from app.services.contract_monitor import init_contract_monitor
-        init_contract_monitor(app)
-        app.logger.info("智能合约监控服务已初始化")
-    except ImportError as import_error:
-        app.logger.warning(f"智能合约监控服务模块导入失败，跳过初始化: {str(import_error)}")
-    except Exception as monitor_error:
-        app.logger.error(f"初始化智能合约监控服务失败: {str(monitor_error)}")
+    if not hasattr(app, '_contract_monitor_initialized'):
+        try:
+            from app.services.contract_monitor import init_contract_monitor
+            init_contract_monitor(app)
+            app.logger.info("智能合约监控服务已初始化")
+            app._contract_monitor_initialized = True
+        except ImportError as import_error:
+            app.logger.warning(f"智能合约监控服务模块导入失败，跳过初始化: {str(import_error)}")
+        except Exception as monitor_error:
+            app.logger.error(f"初始化智能合约监控服务失败: {str(monitor_error)}")
     
     # 初始化后台任务处理系统
-    with app.app_context():
-        try:
-            # import app.tasks
-            app.logger.info("后台任务处理系统已初始化")
-            
-            # 初始化并启动后台任务调度器
+    if not hasattr(app, '_tasks_initialized'):
+        with app.app_context():
             try:
-                from . import tasks
-                tasks.start_scheduled_tasks()
-            except Exception as task_err:
-                app.logger.error(f"启动后台任务调度器失败: {str(task_err)}")
-                import traceback
-                app.logger.error(traceback.format_exc())
+                # import app.tasks
+                app.logger.info("后台任务处理系统已初始化")
+                app._tasks_initialized = True
                 
-        except Exception as e:
-            app.logger.error(f"初始化后台任务处理系统失败: {str(e)}")
+                # 初始化并启动后台任务调度器
+                try:
+                    from . import tasks
+                    tasks.start_scheduled_tasks()
+                except Exception as task_err:
+                    app.logger.error(f"启动后台任务调度器失败: {str(task_err)}")
+                    import traceback
+                    app.logger.error(traceback.format_exc())
+                    
+            except Exception as e:
+                app.logger.error(f"初始化后台任务处理系统失败: {str(e)}")
     
     
     
