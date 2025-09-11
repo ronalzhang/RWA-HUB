@@ -309,21 +309,9 @@ if (window.purchaseHandlerInitialized) {
                     feePayer: new window.solanaWeb3.PublicKey(this.currentTrade.feePayer)
                 });
 
-                // 手动添加ComputeBudget指令以避免钱包自动添加冲突的指令
-                console.log('手动添加ComputeBudget指令以避免钱包冲突');
+                // 移除手动ComputeBudget指令，让钱包自动处理
+                console.log('让钱包自动处理ComputeBudget指令');
                 
-                // 添加计算单元限制指令
-                const computeUnitLimitInstruction = window.solanaWeb3.ComputeBudgetProgram.setComputeUnitLimit({
-                    units: 200000  // 设置合理的计算单元限制
-                });
-                transaction.add(computeUnitLimitInstruction);
-                
-                // 添加计算单元价格指令（可选，用于优先级）
-                const computeUnitPriceInstruction = window.solanaWeb3.ComputeBudgetProgram.setComputeUnitPrice({
-                    microLamports: 1000  // 设置较低的优先级费用
-                });
-                transaction.add(computeUnitPriceInstruction);
-
                 // 添加多个指令
                 console.log('后端返回的指令数据:', this.currentTrade.instructions);
                 
