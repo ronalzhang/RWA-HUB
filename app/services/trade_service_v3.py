@@ -1057,8 +1057,11 @@ class TradeServiceV3:
         """
         try:
             logger.info(f"[{transaction_id}] 开始创建双转账指令")
+            logger.info(f"[{transaction_id}] 双转账参数: 买家={buyer_address}, 发布者={asset_owner_address}, 平台={platform_address}")
+            logger.info(f"[{transaction_id}] 金额分配: 发布者={owner_amount}, 平台={platform_amount}")
             
-            # 创建发布者转账指令
+            # 创建发布者转账指令 (买家 -> 发布者)
+            logger.info(f"[{transaction_id}] 创建第1个指令: {buyer_address} -> {asset_owner_address} (金额: {owner_amount})")
             owner_instruction = TradeServiceV3._create_single_transfer_instruction(
                 buyer_address, 
                 asset_owner_address, 
@@ -1068,7 +1071,8 @@ class TradeServiceV3:
                 f"{transaction_id}_owner"
             )
             
-            # 创建平台转账指令
+            # 创建平台转账指令 (买家 -> 平台)
+            logger.info(f"[{transaction_id}] 创建第2个指令: {buyer_address} -> {platform_address} (金额: {platform_amount})")
             platform_instruction = TradeServiceV3._create_single_transfer_instruction(
                 buyer_address, 
                 platform_address, 
