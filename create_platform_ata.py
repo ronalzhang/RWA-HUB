@@ -113,9 +113,12 @@ def create_platform_ata():
             
             # 9. 发送交易
             print("📡 发送创建ATA交易到区块链...")
-            signature = client.send_transaction(
-                transaction,
-                opts={'skip_preflight': False, 'preflight_commitment': Confirmed}
+            
+            # 使用序列化的交易数据发送
+            from solana.rpc.types import TxOpts
+            signature = client.send_raw_transaction(
+                transaction.serialize(),
+                opts=TxOpts(skip_preflight=False, preflight_commitment=Confirmed)
             )
             
             print(f"✅ 交易已提交，签名: {signature.value}")
