@@ -220,6 +220,20 @@ def get_payment_config_history():
             description = config.description or ''
             change_type = 'update' if '变更为' in description else 'create'
             
+            # 从描述中解析old_value和new_value
+            old_value = None
+            new_value = config.config_value
+            
+            if '从' in description and '变更为' in description:
+                try:
+                    # 解析格式："管理员更新支付配置 - 从 old_value 变更为 new_value"
+                    parts = description.split('从')[1].split('变更为')
+                    if len(parts) >= 2:
+                        old_value = parts[0].strip()
+                        new_value = parts[1].strip()
+                except:
+                    pass
+            
             # 配置名称映射
             config_names = {
                 'PLATFORM_COMMISSION_RATE': '平台分润比例',
@@ -233,6 +247,8 @@ def get_payment_config_history():
                 'config_key': config.config_key,
                 'config_name': config_names.get(config.config_key, config.config_key),
                 'current_value': config.config_value,
+                'old_value': old_value,
+                'new_value': new_value,
                 'change_type': change_type,
                 'description': description,
                 'updated_at': config.updated_at.strftime('%Y-%m-%d %H:%M:%S') if config.updated_at else None,

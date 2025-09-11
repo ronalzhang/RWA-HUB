@@ -243,6 +243,7 @@ class PaymentConfigManager {
     constructor() {
         this.initializeEventListeners();
         this.loadCurrentConfig();
+        this.loadConfigHistory();
     }
 
     initializeEventListeners() {
@@ -272,6 +273,14 @@ class PaymentConfigManager {
         if (resetBtn) {
             resetBtn.addEventListener('click', () => {
                 this.loadCurrentConfig();
+            });
+        }
+        
+        // 刷新配置历史按钮
+        const refreshHistoryBtn = document.querySelector('.bg-gray-100'); // 刷新按钮
+        if (refreshHistoryBtn && refreshHistoryBtn.textContent.includes('刷新')) {
+            refreshHistoryBtn.addEventListener('click', () => {
+                this.loadConfigHistory();
             });
         }
     }
@@ -405,17 +414,35 @@ class PaymentConfigManager {
             
             if (data.success && data.data.length > 0) {
                 const historyContainer = document.getElementById('config-history');
-                historyContainer.innerHTML = data.data.map(record => `
+                historyContainer.innerHTML = data.data.map(record => {
+                    const oldValue = record.old_value || '未设置';
+                    const newValue = record.new_value || '未设置';
+                    const configName = record.config_name || record.config_key;
+                    
+                    return `
                     <div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
                         <div>
-                            <span class="text-sm font-medium text-gray-900">${record.config_key}</span>
-                            <span class="text-sm text-gray-500 ml-2">${record.old_value} → ${record.new_value}</span>
+                            <span class="text-sm font-medium text-gray-900">${configName}</span>
+                            <span class="text-sm text-gray-500 ml-2">${oldValue} → ${newValue}</span>
                         </div>
                         <div class="text-xs text-gray-500">
                             ${new Date(record.updated_at).toLocaleString()}
                         </div>
-                    </div>
-                `).join('');
+                    </div>`;
+                }).join('');
+            } else {
+                // 保持原有的空状态显示
+                const historyContainer = document.getElementById('config-history');
+                if (!historyContainer.innerHTML.includes('暂无配置变更记录')) {
+                    historyContainer.innerHTML = `
+                        <div class="text-center text-gray-500 py-12">
+                            <svg class="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <p class="text-gray-500">暂无配置变更记录</p>
+                            <p class="text-xs text-gray-400 mt-1">配置修改后将在此显示历史记录</p>
+                        </div>`;
+                }
             }
         } catch (error) {
             console.error('加载配置历史失败:', error);

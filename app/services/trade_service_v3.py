@@ -1185,7 +1185,7 @@ class TradeServiceV3:
             # 6. 使用官方库创建转账指令，并确保ATA账户存在
             try:
                 # 检查是否需要创建关联代币账户
-                from spl.token.instructions import create_associated_token_account, CreateAssociatedTokenAccountParams
+                from spl.token.instructions import create_associated_token_account
                 from app.blockchain.solana_service import get_solana_client
                 
                 instructions_list = []
@@ -1198,13 +1198,12 @@ class TradeServiceV3:
                     if not recipient_ata_info.value:
                         logger.info(f"[{transaction_id}] 接收方ATA不存在，创建ATA指令: {str(recipient_payment_token_ata)}")
                         
-                        # 创建关联代币账户指令
-                        create_ata_params = CreateAssociatedTokenAccountParams(
-                            funding_address=buyer_pubkey,  # 买方支付创建费用
-                            wallet_address=recipient_pubkey,  # 接收方拥有账户
-                            token_mint_address=payment_mint_pubkey
+                        # 创建关联代币账户指令 - 使用正确的参数格式
+                        create_ata_instruction = create_associated_token_account(
+                            payer=buyer_pubkey,  # 买方支付创建费用
+                            owner=recipient_pubkey,  # 接收方拥有账户
+                            mint=payment_mint_pubkey  # 代币mint地址
                         )
-                        create_ata_instruction = create_associated_token_account(create_ata_params)
                         instructions_list.append(create_ata_instruction)
                         logger.info(f"[{transaction_id}] 已添加创建ATA指令")
                     else:
