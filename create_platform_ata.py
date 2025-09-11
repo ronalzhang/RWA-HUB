@@ -114,10 +114,22 @@ def create_platform_ata():
             # 9. 发送交易
             print("📡 发送创建ATA交易到区块链...")
             
-            # 使用序列化的交易数据发送
+            # 使用正确的序列化方法
+            try:
+                # solders Transaction使用to_bytes()方法序列化
+                serialized_tx = bytes(transaction)
+            except:
+                # 备用方法
+                try:
+                    serialized_tx = transaction.to_bytes()
+                except:
+                    # 最后的备用方法
+                    import struct
+                    serialized_tx = struct.pack('<Q', len(transaction.message.account_keys)) + b''.join(bytes(key) for key in transaction.message.account_keys)
+            
             from solana.rpc.types import TxOpts
             signature = client.send_raw_transaction(
-                transaction.serialize(),
+                serialized_tx,
                 opts=TxOpts(skip_preflight=False, preflight_commitment=Confirmed)
             )
             
