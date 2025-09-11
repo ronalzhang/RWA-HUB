@@ -956,8 +956,10 @@ class TradeServiceV3:
             dict: 包含验证结果和配置信息的字典
         """
         try:
-            # 获取配置参数
-            platform_treasury_address = current_app.config.get('PLATFORM_TREASURY_WALLET')
+            # 使用ConfigManager从数据库获取配置参数
+            from app.utils.config_manager import ConfigManager
+            
+            platform_treasury_address = ConfigManager.get_config('PLATFORM_FEE_ADDRESS')
             payment_token_mint_address = current_app.config.get('PAYMENT_TOKEN_MINT_ADDRESS')
             payment_token_decimals = current_app.config.get('PAYMENT_TOKEN_DECIMALS', 6)
             solana_rpc_url = current_app.config.get('SOLANA_RPC_URL')
@@ -967,9 +969,9 @@ class TradeServiceV3:
             
             # 检查必需参数是否存在
             if not platform_treasury_address:
-                missing_params.append('PLATFORM_TREASURY_WALLET')
+                missing_params.append('PLATFORM_FEE_ADDRESS')
             elif not validate_solana_address(platform_treasury_address):
-                invalid_params.append('PLATFORM_TREASURY_WALLET: 无效的地址格式')
+                invalid_params.append('PLATFORM_FEE_ADDRESS: 无效的地址格式')
                 
             if not payment_token_mint_address:
                 missing_params.append('PAYMENT_TOKEN_MINT_ADDRESS')
