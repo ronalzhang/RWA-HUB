@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app import create_app
 from app.utils.config_manager import ConfigManager
-from app.utils.crypto_manager import decrypt_private_key
+from app.utils.crypto_manager import get_decrypted_private_key
 from spl.token.instructions import get_associated_token_address, create_associated_token_account
 from solders.pubkey import Pubkey
 from solders.keypair import Keypair
@@ -33,13 +33,10 @@ def create_platform_ata():
             print(f"📍 平台收款地址: {platform_address_str}")
             
             # 2. 获取并解密私钥
-            encrypted_key = ConfigManager.get_config('SOLANA_PRIVATE_KEY_ENCRYPTED')
-            if not encrypted_key:
-                print("❌ 未找到加密的私钥")
-                return False
-            
             try:
-                private_key_bytes = decrypt_private_key(encrypted_key)
+                private_key_str = get_decrypted_private_key('SOLANA_PRIVATE_KEY_ENCRYPTED')
+                # 将十六进制字符串转换为字节
+                private_key_bytes = bytes.fromhex(private_key_str)
                 platform_keypair = Keypair.from_bytes(private_key_bytes)
                 print(f"✅ 私钥解密成功，公钥: {platform_keypair.pubkey()}")
                 
