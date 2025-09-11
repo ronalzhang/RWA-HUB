@@ -771,11 +771,11 @@
         });
     }
     
-    // 钱包连接处理已移动到wallet_manager.js
+    // Wallet connection handling moved to original architecture
     
-    // 钱包功能由上面的简单脚本处理
+    // Wallet functionality handled by scripts above
     
-    // 点击外部关闭钱包菜单
+    // Click outside to close wallet menu
     document.addEventListener('click', function(event) {
         const walletDropdown = document.getElementById('walletDropdown');
         const walletMenu = document.getElementById('walletMenu');
@@ -788,17 +788,17 @@
         }
     });
     
-    // 页面加载完成后初始化
+    // Initialize after page load
     document.addEventListener('DOMContentLoaded', function() {
-        console.log('页面加载完成，初始化钱包和语言功能');
+        console.log('Page loaded, initializing wallet and language features');
         
-        // 语言切换器已移除
+        // Language switcher removed
         
-        // 钱包按钮事件绑定由wallet_manager.js处理
+        // Wallet button events handled by original architecture
         
-        // 语言切换项已移除
+        // Language switcher items removed
         
-        // 点击外部关闭所有下拉菜单
+        // Click outside to close all dropdown menus
         document.addEventListener('click', function(e) {
             if (!e.target.closest('.dropdown')) {
                 document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
@@ -807,9 +807,9 @@
             }
         });
         
-        // 初始化钱包按钮状态 - 但不立即加载资产数据，以改善首页性能
+        // Initialize wallet button state - don't load asset data immediately to improve homepage performance
         if (window.walletState && window.walletState.address) {
-            // 只更新钱包按钮显示，不立即加载资产数据
+            // Only update wallet button display, don't load asset data immediately
             const walletBtnText = document.getElementById('walletBtnText');
             if (walletBtnText && window.walletState.formatAddress) {
                 walletBtnText.textContent = window.walletState.formatAddress(window.walletState.address);
@@ -957,7 +957,7 @@
             });
     </script>
     
-    <!-- 钱包连接逻辑已移动到wallet_manager.js -->
+    <!-- Wallet connection logic uses original architecture -->
     
     <!-- 移除Font Awesome Kit脚本，已在头部引入CDN版本 -->
     <!-- <script src="https://kit.fontawesome.com/ad3f66688a.js" crossorigin="anonymous"></script> -->
@@ -1005,12 +1005,10 @@
     <!-- Solana Web3.js -->
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
     
-    <!-- 统一钱包管理器 -->
-    <script src="{{ url_for('static', filename='js/wallet_manager.js') }}?v=2.1.0&t={{ now }}"></script>
     <!-- SPL Token 库（预加载以解决竞态条件） -->
     <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
     <!-- 统一购买处理器 -->
-    <script src="{{ url_for('static', filename='js/purchase_handler_unified.js') }}?v=20250912_fixed_compute_budget&t={{ now }}"></script>
+    <script src="{{ url_for('static', filename='js/purchase_handler_unified.js') }}?v=20250912_fixed_compute_budget&t={{ range(1000000, 9999999) | random }}"></script>
     
     <!-- 简单的钱包按钮初始化 -->
     <script>
@@ -1074,170 +1072,42 @@
                 walletMenu.classList.remove('show');
                 walletMenu.style.display = 'none';
             } else {
-                // 显示菜单时才加载用户数据，提升首页性能
-                if (window.walletManager && typeof window.walletManager.updateWalletDropdown === 'function') {
-                    window.walletManager.updateWalletDropdown();
-                }
+                // Load user data when menu is shown
                 walletMenu.classList.add('show');
                 walletMenu.style.display = 'block';
             }
         }
         
-        // 已删除重复的updateWalletDropdownInfo函数，统一使用wallet_manager.js中的updateWalletMenuInfo
+        // Functions removed to use original architecture
         
-        // 余额加载功能已移至wallet_manager.js，避免重复代码冲突
-        
-        // 佣金加载功能已移至wallet_manager.js，避免重复代码冲突
-        
-        // 用户资产加载功能已移至wallet_manager.js，避免重复代码冲突
-        
-        // 打开钱包选择器
+        // Open wallet selector - use original English architecture
         function openWalletSelector() {
-            console.log('尝试打开钱包选择器...');
-            console.log('walletManager:', window.walletManager);
-            console.log('walletState:', window.walletState);
-            
-            // 使用新的钱包管理器
-            if (window.walletManager && typeof window.walletManager.openWalletSelector === 'function') {
-                console.log('调用钱包管理器选择器...');
-                window.walletManager.openWalletSelector();
-            } else if (window.walletState && typeof window.walletState.openWalletSelector === 'function') {
-                console.log('调用兼容性钱包选择器...');
-                window.walletState.openWalletSelector();
+            // Use original wallet connection logic
+            if (typeof connectWallet === 'function') {
+                // If original connectWallet function exists, call it directly
+                connectWallet('phantom'); // Default to Phantom
             } else {
-                console.log('钱包选择器不可用，显示简单选择弹窗');
-                // 显示简单的钱包选择弹窗
-                showSimpleWalletSelector();
+                console.error('Wallet connection function not available');
+                alert('Wallet connection temporarily unavailable, please refresh and try again');
             }
         }
         
-        // 统一的钱包选择器 - 桌面端和移动端都显示相同的选择界面
-        function showSimpleWalletSelector() {
-            console.log('显示钱包选择器 - 统一桌面端和移动端体验');
-            
-            // 检查是否有wallet_manager.js的钱包选择器可用
-            if (window.walletManager && typeof window.walletManager.openWalletSelector === 'function') {
-                console.log('调用wallet_manager.js的钱包选择器');
-                window.walletManager.openWalletSelector();
-                return;
-            }
-            
-            // 如果wallet_manager.js不可用，创建简单的模态选择器
-            console.log('wallet_manager.js不可用，创建简单选择器');
-            createSimpleWalletModal();
-        }
+        // Wallet connection functionality keeps original architecture
         
-        // 创建简单的钱包选择模态框
-        function createSimpleWalletModal() {
-            // 移除现有的模态框
-            const existingModal = document.getElementById('simpleWalletModal');
-            if (existingModal) {
-                existingModal.remove();
-            }
-            
-            // 创建模态框HTML
-            const modalHTML = `
-                <div class="modal fade" id="simpleWalletModal" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
-                    <div class="modal-dialog modal-dialog-centered">
-                        <div class="modal-content" style="border-radius: 20px; border: none; overflow: hidden;">
-                            <div class="modal-header" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px 25px;">
-                                <h5 class="modal-title">选择钱包</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body" style="padding: 25px;">
-                                <div class="wallet-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
-                                    <div class="wallet-option" onclick="connectWallet('phantom')" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 16px; padding: 16px; text-align: center; cursor: pointer; transition: all 0.25s ease;">
-                                        <div class="wallet-icon-wrapper phantom" style="width: 56px; height: 56px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #f5eeff;">
-                                            <i class="fas fa-ghost" style="font-size: 24px; color: #8a2be2;"></i>
-                                        </div>
-                                        <div class="wallet-name">Phantom</div>
-                                        <small class="text-muted">Solana Wallet</small>
-                                    </div>
-                                    <div class="wallet-option" onclick="connectWallet('metamask')" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 16px; padding: 16px; text-align: center; cursor: pointer; transition: all 0.25s ease;">
-                                        <div class="wallet-icon-wrapper ethereum" style="width: 56px; height: 56px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #fff5e6;">
-                                            <i class="fab fa-ethereum" style="font-size: 24px; color: #f7931a;"></i>
-                                        </div>
-                                        <div class="wallet-name">MetaMask</div>
-                                        <small class="text-muted">Ethereum Wallet</small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            // 添加到页面
-            document.body.insertAdjacentHTML('beforeend', modalHTML);
-            
-            // 显示模态框
-            const modal = new bootstrap.Modal(document.getElementById('simpleWalletModal'));
-            modal.show();
-        }
-        
-        // 钱包连接功能已完全移至wallet_manager.js，避免重复代码冲突
-        
-        // 全局连接函数，供模态框中的按钮调用
-        function connectWallet(walletType) {
-            console.log('连接钱包类型:', walletType);
-            
-            // 关闭模态框
-            const modal = document.getElementById('simpleWalletModal');
-            if (modal) {
-                const bootstrapModal = bootstrap.Modal.getInstance(modal);
-                if (bootstrapModal) {
-                    bootstrapModal.hide();
-                }
-            }
-            
-            // 优先使用新的钱包管理器
-            if (window.walletManager && typeof window.walletManager.connect === 'function') {
-                console.log('使用钱包管理器连接');
-                window.walletManager.connect(walletType);
-            } else if (window.walletState && typeof window.walletState.connect === 'function') {
-                console.log('使用兼容性钱包连接');
-                window.walletState.connect(walletType);
-            } else {
-                console.error('钱包连接功能不可用');
-                alert('钱包连接功能暂时不可用，请刷新页面重试');
-            }
-        }
-        
-        // 显示佣金详情
+        // Commission details - keep original structure
         function showCommissionDetails() {
             if (!window.walletState || !window.walletState.address) {
-                alert('请先连接钱包');
+                alert('Please connect wallet first');
                 return;
             }
             
             const address = window.walletState.address;
             const commissionValue = document.getElementById('walletCommissionInDropdown').textContent || '0.00';
             
-            // 显示佣金详情弹窗
-            const details = `
-佣金详情信息：
-
-钱包地址: ${formatWalletAddress(address)}
-当前佣金余额: ${commissionValue} USDC
-
-佣金说明:
-• 推荐用户购买资产可获得佣金
-• 佣金率根据平台设置动态调整
-• 佣金实时结算到账
-• 可随时提取到钱包
-
-如需查看详细的佣金记录和提取历史，请访问个人中心页面。
-            `;
-            
-            alert(details);
-            
-            // 可以在这里添加更复杂的弹窗或跳转到佣金详情页面
-            console.log('显示佣金详情，地址:', address, '佣金:', commissionValue);
+            alert(`Commission Details:\n\nWallet: ${formatWalletAddress(address)}\nBalance: ${commissionValue} USDC`);
         }
         
-        // 切换钱包和断开钱包功能已移至wallet_manager.js，避免重复代码冲突
-        
-        // 钱包状态监听和连接检查功能已移至wallet_manager.js，避免重复代码冲突
+        // Switch and disconnect functions use original architecture
     </script>
     
     <script>
