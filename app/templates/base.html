@@ -807,6 +807,32 @@
             }
         });
         
+        // Check for existing wallet connection on page load
+        if (window.solana && window.solana.isConnected) {
+            try {
+                const address = window.solana.publicKey.toString();
+                window.walletState = {
+                    connected: true,
+                    isConnected: true,
+                    address: address,
+                    publicKey: window.solana.publicKey,
+                    formatAddress: function(addr) {
+                        return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
+                    }
+                };
+                
+                // Update UI
+                const walletBtnText = document.getElementById('walletBtnText');
+                if (walletBtnText) {
+                    walletBtnText.textContent = window.walletState.formatAddress(address);
+                }
+                
+                console.log('Auto-detected connected wallet:', address);
+            } catch (error) {
+                console.log('No auto-connected wallet detected');
+            }
+        }
+        
         // Initialize wallet button state - don't load asset data immediately to improve homepage performance
         if (window.walletState && window.walletState.address) {
             // Only update wallet button display, don't load asset data immediately
@@ -1080,15 +1106,135 @@
         
         // Functions removed to use original architecture
         
+        // Mobile detection helper
+        function isMobileDevice() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
+        // Simple wallet connection function
+        function connectWallet(walletType = 'phantom') {
+            console.log('Connecting wallet:', walletType);
+            
+            if (walletType === 'phantom') {
+                if (isMobileDevice()) {
+                    // On mobile, try deep link first, then redirect to app store
+                    if (window.solana && window.solana.isPhantom) {
+                        // Phantom is installed, connect directly
+                        connectPhantomWallet();
+                    } else {
+                        // Redirect to Phantom mobile app or app store
+                        const phantomUrl = 'https://phantom.app/ul/browse/' + encodeURIComponent(window.location.href);
+                        window.open(phantomUrl, '_blank');
+                    }
+                } else {
+                    // Desktop connection
+                    connectPhantomWallet();
+                }
+            }
+        }
+
+        // Connect to Phantom wallet
+        async function connectPhantomWallet() {
+            try {
+                if (!window.solana || !window.solana.isPhantom) {
+                    alert('Phantom wallet not detected. Please install Phantom first.');
+                    return;
+                }
+
+                const resp = await window.solana.connect();
+                const address = resp.publicKey.toString();
+                
+                // Update wallet state
+                window.walletState = {
+                    connected: true,
+                    isConnected: true,
+                    address: address,
+                    publicKey: resp.publicKey,
+                    formatAddress: function(addr) {
+                        return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
+                    }
+                };
+
+                // Update UI
+                const walletBtnText = document.getElementById('walletBtnText');
+                if (walletBtnText) {
+                    walletBtnText.textContent = window.walletState.formatAddress(address);
+                }
+
+                console.log('Wallet connected successfully:', address);
+                
+            } catch (error) {
+                console.error('Failed to connect wallet:', error);
+                alert('Failed to connect wallet. Please try again.');
+            }
+        }
+
+        // Disconnect wallet
+        function disconnectWallet() {
+            try {
+                if (window.solana && window.solana.disconnect) {
+                    window.solana.disconnect();
+                }
+                
+                // Clear wallet state
+                window.walletState = {
+                    connected: false,
+                    isConnected: false,
+                    address: null,
+                    publicKey: null
+                };
+
+                // Update UI
+                const walletBtnText = document.getElementById('walletBtnText');
+                if (walletBtnText) {
+                    walletBtnText.textContent = 'Connect Wallet';
+                }
+
+                console.log('Wallet disconnected');
+                
+            } catch (error) {
+                console.error('Failed to disconnect wallet:', error);
+            }
+        }
+
+        // Disconnect wallet and close menu
+        function disconnectAndCloseMenu() {
+            disconnectWallet();
+            
+            // Close wallet menu
+            const walletMenu = document.getElementById('walletMenu');
+            if (walletMenu) {
+                walletMenu.classList.remove('show');
+                walletMenu.style.display = 'none';
+            }
+        }
+
+        // Switch wallet (reconnect)
+        function switchWalletAndCloseMenu() {
+            disconnectWallet();
+            setTimeout(() => {
+                openWalletSelector();
+            }, 500);
+            
+            // Close wallet menu
+            const walletMenu = document.getElementById('walletMenu');
+            if (walletMenu) {
+                walletMenu.classList.remove('show');
+                walletMenu.style.display = 'none';
+            }
+        }
+
         // Open wallet selector - use original English architecture
         function openWalletSelector() {
-            // Use original wallet connection logic
-            if (typeof connectWallet === 'function') {
-                // If original connectWallet function exists, call it directly
-                connectWallet('phantom'); // Default to Phantom
+            // Show wallet selection or directly connect based on device
+            if (isMobileDevice()) {
+                // On mobile, directly try to connect with Phantom
+                console.log('Mobile device detected, connecting to Phantom...');
+                connectWallet('phantom');
             } else {
-                console.error('Wallet connection function not available');
-                alert('Wallet connection temporarily unavailable, please refresh and try again');
+                // On desktop, show simple selection or connect directly
+                console.log('Desktop device detected, connecting to Phantom...');
+                connectWallet('phantom');
             }
         }
         
