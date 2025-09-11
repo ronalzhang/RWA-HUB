@@ -15,23 +15,18 @@
 {% block content %}
 <div x-data="settingsManager()" x-init="init()" class="space-y-6">
     
-    <!-- 系统配置 -->
-    <div class="bg-white shadow rounded-lg p-6">
-        <h2 class="text-xl font-semibold text-gray-800 mb-6">系统设置</h2>
-
-        {# Display flashed messages #}
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="mb-4">
+    {# Display flashed messages #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="bg-white shadow rounded-lg p-4 mb-6">
                 {% for category, message in messages %}
                     <div class="alert alert-{{ 'danger' if category == 'error' else category }} mb-2">
                         {{ message }}
                     </div>
                 {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-    </div>
+            </div>
+        {% endif %}
+    {% endwith %}
 
     <!-- 系统主密钥管理 -->
     <div class="bg-white shadow rounded-lg p-6">
