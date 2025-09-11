@@ -13,6 +13,7 @@ from spl.token.instructions import get_associated_token_address, create_associat
 from solders.pubkey import Pubkey
 from solders.keypair import Keypair
 from solders.transaction import Transaction
+from solders.message import Message
 from solana.rpc.api import Client
 from solana.rpc.commitment import Confirmed
 import time
@@ -102,11 +103,10 @@ def create_platform_ata():
             
             # 7. 构建和发送交易
             recent_blockhash = client.get_latest_blockhash().value.blockhash
-            transaction = Transaction(
-                recent_blockhash=recent_blockhash,
-                fee_payer=platform_keypair.pubkey()
-            )
-            transaction.add(create_ata_instruction)
+            
+            # 使用正确的Transaction构造方式
+            message = Message.new_with_blockhash([create_ata_instruction], platform_keypair.pubkey(), recent_blockhash)
+            transaction = Transaction.new_unsigned(message)
             
             # 8. 签名交易
             transaction.sign(platform_keypair)
