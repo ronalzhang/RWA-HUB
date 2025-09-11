@@ -67,6 +67,39 @@
                         <span class="text-sm text-gray-600">创建时间:</span>
                         <span id="system-key-created" class="text-sm text-gray-600">-</span>
                     </div>
+                    <!-- 显示当前密钥（已配置时） -->
+                    <div x-show="currentSystemKey" class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-blue-800">当前系统密钥:</span>
+                            <button type="button" 
+                                    @click="showCurrentKey = !showCurrentKey"
+                                    class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors">
+                                <span x-text="showCurrentKey ? '隐藏' : '显示'"></span>
+                            </button>
+                        </div>
+                        <div x-show="showCurrentKey" class="relative">
+                            <input type="text" 
+                                   :value="currentSystemKey" 
+                                   readonly 
+                                   class="w-full px-3 py-2 pr-20 text-xs font-mono bg-white border border-blue-300 rounded-md">
+                            <div class="absolute inset-y-0 right-0 flex items-center space-x-1 pr-2">
+                                <button type="button" 
+                                        @click="copyToClipboard(currentSystemKey, '系统密钥')"
+                                        class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors">
+                                    复制
+                                </button>
+                            </div>
+                        </div>
+                        <div x-show="!showCurrentKey" class="text-xs text-blue-600 font-mono">
+                            ●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●
+                        </div>
+                        <p class="text-xs text-blue-600 mt-2">
+                            <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            请将此密钥安全保存到密码管理器或其他安全地方作为备份
+                        </p>
+                    </div>
                 </div>
                 <button type="button" 
                         @click="checkSystemKeyStatus()"
@@ -78,14 +111,14 @@
             <!-- 系统密钥设置 -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    系统主密钥
+                    <span x-text="currentSystemKey ? '更新系统主密钥' : '系统主密钥'"></span>
                     <span class="text-xs text-gray-500 ml-1">(用于加密用户密码)</span>
                 </label>
                 <div class="relative">
                     <input :type="showSystemKey ? 'text' : 'password'" 
                            x-model="systemMasterKey"
                            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                           placeholder="请输入系统主密钥">
+                           :placeholder="currentSystemKey ? '输入新的系统主密钥（留空保持不变）' : '请输入系统主密钥'">
                     <button type="button" 
                             @click="showSystemKey = !showSystemKey"
                             class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
@@ -102,8 +135,32 @@
                     <button type="button" 
                             @click="generateSystemKey()"
                             class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors">
-                        生成安全密钥
+                        <span x-text="currentSystemKey ? '生成新密钥' : '生成安全密钥'"></span>
                     </button>
+                    <button type="button" 
+                            x-show="systemMasterKey && showSystemKey" 
+                            @click="copyToClipboard(systemMasterKey, '生成的系统密钥')"
+                            class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors">
+                        复制密钥
+                    </button>
+                </div>
+                <!-- 密钥更新警告 -->
+                <div x-show="currentSystemKey" class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-4 w-4 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-2">
+                            <p class="text-xs text-yellow-700">
+                                <strong>密钥更新说明：</strong><br>
+                                • 更新系统密钥将重新加密所有用户密码<br>
+                                • 请务必在更新前备份当前密钥<br>
+                                • 更新过程中请勿关闭页面或中断操作
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -111,7 +168,7 @@
                 <button type="button" 
                         @click="saveSystemKey()"
                         class="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
-                    保存系统主密钥
+                    <span x-text="currentSystemKey ? '更新系统主密钥' : '保存系统主密钥'"></span>
                 </button>
             </div>
         </div>
@@ -318,6 +375,8 @@ function settingsManager() {
         showCryptoPassword: false,
         systemMasterKey: '',
         showSystemKey: false,
+        currentSystemKey: '',  // 存储当前系统密钥
+        showCurrentKey: false, // 控制当前密钥显示/隐藏
 
         
         // 获取URL参数中的钱包地址
@@ -658,9 +717,28 @@ function settingsManager() {
                     if (createdElement && result.created_at) {
                         createdElement.textContent = result.created_at;
                     }
+                    
+                    // 如果已配置，获取当前系统密钥用于显示
+                    if (result.configured) {
+                        await this.loadCurrentSystemKey();
+                    }
                 }
             } catch (error) {
                 console.error('检查系统密钥状态失败:', error);
+            }
+        },
+
+        async loadCurrentSystemKey() {
+            try {
+                const response = await this.authFetch('/admin/v2/api/system-key/get');
+                const result = await response.json();
+                
+                if (result.success && result.system_key) {
+                    this.currentSystemKey = result.system_key;
+                }
+            } catch (error) {
+                console.error('获取当前系统密钥失败:', error);
+                // 不显示错误，静默失败
             }
         },
 
@@ -674,9 +752,40 @@ function settingsManager() {
             this.systemMasterKey = key;
         },
 
+        // 复制到剪贴板功能
+        async copyToClipboard(text, type = '内容') {
+            try {
+                await navigator.clipboard.writeText(text);
+                alert(`${type}已复制到剪贴板！\n\n请将其保存到安全的地方作为备份。`);
+            } catch (error) {
+                // 回退方案
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                
+                try {
+                    document.execCommand('copy');
+                    alert(`${type}已复制到剪贴板！\n\n请将其保存到安全的地方作为备份。`);
+                } catch (err) {
+                    alert(`复制失败，请手动复制：\n\n${text}`);
+                } finally {
+                    document.body.removeChild(textArea);
+                }
+            }
+        },
+
         async saveSystemKey() {
             if (!this.systemMasterKey) {
-                alert('请输入或生成系统主密钥');
+                if (this.currentSystemKey) {
+                    alert('请输入新的系统主密钥，或留空保持现有密钥不变');
+                } else {
+                    alert('请输入或生成系统主密钥');
+                }
                 return;
             }
             
@@ -685,7 +794,25 @@ function settingsManager() {
                 return;
             }
             
-            const confirmation = confirm('警告：保存系统主密钥后，请务必记住此密钥！\n\n如果忘记系统主密钥，将无法访问所有已保存的私钥！\n\n确定要保存吗？');
+            let confirmationMessage = '';
+            if (this.currentSystemKey) {
+                confirmationMessage = '警告：更新系统主密钥后，所有用户密码将使用新密钥重新加密！\n\n' +
+                    '更新前请确保：\n' +
+                    '1. 已备份当前系统密钥\n' +
+                    '2. 已备份新生成的系统密钥\n' +
+                    '3. 在更新过程中不要关闭页面\n\n' +
+                    '确定要更新系统主密钥吗？';
+            } else {
+                confirmationMessage = '警告：保存系统主密钥后，请务必记住此密钥！\n\n' +
+                    '如果忘记系统主密钥，将无法访问所有已保存的私钥！\n\n' +
+                    '建议：\n' +
+                    '1. 复制密钥到剪贴板\n' +
+                    '2. 保存到密码管理器\n' +
+                    '3. 写在纸上存放在安全地方\n\n' +
+                    '确定要保存吗？';
+            }
+            
+            const confirmation = confirm(confirmationMessage);
             if (!confirmation) {
                 return;
             }
@@ -697,14 +824,24 @@ function settingsManager() {
                         'X-Requested-With': 'XMLHttpRequest'
                     },
                     body: JSON.stringify({
-                        system_key: this.systemMasterKey
+                        system_key: this.systemMasterKey,
+                        is_update: !!this.currentSystemKey
                     })
                 });
                 
                 const result = await response.json();
                 if (result.success) {
-                    alert('系统主密钥保存成功！\n\n请务必将此密钥安全保存，建议：\n1. 写在纸上存放在安全地方\n2. 使用密码管理器保存\n3. 不要存储在电脑或网络上');
+                    // 显示成功消息，提醒用户备份
+                    const successMessage = this.currentSystemKey ? 
+                        '系统主密钥更新成功！\n\n所有用户密码已使用新密钥重新加密。' :
+                        '系统主密钥保存成功！\n\n请务必将此密钥安全保存，建议：\n1. 写在纸上存放在安全地方\n2. 使用密码管理器保存\n3. 不要存储在电脑或网络上';
+                    
+                    alert(successMessage);
+                    
+                    // 更新当前密钥显示
+                    this.currentSystemKey = this.systemMasterKey;
                     this.systemMasterKey = ''; // 清空输入框
+                    this.showSystemKey = false; // 隐藏输入
                     this.checkSystemKeyStatus();
                 } else {
                     alert('保存失败: ' + result.error);

@@ -790,16 +790,26 @@ def save_system_key():
                 'error': '系统主密钥长度至少需要32字符'
             }), 400
         
+        is_update = data.get('is_update', False)
+        
         # 检查是否已存在系统密钥
         existing_key = SystemConfig.get_value('SYSTEM_MASTER_KEY_CONFIGURED')
-        if existing_key == 'true':
+        
+        if existing_key == 'true' and not is_update:
             return jsonify({
                 'success': False,
-                'error': '系统主密钥已存在，不能重复设置'
+                'error': '系统主密钥已存在，如需更新请使用更新功能'
+            }), 400
+        
+        if existing_key != 'true' and is_update:
+            return jsonify({
+                'success': False,
+                'error': '系统密钥未配置，无法执行更新操作'
             }), 400
         
         # 保存系统主密钥到数据库，使用加密存储
         from app.utils.crypto_manager import get_crypto_manager
+        from datetime import datetime
         import os
         
         # 临时使用一个固定密码来加密系统密钥存储
@@ -810,25 +820,61 @@ def save_system_key():
             crypto_manager = get_crypto_manager()
             encrypted_system_key = crypto_manager.encrypt_private_key(system_key)
             
-            # 保存加密后的系统密钥
+            # 如果是更新操作，需要重新加密所有用户密码
+            if is_update:
+                current_app.logger.info("开始执行系统密钥更新，重新加密所有用户密码")
+                
+                # 获取当前系统密钥
+                from app.utils.crypto_manager import get_system_master_key
+                old_system_key = get_system_master_key()
+                
+                # 获取所有需要重新加密的用户密码配置
+                all_encrypted_passwords = SystemConfig.query.filter_by(config_key='CRYPTO_PASSWORD_ENCRYPTED').all()
+                
+                # 使用旧密钥解密，新密钥加密
+                for password_config in all_encrypted_passwords:
+                    try:
+                        # 使用旧系统密钥解密用户密码
+                        os.environ['CRYPTO_PASSWORD'] = old_system_key
+                        old_crypto_manager = get_crypto_manager()
+                        user_password = old_crypto_manager.decrypt_private_key(password_config.config_value)
+                        
+                        # 使用新系统密钥加密用户密码
+                        os.environ['CRYPTO_PASSWORD'] = system_key
+                        new_crypto_manager = get_crypto_manager()
+                        new_encrypted_password = new_crypto_manager.encrypt_private_key(user_password)
+                        
+                        # 更新配置
+                        password_config.config_value = new_encrypted_password
+                        password_config.description = f'系统密钥更新时重新加密 - {datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")}'
+                        
+                    except Exception as e:
+                        current_app.logger.error(f"重新加密用户密码失败: {e}")
+                        # 继续处理其他密码，不中断整个过程
+                        continue
+                
+                current_app.logger.info("所有用户密码重新加密完成")
+            
+            # 保存或更新加密后的系统密钥
             SystemConfig.set_value(
                 'SYSTEM_MASTER_KEY_ENCRYPTED', 
                 encrypted_system_key, 
-                '系统主密钥（已加密存储）'
+                f'系统主密钥（{"更新" if is_update else "创建"}于{datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")}）'
             )
             
-            # 设置一个标记表示系统密钥已配置
+            # 设置或更新配置状态标记
             SystemConfig.set_value(
                 'SYSTEM_MASTER_KEY_CONFIGURED',
                 'true',
-                '系统主密钥配置状态标记'
+                f'系统主密钥配置状态标记（{"更新" if is_update else "创建"}于{datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")}）'
             )
             
-            current_app.logger.info("系统主密钥已安全保存到数据库")
+            current_app.logger.info(f"系统主密钥已安全{'更新' if is_update else '保存'}到数据库")
             
             return jsonify({
                 'success': True,
-                'message': '系统主密钥保存成功'
+                'message': f'系统主密钥{"更新" if is_update else "保存"}成功',
+                'is_update': is_update
             })
             
         finally:
