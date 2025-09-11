@@ -370,6 +370,25 @@ class TradeServiceV3:
             )
             
             # 构建返回数据 - 使用指令数据而不是序列化交易
+            instructions_data = []
+            for i, instr in enumerate(instructions):
+                logger.info(f"[{transaction_id}] 序列化指令{i}: 程序ID={str(instr.program_id)}")
+                logger.info(f"[{transaction_id}] 指令{i}账户数: {len(instr.accounts)}")
+                for j, acc in enumerate(instr.accounts):
+                    logger.info(f"[{transaction_id}] 指令{i}账户{j}: {str(acc.pubkey)} (签名者:{acc.is_signer}, 可写:{acc.is_writable})")
+                
+                instructions_data.append({
+                    'program_id': str(instr.program_id),
+                    'accounts': [
+                        {
+                            'pubkey': str(acc.pubkey),
+                            'is_signer': acc.is_signer,
+                            'is_writable': acc.is_writable
+                        } for acc in instr.accounts
+                    ],
+                    'data': bytes(instr.data).hex()  # 统一使用bytes()转换确保格式正确
+                })
+            
             return {
                 'success': True,
                 'message': '购买交易创建成功',
@@ -383,19 +402,7 @@ class TradeServiceV3:
                     'fee_payer': wallet_address,
                     'status': 'pending_signature',
                     'created_at': new_trade.created_at.isoformat(),
-                    'instructions': [
-                        {
-                            'program_id': str(instr.program_id),
-                            'accounts': [
-                                {
-                                    'pubkey': str(acc.pubkey),
-                                    'is_signer': acc.is_signer,
-                                    'is_writable': acc.is_writable
-                                } for acc in instr.accounts
-                            ],
-                            'data': bytes(instr.data).hex()  # 统一使用bytes()转换确保格式正确
-                        } for instr in instructions
-                    ],
+                    'instructions': instructions_data,
                     'recent_blockhash': str(recent_blockhash)
                 }
             }
