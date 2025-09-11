@@ -837,6 +837,13 @@ def save_system_key():
                 os.environ['CRYPTO_PASSWORD'] = original_password
             else:
                 os.environ.pop('CRYPTO_PASSWORD', None)
+        
+    except Exception as e:
+        current_app.logger.error(f"保存系统密钥失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'保存系统密钥失败: {str(e)}'
+        }), 500
 
 @admin_bp.route('/v2/api/system-key/get', methods=['GET'])
 @api_admin_required  
