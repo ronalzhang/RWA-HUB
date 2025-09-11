@@ -239,42 +239,59 @@ def get_security_status():
         password_strength = '极弱'
         
         if crypto_password:
-            # 长度评分
+            # 长度评分 - 更注重长密码
             if len(crypto_password) >= 64:
-                password_score += 30
+                password_score += 35  # 64位+密码给更高分
             elif len(crypto_password) >= 32:
                 password_score += 25
             elif len(crypto_password) >= 16:
                 password_score += 15
             
             # 复杂度评分
-            if any(c.isupper() for c in crypto_password) and any(c.islower() for c in crypto_password):
-                password_score += 15
+            if any(c.isupper() for c in crypto_password):
+                password_score += 10  # 大写字母
+            if any(c.islower() for c in crypto_password):
+                password_score += 10  # 小写字母  
             if any(c.isdigit() for c in crypto_password):
-                password_score += 15
+                password_score += 10  # 数字
             if any(c in '!@#$%^&*()_+-=[]{}|;:,.<>?-_' for c in crypto_password):
-                password_score += 15
+                password_score += 10  # 特殊字符
             
-            # 随机性评分（字符多样性）
+            # 随机性和复杂性评分
             if len(crypto_password) > 0:
                 unique_chars = len(set(crypto_password))
                 diversity_ratio = unique_chars / len(crypto_password)
                 if diversity_ratio > 0.8:
-                    password_score += 20
+                    password_score += 20  # 高随机性
                 elif diversity_ratio > 0.6:
-                    password_score += 15
+                    password_score += 15  # 中等随机性
                 elif diversity_ratio > 0.4:
-                    password_score += 10
+                    password_score += 10  # 低随机性
             
-            # 检查是否使用默认密码
-            if crypto_password.startswith('123abc'):
-                password_score = 0
-                password_strength = '极弱'
-            elif password_score >= 85:
-                password_strength = '强'
+            # 检查弱密码模式
+            weak_patterns = ['123456', '654321', 'abcdef', 'qwerty', 'password', '000000', '111111', 'admin', 'root', '123abc']
+            has_weak_pattern = False
+            for pattern in weak_patterns:
+                if pattern.lower() in crypto_password.lower():
+                    password_score = max(0, password_score - 30)  # 减分而不是清零
+                    has_weak_pattern = True
+                    break
+            
+            # 额外加分：如果密码很长且很随机
+            if len(crypto_password) >= 32 and diversity_ratio > 0.7 and not has_weak_pattern:
+                password_score += 5  # 额外奖励分
+            
+            # 确保最大值不超过100
+            password_score = min(password_score, 100)
+            
+            # 强度等级判定
+            if password_score >= 85:
+                password_strength = '极强'
             elif password_score >= 70:
-                password_strength = '中'
-            elif password_score >= 50:
+                password_strength = '强'
+            elif password_score >= 55:
+                password_strength = '中等'
+            elif password_score >= 30:
                 password_strength = '弱'
             else:
                 password_strength = '极弱'
@@ -730,17 +747,35 @@ def get_wallet_info():
             })
         
         try:
-            # 解密私钥
+            # 解密私钥 - 使用临时环境变量避免竞态条件
             import os
-            original_password = os.environ.get('CRYPTO_PASSWORD')
-            os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
             
+            # 首先解密用户密码
             system_crypto = get_crypto_manager()
-            crypto_password = system_crypto.decrypt_private_key(encrypted_password)
             
-            os.environ['CRYPTO_PASSWORD'] = crypto_password
-            user_crypto = get_crypto_manager()
-            private_key = user_crypto.decrypt_private_key(encrypted_key)
+            # 临时设置系统密钥来解密用户密码 
+            original_password = os.environ.get('CRYPTO_PASSWORD')
+            try:
+                os.environ['CRYPTO_PASSWORD'] = 'RWA_HUB_SYSTEM_KEY_2024'
+                crypto_password = system_crypto.decrypt_private_key(encrypted_password)
+            finally:
+                # 恢复原始密码
+                if original_password:
+                    os.environ['CRYPTO_PASSWORD'] = original_password
+                else:
+                    os.environ.pop('CRYPTO_PASSWORD', None)
+            
+            # 使用解密的用户密码来解密私钥
+            try:
+                os.environ['CRYPTO_PASSWORD'] = crypto_password
+                user_crypto = get_crypto_manager()
+                private_key = user_crypto.decrypt_private_key(encrypted_key)
+            finally:
+                # 恢复原始密码
+                if original_password:
+                    os.environ['CRYPTO_PASSWORD'] = original_password
+                else:
+                    os.environ.pop('CRYPTO_PASSWORD', None)
             
             # 解析私钥并生成地址
             # 优先尝试base58解码（Solana最常用格式）
@@ -822,10 +857,6 @@ def get_wallet_info():
                 # 简化错误处理，直接返回0.0
                 sol_balance_str = "0.0"
                 usdc_balance_str = "0.0"
-            
-            # 恢复原始密码
-            if original_password:
-                os.environ['CRYPTO_PASSWORD'] = original_password
             
             return jsonify({
                 'address': wallet_address,

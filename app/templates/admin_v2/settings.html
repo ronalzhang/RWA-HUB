@@ -443,29 +443,54 @@ function settingsManager() {
             let score = 0;
             let feedback = [];
 
-            // 长度检查
-            if (password.length >= 32) score += 25;
+            // 长度检查 - 更注重长密码
+            if (password.length >= 64) score += 35; // 64位+密码给更高分
+            else if (password.length >= 32) score += 25;
             else if (password.length >= 16) score += 15;
             else feedback.push('密码长度至少16字符');
 
             // 复杂度检查
-            if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score += 15;
-            if (/[0-9]/.test(password)) score += 15;
-            if (/[^A-Za-z0-9]/.test(password)) score += 15;
+            if (/[A-Z]/.test(password)) score += 10; // 大写字母
+            if (/[a-z]/.test(password)) score += 10; // 小写字母
+            if (/[0-9]/.test(password)) score += 10; // 数字
+            if (/[^A-Za-z0-9]/.test(password)) score += 10; // 特殊字符
 
-            // 随机性检查
-            if (password.length > 0 && new Set(password).size / password.length > 0.7) score += 15;
+            // 随机性和复杂性检查
+            const uniqueChars = new Set(password).size;
+            const uniquenessRatio = uniqueChars / password.length;
+            if (uniquenessRatio > 0.8) score += 20; // 高随机性
+            else if (uniquenessRatio > 0.6) score += 15; // 中等随机性
+            else if (uniquenessRatio > 0.4) score += 10; // 低随机性
 
-            // 弱密码检查
-            if (password.includes('123') || password.includes('abc') || password.includes('password')) {
-                score = 0;
-                feedback.push('包含常见弱密码模式');
+            // 检查是否有明显的模式
+            let hasWeakPattern = false;
+            const weakPatterns = [
+                '123456', '654321', 'abcdef', 'qwerty', 'password', 
+                '000000', '111111', 'admin', 'root'
+            ];
+            
+            for (const pattern of weakPatterns) {
+                if (password.toLowerCase().includes(pattern)) {
+                    score = Math.max(0, score - 30); // 减分而不是清零
+                    hasWeakPattern = true;
+                    feedback.push(`包含弱密码模式: ${pattern}`);
+                    break;
+                }
             }
 
+            // 额外加分：如果密码很长且很随机
+            if (password.length >= 32 && uniquenessRatio > 0.7 && !hasWeakPattern) {
+                score += 5; // 额外奖励分
+            }
+
+            // 确保最大值不超过100
+            score = Math.min(score, 100);
+
             let level, color;
-            if (score >= 80) { level = '强'; color = 'text-green-600'; }
-            else if (score >= 60) { level = '中'; color = 'text-yellow-600'; }
-            else if (score >= 40) { level = '弱'; color = 'text-orange-600'; }
+            if (score >= 85) { level = '极强'; color = 'text-green-700'; }
+            else if (score >= 70) { level = '强'; color = 'text-green-600'; }
+            else if (score >= 55) { level = '中等'; color = 'text-yellow-600'; }
+            else if (score >= 30) { level = '弱'; color = 'text-orange-600'; }
             else { level = '极弱'; color = 'text-red-600'; }
 
             const strengthElement = document.getElementById('password-strength');
@@ -474,7 +499,8 @@ function settingsManager() {
                 strengthElement.className = `text-sm font-medium ${color}`;
             }
 
-            if (feedback.length > 0) {
+            // 只在分数很低时显示建议
+            if (feedback.length > 0 && score < 50) {
                 alert('密码强度建议:\n' + feedback.join('\n'));
             }
         },
