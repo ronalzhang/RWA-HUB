@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app import create_app
 from app.utils.config_manager import ConfigManager
-from app.utils.crypto_manager import get_decrypted_private_key
+from app.utils.crypto_manager import get_crypto_manager
 from spl.token.instructions import get_associated_token_address, create_associated_token_account
 from solders.pubkey import Pubkey
 from solders.keypair import Keypair
@@ -16,6 +16,19 @@ from solders.transaction import Transaction
 from solana.rpc.api import Client
 from solana.rpc.commitment import Confirmed
 import time
+
+def get_decrypted_private_key_from_db(storage_key: str = 'SOLANA_PRIVATE_KEY_ENCRYPTED') -> str:
+    """从数据库获取并解密私钥"""
+    from app.models.admin import SystemConfig
+    
+    # 从数据库获取加密的私钥
+    encrypted_key = SystemConfig.get_value(storage_key)
+    if not encrypted_key:
+        raise ValueError(f"未找到数据库中的加密私钥: {storage_key}")
+    
+    # 使用加密管理器解密
+    manager = get_crypto_manager()
+    return manager.decrypt_private_key(encrypted_key)
 
 def create_platform_ata():
     """创建平台USDC ATA账户"""
@@ -34,7 +47,7 @@ def create_platform_ata():
             
             # 2. 获取并解密私钥
             try:
-                private_key_str = get_decrypted_private_key('SOLANA_PRIVATE_KEY_ENCRYPTED')
+                private_key_str = get_decrypted_private_key_from_db('SOLANA_PRIVATE_KEY_ENCRYPTED')
                 # 将十六进制字符串转换为字节
                 private_key_bytes = bytes.fromhex(private_key_str)
                 platform_keypair = Keypair.from_bytes(private_key_bytes)
