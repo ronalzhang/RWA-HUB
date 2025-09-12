@@ -858,24 +858,32 @@
                 return;
             }
             
-            // Standard wallet connection check
+            // Standard wallet connection check - 集成持久化管理器
             if (window.solana && window.solana.isConnected) {
                 try {
                     const address = window.solana.publicKey.toString();
-                    window.walletState = {
+                    const walletState = {
                         connected: true,
                         isConnected: true,
                         address: address,
                         publicKey: window.solana.publicKey,
+                        walletType: 'phantom',
                         formatAddress: function(addr) {
                             return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
                         }
                     };
                     
+                    window.walletState = walletState;
+                    
+                    // 保存到localStorage
+                    if (window.walletPersistenceManager) {
+                        window.walletPersistenceManager.saveWalletState(walletState);
+                    }
+                    
                     // Update UI
                     const walletBtnText = document.getElementById('walletBtnText');
                     if (walletBtnText) {
-                        walletBtnText.textContent = window.walletState.formatAddress(address);
+                        walletBtnText.textContent = walletState.formatAddress(address);
                     }
                     
                     console.log('Auto-detected connected wallet:', address);
@@ -1085,6 +1093,8 @@
     
     <!-- SPL Token 库（预加载以解决竞态条件） -->
     <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
+    <!-- 钱包持久化管理器 -->
+    <script src="{{ url_for('static', filename='js/wallet-persistence.js') }}"></script>
     <!-- 统一购买处理器 -->
     <script src="{{ url_for('static', filename='js/purchase_handler_unified.js') }}?v=20250912_mobile_wallet_fix&t={{ range(1000000, 9999999) | random }}"></script>
     
@@ -1303,20 +1313,28 @@
                 const resp = await window.solana.connect();
                 const address = resp.publicKey.toString();
                 
-                // Update wallet state
-                window.walletState = {
+                // Update wallet state - 集成持久化
+                const walletState = {
                     connected: true,
                     isConnected: true,
                     address: address,
                     publicKey: resp.publicKey,
+                    walletType: 'phantom',
                     formatAddress: function(addr) {
                         return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
                     }
                 };
+                
+                window.walletState = walletState;
+                
+                // 保存到localStorage
+                if (window.walletPersistenceManager) {
+                    window.walletPersistenceManager.saveWalletState(walletState);
+                }
 
                 // Update UI with connected address
                 if (walletBtnText) {
-                    walletBtnText.textContent = window.walletState.formatAddress(address);
+                    walletBtnText.textContent = walletState.formatAddress(address);
                 }
 
                 console.log('Wallet connected successfully:', address);
@@ -1353,6 +1371,11 @@
                     address: null,
                     publicKey: null
                 };
+
+                // 清除localStorage中的状态
+                if (window.walletPersistenceManager) {
+                    window.walletPersistenceManager.clearWalletState();
+                }
 
                 // Update UI
                 const walletBtnText = document.getElementById('walletBtnText');
