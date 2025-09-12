@@ -372,19 +372,42 @@ if (window.purchaseHandlerInitialized) {
                             throw error;
                         }
 
-                        // 如果是区块哈希相关错误，重新获取最新区块哈希
+                        // 如果是区块哈希相关错误，重新构建和签名交易
                         if (error.message.includes('Blockhash not found') || error.message.includes('blockhash')) {
-                            console.log('检测到区块哈希过期，重新获取...');
+                            console.log('检测到区块哈希过期，重新构建交易...');
                             const newBlockhash = await window.solanaConnection.getLatestBlockhash();
-                            transaction.recentBlockhash = newBlockhash.blockhash;
+                            
+                            // 重新构建交易对象而非仅更新区块哈希
+                            const newTransaction = new window.solanaWeb3.Transaction({
+                                recentBlockhash: newBlockhash.blockhash,
+                                feePayer: new window.solanaWeb3.PublicKey(this.currentTrade.feePayer)
+                            });
 
-                            // 重新签名交易并完全替换签名的交易对象
-                            signedTransaction = await window.solana.signTransaction(transaction);
+                            // 重新添加所有指令
+                            this.currentTrade.instructions.forEach((instrData, index) => {
+                                const instruction = new window.solanaWeb3.TransactionInstruction({
+                                    keys: instrData.accounts.map(acc => ({
+                                        pubkey: new window.solanaWeb3.PublicKey(acc.pubkey),
+                                        isSigner: acc.is_signer,
+                                        isWritable: acc.is_writable
+                                    })),
+                                    programId: new window.solanaWeb3.PublicKey(instrData.program_id),
+                                    data: new Uint8Array(Buffer.from(instrData.data, 'hex'))
+                                });
+                                newTransaction.add(instruction);
+                            });
+
+                            // 重新签名新构建的交易
+                            transaction = newTransaction;  // 更新交易引用
+                            signedTransaction = await window.solana.signTransaction(newTransaction);
                             console.log('区块哈希已更新并重新签名:', {
-                                oldBlockhash: newBlockhash.blockhash,
-                                newBlockhash: transaction.recentBlockhash,
+                                oldBlockhash: latestBlockhash.blockhash,
+                                newBlockhash: newBlockhash.blockhash,
                                 hasSignature: signedTransaction.signatures.length > 0
                             });
+                            
+                            // 更新区块哈希信息用于后续确认
+                            latestBlockhash = newBlockhash;
                         }
 
                         // 等待1秒后重试
