@@ -21,48 +21,48 @@ if (window.purchaseHandlerInitialized) {
             // 错误代码映射
             this.errorCodes = {
                 'CONFIGURATION_ERROR': {
-                    title: '配置错误',
-                    message: '系统配置不完整，请联系管理员',
+                    title: 'Configuration Error',
+                    message: 'System configuration incomplete, please contact administrator',
                     retryable: false
                 },
                 'BLOCKCHAIN_CONNECTION_ERROR': {
-                    title: '区块链连接失败',
-                    message: '无法连接到区块链网络，请稍后重试',
+                    title: 'Blockchain Connection Failed',
+                    message: 'Unable to connect to blockchain network, please try again later',
                     retryable: true
                 },
                 'TRANSACTION_CREATION_ERROR': {
-                    title: '交易创建失败',
-                    message: '创建交易时发生错误，请重试',
+                    title: 'Transaction Creation Failed',
+                    message: 'Error occurred while creating transaction, please retry',
                     retryable: true
                 },
                 'VALIDATION_ERROR': {
-                    title: '数据验证失败',
-                    message: '输入数据不符合要求，请检查后重试',
+                    title: 'Data Validation Failed',
+                    message: 'Input data does not meet requirements, please check and retry',
                     retryable: false
                 },
                 'INSUFFICIENT_BALANCE': {
-                    title: '余额不足',
-                    message: '您的钱包余额不足以完成此交易',
+                    title: 'Insufficient Balance',
+                    message: 'Your wallet balance is insufficient for this transaction',
                     retryable: false
                 },
                 'WALLET_CONNECTION_ERROR': {
-                    title: '钱包连接错误',
-                    message: '钱包连接异常，请重新连接钱包',
+                    title: 'Wallet Connection Error',
+                    message: 'Wallet connection abnormal, please reconnect wallet',
                     retryable: false
                 },
                 'TRANSACTION_TIMEOUT': {
-                    title: '交易超时',
-                    message: '交易处理超时，请稍后重试',
+                    title: 'Transaction Timeout',
+                    message: 'Transaction processing timeout, please try again later',
                     retryable: true
                 },
                 'NETWORK_ERROR': {
-                    title: '网络错误',
-                    message: '网络连接不稳定，请检查网络后重试',
+                    title: 'Network Error',
+                    message: 'Network connection unstable, please check network and retry',
                     retryable: true
                 },
                 'USER_REJECTED': {
-                    title: '交易已取消',
-                    message: '您在钱包中拒绝了交易请求',
+                    title: 'Transaction Cancelled',
+                    message: 'You rejected the transaction request in wallet',
                     retryable: false
                 }
             };
@@ -183,7 +183,7 @@ if (window.purchaseHandlerInitialized) {
 
             const walletAddress = this.getWalletAddress();
             if (!walletAddress) {
-                this.showError('钱包未连接', '请先连接您的钱包再进行购买');
+                this.showError('Wallet Not Connected', 'Please connect your wallet before making a purchase');
                 return false;
             }
 
@@ -241,7 +241,7 @@ if (window.purchaseHandlerInitialized) {
                 if (error.name === 'AbortError') {
                     this.handleError({
                         error_code: 'TRANSACTION_TIMEOUT',
-                        message: '请求超时，请检查网络连接后重试'
+                        message: 'Request timeout, please check network connection and retry'
                     }, 'Create Purchase Timeout');
                 } else {
                     this.handleError(error, 'Create Purchase');
@@ -264,7 +264,7 @@ if (window.purchaseHandlerInitialized) {
                 if (!window.solana || !window.solana.isConnected) {
                     throw {
                         error_code: 'WALLET_CONNECTION_ERROR',
-                        message: '钱包未连接或不可用，请重新连接钱包'
+                        message: 'Wallet not connected or unavailable, please reconnect wallet'
                     };
                 }
 
@@ -284,7 +284,7 @@ if (window.purchaseHandlerInitialized) {
                 if (balance < requiredAmount) {
                     throw {
                         error_code: 'INSUFFICIENT_BALANCE',
-                        message: `USDC余额不足。需要: ${requiredAmount} USDC，当前: ${balance} USDC`
+                        message: `USDC balance insufficient. Required: ${requiredAmount} USDC, Current: ${balance} USDC`
                     };
                 }
 
@@ -457,8 +457,8 @@ if (window.purchaseHandlerInitialized) {
                 if (data.success) {
                     this.resetRetryState();
                     this.showSuccess(
-                        '购买成功！',
-                        `您已成功购买 ${this.currentTrade.amount} 个代币\\n交易哈希: ${txHash.substring(0, 8)}...`,
+                        'Purchase Successful!',
+                        `You have successfully purchased ${this.currentTrade.amount} tokens\\nTransaction Hash: ${txHash.substring(0, 8)}...`,
                         () => {
                             window.location.reload();
                         }
@@ -765,7 +765,7 @@ if (window.purchaseHandlerInitialized) {
                 console.log('购买参数:', { assetId, amount });
                 
                 if (!assetId || !amount || amount <= 0) {
-                    alert('请输入有效的购买数量');
+                    alert('Please enter a valid purchase amount');
                     return;
                 }
                 

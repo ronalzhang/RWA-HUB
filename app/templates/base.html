@@ -816,15 +816,43 @@
             const phantomPubkey = urlParams.get('phantom_encryption_public_key');
             const phantomRedirect = urlParams.get('phantom_connect');
             
-            if (phantomPubkey || phantomRedirect) {
+            // Also check for mobile deep link returns
+            const phantomConnected = urlParams.get('phantom_connected');
+            const phantomAddress = urlParams.get('phantom_address');
+            
+            if (phantomPubkey || phantomRedirect || phantomConnected || phantomAddress) {
                 console.log('Detected Phantom redirect, attempting to establish connection...');
-                // Clean URL
+                // Clean URL immediately
                 window.history.replaceState({}, document.title, window.location.pathname);
+                
+                // Show connecting status
+                const walletBtnText = document.getElementById('walletBtnText');
+                if (walletBtnText) {
+                    walletBtnText.textContent = 'Connecting...';
+                }
                 
                 // Try to connect after a short delay
                 setTimeout(() => {
                     if (window.solana && window.solana.isPhantom) {
                         connectPhantomWallet();
+                    } else {
+                        // Retry connection detection for mobile
+                        let retries = 0;
+                        const retryInterval = setInterval(() => {
+                            retries++;
+                            if (window.solana && window.solana.isPhantom) {
+                                clearInterval(retryInterval);
+                                connectPhantomWallet();
+                            } else if (retries >= 10) {
+                                clearInterval(retryInterval);
+                                console.log('Phantom provider not detected after redirect');
+                                // Reset button text if connection failed
+                                if (walletBtnText) {
+                                    walletBtnText.textContent = 'Connect Wallet';
+                                }
+                                alert('Phantom wallet connection failed. Please try again.');
+                            }
+                        }, 500);
                     }
                 }, 1000);
                 return;
@@ -1058,7 +1086,7 @@
     <!-- SPL Token 库（预加载以解决竞态条件） -->
     <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
     <!-- 统一购买处理器 -->
-    <script src="{{ url_for('static', filename='js/purchase_handler_unified.js') }}?v=20250912_fixed_compute_budget&t={{ range(1000000, 9999999) | random }}"></script>
+    <script src="{{ url_for('static', filename='js/purchase_handler_unified.js') }}?v=20250912_mobile_wallet_fix&t={{ range(1000000, 9999999) | random }}"></script>
     
     <!-- 简单的钱包按钮初始化 -->
     <script>
@@ -1155,6 +1183,11 @@
             try {
                 console.log('Attempting mobile Phantom connection...');
                 
+                const walletBtnText = document.getElementById('walletBtnText');
+                if (walletBtnText) {
+                    walletBtnText.textContent = 'Connecting...';
+                }
+                
                 // Method 1: Check if Phantom provider is available (in-app browser)
                 if (window.solana && window.solana.isPhantom) {
                     console.log('Phantom provider detected, connecting...');
@@ -1177,27 +1210,74 @@
                             connectPhantomWallet();
                         } else if (attempts > 10) {
                             clearInterval(checkProvider);
+                            if (walletBtnText) {
+                                walletBtnText.textContent = 'Connect Wallet';
+                            }
                             alert('Please refresh the page in Phantom browser and try again.');
                         }
                     }, 500);
                     return;
                 }
                 
-                // Method 3: Create deep link to open Phantom and return to our site
-                const currentUrl = window.location.href;
+                // Method 3: Use proper Phantom deep link for wallet connection
+                // Reset button text before attempting connection
+                if (walletBtnText) {
+                    walletBtnText.textContent = 'Connect Wallet';
+                }
                 
-                // Use Universal Link format for better compatibility
-                const phantomUrl = `https://phantom.app/ul/v1/connect?app_url=${encodeURIComponent(currentUrl)}&cluster=mainnet-beta&redirect=${encodeURIComponent(currentUrl)}`;
+                const currentDomain = window.location.origin;
+                const appName = 'RWA-HUB';
                 
-                console.log('Opening Phantom with URL:', phantomUrl);
+                // Proper Phantom deep link format for connecting wallet
+                const phantomDeepLink = `phantom://v1/connect?app_url=${encodeURIComponent(currentDomain)}&app_name=${encodeURIComponent(appName)}&redirect_link=${encodeURIComponent(currentDomain + '?phantom_connected=true')}`;
                 
-                // Show user instruction
-                if (confirm('This will open Phantom wallet app. After connecting your wallet, you will be redirected back to this page. Continue?')) {
-                    window.open(phantomUrl, '_blank');
+                console.log('Opening Phantom with deep link:', phantomDeepLink);
+                
+                // Show user instruction with English text
+                if (confirm('This will open Phantom wallet app to connect your wallet. Continue?')) {
+                    try {
+                        // First try the phantom:// deep link
+                        window.location.href = phantomDeepLink;
+                        
+                        // Set a timeout to check if the app opened
+                        setTimeout(() => {
+                            // If user returns quickly, the app didn't open
+                            if (document.visibilityState === 'visible') {
+                                if (confirm('If Phantom didn\'t open, would you like to install it from the app store?')) {
+                                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                                    const storeUrl = isIOS 
+                                        ? 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977'
+                                        : 'https://play.google.com/store/apps/details?id=app.phantom';
+                                    window.open(storeUrl, '_blank');
+                                }
+                            }
+                        }, 3000);
+                        
+                    } catch (linkError) {
+                        console.error('Deep link failed:', linkError);
+                        // Fallback to app store
+                        if (confirm('Unable to open Phantom. Would you like to install it from the app store?')) {
+                            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                            const storeUrl = isIOS 
+                                ? 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977'
+                                : 'https://play.google.com/store/apps/details?id=app.phantom';
+                            window.open(storeUrl, '_blank');
+                        }
+                    }
+                } else {
+                    // User cancelled
+                    console.log('User cancelled wallet connection');
                 }
                 
             } catch (error) {
                 console.error('Mobile Phantom connection failed:', error);
+                
+                // Reset button text on error
+                const walletBtnText = document.getElementById('walletBtnText');
+                if (walletBtnText) {
+                    walletBtnText.textContent = 'Connect Wallet';
+                }
+                
                 alert('Failed to connect to Phantom wallet. Please make sure Phantom is installed and try again.');
             }
         }
@@ -1205,7 +1285,17 @@
         // Connect to Phantom wallet
         async function connectPhantomWallet() {
             try {
+                const walletBtnText = document.getElementById('walletBtnText');
+                
+                // Show connecting status
+                if (walletBtnText) {
+                    walletBtnText.textContent = 'Connecting...';
+                }
+                
                 if (!window.solana || !window.solana.isPhantom) {
+                    if (walletBtnText) {
+                        walletBtnText.textContent = 'Connect Wallet';
+                    }
                     alert('Phantom wallet not detected. Please install Phantom first.');
                     return;
                 }
@@ -1224,8 +1314,7 @@
                     }
                 };
 
-                // Update UI
-                const walletBtnText = document.getElementById('walletBtnText');
+                // Update UI with connected address
                 if (walletBtnText) {
                     walletBtnText.textContent = window.walletState.formatAddress(address);
                 }
@@ -1234,7 +1323,19 @@
                 
             } catch (error) {
                 console.error('Failed to connect wallet:', error);
-                alert('Failed to connect wallet. Please try again.');
+                
+                // Reset button text on error
+                const walletBtnText = document.getElementById('walletBtnText');
+                if (walletBtnText) {
+                    walletBtnText.textContent = 'Connect Wallet';
+                }
+                
+                // Check if user rejected the connection
+                if (error.message && error.message.includes('User rejected')) {
+                    alert('Wallet connection was cancelled.');
+                } else {
+                    alert('Failed to connect wallet. Please try again.');
+                }
             }
         }
 
