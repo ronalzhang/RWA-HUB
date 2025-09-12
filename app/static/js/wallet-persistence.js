@@ -8,6 +8,7 @@ class WalletPersistenceManager {
         this.STORAGE_KEY = 'rwa_hub_wallet_state';
         this.AUTO_RECONNECT_KEY = 'rwa_hub_auto_reconnect';
         this.initialized = false;
+        this.isRestoring = false;  // 防止重复恢复
         
         this.init();
     }
@@ -16,12 +17,14 @@ class WalletPersistenceManager {
         if (this.initialized) return;
         this.initialized = true;
         
-        console.log('🔗 钱包持久化管理器初始化');
-        
-        // 页面加载时尝试恢复钱包连接
-        document.addEventListener('DOMContentLoaded', () => {
+        // 页面加载时尝试恢复钱包连接（只在主要页面执行）
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                this.restoreWalletConnection();
+            });
+        } else {
             this.restoreWalletConnection();
-        });
+        }
         
         // 监听钱包断开事件
         this.setupDisconnectionHandlers();
@@ -43,7 +46,8 @@ class WalletPersistenceManager {
             localStorage.setItem(this.STORAGE_KEY, JSON.stringify(stateToSave));
             localStorage.setItem(this.AUTO_RECONNECT_KEY, 'true');
             
-            console.log('💾 钱包状态已保存到localStorage:', stateToSave);
+            // 设置cookie让后端知道钱包地址
+            this.setWalletCookie(walletState.address);
         } catch (error) {
             console.error('❌ 保存钱包状态失败:', error);
         }
@@ -69,12 +73,10 @@ class WalletPersistenceManager {
             const maxAge = 24 * 60 * 60 * 1000; // 24小时
             
             if (stateAge > maxAge) {
-                console.log('⏰ 钱包状态已过期，清除保存的状态');
                 this.clearWalletState();
                 return null;
             }
             
-            console.log('📖 从localStorage读取钱包状态:', walletState);
             return walletState;
         } catch (error) {
             console.error('❌ 读取钱包状态失败:', error);
@@ -89,7 +91,9 @@ class WalletPersistenceManager {
         try {
             localStorage.removeItem(this.STORAGE_KEY);
             localStorage.removeItem(this.AUTO_RECONNECT_KEY);
-            console.log('🗑️ 钱包状态已清除');
+            
+            // 清除cookie
+            this.clearWalletCookie();
         } catch (error) {
             console.error('❌ 清除钱包状态失败:', error);
         }
@@ -99,14 +103,14 @@ class WalletPersistenceManager {
      * 页面加载时恢复钱包连接
      */
     async restoreWalletConnection() {
+        if (this.isRestoring) return;  // 防止重复执行
+        this.isRestoring = true;
+        
         try {
             const savedState = this.loadWalletState();
             if (!savedState || !savedState.connected) {
-                console.log('📱 没有保存的钱包连接状态');
                 return;
             }
-
-            console.log('🔄 尝试恢复钱包连接...');
 
             // 检查钱包是否仍然可用
             if (savedState.walletType === 'phantom') {
@@ -118,7 +122,6 @@ class WalletPersistenceManager {
                         
                         if (currentAddress && currentAddress === savedState.address) {
                             this.restoreWalletUI(savedState);
-                            console.log('✅ 钱包连接状态已恢复:', currentAddress);
                             return;
                         }
                     }
@@ -134,27 +137,22 @@ class WalletPersistenceManager {
                                     address: address,
                                     publicKey: response.publicKey
                                 });
-                                console.log('✅ 钱包自动重连成功:', address);
                                 return;
                             }
                         }
                     } catch (error) {
-                        if (error.message && error.message.includes('User rejected')) {
-                            console.log('👤 用户之前拒绝了自动连接');
-                        } else {
-                            console.log('🔒 钱包不支持无用户交互连接');
-                        }
+                        // 静默处理，无需日志
                     }
                 }
             }
 
             // 如果无法自动恢复，清除保存的状态
-            console.log('❌ 无法自动恢复钱包连接，需要用户重新连接');
             this.clearWalletState();
 
         } catch (error) {
-            console.error('❌ 恢复钱包连接失败:', error);
             this.clearWalletState();
+        } finally {
+            this.isRestoring = false;
         }
     }
 
@@ -181,6 +179,9 @@ class WalletPersistenceManager {
                 walletBtnText.textContent = window.walletState.formatAddress(walletState.address);
             }
 
+            // 设置cookie让后端知道钱包地址
+            this.setWalletCookie(walletState.address);
+
             // 更新其他可能的钱包UI元素
             this.updateWalletUI(walletState.address);
 
@@ -190,10 +191,35 @@ class WalletPersistenceManager {
             });
             document.dispatchEvent(event);
 
-            console.log('✅ 钱包UI状态已恢复');
-
         } catch (error) {
             console.error('❌ 恢复钱包UI失败:', error);
+        }
+    }
+
+    /**
+     * 设置钱包地址cookie供后端使用
+     */
+    setWalletCookie(address) {
+        try {
+            if (address) {
+                // 设置cookie，24小时过期
+                const expires = new Date();
+                expires.setTime(expires.getTime() + 24 * 60 * 60 * 1000);
+                document.cookie = `eth_address=${address}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+            }
+        } catch (error) {
+            console.error('❌ 设置钱包cookie失败:', error);
+        }
+    }
+
+    /**
+     * 清除钱包地址cookie
+     */
+    clearWalletCookie() {
+        try {
+            document.cookie = 'eth_address=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax';
+        } catch (error) {
+            console.error('❌ 清除钱包cookie失败:', error);
         }
     }
 

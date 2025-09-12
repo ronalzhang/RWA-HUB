@@ -392,19 +392,6 @@ window.ASSET_CONFIG = {
     platformFeeRate: 0.035
 };
 
-// 调试模板变量
-console.log('模板变量调试:');
-console.log('is_admin_user:', "{{ is_admin_user|default('None') }}");
-console.log('is_owner:', "{{ is_owner|default('None') }}"); 
-console.log('current_user_address:', "{{ current_user_address|default('None') }}");
-console.log('asset.owner_address:', "{{ asset.owner_address|default('None') }}");
-
-// 详细的权限检查调试
-console.log('权限检查详情:');
-console.log('- is_admin_user类型:', typeof({{ is_admin_user|lower }}));
-console.log('- is_owner类型:', typeof({{ is_owner|lower }}));
-console.log('- 分红按钮应该显示:', {{ (is_admin_user or is_owner)|lower }});
-
 // 分享功能
 window.shareAsset = function() {
     console.log('分享功能被调用');
@@ -501,17 +488,6 @@ window.shareAsset = function() {
         });
     }
 };
-
-// 检查DOM中是否存在分红按钮
-document.addEventListener('DOMContentLoaded', function() {
-    const dividendBtn = document.getElementById('dividendManagementBtn');
-    console.log('分红按钮DOM检查:');
-    console.log('- 分红按钮存在:', !!dividendBtn);
-    if (dividendBtn) {
-        console.log('- 分红按钮可见:', dividendBtn.style.display !== 'none');
-        console.log('- 分红按钮HTML:', dividendBtn.outerHTML);
-    }
-});
 
 // 页面初始化函数
 document.addEventListener('DOMContentLoaded', function() {
