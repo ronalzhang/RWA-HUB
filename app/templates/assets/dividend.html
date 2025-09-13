@@ -247,13 +247,13 @@
         <div class="container mx-auto px-4 py-4">
             <div class="d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center">
-                    <a href="/assets/{{ symbol }}" class="btn btn-link text-decoration-none d-flex align-items-center">
+                    <a href="/assets/{{ asset.token_symbol }}" class="btn btn-link text-decoration-none d-flex align-items-center">
                         <i class="fas fa-arrow-left me-2"></i>
                         <span class="fw-medium">返回资产详情</span>
                     </a>
                 </div>
                 <div class="d-flex align-items-center">
-                    <span class="badge bg-primary px-3 py-2 rounded-pill">{{ symbol }}</span>
+                    <span class="badge bg-primary px-3 py-2 rounded-pill">{{ asset.token_symbol }}</span>
                     <span class="ms-3 text-muted">分红管理中心</span>
                 </div>
             </div>
@@ -267,7 +267,7 @@
                 <i class="fas fa-coins fa-2x"></i>
             </div>
             <h1 class="display-5 fw-bold text-dark mb-2">分红管理中心</h1>
-            <p class="lead text-muted">为 {{ symbol }} 资产管理分红发放与收益分配</p>
+            <p class="lead text-muted">为 {{ asset.token_symbol }} 资产管理分红发放与收益分配</p>
         </div>
         
         <!-- 统计卡片组 -->
@@ -489,48 +489,130 @@
 
 <script>
 const PLATFORM_FEE_RATE = 0.035; // 3.5%平台手续费
+const TOKEN_SYMBOL = '{{ asset.token_symbol }}';
+
+// 获取钱包地址（优先级：全局状态 -> localStorage -> cookie）
+function getWalletAddress() {
+    // 从全局钱包状态获取
+    if (window.walletState && window.walletState.address) {
+        return window.walletState.address;
+    }
+    
+    // 从localStorage获取
+    try {
+        const savedState = localStorage.getItem('rwa_hub_wallet_state');
+        if (savedState) {
+            const walletState = JSON.parse(savedState);
+            if (walletState.address && walletState.connected) {
+                return walletState.address;
+            }
+        }
+    } catch (e) {
+        console.warn('读取localStorage钱包状态失败:', e);
+    }
+    
+    // 从cookie获取
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'eth_address' && value) {
+            return decodeURIComponent(value);
+        }
+    }
+    
+    return null;
+}
+
+// 设置API请求头
+function getApiHeaders() {
+    const walletAddress = getWalletAddress();
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+    
+    if (walletAddress) {
+        headers['X-Eth-Address'] = walletAddress;
+        headers['X-Token-Symbol'] = TOKEN_SYMBOL;
+    }
+    
+    return headers;
+}
 
 // 加载资产统计信息
 async function loadAssetStats() {
     try {
-        const response = await fetch(`/api/dividend/stats/{{ symbol }}`);
+        const response = await fetch(`/api/dividend/stats/${TOKEN_SYMBOL}`, {
+            headers: getApiHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
         const data = await response.json();
         
-        document.getElementById('totalDividends').textContent = data.count;
-        document.getElementById('totalAmount').textContent = `${data.total_amount} USDC`;
-        document.getElementById('holderCount').textContent = data.holder_count;
+        document.getElementById('totalDividends').textContent = data.count || 0;
+        document.getElementById('totalAmount').textContent = `${data.total_amount || 0} USDC`;
+        document.getElementById('holderCount').textContent = data.holder_count || 0;
     } catch (error) {
         console.error('加载资产统计失败:', error);
+        // 显示默认值
+        document.getElementById('totalDividends').textContent = '0';
+        document.getElementById('totalAmount').textContent = '0 USDC';
+        document.getElementById('holderCount').textContent = '0';
     }
 }
 
 // 加载分红历史
 async function loadDividendHistory() {
     try {
-        const response = await fetch(`/api/dividend/history/{{ symbol }}`);
+        const response = await fetch(`/api/dividend/history/${TOKEN_SYMBOL}`, {
+            headers: getApiHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
         const data = await response.json();
         
         const tbody = document.getElementById('historyTable');
         tbody.innerHTML = '';
         
+        if (data.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center py-5">
+                        <div class="d-flex flex-column align-items-center">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <p class="text-muted mb-0">暂无分红历史记录</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
         data.forEach(record => {
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${new Date(record.created_at).toLocaleString()}
+                <td class="px-4 py-3">
+                    <small class="text-muted">${new Date(record.created_at).toLocaleString()}</small>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${record.amount} USDC
+                <td class="px-4 py-3">
+                    <span class="fw-bold text-success">${record.amount} USDC</span>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${record.interval / 3600}小时
+                <td class="px-4 py-3">
+                    <span class="badge bg-info text-dark">${Math.round(record.interval / 3600)}小时</span>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${record.distributor_address.slice(0, 8)}...${record.distributor_address.slice(-8)}
+                <td class="px-4 py-3">
+                    <code class="small">${record.distributor_address.slice(0, 8)}...${record.distributor_address.slice(-8)}</code>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <a href="https://solscan.io/tx/${record.transaction_hash}" target="_blank" class="text-indigo-600 hover:text-indigo-900">
-                        ${record.transaction_hash.slice(0, 8)}...${record.transaction_hash.slice(-8)}
+                <td class="px-4 py-3">
+                    <a href="https://solscan.io/tx/${record.transaction_hash}" target="_blank" 
+                       class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-external-link-alt me-1"></i>
+                        ${record.transaction_hash.slice(0, 8)}...
                     </a>
                 </td>
             `;
@@ -538,6 +620,17 @@ async function loadDividendHistory() {
         });
     } catch (error) {
         console.error('加载分红历史失败:', error);
+        const tbody = document.getElementById('historyTable');
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center py-5">
+                    <div class="d-flex flex-column align-items-center text-danger">
+                        <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                        <p class="mb-0">加载分红历史失败，请刷新页面重试</p>
+                    </div>
+                </td>
+            </tr>
+        `;
     }
 }
 
@@ -554,15 +647,75 @@ function calculateFees() {
 // 检查权限
 async function checkPermission() {
     try {
-        const response = await fetch(`/api/dividend/check_permission/{{ symbol }}`);
+        const walletAddress = getWalletAddress();
+        
+        if (!walletAddress) {
+            showPermissionError('请先连接钱包后再访问分红管理功能');
+            return;
+        }
+        
+        const response = await fetch(`/api/dividend/check_permission/${TOKEN_SYMBOL}`, {
+            headers: getApiHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
         const data = await response.json();
         
         if (!data.has_permission) {
-            document.getElementById('dividendForm').style.display = 'none';
-            alert('您没有权限管理该资产的分红');
+            showPermissionError('您没有权限管理该资产的分红');
+            return;
         }
+        
+        console.log('✅ 权限验证通过:', data.reason);
+        
     } catch (error) {
         console.error('检查权限失败:', error);
+        showPermissionError('权限验证失败，请稍后重试');
+    }
+}
+
+// 显示权限错误
+function showPermissionError(message) {
+    // 隐藏分红表单
+    const form = document.getElementById('dividendForm');
+    if (form) {
+        form.style.display = 'none';
+    }
+    
+    // 显示错误消息
+    const container = document.querySelector('.container');
+    if (container) {
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-warning alert-dismissible fade show mt-4';
+        alert.innerHTML = `
+            <div class="d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle me-3 fa-2x"></i>
+                <div>
+                    <h5 class="alert-heading mb-1">访问受限</h5>
+                    <p class="mb-2">${message}</p>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="location.reload()">
+                            <i class="fas fa-sync-alt me-1"></i>重试
+                        </button>
+                        <a href="/assets/${TOKEN_SYMBOL}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>返回资产详情
+                        </a>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        // 插入到统计卡片之前
+        const statsSection = document.querySelector('.row.g-4.mb-5');
+        if (statsSection) {
+            container.insertBefore(alert, statsSection);
+        } else {
+            container.appendChild(alert);
+        }
     }
 }
 
@@ -570,15 +723,36 @@ async function checkPermission() {
 document.getElementById('dividendForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
+    const walletAddress = getWalletAddress();
+    if (!walletAddress) {
+        alert('请先连接钱包');
+        return;
+    }
+    
     const amount = document.getElementById('amount').value;
     const interval = document.getElementById('interval').value;
     
+    if (!amount || parseFloat(amount) <= 0) {
+        alert('请输入有效的分红金额');
+        return;
+    }
+    
+    if (!interval || parseInt(interval) <= 0) {
+        alert('请输入有效的分红间隔');
+        return;
+    }
+    
+    const submitBtn = document.getElementById('submitBtn');
+    const originalText = submitBtn.innerHTML;
+    
     try {
-        const response = await fetch(`/api/dividend/distribute/{{ symbol }}`, {
+        // 更新按钮状态
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>处理中...';
+        
+        const response = await fetch(`/api/dividend/distribute/${TOKEN_SYMBOL}`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: getApiHeaders(),
             body: JSON.stringify({
                 amount: parseFloat(amount),
                 interval: parseInt(interval) * 3600,
@@ -587,28 +761,99 @@ document.getElementById('dividendForm').addEventListener('submit', async (e) => 
         
         const data = await response.json();
         
-        if (response.ok) {
-            alert('分红发起成功！');
+        if (response.ok && data.success) {
+            // 成功提示
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: '分红发起成功！',
+                    text: '分红已成功发起，持有人将按比例收到分红',
+                    icon: 'success',
+                    confirmButtonText: '确定'
+                });
+            } else {
+                alert('分红发起成功！');
+            }
+            
+            // 刷新数据和重置表单
             loadAssetStats();
             loadDividendHistory();
             e.target.reset();
+            calculateFees(); // 重置费用显示
         } else {
-            alert(data.error || '分红发起失败');
+            throw new Error(data.error || data.message || '分红发起失败');
         }
     } catch (error) {
         console.error('发起分红失败:', error);
-        alert('发起分红失败，请稍后重试');
+        
+        // 错误提示
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: '操作失败',
+                text: error.message || '发起分红失败，请稍后重试',
+                icon: 'error',
+                confirmButtonText: '确定'
+            });
+        } else {
+            alert(error.message || '发起分红失败，请稍后重试');
+        }
+    } finally {
+        // 恢复按钮状态
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
     }
 });
 
 // 监听输入变化
 document.getElementById('amount').addEventListener('input', calculateFees);
 
+// 监听钱包连接状态变化
+document.addEventListener('walletRestored', function(event) {
+    console.log('钱包状态已恢复:', event.detail);
+    // 重新检查权限
+    setTimeout(checkPermission, 500);
+});
+
+document.addEventListener('walletDisconnected', function() {
+    console.log('钱包已断开');
+    showPermissionError('钱包连接已断开，请重新连接钱包');
+});
+
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', () => {
-    loadAssetStats();
-    loadDividendHistory();
-    checkPermission();
+    // 延迟执行，确保钱包状态已加载
+    setTimeout(() => {
+        loadAssetStats();
+        loadDividendHistory();
+        checkPermission();
+    }, 1000);
 });
+
+// 钱包连接检测（如果钱包管理器加载延迟）
+let walletCheckAttempts = 0;
+const maxWalletCheckAttempts = 10;
+
+function checkWalletAndInit() {
+    const walletAddress = getWalletAddress();
+    
+    if (walletAddress || walletCheckAttempts >= maxWalletCheckAttempts) {
+        // 找到钱包或达到最大尝试次数，开始初始化
+        loadAssetStats();
+        loadDividendHistory();
+        checkPermission();
+        return;
+    }
+    
+    walletCheckAttempts++;
+    setTimeout(checkWalletAndInit, 500);
+}
+
+// 备用初始化
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(checkWalletAndInit, 1500);
+    });
+} else {
+    setTimeout(checkWalletAndInit, 1500);
+}
 </script>
 {% endblock %} 
