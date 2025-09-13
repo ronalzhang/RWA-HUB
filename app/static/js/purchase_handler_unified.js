@@ -718,12 +718,12 @@ if (window.purchaseHandlerInitialized) {
         if (!window.solanaConnection && window.solanaWeb3) {
             console.log('初始化Solana连接...');
             
-            // RPC端点配置（主要和备用）
+            // 使用与后端一致的RPC端点，优先国内可访问的节点
             const rpcEndpoints = [
+                window.SOLANA_NETWORK_URL, // 使用后端配置的RPC端点
                 'https://mainnet.helius-rpc.com/?api-key=edbb3e74-772d-4c65-a430-5c89f7ad02ea',
-                'https://api.mainnet-beta.solana.com',
-                'https://solana-api.projectserum.com'
-            ];
+                'https://api.mainnet-beta.solana.com'
+            ].filter(url => url); // 过滤空值
             
             for (let i = 0; i < rpcEndpoints.length; i++) {
                 try {
@@ -733,6 +733,9 @@ if (window.purchaseHandlerInitialized) {
                     const safeEndpoint = endpoint.includes('api-key=') ? 
                         endpoint.split('?')[0] + '?api-key=***' : endpoint;
                     console.log(`✅ Solana连接已初始化: ${safeEndpoint}`);
+                    
+                    // 对于国内网络，使用更长的超时时间
+                    window.solanaConnection.commitment = 'confirmed';
                     break;
                 } catch (error) {
                     console.error(`RPC端点 ${rpcEndpoints[i]} 连接失败:`, error);

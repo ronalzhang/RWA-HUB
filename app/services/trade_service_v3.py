@@ -488,8 +488,9 @@ class TradeServiceV3:
         logger.info(f"[{confirmation_id}] 开始确认购买交易: TradeID={trade_id}, TxHash={tx_hash}")
         
         # 等待一段时间让区块链有时间处理交易
-        logger.info(f"[{confirmation_id}] 等待区块链处理交易...")
-        time.sleep(5.0)  # 增加到5秒让交易充分传播
+        # 针对国内网络环境增加更长的等待时间
+        logger.info(f"[{confirmation_id}] 等待区块链处理交易（考虑网络延迟）...")
+        time.sleep(8.0)  # 增加到8秒，考虑国内网络到Solana网络的延迟
         
         try:
             # 1. 交易记录验证阶段
