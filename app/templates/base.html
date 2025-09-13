@@ -874,30 +874,13 @@
                         copyWalletAddress: function() {
                             if (this.address) {
                                 navigator.clipboard.writeText(this.address).then(() => {
-                                    console.log('地址已复制到剪贴板:', this.address);
-                                    // 显示复制成功提示
                                     const successMsg = document.getElementById('copyAddressSuccess');
                                     if (successMsg) {
                                         successMsg.style.opacity = '1';
-                                        setTimeout(() => {
-                                            successMsg.style.opacity = '0';
-                                        }, 2000);
+                                        setTimeout(() => successMsg.style.opacity = '0', 2000);
                                     }
-                                }).catch(err => {
-                                    console.error('复制地址失败:', err);
-                                    // 备用复制方法
-                                    try {
-                                        const textArea = document.createElement('textarea');
-                                        textArea.value = this.address;
-                                        document.body.appendChild(textArea);
-                                        textArea.select();
-                                        document.execCommand('copy');
-                                        document.body.removeChild(textArea);
-                                        console.log('使用备用方法复制地址成功');
-                                    } catch (backupErr) {
-                                        console.error('备用复制方法也失败:', backupErr);
-                                        alert('无法复制地址，请手动复制: ' + this.address);
-                                    }
+                                }).catch(() => {
+                                    alert('Address: ' + this.address);
                                 });
                             }
                         }
@@ -914,6 +897,12 @@
                     const walletBtnText = document.getElementById('walletBtnText');
                     if (walletBtnText) {
                         walletBtnText.textContent = walletState.formatAddress(address);
+                    }
+                    
+                    // Update wallet address display in dropdown
+                    const walletAddressDisplay = document.getElementById('walletAddressDisplay');
+                    if (walletAddressDisplay) {
+                        walletAddressDisplay.textContent = walletState.formatAddress(address);
                     }
                     
                     console.log('Auto-detected connected wallet:', address);
@@ -1225,72 +1214,13 @@
                 walletMenu.classList.add('show');
                 walletMenu.style.display = 'block';
                 
-                // 加载用户资产数据
+                // 加载用户资产和余额
                 if (window.walletState && window.walletState.address) {
-                    loadUserAssets(window.walletState.address);
+                    loadWalletData(window.walletState.address);
                 }
             }
         }
         
-        // 加载用户资产列表
-        async function loadUserAssets(walletAddress) {
-            if (!walletAddress) {
-                console.log('没有钱包地址，跳过资产加载');
-                return;
-            }
-
-            const assetsList = document.getElementById('walletAssetsList');
-            if (!assetsList) {
-                console.log('资产列表容器未找到');
-                return;
-            }
-
-            try {
-                console.log('开始加载用户资产:', walletAddress);
-                assetsList.innerHTML = '<li style="text-align: center; padding: 10px; color: #666;">Loading...</li>';
-
-                // 调用API获取用户资产
-                const response = await fetch(`/api/user/assets?address=${encodeURIComponent(walletAddress)}&wallet_type=solana`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                const data = await response.json();
-                console.log('用户资产API响应:', data);
-
-                if (data.success && data.assets && data.assets.length > 0) {
-                    // 显示用户资产
-                    assetsList.innerHTML = '';
-                    data.assets.forEach(asset => {
-                        const li = document.createElement('li');
-                        li.className = 'wallet-asset-item';
-                        li.innerHTML = `
-                            <div class="asset-link" style="display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; color: #333; text-decoration: none; border-radius: 4px; transition: all 0.2s ease; background-color: #f8f9fa;">
-                                <div class="asset-info" style="display: flex; align-items: center;">
-                                    <span class="asset-name" style="font-size: 12px; font-weight: 500; color: #333; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${asset.name || 'Unknown Asset'}</span>
-                                </div>
-                                <div style="display: flex; align-items: center;">
-                                    <span class="asset-quantity" style="font-size: 11px; color: #333; background: #eeeeee; padding: 1px 4px; border-radius: 3px; margin-left: 4px;">${asset.balance}</span>
-                                    <span class="asset-symbol" style="font-size: 10px; color: #666; margin-left: 2px;">${asset.symbol || ''}</span>
-                                </div>
-                            </div>
-                        `;
-                        assetsList.appendChild(li);
-                    });
-                    console.log(`✅ 成功加载 ${data.assets.length} 个用户资产`);
-                } else {
-                    // 没有资产
-                    assetsList.innerHTML = '<li style="text-align: center; padding: 15px; color: #999; font-size: 12px;">No assets found</li>';
-                    console.log('用户暂无资产');
-                }
-            } catch (error) {
-                console.error('加载用户资产失败:', error);
-                assetsList.innerHTML = '<li style="text-align: center; padding: 15px; color: #dc3545; font-size: 12px;">Failed to load assets</li>';
-            }
-        }
-
         // Functions removed to use original architecture
         
         // Mobile detection helper
@@ -1451,30 +1381,13 @@
                     copyWalletAddress: function() {
                         if (this.address) {
                             navigator.clipboard.writeText(this.address).then(() => {
-                                console.log('地址已复制到剪贴板:', this.address);
-                                // 显示复制成功提示
                                 const successMsg = document.getElementById('copyAddressSuccess');
                                 if (successMsg) {
                                     successMsg.style.opacity = '1';
-                                    setTimeout(() => {
-                                        successMsg.style.opacity = '0';
-                                    }, 2000);
+                                    setTimeout(() => successMsg.style.opacity = '0', 2000);
                                 }
-                            }).catch(err => {
-                                console.error('复制地址失败:', err);
-                                // 备用复制方法
-                                try {
-                                    const textArea = document.createElement('textarea');
-                                    textArea.value = this.address;
-                                    document.body.appendChild(textArea);
-                                    textArea.select();
-                                    document.execCommand('copy');
-                                    document.body.removeChild(textArea);
-                                    console.log('使用备用方法复制地址成功');
-                                } catch (backupErr) {
-                                    console.error('备用复制方法也失败:', backupErr);
-                                    alert('无法复制地址，请手动复制: ' + this.address);
-                                }
+                            }).catch(() => {
+                                alert('Address: ' + this.address);
                             });
                         }
                     }
@@ -1491,15 +1404,14 @@
                 if (walletBtnText) {
                     walletBtnText.textContent = walletState.formatAddress(address);
                 }
+                
+                // Update wallet address display in dropdown
+                const walletAddressDisplay = document.getElementById('walletAddressDisplay');
+                if (walletAddressDisplay) {
+                    walletAddressDisplay.textContent = walletState.formatAddress(address);
+                }
 
                 console.log('Wallet connected successfully:', address);
-                
-                // 连接成功后预加载用户资产（可选，提升用户体验）
-                try {
-                    loadUserAssets(address);
-                } catch (assetLoadError) {
-                    console.log('预加载资产失败，稍后打开菜单时再加载:', assetLoadError.message);
-                }
                 
             } catch (error) {
                 console.error('Failed to connect wallet:', error);

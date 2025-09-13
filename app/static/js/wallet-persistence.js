@@ -170,6 +170,19 @@ class WalletPersistenceManager {
                 walletType: walletState.walletType || 'phantom',
                 formatAddress: function(addr) {
                     return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
+                },
+                copyWalletAddress: function() {
+                    if (this.address) {
+                        navigator.clipboard.writeText(this.address).then(() => {
+                            const successMsg = document.getElementById('copyAddressSuccess');
+                            if (successMsg) {
+                                successMsg.style.opacity = '1';
+                                setTimeout(() => successMsg.style.opacity = '0', 2000);
+                            }
+                        }).catch(() => {
+                            alert('Address: ' + this.address);
+                        });
+                    }
                 }
             };
 
@@ -233,13 +246,16 @@ class WalletPersistenceManager {
                 'connectWalletBtn',
                 'walletAddress',
                 'userWalletAddress',
-                'currentWalletAddress'
+                'currentWalletAddress',
+                'walletAddressDisplay'
             ];
 
             walletElements.forEach(id => {
                 const element = document.getElementById(id);
                 if (element) {
                     if (element.tagName === 'BUTTON' && element.textContent.includes('Connect')) {
+                        element.textContent = window.walletState.formatAddress(address);
+                    } else if (id === 'walletAddressDisplay') {
                         element.textContent = window.walletState.formatAddress(address);
                     } else if (element.tagName === 'SPAN' || element.tagName === 'DIV') {
                         element.textContent = address;
