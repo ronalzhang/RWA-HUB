@@ -497,6 +497,19 @@ if (window.purchaseHandlerInitialized) {
             } catch (error) {
                 console.error('确认购买交易失败:', error);
                 
+                // 如果确认API失败，等待一段时间后刷新页面让用户检查结果
+                if (error.message && (error.message.includes('HTTP 500') || error.message.includes('HTTP 50'))) {
+                    console.log('确认API失败，可能是网络问题或交易已完成，将刷新页面');
+                    this.showSuccess(
+                        'Transaction Submitted',
+                        `Transaction has been submitted to the blockchain.\\nHash: ${txHash.substring(0, 8)}...\\n\\nPlease wait while we refresh the page to show the latest status.`,
+                        () => {
+                            setTimeout(() => window.location.reload(), 2000);
+                        }
+                    );
+                    return true;
+                }
+                
                 if (error.name === 'AbortError') {
                     this.handleError({
                         error_code: 'TRANSACTION_TIMEOUT',
