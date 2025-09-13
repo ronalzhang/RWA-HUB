@@ -485,7 +485,7 @@ if (window.purchaseHandlerInitialized) {
                     this.resetRetryState();
                     this.showSuccess(
                         'Purchase Completed Successfully!',
-                        `✅ Your purchase has been completed successfully!\n\n• Tokens purchased: ${this.currentTrade.amount}\n• Transaction hash: ${txHash.substring(0, 12)}...\n• USDC payment confirmed\n• Asset tokens added to your wallet`,
+                        `✅ Your purchase has been completed successfully!\n\n• Tokens purchased: ${this.currentTrade.amount}\n• Transaction hash: ${txHash.substring(0, 16)}...${txHash.substring(-8)}\n• USDC payment confirmed\n• Asset tokens added to your wallet`,
                         () => {
                             window.location.reload();
                         }
@@ -506,7 +506,7 @@ if (window.purchaseHandlerInitialized) {
                     console.log('确认API失败，交易可能已完成，将刷新页面验证结果');
                     this.showSuccess(
                         'Transaction Processing Complete',
-                        `✅ Your transaction has been submitted successfully!\n\n• Transaction hash: ${txHash.substring(0, 12)}...\n• USDC payment processed\n• Please check your wallet for the new tokens\n\nThe page will refresh to show updated balances.`,
+                        `✅ Your transaction has been submitted successfully!\n\n• Transaction hash: ${txHash.substring(0, 16)}...${txHash.substring(-8)}\n• USDC payment processed\n• Please check your wallet for the new tokens\n\nThe page will refresh to show updated balances.`,
                         () => {
                             setTimeout(() => window.location.reload(), 2000);
                         }
