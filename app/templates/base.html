@@ -1221,6 +1221,70 @@
             }
         }
         
+        // Load wallet data (balance and assets)
+        async function loadWalletData(address) {
+            if (!address) return;
+            
+            try {
+                // Load USDC balance
+                const balanceResponse = await fetch('/api/wallet/usdc-balance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        wallet_address: address
+                    })
+                });
+                
+                if (balanceResponse.ok) {
+                    const balanceData = await balanceResponse.json();
+                    if (balanceData.success) {
+                        const balanceElement = document.getElementById('walletBalanceInDropdown');
+                        if (balanceElement) {
+                            balanceElement.textContent = balanceData.balance.toFixed(2);
+                        }
+                    }
+                }
+                
+                // Load user assets
+                const assetsResponse = await fetch(`/api/user/assets?address=${encodeURIComponent(address)}&wallet_type=solana`);
+                if (assetsResponse.ok) {
+                    const assetsData = await assetsResponse.json();
+                    if (assetsData.success) {
+                        const assetsList = document.getElementById('walletAssetsList');
+                        if (assetsList) {
+                            assetsList.innerHTML = '';
+                            
+                            if (assetsData.assets && assetsData.assets.length > 0) {
+                                assetsData.assets.forEach(asset => {
+                                    const assetItem = document.createElement('li');
+                                    assetItem.className = 'wallet-asset-item';
+                                    
+                                    assetItem.innerHTML = `
+                                        <div class="asset-link" style="display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; color: #333; text-decoration: none; border-radius: 4px; transition: all 0.2s ease; background-color: #f8f9fa;">
+                                            <div class="asset-info" style="display: flex; align-items: center;">
+                                                <div class="asset-name" style="font-size: 12px; font-weight: 500; color: #333; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${asset.symbol}</div>
+                                            </div>
+                                            <div class="asset-quantity" style="font-size: 11px; color: #333; background: #eeeeee; padding: 1px 4px; border-radius: 3px; margin-left: 4px;">${asset.balance}</div>
+                                        </div>
+                                    `;
+                                    
+                                    assetsList.appendChild(assetItem);
+                                });
+                            } else {
+                                const noAssetsItem = document.createElement('li');
+                                noAssetsItem.innerHTML = '<div style="padding: 8px; color: #666; font-size: 12px; text-align: center;">No assets found</div>';
+                                assetsList.appendChild(noAssetsItem);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load wallet data:', error);
+            }
+        }
+        
         // Functions removed to use original architecture
         
         // Mobile detection helper
