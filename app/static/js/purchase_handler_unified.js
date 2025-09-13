@@ -561,13 +561,48 @@ if (window.purchaseHandlerInitialized) {
 
                 // 获取关联代币账户地址
                 let associatedTokenAddress;
-                if (window.splToken?.getAssociatedTokenAddress) {
-                    associatedTokenAddress = await window.splToken.getAssociatedTokenAddress(
-                        usdcMint,
-                        walletPubkey
-                    );
-                } else {
-                    console.error('getAssociatedTokenAddress 函数不可用');
+                try {
+                    if (window.splToken?.getAssociatedTokenAddress) {
+                        // 尝试不同的SPL Token库版本的调用方式
+                        try {
+                            // 新版本SPL Token库调用方式
+                            associatedTokenAddress = await window.splToken.getAssociatedTokenAddress(
+                                usdcMint,
+                                walletPubkey
+                            );
+                        } catch (newVersionError) {
+                            console.warn('新版本调用方式失败，尝试旧版本方式:', newVersionError.message);
+                            try {
+                                // 旧版本SPL Token库调用方式（参数顺序可能不同）
+                                associatedTokenAddress = await window.splToken.getAssociatedTokenAddress(
+                                    walletPubkey,
+                                    usdcMint
+                                );
+                            } catch (oldVersionError) {
+                                console.warn('旧版本调用方式也失败，尝试手动计算:', oldVersionError.message);
+                                // 手动计算关联代币账户地址（备用方案）
+                                const TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+                                const ASSOCIATED_TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+                                
+                                const seeds = [
+                                    walletPubkey.toBuffer(),
+                                    TOKEN_PROGRAM_ID.toBuffer(),
+                                    usdcMint.toBuffer()
+                                ];
+                                
+                                const [address] = await window.solanaWeb3.PublicKey.findProgramAddress(
+                                    seeds,
+                                    ASSOCIATED_TOKEN_PROGRAM_ID
+                                );
+                                associatedTokenAddress = address;
+                            }
+                        }
+                    } else {
+                        console.error('getAssociatedTokenAddress 函数不可用');
+                        return 0;
+                    }
+                } catch (error) {
+                    console.error('获取关联代币账户地址失败:', error);
                     return 0;
                 }
 
