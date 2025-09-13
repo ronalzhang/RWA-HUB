@@ -243,17 +243,24 @@ class TradeServiceV3:
                 
                 # 检查是否是发布者购买自己的资产
                 if wallet_address.lower() == asset_owner_address.lower():
-                    logger.info(f"[{transaction_id}] 发布者购买自己的资产，只转账给平台")
-                    # 发布者购买自己的资产时，全额转给平台（不给自己转账）
+                    logger.info(f"[{transaction_id}] 发布者购买自己的资产，按20%分润比例给平台")
+                    # 发布者购买自己的资产时，也按照正常分润比例：20%给平台，80%记录但不实际转账（避免自转账）
+                    platform_commission_rate = TradeServiceV3._get_platform_commission_rate()
+                    platform_amount = total_price * platform_commission_rate  # 20%给平台
+                    owner_amount = total_price * (Decimal('1.0') - platform_commission_rate)  # 80%本应给发布者，但因为是自购所以不转账
+                    
+                    logger.info(f"[{transaction_id}] 自购分润计算: 总价={total_price}, 平台分润={platform_amount}(20%), 发布者应得={owner_amount}(80%，但不实际转账)")
+                    
+                    # 只给平台转账20%，发布者的80%不需要转账（因为是自己给自己转账）
                     instructions = [TradeServiceV3._create_single_transfer_instruction(
                         wallet_address, 
                         platform_treasury_address, 
                         payment_token_mint_address, 
-                        total_price,  # 全额给平台
+                        platform_amount,  # 只转20%给平台
                         payment_token_decimals,
-                        f"{transaction_id}_platform_only"
+                        f"{transaction_id}_platform_self_purchase"
                     )]
-                    logger.debug(f"[{transaction_id}] 发布者自购单转账指令创建成功")
+                    logger.debug(f"[{transaction_id}] 发布者自购转账指令创建成功，只转账20%给平台")
                 else:
                     # 普通用户购买：从系统配置获取平台分润比例
                     platform_commission_rate = TradeServiceV3._get_platform_commission_rate()

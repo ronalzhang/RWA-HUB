@@ -18,8 +18,8 @@ class ConfigManager:
     
     # 默认配置值
     DEFAULT_CONFIGS = {
-        'PLATFORM_FEE_ADDRESS': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
-        'ASSET_CREATION_FEE_ADDRESS': '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',
+        'PLATFORM_FEE_ADDRESS': 'H6FMXx3s1kq1aMkYHiexVzircV31WnWaP5MSQQwfHfeW',
+        'ASSET_CREATION_FEE_ADDRESS': 'H6FMXx3s1kq1aMkYHiexVzircV31WnWaP5MSQQwfHfeW',
         'ASSET_CREATION_FEE_AMOUNT': '0.02',
         'PLATFORM_FEE_BASIS_POINTS': '350',  # 3.5%
         'PLATFORM_FEE_RATE': '0.035',  # 3.5%
