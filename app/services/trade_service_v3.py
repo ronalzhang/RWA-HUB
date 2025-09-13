@@ -489,7 +489,7 @@ class TradeServiceV3:
         
         # 等待一段时间让区块链有时间处理交易
         logger.info(f"[{confirmation_id}] 等待区块链处理交易...")
-        time.sleep(2.0)  # 等待2秒让交易传播和处理
+        time.sleep(5.0)  # 增加到5秒让交易充分传播
         
         try:
             # 1. 交易记录验证阶段
@@ -731,7 +731,7 @@ class TradeServiceV3:
             )
 
     @staticmethod
-    def _verify_blockchain_transaction(tx_hash: str, confirmation_id: str, max_retries: int = 3) -> dict:
+    def _verify_blockchain_transaction(tx_hash: str, confirmation_id: str, max_retries: int = 5) -> dict:
         """
         验证区块链上的交易，包含重试机制
         
@@ -749,7 +749,7 @@ class TradeServiceV3:
             try:
                 if attempt > 0:
                     logger.info(f"[{confirmation_id}] 区块链交易验证重试 {attempt}/{max_retries}")
-                    time.sleep(1.0 * attempt)  # 指数退避
+                    time.sleep(2.0 * attempt)  # 更长的指数退避：2s, 4s, 6s, 8s, 10s
                 
                 
                 
