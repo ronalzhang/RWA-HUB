@@ -324,7 +324,7 @@ if (window.purchaseHandlerInitialized) {
                             isWritable: acc.is_writable
                         })),
                         programId: new window.solanaWeb3.PublicKey(instrData.program_id),
-                        data: new Uint8Array(Buffer.from(instrData.data, 'hex'))
+                        data: new Uint8Array(instrData.data.match(/.{1,2}/g).map(byte => parseInt(byte, 16)))
                     });
 
                     console.log(`创建的指令${index}详情:`, {
@@ -392,7 +392,7 @@ if (window.purchaseHandlerInitialized) {
                                         isWritable: acc.is_writable
                                     })),
                                     programId: new window.solanaWeb3.PublicKey(instrData.program_id),
-                                    data: new Uint8Array(Buffer.from(instrData.data, 'hex'))
+                                    data: new Uint8Array(instrData.data.match(/.{1,2}/g).map(byte => parseInt(byte, 16)))
                                 });
                                 newTransaction.add(instruction);
                             });
