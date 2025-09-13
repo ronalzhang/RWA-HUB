@@ -1276,29 +1276,10 @@ class TradeServiceV3:
                     else:
                         logger.warning(f"[{transaction_id}] 指令数据长度异常: {len(instruction_data_bytes)}字节, hex={data_hex}")
                         
-                        # 修复指令数据长度问题
-                        if len(instruction_data_bytes) >= 9:
-                            # 取前9字节作为标准SPL Transfer指令
-                            corrected_data = instruction_data_bytes[:9]
-                            logger.info(f"[{transaction_id}] 修复指令数据: 原长度={len(instruction_data_bytes)}, 修复后长度={len(corrected_data)}")
-                            
-                            # 验证修复后的数据格式
-                            if len(corrected_data) == 9 and corrected_data[0] == 3:  # 确保是Transfer指令
-                                # 重新创建指令对象，使用修复后的数据
-                                from solders.instruction import Instruction
-                                instruction = Instruction(
-                                    program_id=instruction.program_id,
-                                    accounts=instruction.accounts,
-                                    data=corrected_data
-                                )
-                                data_hex = corrected_data.hex()
-                                logger.info(f"[{transaction_id}] 指令数据已修复: {data_hex}")
-                            else:
-                                logger.error(f"[{transaction_id}] 修复后的数据仍然无效: {corrected_data.hex()}")
-                                raise ValueError(f"无法修复指令数据: 格式不正确")
-                        else:
-                            logger.error(f"[{transaction_id}] 指令数据长度不足，无法修复: {len(instruction_data_bytes)}字节")
-                            raise ValueError(f"指令数据长度不足: 需要至少9字节，实际{len(instruction_data_bytes)}字节")
+                        # SPL Token指令数据应该保持原始格式，不进行强制截取
+                        # 只记录警告，但继续使用原始指令数据
+                        logger.info(f"[{transaction_id}] 使用原始指令数据，长度={len(instruction_data_bytes)}字节")
+                        data_hex = instruction_data_bytes.hex()
                         
                 except Exception as data_error:
                     logger.error(f"[{transaction_id}] 指令数据序列化失败: {data_error}")
