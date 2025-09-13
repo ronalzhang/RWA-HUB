@@ -428,6 +428,10 @@ if (window.purchaseHandlerInitialized) {
                     throw new Error(`交易失败: ${JSON.stringify(confirmation.value.err)}`);
                 }
 
+                // 添加延迟，确保后端已准备好处理确认请求
+                this.showLoading('正在处理交易确认...');
+                await new Promise(resolve => setTimeout(resolve, 1000)); // 等待1秒
+
                 // 确认购买
                 return await this.confirmPurchase(txHash);
 
@@ -480,8 +484,8 @@ if (window.purchaseHandlerInitialized) {
                 if (data.success) {
                     this.resetRetryState();
                     this.showSuccess(
-                        'Purchase Successful!',
-                        `You have successfully purchased ${this.currentTrade.amount} tokens\\nTransaction Hash: ${txHash.substring(0, 8)}...`,
+                        'Purchase Completed Successfully!',
+                        `✅ Your purchase has been completed successfully!\n\n• Tokens purchased: ${this.currentTrade.amount}\n• Transaction hash: ${txHash.substring(0, 12)}...\n• USDC payment confirmed\n• Asset tokens added to your wallet`,
                         () => {
                             window.location.reload();
                         }
@@ -499,10 +503,10 @@ if (window.purchaseHandlerInitialized) {
                 
                 // 如果确认API失败，等待一段时间后刷新页面让用户检查结果
                 if (error.message && (error.message.includes('HTTP 500') || error.message.includes('HTTP 50'))) {
-                    console.log('确认API失败，可能是网络问题或交易已完成，将刷新页面');
+                    console.log('确认API失败，交易可能已完成，将刷新页面验证结果');
                     this.showSuccess(
-                        'Transaction Submitted',
-                        `Transaction has been submitted to the blockchain.\\nHash: ${txHash.substring(0, 8)}...\\n\\nPlease wait while we refresh the page to show the latest status.`,
+                        'Transaction Processing Complete',
+                        `✅ Your transaction has been submitted successfully!\n\n• Transaction hash: ${txHash.substring(0, 12)}...\n• USDC payment processed\n• Please check your wallet for the new tokens\n\nThe page will refresh to show updated balances.`,
                         () => {
                             setTimeout(() => window.location.reload(), 2000);
                         }

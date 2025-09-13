@@ -487,6 +487,10 @@ class TradeServiceV3:
         confirmation_id = f"confirm_{trade_id}_{int(time.time() * 1000)}"
         logger.info(f"[{confirmation_id}] 开始确认购买交易: TradeID={trade_id}, TxHash={tx_hash}")
         
+        # 等待一段时间让区块链有时间处理交易
+        logger.info(f"[{confirmation_id}] 等待区块链处理交易...")
+        time.sleep(2.0)  # 等待2秒让交易传播和处理
+        
         try:
             # 1. 交易记录验证阶段
             logger.debug(f"[{confirmation_id}] 步骤1: 开始交易记录验证")
