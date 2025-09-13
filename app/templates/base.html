@@ -1127,7 +1127,7 @@
     <!-- 钱包持久化管理器 -->
     <script src="{{ url_for('static', filename='js/wallet-persistence.js') }}"></script>
     <!-- 统一购买处理器 -->
-    <script src="{{ url_for('static', filename='js/purchase_handler_unified.js') }}?v=20250913_timing_fix&t={{ range(1000000, 9999999) | random }}"></script>
+    <script src="{{ url_for('static', filename='js/purchase_handler_unified.js') }}?v=20250914_network_fix&cache_bust={{ range(10000000, 99999999) | random }}"></script>
     
     <!-- 简单的钱包按钮初始化 -->
     <script>

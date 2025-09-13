@@ -489,8 +489,8 @@ class TradeServiceV3:
         
         # 等待一段时间让区块链有时间处理交易
         # 针对国内网络环境增加更长的等待时间
-        logger.info(f"[{confirmation_id}] 等待区块链处理交易（考虑网络延迟）...")
-        time.sleep(8.0)  # 增加到8秒，考虑国内网络到Solana网络的延迟
+        logger.info(f"[{confirmation_id}] 等待区块链处理交易（考虑国内网络延迟）...")
+        time.sleep(12.0)  # 增加到12秒，确保交易充分传播到所有RPC节点
         
         try:
             # 1. 交易记录验证阶段
@@ -732,7 +732,7 @@ class TradeServiceV3:
             )
 
     @staticmethod
-    def _verify_blockchain_transaction(tx_hash: str, confirmation_id: str, max_retries: int = 5) -> dict:
+    def _verify_blockchain_transaction(tx_hash: str, confirmation_id: str, max_retries: int = 8) -> dict:
         """
         验证区块链上的交易，包含重试机制
         
@@ -750,7 +750,7 @@ class TradeServiceV3:
             try:
                 if attempt > 0:
                     logger.info(f"[{confirmation_id}] 区块链交易验证重试 {attempt}/{max_retries}")
-                    time.sleep(2.0 * attempt)  # 更长的指数退避：2s, 4s, 6s, 8s, 10s
+                    time.sleep(3.0 * attempt)  # 更长的指数退避：3s, 6s, 9s, 12s, 15s, 18s, 21s, 24s
                 
                 
                 
