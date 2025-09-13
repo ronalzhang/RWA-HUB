@@ -7,31 +7,47 @@ from datetime import datetime
 
 bp = Blueprint('dividend', __name__)
 
+@bp.route('/api/dividend/stats/')
 @bp.route('/api/dividend/stats/<string:token_symbol>')
-def get_dividend_stats(token_symbol):
+def get_dividend_stats(token_symbol=None):
     """获取分红统计信息"""
     try:
+        # 如果没有提供token_symbol，从URL参数或请求头获取
+        if not token_symbol:
+            token_symbol = request.args.get('token_symbol') or request.headers.get('X-Token-Symbol')
+        
         # 简化版本，返回基本统计
         return jsonify({
             'count': 0,
             'total_amount': 0,
-            'holder_count': 0
+            'holder_count': 0,
+            'token_symbol': token_symbol
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@bp.route('/api/dividend/history/')
 @bp.route('/api/dividend/history/<string:token_symbol>')
-def get_dividend_history(token_symbol):
+def get_dividend_history(token_symbol=None):
     """获取分红历史记录"""
     try:
+        # 如果没有提供token_symbol，从URL参数或请求头获取
+        if not token_symbol:
+            token_symbol = request.args.get('token_symbol') or request.headers.get('X-Token-Symbol')
+            
         return jsonify([])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@bp.route('/api/dividend/check_permission/')
 @bp.route('/api/dividend/check_permission/<string:token_symbol>')
-def check_permission(token_symbol):
+def check_permission(token_symbol=None):
     """检查用户是否有权限管理分红"""
     try:
+        # 如果没有提供token_symbol，从URL参数或请求头获取
+        if not token_symbol:
+            token_symbol = request.args.get('token_symbol') or request.headers.get('X-Token-Symbol')
+            
         # 获取用户地址
         eth_address = request.headers.get('X-Eth-Address')
         if not eth_address:
@@ -45,20 +61,21 @@ def check_permission(token_symbol):
             return jsonify({'has_permission': True, 'reason': 'admin'})
             
         # 检查是否是资产所有者
-        try:
-            asset = Asset.query.filter_by(token_symbol=token_symbol).first()
-            if asset and asset.owner_address:
-                # 对ETH地址（0x开头）忽略大小写比较
-                if eth_address.startswith('0x') and asset.owner_address.startswith('0x'):
-                    is_owner = eth_address.lower() == asset.owner_address.lower()
-                # 对SOL地址严格区分大小写
-                else:
-                    is_owner = eth_address == asset.owner_address
-                    
-                if is_owner:
-                    return jsonify({'has_permission': True, 'reason': 'owner'})
-        except Exception as e:
-            current_app.logger.warning(f"检查资产所有者权限时出错: {str(e)}")
+        if token_symbol:
+            try:
+                asset = Asset.query.filter_by(token_symbol=token_symbol).first()
+                if asset and asset.owner_address:
+                    # 对ETH地址（0x开头）忽略大小写比较
+                    if eth_address.startswith('0x') and asset.owner_address.startswith('0x'):
+                        is_owner = eth_address.lower() == asset.owner_address.lower()
+                    # 对SOL地址严格区分大小写
+                    else:
+                        is_owner = eth_address == asset.owner_address
+                        
+                    if is_owner:
+                        return jsonify({'has_permission': True, 'reason': 'owner'})
+            except Exception as e:
+                current_app.logger.warning(f"检查资产所有者权限时出错: {str(e)}")
             
         # 都不符合，无权限
         return jsonify({'has_permission': False, 'reason': 'unauthorized'})

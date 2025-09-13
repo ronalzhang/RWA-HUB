@@ -299,12 +299,12 @@ if (window.purchaseHandlerInitialized) {
                 console.log('原始后端区块哈希:', this.currentTrade.recentBlockhash);
                 
                 // 获取最新的区块哈希
-                const latestBlockhash = await window.solanaConnection.getLatestBlockhash();
+                let latestBlockhash = await window.solanaConnection.getLatestBlockhash();
                 console.log('获取最新区块哈希:', latestBlockhash.blockhash);
 
                 // 构建交易
                 this.showLoading('正在构建交易...');
-                const transaction = new window.solanaWeb3.Transaction({
+                let transaction = new window.solanaWeb3.Transaction({
                     recentBlockhash: latestBlockhash.blockhash,
                     feePayer: new window.solanaWeb3.PublicKey(this.currentTrade.feePayer)
                 });
