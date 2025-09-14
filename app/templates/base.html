@@ -904,8 +904,11 @@
                     if (walletAddressDisplay) {
                         walletAddressDisplay.textContent = walletState.formatAddress(address);
                     }
-                    
+
                     console.log('Auto-detected connected wallet:', address);
+
+                    // 检查管理员权限并显示入口
+                    setTimeout(() => checkAndShowAdminEntry(), 500);
                 } catch (error) {
                     console.log('No auto-connected wallet detected');
                 }
@@ -1024,7 +1027,71 @@
     // 监听钱包状态变化
     document.addEventListener('walletStateChanged', function(event) {
         updateAdminNavLink();
+        checkAndShowAdminEntry();
     });
+
+    // 全局管理员检查和显示入口函数
+    function checkAndShowAdminEntry() {
+        if (!window.walletState || !window.walletState.address) {
+            hideAdminEntry();
+            return;
+        }
+
+        const address = window.walletState.address;
+
+        // 防止重复检查
+        if (window.checkingAdminEntry) return;
+        window.checkingAdminEntry = true;
+
+        console.log('检查管理员权限:', address);
+
+        fetch('/api/admin/check', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Wallet-Address': address
+            },
+            body: JSON.stringify({ wallet_address: address })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success && data.is_admin === true) {
+                console.log('用户是管理员，显示管理员入口');
+                showAdminEntry();
+            } else {
+                console.log('用户不是管理员，隐藏管理员入口');
+                hideAdminEntry();
+            }
+        })
+        .catch(error => {
+            console.error('检查管理员权限失败:', error);
+            hideAdminEntry();
+        })
+        .finally(() => {
+            window.checkingAdminEntry = false;
+        });
+    }
+
+    // 显示管理员入口
+    function showAdminEntry() {
+        const adminEntry = document.getElementById('adminEntry');
+        if (adminEntry) {
+            adminEntry.style.display = 'block';
+        }
+    }
+
+    // 隐藏管理员入口
+    function hideAdminEntry() {
+        const adminEntry = document.getElementById('adminEntry');
+        if (adminEntry) {
+            adminEntry.style.display = 'none';
+        }
+    }
     </script>
 
     <!-- Bootstrap, jQuery和其他脚本 -->
@@ -1476,6 +1543,9 @@
                 }
 
                 console.log('Wallet connected successfully:', address);
+
+                // 检查管理员权限并显示入口
+                setTimeout(() => checkAndShowAdminEntry(), 500);
                 
             } catch (error) {
                 console.error('Failed to connect wallet:', error);
@@ -1520,6 +1590,9 @@
                 if (walletBtnText) {
                     walletBtnText.textContent = 'Connect Wallet';
                 }
+
+                // 隐藏管理员入口
+                hideAdminEntry();
 
                 console.log('Wallet disconnected');
                 

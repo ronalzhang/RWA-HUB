@@ -167,7 +167,7 @@ function checkAdmin(address) {
                 'Content-Type': 'application/json',
                 'X-Eth-Address': address
             },
-            body: JSON.stringify({ address: address })
+            body: JSON.stringify({ wallet_address: address })
         })
     .then(response => {
         if (!response.ok) {
