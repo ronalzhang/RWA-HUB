@@ -1091,26 +1091,37 @@ def check_admin_status():
         # 从配置中获取管理员地址
         admin_addresses = []
         
-        # 方法1: 从环境变量获取
+        # 方法1: 优先从数据库AdminUser表获取（主要方法）
+        try:
+            from app.models.admin import AdminUser
+            admin_users = AdminUser.query.all()
+            admin_addresses.extend([admin.wallet_address for admin in admin_users if admin.wallet_address])
+            logger.debug(f"从AdminUser表获取到{len([admin.wallet_address for admin in admin_users])}个管理员地址")
+        except Exception as db_error:
+            logger.warning(f"从AdminUser表获取管理员地址失败: {db_error}")
+        
+        # 方法2: 从环境变量获取（备用）
         admin_env = os.getenv('ADMIN_WALLET_ADDRESS')
         if admin_env:
             admin_addresses.extend([addr.strip() for addr in admin_env.split(',')])
         
-        # 方法2: 从数据库配置获取
+        # 方法3: 从系统配置获取（备用）
         try:
             from app.models.admin import SystemConfig
             admin_config = SystemConfig.get_value('admin_wallet_address')
             if admin_config:
                 admin_addresses.extend([addr.strip() for addr in admin_config.split(',')])
         except Exception as db_error:
-            logger.warning(f"从数据库获取管理员地址失败: {db_error}")
+            logger.warning(f"从SystemConfig获取管理员地址失败: {db_error}")
         
-        # 方法3: 硬编码的管理员地址（作为备用）
-        default_admin_addresses = [
-            '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',  # 旧管理员地址
-            'H6FMXx3s1kq1aMkYHiexVzircV31WnWaP5MSQQwfHfeW'   # 新管理员地址
-        ]
-        admin_addresses.extend(default_admin_addresses)
+        # 方法4: 硬编码的管理员地址（仅作最后备用，生产环境应该避免使用）
+        if not admin_addresses:  # 只有当没有从数据库获取到管理员时才使用硬编码
+            logger.warning("数据库中没有配置管理员地址，使用硬编码备用地址")
+            default_admin_addresses = [
+                '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',  # 旧管理员地址
+                'H6FMXx3s1kq1aMkYHiexVzircV31WnWaP5MSQQwfHfeW'   # 新管理员地址
+            ]
+            admin_addresses.extend(default_admin_addresses)
         
         # 去重
         admin_addresses = list(set(admin_addresses))
