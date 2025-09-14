@@ -1098,8 +1098,8 @@ def check_admin_status():
         
         # 方法2: 从数据库配置获取
         try:
-            from app.models.system_config import SystemConfig
-            admin_config = SystemConfig.get_config('admin_wallet_address')
+            from app.models.admin import SystemConfig
+            admin_config = SystemConfig.get_value('admin_wallet_address')
             if admin_config:
                 admin_addresses.extend([addr.strip() for addr in admin_config.split(',')])
         except Exception as db_error:
@@ -1107,7 +1107,8 @@ def check_admin_status():
         
         # 方法3: 硬编码的管理员地址（作为备用）
         default_admin_addresses = [
-            '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b'
+            '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',  # 旧管理员地址
+            'H6FMXx3s1kq1aMkYHiexVzircV31WnWaP5MSQQwfHfeW'   # 新管理员地址
         ]
         admin_addresses.extend(default_admin_addresses)
         
