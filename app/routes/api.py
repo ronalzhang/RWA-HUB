@@ -1096,7 +1096,7 @@ def check_admin_status():
             from app.models.admin import AdminUser
             admin_users = AdminUser.query.all()
             admin_addresses.extend([admin.wallet_address for admin in admin_users if admin.wallet_address])
-            logger.debug(f"从AdminUser表获取到{len([admin.wallet_address for admin in admin_users])}个管理员地址")
+            logger.info(f"从AdminUser表获取到{len([admin.wallet_address for admin in admin_users])}个管理员地址: {admin_addresses}")
         except Exception as db_error:
             logger.warning(f"从AdminUser表获取管理员地址失败: {db_error}")
         
@@ -1129,7 +1129,7 @@ def check_admin_status():
         # 检查是否为管理员
         is_admin = wallet_address in admin_addresses
         
-        logger.info(f"管理员检查: {wallet_address}, 结果: {is_admin}")
+        logger.info(f"管理员检查: 钱包地址={wallet_address}, 管理员地址列表={admin_addresses}, 结果={is_admin}")
         
         return jsonify({
             'success': True,
