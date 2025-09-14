@@ -1029,6 +1029,15 @@
         updateAdminNavLink();
     });
 
+    // 监听钱包恢复事件（关键：修复管理员入口不显示问题）
+    document.addEventListener('walletRestored', function(event) {
+        console.log('钱包状态已恢复:', event.detail);
+        if (event.detail && event.detail.address) {
+            // 检查管理员权限
+            checkAdminStatus(event.detail.address);
+        }
+    });
+
     // 检查管理员状态函数（原本应该存在的功能）
     function checkAdminStatus(address) {
         if (!address) {

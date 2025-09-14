@@ -314,17 +314,12 @@ def check_admin_api():
         except Exception as db_error:
             current_app.logger.warning(f"从SystemConfig获取管理员地址失败: {db_error}")
 
-        # 方法4: 硬编码的管理员地址（仅作最后备用，生产环境应该避免使用）
-        if not admin_addresses:  # 只有当没有从数据库获取到管理员时才使用硬编码
-            current_app.logger.warning("数据库中没有配置管理员地址，使用硬编码备用地址")
-            default_admin_addresses = [
-                '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',  # 旧管理员地址
-                'H6FMXx3s1kq1aMkYHiexVzircV31WnWaP5MSQQwfHfeW'   # 新管理员地址
-            ]
-            admin_addresses.extend(default_admin_addresses)
-
         # 去重
         admin_addresses = list(set(admin_addresses))
+
+        # 如果没有配置任何管理员地址，记录警告但不使用硬编码地址
+        if not admin_addresses:
+            current_app.logger.warning("系统中没有配置任何管理员地址，请通过后台管理系统添加管理员")
 
         # 检查是否为管理员
         is_admin = address in admin_addresses
