@@ -280,32 +280,65 @@ def check_admin_api():
             address = request.args.get('address')
         else:  # POST
             data = request.get_json() or {}
-            address = data.get('address')
-        
+            # 支持两种字段名：address（原版）和wallet_address（新版）
+            address = data.get('address') or data.get('wallet_address')
+
         if not address:
             # 安全要求：没有钱包地址时不显示管理员入口
-            return jsonify({'is_admin': False})
-        
-        # 使用统一认证服务检查是否为管理员
-        auth_service = get_auth_service()
-        admin_info = auth_service.get_admin_info(address)
-        
-        if admin_info:
-            current_app.logger.info(f"管理员检查通过: {address}")
-            return jsonify({
-                'is_admin': True,
-                'admin_info': {
-                    'id': admin_info.get('id'),
-                    'name': admin_info.get('username', 'Admin'),
-                    'role': admin_info.get('role', 'admin')
-                }
-            })
-        else:
-            current_app.logger.info(f"非管理员地址: {address}")
-            # 安全要求：非管理员地址不显示管理员入口
-            return jsonify({'is_admin': False})
-            
+            return jsonify({'success': True, 'is_admin': False})
+
+        # 从配置中获取管理员地址
+        admin_addresses = []
+
+        # 方法1: 优先从数据库AdminUser表获取（主要方法）
+        try:
+            from app.models.admin import AdminUser
+            admin_users = AdminUser.query.all()
+            admin_addresses.extend([admin.wallet_address for admin in admin_users if admin.wallet_address])
+            current_app.logger.info(f"从AdminUser表获取到{len([admin.wallet_address for admin in admin_users])}个管理员地址")
+        except Exception as db_error:
+            current_app.logger.warning(f"从AdminUser表获取管理员地址失败: {db_error}")
+
+        # 方法2: 从环境变量获取（备用）
+        import os
+        admin_env = os.getenv('ADMIN_WALLET_ADDRESS')
+        if admin_env:
+            admin_addresses.extend([addr.strip() for addr in admin_env.split(',')])
+
+        # 方法3: 从系统配置获取（备用）
+        try:
+            from app.models.admin import SystemConfig
+            admin_config = SystemConfig.get_value('admin_wallet_address')
+            if admin_config:
+                admin_addresses.extend([addr.strip() for addr in admin_config.split(',')])
+        except Exception as db_error:
+            current_app.logger.warning(f"从SystemConfig获取管理员地址失败: {db_error}")
+
+        # 方法4: 硬编码的管理员地址（仅作最后备用，生产环境应该避免使用）
+        if not admin_addresses:  # 只有当没有从数据库获取到管理员时才使用硬编码
+            current_app.logger.warning("数据库中没有配置管理员地址，使用硬编码备用地址")
+            default_admin_addresses = [
+                '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b',  # 旧管理员地址
+                'H6FMXx3s1kq1aMkYHiexVzircV31WnWaP5MSQQwfHfeW'   # 新管理员地址
+            ]
+            admin_addresses.extend(default_admin_addresses)
+
+        # 去重
+        admin_addresses = list(set(admin_addresses))
+
+        # 检查是否为管理员
+        is_admin = address in admin_addresses
+
+        current_app.logger.info(f"管理员检查: 钱包地址={address}, 管理员地址列表={admin_addresses}, 结果={is_admin}")
+
+        # 返回前端期望的格式
+        return jsonify({
+            'success': True,
+            'wallet_address': address,
+            'is_admin': is_admin,
+            'admin_addresses_count': len(admin_addresses)
+        })
+
     except Exception as e:
         current_app.logger.error(f"检查管理员状态失败: {str(e)}")
-        # 安全要求：出错时不显示管理员入口
-        return jsonify({'is_admin': False}), 500
+        return jsonify({'success': False, 'is_admin': False, 'error': str(e)}), 500
