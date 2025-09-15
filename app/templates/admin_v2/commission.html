@@ -592,9 +592,10 @@
                         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <h5 class="text-sm font-semibold text-blue-700 mb-2">📊 平台收益示例</h5>
                             <div class="text-xs text-blue-600 space-y-1">
-                                <p x-text="'• 用户A直接访问：A购买100 USDC资产，平台获得' + (settings.commission_rate || 35) + ' USDC'"></p>
-                                <p x-text="'• 用户A推荐B：B购买100 USDC，A获得' + (settings.commission_rate || 35) + ' USDC，平台获得A的佣金' + (settings.commission_rate || 35) + '%=' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100).toFixed(2) + ' USDC'"></p>
-                                <p x-text="'• 用户B推荐C：C购买100 USDC，B获得' + (settings.commission_rate || 35) + ' USDC，A获得' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100).toFixed(2) + ' USDC，平台获得' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100 * (settings.commission_rate || 35) / 100).toFixed(2) + ' USDC'"></p>
+                                <p class="text-blue-600 font-medium">💡 聚合递进佣金示例（基于20%平台手续费）：</p>
+                                <p>• 用户A直接访问：A购买100 USDC资产，平台获得20 USDC手续费</p>
+                                <p>• 用户A推荐B：B购买100 USDC，平台收20 USDC手续费，A获得20×35%=7 USDC</p>
+                                <p>• 用户B推荐C：C购买100 USDC，平台收20 USDC，B获得20×35%=7 USDC，A获得7×35%=2.45 USDC，平台最终收益10.55 USDC</p>
                                 <p class="font-semibold text-blue-800">💎 平台从每个无推荐人用户的完整分销网络中持续获得收益！</p>
                             </div>
                         </div>
@@ -650,10 +651,11 @@
                         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <h5 class="text-sm font-semibold text-blue-700 mb-2">🚀 无限级分销说明</h5>
                             <div class="text-xs text-blue-600 space-y-1">
-                                <p x-text="'• 直接推荐：A推荐B，B购买100 USDC，A获得' + (settings.commission_rate || 35) + ' USDC'"></p>
-                                <p x-text="'• 二级推荐：B推荐C，C购买100 USDC，B获得' + (settings.commission_rate || 35) + ' USDC，A获得' + (settings.commission_rate || 35) + '×' + (settings.commission_rate || 35) + '%=' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100).toFixed(2) + ' USDC'"></p>
-                                <p x-text="'• 三级推荐：C推荐D，D购买100 USDC，C获得' + (settings.commission_rate || 35) + ' USDC，B获得' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100).toFixed(2) + ' USDC，A获得' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100 * (settings.commission_rate || 35) / 100).toFixed(2) + ' USDC'"></p>
-                                <p x-text="'• 依此类推：每级向上传递' + (settings.commission_rate || 35) + '%，形成无限级分销网络！'"></p>
+                                <p class="text-blue-600 font-medium">💡 聚合递进分销示例（基于20%平台手续费）：</p>
+                                <p>• 直接推荐：A推荐B，B购买100 USDC，平台收20 USDC，A获得20×35%=7 USDC</p>
+                                <p>• 二级推荐：B推荐C，C购买100 USDC，平台收20 USDC，B获得20×35%=7 USDC，A获得7×35%=2.45 USDC</p>
+                                <p>• 三级推荐：C推荐D，D购买100 USDC，平台收20 USDC，C获得7 USDC，B获得2.45 USDC，A获得2.45×35%=0.86 USDC</p>
+                                <p>• 依此类推：每级向上传递35%，数学收敛确保平台盈利！</p>
                             </div>
                         </div>
                     </div>
@@ -1320,14 +1322,14 @@
                 <div class="ml-4">
                     <h3 class="text-lg font-semibold text-blue-700">🤖 全自动化分销系统说明</h3>
                     <div class="mt-2 text-sm text-blue-600 space-y-2">
-                        <p><strong>💰 自动佣金计算</strong>：系统实时计算用户的35%无限级分销佣金，无需人工干预</p>
+                        <p><strong>💰 聚合递进佣金</strong>：采用保险业成熟模式，每级获得下级佣金收益的35%，确保平台可持续盈利</p>
                         <p><strong>⚡ 自动提现处理</strong>：用户申请提现后，系统延迟1分钟自动处理，零人工成本</p>
                         <p><strong>🏆 平台自动归属</strong>：所有无推荐人用户自动成为平台下线，确保平台收益</p>
                         <p><strong>🔄 实时监控</strong>：系统24小时运行，实时监控待处理取现和系统状态</p>
                         <p><strong>📊 智能统计</strong>：自动统计用户推荐关系、佣金收益和取现记录</p>
                     </div>
                     <div class="mt-3 p-3 bg-white rounded border border-blue-200">
-                        <p class="text-xs text-blue-800"><strong>🎯 核心价值</strong>：完全无人参与的分销系统，让您专注业务发展，佣金管理全部自动化处理！</p>
+                        <p class="text-xs text-blue-800"><strong>🎯 核心价值</strong>：聚合递进机制避免了传统固定比例导致的平台亏损，实现用户激励与平台盈利的双赢！</p>
                     </div>
                 </div>
             </div>
@@ -1428,13 +1430,14 @@
                     
                     <div class="border border-gray-200 rounded-lg p-4">
                         <h4 class="text-lg font-semibold text-gray-700 mb-3">
-                            <i class="fas fa-calculator text-green-500 mr-2"></i>无限级分销算法
+                            <i class="fas fa-calculator text-green-500 mr-2"></i>聚合递进佣金算法
                         </h4>
                         <div class="text-sm text-gray-600 space-y-2">
-                            <div x-text="'🎯 A推荐B：B购买100U → A得' + (settings.commission_rate || 35) + 'U'"></div>
-                            <div x-text="'💰 B推荐C：C购买100U → B得' + (settings.commission_rate || 35) + 'U，A得' + (settings.commission_rate || 35) + '×' + (settings.commission_rate || 35) + '%=' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100).toFixed(2) + 'U'"></div>
-                            <div x-text="'🚀 C推荐D：D购买100U → C得' + (settings.commission_rate || 35) + 'U，B得' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100).toFixed(2) + 'U，A得' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100 * (settings.commission_rate || 35) / 100).toFixed(2) + 'U'"></div>
-                            <div class="text-blue-600 font-medium" x-text="'✨ 依此类推，每级向上传递' + (settings.commission_rate || 35) + '%，形成无限级收益网络！'"></div>
+                            <div class="text-blue-600 font-medium">💡 基础原理：佣金来源于平台手续费，每级获得下级佣金的35%</div>
+                            <div>🎯 A推荐B：B购买100U → 平台收费20U → A得20U×35%=7U</div>
+                            <div>💰 B推荐C：C购买100U → 平台收费20U → B得20U×35%=7U，A得7U×35%=2.45U</div>
+                            <div>🚀 C推荐D：D购买100U → 平台收费20U → C得20U×35%=7U，B得7U×35%=2.45U，A得2.45U×35%=0.86U</div>
+                            <div class="text-green-600 font-medium">✨ 数学收敛：无限级数总和有限，平台始终保持盈利！</div>
                         </div>
                     </div>
                 </div>
