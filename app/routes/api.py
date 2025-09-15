@@ -228,6 +228,8 @@ def _get_user_assets(address, wallet_type='ethereum'):
         for trade in completed_trades:
             if trade.total_amount > 0:  # 只显示持有数量大于0的资产
                 assets.append({
+                    'id': trade.asset_id,
+                    'asset_id': trade.asset_id,
                     'symbol': trade.token_symbol,
                     'name': trade.name,
                     'balance': int(trade.total_amount)
