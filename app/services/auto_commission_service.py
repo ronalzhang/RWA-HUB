@@ -25,7 +25,10 @@ class AutoCommissionService:
     
     def __init__(self):
         self.referral_system = UnlimitedReferralSystem()
-        self.fixed_referral_rate = Decimal('0.05')  # 固定5%上供比例
+        # 从配置表动态获取佣金比例
+        from app.models.commission_config import CommissionConfig
+        commission_rate = CommissionConfig.get_config('commission_rate', 35.0)
+        self.fixed_referral_rate = Decimal(str(commission_rate / 100))  # 将百分比转换为小数
         self.platform_sustainability_threshold = Decimal('0.15')  # 平台可持续性阈值15%
         
     def process_batch_commission_records(self, trade_ids: List[int]) -> Dict:

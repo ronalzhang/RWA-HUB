@@ -955,7 +955,7 @@ def get_share_config():
     try:
         from app.models.commission_config import CommissionConfig
         
-        commission_rate = CommissionConfig.get_config('commission_rate', 20.0)
+        commission_rate = CommissionConfig.get_config('commission_rate', 35.0)
         commission_rules = CommissionConfig.get_config('commission_rules', {})
         max_referral_levels = CommissionConfig.get_config('max_referral_levels', 999)
         enable_multi_level = CommissionConfig.get_config('enable_multi_level', True)

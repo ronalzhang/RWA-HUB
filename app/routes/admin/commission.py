@@ -283,13 +283,29 @@ def api_commission_settings():
             from app.models.commission_config import CommissionConfig
             
             settings = {}
-            # 获取所有配置
-            for key in ['commission_rate', 'commission_description', 'share_button_text', 
-                       'share_description', 'share_success_message', 'min_withdraw_amount',
-                       'withdraw_fee_rate', 'withdraw_description', 'withdrawal_delay_minutes',
-                       'max_referral_levels', 'enable_multi_level', 'platform_referrer_address',
-                       'enable_platform_referrer']:
-                settings[key] = CommissionConfig.get_config(key, None)
+            # 获取所有配置（设置默认值）
+            # 从配置管理器获取平台收款地址
+            from app.utils.config_manager import ConfigManager
+            platform_fee_address = ConfigManager.get_config('PLATFORM_FEE_ADDRESS')
+
+            config_defaults = {
+                'commission_rate': 35.0,
+                'commission_description': '推荐好友享受35%佣金奖励',
+                'share_button_text': '分享赚佣金',
+                'share_description': '分享此项目给好友，好友购买后您将获得35%佣金奖励',
+                'share_success_message': '分享链接已复制，快去邀请好友吧！',
+                'min_withdraw_amount': 10.0,
+                'withdraw_fee_rate': 0.0,
+                'withdraw_description': '最低提现金额10 USDC，提现将转入您的钱包地址',
+                'withdrawal_delay_minutes': 1,
+                'max_referral_levels': 999,
+                'enable_multi_level': True,
+                'platform_referrer_address': platform_fee_address,  # 使用平台收款地址
+                'enable_platform_referrer': True
+            }
+
+            for key, default_value in config_defaults.items():
+                settings[key] = CommissionConfig.get_config(key, default_value)
             
             # 获取佣金计算规则
             commission_rules = CommissionConfig.get_config('commission_rules', {})
@@ -895,6 +911,114 @@ def api_batch_update_platform_referrer():
         db.session.rollback()
         current_app.logger.error(f'批量更新平台推荐人关系失败: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# 以下API用于前端调用（非管理员权限）
+@admin_api_bp.route('/commission/share-config', methods=['GET'])
+def get_share_config():
+    """获取分享配置（前端调用）"""
+    try:
+        from app.models.commission_config import CommissionConfig
+
+        config = {
+            'share_button_text': CommissionConfig.get_config('share_button_text', '分享赚佣金'),
+            'share_description': CommissionConfig.get_config('share_description', '分享此项目给好友，好友购买后您将获得35%佣金奖励'),
+            'share_success_message': CommissionConfig.get_config('share_success_message', '分享链接已复制，快去邀请好友吧！'),
+            'commission_rate': CommissionConfig.get_config('commission_rate', 35.0),
+            'commission_description': CommissionConfig.get_config('commission_description', '推荐好友享受35%佣金奖励')
+        }
+
+        return jsonify({
+            'success': True,
+            'data': config
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"获取分享配置失败: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_api_bp.route('/user/commission/balance/<address>', methods=['GET'])
+def get_user_commission_balance(address):
+    """获取用户佣金余额（钱包显示）"""
+    try:
+        from app.models.commission_config import UserCommissionBalance
+
+        balance = UserCommissionBalance.get_balance(address)
+
+        return jsonify({
+            'success': True,
+            'data': balance.to_dict()
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"获取用户佣金余额失败: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_api_bp.route('/user/commission/withdraw', methods=['POST'])
+def withdraw_commission():
+    """提现佣金"""
+    try:
+        from app.models.commission_config import UserCommissionBalance, CommissionConfig
+        from app.models.commission_withdrawal import CommissionWithdrawal
+
+        data = request.get_json()
+        user_address = data.get('user_address')
+        amount = float(data.get('amount', 0))
+        to_address = data.get('to_address')  # 提现到的钱包地址
+        note = data.get('note', '')  # 用户备注
+
+        if not user_address or not to_address or amount <= 0:
+            return jsonify({'error': '参数错误'}), 400
+
+        # 检查最低提现金额
+        min_withdraw = CommissionConfig.get_config('min_withdraw_amount', 10.0)
+        if amount < min_withdraw:
+            return jsonify({'error': f'最低提现金额为 {min_withdraw} USDC'}), 400
+
+        # 获取提现延迟设置
+        withdraw_delay = CommissionConfig.get_config('withdraw_delay_minutes', 1)
+
+        # 检查用户余额
+        balance = UserCommissionBalance.get_balance(user_address)
+        if balance.available_balance < amount:
+            return jsonify({'error': '余额不足'}), 400
+
+        # 冻结提现金额
+        UserCommissionBalance.update_balance(user_address, amount, 'freeze')
+
+        # 创建提现记录
+        withdrawal = CommissionWithdrawal(
+            user_address=user_address,
+            to_address=to_address,
+            amount=amount,
+            delay_minutes=withdraw_delay,
+            note=note
+        )
+        db.session.add(withdrawal)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'提现申请已提交，预计 {withdraw_delay} 分钟后处理',
+            'data': {
+                'withdrawal_id': withdrawal.id,
+                'amount': float(withdrawal.amount),
+                'to_address': withdrawal.to_address,
+                'delay_minutes': withdrawal.delay_minutes,
+                'process_at': withdrawal.process_at.isoformat() if withdrawal.process_at else None,
+                'remaining_seconds': withdrawal.remaining_delay_seconds
+            }
+        })
+
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"提现失败: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 
 @admin_api_bp.route('/commission/user/<int:user_id>/set-platform-referrer', methods=['POST'])

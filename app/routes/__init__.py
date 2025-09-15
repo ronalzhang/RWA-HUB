@@ -41,9 +41,6 @@ from .admin import admin_bp, admin_api_bp
 # 导入监控管理
 from .admin.monitoring import monitoring_bp
 
-# 导入佣金配置管理
-from .admin.commission_config import commission_config_bp
-
 # 导入IP统计管理
 from .admin.ip_stats import ip_stats_bp
 
@@ -83,10 +80,7 @@ def register_blueprints(app):
     
     # 注册监控管理蓝图
     app.register_blueprint(monitoring_bp)
-    
-    # 注册佣金配置管理蓝图
-    app.register_blueprint(commission_config_bp)
-    
+
     # 注册IP统计管理蓝图
     app.register_blueprint(ip_stats_bp)
     

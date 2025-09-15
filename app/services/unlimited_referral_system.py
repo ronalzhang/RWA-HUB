@@ -22,7 +22,10 @@ class UnlimitedReferralSystem:
     """无限层级推荐系统"""
     
     def __init__(self):
-        self.referral_rate = Decimal('0.05')  # 5%固定上供比例
+        # 从配置表动态获取佣金比例
+        from app.models.commission_config import CommissionConfig
+        commission_rate = CommissionConfig.get_config('commission_rate', 35.0)
+        self.referral_rate = Decimal(str(commission_rate / 100))  # 将百分比转换为小数
         self.platform_base_rate = Decimal('0.10')  # 10%平台基础抽成
         
     def register_referral(self, user_address: str, referrer_address: str, referral_code: str = None) -> UserReferral:
