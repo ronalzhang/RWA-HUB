@@ -154,7 +154,7 @@
                 </div>
                 <div>
                     <h3 class="text-lg font-semibold text-gray-500">佣金率</h3>
-                    <p class="text-2xl font-bold" x-text="(settings.commission_rate || 35) + '%'"></p>
+                    <p class="text-2xl font-bold" x-text="(settings.commission_rate || stats.commission_rate || 0) + '%'"></p>
                 </div>
             </div>
         </div>
@@ -341,7 +341,7 @@
     <!-- 佣金设置 -->
     <div x-show="activeTab === 'settings'" class="bg-white rounded-lg shadow-sm" x-cloak>
         <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-700">35%分销体系配置</h3>
+            <h3 class="text-lg font-semibold text-gray-700" x-text="(settings.commission_rate || 35) + '%分销体系配置'"></h3>
             <p class="text-sm text-gray-500 mt-1">配置推荐佣金、分享功能和提现规则</p>
         </div>
 
@@ -388,7 +388,7 @@
                                 <span class="ml-2 text-sm text-gray-700">启用多级分销</span>
                             </label>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">开启后下级的佣金收益也会给您分成35%</p>
+                        <p class="text-xs text-gray-500 mt-1" x-text="'开启后下级的佣金收益也会给您分成' + (settings.commission_rate || 35) + '%'"></p>
     </div>
 
                                     <div>
@@ -401,7 +401,7 @@
                             <option value="10">10级（十级分销）</option>
                             <option value="999">∞ 无限级（所有下线都上贡）</option>
                         </select>
-                        <p class="text-xs text-gray-500 mt-1">每增加一级，佣金按35%递减传递给上级</p>
+                        <p class="text-xs text-gray-500 mt-1" x-text="'每增加一级，佣金按' + (settings.commission_rate || 35) + '%递减传递给上级'"></p>
                     </div>
                                     </div>
                                 </div>
@@ -530,7 +530,7 @@
                         <div class="flex items-center justify-between p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-orange-200 rounded-lg">
                             <div>
                                 <label class="block text-lg font-semibold text-gray-800">🏆 启用平台推荐人功能</label>
-                                <p class="text-sm text-gray-600 mt-1">开启后，所有无推荐人的用户将自动成为平台的下线，确保平台从每笔交易获得35%收益</p>
+                                <p class="text-sm text-gray-600 mt-1" x-text="'开启后，所有无推荐人的用户将自动成为平台的下线，确保平台从每笔交易获得' + (settings.commission_rate || 35) + '%收益'"></p>
                             </div>
                             <div class="flex items-center space-x-3">
                                 <span class="text-sm font-medium" :class="{
@@ -560,7 +560,7 @@
                             placeholder="请输入平台收益钱包地址（支持以太坊和Solana地址）"
                             class="w-full border-gray-300 rounded-md shadow-sm"
                             :disabled="!settings.enable_platform_referrer">
-                        <p class="text-xs text-gray-500 mt-1">此地址将收到所有无推荐人用户产生的35%佣金</p>
+                        <p class="text-xs text-gray-500 mt-1" x-text="'此地址将收到所有无推荐人用户产生的' + (settings.commission_rate || 35) + '%佣金'"></p>
                     </div>
                     
                     <!-- 平台收益说明 -->
@@ -592,9 +592,9 @@
                         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <h5 class="text-sm font-semibold text-blue-700 mb-2">📊 平台收益示例</h5>
                             <div class="text-xs text-blue-600 space-y-1">
-                                <p>• <strong>用户A直接访问</strong>：A购买100 USDC资产，平台获得35 USDC</p>
-                                <p>• <strong>用户A推荐B</strong>：B购买100 USDC，A获得35 USDC，平台获得A的佣金35%=12.25 USDC</p>
-                                <p>• <strong>用户B推荐C</strong>：C购买100 USDC，B获得35 USDC，A获得12.25 USDC，平台获得4.29 USDC</p>
+                                <p x-text="'• 用户A直接访问：A购买100 USDC资产，平台获得' + (settings.commission_rate || 35) + ' USDC'"></p>
+                                <p x-text="'• 用户A推荐B：B购买100 USDC，A获得' + (settings.commission_rate || 35) + ' USDC，平台获得A的佣金' + (settings.commission_rate || 35) + '%=' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100).toFixed(2) + ' USDC'"></p>
+                                <p x-text="'• 用户B推荐C：C购买100 USDC，B获得' + (settings.commission_rate || 35) + ' USDC，A获得' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100).toFixed(2) + ' USDC，平台获得' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100 * (settings.commission_rate || 35) / 100).toFixed(2) + ' USDC'"></p>
                                 <p class="font-semibold text-blue-800">💎 平台从每个无推荐人用户的完整分销网络中持续获得收益！</p>
                             </div>
                         </div>
@@ -650,10 +650,10 @@
                         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <h5 class="text-sm font-semibold text-blue-700 mb-2">🚀 无限级分销说明</h5>
                             <div class="text-xs text-blue-600 space-y-1">
-                                <p>• <strong>直接推荐</strong>：A推荐B，B购买100 USDC，A获得35 USDC</p>
-                                <p>• <strong>二级推荐</strong>：B推荐C，C购买100 USDC，B获得35 USDC，A获得35×35%=12.25 USDC</p>
-                                <p>• <strong>三级推荐</strong>：C推荐D，D购买100 USDC，C获得35 USDC，B获得12.25 USDC，A获得4.29 USDC</p>
-                                <p>• <strong>依此类推</strong>：每级向上传递35%，形成无限级分销网络！</p>
+                                <p x-text="'• 直接推荐：A推荐B，B购买100 USDC，A获得' + (settings.commission_rate || 35) + ' USDC'"></p>
+                                <p x-text="'• 二级推荐：B推荐C，C购买100 USDC，B获得' + (settings.commission_rate || 35) + ' USDC，A获得' + (settings.commission_rate || 35) + '×' + (settings.commission_rate || 35) + '%=' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100).toFixed(2) + ' USDC'"></p>
+                                <p x-text="'• 三级推荐：C推荐D，D购买100 USDC，C获得' + (settings.commission_rate || 35) + ' USDC，B获得' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100).toFixed(2) + ' USDC，A获得' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100 * (settings.commission_rate || 35) / 100).toFixed(2) + ' USDC'"></p>
+                                <p x-text="'• 依此类推：每级向上传递' + (settings.commission_rate || 35) + '%，形成无限级分销网络！'"></p>
                             </div>
                         </div>
                     </div>
@@ -1409,15 +1409,15 @@
                         <div class="space-y-3">
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-gray-600">佣金率</span>
-                                <span class="font-medium" x-text="(automationStatus.automation_config?.commission_rate || 35) + '%'"></span>
+                                <span class="font-medium" x-text="(automationStatus.automation_config?.commission_rate || settings.commission_rate || 0) + '%'"></span>
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-gray-600">取现延迟</span>
-                                <span class="font-medium" x-text="(automationStatus.automation_config?.withdrawal_delay_minutes || 1) + ' 分钟'"></span>
+                                <span class="font-medium" x-text="(automationStatus.automation_config?.withdrawal_delay_minutes || settings.withdrawal_delay_minutes || 0) + ' 分钟'"></span>
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-gray-600">最低取现金额</span>
-                                <span class="font-medium" x-text="'$' + (automationStatus.automation_config?.min_withdraw_amount || 10)"></span>
+                                <span class="font-medium" x-text="'$' + (automationStatus.automation_config?.min_withdraw_amount || settings.min_withdraw_amount || 0)"></span>
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-gray-600">多级分销</span>
@@ -1431,10 +1431,10 @@
                             <i class="fas fa-calculator text-green-500 mr-2"></i>无限级分销算法
                         </h4>
                         <div class="text-sm text-gray-600 space-y-2">
-                            <div>🎯 <strong>A推荐B</strong>：B购买100U → A得35U</div>
-                            <div>💰 <strong>B推荐C</strong>：C购买100U → B得35U，A得35×35%=12.25U</div>
-                            <div>🚀 <strong>C推荐D</strong>：D购买100U → C得35U，B得12.25U，A得4.29U</div>
-                            <div class="text-blue-600 font-medium">✨ 依此类推，每级向上传递35%，形成无限级收益网络！</div>
+                            <div x-text="'🎯 A推荐B：B购买100U → A得' + (settings.commission_rate || 35) + 'U'"></div>
+                            <div x-text="'💰 B推荐C：C购买100U → B得' + (settings.commission_rate || 35) + 'U，A得' + (settings.commission_rate || 35) + '×' + (settings.commission_rate || 35) + '%=' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100).toFixed(2) + 'U'"></div>
+                            <div x-text="'🚀 C推荐D：D购买100U → C得' + (settings.commission_rate || 35) + 'U，B得' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100).toFixed(2) + 'U，A得' + ((settings.commission_rate || 35) * (settings.commission_rate || 35) / 100 * (settings.commission_rate || 35) / 100).toFixed(2) + 'U'"></div>
+                            <div class="text-blue-600 font-medium" x-text="'✨ 依此类推，每级向上传递' + (settings.commission_rate || 35) + '%，形成无限级收益网络！'"></div>
                         </div>
                     </div>
                 </div>
