@@ -116,7 +116,12 @@ class UnlimitedReferralSystem:
         from app.models.commission_config import CommissionConfig
 
         # 获取平台费率配置（从后台系统配置）
-        platform_fee_rate = Decimal(str(ConfigManager.get_platform_fee_rate()))
+        from app.models.admin import SystemConfig
+        platform_commission_rate = SystemConfig.get_value('PLATFORM_COMMISSION_RATE')
+        if platform_commission_rate:
+            platform_fee_rate = Decimal(str(platform_commission_rate))
+        else:
+            platform_fee_rate = Decimal('0.20')  # 默认20%，但应该从后台配置
 
         # 获取佣金率配置（从后台系统配置）
         commission_rate_percent = CommissionConfig.get_config('commission_rate', 35.0)
