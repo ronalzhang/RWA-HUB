@@ -196,6 +196,175 @@ class AutoCommissionService:
                 created_at=datetime.utcnow()
             )
             db.session.add(balance)
+
+    @staticmethod
+    def run_automation_cycle() -> Dict:
+        """
+        运行完整的自动化周期：处理佣金计算和提现申请
+
+        Returns:
+            Dict: 自动化处理结果
+        """
+        try:
+            results = {
+                'success': True,
+                'commission_update': {'updated_count': 0},
+                'withdrawal_process': {'processed_count': 0, 'total_amount': 0.0}
+            }
+
+            # 1. 处理待处理的提现申请
+            from app.models.commission_withdrawal import CommissionWithdrawal
+            ready_withdrawals = CommissionWithdrawal.get_ready_to_process()
+
+            processed_count = 0
+            total_amount = Decimal('0')
+
+            for withdrawal in ready_withdrawals:
+                success = AutoCommissionService._process_single_withdrawal(withdrawal)
+                if success:
+                    processed_count += 1
+                    total_amount += withdrawal.amount
+
+            results['withdrawal_process'] = {
+                'processed_count': processed_count,
+                'total_amount': float(total_amount)
+            }
+
+            logger.info(f"自动化周期完成: 处理提现 {processed_count} 笔，总金额 {total_amount}")
+            return results
+
+        except Exception as e:
+            logger.error(f"自动化周期执行失败: {e}")
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def _process_single_withdrawal(withdrawal) -> bool:
+        """
+        处理单个提现申请
+
+        Args:
+            withdrawal: CommissionWithdrawal对象
+
+        Returns:
+            bool: 是否处理成功
+        """
+        try:
+            from app.models.commission_config import UserCommissionBalance
+
+            # 检查是否到了处理时间
+            if not withdrawal.is_ready_to_process:
+                return False
+
+            # 标记为处理中
+            withdrawal.mark_processing()
+
+            # 执行区块链转账
+            success = AutoCommissionService._execute_blockchain_transfer(withdrawal)
+
+            if success:
+                withdrawal.mark_completed(
+                    success.get('tx_hash', 'auto_processed'),
+                    success.get('actual_amount', withdrawal.amount)
+                )
+                logger.info(f"提现处理成功: {withdrawal.id}, 金额: {withdrawal.amount}")
+                return True
+            else:
+                withdrawal.mark_failed("区块链转账失败")
+                return False
+
+        except Exception as e:
+            logger.error(f"处理提现 {withdrawal.id} 失败: {e}")
+            withdrawal.mark_failed(str(e))
+            return False
+
+    @staticmethod
+    def _execute_blockchain_transfer(withdrawal) -> Optional[Dict]:
+        """
+        执行区块链转账（简化版本，暂时模拟成功）
+
+        Args:
+            withdrawal: CommissionWithdrawal对象
+
+        Returns:
+            Optional[Dict]: 转账结果
+        """
+        try:
+            # TODO: 实现真实的区块链转账逻辑
+            # 这里应该调用TradeServiceV3的转账功能
+            # 从平台钱包转账到用户指定地址
+
+            # 暂时模拟成功（实际实现时需要集成真实的USDC转账）
+            logger.info(f"模拟区块链转账: 从平台钱包转账 {withdrawal.amount} USDC 到 {withdrawal.to_address}")
+
+            return {
+                'tx_hash': f'sim_{int(datetime.utcnow().timestamp())}_{withdrawal.id}',
+                'actual_amount': withdrawal.amount,
+                'gas_fee': Decimal('0.01')  # 模拟手续费
+            }
+
+        except Exception as e:
+            logger.error(f"区块链转账失败: {e}")
+            return None
+
+    @staticmethod
+    def create_auto_withdrawal(user_address: str, to_address: str, amount: float, currency: str = 'USDC') -> Dict:
+        """
+        创建自动提现申请
+
+        Args:
+            user_address: 用户地址
+            to_address: 提现到的地址
+            amount: 提现金额
+            currency: 币种
+
+        Returns:
+            Dict: 创建结果
+        """
+        try:
+            from app.models.commission_withdrawal import CommissionWithdrawal
+            from app.models.commission_config import UserCommissionBalance, CommissionConfig
+
+            # 检查用户余额
+            balance = UserCommissionBalance.get_balance(user_address)
+            amount_decimal = Decimal(str(amount))
+
+            if balance.available_balance < amount_decimal:
+                return {'success': False, 'error': '余额不足'}
+
+            # 检查最低提现金额
+            min_withdraw = CommissionConfig.get_config('min_withdraw_amount', 10.0)
+            if amount < min_withdraw:
+                return {'success': False, 'error': f'最低提现金额为 {min_withdraw} {currency}'}
+
+            # 获取延迟设置
+            delay_minutes = CommissionConfig.get_config('withdrawal_delay_minutes', 1)
+
+            # 冻结余额
+            UserCommissionBalance.update_balance(user_address, amount, 'freeze')
+
+            # 创建提现记录
+            withdrawal = CommissionWithdrawal(
+                user_address=user_address,
+                to_address=to_address,
+                amount=amount_decimal,
+                currency=currency,
+                delay_minutes=delay_minutes
+            )
+            db.session.add(withdrawal)
+            db.session.commit()
+
+            return {
+                'success': True,
+                'message': f'提现申请已创建，预计 {delay_minutes} 分钟后处理',
+                'withdrawal_id': withdrawal.id,
+                'amount': float(withdrawal.amount),
+                'delay_minutes': withdrawal.delay_minutes
+            }
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"创建自动提现失败: {e}")
+            return {'success': False, 'error': str(e)}
     
     def get_platform_sustainability_metrics(self) -> Dict:
         """

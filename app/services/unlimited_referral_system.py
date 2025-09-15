@@ -105,148 +105,73 @@ class UnlimitedReferralSystem:
     
     def calculate_commission_distribution(self, transaction_amount: Decimal, user_address: str) -> Dict:
         """
-        计算佣金分配 - 无限层级固定比例
-        
+        计算佣金分配 - 聚合递进佣金机制
+
         Args:
             transaction_amount: 交易金额
             user_address: 用户地址
-            
+
         Returns:
             Dict: 佣金分配详情
         """
+        # 获取平台费率配置
+        from app.utils.config_manager import ConfigManager
+        platform_fee_rate = Decimal(str(ConfigManager.get_platform_fee_rate()))
+
         distribution = {
             'platform_fee': Decimal('0'),
             'referral_commissions': [],
             'total_referral_amount': Decimal('0')
         }
-        
-        # 1. 计算平台基础抽成
-        platform_base = transaction_amount * self.platform_base_rate
-        distribution['platform_fee'] = platform_base
-        
-        # 2. 向上追溯推荐链，每层固定5%
+
+        # 1. 计算平台基础手续费（作为佣金分配的基础）
+        base_platform_fee = transaction_amount * platform_fee_rate
+
+        # 2. 聚合递进佣金计算：每级获得上级佣金的35%
+        current_base = base_platform_fee  # 从平台手续费开始分配
         current_user = user_address
         level = 1
-        
-        while True:
+
+        while current_base > Decimal('0.000001') and level <= 100:  # 精度限制和安全限制
             # 查找当前用户的推荐人
             referral = UserReferral.query.filter_by(
                 user_address=current_user,
                 status='active'
             ).first()
-            
+
             if not referral:
-                break  # 没有推荐人，结束追溯
-            
-            # 计算当前层级佣金
-            commission_amount = transaction_amount * self.referral_rate
-            
+                # 没有推荐人，剩余金额归平台
+                distribution['platform_fee'] += current_base
+                break
+
+            # 计算当前级佣金：上级佣金基数的35%
+            commission_amount = current_base * self.referral_rate
+
             # 记录佣金分配
             distribution['referral_commissions'].append({
                 'level': level,
                 'referrer_address': referral.referrer_address,
                 'commission_amount': commission_amount,
+                'base_amount': current_base,
                 'rate': self.referral_rate,
                 'user_address': current_user
             })
-            
+
             distribution['total_referral_amount'] += commission_amount
-            
-            # 移动到上一级
+
+            # 为下一级准备：当前级佣金成为下一级的基数
+            current_base = commission_amount
             current_user = referral.referrer_address
             level += 1
-            
-            # 安全限制：防止无限循环（虽然数据结构上不应该出现）
-            if level > 100:
-                logger.warning(f"推荐链层级过深，用户: {user_address}")
-                break
-        
-        # 3. 计算平台最终收益
-        remaining_amount = transaction_amount - distribution['total_referral_amount'] - platform_base
-        distribution['platform_fee'] += remaining_amount
-        
+
+        # 3. 计算平台最终收益：原始手续费减去分配出的佣金
+        distribution['platform_fee'] = base_platform_fee - distribution['total_referral_amount']
+
+        logger.debug(f"聚合递进佣金计算完成: 交易金额={transaction_amount}, 基础手续费={base_platform_fee}, "
+                    f"分配佣金={distribution['total_referral_amount']}, 平台收益={distribution['platform_fee']}")
+
         return distribution
-    
-    def process_referral_commissions(self, transaction_id: int, user_address: str, transaction_amount: Decimal) -> Dict:
-        """
-        处理推荐佣金发放
-        
-        Args:
-            transaction_id: 交易ID
-            user_address: 用户地址
-            transaction_amount: 交易金额
-            
-        Returns:
-            Dict: 佣金分配结果
-        """
-        try:
-            # 1. 计算佣金分配
-            distribution = self.calculate_commission_distribution(transaction_amount, user_address)
-            
-            # 2. 批量创建佣金记录
-            commission_records = []
-            for referral_info in distribution['referral_commissions']:
-                commission = CommissionRecord(
-                    transaction_id=transaction_id,
-                    asset_id=self._get_asset_id_from_transaction(transaction_id),
-                    recipient_address=referral_info['referrer_address'],
-                    amount=float(referral_info['commission_amount']),
-                    currency='USDC',
-                    commission_type=f'referral_{referral_info["level"]}',
-                    status='pending',
-                    created_at=datetime.utcnow()
-                )
-                commission_records.append(commission)
-            
-            # 3. 批量插入数据库
-            if commission_records:
-                db.session.bulk_save_objects(commission_records)
-            
-            # 4. 更新用户佣金余额
-            for referral_info in distribution['referral_commissions']:
-                self._update_user_commission_balance(
-                    referral_info['referrer_address'],
-                    referral_info['commission_amount']
-                )
-            
-            db.session.commit()
-            
-            logger.info(f"佣金分配完成，交易ID: {transaction_id}, 总佣金: {distribution['total_referral_amount']}")
-            return distribution
-            
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"处理推荐佣金失败: {e}")
-            raise
-    
-    def _get_asset_id_from_transaction(self, transaction_id: int) -> Optional[int]:
-        """从交易记录获取资产ID"""
-        trade = Trade.query.get(transaction_id)
-        return trade.asset_id if trade else None
-    
-    def _update_user_commission_balance(self, user_address: str, amount: Decimal):
-        """
-        更新用户佣金余额
-        
-        Args:
-            user_address: 用户地址
-            amount: 佣金金额
-        """
-        balance = UserCommissionBalance.query.filter_by(user_address=user_address).first()
-        if not balance:
-            balance = UserCommissionBalance(
-                user_address=user_address,
-                total_earned=Decimal('0'),
-                available_balance=Decimal('0'),
-                withdrawn_amount=Decimal('0'),
-                frozen_amount=Decimal('0')
-            )
-            db.session.add(balance)
-        
-        balance.total_earned += amount
-        balance.available_balance += amount
-        balance.last_updated = datetime.utcnow()
-    
+
     def get_referral_statistics(self, user_address: str) -> Dict:
         """
         获取用户推荐统计
