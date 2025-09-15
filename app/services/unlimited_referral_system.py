@@ -22,11 +22,8 @@ class UnlimitedReferralSystem:
     """无限层级推荐系统"""
     
     def __init__(self):
-        # 从配置表动态获取佣金比例
-        from app.models.commission_config import CommissionConfig
-        commission_rate = CommissionConfig.get_config('commission_rate', 35.0)
-        self.referral_rate = Decimal(str(commission_rate / 100))  # 将百分比转换为小数
-        self.platform_base_rate = Decimal('0.10')  # 10%平台基础抽成
+        # 不在构造函数中缓存配置值，而是每次实时获取
+        pass
         
     def register_referral(self, user_address: str, referrer_address: str, referral_code: str = None) -> UserReferral:
         """
@@ -114,9 +111,16 @@ class UnlimitedReferralSystem:
         Returns:
             Dict: 佣金分配详情
         """
-        # 获取平台费率配置
+        # 实时获取配置值，确保使用最新的后台设置
         from app.utils.config_manager import ConfigManager
+        from app.models.commission_config import CommissionConfig
+
+        # 获取平台费率配置（从后台系统配置）
         platform_fee_rate = Decimal(str(ConfigManager.get_platform_fee_rate()))
+
+        # 获取佣金率配置（从后台系统配置）
+        commission_rate_percent = CommissionConfig.get_config('commission_rate', 35.0)
+        referral_rate = Decimal(str(commission_rate_percent / 100))
 
         distribution = {
             'platform_fee': Decimal('0'),
@@ -127,7 +131,7 @@ class UnlimitedReferralSystem:
         # 1. 计算平台基础手续费（作为佣金分配的基础）
         base_platform_fee = transaction_amount * platform_fee_rate
 
-        # 2. 聚合递进佣金计算：每级获得上级佣金的35%
+        # 2. 聚合递进佣金计算：每级获得上级佣金的配置比例
         current_base = base_platform_fee  # 从平台手续费开始分配
         current_user = user_address
         level = 1
@@ -144,8 +148,8 @@ class UnlimitedReferralSystem:
                 distribution['platform_fee'] += current_base
                 break
 
-            # 计算当前级佣金：上级佣金基数的35%
-            commission_amount = current_base * self.referral_rate
+            # 计算当前级佣金：上级佣金基数的配置比例
+            commission_amount = current_base * referral_rate
 
             # 记录佣金分配
             distribution['referral_commissions'].append({
@@ -153,7 +157,7 @@ class UnlimitedReferralSystem:
                 'referrer_address': referral.referrer_address,
                 'commission_amount': commission_amount,
                 'base_amount': current_base,
-                'rate': self.referral_rate,
+                'rate': referral_rate,
                 'user_address': current_user
             })
 
@@ -168,7 +172,8 @@ class UnlimitedReferralSystem:
         distribution['platform_fee'] = base_platform_fee - distribution['total_referral_amount']
 
         logger.debug(f"聚合递进佣金计算完成: 交易金额={transaction_amount}, 基础手续费={base_platform_fee}, "
-                    f"分配佣金={distribution['total_referral_amount']}, 平台收益={distribution['platform_fee']}")
+                    f"分配佣金={distribution['total_referral_amount']}, 平台收益={distribution['platform_fee']}, "
+                    f"平台费率={platform_fee_rate*100}%, 佣金率={referral_rate*100}%")
 
         return distribution
 

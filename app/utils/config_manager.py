@@ -21,8 +21,8 @@ class ConfigManager:
         'PLATFORM_FEE_ADDRESS': 'H6FMXx3s1kq1aMkYHiexVzircV31WnWaP5MSQQwfHfeW',
         'ASSET_CREATION_FEE_ADDRESS': 'H6FMXx3s1kq1aMkYHiexVzircV31WnWaP5MSQQwfHfeW',
         'ASSET_CREATION_FEE_AMOUNT': '0.02',
-        'PLATFORM_FEE_BASIS_POINTS': '350',  # 3.5%
-        'PLATFORM_FEE_RATE': '0.035',  # 3.5%
+        'PLATFORM_FEE_BASIS_POINTS': '350',  # 3.5% - 默认值，可在后台修改
+        'PLATFORM_FEE_RATE': '0.035',  # 3.5% - 默认值，可在后台修改
     }
     
     @staticmethod
