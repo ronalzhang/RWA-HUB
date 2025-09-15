@@ -666,8 +666,8 @@
                                     <div>
                                         <i class="fas fa-hand-holding-usd me-2"></i>{{ _('Commission') }}: <span id="walletCommissionInDropdown" style="font-weight:600;">0.00</span>
                                     </div>
-                                    <button class="btn btn-sm text-success p-0" style="background:none; border:none; font-size:12px;" title="{{ _('View Details') }}" onclick="showCommissionDetails()">
-                                        <i class="fas fa-info-circle"></i>
+                                    <button class="btn btn-sm btn-success p-1" style="font-size:11px; line-height:1;" title="{{ _('Withdraw to current wallet') }}" onclick="withdrawCommission()">
+                                        <i class="fas fa-arrow-down me-1"></i>{{ _('Withdraw') }}
                                     </button>
                                     </div>
                                 
@@ -1303,7 +1303,27 @@
                         }
                     }
                 }
-                
+
+                // Load commission balance
+                try {
+                    const commissionResponse = await fetch(`/admin/api/user/commission/balance/${address}`);
+                    if (commissionResponse.ok) {
+                        const commissionData = await commissionResponse.json();
+                        if (commissionData.success && commissionData.data) {
+                            const commissionElement = document.getElementById('walletCommissionInDropdown');
+                            if (commissionElement) {
+                                commissionElement.textContent = (commissionData.data.available_balance || 0).toFixed(2);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.log('Commission balance not available:', error);
+                    const commissionElement = document.getElementById('walletCommissionInDropdown');
+                    if (commissionElement) {
+                        commissionElement.textContent = '0.00';
+                    }
+                }
+
                 // Load user assets
                 const assetsResponse = await fetch(`/api/user/assets?address=${encodeURIComponent(address)}&wallet_type=solana`);
                 if (assetsResponse.ok) {
@@ -1321,7 +1341,7 @@
                                     assetItem.innerHTML = `
                                         <div class="asset-link" style="display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; color: #333; text-decoration: none; border-radius: 4px; transition: all 0.2s ease; background-color: #f8f9fa;">
                                             <div class="asset-info" style="display: flex; align-items: center;">
-                                                <div class="asset-name" style="font-size: 12px; font-weight: 500; color: #333; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${asset.symbol}</div>
+                                                <a href="/asset/${asset.id || asset.asset_id}" class="asset-name" style="font-size: 12px; font-weight: 500; color: #2775ca; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; cursor: pointer;" title="View asset details">${asset.symbol}</a>
                                             </div>
                                             <div class="asset-quantity" style="font-size: 11px; color: #333; background: #eeeeee; padding: 1px 4px; border-radius: 3px; margin-left: 4px;">${asset.balance}</div>
                                         </div>
@@ -1640,11 +1660,62 @@
                 alert('Please connect wallet first');
                 return;
             }
-            
+
             const address = window.walletState.address;
             const commissionValue = document.getElementById('walletCommissionInDropdown').textContent || '0.00';
-            
+
             alert(`Commission Details:\n\nWallet: ${formatWalletAddress(address)}\nBalance: ${commissionValue} USDC`);
+        }
+
+        // Withdraw commission function
+        async function withdrawCommission() {
+            if (!window.walletState || !window.walletState.address) {
+                alert('Please connect wallet first');
+                return;
+            }
+
+            const address = window.walletState.address;
+            const commissionValue = parseFloat(document.getElementById('walletCommissionInDropdown').textContent || '0.00');
+
+            if (commissionValue <= 0) {
+                alert('No commission balance to withdraw');
+                return;
+            }
+
+            if (!confirm(`Confirm withdrawal of ${commissionValue.toFixed(2)} USDC to your current wallet?\n\nTo: ${formatWalletAddress(address)}\nAmount: ${commissionValue.toFixed(2)} USDC\n\nThis will be processed automatically within 1 minute.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/api/user/commission/withdraw', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_address: address,
+                        to_address: address,
+                        amount: commissionValue,
+                        note: 'Automatic withdrawal to connected wallet'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success || response.ok) {
+                    alert(`Withdrawal request submitted successfully!\n\nAmount: ${commissionValue.toFixed(2)} USDC\nTo: ${formatWalletAddress(address)}\nDelay: ${data.delay_minutes || 1} minute(s)\n\nThe transaction will be processed automatically.`);
+
+                    // Refresh commission balance
+                    if (window.walletState && window.walletState.address) {
+                        loadWalletData(window.walletState.address);
+                    }
+                } else {
+                    throw new Error(data.error || 'Withdrawal request failed');
+                }
+            } catch (error) {
+                console.error('Withdrawal error:', error);
+                alert(`Withdrawal failed: ${error.message}`);
+            }
         }
         
         // Switch and disconnect functions use original architecture
