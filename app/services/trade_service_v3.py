@@ -233,14 +233,20 @@ class TradeServiceV3:
                     f'无法获取区块哈希: {str(e)}'
                 )
 
-            # 5. 指令创建阶段 - 双账户转账（发布者 + 平台）
+            # 5. 指令创建阶段 - 双账户转账（发布者 + 平台）+ Memo
             logger.debug(f"[{transaction_id}] 步骤5: 开始指令创建")
-            
+
             try:
                 # 获取资产发布者地址
                 asset_owner_address = asset.owner_address
                 logger.info(f"[{transaction_id}] 获取到资产发布者地址: {asset_owner_address}")
-                
+
+                # 创建memo指令，让钱包显示清晰的交易信息
+                memo_text = f"RWA-HUB Purchase: {amount} tokens of Asset #{asset_id} for {float(total_price)} USDC"
+                memo_instruction = TradeServiceV3._create_memo_instruction(memo_text, transaction_id)
+
+                instructions = [memo_instruction]  # 首先添加memo指令
+
                 # 检查是否是发布者购买自己的资产
                 if wallet_address.lower() == asset_owner_address.lower():
                     logger.info(f"[{transaction_id}] 发布者购买自己的资产，按20%分润比例给平台")
@@ -248,45 +254,49 @@ class TradeServiceV3:
                     platform_commission_rate = TradeServiceV3._get_platform_commission_rate()
                     platform_amount = total_price * platform_commission_rate  # 20%给平台
                     owner_amount = total_price * (Decimal('1.0') - platform_commission_rate)  # 80%本应给发布者，但因为是自购所以不转账
-                    
+
                     logger.info(f"[{transaction_id}] 自购分润计算: 总价={total_price}, 平台分润={platform_amount}(20%), 发布者应得={owner_amount}(80%，但不实际转账)")
-                    
+
                     # 只给平台转账20%，发布者的80%不需要转账（因为是自己给自己转账）
-                    instructions = [TradeServiceV3._create_single_transfer_instruction(
-                        wallet_address, 
-                        platform_treasury_address, 
-                        payment_token_mint_address, 
+                    platform_transfer = TradeServiceV3._create_single_transfer_instruction(
+                        wallet_address,
+                        platform_treasury_address,
+                        payment_token_mint_address,
                         platform_amount,  # 只转20%给平台
                         payment_token_decimals,
                         f"{transaction_id}_platform_self_purchase"
-                    )]
+                    )
+                    instructions.append(platform_transfer)
                     logger.debug(f"[{transaction_id}] 发布者自购转账指令创建成功，只转账20%给平台")
                 else:
                     # 普通用户购买：从系统配置获取平台分润比例
                     platform_commission_rate = TradeServiceV3._get_platform_commission_rate()
                     owner_rate = Decimal('1.0') - platform_commission_rate
-                    
+
                     owner_amount = total_price * owner_rate  # 发布者获得剩余部分
                     platform_amount = total_price * platform_commission_rate  # 平台获得配置的比例
-                    
+
                     logger.info(f"[{transaction_id}] 分润计算: 总价={total_price}, 发布者={owner_amount}, 平台={platform_amount}")
-                    
-                    instructions = TradeServiceV3._create_dual_transfer_instructions(
-                        wallet_address, 
+
+                    transfer_instructions = TradeServiceV3._create_dual_transfer_instructions(
+                        wallet_address,
                         asset_owner_address,
-                        platform_treasury_address, 
-                        payment_token_mint_address, 
+                        platform_treasury_address,
+                        payment_token_mint_address,
                         owner_amount,
                         platform_amount,
                         payment_token_decimals,
                         transaction_id
                     )
-                    logger.debug(f"[{transaction_id}] 双转账指令创建成功，指令数量: {len(instructions)}")
-                
+                    instructions.extend(transfer_instructions)
+                    logger.debug(f"[{transaction_id}] 双转账指令创建成功，转账指令数量: {len(transfer_instructions)}")
+
+                logger.info(f"[{transaction_id}] 总指令数量: {len(instructions)} (包含memo指令)")
+
             except Exception as e:
                 logger.error(f"[{transaction_id}] 指令创建失败: {e}", exc_info=True)
                 return TradeServiceV3._create_error_response(
-                    TradeServiceV3.ErrorCodes.INSTRUCTION_CREATION_ERROR, 
+                    TradeServiceV3.ErrorCodes.INSTRUCTION_CREATION_ERROR,
                     f'指令创建失败: {str(e)}'
                 )
 
@@ -1046,6 +1056,43 @@ class TradeServiceV3:
             }
 
 
+    @staticmethod
+    def _create_memo_instruction(memo_text: str, transaction_id: str):
+        """
+        创建Memo指令，让钱包显示可读的交易信息
+
+        Args:
+            memo_text: 要显示的memo文本
+            transaction_id: 交易ID用于日志关联
+
+        Returns:
+            Instruction: Memo指令
+        """
+        try:
+            from solders.instruction import Instruction
+            from solders.pubkey import Pubkey
+
+            logger.debug(f"[{transaction_id}] 创建memo指令: {memo_text}")
+
+            # Solana Memo程序ID
+            MEMO_PROGRAM_ID = Pubkey.from_string('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
+
+            # 将memo文本转换为UTF-8字节
+            memo_data = memo_text.encode('utf-8')
+
+            # 创建memo指令（不需要任何账户，只需要数据）
+            memo_instruction = Instruction(
+                program_id=MEMO_PROGRAM_ID,
+                data=memo_data,
+                accounts=[]  # Memo指令不需要任何账户
+            )
+
+            logger.info(f"[{transaction_id}] Memo指令创建成功，文本长度: {len(memo_text)}字符")
+            return memo_instruction
+
+        except Exception as e:
+            logger.error(f"[{transaction_id}] 创建memo指令失败: {e}", exc_info=True)
+            raise Exception(f"Memo指令创建失败: {str(e)}")
 
     @staticmethod
     def _create_dual_transfer_instructions(
