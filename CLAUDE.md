@@ -286,6 +286,102 @@ grep -r "# 临时注释\|# TODO\|# FIXME" app/
 
 **重要提醒：这个检查过程必须在每次修复任务中执行，确保代码库始终保持干净整洁的状态！**
 
+### 🧹 定期代码库清理规则（重要！）
+
+**清理触发条件：**
+- 每次重大功能开发完成后
+- 修复问题过程中发现重复文件时
+- 每月定期维护时
+- 部署前的代码审查时
+
+**系统性清理检查清单：**
+
+1. **遗留文档文件清理**：
+   ```bash
+   # 检查并删除过期的总结文档
+   ls -la *.md | grep -E "(SUMMARY|FIX|REPORT|DEPLOYMENT)"
+   # 保留：README.md, CLAUDE.md, SPL_TOKEN_IMPLEMENTATION_PLAN.md
+   # 删除：所有SUMMARY、FIX、REPORT类文档
+   ```
+
+2. **临时脚本文件清理**：
+   ```bash
+   # 检查根目录临时脚本
+   ls -la *.py | grep -E "(debug|test|check|setup|verify)"
+   # 删除：debug_*.py, test_*.py, check_*.py, setup_*.py, verify_*.py
+   # 保留：app.py, app_wsgi.py等核心文件
+   ```
+
+3. **重复配置文件清理**：
+   ```bash
+   # 检查重复的环境配置
+   find . -name ".env*" -o -name "config*.py"
+   # 保留：根目录/.env, app/config.py
+   # 删除：app/.env*, 根目录/config.py等重复文件
+   ```
+
+4. **过期路由文件清理**：
+   ```bash
+   # 检查routes目录大文件（可能是未拆分的旧实现）
+   find app/routes -name "*.py" -exec wc -l {} \; | sort -nr
+   # 检查：超过1000行的文件是否需要拆分或删除
+   ```
+
+5. **硬编码地址清理**：
+   ```bash
+   # 搜索硬编码的钱包地址
+   grep -r "6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b\|H6FMXx3s1kq1aMkYHiexVzircV31WnWaP5MSQQwfHfeW" app/
+   # 确保所有地址都从环境变量或数据库获取
+   ```
+
+6. **HTML页面文件清理**：
+   ```bash
+   # 检查根目录的HTML文件（通常不应存在）
+   ls -la *.html
+   # 删除：根目录下的临时HTML文件
+   # 保留：app/templates/目录下的模板文件
+   ```
+
+**清理执行流程：**
+1. **检查前备份**：确保git status clean或已提交重要更改
+2. **系统性检查**：按照上述清单逐项检查
+3. **批量删除**：使用rm -f命令删除确认无用的文件
+4. **功能验证**：删除后测试核心功能是否正常
+5. **提交更改**：使用标准格式提交清理更改
+
+**清理提交格式：**
+```bash
+git commit -m "代码库定期清理
+
+🧹 清理内容:
+- 删除X个遗留文档文件
+- 清理X个临时脚本文件
+- 移除重复配置文件
+- 清理硬编码地址
+
+✨ 改进效果:
+- 代码库文件数量减少X%
+- 移除重复代码X行
+- 统一配置管理方式
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+```
+
+**清理后验证：**
+- 应用启动正常
+- 核心功能测试通过
+- 无重复路由注册错误
+- 配置加载正确
+
+**定期清理的好处：**
+- 降低维护复杂度
+- 减少部署文件大小
+- 避免配置冲突
+- 提高代码可读性
+- 防止硬编码地址泄露
+
 ### ⚡ Python语法和结构规则
 
 - **缩进一致性**：所有字典定义必须保持一致的缩进，避免混合空格和制表符
