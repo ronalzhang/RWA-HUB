@@ -29,9 +29,6 @@ from .assets import register_global_handlers
 # 导入Solana API
 from .solana_api import solana_api as solana_api_bp
 
-# 导入Solana管理功能
-from .admin_solana import admin_solana_bp
-
 # 导入管理员API兼容路由
 from .admin_api import admin_compat_routes_bp, admin_v2_bp, admin_compat_bp, admin_frontend_bp
 
@@ -53,16 +50,11 @@ from .admin.asset_management import asset_management_bp
 # 导入分红管理
 from .dividend import bp as dividend_bp
 
-# 导入区块链API
-# from .blockchain_api import blockchain_api  # 临时注释，文件不存在
-
 # 导入语言切换API
 from .language_api import language_api
 
 # 导入健康检查API
 from .health_api import health_bp
-
-# V2交易API已整合到主API中
 
 # 导入交易历史API
 from .trades_api import trades_api_bp
@@ -92,13 +84,10 @@ def register_blueprints(app):
     
     # 注册分红管理蓝图
     app.register_blueprint(dividend_bp)
-    
-    # 注册区块链API蓝图
-    # app.register_blueprint(blockchain_api)  # 临时注释，文件不存在
-    
+
     # 注册语言切换API蓝图
     app.register_blueprint(language_api)
-    
+
     # 注册健康检查API蓝图
     app.register_blueprint(health_bp)
     
@@ -120,9 +109,8 @@ def register_blueprints(app):
     
     # 注册Solana API蓝图
     app.register_blueprint(solana_api_bp)
-    
-    # 临时注释掉冲突的蓝图，等重构完成后再启用
-    # app.register_blueprint(admin_solana_bp)
+
+    # 注册管理员API蓝图
     app.register_blueprint(admin_v2_bp)           # 启用V2 API蓝图以支持新的认证系统
     app.register_blueprint(admin_compat_bp)        # 启用兼容路由以支持前端API调用
     app.register_blueprint(admin_compat_routes_bp) # 启用兼容路由以支持前端页面API调用

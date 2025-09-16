@@ -275,14 +275,6 @@ def get_user_assets_query():
     current_app.logger.info(f'通过查询参数获取资产 - 地址: {address}, 类型: {wallet_type}')
     return _get_user_assets(address, wallet_type)
 
-@api_bp.route('/user/assets/<string:address>', methods=['GET'])
-def get_user_assets(address):
-    """获取用户持有的资产数据（通过路径参数）"""
-    wallet_type = 'ethereum' if address.startswith('0x') else 'solana'
-    current_app.logger.info(f'通过路径参数获取资产 - 地址: {address}, 类型: {wallet_type}')
-    return _get_user_assets(address, wallet_type)
-
-
 @api_bp.route('/trades', methods=['GET'])
 def get_trade_history():
     """获取资产交易历史"""
