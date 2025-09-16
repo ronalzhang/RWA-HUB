@@ -585,9 +585,9 @@ if (window.purchaseHandlerInitialized) {
                                 const ASSOCIATED_TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
                                 
                                 const seeds = [
-                                    walletPubkey.toBuffer(),
-                                    TOKEN_PROGRAM_ID.toBuffer(),
-                                    usdcMint.toBuffer()
+                                    walletPubkey.toBytes ? walletPubkey.toBytes() : walletPubkey.toBuffer(),
+                                    TOKEN_PROGRAM_ID.toBytes ? TOKEN_PROGRAM_ID.toBytes() : TOKEN_PROGRAM_ID.toBuffer(),
+                                    usdcMint.toBytes ? usdcMint.toBytes() : usdcMint.toBuffer()
                                 ];
                                 
                                 const [address] = await window.solanaWeb3.PublicKey.findProgramAddress(
