@@ -305,6 +305,34 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- 资产分页 -->
+            <div x-show="activeTab === 'assets' && assets.length > 0" class="bg-white px-6 py-3 border-t border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div class="text-sm text-gray-700">
+                        显示第 <span x-text="(pagination.page - 1) * pagination.limit + 1"></span> 到
+                        <span x-text="Math.min(pagination.page * pagination.limit, pagination.total)"></span> 项，
+                        共 <span x-text="pagination.total"></span> 项
+                    </div>
+                    <div class="flex space-x-2">
+                        <button @click="loadAssets(pagination.page - 1)"
+                                :disabled="pagination.page <= 1"
+                                :class="pagination.page <= 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'"
+                                class="px-3 py-1 text-white rounded text-sm">
+                            上一页
+                        </button>
+                        <span class="px-3 py-1 bg-gray-100 rounded text-sm">
+                            第 <span x-text="pagination.page"></span> / <span x-text="pagination.pages"></span> 页
+                        </span>
+                        <button @click="loadAssets(pagination.page + 1)"
+                                :disabled="pagination.page >= pagination.pages"
+                                :class="pagination.page >= pagination.pages ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'"
+                                class="px-3 py-1 text-white rounded text-sm">
+                            下一页
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- 分红列表标签页 -->
