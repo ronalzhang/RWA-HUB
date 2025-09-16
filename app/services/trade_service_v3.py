@@ -245,7 +245,7 @@ class TradeServiceV3:
                 memo_text = f"RWA-HUB Purchase: {amount} tokens of Asset #{asset_id} for {float(total_price)} USDC"
                 memo_instruction = TradeServiceV3._create_memo_instruction(memo_text, transaction_id)
 
-                instructions = [memo_instruction]  # 首先添加memo指令
+                instructions = []  # 首先创建空指令列表
 
                 # 检查是否是发布者购买自己的资产
                 if wallet_address.lower() == asset_owner_address.lower():
@@ -291,7 +291,9 @@ class TradeServiceV3:
                     instructions.extend(transfer_instructions)
                     logger.debug(f"[{transaction_id}] 双转账指令创建成功，转账指令数量: {len(transfer_instructions)}")
 
-                logger.info(f"[{transaction_id}] 总指令数量: {len(instructions)} (包含memo指令)")
+                # 最后添加memo指令，确保钱包优先识别转账指令
+                instructions.append(memo_instruction)
+                logger.info(f"[{transaction_id}] 总指令数量: {len(instructions)} (转账指令在前，memo指令在后)")
 
             except Exception as e:
                 logger.error(f"[{transaction_id}] 指令创建失败: {e}", exc_info=True)
