@@ -42,10 +42,10 @@ from .admin.monitoring import monitoring_bp
 from .admin.ip_stats import ip_stats_bp
 
 # 导入支付管理
+# 支付管理模块
 from .admin.payment_management import payment_management_bp
 
-# 导入资产管理
-from .admin.asset_management import asset_management_bp
+# 资产管理功能已合并到admin/__init__.py中
 
 # 导入分红管理
 from .dividend import bp as dividend_bp
@@ -77,10 +77,10 @@ def register_blueprints(app):
     app.register_blueprint(ip_stats_bp)
     
     # 注册支付管理蓝图
+    # 注册支付管理蓝图
     app.register_blueprint(payment_management_bp, url_prefix='/admin')
-    
-    # 注册资产管理蓝图
-    app.register_blueprint(asset_management_bp)
+
+    # 资产管理功能已合并到admin蓝图中，不需要单独注册
     
     # 注册分红管理蓝图
     app.register_blueprint(dividend_bp)
