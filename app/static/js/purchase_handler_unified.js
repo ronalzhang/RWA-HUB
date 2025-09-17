@@ -317,6 +317,26 @@ if (window.purchaseHandlerInitialized) {
                 
                 // 处理多个指令（用于分润转账）
                 this.currentTrade.instructions.forEach((instrData, index) => {
+                    // 安全的数据解析
+                    let instructionData;
+                    try {
+                        if (typeof instrData.data === 'string' && instrData.data.length > 0) {
+                            // 确保是有效的十六进制字符串
+                            const hexString = instrData.data.replace(/[^0-9a-fA-F]/g, '');
+                            if (hexString.length % 2 === 0) {
+                                instructionData = new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+                            } else {
+                                console.warn(`指令${index}数据长度无效:`, instrData.data);
+                                instructionData = new Uint8Array(0);
+                            }
+                        } else {
+                            instructionData = new Uint8Array(0);
+                        }
+                    } catch (error) {
+                        console.error(`指令${index}数据解析失败:`, error, instrData.data);
+                        instructionData = new Uint8Array(0);
+                    }
+
                     const instruction = new window.solanaWeb3.TransactionInstruction({
                         keys: instrData.accounts.map(acc => ({
                             pubkey: new window.solanaWeb3.PublicKey(acc.pubkey),
@@ -324,7 +344,7 @@ if (window.purchaseHandlerInitialized) {
                             isWritable: acc.is_writable
                         })),
                         programId: new window.solanaWeb3.PublicKey(instrData.program_id),
-                        data: new Uint8Array(instrData.data.match(/.{1,2}/g).map(byte => parseInt(byte, 16)))
+                        data: instructionData
                     });
 
                     console.log(`创建的指令${index}详情:`, {
@@ -437,12 +457,28 @@ if (window.purchaseHandlerInitialized) {
 
             } catch (error) {
                 console.error('签名和确认交易失败:', error);
-                
+
+                // 更详细的错误分类和处理
                 if (error.message && error.message.includes('User rejected')) {
                     this.handleError({
                         error_code: 'USER_REJECTED',
                         message: '您在钱包中拒绝了交易请求'
                     }, 'Sign Transaction');
+                } else if (error.message && error.message.includes('Unexpected error')) {
+                    this.handleError({
+                        error_code: 'WALLET_ERROR',
+                        message: '钱包处理交易时出现异常，请检查：\n1. 钱包是否有足够的SOL支付gas费\n2. USDC余额是否足够\n3. 网络连接是否正常'
+                    }, 'Wallet Transaction Error');
+                } else if (error.message && error.message.includes('insufficient funds')) {
+                    this.handleError({
+                        error_code: 'INSUFFICIENT_FUNDS',
+                        message: '余额不足，请检查您的USDC余额和SOL余额（用于支付gas费）'
+                    }, 'Insufficient Funds');
+                } else if (error.message && error.message.includes('Network')) {
+                    this.handleError({
+                        error_code: 'NETWORK_ERROR',
+                        message: '网络连接异常，请稍后重试'
+                    }, 'Network Error');
                 } else {
                     this.handleError(error, 'Sign and Confirm Transaction');
                 }
