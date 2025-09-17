@@ -144,21 +144,23 @@ def create_app(config_name='development'):
     babel.locale_selector_func = get_locale
     
     # 设置日志
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
-    
-    file_handler = RotatingFileHandler(
-        'logs/app.log',
-        maxBytes=10240,
-        backupCount=10
-    )
-    file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-    ))
-    file_handler.setLevel(logging.INFO)
-    app.logger.addHandler(file_handler)
-    app.logger.setLevel(logging.INFO)
-    app.logger.info('应用启动')
+    if not hasattr(app, '_file_handler_configured'):
+        if not os.path.exists('logs'):
+            os.makedirs('logs')
+
+        file_handler = RotatingFileHandler(
+            'logs/app.log',
+            maxBytes=10240,
+            backupCount=10
+        )
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+        ))
+        file_handler.setLevel(logging.INFO)
+        app.logger.addHandler(file_handler)
+        app.logger.setLevel(logging.INFO)
+        app._file_handler_configured = True
+        app.logger.info('应用启动')
     
     # 初始化存储（在注册蓝图之前）
     from .utils.storage import init_storage
@@ -212,15 +214,18 @@ def create_app(config_name='development'):
     
     
     
-    return app
-
     # 确保所有模型都被导入
     with app.app_context():
-        # 导入所有模型以确保它们被注册到SQLAlchemy
-        from app.models.commission_withdrawal import CommissionWithdrawal
-        from app.models.referral import DistributionSetting
-        from app.models.commission_config import CommissionConfig, UserCommissionBalance
-        app.logger.info("所有模型已导入并注册")
+        try:
+            # 导入所有模型以确保它们被注册到SQLAlchemy
+            from app.models.commission_withdrawal import CommissionWithdrawal
+            from app.models.referral import DistributionSetting
+            from app.models.commission_config import CommissionConfig, UserCommissionBalance
+            app.logger.info("所有模型已导入并注册")
+        except ImportError as e:
+            app.logger.warning(f"某些模型导入失败: {str(e)}")
+
+    return app
 
     # 在初始化时添加分销佣金设置
 @click.command('init-distribution')

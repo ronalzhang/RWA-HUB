@@ -97,18 +97,28 @@ def init_extensions(app):
 
 # 配置日志
 def configure_logging(app):
+    # 防止重复配置日志
+    if hasattr(app, '_logging_configured'):
+        return
+
+    # 清除现有处理器，防止重复
+    app.logger.handlers.clear()
+
     # 设置日志级别
     app.logger.setLevel(logging.INFO)
-    
+
     # 创建控制台处理器
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
-    
+
     # 创建格式化器
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     console_handler.setFormatter(formatter)
-    
+
     # 添加处理器
     app.logger.addHandler(console_handler)
-    
+
+    # 标记为已配置
+    app._logging_configured = True
+
     app.logger.info("日志系统配置完成") 
