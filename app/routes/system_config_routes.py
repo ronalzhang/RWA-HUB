@@ -51,7 +51,6 @@ def get_system_config():
 @system_config_bp.route('/master-key', methods=['POST'])
 @admin_required
 @permission_required('管理系统')
-@log_admin_operation('生成系统主密钥')
 def generate_master_key():
     """生成新的系统主密钥"""
     try:
@@ -100,7 +99,6 @@ def generate_master_key():
 @system_config_bp.route('/platform-keypair', methods=['POST'])
 @admin_required
 @permission_required('管理系统')
-@log_admin_operation('设置平台私钥')
 def set_platform_keypair():
     """设置平台SPL Token私钥"""
     try:
