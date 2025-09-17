@@ -1267,21 +1267,6 @@
             return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         }
 
-        // Simple wallet connection function
-        function connectWallet(walletType = 'phantom') {
-            console.log('Connecting wallet:', walletType);
-            
-            if (walletType === 'phantom') {
-                if (isMobileDevice()) {
-                    // On mobile, use WalletConnect-style connection
-                    connectPhantomMobile();
-                } else {
-                    // Desktop connection
-                    connectPhantomWallet();
-                }
-            }
-        }
-
         // Connect to Phantom wallet on mobile
         async function connectPhantomMobile() {
             try {
@@ -1599,11 +1584,11 @@
             if (isMobileDevice()) {
                 // On mobile, directly try to connect with Phantom
                 console.log('Mobile device detected, connecting to Phantom...');
-                connectWallet('phantom');
+                window.connectWallet('phantom');
             } else {
                 // On desktop, show simple selection or connect directly
                 console.log('Desktop device detected, connecting to Phantom...');
-                connectWallet('phantom');
+                window.connectWallet('phantom');
             }
         }
         

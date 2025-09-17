@@ -28,14 +28,15 @@
     }
   }
   
-  // 获取钱包地址
+  // Use the unified getWalletAddress function from wallet-unified-manager.js
   function getWalletAddress() {
-    // 优先使用 walletState
+    if (window.getWalletAddress) {
+      return window.getWalletAddress();
+    }
+    // Fallback if unified manager not available
     if (window.walletState && window.walletState.address) {
       return window.walletState.address;
     }
-    
-    // 备用方案，从localStorage获取
     return localStorage.getItem('walletAddress');
   }
   

@@ -603,24 +603,28 @@ window.handlePurchaseClick = function() {
     }
 };
 
-// 获取钱包地址的辅助函数
+// Use the unified getWalletAddress function from wallet-unified-manager.js
 function getWalletAddress() {
+    if (window.getWalletAddress) {
+        return window.getWalletAddress();
+    }
+    // Fallback if unified manager not available
     if (window.walletState && window.walletState.address) {
         return window.walletState.address;
     }
-    
+
     if (localStorage.getItem('walletAddress')) {
         return localStorage.getItem('walletAddress');
     }
-    
+
     if (window.solana && window.solana.publicKey) {
         return window.solana.publicKey.toString();
     }
-    
+
     if (window.ethereum && window.ethereum.selectedAddress) {
         return window.ethereum.selectedAddress;
     }
-    
+
     return null;
 }
 
