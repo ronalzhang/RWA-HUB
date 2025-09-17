@@ -7,7 +7,7 @@ from flask import Blueprint, request, jsonify, current_app
 from app.extensions import db
 from app.models.admin import SystemConfig
 from app.utils.crypto_manager import CryptoManager
-from app.routes.admin_api import admin_required, permission_required, log_admin_operation
+from app.routes.admin.auth import admin_required, permission_required
 import base58
 from solders.keypair import Keypair
 import secrets
