@@ -478,3 +478,240 @@ def list_spl_tokens():
 def spl_tokens_page():
     """SPL Token管理页面"""
     return render_template('admin_v2/spl_tokens.html')
+
+
+# ============================================================================
+# 监控和统计相关API
+# ============================================================================
+
+@spl_token_bp.route('/api/admin/spl-token/statistics', methods=['GET'])
+def get_token_statistics():
+    """获取SPL Token统计信息"""
+    try:
+        logger.info("获取SPL Token统计信息")
+
+        result = SplTokenService.get_token_statistics()
+
+        if result.get('success'):
+            return success_response(
+                data=result.get('data'),
+                message="获取统计信息成功"
+            )
+        else:
+            return error_response(
+                error_code=result.get('error', 'STATISTICS_ERROR'),
+                message=result.get('message', '获取统计信息失败')
+            )
+
+    except Exception as e:
+        logger.error(f"获取统计信息API异常: {e}", exc_info=True)
+        return error_response(message=f"获取统计信息失败: {str(e)}")
+
+
+@spl_token_bp.route('/api/spl-token/supply-info/<mint_address>', methods=['GET'])
+def get_supply_info(mint_address):
+    """获取Token供应量信息"""
+    try:
+        logger.info(f"获取Token供应量信息: {mint_address}")
+
+        result = SplTokenService.get_token_supply_info(mint_address)
+
+        if result.get('success'):
+            return success_response(
+                data=result.get('data'),
+                message="获取供应量信息成功"
+            )
+        else:
+            return error_response(
+                error_code=result.get('error', 'SUPPLY_INFO_ERROR'),
+                message=result.get('message', '获取供应量信息失败')
+            )
+
+    except Exception as e:
+        logger.error(f"获取供应量信息API异常: {e}", exc_info=True)
+        return error_response(message=f"获取供应量信息失败: {str(e)}")
+
+
+@spl_token_bp.route('/api/spl-token/holder-count/<mint_address>', methods=['GET'])
+def get_holder_count(mint_address):
+    """获取Token持有者数量"""
+    try:
+        logger.info(f"获取Token持有者数量: {mint_address}")
+
+        result = SplTokenService.get_token_holder_count(mint_address)
+
+        if result.get('success'):
+            return success_response(
+                data=result.get('data'),
+                message="获取持有者数量成功"
+            )
+        else:
+            return error_response(
+                error_code=result.get('error', 'HOLDER_COUNT_ERROR'),
+                message=result.get('message', '获取持有者数量失败')
+            )
+
+    except Exception as e:
+        logger.error(f"获取持有者数量API异常: {e}", exc_info=True)
+        return error_response(message=f"获取持有者数量失败: {str(e)}")
+
+
+@spl_token_bp.route('/api/spl-token/activity/<mint_address>', methods=['GET'])
+def get_token_activity(mint_address):
+    """获取Token活动监控信息"""
+    try:
+        # 获取时间范围参数（默认24小时）
+        hours = request.args.get('hours', 24, type=int)
+        if hours <= 0 or hours > 720:  # 最大30天
+            hours = 24
+
+        logger.info(f"获取Token活动信息: {mint_address}, 时间范围: {hours}小时")
+
+        result = SplTokenService.monitor_token_activity(mint_address, hours)
+
+        if result.get('success'):
+            return success_response(
+                data=result.get('data'),
+                message="获取活动信息成功"
+            )
+        else:
+            return error_response(
+                error_code=result.get('error', 'MONITORING_ERROR'),
+                message=result.get('message', '获取活动信息失败')
+            )
+
+    except Exception as e:
+        logger.error(f"获取活动信息API异常: {e}", exc_info=True)
+        return error_response(message=f"获取活动信息失败: {str(e)}")
+
+
+@spl_token_bp.route('/api/admin/spl-token/dashboard-stats', methods=['GET'])
+def get_dashboard_statistics():
+    """获取SPL Token仪表板统计信息"""
+    try:
+        logger.info("获取仪表板统计信息")
+
+        # 获取基础统计
+        stats_result = SplTokenService.get_token_statistics()
+        if not stats_result.get('success'):
+            return error_response(
+                error_code=stats_result.get('error', 'STATISTICS_ERROR'),
+                message=stats_result.get('message', '获取统计信息失败')
+            )
+
+        dashboard_data = stats_result.get('data', {})
+
+        # 添加额外的仪表板信息
+        try:
+            from app.models import Asset
+            from sqlalchemy import func
+            from datetime import datetime, timedelta
+
+            # 最近7天创建的Token数量
+            seven_days_ago = datetime.utcnow() - timedelta(days=7)
+            recent_tokens_count = db.session.query(func.count(Asset.id)).filter(
+                Asset.spl_created_at >= seven_days_ago,
+                Asset.spl_mint_address.isnot(None)
+            ).scalar() or 0
+
+            # 最近失败的Token创建数量
+            recent_failed_count = db.session.query(func.count(Asset.id)).filter(
+                Asset.spl_creation_status == SplTokenService.CreationStatus.FAILED,
+                Asset.updated_at >= seven_days_ago
+            ).scalar() or 0
+
+            dashboard_data['recent_activity'] = {
+                'tokens_created_7_days': recent_tokens_count,
+                'failed_creations_7_days': recent_failed_count
+            }
+
+        except Exception as e:
+            logger.warning(f"获取额外仪表板数据失败: {e}")
+            dashboard_data['recent_activity'] = {
+                'tokens_created_7_days': 0,
+                'failed_creations_7_days': 0
+            }
+
+        return success_response(
+            data=dashboard_data,
+            message="获取仪表板统计信息成功"
+        )
+
+    except Exception as e:
+        logger.error(f"获取仪表板统计信息API异常: {e}", exc_info=True)
+        return error_response(message=f"获取仪表板统计信息失败: {str(e)}")
+
+
+@spl_token_bp.route('/api/spl-token/health-check/<mint_address>', methods=['GET'])
+def token_health_check(mint_address):
+    """Token健康检查"""
+    try:
+        logger.info(f"执行Token健康检查: {mint_address}")
+
+        health_data = {
+            'mint_address': mint_address,
+            'timestamp': time.time(),
+            'checks': {}
+        }
+
+        # 检查1: Mint账户是否存在
+        try:
+            from app.blockchain.solana_service import get_solana_client
+            from solders.pubkey import Pubkey
+
+            client = get_solana_client()
+            mint_pubkey = Pubkey.from_string(mint_address)
+            mint_info = client.get_account_info(mint_pubkey)
+
+            health_data['checks']['mint_account_exists'] = {
+                'status': 'pass' if mint_info.value else 'fail',
+                'message': 'Mint账户存在' if mint_info.value else 'Mint账户不存在'
+            }
+        except Exception as e:
+            health_data['checks']['mint_account_exists'] = {
+                'status': 'error',
+                'message': f'检查Mint账户失败: {str(e)}'
+            }
+
+        # 检查2: 数据库记录是否存在
+        try:
+            asset = Asset.query.filter_by(spl_mint_address=mint_address).first()
+            health_data['checks']['database_record'] = {
+                'status': 'pass' if asset else 'fail',
+                'message': '数据库记录存在' if asset else '数据库记录不存在',
+                'asset_id': asset.id if asset else None
+            }
+        except Exception as e:
+            health_data['checks']['database_record'] = {
+                'status': 'error',
+                'message': f'检查数据库记录失败: {str(e)}'
+            }
+
+        # 检查3: 供应量信息
+        supply_result = SplTokenService.get_token_supply_info(mint_address)
+        health_data['checks']['supply_info'] = {
+            'status': 'pass' if supply_result.get('success') else 'fail',
+            'message': '供应量信息正常' if supply_result.get('success') else supply_result.get('message', '获取供应量失败'),
+            'data': supply_result.get('data') if supply_result.get('success') else None
+        }
+
+        # 计算总体健康状态
+        all_checks = health_data['checks'].values()
+        passed_checks = sum(1 for check in all_checks if check['status'] == 'pass')
+        total_checks = len(all_checks)
+
+        health_data['overall_status'] = {
+            'status': 'healthy' if passed_checks == total_checks else 'degraded' if passed_checks > 0 else 'unhealthy',
+            'passed_checks': passed_checks,
+            'total_checks': total_checks,
+            'health_score': round((passed_checks / total_checks) * 100, 2) if total_checks > 0 else 0
+        }
+
+        return success_response(
+            data=health_data,
+            message="健康检查完成"
+        )
+
+    except Exception as e:
+        logger.error(f"Token健康检查API异常: {e}", exc_info=True)
+        return error_response(message=f"健康检查失败: {str(e)}")

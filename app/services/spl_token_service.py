@@ -1112,3 +1112,333 @@ class SplTokenService:
             3: 'failed'
         }
         return status_map.get(status_code, 'unknown')
+
+    @staticmethod
+    def get_token_statistics() -> Dict:
+        """
+        获取SPL Token统计信息
+
+        Returns:
+            dict: 包含各种统计信息的字典
+        """
+        operation_id = f"get_stats_{int(time.time())}"
+        logger.info(f"[{operation_id}] 开始获取SPL Token统计信息")
+
+        try:
+            # 从数据库获取基础统计信息
+            from sqlalchemy import func
+
+            # 总资产数量
+            total_assets = db.session.query(func.count(Asset.id)).scalar() or 0
+
+            # 已创建SPL Token的资产数量
+            assets_with_tokens = db.session.query(func.count(Asset.id)).filter(
+                Asset.spl_mint_address.isnot(None),
+                Asset.spl_mint_address != ''
+            ).scalar() or 0
+
+            # 各状态的Token数量
+            pending_tokens = db.session.query(func.count(Asset.id)).filter(
+                Asset.spl_creation_status == SplTokenService.CreationStatus.PENDING
+            ).scalar() or 0
+
+            creating_tokens = db.session.query(func.count(Asset.id)).filter(
+                Asset.spl_creation_status == SplTokenService.CreationStatus.CREATING
+            ).scalar() or 0
+
+            completed_tokens = db.session.query(func.count(Asset.id)).filter(
+                Asset.spl_creation_status == SplTokenService.CreationStatus.COMPLETED
+            ).scalar() or 0
+
+            failed_tokens = db.session.query(func.count(Asset.id)).filter(
+                Asset.spl_creation_status == SplTokenService.CreationStatus.FAILED
+            ).scalar() or 0
+
+            # 计算Token化率
+            tokenization_rate = (assets_with_tokens / total_assets * 100) if total_assets > 0 else 0
+
+            # 获取最近创建的Token
+            recent_tokens = db.session.query(Asset).filter(
+                Asset.spl_mint_address.isnot(None),
+                Asset.spl_created_at.isnot(None)
+            ).order_by(Asset.spl_created_at.desc()).limit(5).all()
+
+            recent_tokens_info = []
+            for asset in recent_tokens:
+                recent_tokens_info.append({
+                    'id': asset.id,
+                    'name': asset.name,
+                    'symbol': asset.token_symbol,
+                    'mint_address': asset.spl_mint_address,
+                    'created_at': asset.spl_created_at.isoformat() if asset.spl_created_at else None,
+                    'supply': asset.token_supply
+                })
+
+            statistics = {
+                'overview': {
+                    'total_assets': total_assets,
+                    'assets_with_tokens': assets_with_tokens,
+                    'tokenization_rate': round(tokenization_rate, 2)
+                },
+                'status_breakdown': {
+                    'pending': pending_tokens,
+                    'creating': creating_tokens,
+                    'completed': completed_tokens,
+                    'failed': failed_tokens
+                },
+                'recent_tokens': recent_tokens_info,
+                'generated_at': time.time()
+            }
+
+            logger.info(f"[{operation_id}] 统计信息获取成功")
+            return {
+                'success': True,
+                'data': statistics
+            }
+
+        except Exception as e:
+            logger.error(f"[{operation_id}] 获取统计信息失败: {e}", exc_info=True)
+            return {
+                'success': False,
+                'error': 'STATISTICS_ERROR',
+                'message': f'获取统计信息失败: {str(e)}'
+            }
+
+    @staticmethod
+    def get_token_supply_info(mint_address: str) -> Dict:
+        """
+        获取Token的供应量信息
+
+        Args:
+            mint_address: Token mint地址
+
+        Returns:
+            dict: 包含供应量信息的字典
+        """
+        operation_id = f"supply_info_{int(time.time())}"
+        logger.info(f"[{operation_id}] 获取Token供应量信息: {mint_address}")
+
+        try:
+            client = get_solana_client()
+            mint_pubkey = Pubkey.from_string(mint_address)
+
+            # 获取mint账户信息
+            mint_info = client.get_account_info(mint_pubkey)
+            if not mint_info.value:
+                return {
+                    'success': False,
+                    'error': 'MINT_NOT_FOUND',
+                    'message': f'Mint账户不存在: {mint_address}'
+                }
+
+            # 解析mint账户数据获取供应量
+            mint_data = mint_info.value.data
+            if len(mint_data) < 82:  # SPL Token mint账户至少82字节
+                return {
+                    'success': False,
+                    'error': 'INVALID_MINT_DATA',
+                    'message': 'Mint账户数据格式无效'
+                }
+
+            # 解析供应量（字节36-44，小端序）
+            supply_bytes = mint_data[36:44]
+            total_supply = int.from_bytes(supply_bytes, byteorder='little')
+
+            # 解析小数位数（字节44）
+            decimals = mint_data[44]
+
+            # 计算实际供应量
+            actual_supply = total_supply / (10 ** decimals)
+
+            return {
+                'success': True,
+                'data': {
+                    'mint_address': mint_address,
+                    'total_supply_raw': total_supply,
+                    'total_supply': actual_supply,
+                    'decimals': decimals,
+                    'formatted_supply': f"{actual_supply:,.0f}"
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"[{operation_id}] 获取供应量信息失败: {e}", exc_info=True)
+            return {
+                'success': False,
+                'error': 'SUPPLY_INFO_ERROR',
+                'message': f'获取供应量信息失败: {str(e)}'
+            }
+
+    @staticmethod
+    def get_token_holder_count(mint_address: str) -> Dict:
+        """
+        获取Token持有者数量（近似值）
+
+        Args:
+            mint_address: Token mint地址
+
+        Returns:
+            dict: 包含持有者数量信息的字典
+        """
+        operation_id = f"holder_count_{int(time.time())}"
+        logger.info(f"[{operation_id}] 获取Token持有者数量: {mint_address}")
+
+        try:
+            client = get_solana_client()
+            mint_pubkey = Pubkey.from_string(mint_address)
+
+            # 获取所有关联代币账户
+            # 注意：这个方法在主网上可能很慢，因为需要扫描大量账户
+            # 实际生产环境建议使用Solana RPC的getProgramAccounts API
+            # 或者使用Solscan/SolanaFM等第三方API
+
+            # 这里提供一个简化实现，实际应用中可能需要优化
+            response = client.get_program_accounts(
+                TOKEN_PROGRAM_ID,
+                encoding='base64',
+                filters=[
+                    {'memcmp': {'offset': 0, 'bytes': str(mint_pubkey)}},  # mint字段匹配
+                    {'dataSize': 165}  # Token账户固定大小
+                ]
+            )
+
+            if not response or not response.value:
+                holder_count = 0
+            else:
+                # 过滤出余额大于0的账户
+                holder_count = 0
+                for account in response.value:
+                    try:
+                        # 解析Token账户数据
+                        account_data = base64.b64decode(account.account.data[0])
+                        if len(account_data) >= 72:
+                            # 余额位于字节64-72（小端序）
+                            balance_bytes = account_data[64:72]
+                            balance = int.from_bytes(balance_bytes, byteorder='little')
+                            if balance > 0:
+                                holder_count += 1
+                    except Exception:
+                        continue
+
+            return {
+                'success': True,
+                'data': {
+                    'mint_address': mint_address,
+                    'holder_count': holder_count,
+                    'note': '此数据为近似值，可能不包含所有持有者'
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"[{operation_id}] 获取持有者数量失败: {e}", exc_info=True)
+            # 在出错时返回估算值（基于数据库记录）
+            try:
+                from app.models import Holding
+                asset = Asset.query.filter_by(spl_mint_address=mint_address).first()
+                if asset:
+                    db_holder_count = db.session.query(func.count(Holding.id)).filter(
+                        Holding.asset_id == asset.id,
+                        Holding.quantity > 0
+                    ).scalar() or 0
+
+                    return {
+                        'success': True,
+                        'data': {
+                            'mint_address': mint_address,
+                            'holder_count': db_holder_count,
+                            'note': '此数据基于数据库记录，可能不完全准确'
+                        }
+                    }
+            except Exception:
+                pass
+
+            return {
+                'success': False,
+                'error': 'HOLDER_COUNT_ERROR',
+                'message': f'获取持有者数量失败: {str(e)}'
+            }
+
+    @staticmethod
+    def monitor_token_activity(mint_address: str, hours: int = 24) -> Dict:
+        """
+        监控Token活动（转账、mint、burn等）
+
+        Args:
+            mint_address: Token mint地址
+            hours: 监控时间范围（小时）
+
+        Returns:
+            dict: 包含活动统计的字典
+        """
+        operation_id = f"monitor_{int(time.time())}"
+        logger.info(f"[{operation_id}] 监控Token活动: {mint_address}, 时间范围: {hours}小时")
+
+        try:
+            # 这里是一个简化实现
+            # 实际生产环境中，应该使用Solana的getSignaturesForAddress API
+            # 或者建立一个专门的事件监听系统
+
+            # 基于数据库的统计（作为降级方案）
+            from app.models import Trade
+            from datetime import datetime, timedelta
+
+            end_time = datetime.utcnow()
+            start_time = end_time - timedelta(hours=hours)
+
+            # 获取相关资产
+            asset = Asset.query.filter_by(spl_mint_address=mint_address).first()
+            if not asset:
+                return {
+                    'success': False,
+                    'error': 'ASSET_NOT_FOUND',
+                    'message': '未找到对应的资产记录'
+                }
+
+            # 统计交易活动
+            trades_count = db.session.query(func.count(Trade.id)).filter(
+                Trade.asset_id == asset.id,
+                Trade.created_at >= start_time,
+                Trade.created_at <= end_time
+            ).scalar() or 0
+
+            # 统计交易量
+            total_volume = db.session.query(func.sum(Trade.total)).filter(
+                Trade.asset_id == asset.id,
+                Trade.created_at >= start_time,
+                Trade.created_at <= end_time,
+                Trade.status == 2  # 已完成的交易
+            ).scalar() or 0
+
+            # 统计Token数量变化
+            token_amount_traded = db.session.query(func.sum(Trade.amount)).filter(
+                Trade.asset_id == asset.id,
+                Trade.created_at >= start_time,
+                Trade.created_at <= end_time,
+                Trade.status == 2  # 已完成的交易
+            ).scalar() or 0
+
+            activity_data = {
+                'mint_address': mint_address,
+                'monitoring_period': f'{hours} hours',
+                'period_start': start_time.isoformat(),
+                'period_end': end_time.isoformat(),
+                'activity_summary': {
+                    'total_transactions': trades_count,
+                    'total_volume_usdc': float(total_volume),
+                    'total_tokens_traded': int(token_amount_traded)
+                },
+                'note': '此数据基于数据库记录，不包含链上直接转账'
+            }
+
+            return {
+                'success': True,
+                'data': activity_data
+            }
+
+        except Exception as e:
+            logger.error(f"[{operation_id}] 监控Token活动失败: {e}", exc_info=True)
+            return {
+                'success': False,
+                'error': 'MONITORING_ERROR',
+                'message': f'监控Token活动失败: {str(e)}'
+            }

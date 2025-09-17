@@ -1,0 +1,783 @@
+{% extends "base_v6.html" %}
+
+{% block title %}投资组合 - RWA-HUB{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+/* 投资组合页面样式 */
+.portfolio-container {
+    min-height: 100vh;
+    background: var(--neutral-darker);
+    padding: 2rem 0;
+}
+
+.portfolio-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    padding-top: 2rem;
+}
+
+.portfolio-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 1rem;
+}
+
+.portfolio-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.stat-card {
+    background: var(--surface-glass);
+    backdrop-filter: blur(30px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-elevated);
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.tokens-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.token-card {
+    background: var(--surface-glass);
+    backdrop-filter: blur(30px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    padding: 2rem;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.token-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient-primary);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.token-card:hover::before {
+    opacity: 1;
+}
+
+.token-card:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-elevated);
+}
+
+.token-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.token-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--gradient-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.2rem;
+    margin-right: 1rem;
+}
+
+.token-info h3 {
+    color: var(--text-primary);
+    margin: 0 0 0.25rem 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.token-symbol {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.token-balance {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.balance-amount {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.balance-value {
+    color: var(--accent-green);
+    font-weight: 600;
+}
+
+.token-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.btn-token {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.btn-transfer {
+    background: var(--gradient-secondary);
+    color: white;
+}
+
+.btn-transfer:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 102, 204, 0.3);
+    color: white;
+}
+
+.btn-view {
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+}
+
+.btn-view:hover {
+    background: var(--surface-elevated);
+    color: var(--text-primary);
+}
+
+.empty-portfolio {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-secondary);
+}
+
+.empty-portfolio i {
+    font-size: 4rem;
+    margin-bottom: 2rem;
+    opacity: 0.5;
+}
+
+.loading-spinner {
+    text-align: center;
+    padding: 3rem;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--surface-elevated);
+    border-top: 4px solid var(--accent-cyan);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+    .portfolio-stats {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .tokens-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .token-actions {
+        flex-direction: column;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="portfolio-container">
+    <div class="container-fluid px-4">
+        <div class="portfolio-header">
+            <h1 class="portfolio-title">我的投资组合</h1>
+            <p style="color: var(--text-secondary); font-size: 1.1rem;">
+                查看您持有的资产代币和投资回报
+            </p>
+        </div>
+
+        <!-- 统计数据 -->
+        <div class="portfolio-stats" id="portfolioStats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalValue">--</div>
+                <div class="stat-label">投资组合总价值 (USDC)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalTokens">--</div>
+                <div class="stat-label">持有代币种类</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalBalance">--</div>
+                <div class="stat-label">总代币数量</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalReturn">--</div>
+                <div class="stat-label">总收益 (USDC)</div>
+            </div>
+        </div>
+
+        <!-- 代币列表 -->
+        <div id="tokensContainer">
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <p style="color: var(--text-secondary);">正在加载您的投资组合...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 投资组合管理
+class PortfolioManager {
+    constructor() {
+        this.userAddress = null;
+        this.tokens = [];
+        this.init();
+    }
+
+    async init() {
+        try {
+            // 获取用户钱包地址
+            this.userAddress = await this.getUserAddress();
+            if (!this.userAddress) {
+                this.showConnectWallet();
+                return;
+            }
+
+            // 加载投资组合数据
+            await this.loadPortfolio();
+        } catch (error) {
+            console.error('初始化投资组合失败:', error);
+            this.showError('初始化失败，请刷新页面重试');
+        }
+    }
+
+    async getUserAddress() {
+        // 检查是否已连接钱包
+        if (window.solana && window.solana.isPhantom) {
+            try {
+                const response = await window.solana.connect({ onlyIfTrusted: true });
+                return response.publicKey.toString();
+            } catch (error) {
+                console.log('用户尚未连接钱包');
+                return null;
+            }
+        }
+        return null;
+    }
+
+    async loadPortfolio() {
+        try {
+            // 获取用户持有的资产
+            const response = await fetch('/api/user/holdings');
+            if (!response.ok) {
+                throw new Error('获取持仓数据失败');
+            }
+
+            const data = await response.json();
+            const holdings = data.data || [];
+
+            // 获取每个资产的SPL Token余额
+            const tokenPromises = holdings.map(holding => this.loadTokenBalance(holding));
+            this.tokens = await Promise.all(tokenPromises);
+
+            // 过滤掉没有SPL Token的资产
+            this.tokens = this.tokens.filter(token => token.hasToken);
+
+            this.renderPortfolio();
+        } catch (error) {
+            console.error('加载投资组合失败:', error);
+            this.showError('加载投资组合失败');
+        }
+    }
+
+    async loadTokenBalance(holding) {
+        try {
+            // 获取资产的SPL Token信息
+            const asset = holding.asset;
+            if (!asset.spl_mint_address) {
+                return {
+                    ...holding,
+                    hasToken: false,
+                    balance: holding.amount,
+                    onChainBalance: 0
+                };
+            }
+
+            // 查询链上余额
+            const balanceResponse = await fetch(`/api/spl-token/balance/${this.userAddress}/${asset.spl_mint_address}`);
+            if (!balanceResponse.ok) {
+                throw new Error('查询余额失败');
+            }
+
+            const balanceData = await balanceResponse.json();
+            const onChainBalance = balanceData.data?.balance || 0;
+
+            return {
+                ...holding,
+                hasToken: true,
+                balance: holding.amount,
+                onChainBalance: onChainBalance,
+                tokenAddress: asset.spl_mint_address,
+                metadata_uri: asset.metadata_uri
+            };
+        } catch (error) {
+            console.error(`加载资产 ${holding.asset.token_symbol} 的Token余额失败:`, error);
+            return {
+                ...holding,
+                hasToken: false,
+                balance: holding.amount,
+                onChainBalance: 0
+            };
+        }
+    }
+
+    renderPortfolio() {
+        this.renderStats();
+        this.renderTokens();
+    }
+
+    renderStats() {
+        const totalValue = this.tokens.reduce((sum, token) => {
+            return sum + (token.onChainBalance * token.asset.token_price);
+        }, 0);
+
+        const totalTokens = this.tokens.length;
+        const totalBalance = this.tokens.reduce((sum, token) => sum + token.onChainBalance, 0);
+        const totalReturn = 0; // 暂时设为0，后续可以计算收益
+
+        document.getElementById('totalValue').textContent = totalValue.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+        document.getElementById('totalTokens').textContent = totalTokens;
+        document.getElementById('totalBalance').textContent = totalBalance.toLocaleString();
+        document.getElementById('totalReturn').textContent = totalReturn.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    renderTokens() {
+        const container = document.getElementById('tokensContainer');
+
+        if (this.tokens.length === 0) {
+            container.innerHTML = `
+                <div class="empty-portfolio">
+                    <i class="fas fa-wallet"></i>
+                    <h3>暂无代币持仓</h3>
+                    <p>您还没有购买任何资产代币</p>
+                    <a href="/" class="btn-token btn-transfer" style="display: inline-block; margin-top: 1rem;">
+                        开始投资
+                    </a>
+                </div>
+            `;
+            return;
+        }
+
+        const tokensHTML = this.tokens.map(token => this.renderTokenCard(token)).join('');
+        container.innerHTML = `<div class="tokens-grid">${tokensHTML}</div>`;
+    }
+
+    renderTokenCard(token) {
+        const asset = token.asset;
+        const value = token.onChainBalance * asset.token_price;
+        const balanceStatus = token.balance === token.onChainBalance ?
+            '<i class="fas fa-check-circle" style="color: var(--accent-green);"></i>' :
+            '<i class="fas fa-exclamation-triangle" style="color: var(--accent-orange);" title="数据库余额与链上余额不一致"></i>';
+
+        return `
+            <div class="token-card">
+                <div class="token-header">
+                    <div class="token-icon">
+                        <i class="fas fa-building"></i>
+                    </div>
+                    <div class="token-info">
+                        <h3>${asset.name}</h3>
+                        <div class="token-symbol">${asset.token_symbol}</div>
+                    </div>
+                </div>
+
+                <div class="token-balance">
+                    <div>
+                        <div class="balance-amount">${token.onChainBalance.toLocaleString()}</div>
+                        <div style="color: var(--text-secondary); font-size: 0.9rem;">
+                            链上余额 ${balanceStatus}
+                        </div>
+                    </div>
+                    <div class="balance-value">
+                        $${value.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        })}
+                    </div>
+                </div>
+
+                <div style="margin: 1rem 0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span style="color: var(--text-secondary); font-size: 0.9rem;">代币价格:</span>
+                        <span style="color: var(--text-primary);">$${asset.token_price}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span style="color: var(--text-secondary); font-size: 0.9rem;">年收益率:</span>
+                        <span style="color: var(--accent-green);">${((asset.annual_revenue / asset.token_price) * 100).toFixed(2)}%</span>
+                    </div>
+                    ${token.tokenAddress ? `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span style="color: var(--text-secondary); font-size: 0.9rem;">Token地址:</span>
+                            <a href="https://solscan.io/token/${token.tokenAddress}" target="_blank"
+                               style="color: var(--accent-cyan); text-decoration: none; font-size: 0.8rem;">
+                                ${token.tokenAddress.substring(0, 6)}...${token.tokenAddress.substring(token.tokenAddress.length - 4)}
+                            </a>
+                        </div>
+                    ` : ''}
+                </div>
+
+                <div class="token-actions">
+                    <button class="btn-token btn-transfer" onclick="transferToken('${token.tokenAddress}', '${asset.token_symbol}')">
+                        <i class="fas fa-paper-plane"></i> 转账
+                    </button>
+                    <a href="/assets/detail/${asset.id}" class="btn-token btn-view">
+                        <i class="fas fa-eye"></i> 详情
+                    </a>
+                </div>
+            </div>
+        `;
+    }
+
+    showConnectWallet() {
+        document.getElementById('tokensContainer').innerHTML = `
+            <div class="empty-portfolio">
+                <i class="fas fa-wallet"></i>
+                <h3>请连接钱包</h3>
+                <p>连接您的Solana钱包以查看投资组合</p>
+                <button id="connectWalletBtn" class="btn-token btn-transfer" style="margin-top: 1rem;">
+                    连接钱包
+                </button>
+            </div>
+        `;
+
+        document.getElementById('connectWalletBtn').addEventListener('click', async () => {
+            try {
+                if (window.solana && window.solana.isPhantom) {
+                    await window.solana.connect();
+                    location.reload();
+                } else {
+                    alert('请安装Phantom钱包');
+                }
+            } catch (error) {
+                console.error('连接钱包失败:', error);
+            }
+        });
+    }
+
+    showError(message) {
+        document.getElementById('tokensContainer').innerHTML = `
+            <div class="empty-portfolio">
+                <i class="fas fa-exclamation-circle"></i>
+                <h3>加载失败</h3>
+                <p>${message}</p>
+                <button onclick="location.reload()" class="btn-token btn-transfer" style="margin-top: 1rem;">
+                    重新加载
+                </button>
+            </div>
+        `;
+    }
+}
+
+// 转账功能
+function transferToken(tokenAddress, tokenSymbol) {
+    if (!tokenAddress) {
+        alert('Token地址无效');
+        return;
+    }
+
+    showTransferModal(tokenAddress, tokenSymbol);
+}
+
+// 显示转账模态框
+function showTransferModal(tokenAddress, tokenSymbol) {
+    const modalHtml = `
+        <div class="modal fade" id="transferModal" tabindex="-1" style="z-index: 10000;">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content" style="border-radius: 15px; border: none; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+                    <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 15px 15px 0 0; border: none;">
+                        <h5 class="modal-title">
+                            <i class="fas fa-paper-plane me-2"></i>转账 ${tokenSymbol} Token
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Token Address: <code>${tokenAddress}</code>
+                        </div>
+
+                        <form id="transferForm">
+                            <div class="mb-3">
+                                <label for="recipientAddress" class="form-label">接收方地址</label>
+                                <input type="text" class="form-control" id="recipientAddress"
+                                       placeholder="输入Solana钱包地址" required>
+                                <div class="form-text">请输入有效的Solana钱包地址</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="transferAmount" class="form-label">转账数量</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="transferAmount"
+                                           min="1" step="1" placeholder="0" required>
+                                    <span class="input-group-text">${tokenSymbol}</span>
+                                </div>
+                                <div class="form-text">
+                                    可用余额: <span id="availableBalance">--</span> ${tokenSymbol}
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="transferMemo" class="form-label">备注 (可选)</label>
+                                <input type="text" class="form-control" id="transferMemo"
+                                       placeholder="转账备注" maxlength="100">
+                                <div class="form-text">最多100个字符</div>
+                            </div>
+
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>重要提醒:</strong>
+                                <ul class="mb-0 mt-2">
+                                    <li>请仔细确认接收方地址，转账一旦发送无法撤销</li>
+                                    <li>转账将产生少量Solana网络费用</li>
+                                    <li>确保您的钱包中有足够的SOL支付手续费</li>
+                                </ul>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-primary" onclick="executeTransfer('${tokenAddress}', '${tokenSymbol}')"
+                                id="executeTransferBtn">
+                            <i class="fas fa-paper-plane me-2"></i>确认转账
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 移除现有模态框
+    const existingModal = document.getElementById('transferModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // 添加新模态框
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // 显示模态框
+    const modal = new bootstrap.Modal(document.getElementById('transferModal'));
+    modal.show();
+
+    // 加载用户余额
+    loadUserBalance(tokenAddress, tokenSymbol);
+}
+
+// 加载用户余额
+async function loadUserBalance(tokenAddress, tokenSymbol) {
+    const balanceElement = document.getElementById('availableBalance');
+    if (!balanceElement) return;
+
+    try {
+        balanceElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        // 获取当前用户地址
+        const userAddress = await getUserAddress();
+        if (!userAddress) {
+            balanceElement.textContent = '未连接钱包';
+            return;
+        }
+
+        // 查询余额
+        const response = await fetch(\`/api/spl-token/balance/\${userAddress}/\${tokenAddress}\`);
+        const result = await response.json();
+
+        if (result.success && result.data) {
+            const balance = result.data.balance || 0;
+            balanceElement.textContent = balance.toLocaleString();
+
+            // 设置转账输入框的最大值
+            const amountInput = document.getElementById('transferAmount');
+            if (amountInput) {
+                amountInput.max = balance;
+            }
+        } else {
+            balanceElement.textContent = '查询失败';
+        }
+
+    } catch (error) {
+        console.error('查询余额失败:', error);
+        balanceElement.textContent = '查询失败';
+    }
+}
+
+// 执行转账
+async function executeTransfer(tokenAddress, tokenSymbol) {
+    const form = document.getElementById('transferForm');
+    const executeBtn = document.getElementById('executeTransferBtn');
+
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+
+    const recipientAddress = document.getElementById('recipientAddress').value.trim();
+    const transferAmount = parseInt(document.getElementById('transferAmount').value);
+    const transferMemo = document.getElementById('transferMemo').value.trim();
+
+    // 基本验证
+    if (!recipientAddress || transferAmount <= 0) {
+        alert('请填写完整的转账信息');
+        return;
+    }
+
+    // 地址格式验证 (Solana地址通常是44个字符)
+    if (recipientAddress.length < 32 || recipientAddress.length > 50) {
+        alert('接收方地址格式不正确');
+        return;
+    }
+
+    // 确认转账
+    const confirmMessage = \`确认转账 \${transferAmount} \${tokenSymbol} 到地址:\\n\${recipientAddress}\\n\\n此操作无法撤销，是否继续？\`;
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+
+    const originalBtnHtml = executeBtn.innerHTML;
+
+    try {
+        executeBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>转账中...';
+        executeBtn.disabled = true;
+
+        // 获取当前用户地址
+        const userAddress = await getUserAddress();
+        if (!userAddress) {
+            throw new Error('请先连接钱包');
+        }
+
+        // 调用转账API
+        const response = await fetch('/api/spl-token/transfer', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Eth-Address': userAddress
+            },
+            body: JSON.stringify({
+                mint_address: tokenAddress,
+                from_address: userAddress,
+                to_address: recipientAddress,
+                amount: transferAmount,
+                memo: transferMemo
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // 转账成功
+            alert(\`转账成功！\\n交易哈希: \${result.data.tx_hash}\\n\\n请等待区块链确认...\`);
+
+            // 关闭模态框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('transferModal'));
+            modal.hide();
+
+            // 刷新页面数据
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+
+        } else {
+            throw new Error(result.message || '转账失败');
+        }
+
+    } catch (error) {
+        console.error('转账失败:', error);
+        alert(\`转账失败: \${error.message}\`);
+    } finally {
+        executeBtn.innerHTML = originalBtnHtml;
+        executeBtn.disabled = false;
+    }
+}
+
+// 获取用户地址 (复用现有函数或者简单实现)
+async function getUserAddress() {
+    // 尝试从钱包获取地址
+    if (window.solana && window.solana.isPhantom && window.solana.isConnected) {
+        try {
+            return window.solana.publicKey.toString();
+        } catch (error) {
+            console.error('获取钱包地址失败:', error);
+        }
+    }
+
+    // 从localStorage获取
+    return localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', () => {
+    new PortfolioManager();
+});
+</script>
+{% endblock %}

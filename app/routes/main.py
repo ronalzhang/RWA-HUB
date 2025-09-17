@@ -119,6 +119,31 @@ def index_v6():
                              csrf_token=generate_csrf,  # 添加CSRF token
                              _=_)
 
+@main_bp.route('/portfolio')
+def portfolio():
+    """用户投资组合页面"""
+    try:
+        # 获取当前用户的钱包地址
+        eth_address_header = request.headers.get('X-Eth-Address')
+        eth_address_cookie = request.cookies.get('eth_address')
+        eth_address_args = request.args.get('eth_address')
+
+        # 优先使用 Args > Header > Cookie
+        eth_address = eth_address_args or eth_address_header or eth_address_cookie
+
+        current_app.logger.info(f'投资组合页面 - 钱包地址: {eth_address}')
+
+        # 渲染投资组合页面
+        return render_template('portfolio.html',
+                             current_user_address=eth_address,
+                             _=_)
+
+    except Exception as e:
+        current_app.logger.error(f'加载投资组合页面失败: {str(e)}')
+        return render_template('portfolio.html',
+                             current_user_address=None,
+                             _=_)
+
 # 在文件末尾添加favicon路由
 @main_bp.route('/favicon.ico')
 def favicon():
