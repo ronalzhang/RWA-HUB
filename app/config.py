@@ -2,8 +2,8 @@ import os
 from datetime import timedelta
 from dotenv import load_dotenv
 
-# 尝试加载.env文件
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+# 尝试加载.env文件 - 修正路径到项目根目录
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
 
@@ -18,21 +18,11 @@ class Config:
     BABEL_DEFAULT_LOCALE = 'en'
     BABEL_DEFAULT_TIMEZONE = 'UTC'
     LANGUAGES = ['en', 'zh_Hant']
-    
-    # 管理员配置
-    ADMIN_CONFIG = {
-        '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b': {
-            'role': 'super_admin',
-            'name': 'SOL超级管理员',
-            'level': 1,
-            'permissions': ['审核', '编辑', '删除', '发布公告', '管理用户', '查看统计']
-        }
-    }
-    
-    # 写入ADMIN_ADDRESSES以向后兼容旧代码
-    ADMIN_ADDRESSES = list(ADMIN_CONFIG.keys())
-    
-    # 权限等级说明
+
+    # 管理员配置已移至数据库AdminUser模型，不再硬编码
+    # 如需添加管理员，请使用后台管理界面或数据库直接操作
+
+    # 权限等级说明（保留作为参考）
     PERMISSION_LEVELS = {
         '审核': 2,    # 副管理员及以上可审核
         '编辑': 2,    # 副管理员及以上可编辑
@@ -53,14 +43,13 @@ class Config:
     SOLANA_PROGRAM_ID = os.environ.get('SOLANA_PROGRAM_ID', '2TsURTNQXyqHLB2bfbzFME7HkSMLWueYPjqXBBy2u1wP')
     SOLANA_USDC_MINT = os.environ.get('SOLANA_USDC_MINT', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')  # Mainnet USDC
     
-    # Solana交易参数配置
-    PLATFORM_TREASURY_WALLET = os.environ.get('PLATFORM_TREASURY_WALLET', '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b')
+    # Solana交易参数配置 - 从环境变量获取，不硬编码
+    PLATFORM_TREASURY_WALLET = os.environ.get('PLATFORM_TREASURY_WALLET')
     PAYMENT_TOKEN_MINT_ADDRESS = os.environ.get('PAYMENT_TOKEN_MINT_ADDRESS', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')  # USDC mint address
     PAYMENT_TOKEN_DECIMALS = int(os.environ.get('PAYMENT_TOKEN_DECIMALS', 6))  # USDC has 6 decimals
-    
+
     # 平台费用地址现在通过ConfigManager动态获取，不再使用硬编码
-    # PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b')
-    PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS', '6UrwhN2rqQvo2tBfc9FZCdUbt9JLs3BJiEm7pv4NM41b')
+    PLATFORM_FEE_ADDRESS = os.environ.get('PLATFORM_FEE_ADDRESS')
     PLATFORM_FEE_RATE = float(os.environ.get('PLATFORM_FEE_RATE', 0.035))  # 3.5%平台费率
     PLATFORM_FEE_BASIS_POINTS = int(os.environ.get('PLATFORM_FEE_BASIS_POINTS', 350))  # 3.5%平台费率，以基点表示
     
@@ -70,6 +59,11 @@ class Config:
     
     ETH_RPC_URL = os.environ.get('ETH_RPC_URL', 'https://rpc.ankr.com/eth')
     ETH_USDC_CONTRACT = os.environ.get('ETH_USDC_CONTRACT', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
+
+    # SPL Token配置
+    PLATFORM_SPL_KEYPAIR = os.environ.get('PLATFORM_SPL_KEYPAIR')  # 加密的SPL Token平台私钥
+    CRYPTO_PASSWORD = os.environ.get('CRYPTO_PASSWORD')  # 加密密码
+    CRYPTO_SALT = os.environ.get('CRYPTO_SALT')  # 加密盐值
     
     # Redis缓存配置
     REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')

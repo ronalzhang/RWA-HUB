@@ -13,10 +13,22 @@ logger = logging.getLogger(__name__)
 
 class CryptoManager:
     """安全的加密管理器"""
-    
+
     def __init__(self):
         self.master_key = self._get_or_create_master_key()
         self.fernet = Fernet(self.master_key)
+
+    @staticmethod
+    def encrypt_data(data: str) -> str:
+        """静态方法：加密数据"""
+        manager = get_crypto_manager()
+        return manager.encrypt_private_key(data)
+
+    @staticmethod
+    def decrypt_data(encrypted_data: str) -> str:
+        """静态方法：解密数据"""
+        manager = get_crypto_manager()
+        return manager.decrypt_private_key(encrypted_data)
     
     def _get_or_create_master_key(self) -> bytes:
         """获取或创建主密钥"""

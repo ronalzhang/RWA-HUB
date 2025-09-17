@@ -10,6 +10,7 @@ from app.models import Asset, User, Trade, Holding, TradeStatus
 from app.blockchain.solana_service import get_solana_client, get_latest_blockhash_with_cache, validate_solana_address
 from app.services.transaction_monitor import transaction_monitor, TransactionStatus
 from app.services.log_aggregator import transaction_log_aggregator
+from app.services.spl_token_service import SplTokenService
 
 from solders.pubkey import Pubkey
 from solders.hash import Hash
@@ -705,7 +706,27 @@ class TradeServiceV3:
                 logger.debug(f"[{confirmation_id}] 准备提交数据库事务: 资产库存更新 + 交易状态更新 + 用户持仓更新")
                 db.session.commit()
                 logger.info(f"[{confirmation_id}] 数据库事务提交成功: TradeID={trade.id} 已完成，资产库存={asset.remaining_supply}，用户持仓={holding.quantity}")
-                
+
+                # 4. SPL Token处理阶段 - 在数据库事务成功后处理
+                logger.debug(f"[{confirmation_id}] 步骤4: 开始SPL Token处理")
+
+                try:
+                    spl_result = TradeServiceV3._handle_spl_token_for_purchase(
+                        asset,
+                        trade,
+                        user,
+                        confirmation_id
+                    )
+                    if spl_result['success']:
+                        logger.info(f"[{confirmation_id}] SPL Token处理成功: {spl_result.get('message', '')}")
+                    else:
+                        logger.warning(f"[{confirmation_id}] SPL Token处理失败（不影响购买结果）: {spl_result.get('message', '')}")
+                        # SPL Token处理失败不影响主购买流程，仅记录警告
+
+                except Exception as spl_e:
+                    logger.error(f"[{confirmation_id}] SPL Token处理阶段发生异常（不影响购买结果）: {spl_e}", exc_info=True)
+                    # SPL Token异常不影响主购买流程
+
             except SQLAlchemyError as e:
                 logger.error(f"[{confirmation_id}] 数据库SQLAlchemy错误，执行回滚: {e}", exc_info=True)
                 db.session.rollback()
@@ -1842,7 +1863,93 @@ class TradeServiceV3:
             
             logger.debug(f"{log_prefix}交易序列化验证完全通过")
             return True
-            
+
         except Exception as e:
             logger.error(f"{log_prefix}序列化验证过程中发生错误: {e}", exc_info=True)
             return False
+
+    @staticmethod
+    def _handle_spl_token_for_purchase(asset, trade, user, confirmation_id):
+        """
+        处理购买成功后的SPL Token创建和mint
+
+        Args:
+            asset: 资产对象
+            trade: 交易对象
+            user: 用户对象
+            confirmation_id: 确认ID（用于日志）
+
+        Returns:
+            dict: 包含处理结果的字典
+        """
+        spl_log_prefix = f"[{confirmation_id}][SPL]"
+        logger.info(f"{spl_log_prefix} 开始处理资产 {asset.token_symbol} 的SPL Token")
+
+        try:
+            # 1. 检查资产是否已有SPL Token
+            if not asset.spl_mint_address:
+                logger.info(f"{spl_log_prefix} 资产尚未创建SPL Token，开始创建...")
+
+                # 创建SPL Token
+                create_result = SplTokenService.create_asset_token(asset.id)
+                if not create_result.get('success'):
+                    logger.error(f"{spl_log_prefix} SPL Token创建失败: {create_result.get('message')}")
+                    return {
+                        'success': False,
+                        'message': f"SPL Token创建失败: {create_result.get('message')}"
+                    }
+
+                # 刷新资产数据以获取新的mint地址
+                db.session.refresh(asset)
+                logger.info(f"{spl_log_prefix} SPL Token创建成功: {asset.spl_mint_address}")
+
+            else:
+                logger.info(f"{spl_log_prefix} 资产已有SPL Token: {asset.spl_mint_address}")
+
+            # 2. Mint代币给用户
+            # 获取用户的Solana地址
+            user_address = user.solana_address or trade.trader_address
+            if not user_address:
+                logger.error(f"{spl_log_prefix} 无法获取用户Solana地址")
+                return {
+                    'success': False,
+                    'message': "无法获取用户Solana地址"
+                }
+
+            logger.info(f"{spl_log_prefix} 开始mint {trade.amount} 个代币给用户 {user_address}")
+
+            # Mint代币给用户
+            mint_result = SplTokenService.mint_tokens_to_user(
+                mint_address=asset.spl_mint_address,
+                user_address=user_address,
+                amount=trade.amount,
+                asset_id=asset.id
+            )
+
+            if not mint_result.get('success'):
+                logger.error(f"{spl_log_prefix} 代币mint失败: {mint_result.get('message')}")
+                return {
+                    'success': False,
+                    'message': f"代币mint失败: {mint_result.get('message')}"
+                }
+
+            logger.info(f"{spl_log_prefix} 代币mint成功: {mint_result.get('data', {}).get('tx_hash')}")
+
+            # 3. 记录SPL Token交易信息到trade记录（可选）
+            if mint_result.get('data', {}).get('tx_hash'):
+                # 可以在这里更新trade记录，添加spl_token_tx_hash字段
+                logger.debug(f"{spl_log_prefix} SPL Token mint交易哈希: {mint_result['data']['tx_hash']}")
+
+            return {
+                'success': True,
+                'message': f"成功为用户mint了 {trade.amount} 个 {asset.token_symbol} 代币",
+                'mint_address': asset.spl_mint_address,
+                'mint_tx_hash': mint_result.get('data', {}).get('tx_hash')
+            }
+
+        except Exception as e:
+            logger.error(f"{spl_log_prefix} SPL Token处理过程中发生异常: {e}", exc_info=True)
+            return {
+                'success': False,
+                'message': f"SPL Token处理异常: {str(e)}"
+            }

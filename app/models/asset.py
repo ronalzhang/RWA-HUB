@@ -79,6 +79,15 @@ class Asset(db.Model):
     approved_at = db.Column(db.DateTime)  # 审核通过时间
     approved_by = db.Column(db.String(64))  # 审核人地址
 
+    # SPL Token相关字段
+    spl_mint_address = db.Column(db.String(44), nullable=True, unique=True)  # 真正的SPL Token mint地址
+    mint_authority_keypair = db.Column(db.Text, nullable=True)  # 加密存储的mint权限私钥
+    freeze_authority_keypair = db.Column(db.Text, nullable=True)  # 加密存储的freeze权限私钥
+    metadata_uri = db.Column(db.String(500), nullable=True)  # Token元数据URI
+    spl_creation_status = db.Column(db.Integer, default=0)  # SPL Token创建状态 (0=待创建, 1=创建中, 2=完成, 3=失败)
+    spl_creation_tx_hash = db.Column(db.String(128), nullable=True)  # SPL Token创建交易哈希
+    spl_created_at = db.Column(db.DateTime, nullable=True)  # SPL Token创建时间
+
     # 上链进度跟踪
     deployment_in_progress = db.Column(db.Boolean, default=False)  # 标记上链操作是否正在进行中
     deployment_started_at = db.Column(db.DateTime, nullable=True)  # 记录上链操作开始时间

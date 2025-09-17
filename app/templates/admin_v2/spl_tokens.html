@@ -1,0 +1,516 @@
+{% extends "admin_v2/base.html" %}
+
+{% block title %}RWA-HUB 管理后台 - SPL Token管理{% endblock %}
+
+{% block page_title %}SPL Token管理{% endblock %}
+{% block page_subtitle %}管理平台的SPL Token创建、转移和销毁{% endblock %}
+
+{% block breadcrumb %}
+<li aria-current="page">
+    <div class="flex items-center">
+        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+        <span class="text-gray-500">SPL Token管理</span>
+    </div>
+</li>
+{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+.token-status-pending { color: #f59e0b; }
+.token-status-creating { color: #3b82f6; }
+.token-status-completed { color: #10b981; }
+.token-status-failed { color: #ef4444; }
+
+.token-card {
+    transition: all 0.3s ease;
+}
+
+.token-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.metadata-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    background-color: #e5e7eb;
+    color: #374151;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.metadata-badge.has-metadata {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.metadata-badge.no-metadata {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="splTokenManagement()" x-init="loadData()" x-cloak>
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-blue-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 mr-4">
+                    <i class="fas fa-coins text-blue-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-500">SPL Token总数</h3>
+                    <p class="text-2xl font-bold" x-text="stats.totalTokens || 0"></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-green-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 mr-4">
+                    <i class="fas fa-check-circle text-green-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-500">已创建Token</h3>
+                    <p class="text-2xl font-bold" x-text="stats.completedTokens || 0"></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-yellow-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-yellow-100 mr-4">
+                    <i class="fas fa-clock text-yellow-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-500">待创建Token</h3>
+                    <p class="text-2xl font-bold" x-text="stats.pendingTokens || 0"></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-purple-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100 mr-4">
+                    <i class="fas fa-tags text-purple-500"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-500">有元数据Token</h3>
+                    <p class="text-2xl font-bold" x-text="stats.tokensWithMetadata || 0"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div class="flex flex-wrap gap-4">
+            <button @click="showCreateTokenModal = true"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center">
+                <i class="fas fa-plus mr-2"></i>
+                创建SPL Token
+            </button>
+            <button @click="refreshData()"
+                    class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center">
+                <i class="fas fa-sync mr-2"></i>
+                刷新数据
+            </button>
+            <button @click="showMintTokenModal = true"
+                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center">
+                <i class="fas fa-coins mr-2"></i>
+                Mint Token
+            </button>
+            <button @click="showTransferModal = true"
+                    class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg flex items-center">
+                <i class="fas fa-exchange-alt mr-2"></i>
+                转移Token
+            </button>
+            <button @click="showBurnModal = true"
+                    class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center">
+                <i class="fas fa-fire mr-2"></i>
+                销毁Token
+            </button>
+        </div>
+    </div>
+
+    <!-- Token列表 -->
+    <div class="bg-white rounded-lg shadow-sm">
+        <div class="p-6 border-b border-gray-200">
+            <h3 class="text-lg font-semibold">SPL Token列表</h3>
+        </div>
+
+        <div class="p-6">
+            <template x-if="loading">
+                <div class="text-center py-8">
+                    <i class="fas fa-spinner fa-spin text-gray-400 text-2xl"></i>
+                    <p class="text-gray-500 mt-2">加载中...</p>
+                </div>
+            </template>
+
+            <template x-if="!loading && tokens.length === 0">
+                <div class="text-center py-8">
+                    <i class="fas fa-coins text-gray-400 text-4xl"></i>
+                    <p class="text-gray-500 mt-2">暂无SPL Token</p>
+                </div>
+            </template>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" x-show="!loading && tokens.length > 0">
+                <template x-for="token in tokens" :key="token.asset_id">
+                    <div class="token-card bg-gray-50 rounded-lg p-6 border">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h4 class="font-semibold text-lg" x-text="token.asset_symbol"></h4>
+                                <p class="text-gray-600" x-text="token.asset_name"></p>
+                            </div>
+                            <span class="px-2 py-1 rounded-full text-xs font-medium"
+                                  :class="{
+                                      'bg-yellow-100 text-yellow-800': token.creation_status === 'pending',
+                                      'bg-blue-100 text-blue-800': token.creation_status === 'creating',
+                                      'bg-green-100 text-green-800': token.creation_status === 'completed',
+                                      'bg-red-100 text-red-800': token.creation_status === 'failed'
+                                  }"
+                                  x-text="getStatusText(token.creation_status)">
+                            </span>
+                        </div>
+
+                        <div class="space-y-2 mb-4">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">资产ID:</span>
+                                <span x-text="token.asset_id"></span>
+                            </div>
+                            <template x-if="token.spl_mint_address">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-600">Mint地址:</span>
+                                    <span class="font-mono text-xs" x-text="token.spl_mint_address.substring(0, 8) + '...'"></span>
+                                </div>
+                            </template>
+                            <template x-if="token.on_chain_supply">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-600">链上供应量:</span>
+                                    <span x-text="token.on_chain_supply.total_supply || 0"></span>
+                                </div>
+                            </template>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">元数据:</span>
+                                <span class="metadata-badge"
+                                      :class="token.metadata_uri ? 'has-metadata' : 'no-metadata'"
+                                      x-text="token.metadata_uri ? '已有元数据' : '无元数据'">
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2">
+                            <template x-if="token.creation_status === 'pending'">
+                                <button @click="createToken(token.asset_id)"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs">
+                                    创建Token
+                                </button>
+                            </template>
+                            <template x-if="token.spl_mint_address">
+                                <button @click="viewTokenDetails(token)"
+                                        class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-xs">
+                                    查看详情
+                                </button>
+                            </template>
+                            <template x-if="token.spl_mint_address && !token.metadata_uri">
+                                <button @click="refreshMetadata(token.asset_id)"
+                                        class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs">
+                                    刷新元数据
+                                </button>
+                            </template>
+                            <template x-if="token.creation_tx_hash">
+                                <button @click="viewTransaction(token.creation_tx_hash)"
+                                        class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-xs">
+                                    查看交易
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建Token模态框 -->
+    <div x-show="showCreateTokenModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.away="showCreateTokenModal = false">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-lg font-semibold mb-4">创建SPL Token</h3>
+            <form @submit.prevent="submitCreateToken()">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">选择资产</label>
+                    <select x-model="createTokenForm.asset_id" required class="w-full border rounded-lg px-3 py-2">
+                        <option value="">请选择资产</option>
+                        <template x-for="asset in availableAssets" :key="asset.id">
+                            <option :value="asset.id" x-text="`${asset.token_symbol} - ${asset.name}`"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" @click="showCreateTokenModal = false"
+                            class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                        取消
+                    </button>
+                    <button type="submit"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                        创建
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Mint Token模态框 -->
+    <div x-show="showMintTokenModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.away="showMintTokenModal = false">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-lg font-semibold mb-4">Mint Token</h3>
+            <form @submit.prevent="submitMintToken()">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">选择资产</label>
+                    <select x-model="mintTokenForm.asset_id" required class="w-full border rounded-lg px-3 py-2">
+                        <option value="">请选择资产</option>
+                        <template x-for="token in completedTokens" :key="token.asset_id">
+                            <option :value="token.asset_id" x-text="`${token.asset_symbol} - ${token.asset_name}`"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">用户地址</label>
+                    <input type="text" x-model="mintTokenForm.user_address" required
+                           placeholder="Solana钱包地址"
+                           class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">数量</label>
+                    <input type="number" x-model="mintTokenForm.amount" required min="1"
+                           placeholder="mint数量"
+                           class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" @click="showMintTokenModal = false"
+                            class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                        取消
+                    </button>
+                    <button type="submit"
+                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                        Mint
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 其他模态框省略，类似结构 -->
+
+    <!-- 消息提示 -->
+    <div x-show="message"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform translate-y-2"
+         x-transition:enter-end="opacity-100 transform translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 transform translate-y-0"
+         x-transition:leave-end="opacity-0 transform translate-y-2"
+         class="fixed top-4 right-4 z-50 max-w-sm">
+        <div class="bg-white border-l-4 p-4 rounded-lg shadow-lg"
+             :class="{
+                 'border-green-500': messageType === 'success',
+                 'border-red-500': messageType === 'error',
+                 'border-yellow-500': messageType === 'warning'
+             }">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="text-sm"
+                       :class="{
+                           'fas fa-check-circle text-green-500': messageType === 'success',
+                           'fas fa-exclamation-circle text-red-500': messageType === 'error',
+                           'fas fa-exclamation-triangle text-yellow-500': messageType === 'warning'
+                       }"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm" x-text="message"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function splTokenManagement() {
+    return {
+        loading: false,
+        tokens: [],
+        availableAssets: [],
+        stats: {},
+        message: '',
+        messageType: 'success',
+
+        // 模态框控制
+        showCreateTokenModal: false,
+        showMintTokenModal: false,
+        showTransferModal: false,
+        showBurnModal: false,
+
+        // 表单数据
+        createTokenForm: {
+            asset_id: ''
+        },
+        mintTokenForm: {
+            asset_id: '',
+            user_address: '',
+            amount: ''
+        },
+
+        // 计算属性
+        get completedTokens() {
+            return this.tokens.filter(token => token.creation_status === 'completed');
+        },
+
+        async loadData() {
+            this.loading = true;
+            try {
+                // 并行加载数据
+                const [tokensResponse, assetsResponse] = await Promise.all([
+                    fetch('/api/admin/spl-token/list'),
+                    fetch('/api/admin/assets')
+                ]);
+
+                if (tokensResponse.ok) {
+                    const tokensData = await tokensResponse.json();
+                    this.tokens = tokensData.data || [];
+                    this.calculateStats();
+                }
+
+                if (assetsResponse.ok) {
+                    const assetsData = await assetsResponse.json();
+                    this.availableAssets = (assetsData.data || []).filter(asset =>
+                        asset.status === 2 && !asset.spl_mint_address
+                    );
+                }
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                this.showMessage('加载数据失败', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        calculateStats() {
+            this.stats = {
+                totalTokens: this.tokens.length,
+                completedTokens: this.tokens.filter(t => t.creation_status === 'completed').length,
+                pendingTokens: this.tokens.filter(t => t.creation_status === 'pending').length,
+                tokensWithMetadata: this.tokens.filter(t => t.metadata_uri).length
+            };
+        },
+
+        async createToken(assetId) {
+            try {
+                const response = await fetch('/api/admin/spl-token/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ asset_id: assetId })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    this.showMessage('SPL Token创建成功', 'success');
+                    await this.loadData();
+                } else {
+                    this.showMessage(data.message || '创建失败', 'error');
+                }
+            } catch (error) {
+                console.error('创建Token失败:', error);
+                this.showMessage('创建Token失败', 'error');
+            }
+        },
+
+        async submitCreateToken() {
+            await this.createToken(this.createTokenForm.asset_id);
+            this.showCreateTokenModal = false;
+            this.createTokenForm.asset_id = '';
+        },
+
+        async submitMintToken() {
+            try {
+                const response = await fetch('/api/admin/spl-token/mint', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.mintTokenForm)
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    this.showMessage('Token mint成功', 'success');
+                    this.showMintTokenModal = false;
+                    this.mintTokenForm = { asset_id: '', user_address: '', amount: '' };
+                } else {
+                    this.showMessage(data.message || 'Mint失败', 'error');
+                }
+            } catch (error) {
+                console.error('Mint Token失败:', error);
+                this.showMessage('Mint Token失败', 'error');
+            }
+        },
+
+        async refreshMetadata(assetId) {
+            try {
+                const response = await fetch('/api/admin/spl-token/refresh-metadata', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ asset_id: assetId })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    this.showMessage('元数据刷新成功', 'success');
+                    await this.loadData();
+                } else {
+                    this.showMessage(data.message || '刷新失败', 'error');
+                }
+            } catch (error) {
+                console.error('刷新元数据失败:', error);
+                this.showMessage('刷新元数据失败', 'error');
+            }
+        },
+
+        refreshData() {
+            this.loadData();
+        },
+
+        viewTokenDetails(token) {
+            if (token.spl_mint_address) {
+                window.open(`https://solscan.io/token/${token.spl_mint_address}`, '_blank');
+            }
+        },
+
+        viewTransaction(txHash) {
+            if (txHash) {
+                window.open(`https://solscan.io/tx/${txHash}`, '_blank');
+            }
+        },
+
+        getStatusText(status) {
+            const statusMap = {
+                'pending': '待创建',
+                'creating': '创建中',
+                'completed': '已完成',
+                'failed': '创建失败'
+            };
+            return statusMap[status] || '未知';
+        },
+
+        showMessage(text, type = 'success') {
+            this.message = text;
+            this.messageType = type;
+            setTimeout(() => {
+                this.message = '';
+            }, 5000);
+        }
+    }
+}
+</script>
+{% endblock %}
