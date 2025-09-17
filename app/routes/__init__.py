@@ -111,9 +111,9 @@ def register_blueprints(app):
     from .spl_token_routes import spl_token_bp
     app.register_blueprint(spl_token_bp)
 
-    # 注册系统配置管理蓝图
-    from .system_config_routes import system_config_bp
-    app.register_blueprint(system_config_bp)
+    # 注册系统配置管理蓝图 - 临时禁用以解决端点冲突
+    # from .system_config_routes import system_config_bp
+    # app.register_blueprint(system_config_bp)
 
     # 注册全局处理器
     register_global_handlers(app)
