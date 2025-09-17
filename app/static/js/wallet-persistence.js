@@ -186,26 +186,48 @@ class WalletPersistenceManager {
                 }
             };
 
-            // 更新连接按钮文本
-            const walletBtnText = document.getElementById('walletBtnText');
-            if (walletBtnText) {
-                walletBtnText.textContent = window.walletState.formatAddress(walletState.address);
-            }
+            // 更新连接按钮文本 - 使用统一的更新逻辑
+            this.updateWalletConnectedUI(walletState.address);
 
             // 设置cookie让后端知道钱包地址
             this.setWalletCookie(walletState.address);
 
-            // 更新其他可能的钱包UI元素
-            this.updateWalletUI(walletState.address);
-
             // 触发钱包连接事件
-            const event = new CustomEvent('walletRestored', { 
-                detail: { address: walletState.address, walletType: walletState.walletType } 
+            const event = new CustomEvent('walletRestored', {
+                detail: { address: walletState.address, walletType: walletState.walletType }
             });
             document.dispatchEvent(event);
 
+            console.log('🎯 钱包UI状态已恢复:', walletState.address);
+
         } catch (error) {
             console.error('❌ 恢复钱包UI失败:', error);
+        }
+    }
+
+    /**
+     * 更新钱包已连接状态的UI
+     */
+    updateWalletConnectedUI(address) {
+        try {
+            // 更新主要连接按钮
+            const walletBtnText = document.getElementById('walletBtnText');
+            if (walletBtnText && window.walletState?.formatAddress) {
+                walletBtnText.textContent = window.walletState.formatAddress(address);
+            }
+
+            // 更新下拉菜单中的地址显示
+            const walletAddressDisplay = document.getElementById('walletAddressDisplay');
+            if (walletAddressDisplay && window.walletState?.formatAddress) {
+                walletAddressDisplay.textContent = window.walletState.formatAddress(address);
+            }
+
+            // 更新其他钱包相关UI元素
+            this.updateWalletUI(address);
+
+            console.log('🔄 钱包UI已更新为已连接状态:', address);
+        } catch (error) {
+            console.error('❌ 更新钱包连接UI失败:', error);
         }
     }
 

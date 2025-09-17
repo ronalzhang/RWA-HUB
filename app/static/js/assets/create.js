@@ -98,61 +98,64 @@ function initializeCreatePage() {
 // 检查钱包连接状态
 function initializeWalletCheck() {
     console.log('执行钱包连接状态检查...');
-        const walletCheck = document.getElementById('walletCheck');
-        const formContent = document.getElementById('formContent');
-        
+    const walletCheck = document.getElementById('walletCheck');
+    const formContent = document.getElementById('formContent');
+
     if (!walletCheck || !formContent) {
         console.error('找不到钱包检查或表单内容元素');
         return;
     }
-    
-    // 先检查sessionStorage中是否有钱包信息（可能比walletState更可靠）
-    const sessionWalletAddress = sessionStorage.getItem('walletAddress');
-    const sessionWalletType = sessionStorage.getItem('walletType');
-    
-    // 然后检查localStorage中是否有钱包信息
-    const localWalletAddress = localStorage.getItem('walletAddress');
-    const localWalletType = localStorage.getItem('walletType');
-    
-    // 最后检查window.walletState
-    const walletStateConnected = window.walletState && window.walletState.connected && window.walletState.address;
-    
-    // 优先级：sessionStorage > localStorage > walletState
-    if (sessionWalletAddress && sessionWalletType) {
-        console.log('从sessionStorage找到钱包地址:', sessionWalletAddress);
-                walletCheck.style.display = 'none';
-                formContent.style.display = 'block';
-        
-        // 检查管理员状态
-        setTimeout(() => checkAdmin(sessionWalletAddress), 100);
-        return;
-            }
-    
-    if (localWalletAddress && localWalletType) {
-        console.log('从localStorage找到钱包地址:', localWalletAddress);
+
+    // 统一的钱包状态检查优先级，与purchase_handler_unified.js保持一致
+    let walletAddress = null;
+
+    // 优先级1: 检查全局钱包状态
+    if (window.walletState?.address && window.walletState?.connected) {
+        console.log('从全局walletState找到钱包地址:', window.walletState.address);
+        walletAddress = window.walletState.address;
+    }
+    // 优先级2: 检查Phantom钱包直接连接状态
+    else if (window.solana && window.solana.isConnected && window.solana.publicKey) {
+        walletAddress = window.solana.publicKey.toString();
+        console.log('从Phantom钱包直接获取地址:', walletAddress);
+    }
+    // 优先级3: 检查钱包持久化管理器
+    else if (window.walletPersistenceManager) {
+        const savedState = window.walletPersistenceManager.loadWalletState();
+        if (savedState && savedState.address && savedState.connected) {
+            console.log('从持久化管理器找到钱包地址:', savedState.address);
+            walletAddress = savedState.address;
+        }
+    }
+    // 优先级4: 检查localStorage (兼容性)
+    else {
+        const sessionWalletAddress = sessionStorage.getItem('walletAddress');
+        const localWalletAddress = localStorage.getItem('walletAddress') || localStorage.getItem('eth_address');
+
+        if (sessionWalletAddress) {
+            console.log('从sessionStorage找到钱包地址:', sessionWalletAddress);
+            walletAddress = sessionWalletAddress;
+        } else if (localWalletAddress) {
+            console.log('从localStorage找到钱包地址:', localWalletAddress);
+            walletAddress = localWalletAddress;
+        }
+    }
+
+    if (walletAddress) {
+        // 钱包已连接，显示表单
         walletCheck.style.display = 'none';
         formContent.style.display = 'block';
-        
+
         // 检查管理员状态
-        setTimeout(() => checkAdmin(localWalletAddress), 100);
-        return;
+        setTimeout(() => checkAdmin(walletAddress), 100);
+        console.log('✅ 钱包已连接，显示创建表单');
+    } else {
+        // 钱包未连接，显示连接提示
+        console.log('❌ 未找到已连接的钱包地址，显示连接提示');
+        walletCheck.style.display = 'block';
+        formContent.style.display = 'none';
     }
-    
-    if (walletStateConnected) {
-        console.log('从walletState找到钱包地址:', window.walletState.address);
-        walletCheck.style.display = 'none';
-        formContent.style.display = 'block';
-        
-        // 检查管理员状态
-        setTimeout(() => checkAdmin(window.walletState.address), 100);
-        return;
-    }
-    
-    // 如果上述三种方式都没有找到钱包地址，则显示钱包检查
-    console.log('未找到已连接的钱包地址，显示连接提示');
-    walletCheck.style.display = 'block';
-    formContent.style.display = 'none';
-    }
+}
 
     // 检查管理员状态
 function checkAdmin(address) {

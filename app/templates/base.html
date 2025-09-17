@@ -808,112 +808,8 @@
         });
         
         // Check for existing wallet connection on page load
-        checkForWalletConnectionOnLoad();
-        
-        function checkForWalletConnectionOnLoad() {
-            // Check URL parameters for Phantom redirect
-            const urlParams = new URLSearchParams(window.location.search);
-            const phantomPubkey = urlParams.get('phantom_encryption_public_key');
-            const phantomRedirect = urlParams.get('phantom_connect');
-            
-            // Also check for mobile deep link returns
-            const phantomConnected = urlParams.get('phantom_connected');
-            const phantomAddress = urlParams.get('phantom_address');
-            
-            if (phantomPubkey || phantomRedirect || phantomConnected || phantomAddress) {
-                console.log('Detected Phantom redirect, attempting to establish connection...');
-                // Clean URL immediately
-                window.history.replaceState({}, document.title, window.location.pathname);
-                
-                // Show connecting status
-                const walletBtnText = document.getElementById('walletBtnText');
-                if (walletBtnText) {
-                    walletBtnText.textContent = 'Connecting...';
-                }
-                
-                // Try to connect after a short delay
-                setTimeout(() => {
-                    if (window.solana && window.solana.isPhantom) {
-                        connectPhantomWallet();
-                    } else {
-                        // Retry connection detection for mobile
-                        let retries = 0;
-                        const retryInterval = setInterval(() => {
-                            retries++;
-                            if (window.solana && window.solana.isPhantom) {
-                                clearInterval(retryInterval);
-                                connectPhantomWallet();
-                            } else if (retries >= 10) {
-                                clearInterval(retryInterval);
-                                console.log('Phantom provider not detected after redirect');
-                                // Reset button text if connection failed
-                                if (walletBtnText) {
-                                    walletBtnText.textContent = 'Connect Wallet';
-                                }
-                                alert('Phantom wallet connection failed. Please try again.');
-                            }
-                        }, 500);
-                    }
-                }, 1000);
-                return;
-            }
-            
-            // Standard wallet connection check - 集成持久化管理器
-            if (window.solana && window.solana.isConnected) {
-                try {
-                    const address = window.solana.publicKey.toString();
-                    const walletState = {
-                        connected: true,
-                        isConnected: true,
-                        address: address,
-                        publicKey: window.solana.publicKey,
-                        walletType: 'phantom',
-                        formatAddress: function(addr) {
-                            return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
-                        },
-                        copyWalletAddress: function() {
-                            if (this.address) {
-                                navigator.clipboard.writeText(this.address).then(() => {
-                                    const successMsg = document.getElementById('copyAddressSuccess');
-                                    if (successMsg) {
-                                        successMsg.style.opacity = '1';
-                                        setTimeout(() => successMsg.style.opacity = '0', 2000);
-                                    }
-                                }).catch(() => {
-                                    alert('Address: ' + this.address);
-                                });
-                            }
-                        }
-                    };
-                    
-                    window.walletState = walletState;
-                    
-                    // 保存到localStorage
-                    if (window.walletPersistenceManager) {
-                        window.walletPersistenceManager.saveWalletState(walletState);
-                    }
-                    
-                    // Update UI
-                    const walletBtnText = document.getElementById('walletBtnText');
-                    if (walletBtnText) {
-                        walletBtnText.textContent = walletState.formatAddress(address);
-                    }
-                    
-                    // Update wallet address display in dropdown
-                    const walletAddressDisplay = document.getElementById('walletAddressDisplay');
-                    if (walletAddressDisplay) {
-                        walletAddressDisplay.textContent = walletState.formatAddress(address);
-                    }
-
-                    console.log('Auto-detected connected wallet:', address);
-
-                    // 检查管理员权限
-                    checkAdminStatus(address);
-                } catch (error) {
-                    console.log('No auto-connected wallet detected');
-                }
-            }
-        }
+        initializeWalletConnection();
+    });
         
         // Initialize wallet button state - don't load asset data immediately to improve homepage performance
         if (window.walletState && window.walletState.address) {
@@ -1197,9 +1093,11 @@
         tryLoadNext();
     })();
     </script>
-    
+
     <!-- SPL Token 库（预加载以解决竞态条件） -->
     <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
+    <!-- 统一钱包管理器 - 必须在其他钱包相关脚本之前加载 -->
+    <script src="{{ url_for('static', filename='js/wallet-unified-manager.js') }}"></script>
     <!-- 钱包持久化管理器 -->
     <script src="{{ url_for('static', filename='js/wallet-persistence.js') }}"></script>
     <!-- 统一购买处理器 -->
@@ -1488,134 +1386,192 @@
             }
         }
 
-        // Connect to Phantom wallet
+        // Connect to Phantom wallet - 使用统一管理器
         async function connectPhantomWallet() {
             try {
+                console.log('🔗 开始连接Phantom钱包 (使用统一管理器)...');
+
+                // 使用统一钱包管理器进行连接
+                if (window.unifiedWalletManager) {
+                    const success = await window.unifiedWalletManager.connectWallet('phantom');
+                    if (success) {
+                        console.log('✅ Phantom钱包连接成功');
+                        return;
+                    }
+                } else if (window.connectWallet) {
+                    // 备用方案：使用全局连接函数
+                    const success = await window.connectWallet('phantom');
+                    if (success) {
+                        console.log('✅ Phantom钱包连接成功 (备用方案)');
+                        return;
+                    }
+                }
+
+                // 如果统一管理器不可用，回退到基本连接逻辑
+                console.log('⚠️ 统一管理器不可用，使用基本连接逻辑');
+
+                if (!window.solana?.isPhantom) {
+                    throw new Error('Phantom钱包未安装或不可用');
+                }
+
                 const walletBtnText = document.getElementById('walletBtnText');
-                
-                // Show connecting status
                 if (walletBtnText) {
                     walletBtnText.textContent = 'Connecting...';
                 }
-                
-                if (!window.solana || !window.solana.isPhantom) {
-                    if (walletBtnText) {
-                        walletBtnText.textContent = 'Connect Wallet';
-                    }
-                    alert('Phantom wallet not detected. Please install Phantom first.');
-                    return;
-                }
 
-                const resp = await window.solana.connect();
-                const address = resp.publicKey.toString();
-                
-                // Update wallet state - 集成持久化
+                const response = await window.solana.connect();
+                const address = response.publicKey.toString();
+
+                // 手动创建钱包状态（作为备用）
                 const walletState = {
                     connected: true,
                     isConnected: true,
                     address: address,
-                    publicKey: resp.publicKey,
+                    publicKey: response.publicKey,
                     walletType: 'phantom',
                     formatAddress: function(addr) {
                         return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
-                    },
-                    copyWalletAddress: function() {
-                        if (this.address) {
-                            navigator.clipboard.writeText(this.address).then(() => {
-                                const successMsg = document.getElementById('copyAddressSuccess');
-                                if (successMsg) {
-                                    successMsg.style.opacity = '1';
-                                    setTimeout(() => successMsg.style.opacity = '0', 2000);
-                                }
-                            }).catch(() => {
-                                alert('Address: ' + this.address);
-                            });
-                        }
                     }
                 };
-                
-                window.walletState = walletState;
-                
-                // 保存到localStorage
-                if (window.walletPersistenceManager) {
-                    window.walletPersistenceManager.saveWalletState(walletState);
-                }
 
-                // Update UI with connected address
+                window.walletState = walletState;
+
+                // 更新UI
                 if (walletBtnText) {
                     walletBtnText.textContent = walletState.formatAddress(address);
                 }
-                
-                // Update wallet address display in dropdown
-                const walletAddressDisplay = document.getElementById('walletAddressDisplay');
-                if (walletAddressDisplay) {
-                    walletAddressDisplay.textContent = walletState.formatAddress(address);
-                }
 
-                console.log('Wallet connected successfully:', address);
+                console.log('✅ Phantom钱包连接成功 (基本逻辑):', address);
 
-                // 检查管理员权限
-                checkAdminStatus(address);
-                
             } catch (error) {
-                console.error('Failed to connect wallet:', error);
-                
-                // Reset button text on error
+                console.error('❌ Phantom钱包连接失败:', error);
+
                 const walletBtnText = document.getElementById('walletBtnText');
                 if (walletBtnText) {
                     walletBtnText.textContent = 'Connect Wallet';
                 }
-                
-                // Check if user rejected the connection
-                if (error.message && error.message.includes('User rejected')) {
-                    alert('Wallet connection was cancelled.');
+
+                if (error.code === 4001) {
+                    console.log('用户拒绝了连接请求');
                 } else {
-                    alert('Failed to connect wallet. Please try again.');
+                    alert('Failed to connect wallet: ' + error.message);
                 }
             }
         }
 
-        // Disconnect wallet
-        function disconnectWallet() {
-            try {
-                if (window.solana && window.solana.disconnect) {
-                    window.solana.disconnect();
-                }
-                
-                // Clear wallet state
-                window.walletState = {
-                    connected: false,
-                    isConnected: false,
-                    address: null,
-                    publicKey: null
-                };
+        // Initialize wallet connection check - 使用统一管理器
+        function initializeWalletConnection() {
+            console.log('🚀 初始化钱包连接检查 (使用统一管理器)');
 
-                // 清除localStorage中的状态
-                if (window.walletPersistenceManager) {
-                    window.walletPersistenceManager.clearWalletState();
+            // 延迟初始化，确保所有脚本都已加载
+            setTimeout(() => {
+                if (window.unifiedWalletManager) {
+                    console.log('✅ 统一钱包管理器已可用');
+                    // 统一管理器会自动处理初始连接检查
+                } else {
+                    console.log('⚠️ 统一钱包管理器不可用，使用基本检查');
+                    checkBasicWalletConnection();
                 }
+            }, 1000);
+        }
 
-                // Update UI
+        // 基本钱包连接检查（备用方案）
+        function checkBasicWalletConnection() {
+            // 检查Phantom重定向参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const phantomPubkey = urlParams.get('phantom_encryption_public_key');
+            const phantomRedirect = urlParams.get('phantom_redirect');
+            const phantomConnected = urlParams.get('phantom_connected');
+            const phantomAddress = urlParams.get('phantom_address');
+
+            if (phantomPubkey || phantomRedirect || phantomConnected || phantomAddress) {
+                console.log('检测到Phantom重定向，尝试建立连接...');
+                window.history.replaceState({}, document.title, window.location.pathname);
+
                 const walletBtnText = document.getElementById('walletBtnText');
                 if (walletBtnText) {
-                    walletBtnText.textContent = 'Connect Wallet';
+                    walletBtnText.textContent = 'Connecting...';
                 }
 
-                // 隐藏管理员入口
-                hideAdminEntry();
+                setTimeout(() => {
+                    if (window.solana && window.solana.isPhantom) {
+                        connectPhantomWallet();
+                    } else {
+                        console.log('Phantom provider not detected after redirect');
+                        if (walletBtnText) {
+                            walletBtnText.textContent = 'Connect Wallet';
+                        }
+                    }
+                }, 1000);
+                return;
+            }
 
-                console.log('Wallet disconnected');
-                
-            } catch (error) {
-                console.error('Failed to disconnect wallet:', error);
+            // 标准钱包连接检查
+            if (window.solana && window.solana.isConnected) {
+                try {
+                    const address = window.solana.publicKey.toString();
+                    console.log('检测到已连接的钱包:', address);
+
+                    // 手动创建钱包状态
+                    const walletState = {
+                        connected: true,
+                        isConnected: true,
+                        address: address,
+                        publicKey: window.solana.publicKey,
+                        walletType: 'phantom',
+                        formatAddress: function(addr) {
+                            return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
+                        }
+                    };
+
+                    window.walletState = walletState;
+
+                    // 更新UI
+                    const walletBtnText = document.getElementById('walletBtnText');
+                    if (walletBtnText) {
+                        walletBtnText.textContent = walletState.formatAddress(address);
+                    }
+
+                    console.log('钱包状态已恢复:', address);
+                } catch (error) {
+                    console.log('未检测到自动连接的钱包');
+                }
             }
         }
 
-        // Disconnect wallet and close menu
+        // 断开钱包连接 - 使用统一管理器
+        function disconnectWallet() {
+            console.log('🔌 断开钱包连接...');
+
+            if (window.unifiedWalletManager) {
+                window.unifiedWalletManager.disconnectWallet();
+            } else if (window.disconnectWallet) {
+                window.disconnectWallet();
+            } else {
+                // 基本断开逻辑
+                try {
+                    if (window.solana?.disconnect) {
+                        window.solana.disconnect();
+                    }
+
+                    window.walletState = null;
+
+                    const walletBtnText = document.getElementById('walletBtnText');
+                    if (walletBtnText) {
+                        walletBtnText.textContent = 'Connect Wallet';
+                    }
+
+                    console.log('钱包已断开连接 (基本逻辑)');
+                } catch (error) {
+                    console.error('断开钱包连接失败:', error);
+                }
+            }
+        }
+
+        // 断开钱包并关闭菜单
         function disconnectAndCloseMenu() {
             disconnectWallet();
-            
-            // Close wallet menu
+
             const walletMenu = document.getElementById('walletMenu');
             if (walletMenu) {
                 walletMenu.classList.remove('show');
@@ -1623,14 +1579,13 @@
             }
         }
 
-        // Switch wallet (reconnect)
+        // 切换钱包（重新连接）
         function switchWalletAndCloseMenu() {
             disconnectWallet();
             setTimeout(() => {
                 openWalletSelector();
             }, 500);
-            
-            // Close wallet menu
+
             const walletMenu = document.getElementById('walletMenu');
             if (walletMenu) {
                 walletMenu.classList.remove('show');

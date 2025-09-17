@@ -68,11 +68,117 @@ if (window.purchaseHandlerInitialized) {
             };
         }
 
-        // 获取钱包地址
+        // 获取钱包地址 - 统一版本，与wallet-persistence.js保持一致
         getWalletAddress() {
-            return window.walletState?.address ||
-                localStorage.getItem('walletAddress') ||
-                (window.solana && window.solana.publicKey ? window.solana.publicKey.toString() : null);
+            // 优先级1: 检查全局钱包状态
+            if (window.walletState?.address && window.walletState?.connected) {
+                console.log('从全局walletState获取地址:', window.walletState.address);
+                return window.walletState.address;
+            }
+
+            // 优先级2: 检查Phantom钱包直接连接状态
+            if (window.solana && window.solana.isConnected && window.solana.publicKey) {
+                const address = window.solana.publicKey.toString();
+                console.log('从Phantom钱包直接获取地址:', address);
+
+                // 同步更新全局状态和持久化
+                this.syncWalletState(address, window.solana.publicKey);
+                return address;
+            }
+
+            // 优先级3: 检查钱包持久化管理器
+            if (window.walletPersistenceManager) {
+                const savedState = window.walletPersistenceManager.loadWalletState();
+                if (savedState && savedState.address && savedState.connected) {
+                    console.log('从持久化管理器获取地址:', savedState.address);
+                    return savedState.address;
+                }
+            }
+
+            // 优先级4: 检查localStorage存储的地址 (兼容性)
+            const storedAddress = localStorage.getItem('walletAddress') ||
+                                localStorage.getItem('eth_address');
+            if (storedAddress) {
+                console.log('从localStorage获取地址:', storedAddress);
+                return storedAddress;
+            }
+
+            // 优先级5: 检查Cookie中的地址 (兼容性)
+            const cookieAddress = this.getCookieValue('eth_address');
+            if (cookieAddress) {
+                console.log('从Cookie获取地址:', cookieAddress);
+                return cookieAddress;
+            }
+
+            console.log('未找到任何有效的钱包地址');
+            return null;
+        }
+
+        // 同步钱包状态到全局和持久化
+        syncWalletState(address, publicKey) {
+            try {
+                const walletState = {
+                    connected: true,
+                    isConnected: true,
+                    address: address,
+                    publicKey: publicKey,
+                    walletType: 'phantom',
+                    formatAddress: function(addr) {
+                        return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
+                    },
+                    copyWalletAddress: function() {
+                        if (this.address) {
+                            navigator.clipboard.writeText(this.address).then(() => {
+                                const successMsg = document.getElementById('copyAddressSuccess');
+                                if (successMsg) {
+                                    successMsg.style.opacity = '1';
+                                    setTimeout(() => successMsg.style.opacity = '0', 2000);
+                                }
+                            }).catch(() => {
+                                alert('Address: ' + this.address);
+                            });
+                        }
+                    }
+                };
+
+                // 更新全局状态
+                window.walletState = walletState;
+
+                // 保存到持久化管理器
+                if (window.walletPersistenceManager) {
+                    window.walletPersistenceManager.saveWalletState(walletState);
+                }
+
+                // 更新UI显示
+                this.updateWalletUI(address);
+
+                console.log('钱包状态已同步:', address);
+            } catch (error) {
+                console.error('同步钱包状态失败:', error);
+            }
+        }
+
+        // 更新钱包UI显示
+        updateWalletUI(address) {
+            try {
+                const walletBtnText = document.getElementById('walletBtnText');
+                if (walletBtnText && window.walletState && window.walletState.formatAddress) {
+                    walletBtnText.textContent = window.walletState.formatAddress(address);
+                }
+
+                const walletAddressDisplay = document.getElementById('walletAddressDisplay');
+                if (walletAddressDisplay && window.walletState && window.walletState.formatAddress) {
+                    walletAddressDisplay.textContent = window.walletState.formatAddress(address);
+                }
+            } catch (error) {
+                console.error('更新钱包UI失败:', error);
+            }
+        }
+
+        // 辅助函数：从Cookie获取值
+        getCookieValue(name) {
+            const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+            return match ? match[2] : null;
         }
 
         // 显示错误消息
