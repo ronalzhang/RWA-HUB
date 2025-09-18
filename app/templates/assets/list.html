@@ -2,6 +2,22 @@
 
 {% block title %}{{ _('Asset List') }} - RWA-HUB{% endblock %}
 
+{% block styles %}
+<style>
+.asset-value-text {
+    display: inline-block;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+.card-body {
+    min-height: 180px; /* 确保卡片最小高度一致 */
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container py-5 asset-list-page">
     <!-- 标题和创建按钮 -->
@@ -79,17 +95,17 @@
                             {% if asset.asset_type == 10 %}
                             <p class="card-text mb-2">
                                 <span class="text-muted">{{ _('Area') }}：</span>
-                                <span class="fw-bold text-dark">{{ asset.area|number_format(field_name='area') }} ㎡</span>
+                                <span class="fw-bold text-dark text-nowrap">{{ asset.area|number_format(field_name='area') }} ㎡</span>
                             </p>
                             {% else %}
                             <p class="card-text mb-2">
                                 <span class="text-muted">{{ _('Total Value') }}：</span>
-                                <span class="fw-bold text-dark">{{ asset.total_value|number_format(field_name='total_value') }} USDC</span>
+                                <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|compact_number(field_name='total_value', asset_type=asset.asset_type) }} USDC</span>
                             </p>
                             {% endif %}
                             <p class="card-text mb-3">
                                 <span class="text-muted">{{ _('Token Price') }}：</span>
-                                <span class="fw-bold text-primary">{{ asset.token_price|number_format(field_name='token_price') }} USDC</span>
+                                <span class="fw-bold text-primary text-nowrap">{{ asset.token_price|number_format(field_name='token_price') }} USDC</span>
                             </p>
 
                             <!-- Progress bar for remaining supply -->

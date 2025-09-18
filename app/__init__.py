@@ -92,7 +92,7 @@ def create_app(config_name='development'):
                         else:
                             # 对于非整数的供应量（理论上不应该，但做兼容处理），保留2位小数
                             return "{:,.2f}".format(float_value)
-                
+
                 # 如果没有提供字段名或不匹配任何规则，使用默认格式化
                 # 检查是否为整数或可以无损转换为整数
                 float_value = float(value)
@@ -101,12 +101,37 @@ def create_app(config_name='development'):
                 else:
                     # 默认保留2位小数
                     return "{:,.2f}".format(float_value)
-            
+
             # 如果输入不是数字类型，直接返回原值
             return value
         except (ValueError, TypeError) as e:
             app.logger.error(f"格式化数字出错 (field: {field_name}, value: {value}): {str(e)}")
             return value # 出错时返回原值
+
+    @app.template_filter('compact_number')
+    def compact_number_filter(value, field_name=None, asset_type=None):
+        """使用K/M单位格式化大数值，只对类不动产(asset_type=20)的total_value使用"""
+        try:
+            if isinstance(value, (int, float, Decimal)):
+                float_value = float(value)
+
+                # 只对类不动产(COMMERCIAL=20)的总价值使用紧凑格式
+                if (field_name and 'total_value' in field_name and
+                    asset_type and asset_type == 20):  # 20 = COMMERCIAL 类不动产
+                    if abs(float_value) >= 1000000:
+                        return f"{float_value/1000000:.1f}M"
+                    elif abs(float_value) >= 1000:
+                        return f"{float_value/1000:.1f}K"
+                    else:
+                        return f"{float_value:.2f}"
+                else:
+                    # 其他情况使用原格式
+                    return number_format_filter(value, field_name)
+
+            return value
+        except (ValueError, TypeError) as e:
+            app.logger.error(f"紧凑格式化数字出错 (field: {field_name}, value: {value}, asset_type: {asset_type}): {str(e)}")
+            return value
             
     @app.template_filter('from_json')
     def from_json_filter(value):
