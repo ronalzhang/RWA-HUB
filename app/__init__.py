@@ -110,14 +110,14 @@ def create_app(config_name='development'):
 
     @app.template_filter('compact_number')
     def compact_number_filter(value, field_name=None, asset_type=None):
-        """使用K/M单位格式化大数值，只对类不动产(asset_type=20)的total_value使用"""
+        """使用K/M单位格式化大数值，对证券资产(20)和类不动产(30)的total_value使用"""
         try:
             if isinstance(value, (int, float, Decimal)):
                 float_value = float(value)
 
-                # 只对类不动产(COMMERCIAL=20)的总价值使用紧凑格式
+                # 对证券资产(SECURITIES=20)和类不动产(COMMERCIAL=30)的总价值使用紧凑格式
                 if (field_name and 'total_value' in field_name and
-                    asset_type and asset_type == 20):  # 20 = COMMERCIAL 类不动产
+                    asset_type and asset_type in [20, 30]):  # 20=证券资产, 30=类不动产
                     if abs(float_value) >= 1000000:
                         return f"{float_value/1000000:.1f}M"
                     elif abs(float_value) >= 1000:

@@ -12,10 +12,10 @@ from app.utils.validation_utils import ValidationUtils, ValidationError
 
 class AssetType(enum.Enum):
     REAL_ESTATE = 10        # 不动产
-    COMMERCIAL = 20         # 类不动产
-    INDUSTRIAL = 30         # 工业地产
+    SECURITIES = 20         # 证券资产（股票、ETF等金融类资产）
+    COMMERCIAL = 30         # 类不动产
     LAND = 40               # 土地资产
-    SECURITIES = 50         # 证券资产
+    INDUSTRIAL = 50         # 工业地产
     ART = 60                # 艺术品
     COLLECTIBLES = 70       # 收藏品
     OTHER = 99              # 其他资产

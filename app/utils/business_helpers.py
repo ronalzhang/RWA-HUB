@@ -103,10 +103,10 @@ class AssetBusinessHelper:
         if re.search(r'[\u4e00-\u9fff]', clean_name):
             type_prefixes = {
                 AssetType.REAL_ESTATE.value: 'RE',
-                AssetType.COMMERCIAL.value: 'CM',
-                AssetType.INDUSTRIAL.value: 'IN',
+                AssetType.SECURITIES.value: 'SE',     # 证券资产（20）
+                AssetType.COMMERCIAL.value: 'CM',     # 类不动产（30）
                 AssetType.LAND.value: 'LD',
-                AssetType.SECURITIES.value: 'SE',
+                AssetType.INDUSTRIAL.value: 'IN',     # 工业地产（50）
                 AssetType.ART.value: 'AR',
                 AssetType.COLLECTIBLES.value: 'CO'
             }

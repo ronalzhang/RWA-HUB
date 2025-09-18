@@ -101,8 +101,14 @@
                                 <div class="position-absolute top-0 end-0 m-2">
                                     {% if asset.asset_type == 10 %}
                                     <span class="badge bg-primary">{{ _('Real Estate') }}</span>
+                                    {% elif asset.asset_type == 20 %}
+                                    <span class="badge bg-success">{{ _('Securities') }}</span>
+                                    {% elif asset.asset_type == 30 %}
+                                    <span class="badge bg-info">{{ _('Commercial') }}</span>
+                                    {% elif asset.asset_type == 50 %}
+                                    <span class="badge bg-warning">{{ _('Industrial') }}</span>
                                     {% else %}
-                                    <span class="badge bg-info">{{ _('Similar Assets') }}</span>
+                                    <span class="badge bg-secondary">{{ _('Other Assets') }}</span>
                                     {% endif %}
                                 </div>
                             </div>
@@ -121,10 +127,15 @@
                                     <span class="text-muted">{{ _('Area') }}：</span>
                                     <span class="fw-bold text-dark text-nowrap">{{ asset.area|number_format(field_name='area') }} ㎡</span>
                                 </p>
-                                {% else %}
+                                {% elif asset.asset_type in [20, 30] %}
                                 <p class="card-text mb-2">
                                     <span class="text-muted">{{ _('Total Value') }}：</span>
                                     <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|compact_number(field_name='total_value', asset_type=asset.asset_type) }} USDC</span>
+                                </p>
+                                {% else %}
+                                <p class="card-text mb-2">
+                                    <span class="text-muted">{{ _('Total Value') }}：</span>
+                                    <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|number_format(field_name='total_value') }} USDC</span>
                                 </p>
                                 {% endif %}
                                 <p class="card-text mb-3">

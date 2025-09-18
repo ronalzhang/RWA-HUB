@@ -83,10 +83,15 @@
                                 <span class="text-muted">面积：</span>
                                 <span class="fw-bold text-dark text-nowrap">{{ asset.area|number_format }} ㎡</span>
                             </p>
-                            {% else %}
+                            {% elif asset.asset_type in [20, 30] %}
                             <p class="card-text mb-2">
                                 <span class="text-muted">总价值：</span>
                                 <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|compact_number(field_name='total_value', asset_type=asset.asset_type) }} USDC</span>
+                            </p>
+                            {% else %}
+                            <p class="card-text mb-2">
+                                <span class="text-muted">总价值：</span>
+                                <span class="fw-bold text-dark text-nowrap">{{ asset.total_value|number_format }} USDC</span>
                             </p>
                             {% endif %}
                             <p class="card-text mb-3">
