@@ -1202,15 +1202,15 @@
                     }
                 }
 
-                // Load commission balance
+                // Load commission balance using service API
                 try {
-                    const commissionResponse = await fetch(`/admin/api/user/commission/balance/${address}`);
+                    const commissionResponse = await fetch(`/api/service/wallet/commission_balance?address=${encodeURIComponent(address)}`);
                     if (commissionResponse.ok) {
                         const commissionData = await commissionResponse.json();
-                        if (commissionData.success && commissionData.data) {
+                        if (commissionData.success) {
                             const commissionElement = document.getElementById('walletCommissionInDropdown');
                             if (commissionElement) {
-                                commissionElement.textContent = (commissionData.data.available_balance || 0).toFixed(2);
+                                commissionElement.textContent = parseFloat(commissionData.balance || 0).toFixed(2);
                             }
                         }
                     }
@@ -1667,6 +1667,38 @@
             setTimeout(function() {
                 // 在此处添加任何需要在页面加载后执行的代码
                 console.log('页面初始化完成');
+
+                // 添加点击空白处关闭钱包下拉菜单
+                document.addEventListener('click', function(event) {
+                    const walletMenu = document.getElementById('walletMenu');
+                    const walletBtn = document.getElementById('walletBtn');
+
+                    if (walletMenu && walletBtn &&
+                        !walletMenu.contains(event.target) &&
+                        !walletBtn.contains(event.target)) {
+                        walletMenu.classList.remove('show');
+                        walletMenu.style.display = 'none';
+                    }
+                });
+
+                // 添加钱包地址复制功能
+                const walletAddressEl = document.getElementById('walletAddressDisplay');
+                if (walletAddressEl) {
+                    walletAddressEl.addEventListener('click', function() {
+                        if (window.walletState && window.walletState.address) {
+                            navigator.clipboard.writeText(window.walletState.address).then(() => {
+                                // 临时显示复制成功
+                                const originalText = this.textContent;
+                                this.textContent = 'Copied!';
+                                setTimeout(() => {
+                                    this.textContent = originalText;
+                                }, 1000);
+                            }).catch(() => {
+                                alert('Copy failed, please try manually');
+                            });
+                        }
+                    });
+                }
             }, 100);
         });
     </script>
