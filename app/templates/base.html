@@ -1096,11 +1096,7 @@
 
     <!-- SPL Token 库（预加载以解决竞态条件） -->
     <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
-    <!-- 统一钱包管理器 - 必须在其他钱包相关脚本之前加载 -->
-    <script src="{{ url_for('static', filename='js/wallet-unified-manager.js') }}"></script>
-    <!-- 钱包持久化管理器 -->
-    <script src="{{ url_for('static', filename='js/wallet-persistence.js') }}"></script>
-    <!-- 统一购买处理器 -->
+    <!-- 统一购买处理器（包含钱包管理功能） -->
     <script src="{{ url_for('static', filename='js/purchase_handler_unified.js') }}?v=20250914_network_fix&cache_bust={{ range(10000000, 99999999) | random }}"></script>
     
     <!-- 简单的钱包按钮初始化 -->
@@ -1680,25 +1676,6 @@
                         walletMenu.style.display = 'none';
                     }
                 });
-
-                // 添加钱包地址复制功能
-                const walletAddressEl = document.getElementById('walletAddressDisplay');
-                if (walletAddressEl) {
-                    walletAddressEl.addEventListener('click', function() {
-                        if (window.walletState && window.walletState.address) {
-                            navigator.clipboard.writeText(window.walletState.address).then(() => {
-                                // 临时显示复制成功
-                                const originalText = this.textContent;
-                                this.textContent = 'Copied!';
-                                setTimeout(() => {
-                                    this.textContent = originalText;
-                                }, 1000);
-                            }).catch(() => {
-                                alert('Copy failed, please try manually');
-                            });
-                        }
-                    });
-                }
             }, 100);
         });
     </script>
