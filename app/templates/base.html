@@ -683,10 +683,11 @@
                                 
                                 <!-- 钱包操作按钮 -->
                                 <div class="d-flex mt-2" style="border-top:1px solid #eee; padding-top:6px; gap:6px;">
-                                    <button id="switchWalletBtn" type="button" onclick="switchWalletAndCloseMenu()" style="background-color:#eef5ff; color:#0d6efd; padding:5px 8px; border-radius:6px; font-size:12px; font-weight:500; border:none; outline:none; box-shadow:none; display:flex; align-items:center; justify-content:center; flex:1;">
+                                    <!-- 暂时隐藏切换功能，只支持Phantom钱包 -->
+                                    <!-- <button id="switchWalletBtn" type="button" onclick="switchWalletAndCloseMenu()" style="background-color:#eef5ff; color:#0d6efd; padding:5px 8px; border-radius:6px; font-size:12px; font-weight:500; border:none; outline:none; box-shadow:none; display:flex; align-items:center; justify-content:center; flex:1;">
                                         <i class="fas fa-repeat me-1"></i> {{ _('Switch') }}
-                                </button>
-                                    <button id="disconnectWalletBtn" type="button" onclick="disconnectAndCloseMenu()" style="background-color:#fff0f0; color:#dc3545; padding:5px 8px; border-radius:6px; font-size:12px; font-weight:500; border:none; outline:none; box-shadow:none; display:flex; align-items:center; justify-content:center; flex:1;">
+                                </button> -->
+                                    <button id="disconnectWalletBtn" type="button" onclick="disconnectAndCloseMenu()" style="background-color:#fff0f0; color:#dc3545; padding:5px 8px; border-radius:6px; font-size:12px; font-weight:500; border:none; outline:none; box-shadow:none; display:flex; align-items:center; justify-content:center; width:100%;">
                                         <i class="fas fa-power-off me-1"></i> {{ _('Disconnect') }}
                                 </button>
                                     </div>
@@ -1070,95 +1071,69 @@
 
     <!-- 全局钱包函数定义 -->
     <script>
-        // 全局钱包连接函数 - 支持多种钱包类型
+        // 全局钱包连接函数 - 只支持Phantom钱包
         window.connectWallet = async function(walletType = 'phantom') {
             console.log('connectWallet called with type:', walletType);
 
+            // 只支持Phantom钱包
+            if (walletType.toLowerCase() !== 'phantom') {
+                alert('Currently only Phantom wallet is supported.');
+                return false;
+            }
+
             try {
-                let walletAdapter = null;
-                let connectedAddress = null;
+                if (window.solana && window.solana.isPhantom) {
+                    // 用户需要主动确认连接，不使用 onlyIfTrusted
+                    console.log('Requesting wallet connection with user confirmation...');
+                    const response = await window.solana.connect();
+                    const connectedAddress = response.publicKey.toString();
+                    console.log('Phantom connected:', connectedAddress);
 
-                // 根据钱包类型选择适配器
-                switch (walletType.toLowerCase()) {
-                    case 'phantom':
-                        if (window.solana && window.solana.isPhantom) {
-                            walletAdapter = window.solana;
-                            const response = await walletAdapter.connect({ onlyIfTrusted: false });
-                            connectedAddress = response.publicKey.toString();
-                            console.log('Phantom connected:', connectedAddress);
-                        } else {
-                            throw new Error('Phantom wallet not detected. Please install Phantom wallet extension.');
+                    // 创建统一的钱包状态对象
+                    window.walletState = {
+                        connected: true,
+                        isConnected: true,
+                        address: connectedAddress,
+                        walletType: 'phantom',
+                        adapter: window.solana,
+                        formatAddress: function(addr) {
+                            if (!addr) return '';
+                            return addr.slice(0, 6) + '...' + addr.slice(-4);
+                        },
+                        copyWalletAddress: function() {
+                            if (this.address) {
+                                navigator.clipboard.writeText(this.address).then(() => {
+                                    const successMsg = document.getElementById('copyAddressSuccess');
+                                    if (successMsg) {
+                                        successMsg.style.opacity = '1';
+                                        setTimeout(() => successMsg.style.opacity = '0', 2000);
+                                    }
+                                }).catch(() => {
+                                    alert('Address: ' + this.address);
+                                });
+                            }
                         }
-                        break;
+                    };
 
-                    case 'solflare':
-                        if (window.solflare) {
-                            walletAdapter = window.solflare;
-                            const response = await walletAdapter.connect();
-                            connectedAddress = response.publicKey.toString();
-                            console.log('Solflare connected:', connectedAddress);
-                        } else {
-                            throw new Error('Solflare wallet not detected. Please install Solflare wallet extension.');
-                        }
-                        break;
+                    // 更新UI
+                    updateWalletUI(connectedAddress);
 
-                    case 'backpack':
-                        if (window.backpack) {
-                            walletAdapter = window.backpack;
-                            const response = await walletAdapter.connect();
-                            connectedAddress = response.publicKey.toString();
-                            console.log('Backpack connected:', connectedAddress);
-                        } else {
-                            throw new Error('Backpack wallet not detected. Please install Backpack wallet extension.');
-                        }
-                        break;
-
-                    default:
-                        throw new Error(`Unsupported wallet type: ${walletType}`);
-                }
-
-                if (!connectedAddress) {
-                    throw new Error('Failed to get wallet address');
-                }
-
-                // 创建统一的钱包状态对象
-                window.walletState = {
-                    connected: true,
-                    isConnected: true,
-                    address: connectedAddress,
-                    walletType: walletType.toLowerCase(),
-                    adapter: walletAdapter,
-                    formatAddress: function(addr) {
-                        if (!addr) return '';
-                        return addr.slice(0, 6) + '...' + addr.slice(-4);
-                    },
-                    copyWalletAddress: function() {
-                        if (this.address) {
-                            navigator.clipboard.writeText(this.address).then(() => {
-                                const successMsg = document.getElementById('copyAddressSuccess');
-                                if (successMsg) {
-                                    successMsg.style.opacity = '1';
-                                    setTimeout(() => successMsg.style.opacity = '0', 2000);
-                                }
-                            }).catch(() => {
-                                alert('Address: ' + this.address);
-                            });
-                        }
+                    // 加载钱包数据
+                    if (typeof loadWalletData === 'function') {
+                        loadWalletData(connectedAddress);
                     }
-                };
 
-                // 更新UI
-                updateWalletUI(connectedAddress);
-
-                // 加载钱包数据
-                if (typeof loadWalletData === 'function') {
-                    loadWalletData(connectedAddress);
+                    return true;
+                } else {
+                    throw new Error('Phantom wallet not detected. Please install Phantom wallet extension.');
                 }
-
-                return true;
             } catch (error) {
                 console.error('Wallet connection failed:', error);
-                alert(`Connection failed: ${error.message}`);
+                if (error.message && error.message.includes('User rejected')) {
+                    console.log('User rejected the connection');
+                } else {
+                    alert(`Connection failed: ${error.message}`);
+                }
                 return false;
             }
         };
@@ -1694,93 +1669,24 @@
             }
         }
 
-        // Open wallet selector - 提供钱包选择界面
+        // Open wallet selector - 只支持Phantom钱包
         function openWalletSelector() {
-            // 检测设备类型并显示适当的钱包选择
+            // 统一使用Phantom钱包连接
             if (isMobileDevice()) {
-                // 移动设备：显示选择对话框
-                showMobileWalletSelector();
+                // 移动设备：使用移动端专用连接流程
+                connectPhantomMobile();
             } else {
-                // 桌面设备：显示钱包选择对话框
-                showDesktopWalletSelector();
-            }
-        }
-
-        // 移动设备钱包选择器
-        function showMobileWalletSelector() {
-            const walletOptions = [];
-
-            // 检测可用的钱包
-            if (window.solana && window.solana.isPhantom) {
-                walletOptions.push('Phantom');
-            }
-            if (window.solflare) {
-                walletOptions.push('Solflare');
-            }
-
-            if (walletOptions.length === 0) {
-                alert('No Solana wallet detected. Please install Phantom or Solflare wallet app.');
-                return;
-            }
-
-            if (walletOptions.length === 1) {
-                // 只有一个钱包，直接连接
-                console.log(`Mobile: Auto-connecting to ${walletOptions[0]}...`);
-                window.connectWallet(walletOptions[0].toLowerCase());
-            } else {
-                // 多个钱包，显示选择
-                const choice = confirm(`Select wallet to connect:\n\n• Phantom (Recommended)\n• Solflare\n\nClick OK for Phantom, Cancel for Solflare`);
-                const selectedWallet = choice ? 'phantom' : 'solflare';
-                console.log(`Mobile: User selected ${selectedWallet}`);
-                window.connectWallet(selectedWallet);
-            }
-        }
-
-        // 桌面设备钱包选择器
-        function showDesktopWalletSelector() {
-            const walletOptions = [];
-
-            // 检测可用的钱包扩展
-            if (window.solana && window.solana.isPhantom) {
-                walletOptions.push('Phantom');
-            }
-            if (window.solflare) {
-                walletOptions.push('Solflare');
-            }
-            if (window.backpack) {
-                walletOptions.push('Backpack');
-            }
-
-            if (walletOptions.length === 0) {
-                alert('No Solana wallet extension detected.\n\nPlease install one of the following:\n• Phantom Wallet\n• Solflare Wallet\n• Backpack Wallet\n\nThen refresh this page.');
-                return;
-            }
-
-            if (walletOptions.length === 1) {
-                // 只有一个钱包，直接连接
-                console.log(`Desktop: Auto-connecting to ${walletOptions[0]}...`);
-                window.connectWallet(walletOptions[0].toLowerCase());
-            } else {
-                // 多个钱包，显示选择对话框
-                let message = 'Select a wallet to connect:\n\n';
-                walletOptions.forEach((wallet, index) => {
-                    message += `${index + 1}. ${wallet}\n`;
-                });
-                message += '\nEnter number (1-' + walletOptions.length + '):';
-
-                const choice = prompt(message);
-                const walletIndex = parseInt(choice) - 1;
-
-                if (walletIndex >= 0 && walletIndex < walletOptions.length) {
-                    const selectedWallet = walletOptions[walletIndex].toLowerCase();
-                    console.log(`Desktop: User selected ${selectedWallet}`);
-                    window.connectWallet(selectedWallet);
+                // 桌面设备：检测Phantom扩展
+                if (window.solana && window.solana.isPhantom) {
+                    console.log('Desktop: Connecting to Phantom...');
+                    window.connectWallet('phantom');
                 } else {
-                    console.log('Desktop: Invalid wallet selection');
+                    alert('Please install Phantom wallet extension.\n\nVisit: https://phantom.app/\n\nThen refresh this page.');
                 }
             }
         }
-        
+
+
         // Wallet connection functionality keeps original architecture
         
         // Commission details - keep original structure
