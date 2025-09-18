@@ -24,6 +24,7 @@ from solders.message import Message
 from sqlalchemy import func
 from app.extensions import db
 from app.models import Asset, Trade, Holding
+from app.models.trade import TradeStatus
 from app.blockchain.solana_service import get_solana_client, get_latest_blockhash_with_cache
 from app.utils.crypto_manager import CryptoManager
 from datetime import datetime, timedelta
@@ -1392,7 +1393,7 @@ class SplTokenService:
                 Trade.asset_id == asset.id,
                 Trade.created_at >= start_time,
                 Trade.created_at <= end_time,
-                Trade.status == 2  # 已完成的交易
+                Trade.status == TradeStatus.COMPLETED.value  # 已完成的交易
             ).scalar() or 0
 
             # 统计Token数量变化
@@ -1400,7 +1401,7 @@ class SplTokenService:
                 Trade.asset_id == asset.id,
                 Trade.created_at >= start_time,
                 Trade.created_at <= end_time,
-                Trade.status == 2  # 已完成的交易
+                Trade.status == TradeStatus.COMPLETED.value  # 已完成的交易
             ).scalar() or 0
 
             activity_data = {
