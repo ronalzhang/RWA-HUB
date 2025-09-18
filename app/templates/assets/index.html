@@ -117,10 +117,10 @@
                             <!-- Progress bar for remaining supply -->
                             <div class="d-flex justify-content-between align-items-center text-muted small mb-1">
                                 <span>可用</span>
-                                <span>{{ asset.remaining_supply|number_format }}/{{ asset.total_supply|number_format }}</span>
+                                <span>{{ asset.remaining_supply|number_format }}/{{ asset.token_supply|number_format }}</span>
                             </div>
                             <div class="progress" style="height: 6px;">
-                                {% set progress_percentage = ((asset.total_supply - asset.remaining_supply) / asset.total_supply * 100) if asset.total_supply > 0 else 0 %}
+                                {% set progress_percentage = ((asset.token_supply - asset.remaining_supply) / asset.token_supply * 100) if asset.token_supply > 0 else 0 %}
                                 <div class="progress-bar bg-success" role="progressbar"
                                      style="width: {{ progress_percentage }}%"
                                      aria-valuenow="{{ progress_percentage }}"
