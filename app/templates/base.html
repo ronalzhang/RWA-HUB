@@ -809,8 +809,7 @@
         
         // Check for existing wallet connection on page load
         initializeWalletConnection();
-    });
-        
+
         // Initialize wallet button state - don't load asset data immediately to improve homepage performance
         if (window.walletState && window.walletState.address) {
             // Only update wallet button display, don't load asset data immediately
@@ -1060,41 +1059,11 @@
     <!-- SweetAlert2 JavaScript -->
     <script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
 
-    <!-- Solana Web3.js - 使用备用CDN避免国内网络问题 -->
-    <script>
-    // 动态加载Solana Web3.js，提供多个备用CDN
-    (function loadSolanaWeb3() {
-        const cdnUrls = [
-            'https://cdn.jsdelivr.net/npm/@solana/web3.js@1.78.0/lib/index.iife.min.js',
-            'https://unpkg.com/@solana/web3.js@1.78.0/lib/index.iife.min.js'
-        ];
-        
-        let loadIndex = 0;
-        
-        function tryLoadNext() {
-            if (loadIndex >= cdnUrls.length) {
-                console.error('无法加载Solana Web3.js库');
-                return;
-            }
-            
-            const script = document.createElement('script');
-            script.src = cdnUrls[loadIndex];
-            script.onload = function() {
-                console.log('✅ Solana Web3.js加载成功:', cdnUrls[loadIndex]);
-            };
-            script.onerror = function() {
-                console.warn('❌ Solana Web3.js加载失败:', cdnUrls[loadIndex]);
-                loadIndex++;
-                tryLoadNext();
-            };
-            document.head.appendChild(script);
-        }
-        
-        tryLoadNext();
-    })();
-    </script>
+    <!-- Solana Web3.js - 同步加载避免竞态条件 -->
+    <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.78.0/lib/index.iife.min.js"
+            onerror="this.onerror=null; this.src='https://unpkg.com/@solana/web3.js@1.78.0/lib/index.iife.min.js'"></script>
 
-    <!-- SPL Token 库（预加载以解决竞态条件） -->
+    <!-- SPL Token 库（在Solana Web3.js之后加载） -->
     <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
     <!-- 统一购买处理器（包含钱包管理功能） -->
     <script src="{{ url_for('static', filename='js/purchase_handler_unified.js') }}?v=20250914_network_fix&cache_bust={{ range(10000000, 99999999) | random }}"></script>
