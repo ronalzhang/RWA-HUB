@@ -1354,106 +1354,128 @@
             return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         }
 
-        // Connect to Phantom wallet on mobile
+        // Connect to Phantom wallet on mobile - 完整的移动端连接流程
         async function connectPhantomMobile() {
             try {
                 console.log('Attempting mobile Phantom connection...');
-                
+
                 const walletBtnText = document.getElementById('walletBtnText');
                 if (walletBtnText) {
                     walletBtnText.textContent = 'Connecting...';
                 }
-                
+
                 // Method 1: Check if Phantom provider is available (in-app browser)
                 if (window.solana && window.solana.isPhantom) {
-                    console.log('Phantom provider detected, connecting...');
-                    await connectPhantomWallet();
-                    return;
+                    console.log('Phantom provider detected in mobile browser, connecting...');
+                    return await window.connectWallet('phantom');
                 }
-                
+
                 // Method 2: Try to detect if we're in Phantom's in-app browser
                 const userAgent = navigator.userAgent.toLowerCase();
                 if (userAgent.includes('phantom')) {
-                    // We're in Phantom's browser, but provider not ready yet
                     console.log('In Phantom browser, waiting for provider...');
-                    
-                    // Wait for provider to load
+
                     let attempts = 0;
-                    const checkProvider = setInterval(() => {
-                        attempts++;
-                        if (window.solana && window.solana.isPhantom) {
-                            clearInterval(checkProvider);
-                            connectPhantomWallet();
-                        } else if (attempts > 10) {
-                            clearInterval(checkProvider);
-                            if (walletBtnText) {
-                                walletBtnText.textContent = 'Connect Wallet';
+                    return new Promise((resolve) => {
+                        const checkProvider = setInterval(() => {
+                            attempts++;
+                            if (window.solana && window.solana.isPhantom) {
+                                clearInterval(checkProvider);
+                                window.connectWallet('phantom').then(resolve);
+                            } else if (attempts > 10) {
+                                clearInterval(checkProvider);
+                                if (walletBtnText) {
+                                    walletBtnText.textContent = 'Connect Wallet';
+                                }
+                                alert('Please refresh the page in Phantom browser and try again.');
+                                resolve(false);
                             }
-                            alert('Please refresh the page in Phantom browser and try again.');
-                        }
-                    }, 500);
-                    return;
+                        }, 500);
+                    });
                 }
-                
-                // Method 3: Use proper Phantom deep link for wallet connection
-                // Reset button text before attempting connection
+
+                // Method 3: Use WalletConnect-style deep link for mobile browsers
                 if (walletBtnText) {
                     walletBtnText.textContent = 'Connect Wallet';
                 }
-                
-                const currentDomain = window.location.origin;
-                const appName = 'RWA-HUB';
-                
-                // Proper Phantom deep link format for connecting wallet
-                const phantomDeepLink = `phantom://v1/connect?app_url=${encodeURIComponent(currentDomain)}&app_name=${encodeURIComponent(appName)}&redirect_link=${encodeURIComponent(currentDomain + '?phantom_connected=true')}`;
-                
-                console.log('Opening Phantom with deep link:', phantomDeepLink);
-                
-                // Show user instruction with English text
-                if (confirm('This will open Phantom wallet app to connect your wallet. Continue?')) {
+
+                const currentUrl = encodeURIComponent(window.location.href);
+                const appName = encodeURIComponent('RWA-HUB');
+
+                // Store connection attempt state
+                sessionStorage.setItem('phantom_connection_attempt', Date.now().toString());
+
+                // Use universal link format that works better with mobile browsers
+                const universalLink = `https://phantom.app/ul/v1/connect?app_url=${currentUrl}&app_name=${appName}&redirect_link=${currentUrl}`;
+
+                console.log('Opening Phantom with universal link:', universalLink);
+
+                // Show instruction with better UX
+                const userConfirmed = confirm('Connect with Phantom wallet?\n\n• This will open Phantom app\n• Approve the connection in Phantom\n• You will be redirected back to this page\n\nContinue?');
+
+                if (userConfirmed) {
                     try {
-                        // First try the phantom:// deep link
-                        window.location.href = phantomDeepLink;
-                        
-                        // Set a timeout to check if the app opened
+                        // For iOS: try phantom:// scheme first, fallback to universal link
+                        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                        if (isIOS) {
+                            // Try phantom scheme first
+                            const phantomScheme = `phantom://v1/connect?app_url=${currentUrl}&app_name=${appName}&redirect_link=${currentUrl}`;
+                            window.location.href = phantomScheme;
+
+                            // Fallback to universal link after delay
+                            setTimeout(() => {
+                                if (document.visibilityState === 'visible') {
+                                    window.location.href = universalLink;
+                                }
+                            }, 1500);
+                        } else {
+                            // Android: use intent or universal link
+                            window.location.href = universalLink;
+                        }
+
+                        // Show waiting message
+                        if (walletBtnText) {
+                            walletBtnText.textContent = 'Waiting for Phantom...';
+                        }
+
+                        // Set timeout to handle if user doesn't complete connection
                         setTimeout(() => {
-                            // If user returns quickly, the app didn't open
-                            if (document.visibilityState === 'visible') {
-                                if (confirm('If Phantom didn\'t open, would you like to install it from the app store?')) {
-                                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                                    const storeUrl = isIOS 
+                            if (document.visibilityState === 'visible' && !window.walletState?.connected) {
+                                if (walletBtnText) {
+                                    walletBtnText.textContent = 'Connect Wallet';
+                                }
+
+                                if (confirm('Connection timed out or cancelled.\n\nIf Phantom didn\'t open, would you like to install it?')) {
+                                    const storeUrl = isIOS
                                         ? 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977'
                                         : 'https://play.google.com/store/apps/details?id=app.phantom';
                                     window.open(storeUrl, '_blank');
                                 }
                             }
-                        }, 3000);
-                        
+                        }, 10000); // 10 second timeout
+
                     } catch (linkError) {
                         console.error('Deep link failed:', linkError);
-                        // Fallback to app store
-                        if (confirm('Unable to open Phantom. Would you like to install it from the app store?')) {
+                        if (confirm('Unable to open Phantom. Install from app store?')) {
                             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                            const storeUrl = isIOS 
+                            const storeUrl = isIOS
                                 ? 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977'
                                 : 'https://play.google.com/store/apps/details?id=app.phantom';
                             window.open(storeUrl, '_blank');
                         }
                     }
                 } else {
-                    // User cancelled
                     console.log('User cancelled wallet connection');
                 }
-                
+
             } catch (error) {
                 console.error('Mobile Phantom connection failed:', error);
-                
-                // Reset button text on error
+
                 const walletBtnText = document.getElementById('walletBtnText');
                 if (walletBtnText) {
                     walletBtnText.textContent = 'Connect Wallet';
                 }
-                
+
                 alert('Failed to connect to Phantom wallet. Please make sure Phantom is installed and try again.');
             }
         }
@@ -1547,29 +1569,96 @@
             }, 1000);
         }
 
-        // 基本钱包连接检查（备用方案）
+        // 基本钱包连接检查（备用方案）+ 移动端返回检测增强
         function checkBasicWalletConnection() {
-            // 检查Phantom重定向参数
+            // 检查是否是从Phantom app返回
             const urlParams = new URLSearchParams(window.location.search);
             const phantomPubkey = urlParams.get('phantom_encryption_public_key');
             const phantomRedirect = urlParams.get('phantom_redirect');
             const phantomConnected = urlParams.get('phantom_connected');
             const phantomAddress = urlParams.get('phantom_address');
 
-            if (phantomPubkey || phantomRedirect || phantomConnected || phantomAddress) {
-                console.log('检测到Phantom重定向，尝试建立连接...');
+            // 检查是否有连接尝试的状态
+            const connectionAttempt = sessionStorage.getItem('phantom_connection_attempt');
+
+            // 如果有URL参数或连接尝试，说明是从Phantom返回
+            if ((phantomPubkey || phantomRedirect || phantomConnected || phantomAddress) ||
+                (connectionAttempt && (Date.now() - parseInt(connectionAttempt)) < 60000)) {
+
+                console.log('检测到从Phantom钱包返回，尝试建立连接...');
+
+                // 清理URL参数，避免页面刷新时重复处理
                 window.history.replaceState({}, document.title, window.location.pathname);
+
+                // 清理连接尝试状态
+                sessionStorage.removeItem('phantom_connection_attempt');
 
                 const walletBtnText = document.getElementById('walletBtnText');
                 if (walletBtnText) {
                     walletBtnText.textContent = 'Connecting...';
                 }
 
-                setTimeout(() => {
-                    if (window.solana && window.solana.isPhantom) {
-                        connectPhantomWallet();
-                    } else {
-                        console.log('Phantom provider not detected after redirect');
+                // 延迟一下，让Phantom provider有时间加载
+                setTimeout(async () => {
+                    try {
+                        if (window.solana && window.solana.isPhantom) {
+                            console.log('Phantom provider available, attempting connection...');
+
+                            // 尝试连接（如果用户在Phantom中已经批准）
+                            const success = await window.connectWallet('phantom');
+                            if (success) {
+                                console.log('✅ 从Phantom返回连接成功');
+                                return;
+                            }
+                        }
+
+                        // 如果自动连接失败，检查是否已经连接
+                        if (window.solana && window.solana.isConnected) {
+                            const address = window.solana.publicKey.toString();
+                            console.log('检测到已连接的钱包:', address);
+
+                            // 手动创建钱包状态
+                            window.walletState = {
+                                connected: true,
+                                isConnected: true,
+                                address: address,
+                                walletType: 'phantom',
+                                adapter: window.solana,
+                                formatAddress: function(addr) {
+                                    return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
+                                },
+                                copyWalletAddress: function() {
+                                    if (this.address) {
+                                        navigator.clipboard.writeText(this.address).then(() => {
+                                            const successMsg = document.getElementById('copyAddressSuccess');
+                                            if (successMsg) {
+                                                successMsg.style.opacity = '1';
+                                                setTimeout(() => successMsg.style.opacity = '0', 2000);
+                                            }
+                                        }).catch(() => {
+                                            alert('Address: ' + this.address);
+                                        });
+                                    }
+                                }
+                            };
+
+                            // 更新UI
+                            updateWalletUI(address);
+
+                            // 加载钱包数据
+                            if (typeof loadWalletData === 'function') {
+                                loadWalletData(address);
+                            }
+
+                            console.log('✅ 钱包状态已恢复');
+                        } else {
+                            console.log('连接可能被用户拒绝或失败');
+                            if (walletBtnText) {
+                                walletBtnText.textContent = 'Connect Wallet';
+                            }
+                        }
+                    } catch (error) {
+                        console.error('从Phantom返回时连接失败:', error);
                         if (walletBtnText) {
                             walletBtnText.textContent = 'Connect Wallet';
                         }
@@ -1578,7 +1667,7 @@
                 return;
             }
 
-            // 标准钱包连接检查
+            // 标准钱包连接检查（没有从Phantom返回的情况）
             if (window.solana && window.solana.isConnected) {
                 try {
                     const address = window.solana.publicKey.toString();
