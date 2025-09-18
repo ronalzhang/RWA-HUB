@@ -244,12 +244,12 @@ def get_token_metadata(mint_address):
     try:
         result = SplTokenService.get_token_metadata(mint_address)
         if result['success']:
-            return success_response(data=result['data'], message="获取Token元数据成功")
+            return success_response(data=result['data'], message="Token metadata retrieved successfully")
         else:
             return error_response(message=result['message'], error_code=result['error'])
     except Exception as e:
         logger.error(f"获取Token元数据API异常: {e}", exc_info=True)
-        return error_response(message=f"获取Token元数据失败: {str(e)}")
+        return error_response(message=f"Failed to get token metadata: {str(e)}")
 
 
 @spl_token_bp.route('/api/admin/spl-token/refresh-metadata', methods=['POST'])
@@ -269,15 +269,15 @@ def refresh_token_metadata():
         asset_id = data.get('asset_id')
 
         if not asset_id:
-            return error_response(message="资产ID不能为空")
+            return error_response(message="Asset ID cannot be empty")
 
         # 获取资产
         asset = Asset.query.get(asset_id)
         if not asset:
-            return error_response(message="资产不存在")
+            return error_response(message="Asset not found")
 
         if not asset.spl_mint_address:
-            return error_response(message="该资产尚未创建SPL Token")
+            return error_response(message="This asset has not created SPL Token yet")
 
         # 重新生成元数据
         operation_id = f"refresh_metadata_{asset_id}_{int(time.time())}"
@@ -290,7 +290,7 @@ def refresh_token_metadata():
 
             return success_response(
                 data=metadata_result['data'],
-                message="Token元数据刷新成功"
+                message="Token metadata refreshed successfully"
             )
         else:
             return error_response(
@@ -300,7 +300,7 @@ def refresh_token_metadata():
 
     except Exception as e:
         logger.error(f"刷新Token元数据API异常: {e}", exc_info=True)
-        return error_response(message=f"刷新Token元数据失败: {str(e)}")
+        return error_response(message=f"Failed to refresh token metadata: {str(e)}")
 
 
 @spl_token_bp.route('/api/spl-token/transfer', methods=['POST'])
@@ -322,7 +322,7 @@ def transfer_tokens():
     try:
         data = request.get_json()
         if not data:
-            return error_response(message="请求体不能为空")
+            return error_response(message="Request body cannot be empty")
 
         mint_address = data.get('mint_address')
         from_address = data.get('from_address')
@@ -386,7 +386,7 @@ def burn_tokens():
     try:
         data = request.get_json()
         if not data:
-            return error_response(message="请求体不能为空")
+            return error_response(message="Request body cannot be empty")
 
         mint_address = data.get('mint_address')
         owner_address = data.get('owner_address')
@@ -467,11 +467,11 @@ def list_spl_tokens():
 
             tokens.append(token_data)
 
-        return success_response(data=tokens, message="获取SPL Token列表成功")
+        return success_response(data=tokens, message="SPL Token list retrieved successfully")
 
     except Exception as e:
         logger.error(f"获取SPL Token列表API异常: {e}", exc_info=True)
-        return error_response(message=f"获取SPL Token列表失败: {str(e)}")
+        return error_response(message=f"Failed to get: {str(e)}")
 
 
 @spl_token_bp.route('/admin/spl-tokens')
@@ -495,17 +495,17 @@ def get_token_statistics():
         if result.get('success'):
             return success_response(
                 data=result.get('data'),
-                message="获取统计信息成功"
+                message="Successfully retrieved"
             )
         else:
             return error_response(
                 error_code=result.get('error', 'STATISTICS_ERROR'),
-                message=result.get('message', '获取统计信息失败')
+                message=result.get('message', 'Failed to get')
             )
 
     except Exception as e:
         logger.error(f"获取统计信息API异常: {e}", exc_info=True)
-        return error_response(message=f"获取统计信息失败: {str(e)}")
+        return error_response(message=f"Failed to get: {str(e)}")
 
 
 @spl_token_bp.route('/api/spl-token/supply-info/<mint_address>', methods=['GET'])
@@ -519,17 +519,17 @@ def get_supply_info(mint_address):
         if result.get('success'):
             return success_response(
                 data=result.get('data'),
-                message="获取供应量信息成功"
+                message="Successfully retrieved"
             )
         else:
             return error_response(
                 error_code=result.get('error', 'SUPPLY_INFO_ERROR'),
-                message=result.get('message', '获取供应量信息失败')
+                message=result.get('message', 'Failed to get')
             )
 
     except Exception as e:
         logger.error(f"获取供应量信息API异常: {e}", exc_info=True)
-        return error_response(message=f"获取供应量信息失败: {str(e)}")
+        return error_response(message=f"Failed to get: {str(e)}")
 
 
 @spl_token_bp.route('/api/spl-token/holder-count/<mint_address>', methods=['GET'])
@@ -543,17 +543,17 @@ def get_holder_count(mint_address):
         if result.get('success'):
             return success_response(
                 data=result.get('data'),
-                message="获取持有者数量成功"
+                message="Successfully retrieved"
             )
         else:
             return error_response(
                 error_code=result.get('error', 'HOLDER_COUNT_ERROR'),
-                message=result.get('message', '获取持有者数量失败')
+                message=result.get('message', 'Failed to get')
             )
 
     except Exception as e:
         logger.error(f"获取持有者数量API异常: {e}", exc_info=True)
-        return error_response(message=f"获取持有者数量失败: {str(e)}")
+        return error_response(message=f"Failed to get: {str(e)}")
 
 
 @spl_token_bp.route('/api/spl-token/activity/<mint_address>', methods=['GET'])
@@ -572,17 +572,17 @@ def get_token_activity(mint_address):
         if result.get('success'):
             return success_response(
                 data=result.get('data'),
-                message="获取活动信息成功"
+                message="Successfully retrieved"
             )
         else:
             return error_response(
                 error_code=result.get('error', 'MONITORING_ERROR'),
-                message=result.get('message', '获取活动信息失败')
+                message=result.get('message', 'Failed to get')
             )
 
     except Exception as e:
         logger.error(f"获取活动信息API异常: {e}", exc_info=True)
-        return error_response(message=f"获取活动信息失败: {str(e)}")
+        return error_response(message=f"Failed to get: {str(e)}")
 
 
 @spl_token_bp.route('/api/admin/spl-token/dashboard-stats', methods=['GET'])
@@ -596,7 +596,7 @@ def get_dashboard_statistics():
         if not stats_result.get('success'):
             return error_response(
                 error_code=stats_result.get('error', 'STATISTICS_ERROR'),
-                message=stats_result.get('message', '获取统计信息失败')
+                message=stats_result.get('message', 'Failed to get')
             )
 
         dashboard_data = stats_result.get('data', {})
@@ -626,7 +626,7 @@ def get_dashboard_statistics():
             }
 
         except Exception as e:
-            logger.warning(f"获取额外仪表板数据失败: {e}")
+            logger.warning(f"Failed to get: {e}")
             dashboard_data['recent_activity'] = {
                 'tokens_created_7_days': 0,
                 'failed_creations_7_days': 0
@@ -634,12 +634,12 @@ def get_dashboard_statistics():
 
         return success_response(
             data=dashboard_data,
-            message="获取仪表板统计信息成功"
+            message="Successfully retrieved"
         )
 
     except Exception as e:
         logger.error(f"获取仪表板统计信息API异常: {e}", exc_info=True)
-        return error_response(message=f"获取仪表板统计信息失败: {str(e)}")
+        return error_response(message=f"Failed to get: {str(e)}")
 
 
 @spl_token_bp.route('/api/spl-token/health-check/<mint_address>', methods=['GET'])
@@ -665,12 +665,12 @@ def token_health_check(mint_address):
 
             health_data['checks']['mint_account_exists'] = {
                 'status': 'pass' if mint_info.value else 'fail',
-                'message': 'Mint账户存在' if mint_info.value else 'Mint账户不存在'
+                'message': 'Mint account exists' if mint_info.value else 'Mint account not found'
             }
         except Exception as e:
             health_data['checks']['mint_account_exists'] = {
                 'status': 'error',
-                'message': f'检查Mint账户失败: {str(e)}'
+                'message': f'Failed to check mint account: {str(e)}'
             }
 
         # 检查2: 数据库记录是否存在
@@ -678,20 +678,20 @@ def token_health_check(mint_address):
             asset = Asset.query.filter_by(spl_mint_address=mint_address).first()
             health_data['checks']['database_record'] = {
                 'status': 'pass' if asset else 'fail',
-                'message': '数据库记录存在' if asset else '数据库记录不存在',
+                'message': 'Database record exists' if asset else 'Database record not found',
                 'asset_id': asset.id if asset else None
             }
         except Exception as e:
             health_data['checks']['database_record'] = {
                 'status': 'error',
-                'message': f'检查数据库记录失败: {str(e)}'
+                'message': f'Failed to check database record: {str(e)}'
             }
 
         # 检查3: 供应量信息
         supply_result = SplTokenService.get_token_supply_info(mint_address)
         health_data['checks']['supply_info'] = {
             'status': 'pass' if supply_result.get('success') else 'fail',
-            'message': '供应量信息正常' if supply_result.get('success') else supply_result.get('message', '获取供应量失败'),
+            'message': 'Supply information normal' if supply_result.get('success') else supply_result.get('message', 'Failed to get supply'),
             'data': supply_result.get('data') if supply_result.get('success') else None
         }
 
@@ -709,9 +709,9 @@ def token_health_check(mint_address):
 
         return success_response(
             data=health_data,
-            message="健康检查完成"
+            message="Health check completed"
         )
 
     except Exception as e:
         logger.error(f"Token健康检查API异常: {e}", exc_info=True)
-        return error_response(message=f"健康检查失败: {str(e)}")
+        return error_response(message=f"Health check failed: {str(e)}")

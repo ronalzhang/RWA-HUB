@@ -36,10 +36,10 @@ def health_check():
         return jsonify(summary), status_code
         
     except Exception as e:
-        logger.error(f"健康检查失败: {e}")
+        logger.error(f"Health check failed: {e}")
         return jsonify({
             'overall_status': 'critical',
-            'message': f'健康检查服务异常: {str(e)}',
+            'message': f'Health check service error: {str(e)}',
             'timestamp': None
         }), 503
 
@@ -66,9 +66,9 @@ def detailed_health_check():
         })
         
     except Exception as e:
-        logger.error(f"详细健康检查失败: {e}")
+        logger.error(f"Detailed health check failed: {e}")
         return jsonify({
-            'error': f'详细健康检查失败: {str(e)}'
+            'error': f'Detailed health check failed: {str(e)}'
         }), 500
 
 @health_bp.route('/check/<check_name>', methods=['GET'])
@@ -95,11 +95,11 @@ def single_health_check(check_name):
         }), status_code
         
     except Exception as e:
-        logger.error(f"单个健康检查失败 {check_name}: {e}")
+        logger.error(f"Single health check failed {check_name}: {e}")
         return jsonify({
             'name': check_name,
             'status': 'critical',
-            'message': f'检查失败: {str(e)}',
+            'message': f'Check failed: {str(e)}',
             'error': True
         }), 500
 
@@ -116,15 +116,15 @@ def uptime_stats(check_name):
         
         if not stats:
             return jsonify({
-                'error': f'没有找到检查项 {check_name} 的历史数据'
+                'error': f'No historical data found for check {check_name}'
             }), 404
         
         return jsonify(stats)
         
     except Exception as e:
-        logger.error(f"获取可用性统计失败 {check_name}: {e}")
+        logger.error(f"Failed to get uptime stats {check_name}: {e}")
         return jsonify({
-            'error': f'获取可用性统计失败: {str(e)}'
+            'error': f'Failed to get uptime stats: {str(e)}'
         }), 500
 
 @health_bp.route('/performance', methods=['GET'])
@@ -154,9 +154,9 @@ def performance_metrics():
         })
         
     except Exception as e:
-        logger.error(f"获取性能指标失败: {e}")
+        logger.error(f"Failed to get performance metrics: {e}")
         return jsonify({
-            'error': f'获取性能指标失败: {str(e)}'
+            'error': f'Failed to get performance metrics: {str(e)}'
         }), 500
 
 @health_bp.route('/cache/stats', methods=['GET'])
@@ -172,9 +172,9 @@ def cache_stats():
         })
         
     except Exception as e:
-        logger.error(f"获取缓存统计失败: {e}")
+        logger.error(f"Failed to get cache stats: {e}")
         return jsonify({
-            'error': f'获取缓存统计失败: {str(e)}'
+            'error': f'Failed to get cache stats: {str(e)}'
         }), 500
 
 @health_bp.route('/database/stats', methods=['GET'])
@@ -204,9 +204,9 @@ def database_stats():
         })
         
     except Exception as e:
-        logger.error(f"获取数据库统计失败: {e}")
+        logger.error(f"Failed to get database stats: {e}")
         return jsonify({
-            'error': f'获取数据库统计失败: {str(e)}'
+            'error': f'Failed to get database stats: {str(e)}'
         }), 500
 
 @health_bp.route('/tasks/stats', methods=['GET'])
@@ -222,9 +222,9 @@ def task_stats():
         })
         
     except Exception as e:
-        logger.error(f"获取任务统计失败: {e}")
+        logger.error(f"Failed to get task stats: {e}")
         return jsonify({
-            'error': f'获取任务统计失败: {str(e)}'
+            'error': f'Failed to get task stats: {str(e)}'
         }), 500
 
 @health_bp.route('/ready', methods=['GET'])
@@ -250,17 +250,17 @@ def readiness_check():
             return jsonify({
                 'ready': True,
                 'checks': check_results,
-                'message': '服务就绪'
+                'message': 'Service Ready'
             }), 200
         else:
             return jsonify({
                 'ready': False,
                 'checks': check_results,
-                'message': '服务未就绪'
+                'message': 'Service Not Ready'
             }), 503
             
     except Exception as e:
-        logger.error(f"就绪检查失败: {e}")
+        logger.error(f"Readiness check failed: {e}")
         return jsonify({
             'ready': False,
             'error': str(e)
@@ -273,12 +273,12 @@ def liveness_check():
         # 简单的存活检查，只要能响应就认为存活
         return jsonify({
             'alive': True,
-            'message': '服务存活',
+            'message': 'Service Alive',
             'timestamp': None
         }), 200
         
     except Exception as e:
-        logger.error(f"存活检查失败: {e}")
+        logger.error(f"Liveness check failed: {e}")
         return jsonify({
             'alive': False,
             'error': str(e)
@@ -288,7 +288,7 @@ def liveness_check():
 @health_bp.errorhandler(404)
 def not_found(error):
     return jsonify({
-        'error': '健康检查端点不存在',
+        'error': 'Health check endpoint not found',
         'available_endpoints': [
             '/api/health/',
             '/api/health/detailed',
@@ -306,6 +306,6 @@ def not_found(error):
 @health_bp.errorhandler(500)
 def internal_error(error):
     return jsonify({
-        'error': '健康检查服务内部错误',
+        'error': 'Health check service internal error',
         'message': str(error)
     }), 500
