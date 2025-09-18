@@ -1098,7 +1098,109 @@
     <script src="{{ url_for('static', filename='js/contracts/spl-token.iife.min.js') }}"></script>
     <!-- 统一购买处理器（包含钱包管理功能） -->
     <script src="{{ url_for('static', filename='js/purchase_handler_unified.js') }}?v=20250914_network_fix&cache_bust={{ range(10000000, 99999999) | random }}"></script>
-    
+
+    <!-- 全局钱包函数定义 -->
+    <script>
+        // 全局钱包连接函数 - 兼容性wrapper
+        window.connectWallet = async function(walletType = 'phantom') {
+            console.log('connectWallet called with type:', walletType);
+
+            // 尝试直接连接Phantom钱包
+            try {
+                if (window.solana && window.solana.isPhantom) {
+                    const response = await window.solana.connect({ onlyIfTrusted: false });
+                    const address = response.publicKey.toString();
+
+                    console.log('Phantom connected:', address);
+
+                    // 创建钱包状态对象
+                    window.walletState = {
+                        connected: true,
+                        isConnected: true,
+                        address: address,
+                        walletType: 'phantom',
+                        formatAddress: function(addr) {
+                            if (!addr) return '';
+                            return addr.slice(0, 6) + '...' + addr.slice(-4);
+                        },
+                        copyWalletAddress: function() {
+                            if (this.address) {
+                                navigator.clipboard.writeText(this.address).then(() => {
+                                    const successMsg = document.getElementById('copyAddressSuccess');
+                                    if (successMsg) {
+                                        successMsg.style.opacity = '1';
+                                        setTimeout(() => successMsg.style.opacity = '0', 2000);
+                                    }
+                                }).catch(() => {
+                                    alert('Address: ' + this.address);
+                                });
+                            }
+                        }
+                    };
+
+                    // 更新UI
+                    updateWalletUI(address);
+
+                    return true;
+                } else {
+                    console.log('Phantom not detected, opening wallet selection');
+                    alert('Please install Phantom wallet extension');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Wallet connection failed:', error);
+                return false;
+            }
+        };
+
+        window.disconnectWallet = async function() {
+            console.log('disconnectWallet called');
+            try {
+                if (window.solana && window.solana.isPhantom) {
+                    await window.solana.disconnect();
+                }
+
+                // 清除钱包状态
+                window.walletState = null;
+
+                // 更新UI
+                const walletBtnText = document.getElementById('walletBtnText');
+                if (walletBtnText) {
+                    walletBtnText.textContent = 'Connect Wallet';
+                }
+
+                // 隐藏钱包菜单
+                const walletMenu = document.getElementById('walletMenu');
+                if (walletMenu) {
+                    walletMenu.classList.remove('show');
+                    walletMenu.style.display = 'none';
+                }
+
+                return true;
+            } catch (error) {
+                console.error('Wallet disconnect failed:', error);
+                return false;
+            }
+        };
+
+        window.getWalletAddress = function() {
+            return window.walletState ? window.walletState.address : null;
+        };
+
+        // 辅助函数：更新钱包UI显示
+        function updateWalletUI(address) {
+            const walletBtnText = document.getElementById('walletBtnText');
+            if (walletBtnText && address) {
+                walletBtnText.textContent = address.slice(0, 6) + '...' + address.slice(-4);
+            }
+
+            const walletAddressDisplay = document.getElementById('walletAddressDisplay');
+            if (walletAddressDisplay && address) {
+                walletAddressDisplay.textContent = address.slice(0, 6) + '...' + address.slice(-4);
+            }
+        }
+    </script>
+
     <!-- 简单的钱包按钮初始化 -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -1250,7 +1352,6 @@
                             }
                         }
                     }
-                }
             } catch (error) {
                 console.error('Failed to load wallet data:', error);
             }
