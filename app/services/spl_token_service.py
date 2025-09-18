@@ -21,10 +21,12 @@ from spl.token.constants import TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
 from solders.transaction import Transaction
 from solders.message import Message
 
+from sqlalchemy import func
 from app.extensions import db
-from app.models import Asset
+from app.models import Asset, Trade, Holding
 from app.blockchain.solana_service import get_solana_client, get_latest_blockhash_with_cache
 from app.utils.crypto_manager import CryptoManager
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -1126,7 +1128,6 @@ class SplTokenService:
 
         try:
             # 从数据库获取基础统计信息
-            from sqlalchemy import func
 
             # 总资产数量
             total_assets = db.session.query(func.count(Asset.id)).scalar() or 0
@@ -1293,39 +1294,27 @@ class SplTokenService:
             # 或者使用Solscan/SolanaFM等第三方API
 
             # 这里提供一个简化实现，实际应用中可能需要优化
-            response = client.get_program_accounts(
-                TOKEN_PROGRAM_ID,
-                encoding='base64',
-                filters=[
-                    {'memcmp': {'offset': 0, 'bytes': str(mint_pubkey)}},  # mint字段匹配
-                    {'dataSize': 165}  # Token账户固定大小
-                ]
-            )
+            # 由于RPC调用可能很慢且不稳定，直接使用数据库估算值
+            holder_count = 0
 
-            if not response or not response.value:
-                holder_count = 0
+            # 尝试从数据库获取估算值
+            asset = Asset.query.filter_by(spl_mint_address=mint_address).first()
+            if asset:
+                db_holder_count = db.session.query(func.count(Holding.id)).filter(
+                    Holding.asset_id == asset.id,
+                    Holding.quantity > 0
+                ).scalar() or 0
+                holder_count = db_holder_count
+                logger.info(f"[{operation_id}] 使用数据库记录估算持有者数量: {holder_count}")
             else:
-                # 过滤出余额大于0的账户
-                holder_count = 0
-                for account in response.value:
-                    try:
-                        # 解析Token账户数据
-                        account_data = base64.b64decode(account.account.data[0])
-                        if len(account_data) >= 72:
-                            # 余额位于字节64-72（小端序）
-                            balance_bytes = account_data[64:72]
-                            balance = int.from_bytes(balance_bytes, byteorder='little')
-                            if balance > 0:
-                                holder_count += 1
-                    except Exception:
-                        continue
+                logger.warning(f"[{operation_id}] 未找到对应资产，返回0")
 
             return {
                 'success': True,
                 'data': {
                     'mint_address': mint_address,
                     'holder_count': holder_count,
-                    'note': '此数据为近似值，可能不包含所有持有者'
+                    'note': '此数据基于数据库记录，可能不完全准确'
                 }
             }
 
@@ -1333,7 +1322,6 @@ class SplTokenService:
             logger.error(f"[{operation_id}] 获取持有者数量失败: {e}", exc_info=True)
             # 在出错时返回估算值（基于数据库记录）
             try:
-                from app.models import Holding
                 asset = Asset.query.filter_by(spl_mint_address=mint_address).first()
                 if asset:
                     db_holder_count = db.session.query(func.count(Holding.id)).filter(
@@ -1379,8 +1367,6 @@ class SplTokenService:
             # 或者建立一个专门的事件监听系统
 
             # 基于数据库的统计（作为降级方案）
-            from app.models import Trade
-            from datetime import datetime, timedelta
 
             end_time = datetime.utcnow()
             start_time = end_time - timedelta(hours=hours)
