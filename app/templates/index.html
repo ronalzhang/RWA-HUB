@@ -536,28 +536,11 @@
         card.style.position = 'absolute';
         card.style.width = '300px';
         card.style.height = '360px';
-        card.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
-        card.style.borderRadius = '20px';
-        card.style.boxShadow = '0 15px 35px rgba(0, 0, 0, 0.1)';
-        card.style.overflow = 'hidden';
         card.style.cursor = 'pointer';
         card.style.display = 'block';
         card.style.visibility = 'visible';
 
-        // 使用简化的2D叠加效果，避免3D变换问题
-        const leftOffsets = [0, 20, 40, 60, 80]; // 简单的左偏移
-        const topOffsets = [0, 10, 20, 30, 40];  // 简单的上偏移
-        const opacities = [1, 0.9, 0.8, 0.7, 0.6];
-        const zIndexes = [50, 40, 30, 20, 10];
-        const scales = [1, 0.95, 0.9, 0.85, 0.8];
-
-        if (index < leftOffsets.length) {
-            card.style.left = leftOffsets[index] + 'px';
-            card.style.top = topOffsets[index] + 'px';
-            card.style.opacity = opacities[index];
-            card.style.zIndex = zIndexes[index];
-            card.style.transform = `scale(${scales[index]})`;
-        }
+        // 移除简化的2D定位，让CSS的3D变换控制卡片位置
 
         console.log(`卡片${index}HTML内容已设置，返回卡片元素`);
         return card;
@@ -657,22 +640,25 @@
         card.onclick = () => handleHotspotClick(hotspot);
     }
 
-    // 应用卡片变换 - 简化为2D定位
+    // 应用卡片变换 - 3D版本
     function applyCardTransform(card, index) {
         // 移除所有动画类
         card.classList.remove('rotating-out', 'rotating-in');
 
-        // 简化的2D定位参数
-        const leftOffsets = [0, 20, 40, 60, 80];
-        const topOffsets = [0, 10, 20, 30, 40];
-        const opacities = [1, 0.9, 0.8, 0.7, 0.6];
-        const zIndexes = [50, 40, 30, 20, 10];
-        const scales = [1, 0.95, 0.9, 0.85, 0.8];
+        // 3D变换参数 - 与CSS保持一致
+        const transforms = [
+            'translateZ(0px) rotateY(0deg) rotateX(0deg)',
+            'translateZ(-40px) rotateY(-8deg) rotateX(2deg) translateX(15px)',
+            'translateZ(-80px) rotateY(-16deg) rotateX(4deg) translateX(30px)',
+            'translateZ(-120px) rotateY(-24deg) rotateX(6deg) translateX(45px)',
+            'translateZ(-160px) rotateY(-32deg) rotateX(8deg) translateX(60px)'
+        ];
 
-        if (index < leftOffsets.length) {
-            card.style.left = leftOffsets[index] + 'px';
-            card.style.top = topOffsets[index] + 'px';
-            card.style.transform = `scale(${scales[index]})`;
+        const opacities = [1, 0.92, 0.84, 0.76, 0.68];
+        const zIndexes = [50, 40, 30, 20, 10];
+
+        if (index < transforms.length) {
+            card.style.transform = transforms[index];
             card.style.opacity = opacities[index];
             card.style.zIndex = zIndexes[index];
         }
