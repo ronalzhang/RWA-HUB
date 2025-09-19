@@ -33,6 +33,11 @@
                                 <!-- 动态加载新闻热点卡片 -->
                             </div>
 
+                            <!-- 轮播指示器 -->
+                            <div class="hotspots-indicators" id="hotspotsIndicators" style="display: none;">
+                                <!-- 动态生成指示器 -->
+                            </div>
+
                             <!-- 加载状态 -->
                             <div class="loading-placeholder" id="hotspotsLoading">
                                 <div class="placeholder-card">
@@ -397,6 +402,7 @@
     function renderHotspots(hotspots) {
         const hotspotsStack = document.getElementById('hotspotsStack');
         const hotspotsLoading = document.getElementById('hotspotsLoading');
+        const hotspotsIndicators = document.getElementById('hotspotsIndicators');
 
         // 隐藏加载状态
         hotspotsLoading.style.display = 'none';
@@ -404,15 +410,38 @@
 
         // 清空容器
         hotspotsStack.innerHTML = '';
+        hotspotsIndicators.innerHTML = '';
 
-        // 创建卡片
-        hotspots.forEach((hotspot, index) => {
+        // 如果只有1个卡片，不显示叠加效果
+        if (hotspots.length === 1) {
+            const card = createHotspotCard(hotspots[0], 0);
+            card.style.position = 'relative';
+            card.style.transform = 'none';
+            hotspotsStack.appendChild(card);
+            return;
+        }
+
+        // 创建卡片（只显示前5个）
+        const displayHotspots = hotspots.slice(0, 5);
+        displayHotspots.forEach((hotspot, index) => {
             const card = createHotspotCard(hotspot, index);
             hotspotsStack.appendChild(card);
         });
 
-        // 启动自动轮播
-        startAutoRotation();
+        // 创建轮播指示器（如果有2个或以上卡片）
+        if (hotspots.length >= 2) {
+            hotspots.forEach((_, index) => {
+                const indicator = document.createElement('div');
+                indicator.className = 'hotspots-indicator';
+                if (index === 0) indicator.classList.add('active');
+                indicator.addEventListener('click', () => rotateToCard(index));
+                hotspotsIndicators.appendChild(indicator);
+            });
+            hotspotsIndicators.style.display = 'flex';
+
+            // 启动无限循环轮播
+            startInfiniteRotation(hotspots);
+        }
     }
 
     // 创建新闻热点卡片
@@ -420,6 +449,7 @@
         const card = document.createElement('div');
         card.className = 'hotspot-card';
         card.setAttribute('data-hotspot-id', hotspot.id);
+        card.setAttribute('data-index', index);
 
         // 处理分类显示文本
         const categoryMap = {
@@ -460,6 +490,124 @@
         return card;
     }
 
+    // 全局变量
+    let currentRotationIndex = 0;
+    let rotationInterval = null;
+    let allHotspots = [];
+
+    // 启动无限循环轮播
+    function startInfiniteRotation(hotspots) {
+        allHotspots = hotspots;
+
+        // 清除之前的定时器
+        if (rotationInterval) {
+            clearInterval(rotationInterval);
+        }
+
+        // 每4秒轮播一次
+        rotationInterval = setInterval(() => {
+            rotateToNext();
+        }, 4000);
+    }
+
+    // 轮播到下一个
+    function rotateToNext() {
+        currentRotationIndex = (currentRotationIndex + 1) % allHotspots.length;
+        rotateToCard(currentRotationIndex);
+    }
+
+    // 轮播到指定卡片
+    function rotateToCard(targetIndex) {
+        currentRotationIndex = targetIndex;
+
+        // 更新指示器
+        document.querySelectorAll('.hotspots-indicator').forEach((indicator, index) => {
+            indicator.classList.toggle('active', index === targetIndex);
+        });
+
+        // 重新排列卡片
+        rearrangeCards();
+    }
+
+    // 重新排列卡片位置
+    function rearrangeCards() {
+        const cards = document.querySelectorAll('.hotspot-card');
+        const totalCards = allHotspots.length;
+
+        cards.forEach((card, visualIndex) => {
+            // 计算实际的数据索引
+            const dataIndex = (currentRotationIndex + visualIndex) % totalCards;
+
+            // 如果这个位置需要显示新的卡片
+            if (dataIndex < allHotspots.length) {
+                const hotspot = allHotspots[dataIndex];
+                updateCardContent(card, hotspot);
+                card.style.display = 'block';
+
+                // 应用变换
+                applyCardTransform(card, visualIndex);
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    // 更新卡片内容
+    function updateCardContent(card, hotspot) {
+        const categoryMap = {
+            'general': '通用',
+            'crypto': '加密货币',
+            'defi': 'DeFi',
+            'market': '市场动态',
+            'announcement': '公告'
+        };
+        const categoryText = categoryMap[hotspot.category] || hotspot.category;
+        const createdDate = hotspot.created_at ? new Date(hotspot.created_at).toLocaleDateString('zh-CN') : '';
+        const imageUrl = hotspot.image_url || '/static/images/placeholder.jpg';
+
+        card.innerHTML = `
+            <img src="${imageUrl}"
+                 alt="${escapeHtml(hotspot.title)}"
+                 class="hotspot-card-image"
+                 onerror="this.src='/static/images/placeholder.jpg'">
+            <div class="hotspot-card-content">
+                <h3 class="hotspot-card-title">${escapeHtml(hotspot.title)}</h3>
+                <p class="hotspot-card-summary">${escapeHtml(hotspot.summary || '')}</p>
+                <div class="hotspot-card-meta">
+                    <span class="hotspot-card-category">${categoryText}</span>
+                    <span class="hotspot-card-date">${createdDate}</span>
+                </div>
+            </div>
+        `;
+
+        // 重新绑定点击事件
+        card.onclick = () => handleHotspotClick(hotspot);
+    }
+
+    // 应用卡片变换
+    function applyCardTransform(card, index) {
+        // 移除所有动画类
+        card.classList.remove('rotating-out', 'rotating-in');
+
+        // 根据位置应用变换
+        const transforms = [
+            'translateZ(0px) rotateY(0deg) scale(1)', // 前景
+            'translateZ(-30px) rotateY(-12deg) translateX(25px) scale(0.95)', // 第二层
+            'translateZ(-60px) rotateY(-24deg) translateX(50px) scale(0.9)', // 第三层
+            'translateZ(-90px) rotateY(-36deg) translateX(75px) scale(0.85)', // 第四层
+            'translateZ(-120px) rotateY(-48deg) translateX(100px) scale(0.8)' // 第五层
+        ];
+
+        const opacities = [1, 0.9, 0.8, 0.7, 0.6];
+        const zIndexes = [50, 40, 30, 20, 10];
+
+        if (index < transforms.length) {
+            card.style.transform = transforms[index];
+            card.style.opacity = opacities[index];
+            card.style.zIndex = zIndexes[index];
+        }
+    }
+
     // 处理新闻热点点击事件
     function handleHotspotClick(hotspot) {
         if (hotspot.link_url) {
@@ -477,34 +625,12 @@
         const hotspotsStack = document.getElementById('hotspotsStack');
         const hotspotsLoading = document.getElementById('hotspotsLoading');
         const hotspotsNoData = document.getElementById('hotspotsNoData');
+        const hotspotsIndicators = document.getElementById('hotspotsIndicators');
 
         hotspotsLoading.style.display = 'none';
         hotspotsStack.style.display = 'none';
         hotspotsNoData.style.display = 'flex';
-    }
-
-    // 启动自动轮播
-    function startAutoRotation() {
-        const cards = document.querySelectorAll('.hotspot-card');
-        if (cards.length <= 1) return;
-
-        let currentIndex = 0;
-
-        // 每5秒轮播一次
-        setInterval(() => {
-            // 移除当前活跃状态
-            cards.forEach(card => card.classList.remove('active'));
-
-            // 设置下一个卡片为活跃状态
-            currentIndex = (currentIndex + 1) % cards.length;
-            cards[currentIndex].classList.add('active');
-
-            // 重新排列卡片顺序（可选，实现更复杂的轮播效果）
-            setTimeout(() => {
-                cards[currentIndex].classList.remove('active');
-            }, 4000);
-
-        }, 5000);
+        hotspotsIndicators.style.display = 'none';
     }
 
     // HTML转义函数
