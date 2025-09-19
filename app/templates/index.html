@@ -29,30 +29,26 @@
                     <div class="col-lg-6 mt-4 mt-lg-0 ps-lg-4">
                         <div class="news-hotspots-container" data-aos="fade-up">
                             <!-- 新闻热点卡片堆叠容器 -->
+                            <!-- 热点卡片加载状态 -->
+                            <div class="hotspots-loading" id="hotspotsLoading" style="display: none;">
+                                <div class="loading-spinner"></div>
+                                <p>加载中...</p>
+                            </div>
+
+                            <!-- 热点卡片无数据状态 -->
+                            <div class="hotspots-no-data" id="hotspotsNoData" style="display: none;">
+                                <p>暂无热点数据</p>
+                            </div>
+
+                            <!-- 热点卡片轮播容器 -->
                             <div class="hotspots-stack" id="hotspotsStack">
                                 <!-- 动态加载新闻热点卡片 -->
                             </div>
 
-                            <!-- 轮播指示器已移除 - 使用自动轮播，无需手动切换点 -->
-
-                            <!-- 加载状态 -->
-                            <div class="loading-placeholder" id="hotspotsLoading">
-                                <div class="placeholder-card">
-                                    <div class="placeholder-image"></div>
-                                    <div class="placeholder-content">
-                                        <div class="placeholder-title"></div>
-                                        <div class="placeholder-text"></div>
-                                    </div>
-                                </div>
+                            <!-- 热点卡片指示器 -->
+                            <div class="hotspots-indicators" id="hotspotsIndicators" style="display: none;">
                             </div>
 
-                            <!-- 无数据状态 -->
-                            <div class="no-data-placeholder" id="hotspotsNoData" style="display: none;">
-                                <div class="no-data-card">
-                                    <i class="fas fa-newspaper"></i>
-                                    <p>暂无热点新闻</p>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
