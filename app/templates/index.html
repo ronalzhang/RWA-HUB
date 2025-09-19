@@ -1336,3 +1336,49 @@
 </style>
 </div>
 {% endblock %}
+
+<!-- 新增：统一钱包管理器测试 -->
+<script src="{{ url_for('static', filename='js/unified-wallet-manager.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔄 测试统一钱包管理器...');
+
+    // 等待钱包管理器初始化
+    setTimeout(() => {
+        if (window.unifiedWalletManager) {
+            console.log('✅ 统一钱包管理器已加载');
+            console.log('当前连接状态:', window.unifiedWalletManager.isConnected());
+            console.log('当前地址:', window.unifiedWalletManager.getAddress());
+
+            // 重新绑定钱包按钮（覆盖base.html中的逻辑）
+            const walletBtn = document.getElementById('walletBtn');
+            if (walletBtn) {
+                // 移除旧的事件监听器
+                walletBtn.removeAttribute('data-event-bound');
+
+                // 克隆节点以移除所有事件监听器
+                const newWalletBtn = walletBtn.cloneNode(true);
+                walletBtn.parentNode.replaceChild(newWalletBtn, walletBtn);
+
+                // 添加新的事件监听器
+                newWalletBtn.addEventListener('click', async function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    if (window.unifiedWalletManager.isConnected()) {
+                        // 已连接时复制地址
+                        await window.unifiedWalletManager.copyAddress();
+                    } else {
+                        // 未连接时尝试连接
+                        await window.unifiedWalletManager.connect();
+                    }
+                });
+
+                console.log('✅ 钱包按钮已重新绑定到统一管理器');
+            }
+        } else {
+            console.error('❌ 统一钱包管理器未加载');
+        }
+    }, 2000);
+});
+</script>
