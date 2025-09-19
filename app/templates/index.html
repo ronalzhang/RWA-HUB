@@ -561,14 +561,20 @@
 
     // 加载新闻热点数据
     function loadNewsHotspots() {
-        const hotspotsStack = document.getElementById('hotspotsStack');
-        const hotspotsLoading = document.getElementById('hotspotsLoading');
-        const hotspotsNoData = document.getElementById('hotspotsNoData');
+        // 检查元素是否存在，如果不存在则跳过
+        const newsCarousel = document.getElementById('newsCarousel');
+        const newsLoading = document.getElementById('newsLoading');
+        const newsEmpty = document.getElementById('newsEmpty');
+
+        if (!newsCarousel || !newsLoading || !newsEmpty) {
+            console.log('热点卡片容器元素未找到，跳过加载');
+            return;
+        }
 
         // 显示加载状态
-        hotspotsLoading.style.display = 'flex';
-        hotspotsStack.style.display = 'none';
-        hotspotsNoData.style.display = 'none';
+        newsLoading.style.display = 'flex';
+        newsCarousel.style.display = 'none';
+        newsEmpty.style.display = 'none';
 
         // 获取新闻热点数据 - 添加缓存破坏参数
         const cacheBreaker = Date.now();
