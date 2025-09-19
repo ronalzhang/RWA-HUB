@@ -551,6 +551,133 @@
         }
     }
 
+    // =================== 现代化热点卡片系统 ===================
+
+    // 现代化热点卡片渲染函数
+    function renderModernHotspots(hotspots) {
+        console.log('✅ 热点数据加载成功，数量:', hotspots.length);
+
+        const newsCarousel = document.getElementById('newsCarousel');
+        const newsLoading = document.getElementById('newsLoading');
+        const newsEmpty = document.getElementById('newsEmpty');
+
+        if (!newsCarousel) {
+            console.error('newsCarousel 元素未找到');
+            return;
+        }
+
+        // 隐藏加载状态，显示内容
+        if (newsLoading) newsLoading.style.display = 'none';
+        if (newsEmpty) newsEmpty.style.display = 'none';
+        newsCarousel.style.display = 'block';
+
+        // 清空容器
+        newsCarousel.innerHTML = '';
+
+        // 创建无限滚动容器
+        const scrollContainer = document.createElement('div');
+        scrollContainer.className = 'hotspots-infinite-scroll';
+
+        // 复制数组以实现无限滚动（显示两倍数据）
+        const infiniteHotspots = [...hotspots, ...hotspots];
+
+        infiniteHotspots.forEach((hotspot, index) => {
+            const card = createModernHotspotCard(hotspot, index);
+            scrollContainer.appendChild(card);
+        });
+
+        newsCarousel.appendChild(scrollContainer);
+
+        // 启动无限滚动动画
+        startInfiniteScrollAnimation(scrollContainer, hotspots.length);
+
+        console.log('✅ 现代热点卡片渲染完成');
+    }
+
+    // 创建现代热点卡片（图片背景，文字叠加）
+    function createModernHotspotCard(hotspot, index) {
+        const card = document.createElement('div');
+        card.className = 'hotspot-card-modern';
+
+        const imageUrl = hotspot.image_url || '/static/images/placeholder.jpg';
+        const categoryText = getCategoryDisplayText(hotspot.category);
+        const createdDate = hotspot.created_at ? new Date(hotspot.created_at).toLocaleDateString('zh-CN', {
+            month: 'short',
+            day: 'numeric'
+        }) : '';
+
+        card.innerHTML = `
+            <div class="hotspot-card-bg" style="background-image: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.6) 100%), url('${imageUrl}');">
+                <div class="hotspot-card-overlay">
+                    <div class="hotspot-card-top">
+                        <span class="hotspot-card-category">${categoryText}</span>
+                        <span class="hotspot-card-date">${createdDate}</span>
+                    </div>
+                    <div class="hotspot-card-bottom">
+                        <h3 class="hotspot-card-title">${escapeHtml(hotspot.title)}</h3>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // 点击事件
+        card.onclick = () => {
+            if (hotspot.link_url) {
+                window.open(hotspot.link_url, '_blank');
+            } else {
+                window.location.href = `/news/${hotspot.id}`;
+            }
+        };
+
+        return card;
+    }
+
+    // 启动无限滚动动画
+    function startInfiniteScrollAnimation(container, originalCount) {
+        const cardHeight = 150; // 每张卡片的高度
+        const gap = 12; // 卡片间距
+        const totalHeight = originalCount * (cardHeight + gap);
+        let currentOffset = 0;
+        let isPaused = false;
+
+        function animate() {
+            if (!isPaused) {
+                currentOffset += 0.8; // 滚动速度
+
+                if (currentOffset >= totalHeight) {
+                    currentOffset = 0; // 重置到开始位置
+                }
+
+                container.style.transform = `translateY(-${currentOffset}px)`;
+            }
+            requestAnimationFrame(animate);
+        }
+
+        // 启动动画
+        animate();
+
+        // 鼠标悬停时暂停滚动
+        container.addEventListener('mouseenter', () => {
+            isPaused = true;
+        });
+
+        container.addEventListener('mouseleave', () => {
+            isPaused = false;
+        });
+    }
+
+    // 获取分类显示文本
+    function getCategoryDisplayText(category) {
+        const categoryMap = {
+            'general': '通用',
+            'crypto': '加密货币',
+            'defi': 'DeFi',
+            'market': '市场动态',
+            'announcement': '公告'
+        };
+        return categoryMap[category] || category;
+    }
+
     // 加载新闻热点数据
     function loadNewsHotspots() {
         // 检查元素是否存在，如果不存在则跳过
@@ -584,7 +711,7 @@
                 // 简化判断逻辑，强制执行渲染
                 if (data && data.data && Array.isArray(data.data) && data.data.length > 0) {
                     console.log('✅ 条件满足，开始渲染热点卡片，数量:', data.data.length);
-                    renderHotspots(data.data);
+                    renderModernHotspots(data.data); // 使用新的现代化渲染函数
                 } else {
                     console.log('❌ 条件不满足，显示无数据状态');
                     console.log('详细原因检查:');
