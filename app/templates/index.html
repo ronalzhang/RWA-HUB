@@ -355,6 +355,197 @@
         }
 
         console.log("资产卡片处理完成");
+    });
+
+    // ===== 全新的极简新闻轮播实现 =====
+    let newsData = [];
+    let currentIndex = 0;
+    let autoPlayTimer = null;
+
+    // 加载新闻数据
+    function loadNews() {
+        const loading = document.getElementById('newsLoading');
+        const carousel = document.getElementById('newsCarousel');
+        const empty = document.getElementById('newsEmpty');
+
+        if (!loading || !carousel || !empty) {
+            console.error('新闻轮播DOM元素未找到');
+            return;
+        }
+
+        loading.style.display = 'flex';
+        carousel.style.display = 'none';
+        empty.style.display = 'none';
+
+        fetch('/api/admin/news/hotspots?limit=5')
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.data && data.data.length > 0) {
+                    newsData = data.data;
+                    renderNews();
+                    startAutoPlay();
+                    console.log('✅ 新闻轮播初始化成功，数量:', newsData.length);
+                } else {
+                    showEmpty();
+                }
+            })
+            .catch(error => {
+                console.error('加载新闻失败:', error);
+                showEmpty();
+            })
+            .finally(() => {
+                loading.style.display = 'none';
+            });
+    }
+
+    // 渲染新闻
+    function renderNews() {
+        const carousel = document.getElementById('newsCarousel');
+        const dots = document.getElementById('newsDots');
+
+        if (!carousel || !dots) return;
+
+        carousel.innerHTML = '';
+        dots.innerHTML = '';
+
+        // 只显示奇数张卡片（1,3,5）
+        const displayCount = newsData.length <= 3 ? Math.min(newsData.length, 3) : 5;
+        const displayNews = newsData.slice(0, displayCount);
+
+        // 创建卡片
+        displayNews.forEach((news, index) => {
+            const card = createNewsCard(news, index);
+            carousel.appendChild(card);
+
+            // 创建导航点
+            const dot = document.createElement('div');
+            dot.className = `news-dot ${index === 0 ? 'active' : ''}`;
+            dot.onclick = () => goToSlide(index);
+            dots.appendChild(dot);
+        });
+
+        carousel.style.display = 'block';
+        currentIndex = 0;
+        updateActiveSlide();
+    }
+
+    // 创建新闻卡片
+    function createNewsCard(news, index) {
+        const card = document.createElement('div');
+        card.className = `news-card ${index === 0 ? 'active' : ''}`;
+        card.onclick = () => window.location.href = `/news/${news.id}`;
+
+        const categoryText = {
+            'general': '通用',
+            'crypto': '加密货币',
+            'defi': 'DeFi',
+            'market': '市场动态'
+        }[news.category] || news.category || '通用';
+
+        const imageUrl = news.image_url || '';
+        const title = escapeHtml(news.title) || '无标题';
+        const summary = escapeHtml(news.summary || '') || '暂无摘要';
+        const dateText = formatDate(news.created_at);
+
+        card.innerHTML = `
+            <div class="news-card-content">
+                <div class="news-card-image" style="background-image: url('${imageUrl}')">
+                    ${!imageUrl ? '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;"><i class="fas fa-image fa-2x"></i></div>' : ''}
+                </div>
+                <div class="news-card-text">
+                    <div>
+                        <div class="news-card-title">${title}</div>
+                        <div class="news-card-summary">${summary}</div>
+                    </div>
+                    <div class="news-card-meta">
+                        <span>${categoryText}</span>
+                        <span>${dateText}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        return card;
+    }
+
+    // 更新活动滑块
+    function updateActiveSlide() {
+        const cards = document.querySelectorAll('.news-card');
+        const dots = document.querySelectorAll('.news-dot');
+
+        cards.forEach((card, index) => {
+            card.className = 'news-card';
+            if (index === currentIndex) {
+                card.classList.add('active');
+            } else if (index < currentIndex) {
+                card.classList.add('prev');
+            } else {
+                card.classList.add('next');
+            }
+        });
+
+        dots.forEach((dot, index) => {
+            dot.className = `news-dot ${index === currentIndex ? 'active' : ''}`;
+        });
+    }
+
+    // 跳转到指定滑块
+    function goToSlide(index) {
+        currentIndex = index;
+        updateActiveSlide();
+        resetAutoPlay();
+    }
+
+    // 下一张
+    function nextSlide() {
+        if (newsData.length <= 1) return;
+
+        const maxIndex = Math.min(newsData.length, newsData.length <= 3 ? 3 : 5) - 1;
+        currentIndex = (currentIndex + 1) % (maxIndex + 1);
+        updateActiveSlide();
+    }
+
+    // 开始自动播放
+    function startAutoPlay() {
+        if (newsData.length > 1) {
+            autoPlayTimer = setInterval(nextSlide, 4000);
+        }
+    }
+
+    // 重置自动播放
+    function resetAutoPlay() {
+        if (autoPlayTimer) {
+            clearInterval(autoPlayTimer);
+            autoPlayTimer = null;
+            startAutoPlay();
+        }
+    }
+
+    // 显示空状态
+    function showEmpty() {
+        const empty = document.getElementById('newsEmpty');
+        if (empty) {
+            empty.style.display = 'flex';
+        }
+    }
+
+    // 工具函数
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return '最新';
+        try {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+        } catch (e) {
+            return '最新';
+        }
+    }
 
         // 可以选择性保留调试日志，或移除
         const assetLinks = document.querySelectorAll('.home-asset-card-link');
