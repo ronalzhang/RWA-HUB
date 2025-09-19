@@ -455,15 +455,6 @@
             const card = createHotspotCard(hotspot, index);
             hotspotsStack.appendChild(card);
             console.log(`第${index + 1}个卡片已添加到DOM`);
-
-        // 强制调试：检查卡片可见性
-        console.log(`卡片${index}样式检查:`, {
-            display: card.style.display,
-            visibility: card.style.visibility,
-            opacity: card.style.opacity,
-            position: card.style.position,
-            zIndex: card.style.zIndex
-        });
         });
 
         console.log('🔍 渲染完成后容器状态检查:');
@@ -471,40 +462,6 @@
         console.log('hotspotsStack.children.length:', hotspotsStack.children.length);
         console.log('hotspotsLoading.style.display:', hotspotsLoading.style.display);
         console.log('hotspotsNoData.style.display:', hotspotsNoData.style.display);
-
-        // 强制检查整个容器的样式和可见性
-        console.log('🔍 详细容器检查:');
-        const container = document.querySelector('.news-hotspots-container');
-        console.log('news-hotspots-container存在:', !!container);
-        if (container) {
-            console.log('container.style.display:', container.style.display);
-            console.log('container.offsetHeight:', container.offsetHeight);
-            console.log('container.offsetWidth:', container.offsetWidth);
-        }
-
-        // 强制检查第一个卡片的可见性
-        const firstCard = hotspotsStack.children[0];
-        if (firstCard) {
-            console.log('🔍 第一个卡片检查:');
-            console.log('firstCard.offsetHeight:', firstCard.offsetHeight);
-            console.log('firstCard.offsetWidth:', firstCard.offsetWidth);
-            console.log('firstCard.getBoundingClientRect():', firstCard.getBoundingClientRect());
-        }
-
-        // 强制使hotspotsNoData完全消失
-        hotspotsNoData.style.display = 'none !important';
-        hotspotsNoData.style.visibility = 'hidden';
-        hotspotsNoData.style.opacity = '0';
-
-        // 强制搜索并隐藏所有可能的"暂无"文字
-        const allElements = document.querySelectorAll('*');
-        allElements.forEach(el => {
-            if (el.textContent && el.textContent.includes('暂无热点新闻')) {
-                console.log('发现"暂无热点新闻"元素:', el);
-                el.style.display = 'none';
-                el.style.visibility = 'hidden';
-            }
-        });
 
         // 创建轮播指示器（如果有2个或以上卡片）
         if (hotspots.length >= 2) {
@@ -581,26 +538,25 @@
         card.style.height = '360px';
         card.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
         card.style.borderRadius = '20px';
-        card.style.boxShadow = '0 15px 35px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.08)';
+        card.style.boxShadow = '0 15px 35px rgba(0, 0, 0, 0.1)';
         card.style.overflow = 'hidden';
         card.style.cursor = 'pointer';
         card.style.display = 'block';
         card.style.visibility = 'visible';
 
-        // 设置3D叠加效果的z-index和transform
-        const transforms = [
-            'translateZ(0px) rotateY(0deg) scale(1)', // 前景
-            'translateZ(-30px) rotateY(-12deg) translateX(25px) scale(0.95)', // 第二层
-            'translateZ(-60px) rotateY(-24deg) translateX(50px) scale(0.9)', // 第三层
-            'translateZ(-90px) rotateY(-36deg) translateX(75px) scale(0.85)' // 第四层
-        ];
-        const opacities = [1, 0.9, 0.8, 0.7];
-        const zIndexes = [50, 40, 30, 20];
+        // 使用简化的2D叠加效果，避免3D变换问题
+        const leftOffsets = [0, 20, 40, 60, 80]; // 简单的左偏移
+        const topOffsets = [0, 10, 20, 30, 40];  // 简单的上偏移
+        const opacities = [1, 0.9, 0.8, 0.7, 0.6];
+        const zIndexes = [50, 40, 30, 20, 10];
+        const scales = [1, 0.95, 0.9, 0.85, 0.8];
 
-        if (index < transforms.length) {
-            card.style.transform = transforms[index];
+        if (index < leftOffsets.length) {
+            card.style.left = leftOffsets[index] + 'px';
+            card.style.top = topOffsets[index] + 'px';
             card.style.opacity = opacities[index];
             card.style.zIndex = zIndexes[index];
+            card.style.transform = `scale(${scales[index]})`;
         }
 
         console.log(`卡片${index}HTML内容已设置，返回卡片元素`);
@@ -701,25 +657,22 @@
         card.onclick = () => handleHotspotClick(hotspot);
     }
 
-    // 应用卡片变换
+    // 应用卡片变换 - 简化为2D定位
     function applyCardTransform(card, index) {
         // 移除所有动画类
         card.classList.remove('rotating-out', 'rotating-in');
 
-        // 根据位置应用变换
-        const transforms = [
-            'translateZ(0px) rotateY(0deg) scale(1)', // 前景
-            'translateZ(-30px) rotateY(-12deg) translateX(25px) scale(0.95)', // 第二层
-            'translateZ(-60px) rotateY(-24deg) translateX(50px) scale(0.9)', // 第三层
-            'translateZ(-90px) rotateY(-36deg) translateX(75px) scale(0.85)', // 第四层
-            'translateZ(-120px) rotateY(-48deg) translateX(100px) scale(0.8)' // 第五层
-        ];
-
+        // 简化的2D定位参数
+        const leftOffsets = [0, 20, 40, 60, 80];
+        const topOffsets = [0, 10, 20, 30, 40];
         const opacities = [1, 0.9, 0.8, 0.7, 0.6];
         const zIndexes = [50, 40, 30, 20, 10];
+        const scales = [1, 0.95, 0.9, 0.85, 0.8];
 
-        if (index < transforms.length) {
-            card.style.transform = transforms[index];
+        if (index < leftOffsets.length) {
+            card.style.left = leftOffsets[index] + 'px';
+            card.style.top = topOffsets[index] + 'px';
+            card.style.transform = `scale(${scales[index]})`;
             card.style.opacity = opacities[index];
             card.style.zIndex = zIndexes[index];
         }

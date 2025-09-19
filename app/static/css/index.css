@@ -474,12 +474,11 @@ section[id="assets"] .card .card-text,
     margin-bottom: 0.5rem !important;
 }
 
-/* 新闻热点卡片样式 - 重新设计为真正的叠加效果 */
+/* 新闻热点卡片样式 - 简化为2D叠加效果 */
 .news-hotspots-container {
     position: relative !important;
     width: 100% !important;
     height: 400px !important;
-    perspective: 1200px !important;
     overflow: hidden !important;
     display: block !important; /* 强制显示容器 */
 }
@@ -488,7 +487,6 @@ section[id="assets"] .card .card-text,
     position: relative !important;
     width: 100% !important;
     height: 100% !important;
-    transform-style: preserve-3d !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -513,69 +511,78 @@ section[id="assets"] .card .card-text,
     visibility: visible !important; /* 强制可见 */
 }
 
-/* 叠加层级和位置 - 苹果唱片风格 */
+/* 简化的2D叠加层级和位置 - 苹果风格 */
 .hotspot-card:nth-child(1) {
     z-index: 50 !important;
-    transform: translateZ(0px) rotateY(0deg) scale(1) !important;
+    left: 0px !important;
+    top: 0px !important;
     opacity: 1 !important;
+    transform: scale(1) !important;
 }
 
 .hotspot-card:nth-child(2) {
     z-index: 40 !important;
-    transform: translateZ(-30px) rotateY(-12deg) translateX(25px) scale(0.95) !important;
+    left: 20px !important;
+    top: 10px !important;
     opacity: 0.9 !important;
+    transform: scale(0.95) !important;
 }
 
 .hotspot-card:nth-child(3) {
     z-index: 30 !important;
-    transform: translateZ(-60px) rotateY(-24deg) translateX(50px) scale(0.9) !important;
+    left: 40px !important;
+    top: 20px !important;
     opacity: 0.8 !important;
+    transform: scale(0.9) !important;
 }
 
 .hotspot-card:nth-child(4) {
     z-index: 20 !important;
-    transform: translateZ(-90px) rotateY(-36deg) translateX(75px) scale(0.85) !important;
+    left: 60px !important;
+    top: 30px !important;
     opacity: 0.7 !important;
+    transform: scale(0.85) !important;
 }
 
 .hotspot-card:nth-child(5) {
     z-index: 10 !important;
-    transform: translateZ(-120px) rotateY(-48deg) translateX(100px) scale(0.8) !important;
+    left: 80px !important;
+    top: 40px !important;
     opacity: 0.6 !important;
+    transform: scale(0.8) !important;
 }
 
-/* 卡片悬停效果 */
+/* 卡片悬停效果 - 简化为2D */
 .hotspot-card:hover {
-    transform: translateZ(30px) rotateY(0deg) translateX(0px) scale(1.05) !important;
+    transform: scale(1.05) !important;
     box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2), 0 10px 25px rgba(0, 0, 0, 0.15) !important;
     z-index: 100 !important;
     opacity: 1 !important;
     background: rgba(255, 255, 255, 0.98) !important;
 }
 
-/* 轮播动画类 */
+/* 轮播动画类 - 简化为2D */
 .hotspot-card.rotating-out {
-    transform: translateZ(-150px) rotateY(-60deg) translateX(120px) scale(0.7) !important;
+    transform: translateX(100px) scale(0.7) !important;
     opacity: 0 !important;
-    transition: all 0.8s ease-in-out !important;
+    transition: all 0.6s ease-in-out !important;
 }
 
 .hotspot-card.rotating-in {
-    transform: translateZ(0px) rotateY(0deg) translateX(0px) scale(1) !important;
+    transform: scale(1) !important;
     opacity: 1 !important;
     z-index: 50 !important;
-    transition: all 0.8s ease-in-out !important;
+    transition: all 0.6s ease-in-out !important;
 }
 
 /* 卡片内容样式 */
 .hotspot-card-image {
     width: 100% !important;
     height: 180px !important;
-    object-fit: cover !important; /* 改为cover以更好适应圆角 */
+    object-fit: cover !important;
     object-position: center !important;
-    border-radius: 20px 20px 15px 15px !important; /* 优化上方圆角，下方稍小 */
+    border-radius: 20px 20px 0 0 !important;
     background: rgba(248, 249, 250, 0.8) !important;
-    backdrop-filter: blur(10px) !important;
 }
 
 .hotspot-card-content {
