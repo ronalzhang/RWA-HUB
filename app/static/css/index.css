@@ -649,7 +649,7 @@ section[id="assets"] .card .card-text,
     transform: scale(1.1) !important;
 }
 
-/* 加载和无数据状态 - 修复遮挡问题 */
+/* 加载和无数据状态 - 允许JavaScript控制显示隐藏 */
 .loading-placeholder,
 .no-data-placeholder {
     position: absolute !important;
@@ -657,7 +657,7 @@ section[id="assets"] .card .card-text,
     left: 0 !important;
     width: 100% !important;
     height: 100% !important;
-    display: flex !important;
+    /* 移除 display: flex !important，允许JavaScript控制 */
     align-items: center !important;
     justify-content: center !important;
     /* 移除背景模糊，避免遮挡新闻卡片 */
