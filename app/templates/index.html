@@ -472,6 +472,40 @@
         console.log('hotspotsLoading.style.display:', hotspotsLoading.style.display);
         console.log('hotspotsNoData.style.display:', hotspotsNoData.style.display);
 
+        // 强制检查整个容器的样式和可见性
+        console.log('🔍 详细容器检查:');
+        const container = document.querySelector('.news-hotspots-container');
+        console.log('news-hotspots-container存在:', !!container);
+        if (container) {
+            console.log('container.style.display:', container.style.display);
+            console.log('container.offsetHeight:', container.offsetHeight);
+            console.log('container.offsetWidth:', container.offsetWidth);
+        }
+
+        // 强制检查第一个卡片的可见性
+        const firstCard = hotspotsStack.children[0];
+        if (firstCard) {
+            console.log('🔍 第一个卡片检查:');
+            console.log('firstCard.offsetHeight:', firstCard.offsetHeight);
+            console.log('firstCard.offsetWidth:', firstCard.offsetWidth);
+            console.log('firstCard.getBoundingClientRect():', firstCard.getBoundingClientRect());
+        }
+
+        // 强制使hotspotsNoData完全消失
+        hotspotsNoData.style.display = 'none !important';
+        hotspotsNoData.style.visibility = 'hidden';
+        hotspotsNoData.style.opacity = '0';
+
+        // 强制搜索并隐藏所有可能的"暂无"文字
+        const allElements = document.querySelectorAll('*');
+        allElements.forEach(el => {
+            if (el.textContent && el.textContent.includes('暂无热点新闻')) {
+                console.log('发现"暂无热点新闻"元素:', el);
+                el.style.display = 'none';
+                el.style.visibility = 'hidden';
+            }
+        });
+
         // 创建轮播指示器（如果有2个或以上卡片）
         if (hotspots.length >= 2) {
             hotspots.forEach((_, index) => {
