@@ -5,6 +5,7 @@ from sqlalchemy.orm import defer
 from ..extensions import db
 from ..models.asset import Asset, AssetStatus
 from ..models.user import User
+from ..models.news_hotspot import NewsHotspot
 from ..utils import is_admin
 from . import main_bp
 
@@ -154,3 +155,31 @@ def favicon():
         return send_from_directory(os.path.join(current_app.root_path, 'static'), 'favicon.ico', mimetype='image/vnd.microsoft.icon')
     except FileNotFoundError:
         return '', 404
+
+@main_bp.route('/news/<int:news_id>')
+def news_detail(news_id):
+    """新闻详情页面"""
+    try:
+        # 根据ID查找新闻热点
+        hotspot = NewsHotspot.query.filter_by(id=news_id, is_active=True).first()
+        if not hotspot:
+            current_app.logger.warning(f'新闻详情页面 - 未找到ID为{news_id}的热点新闻')
+            return render_template('404.html'), 404
+
+        # 获取相关新闻（同分类，排除当前新闻）
+        related_news = NewsHotspot.query.filter(
+            NewsHotspot.category == hotspot.category,
+            NewsHotspot.is_active == True,
+            NewsHotspot.id != news_id
+        ).order_by(NewsHotspot.created_at.desc()).limit(3).all()
+
+        current_app.logger.info(f'显示新闻详情: {hotspot.title}')
+
+        return render_template('news_detail.html',
+                             hotspot=hotspot,
+                             related_news=related_news,
+                             _=_)
+
+    except Exception as e:
+        current_app.logger.error(f'加载新闻详情页面失败: {str(e)}')
+        return render_template('404.html'), 404

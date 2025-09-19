@@ -661,14 +661,8 @@
 
     // 处理新闻热点点击事件
     function handleHotspotClick(hotspot) {
-        if (hotspot.link_url) {
-            // 如果有链接，跳转到链接
-            window.open(hotspot.link_url, '_blank');
-        } else {
-            // 否则显示详情（可以扩展为模态框）
-            console.log('点击新闻热点:', hotspot.title);
-            alert(`新闻标题: ${hotspot.title}\n\n${hotspot.summary || '暂无详情'}`);
-        }
+        // 跳转到新闻详情页面
+        window.location.href = `/news/${hotspot.id}`;
     }
 
     // 显示无数据状态

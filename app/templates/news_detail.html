@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}{{ hotspot.title }} - RWA-HUB{% endblock %}
+
+{% block extra_head %}
+<meta name="description" content="{{ hotspot.summary[:160] if hotspot.summary else '' }}">
+<meta property="og:title" content="{{ hotspot.title }}">
+<meta property="og:description" content="{{ hotspot.summary if hotspot.summary else '' }}">
+<meta property="og:image" content="{{ hotspot.image_url if hotspot.image_url else '' }}">
+<meta property="og:type" content="article">
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- 面包屑导航 -->
+    <nav class="mb-8">
+        <ol class="flex items-center space-x-2 text-sm text-gray-600">
+            <li><a href="{{ url_for('main.index') }}" class="hover:text-blue-600">首页</a></li>
+            <li><i class="fas fa-chevron-right text-xs"></i></li>
+            <li><span class="text-gray-400">新闻详情</span></li>
+        </ol>
+    </nav>
+
+    <div class="max-w-4xl mx-auto">
+        <!-- 新闻标题 -->
+        <header class="mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">{{ hotspot.title }}</h1>
+
+            <!-- 新闻元信息 -->
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-6">
+                <div class="flex items-center">
+                    <i class="fas fa-calendar-alt mr-2"></i>
+                    <time datetime="{{ hotspot.created_at.isoformat() if hotspot.created_at else '' }}">
+                        {{ hotspot.created_at.strftime('%Y年%m月%d日') if hotspot.created_at else '' }}
+                    </time>
+                </div>
+
+                {% if hotspot.category %}
+                <div class="flex items-center">
+                    <i class="fas fa-tag mr-2"></i>
+                    <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        {% if hotspot.category == 'general' %}通用
+                        {% elif hotspot.category == 'crypto' %}加密货币
+                        {% elif hotspot.category == 'defi' %}DeFi
+                        {% elif hotspot.category == 'market' %}市场动态
+                        {% else %}{{ hotspot.category }}
+                        {% endif %}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+        </header>
+
+        <!-- 新闻图片 -->
+        {% if hotspot.image_url %}
+        <div class="mb-8">
+            <img src="{{ hotspot.image_url }}" alt="{{ hotspot.title }}"
+                 class="w-full h-64 md:h-96 object-cover rounded-lg shadow-lg">
+        </div>
+        {% endif %}
+
+        <!-- 新闻摘要 -->
+        {% if hotspot.summary %}
+        <div class="mb-8 p-6 bg-gray-50 rounded-lg border-l-4 border-blue-500">
+            <p class="text-lg text-gray-700 leading-relaxed">{{ hotspot.summary }}</p>
+        </div>
+        {% endif %}
+
+        <!-- 新闻内容 -->
+        <article class="prose prose-lg max-w-none mb-12">
+            {% if hotspot.content %}
+                {{ hotspot.content|safe }}
+            {% else %}
+                <p class="text-gray-600">暂无详细内容。</p>
+            {% endif %}
+        </article>
+
+        <!-- 原文链接 -->
+        {% if hotspot.link_url %}
+        <div class="mb-12 p-4 bg-blue-50 rounded-lg">
+            <p class="text-sm text-gray-600 mb-2">查看原文：</p>
+            <a href="{{ hotspot.link_url }}" target="_blank" rel="noopener noreferrer"
+               class="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium">
+                {{ hotspot.link_url }}
+                <i class="fas fa-external-link-alt ml-2 text-xs"></i>
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- 标签 -->
+        {% if hotspot.tags %}
+        <div class="mb-12">
+            <h3 class="text-lg font-semibold text-gray-900 mb-3">相关标签</h3>
+            <div class="flex flex-wrap gap-2">
+                {% for tag in hotspot.tags.split(',') %}
+                {% if tag.strip() %}
+                <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">{{ tag.strip() }}</span>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 分享按钮 -->
+        <div class="mb-12">
+            <h3 class="text-lg font-semibold text-gray-900 mb-3">分享这篇文章</h3>
+            <div class="flex space-x-3">
+                <button onclick="shareToTwitter()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                    <i class="fab fa-twitter mr-2"></i>Twitter
+                </button>
+                <button onclick="shareToFacebook()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                    <i class="fab fa-facebook mr-2"></i>Facebook
+                </button>
+                <button onclick="copyLink()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                    <i class="fas fa-link mr-2"></i>复制链接
+                </button>
+            </div>
+        </div>
+
+        <!-- 相关新闻 -->
+        {% if related_news %}
+        <section class="border-t pt-12">
+            <h3 class="text-2xl font-bold text-gray-900 mb-6">相关新闻</h3>
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {% for news in related_news %}
+                <article class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                    {% if news.image_url %}
+                    <img src="{{ news.image_url }}" alt="{{ news.title }}" class="w-full h-48 object-cover">
+                    {% endif %}
+                    <div class="p-4">
+                        <h4 class="font-semibold text-gray-900 mb-2 line-clamp-2">
+                            <a href="{{ url_for('main.news_detail', news_id=news.id) }}" class="hover:text-blue-600">
+                                {{ news.title }}
+                            </a>
+                        </h4>
+                        {% if news.summary %}
+                        <p class="text-gray-600 text-sm mb-3 line-clamp-2">{{ news.summary }}</p>
+                        {% endif %}
+                        <div class="text-xs text-gray-500">
+                            {{ news.created_at.strftime('%Y-%m-%d') if news.created_at else '' }}
+                        </div>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- 返回首页按钮 -->
+        <div class="text-center mt-12">
+            <a href="{{ url_for('main.index') }}" class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>返回首页
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function shareToTwitter() {
+    const text = `{{ hotspot.title }} - RWA-HUB`;
+    const url = window.location.href;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
+}
+
+function shareToFacebook() {
+    const url = window.location.href;
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
+}
+
+function copyLink() {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+        alert('链接已复制到剪贴板！');
+    }).catch(() => {
+        const textArea = document.createElement('textarea');
+        textArea.value = window.location.href;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('链接已复制到剪贴板！');
+    });
+}
+</script>
+
+<style>
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.prose {
+    color: #374151;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+    color: #111827;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+}
+
+.prose p {
+    margin-bottom: 1.25rem;
+    line-height: 1.7;
+}
+
+.prose img {
+    margin: 1.5rem 0;
+    border-radius: 0.5rem;
+}
+
+.prose blockquote {
+    border-left: 4px solid #e5e7eb;
+    padding-left: 1rem;
+    font-style: italic;
+    color: #6b7280;
+}
+
+.prose ul, .prose ol {
+    margin: 1.25rem 0;
+    padding-left: 1.5rem;
+}
+
+.prose li {
+    margin: 0.5rem 0;
+}
+</style>
+{% endblock %}
