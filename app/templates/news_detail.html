@@ -12,384 +12,265 @@
 
 {% block styles %}
 <style>
-/* 极简奢华新闻详情页样式 */
+/* 现代科技风格新闻详情页 */
 .news-detail-page {
     min-height: 100vh;
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* 科技背景效果 */
+.news-detail-page::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background:
+        radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(255, 107, 107, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 1;
 }
 
 .news-detail-container {
-    max-width: 800px;
+    position: relative;
+    z-index: 2;
+    max-width: 900px;
     margin: 0 auto;
     padding: 2rem 1rem;
 }
 
-.news-hero {
-    background: white;
-    border-radius: 24px;
-    overflow: hidden;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
-    margin-bottom: 3rem;
+/* 返回按钮 */
+.back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #94a3b8;
+    text-decoration: none;
+    font-size: 0.9rem;
+    margin-bottom: 2rem;
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    background: rgba(30, 41, 59, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(148, 163, 184, 0.1);
     transition: all 0.3s ease;
 }
 
-.news-hero:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 35px 60px -12px rgba(0, 0, 0, 0.12);
+.back-button:hover {
+    color: #e2e8f0;
+    background: rgba(30, 41, 59, 0.8);
+    border-color: rgba(148, 163, 184, 0.2);
+    transform: translateX(-2px);
+}
+
+/* 主内容卡片 */
+.news-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow:
+        0 25px 50px -12px rgba(0, 0, 0, 0.3),
+        0 0 0 1px rgba(255, 255, 255, 0.1);
+    margin-bottom: 2rem;
+}
+
+/* 头部图片区域 */
+.news-header {
+    position: relative;
+    height: 400px;
+    overflow: hidden;
 }
 
 .news-image {
     width: 100%;
-    height: 400px;
+    height: 100%;
     object-fit: cover;
-    background: linear-gradient(45deg, #e5e7eb, #f3f4f6);
+    transition: transform 0.3s ease;
+}
+
+.news-image:hover {
+    transform: scale(1.02);
 }
 
 .news-image-placeholder {
-    height: 400px;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(45deg, #e5e7eb, #f3f4f6);
-    color: #9ca3af;
-    font-size: 4rem;
+    background: linear-gradient(135deg, #334155 0%, #475569 100%);
+    color: #94a3b8;
 }
 
-.news-header {
-    padding: 3rem 3rem 2rem 3rem;
+.news-image-placeholder i {
+    font-size: 4rem;
+    opacity: 0.3;
+}
+
+/* 渐变遮罩 */
+.news-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 120px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.6));
+    pointer-events: none;
+}
+
+/* 文章内容 */
+.news-content {
+    padding: 2.5rem;
+}
+
+.news-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+.news-category {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.news-date {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
 }
 
 .news-title {
     font-size: 2.5rem;
     font-weight: 700;
     line-height: 1.2;
-    color: #1f2937;
+    color: #1e293b;
     margin-bottom: 1.5rem;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-}
-
-.news-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1.5rem;
-    align-items: center;
-    color: #6b7280;
-    font-size: 0.95rem;
-    margin-bottom: 2rem;
-}
-
-.news-meta-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.news-category {
-    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-    color: white;
-    padding: 0.375rem 1rem;
-    border-radius: 12px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.025em;
+    background: linear-gradient(135deg, #1e293b, #334155);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .news-summary {
-    background: #f8fafc;
+    font-size: 1.2rem;
+    line-height: 1.6;
+    color: #475569;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    border-radius: 16px;
     border-left: 4px solid #3b82f6;
-    padding: 2rem;
-    margin: 2rem 3rem;
-    border-radius: 0 12px 12px 0;
-    font-size: 1.125rem;
-    line-height: 1.7;
-    color: #4b5563;
-    font-style: italic;
 }
 
-.news-content {
-    padding: 0 3rem 3rem 3rem;
-    font-size: 1.125rem;
+.news-body {
+    font-size: 1.1rem;
     line-height: 1.8;
-    color: #374151;
+    color: #334155;
 }
 
-.news-content h1,
-.news-content h2,
-.news-content h3,
-.news-content h4,
-.news-content h5,
-.news-content h6 {
-    color: #1f2937;
-    font-weight: 600;
-    margin-top: 2.5rem;
-    margin-bottom: 1rem;
-}
-
-.news-content h2 {
-    font-size: 1.875rem;
-    border-bottom: 2px solid #e5e7eb;
-    padding-bottom: 0.5rem;
-}
-
-.news-content h3 {
-    font-size: 1.5rem;
-}
-
-.news-content p {
+.news-body p {
     margin-bottom: 1.5rem;
 }
 
-.news-content img {
-    margin: 2rem 0;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+/* 标签区域 */
+.news-tags {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e2e8f0;
 }
 
-.news-content blockquote {
-    border-left: 4px solid #e5e7eb;
-    padding-left: 1.5rem;
-    font-style: italic;
-    color: #6b7280;
-    margin: 2rem 0;
-    background: #f9fafb;
-    padding: 1.5rem;
-    border-radius: 0 12px 12px 0;
-}
-
-.news-content ul,
-.news-content ol {
-    margin: 1.5rem 0;
-    padding-left: 2rem;
-}
-
-.news-content li {
-    margin: 0.75rem 0;
-}
-
-.news-footer {
-    background: white;
-    border-radius: 24px;
-    padding: 2.5rem;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
-    margin-bottom: 2rem;
-}
-
-.source-link {
-    background: #f0f9ff;
-    border: 1px solid #e0f2fe;
-    border-radius: 16px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.source-link a {
-    color: #0284c7;
-    text-decoration: none;
+.news-tags-title {
+    font-size: 0.9rem;
+    color: #64748b;
+    margin-bottom: 1rem;
     font-weight: 500;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: color 0.2s ease;
 }
 
-.source-link a:hover {
-    color: #0369a1;
-}
-
-.tags-section {
-    margin-bottom: 2rem;
-}
-
-.tags-list {
+.tag-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-top: 1rem;
+    gap: 0.5rem;
 }
 
 .tag {
-    background: #f3f4f6;
-    color: #374151;
-    padding: 0.5rem 1rem;
+    padding: 0.4rem 1rem;
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
     border-radius: 20px;
-    font-size: 0.875rem;
+    font-size: 0.85rem;
     font-weight: 500;
+    border: 1px solid rgba(59, 130, 246, 0.2);
     transition: all 0.2s ease;
 }
 
 .tag:hover {
-    background: #e5e7eb;
-    transform: translateY(-1px);
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.3);
 }
 
-.share-section h3 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: #1f2937;
-    margin-bottom: 1rem;
-}
-
-.share-buttons {
+/* 操作按钮区域 */
+.news-actions {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e2e8f0;
     display: flex;
-    flex-wrap: wrap;
+    justify-content: center;
     gap: 1rem;
 }
 
-.share-btn {
+.action-button {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
     padding: 0.75rem 1.5rem;
     border-radius: 12px;
+    font-size: 0.9rem;
     font-weight: 500;
     text-decoration: none;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
     border: none;
     cursor: pointer;
-    font-size: 0.95rem;
 }
 
-.share-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.15);
-}
-
-.share-btn.twitter {
-    background: linear-gradient(135deg, #1da1f2, #0d8bd9);
-    color: white;
-}
-
-.share-btn.facebook {
-    background: linear-gradient(135deg, #4267b2, #365899);
-    color: white;
-}
-
-.share-btn.copy {
-    background: linear-gradient(135deg, #6b7280, #4b5563);
-    color: white;
-}
-
-.breadcrumb {
-    margin-bottom: 2rem;
-    padding: 1rem 0;
-}
-
-.breadcrumb ol {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: #6b7280;
-    font-size: 0.95rem;
-}
-
-.breadcrumb a {
-    color: #3b82f6;
-    text-decoration: none;
-    transition: color 0.2s ease;
-}
-
-.breadcrumb a:hover {
-    color: #1d4ed8;
-}
-
-.back-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.75rem;
+.action-button.primary {
     background: linear-gradient(135deg, #3b82f6, #1d4ed8);
     color: white;
-    padding: 1rem 2rem;
-    border-radius: 16px;
-    text-decoration: none;
-    font-weight: 500;
-    transition: all 0.3s ease;
-    box-shadow: 0 8px 20px -4px rgba(59, 130, 246, 0.3);
-    margin-top: 2rem;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
-.back-button:hover {
+.action-button.primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 25px -4px rgba(59, 130, 246, 0.4);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
     color: white;
-    text-decoration: none;
 }
 
-.related-news {
-    background: white;
-    border-radius: 24px;
-    padding: 2.5rem;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
-    margin-bottom: 2rem;
+.action-button.secondary {
+    background: rgba(148, 163, 184, 0.1);
+    color: #475569;
+    border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
-.related-news h3 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #1f2937;
-    margin-bottom: 2rem;
-    padding-bottom: 1rem;
-    border-bottom: 2px solid #e5e7eb;
-}
-
-.related-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2rem;
-}
-
-.related-item {
-    background: #f9fafb;
-    border-radius: 16px;
-    overflow: hidden;
-    transition: all 0.3s ease;
-    border: 1px solid #e5e7eb;
-}
-
-.related-item:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.12);
-    border-color: #d1d5db;
-}
-
-.related-item img {
-    width: 100%;
-    height: 180px;
-    object-fit: cover;
-}
-
-.related-item-content {
-    padding: 1.5rem;
-}
-
-.related-item h4 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: #1f2937;
-    margin-bottom: 0.75rem;
-    line-height: 1.4;
-}
-
-.related-item h4 a {
-    color: inherit;
-    text-decoration: none;
-    transition: color 0.2s ease;
-}
-
-.related-item h4 a:hover {
-    color: #3b82f6;
-}
-
-.related-item p {
-    color: #6b7280;
-    font-size: 0.95rem;
-    line-height: 1.5;
-    margin-bottom: 1rem;
-}
-
-.related-item-date {
-    color: #9ca3af;
-    font-size: 0.875rem;
+.action-button.secondary:hover {
+    background: rgba(148, 163, 184, 0.15);
+    color: #334155;
+    border-color: rgba(148, 163, 184, 0.3);
 }
 
 /* 响应式设计 */
@@ -402,53 +283,44 @@
         font-size: 2rem;
     }
 
-    .news-header,
-    .news-content {
-        padding: 2rem 1.5rem;
+    .news-summary {
+        font-size: 1.1rem;
+        padding: 1rem;
     }
 
-    .news-summary {
-        margin: 1.5rem 1.5rem;
+    .news-content {
         padding: 1.5rem;
     }
 
-    .news-footer {
-        padding: 2rem 1.5rem;
-    }
-
-    .related-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .share-buttons {
+    .news-actions {
         flex-direction: column;
+        align-items: center;
     }
 
-    .share-btn {
+    .action-button {
+        width: 100%;
         justify-content: center;
     }
 }
 
-/* 暗色主题适配预留 */
-@media (prefers-color-scheme: dark) {
-    .news-detail-page {
-        background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+/* 加载动画 */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
     }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
 
-    .news-hero,
-    .news-footer,
-    .related-news {
-        background: #374151;
-        color: #f9fafb;
-    }
+.news-card {
+    animation: fadeInUp 0.6s ease-out;
+}
 
-    .news-title {
-        color: #f9fafb;
-    }
-
-    .news-content {
-        color: #e5e7eb;
-    }
+.back-button {
+    animation: fadeInUp 0.6s ease-out 0.1s both;
 }
 </style>
 {% endblock %}
@@ -456,262 +328,127 @@
 {% block content %}
 <div class="news-detail-page">
     <div class="news-detail-container">
-        <!-- 面包屑导航 -->
-        <nav class="breadcrumb">
-            <ol>
-                <li><a href="{{ url_for('main.index') }}">首页</a></li>
-                <li><i class="fas fa-chevron-right text-xs mx-2"></i></li>
-                <li><span>新闻详情</span></li>
-            </ol>
-        </nav>
+        <!-- 返回按钮 -->
+        <a href="/" class="back-button">
+            <i class="fas fa-arrow-left"></i>
+            返回首页
+        </a>
 
-        <!-- 新闻主体 -->
-        <article class="news-hero">
-            <!-- 新闻图片 -->
-            {% if hotspot.image_url %}
-            <img src="{{ hotspot.image_url }}" alt="{{ hotspot.title }}" class="news-image">
-            {% else %}
-            <div class="news-image-placeholder">
-                <i class="fas fa-image"></i>
+        <!-- 主内容卡片 -->
+        <article class="news-card">
+            <!-- 头部图片 -->
+            <div class="news-header">
+                {% if hotspot.image_url %}
+                <img src="{{ hotspot.image_url }}" alt="{{ hotspot.title }}" class="news-image"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="news-image-placeholder" style="display: none;">
+                    <i class="fas fa-image"></i>
+                </div>
+                {% else %}
+                <div class="news-image-placeholder">
+                    <i class="fas fa-newspaper"></i>
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
 
-            <!-- 新闻标题和元信息 -->
-            <header class="news-header">
-                <h1 class="news-title">{{ hotspot.title }}</h1>
-
+            <!-- 文章内容 -->
+            <div class="news-content">
+                <!-- 元数据 -->
                 <div class="news-meta">
-                    <div class="news-meta-item">
-                        <i class="fas fa-calendar-alt"></i>
-                        <time datetime="{{ hotspot.created_at.isoformat() if hotspot.created_at else '' }}">
-                            {{ hotspot.created_at.strftime('%Y年%m月%d日') if hotspot.created_at else '最新' }}
-                        </time>
-                    </div>
-
-                    {% if hotspot.category %}
                     <div class="news-category">
-                        {% if hotspot.category == 'general' %}通用
+                        <i class="fas fa-tag"></i>
+                        {% if hotspot.category == 'announcement' %}公告
                         {% elif hotspot.category == 'crypto' %}加密货币
                         {% elif hotspot.category == 'defi' %}DeFi
                         {% elif hotspot.category == 'market' %}市场动态
-                        {% elif hotspot.category == 'announcement' %}公告
                         {% else %}{{ hotspot.category }}
                         {% endif %}
                     </div>
-                    {% endif %}
-
-                    <div class="news-meta-item">
-                        <i class="fas fa-eye"></i>
-                        <span>热点新闻</span>
+                    <div class="news-date">
+                        <i class="fas fa-calendar-alt"></i>
+                        {{ hotspot.created_at.strftime('%Y年%m月%d日') if hotspot.created_at else '最新' }}
                     </div>
                 </div>
-            </header>
 
-            <!-- 新闻摘要 -->
-            {% if hotspot.summary %}
-            <div class="news-summary">
-                {{ hotspot.summary }}
-            </div>
-            {% endif %}
+                <!-- 标题 -->
+                <h1 class="news-title">{{ hotspot.title }}</h1>
 
-            <!-- 新闻内容 -->
-            <div class="news-content">
-                {% if hotspot.content %}
-                    {{ hotspot.content|safe }}
-                {% else %}
-                    <p>这是一条来自RWA-HUB的热点新闻，为您提供最新的区块链和数字资产相关资讯。我们致力于为用户提供及时、准确、有价值的市场动态和行业洞察。</p>
-
-                    <p>RWA-HUB作为领先的实物资产代币化平台，持续关注全球数字资产领域的发展趋势，为投资者和用户提供专业的资讯服务。</p>
+                <!-- 摘要 -->
+                {% if hotspot.summary %}
+                <div class="news-summary">
+                    <i class="fas fa-quote-left" style="color: #3b82f6; margin-right: 0.5rem;"></i>
+                    {{ hotspot.summary }}
+                </div>
                 {% endif %}
+
+                <!-- 正文内容 -->
+                <div class="news-body">
+                    {% if hotspot.content %}
+                    {% for paragraph in hotspot.content.split('\n') %}
+                        {% if paragraph.strip() %}
+                        <p>{{ paragraph }}</p>
+                        {% endif %}
+                    {% endfor %}
+                    {% else %}
+                    <p>{{ hotspot.summary or '暂无详细内容' }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- 标签 -->
+                {% if hotspot.tags %}
+                <div class="news-tags">
+                    <div class="news-tags-title">
+                        <i class="fas fa-tags"></i>
+                        相关标签
+                    </div>
+                    <div class="tag-list">
+                        {% for tag in hotspot.tags.split(',') if tag.strip() %}
+                        <span class="tag">{{ tag.strip() }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- 操作按钮 -->
+                <div class="news-actions">
+                    {% if hotspot.link_url %}
+                    <a href="{{ hotspot.link_url }}" target="_blank" class="action-button primary">
+                        <i class="fas fa-external-link-alt"></i>
+                        查看原文
+                    </a>
+                    {% endif %}
+                    <a href="/" class="action-button secondary">
+                        <i class="fas fa-home"></i>
+                        返回首页
+                    </a>
+                </div>
             </div>
         </article>
-
-        <!-- 附加信息 -->
-        <div class="news-footer">
-            <!-- 原文链接 -->
-            {% if hotspot.link_url %}
-            <div class="source-link">
-                <p class="text-sm font-medium text-gray-600 mb-2">查看原文链接：</p>
-                <a href="{{ hotspot.link_url }}" target="_blank" rel="noopener noreferrer">
-                    {{ hotspot.link_url }}
-                    <i class="fas fa-external-link-alt"></i>
-                </a>
-            </div>
-            {% endif %}
-
-            <!-- 标签 -->
-            {% if hotspot.tags %}
-            <div class="tags-section">
-                <h3 class="text-lg font-semibold text-gray-900 mb-3">相关标签</h3>
-                <div class="tags-list">
-                    {% for tag in hotspot.tags.split(',') %}
-                    {% if tag.strip() %}
-                    <span class="tag">{{ tag.strip() }}</span>
-                    {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- 分享按钮 -->
-            <div class="share-section">
-                <h3>分享这篇文章</h3>
-                <div class="share-buttons">
-                    <button onclick="shareToTwitter()" class="share-btn twitter">
-                        <i class="fab fa-twitter"></i>
-                        <span>Twitter</span>
-                    </button>
-                    <button onclick="shareToFacebook()" class="share-btn facebook">
-                        <i class="fab fa-facebook"></i>
-                        <span>Facebook</span>
-                    </button>
-                    <button onclick="copyLink()" class="share-btn copy">
-                        <i class="fas fa-link"></i>
-                        <span>复制链接</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 相关新闻 -->
-        {% if related_news %}
-        <section class="related-news">
-            <h3>相关新闻</h3>
-            <div class="related-grid">
-                {% for news in related_news %}
-                <article class="related-item">
-                    {% if news.image_url %}
-                    <img src="{{ news.image_url }}" alt="{{ news.title }}">
-                    {% else %}
-                    <div style="height: 180px; background: linear-gradient(45deg, #e5e7eb, #f3f4f6); display: flex; align-items: center; justify-content: center; color: #9ca3af;">
-                        <i class="fas fa-image fa-2x"></i>
-                    </div>
-                    {% endif %}
-                    <div class="related-item-content">
-                        <h4>
-                            <a href="{{ url_for('main.news_detail', news_id=news.id) }}">
-                                {{ news.title }}
-                            </a>
-                        </h4>
-                        {% if news.summary %}
-                        <p>{{ news.summary[:80] }}{% if news.summary|length > 80 %}...{% endif %}</p>
-                        {% endif %}
-                        <div class="related-item-date">
-                            {{ news.created_at.strftime('%Y-%m-%d') if news.created_at else '' }}
-                        </div>
-                    </div>
-                </article>
-                {% endfor %}
-            </div>
-        </section>
-        {% endif %}
-
-        <!-- 返回首页按钮 -->
-        <div class="text-center">
-            <a href="{{ url_for('main.index') }}" class="back-button">
-                <i class="fas fa-arrow-left"></i>
-                <span>返回首页</span>
-            </a>
-        </div>
     </div>
 </div>
 
 <script>
-function shareToTwitter() {
-    const text = `{{ hotspot.title }} - RWA-HUB`;
-    const url = window.location.href;
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
-    window.open(twitterUrl, '_blank', 'width=600,height=400');
-}
-
-function shareToFacebook() {
-    const url = window.location.href;
-    const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
-    window.open(facebookUrl, '_blank', 'width=600,height=400');
-}
-
-function copyLink() {
-    navigator.clipboard.writeText(window.location.href).then(() => {
-        // 创建临时提示
-        const toast = document.createElement('div');
-        toast.textContent = '链接已复制到剪贴板！';
-        toast.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: #10b981;
-            color: white;
-            padding: 1rem 2rem;
-            border-radius: 12px;
-            font-weight: 500;
-            z-index: 1000;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25);
-        `;
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-            toast.remove();
-        }, 2000);
-    }).catch(() => {
-        // 降级处理
-        const textArea = document.createElement('textarea');
-        textArea.value = window.location.href;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-
-        const toast = document.createElement('div');
-        toast.textContent = '链接已复制到剪贴板！';
-        toast.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: #10b981;
-            color: white;
-            padding: 1rem 2rem;
-            border-radius: 12px;
-            font-weight: 500;
-            z-index: 1000;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25);
-        `;
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-            toast.remove();
-        }, 2000);
-    });
-}
-
-// 添加AOS动画效果
+// 平滑滚动效果
 document.addEventListener('DOMContentLoaded', function() {
-    if (typeof AOS !== 'undefined') {
-        AOS.init({
-            duration: 800,
-            once: true,
-            offset: 100
-        });
+    // 如果页面是从锚点链接进入的，平滑滚动到顶部
+    if (window.location.hash) {
+        setTimeout(() => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 100);
     }
 
-    // 添加阅读进度指示器
-    const progressBar = document.createElement('div');
-    progressBar.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 0%;
-        height: 3px;
-        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-        z-index: 1000;
-        transition: width 0.1s ease;
-    `;
-    document.body.appendChild(progressBar);
-
-    window.addEventListener('scroll', () => {
-        const scrolled = (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
-        progressBar.style.width = scrolled + '%';
+    // 为所有内部链接添加平滑滚动
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
     });
 });
 </script>

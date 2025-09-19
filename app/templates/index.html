@@ -606,13 +606,9 @@
             </div>
         `;
 
-        // 点击事件
+        // 点击事件 - 优先跳转到详情页
         container.onclick = () => {
-            if (hotspot.link_url) {
-                window.open(hotspot.link_url, '_blank');
-            } else {
-                window.location.href = `/news/${hotspot.id}`;
-            }
+            window.location.href = `/news/${hotspot.id}`;
         };
     }
 
