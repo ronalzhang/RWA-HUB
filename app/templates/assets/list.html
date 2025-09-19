@@ -76,11 +76,13 @@
                             <!-- 资产类型标签 -->
                             <div class="position-absolute top-0 end-0 m-2">
                                 {% if asset.asset_type == 10 %}
-                                <span class="badge bg-primary">{{ _('Real Estate') }}</span>
+                                <span class="badge bg-primary">{{ _('Real Property') }}</span>
                                 {% elif asset.asset_type == 20 %}
                                 <span class="badge bg-success">{{ _('Securities') }}</span>
                                 {% elif asset.asset_type == 30 %}
-                                <span class="badge bg-info">{{ _('Commercial') }}</span>
+                                <span class="badge bg-info">{{ _('Quasi Property') }}</span>
+                                {% elif asset.asset_type == 40 %}
+                                <span class="badge bg-secondary">{{ _('Land') }}</span>
                                 {% elif asset.asset_type == 50 %}
                                 <span class="badge bg-warning">{{ _('Industrial') }}</span>
                                 {% else %}

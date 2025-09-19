@@ -11,14 +11,14 @@ from sqlalchemy.dialects.postgresql import JSON
 from app.utils.validation_utils import ValidationUtils, ValidationError
 
 class AssetType(enum.Enum):
-    REAL_ESTATE = 10        # 不动产
+    REAL_PROPERTY = 10      # 不动产 (Real Property)
     SECURITIES = 20         # 证券资产（股票、ETF等金融类资产）
-    COMMERCIAL = 30         # 类不动产
-    LAND = 40               # 土地资产
+    QUASI_PROPERTY = 30     # 类不动产 (Quasi Property)
+    LAND = 40              # 土地资产
     INDUSTRIAL = 50         # 工业地产
-    ART = 60                # 艺术品
-    COLLECTIBLES = 70       # 收藏品
-    OTHER = 99              # 其他资产
+    ART = 60               # 艺术品
+    COLLECTIBLES = 70      # 收藏品
+    OTHER = 99             # 其他资产
 
 class AssetStatus(enum.Enum):
     PENDING = 1    # 待审核/待支付

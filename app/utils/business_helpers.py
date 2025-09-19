@@ -102,13 +102,13 @@ class AssetBusinessHelper:
         # 如果是中文，取拼音首字母或使用类型前缀
         if re.search(r'[\u4e00-\u9fff]', clean_name):
             type_prefixes = {
-                AssetType.REAL_ESTATE.value: 'RE',
-                AssetType.SECURITIES.value: 'SE',     # 证券资产（20）
-                AssetType.COMMERCIAL.value: 'CM',     # 类不动产（30）
-                AssetType.LAND.value: 'LD',
-                AssetType.INDUSTRIAL.value: 'IN',     # 工业地产（50）
-                AssetType.ART.value: 'AR',
-                AssetType.COLLECTIBLES.value: 'CO'
+                AssetType.REAL_PROPERTY.value: 'RP',    # Real Property（不动产）
+                AssetType.SECURITIES.value: 'SE',       # Securities（证券资产）
+                AssetType.QUASI_PROPERTY.value: 'QP',   # Quasi Property（类不动产）
+                AssetType.LAND.value: 'LD',             # Land（土地资产）
+                AssetType.INDUSTRIAL.value: 'IN',       # Industrial（工业地产）
+                AssetType.ART.value: 'AR',              # Art（艺术品）
+                AssetType.COLLECTIBLES.value: 'CO'      # Collectibles（收藏品）
             }
             prefix = type_prefixes.get(asset_type, 'RW')
         else:

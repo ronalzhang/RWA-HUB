@@ -1363,11 +1363,11 @@ function closePreview() {
 // 获取资产类型名称
 function getAssetTypeName(assetType) {
     const types = {
-        '10': 'Real Estate',
-        '20': 'Mining/Energy',
-        '30': 'Infrastructure',
-        '40': 'Agriculture',
-        '50': 'Other'
+        '10': 'Real Property',
+        '20': 'Securities',
+        '30': 'Quasi Property',
+        '40': 'Land',
+        '50': 'Industrial'
     };
     return types[assetType] || 'Unknown';
 }
