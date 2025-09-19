@@ -541,6 +541,34 @@
             handleHotspotClick(hotspot);
         });
 
+        // 强制设置关键CSS样式以确保显示
+        card.style.position = 'absolute';
+        card.style.width = '300px';
+        card.style.height = '360px';
+        card.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+        card.style.borderRadius = '20px';
+        card.style.boxShadow = '0 15px 35px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.08)';
+        card.style.overflow = 'hidden';
+        card.style.cursor = 'pointer';
+        card.style.display = 'block';
+        card.style.visibility = 'visible';
+
+        // 设置3D叠加效果的z-index和transform
+        const transforms = [
+            'translateZ(0px) rotateY(0deg) scale(1)', // 前景
+            'translateZ(-30px) rotateY(-12deg) translateX(25px) scale(0.95)', // 第二层
+            'translateZ(-60px) rotateY(-24deg) translateX(50px) scale(0.9)', // 第三层
+            'translateZ(-90px) rotateY(-36deg) translateX(75px) scale(0.85)' // 第四层
+        ];
+        const opacities = [1, 0.9, 0.8, 0.7];
+        const zIndexes = [50, 40, 30, 20];
+
+        if (index < transforms.length) {
+            card.style.transform = transforms[index];
+            card.style.opacity = opacities[index];
+            card.style.zIndex = zIndexes[index];
+        }
+
         console.log(`卡片${index}HTML内容已设置，返回卡片元素`);
         return card;
     }
