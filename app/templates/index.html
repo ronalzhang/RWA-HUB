@@ -385,10 +385,14 @@
             .then(response => response.json())
             .then(data => {
                 console.log('新闻热点数据:', data);
+                console.log('数据成功状态:', data.success);
+                console.log('数据数量:', data.data ? data.data.length : 0);
 
                 if (data.success && data.data && data.data.length > 0) {
+                    console.log('开始渲染热点卡片...');
                     renderHotspots(data.data);
                 } else {
+                    console.log('没有数据，显示无数据状态');
                     showNoData();
                 }
             })
@@ -400,9 +404,17 @@
 
     // 渲染新闻热点卡片
     function renderHotspots(hotspots) {
+        console.log('renderHotspots 函数开始，热点数量:', hotspots.length);
+
         const hotspotsStack = document.getElementById('hotspotsStack');
         const hotspotsLoading = document.getElementById('hotspotsLoading');
         const hotspotsIndicators = document.getElementById('hotspotsIndicators');
+
+        console.log('DOM元素检查:', {
+            hotspotsStack: !!hotspotsStack,
+            hotspotsLoading: !!hotspotsLoading,
+            hotspotsIndicators: !!hotspotsIndicators
+        });
 
         // 隐藏加载状态
         hotspotsLoading.style.display = 'none';
@@ -414,18 +426,23 @@
 
         // 如果只有1个卡片，不显示叠加效果
         if (hotspots.length === 1) {
+            console.log('单个卡片模式');
             const card = createHotspotCard(hotspots[0], 0);
             card.style.position = 'relative';
             card.style.transform = 'none';
             hotspotsStack.appendChild(card);
+            console.log('单个卡片已添加到DOM');
             return;
         }
 
         // 创建卡片（只显示前5个）
+        console.log('多卡片模式，开始创建卡片...');
         const displayHotspots = hotspots.slice(0, 5);
         displayHotspots.forEach((hotspot, index) => {
+            console.log(`创建第${index + 1}个卡片:`, hotspot.title);
             const card = createHotspotCard(hotspot, index);
             hotspotsStack.appendChild(card);
+            console.log(`第${index + 1}个卡片已添加到DOM`);
         });
 
         // 创建轮播指示器（如果有2个或以上卡片）
@@ -446,6 +463,8 @@
 
     // 创建新闻热点卡片
     function createHotspotCard(hotspot, index) {
+        console.log(`createHotspotCard 开始创建第${index}个卡片:`, hotspot.title);
+
         const card = document.createElement('div');
         card.className = 'hotspot-card';
         card.setAttribute('data-hotspot-id', hotspot.id);
@@ -467,11 +486,19 @@
         // 处理图片
         const imageUrl = hotspot.image_url || '/static/images/placeholder.jpg';
 
+        console.log(`卡片${index}详情:`, {
+            title: hotspot.title,
+            category: hotspot.category,
+            categoryText: categoryText,
+            imageUrl: imageUrl,
+            summary: hotspot.summary
+        });
+
         card.innerHTML = `
             <img src="${imageUrl}"
                  alt="${escapeHtml(hotspot.title)}"
                  class="hotspot-card-image"
-                 onerror="this.src='/static/images/placeholder.jpg'">
+                 onerror="this.onerror=null; this.src='/static/images/placeholder.jpg';">
             <div class="hotspot-card-content">
                 <h3 class="hotspot-card-title">${escapeHtml(hotspot.title)}</h3>
                 <p class="hotspot-card-summary">${escapeHtml(hotspot.summary || '')}</p>
@@ -487,6 +514,7 @@
             handleHotspotClick(hotspot);
         });
 
+        console.log(`卡片${index}HTML内容已设置，返回卡片元素`);
         return card;
     }
 
