@@ -341,7 +341,9 @@
                                     <select class="form-select" id="type" name="type" required>
                                         <option value="">{{ _('Please select asset type') }}</option>
                                         <option value="10">{{ _('Real Estate') }}</option>
-                                        <option value="20">{{ _('Similar Assets') }}</option>
+                                        <option value="20">{{ _('Securities') }}</option>
+                                        <option value="30">{{ _('Commercial') }}</option>
+                                        <option value="50">{{ _('Industrial') }}</option>
                                     </select>
                                     <div class="invalid-feedback">{{ _('Please select asset type') }}</div>
                                 </div>
@@ -483,8 +485,8 @@
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="similar-assets-docs">
-                                        <h6 class="text-muted">{{ _('Suggested Documents for Similar Assets') }}:</h6>
+                                    <div class="other-assets-docs">
+                                        <h6 class="text-muted">{{ _('Suggested Documents for Securities/Commercial/Industrial Assets') }}:</h6>
                                         <ul class="list-unstyled text-muted">
                                             <li><i class="far fa-circle me-2"></i>{{ _('Auction Certificate') }}</li>
                                             <li><i class="far fa-circle me-2"></i>{{ _('Exhibition Documents') }}</li>

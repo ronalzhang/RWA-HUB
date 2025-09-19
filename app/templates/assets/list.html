@@ -78,13 +78,13 @@
                                 {% if asset.asset_type == 10 %}
                                 <span class="badge bg-primary">{{ _('Real Estate') }}</span>
                                 {% elif asset.asset_type == 20 %}
-                                <span class="badge bg-success">Securities</span>
+                                <span class="badge bg-success">{{ _('Securities') }}</span>
                                 {% elif asset.asset_type == 30 %}
-                                <span class="badge bg-info">Commercial</span>
+                                <span class="badge bg-info">{{ _('Commercial') }}</span>
                                 {% elif asset.asset_type == 50 %}
-                                <span class="badge bg-warning">Industrial</span>
+                                <span class="badge bg-warning">{{ _('Industrial') }}</span>
                                 {% else %}
-                                <span class="badge bg-secondary">Other Assets ({{ asset.asset_type }})</span>
+                                <span class="badge bg-secondary">{{ _('Other Assets') }}</span>
                                 {% endif %}
                             </div>
                         </div>
