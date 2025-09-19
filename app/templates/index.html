@@ -380,19 +380,30 @@
         hotspotsStack.style.display = 'none';
         hotspotsNoData.style.display = 'none';
 
-        // 获取新闻热点数据
-        fetch('/api/admin/news/hotspots?limit=5')
+        // 获取新闻热点数据 - 添加缓存破坏参数
+        const cacheBreaker = Date.now();
+        fetch(`/api/admin/news/hotspots?limit=5&_t=${cacheBreaker}`)
             .then(response => response.json())
             .then(data => {
-                console.log('新闻热点数据:', data);
-                console.log('数据成功状态:', data.success);
-                console.log('数据数量:', data.data ? data.data.length : 0);
+                console.log('=== 新闻热点调试信息 ===');
+                console.log('完整响应数据:', data);
+                console.log('success字段:', data.success);
+                console.log('data字段存在:', !!data.data);
+                console.log('data.data类型:', typeof data.data);
+                console.log('data.data长度:', data.data ? data.data.length : 'null');
+                console.log('=== 调试信息结束 ===');
 
-                if (data.success && data.data && data.data.length > 0) {
-                    console.log('开始渲染热点卡片...');
+                // 简化判断逻辑，强制执行渲染
+                if (data && data.data && Array.isArray(data.data) && data.data.length > 0) {
+                    console.log('✅ 条件满足，开始渲染热点卡片，数量:', data.data.length);
                     renderHotspots(data.data);
                 } else {
-                    console.log('没有数据，显示无数据状态');
+                    console.log('❌ 条件不满足，显示无数据状态');
+                    console.log('详细原因检查:');
+                    console.log('- data存在:', !!data);
+                    console.log('- data.data存在:', !!(data && data.data));
+                    console.log('- 是数组:', Array.isArray(data && data.data));
+                    console.log('- 长度大于0:', data && data.data && data.data.length > 0);
                     showNoData();
                 }
             })

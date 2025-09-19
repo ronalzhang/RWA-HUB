@@ -571,9 +571,9 @@ section[id="assets"] .card .card-text,
 .hotspot-card-image {
     width: 100% !important;
     height: 180px !important;
-    object-fit: contain !important;
+    object-fit: cover !important; /* 改为cover以更好适应圆角 */
     object-position: center !important;
-    border-radius: 20px 20px 0 0 !important;
+    border-radius: 20px 20px 15px 15px !important; /* 优化上方圆角，下方稍小 */
     background: rgba(248, 249, 250, 0.8) !important;
     backdrop-filter: blur(10px) !important;
 }
