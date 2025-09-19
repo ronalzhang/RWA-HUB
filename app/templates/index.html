@@ -328,6 +328,7 @@
         // 延迟加载新闻热点，避免阻塞页面渲染
         setTimeout(() => {
             loadNews();
+            loadNewsHotspots(); // 添加热点卡片加载
         }, 300);
 
         // 处理资产卡片
@@ -353,6 +354,17 @@
         if (typeof AOS !== 'undefined') {
             AOS.init(); // 重新启用AOS
         }
+
+        // 可以选择性保留调试日志，或移除
+        const assetLinks = document.querySelectorAll('.home-asset-card-link');
+        assetLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                const tokenSymbol = this.getAttribute('data-token-symbol');
+                console.log(`首页 - 卡片点击事件触发 - 符号: ${tokenSymbol}`);
+                console.log(`目标 href: ${this.getAttribute('data-href')}`);
+                // 不阻止默认行为，让<a>标签的默认跳转发生
+            });
+        });
 
         console.log("资产卡片处理完成");
     });
@@ -546,18 +558,6 @@
             return '最新';
         }
     }
-
-        // 可以选择性保留调试日志，或移除
-        const assetLinks = document.querySelectorAll('.home-asset-card-link');
-        assetLinks.forEach(link => {
-            link.addEventListener('click', function(e) {
-                const tokenSymbol = this.getAttribute('data-token-symbol'); // data-token-symbol 可能在a标签上没有，需要确认
-                console.log(`首页 - 卡片点击事件触发 - 符号: ${tokenSymbol}`);
-                console.log(`目标 href: ${this.getAttribute('data-href')}`);
-                // 不阻止默认行为，让<a>标签的默认跳转发生
-            });
-        });
-    });
 
     // 加载新闻热点数据
     function loadNewsHotspots() {
