@@ -29,24 +29,28 @@
                     <div class="col-lg-6 mt-4 mt-lg-0 ps-lg-4">
                         <div class="news-hotspots-container" data-aos="fade-up">
                             <!-- 新闻热点卡片堆叠容器 -->
-                            <!-- 热点卡片加载状态 -->
-                            <div class="hotspots-loading" id="hotspotsLoading" style="display: none;">
-                                <div class="loading-spinner"></div>
-                                <p>加载中...</p>
-                            </div>
+                            <!-- 热点卡片容器 - 极简设计 -->
+                            <div class="news-carousel-wrapper">
+                                <!-- 加载状态 -->
+                                <div class="news-loading" id="newsLoading">
+                                    <div class="loading-spinner"></div>
+                                </div>
 
-                            <!-- 热点卡片无数据状态 -->
-                            <div class="hotspots-no-data" id="hotspotsNoData" style="display: none;">
-                                <p>暂无热点数据</p>
-                            </div>
+                                <!-- 新闻卡片容器 -->
+                                <div class="news-carousel" id="newsCarousel">
+                                    <!-- 动态加载 -->
+                                </div>
 
-                            <!-- 热点卡片轮播容器 -->
-                            <div class="hotspots-stack" id="hotspotsStack">
-                                <!-- 动态加载新闻热点卡片 -->
-                            </div>
+                                <!-- 导航点 -->
+                                <div class="news-dots" id="newsDots">
+                                    <!-- 动态生成 -->
+                                </div>
 
-                            <!-- 热点卡片指示器 -->
-                            <div class="hotspots-indicators" id="hotspotsIndicators" style="display: none;">
+                                <!-- 无数据状态 -->
+                                <div class="news-empty" id="newsEmpty" style="display: none;">
+                                    <i class="fas fa-newspaper"></i>
+                                    <p>暂无热点新闻</p>
+                                </div>
                             </div>
 
                         </div>
@@ -319,11 +323,12 @@
     });
     
     document.addEventListener('DOMContentLoaded', function() {
-        console.log("🚀🚀🚀 新版本代码已加载 - v" + Date.now());
-        console.log("DOM加载完成，开始处理新闻热点和资产卡片");
+        console.log("🚀 页面加载完成");
 
-        // 加载新闻热点
-        loadNewsHotspots();
+        // 延迟加载新闻热点，避免阻塞页面渲染
+        setTimeout(() => {
+            loadNews();
+        }, 300);
 
         // 处理资产卡片
         const cards = document.querySelectorAll('#assets .card');
@@ -750,7 +755,180 @@
 </script>
 
 <style>
-    /* 移除 .home-asset-card-link 样式 */
+/* 极简新闻轮播样式 */
+.news-carousel-wrapper {
+    position: relative;
+    width: 100%;
+    height: 400px;
+    background: #f8f9fa;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.news-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: #fff;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #e3e3e3;
+    border-top: 3px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.news-carousel {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.news-card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #fff;
+    cursor: pointer;
+    transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+    opacity: 0;
+    transform: translateX(100%);
+}
+
+.news-card.active {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.news-card.prev {
+    transform: translateX(-100%);
+}
+
+.news-card.next {
+    transform: translateX(100%);
+}
+
+.news-card-content {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.news-card-image {
+    height: 60%;
+    background-size: cover;
+    background-position: center;
+    background-color: #e9ecef;
+}
+
+.news-card-text {
+    padding: 20px;
+    height: 40%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.news-card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #212529;
+    line-height: 1.3;
+    margin-bottom: 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.news-card-summary {
+    font-size: 0.9rem;
+    color: #6c757d;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.news-card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: #9a9a9a;
+}
+
+.news-dots {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+}
+
+.news-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.5);
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.news-dot.active {
+    background: #fff;
+}
+
+.news-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #9a9a9a;
+    background: #fff;
+}
+
+.news-empty i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    .news-carousel-wrapper {
+        height: 350px;
+    }
+
+    .news-card-text {
+        padding: 15px;
+    }
+
+    .news-card-title {
+        font-size: 1rem;
+    }
+
+    .news-card-summary {
+        font-size: 0.85rem;
+    }
+}
 </style>
 </div>
 {% endblock %}
