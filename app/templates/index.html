@@ -421,15 +421,18 @@
         const hotspotsStack = document.getElementById('hotspotsStack');
         const hotspotsLoading = document.getElementById('hotspotsLoading');
         const hotspotsIndicators = document.getElementById('hotspotsIndicators');
+        const hotspotsNoData = document.getElementById('hotspotsNoData');
 
         console.log('DOM元素检查:', {
             hotspotsStack: !!hotspotsStack,
             hotspotsLoading: !!hotspotsLoading,
-            hotspotsIndicators: !!hotspotsIndicators
+            hotspotsIndicators: !!hotspotsIndicators,
+            hotspotsNoData: !!hotspotsNoData
         });
 
-        // 隐藏加载状态
+        // 隐藏加载状态和无数据状态
         hotspotsLoading.style.display = 'none';
+        hotspotsNoData.style.display = 'none';
         hotspotsStack.style.display = 'block';
 
         // 清空容器

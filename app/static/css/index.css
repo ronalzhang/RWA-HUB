@@ -688,7 +688,7 @@ section[id="assets"] .card .card-text,
     transform: scale(1.1) !important;
 }
 
-/* 加载和无数据状态 - 3D环境优化 */
+/* 加载和无数据状态 - 修复遮挡问题 */
 .loading-placeholder,
 .no-data-placeholder {
     position: absolute !important;
@@ -699,10 +699,9 @@ section[id="assets"] .card .card-text,
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-    background: rgba(255, 255, 255, 0.1) !important;
-    z-index: 60 !important;
+    /* 移除背景模糊，避免遮挡新闻卡片 */
+    z-index: 5 !important; /* 降低z-index，确保新闻卡片在上方 */
+    pointer-events: none !important; /* 确保不会阻挡卡片交互 */
 }
 
 .placeholder-card {
@@ -741,6 +740,8 @@ section[id="assets"] .card .card-text,
     box-shadow:
         0 20px 40px rgba(0, 0, 0, 0.1),
         0 8px 16px rgba(0, 0, 0, 0.1) !important;
+    pointer-events: auto !important; /* 只有卡片本身可以交互 */
+    z-index: 10 !important; /* 确保卡片可见但不遮挡新闻 */
 }
 
 .no-data-card i {
