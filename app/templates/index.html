@@ -650,15 +650,25 @@
 
     // 显示无数据状态
     function showNoData() {
+        console.log('showNoData 函数被调用');
         const hotspotsStack = document.getElementById('hotspotsStack');
         const hotspotsLoading = document.getElementById('hotspotsLoading');
         const hotspotsNoData = document.getElementById('hotspotsNoData');
         const hotspotsIndicators = document.getElementById('hotspotsIndicators');
 
+        console.log('showNoData DOM元素检查:', {
+            hotspotsStack: !!hotspotsStack,
+            hotspotsLoading: !!hotspotsLoading,
+            hotspotsNoData: !!hotspotsNoData,
+            hotspotsIndicators: !!hotspotsIndicators
+        });
+
         hotspotsLoading.style.display = 'none';
         hotspotsStack.style.display = 'none';
         hotspotsNoData.style.display = 'flex';
         hotspotsIndicators.style.display = 'none';
+
+        console.log('已切换到无数据状态显示');
     }
 
     // HTML转义函数
