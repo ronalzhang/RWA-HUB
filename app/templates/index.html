@@ -33,10 +33,7 @@
                                 <!-- 动态加载新闻热点卡片 -->
                             </div>
 
-                            <!-- 轮播指示器 -->
-                            <div class="hotspots-indicators" id="hotspotsIndicators" style="display: none;">
-                                <!-- 动态生成指示器 -->
-                            </div>
+                            <!-- 轮播指示器已移除 - 使用自动轮播，无需手动切换点 -->
 
                             <!-- 加载状态 -->
                             <div class="loading-placeholder" id="hotspotsLoading">
@@ -476,18 +473,8 @@
         console.log('hotspotsLoading.style.display:', hotspotsLoading.style.display);
         console.log('hotspotsNoData.style.display:', hotspotsNoData.style.display);
 
-        // 创建轮播指示器（如果有2个或以上卡片）
+        // 启动无限循环轮播（无需指示器）
         if (hotspots.length >= 2) {
-            hotspots.forEach((_, index) => {
-                const indicator = document.createElement('div');
-                indicator.className = 'hotspots-indicator';
-                if (index === 0) indicator.classList.add('active');
-                indicator.addEventListener('click', () => rotateToCard(index));
-                hotspotsIndicators.appendChild(indicator);
-            });
-            hotspotsIndicators.style.display = 'flex';
-
-            // 启动无限循环轮播
             startInfiniteRotation(hotspots);
         }
     }
@@ -584,35 +571,20 @@
     function rotateToCard(targetIndex) {
         currentRotationIndex = targetIndex;
 
-        // 更新指示器
-        document.querySelectorAll('.hotspots-indicator').forEach((indicator, index) => {
-            indicator.classList.toggle('active', index === targetIndex);
-        });
-
-        // 重新排列卡片
+        // 重新排列卡片 - 使用动画过渡
         rearrangeCards();
     }
 
-    // 重新排列卡片位置
+    // 重新排列卡片位置 - 真正的滚动动画
     function rearrangeCards() {
         const cards = document.querySelectorAll('.hotspot-card');
-        const totalCards = allHotspots.length;
 
-        cards.forEach((card, visualIndex) => {
-            // 计算实际的数据索引
-            const dataIndex = (currentRotationIndex + visualIndex) % totalCards;
+        cards.forEach((card, cardIndex) => {
+            // 计算这张卡片相对于当前中心位置的相对索引
+            const relativeIndex = (cardIndex - currentRotationIndex + allHotspots.length) % allHotspots.length;
 
-            // 如果这个位置需要显示新的卡片
-            if (dataIndex < allHotspots.length) {
-                const hotspot = allHotspots[dataIndex];
-                updateCardContent(card, hotspot);
-                card.style.display = 'block';
-
-                // 应用变换
-                applyCardTransform(card, visualIndex);
-            } else {
-                card.style.display = 'none';
-            }
+            // 应用滚动变换 - 让卡片滑动到新位置
+            applyCardTransform(card, relativeIndex);
         });
     }
 
@@ -648,16 +620,12 @@
         card.onclick = () => handleHotspotClick(hotspot);
     }
 
-    // 应用卡片变换 - 苹果Music风格横向布局
-    function applyCardTransform(card, index) {
-        // 移除所有动画类
-        card.classList.remove('sliding-left', 'sliding-right');
+    // 应用卡片变换 - 苹果Music风格滚动动画
+    function applyCardTransform(card, relativeIndex) {
+        // 确保过渡动画生效
+        card.style.transition = 'all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
 
-        // 苹果Music风格横向排列的变换参数
-        // 计算相对于当前中心位置的索引
-        const relativeIndex = (index - currentRotationIndex + allHotspots.length) % allHotspots.length;
-
-        // 定义5个位置的变换：左2、左1、中心、右1、右2
+        // 定义5个位置的变换：中心、右1、右2、左1、左2
         const transforms = [
             'translateX(0px) translateZ(0px) rotateY(0deg) scale(1)',           // 中心位置
             'translateX(196px) translateZ(-50px) rotateY(-25deg) scale(0.85)',  // 右1
@@ -670,13 +638,19 @@
         const zIndexes = [50, 40, 30, 40, 30];
 
         if (relativeIndex < transforms.length) {
-            card.style.transform = transforms[relativeIndex];
-            card.style.opacity = opacities[relativeIndex];
-            card.style.zIndex = zIndexes[relativeIndex];
+            // 使用requestAnimationFrame确保动画流畅
+            requestAnimationFrame(() => {
+                card.style.transform = transforms[relativeIndex];
+                card.style.opacity = opacities[relativeIndex];
+                card.style.zIndex = zIndexes[relativeIndex];
+            });
         } else {
             // 隐藏超出5个位置的卡片
-            card.style.opacity = '0';
-            card.style.zIndex = '1';
+            requestAnimationFrame(() => {
+                card.style.opacity = '0';
+                card.style.zIndex = '1';
+                card.style.transform = 'translateX(500px) translateZ(-200px) scale(0.5)'; // 移到远处
+            });
         }
     }
 
