@@ -474,14 +474,14 @@ section[id="assets"] .card .card-text,
     margin-bottom: 0.5rem !important;
 }
 
-/* 新闻热点卡片样式 - 重新设计3D效果 */
+/* 新闻热点卡片样式 - 苹果Music风格横向布局 */
 .news-hotspots-container {
     position: relative !important;
     width: 100% !important;
     height: 420px !important;
-    perspective: 1000px !important;
+    perspective: 1200px !important;
     perspective-origin: 50% 50% !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -489,166 +489,127 @@ section[id="assets"] .card .card-text,
 
 .hotspots-stack {
     position: relative !important;
-    width: 320px !important;
+    width: 100% !important;
     height: 380px !important;
     transform-style: preserve-3d !important;
     transform-origin: center center !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
 .hotspot-card {
     position: absolute !important;
-    width: 300px !important;
+    width: 280px !important;
     height: 360px !important;
-    left: 50% !important;
-    top: 50% !important;
-    margin-left: -150px !important;
-    margin-top: -180px !important;
     border-radius: 20px !important;
     background: rgba(255, 255, 255, 0.95) !important;
     backdrop-filter: blur(20px) !important;
     -webkit-backdrop-filter: blur(20px) !important;
     box-shadow:
-        0 20px 40px rgba(0, 0, 0, 0.1),
+        0 20px 40px rgba(0, 0, 0, 0.15),
         0 8px 16px rgba(0, 0, 0, 0.1),
         inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
     overflow: hidden !important;
     cursor: pointer !important;
-    transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1) !important;
+    transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
     transform-origin: center center !important;
     will-change: transform !important;
 }
 
-/* 3D层级定位 - 苹果风格叠加 */
+/* 苹果Music风格横向布局 - 中心+左右对称 */
+/* 中心卡片 - 最前层 */
 .hotspot-card:nth-child(1) {
     z-index: 50 !important;
-    transform: translateZ(0px) rotateY(0deg) rotateX(0deg) !important;
+    transform: translateX(0px) translateZ(0px) rotateY(0deg) scale(1) !important;
     opacity: 1 !important;
 }
 
+/* 右侧第一张卡片 */
 .hotspot-card:nth-child(2) {
     z-index: 40 !important;
-    transform: translateZ(-40px) rotateY(-8deg) rotateX(2deg) translateX(15px) !important;
-    opacity: 0.92 !important;
+    transform: translateX(196px) translateZ(-50px) rotateY(-25deg) scale(0.85) !important;
+    opacity: 0.8 !important;
 }
 
+/* 左侧第一张卡片 */
 .hotspot-card:nth-child(3) {
-    z-index: 30 !important;
-    transform: translateZ(-80px) rotateY(-16deg) rotateX(4deg) translateX(30px) !important;
-    opacity: 0.84 !important;
+    z-index: 40 !important;
+    transform: translateX(-196px) translateZ(-50px) rotateY(25deg) scale(0.85) !important;
+    opacity: 0.8 !important;
 }
 
+/* 右侧第二张卡片 */
 .hotspot-card:nth-child(4) {
-    z-index: 20 !important;
-    transform: translateZ(-120px) rotateY(-24deg) rotateX(6deg) translateX(45px) !important;
-    opacity: 0.76 !important;
+    z-index: 30 !important;
+    transform: translateX(336px) translateZ(-100px) rotateY(-45deg) scale(0.7) !important;
+    opacity: 0.6 !important;
 }
 
+/* 左侧第二张卡片 */
 .hotspot-card:nth-child(5) {
-    z-index: 10 !important;
-    transform: translateZ(-160px) rotateY(-32deg) rotateX(8deg) translateX(60px) !important;
-    opacity: 0.68 !important;
+    z-index: 30 !important;
+    transform: translateX(-336px) translateZ(-100px) rotateY(45deg) scale(0.7) !important;
+    opacity: 0.6 !important;
 }
 
-/* 3D悬停效果 - 增强版 */
+/* 3D悬停效果 - 苹果Music风格 */
 .hotspot-card:hover {
-    transform: translateZ(50px) rotateY(0deg) rotateX(0deg) scale(1.08) !important;
+    transform: translateX(0px) translateZ(80px) rotateY(0deg) scale(1.1) !important;
     opacity: 1 !important;
     z-index: 100 !important;
     box-shadow:
-        0 40px 80px rgba(0, 0, 0, 0.25),
-        0 20px 40px rgba(0, 0, 0, 0.15),
+        0 50px 100px rgba(0, 0, 0, 0.3),
+        0 25px 50px rgba(0, 0, 0, 0.2),
         inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
     background: rgba(255, 255, 255, 0.98) !important;
-    backdrop-filter: blur(25px) !important;
-    -webkit-backdrop-filter: blur(25px) !important;
+    backdrop-filter: blur(30px) !important;
+    -webkit-backdrop-filter: blur(30px) !important;
 }
 
-/* 轮播动画类 - 3D版本 */
-.hotspot-card.rotating-out {
-    transform: translateZ(-200px) rotateY(-40deg) rotateX(10deg) translateX(80px) scale(0.6) !important;
-    opacity: 0 !important;
-    transition: all 0.8s cubic-bezier(0.23, 1, 0.32, 1) !important;
+/* 轮播动画类 - 横向滑动效果 */
+.hotspot-card.sliding-left {
+    transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
 }
 
-.hotspot-card.rotating-in {
-    transform: translateZ(0px) rotateY(0deg) rotateX(0deg) scale(1) !important;
-    opacity: 1 !important;
-    z-index: 50 !important;
-    transition: all 0.8s cubic-bezier(0.23, 1, 0.32, 1) !important;
+.hotspot-card.sliding-right {
+    transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
 }
 
-/* 卡片内容样式 - 优化3D显示 */
+/* 卡片内容样式 - 简化为图片+融入标题 */
 .hotspot-card-image {
     width: 100% !important;
-    height: 180px !important;
+    height: 100% !important;
     object-fit: cover !important;
     object-position: center !important;
-    border-radius: 20px 20px 0 0 !important;
+    border-radius: 20px !important;
     background: rgba(248, 249, 250, 0.9) !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important;
 }
 
-.hotspot-card-content {
-    padding: 1.5rem !important;
-    height: 180px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: space-between !important;
-    background: rgba(255, 255, 255, 0.8) !important;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
+.hotspot-card-title-overlay {
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.7)) !important;
+    padding: 3rem 1.5rem 1.5rem 1.5rem !important;
     border-radius: 0 0 20px 20px !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
 }
 
 .hotspot-card-title {
     font-size: 1.1rem !important;
     font-weight: 700 !important;
-    color: #1a1a1a !important;
-    margin-bottom: 0.8rem !important;
+    color: white !important;
+    margin: 0 !important;
     line-height: 1.4 !important;
     display: -webkit-box !important;
     -webkit-line-clamp: 2 !important;
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
-    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8) !important;
-}
-
-.hotspot-card-summary {
-    font-size: 0.9rem !important;
-    color: #555 !important;
-    line-height: 1.5 !important;
-    display: -webkit-box !important;
-    -webkit-line-clamp: 3 !important;
-    -webkit-box-orient: vertical !important;
-    overflow: hidden !important;
-    flex-grow: 1 !important;
-    margin-bottom: 1rem !important;
-}
-
-.hotspot-card-meta {
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    padding-top: 1rem !important;
-    border-top: 1px solid rgba(240, 240, 240, 0.8) !important;
-}
-
-.hotspot-card-category {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
-    color: white !important;
-    padding: 0.3rem 0.8rem !important;
-    border-radius: 0.5rem !important;
-    font-size: 0.75rem !important;
-    font-weight: 600 !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-    text-shadow: none !important;
-}
-
-.hotspot-card-date {
-    font-size: 0.75rem !important;
-    color: #888 !important;
-    font-weight: 500 !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5) !important;
 }
 
 /* 轮播指示器 - 3D环境适配 */

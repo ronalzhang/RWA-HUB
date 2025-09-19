@@ -430,10 +430,20 @@
             hotspotsNoData: !!hotspotsNoData
         });
 
-        // 隐藏加载状态和无数据状态
-        hotspotsLoading.style.display = 'none';
-        hotspotsNoData.style.display = 'none';
-        hotspotsStack.style.display = 'block';
+        // 强制确保无数据状态隐藏
+        if (hotspotsNoData) {
+            hotspotsNoData.style.display = 'none';
+            hotspotsNoData.style.visibility = 'hidden';
+            hotspotsNoData.style.opacity = '0';
+        }
+
+        // 显示加载状态和卡片容器
+        if (hotspotsLoading) {
+            hotspotsLoading.style.display = 'none';
+        }
+        if (hotspotsStack) {
+            hotspotsStack.style.display = 'flex';
+        }
 
         // 清空容器
         hotspotsStack.innerHTML = '';
@@ -520,13 +530,8 @@
                  alt="${escapeHtml(hotspot.title)}"
                  class="hotspot-card-image"
                  onerror="this.onerror=null; this.src='/static/images/placeholder.jpg';">
-            <div class="hotspot-card-content">
+            <div class="hotspot-card-title-overlay">
                 <h3 class="hotspot-card-title">${escapeHtml(hotspot.title)}</h3>
-                <p class="hotspot-card-summary">${escapeHtml(hotspot.summary || '')}</p>
-                <div class="hotspot-card-meta">
-                    <span class="hotspot-card-category">${categoryText}</span>
-                    <span class="hotspot-card-date">${createdDate}</span>
-                </div>
             </div>
         `;
 
@@ -643,27 +648,35 @@
         card.onclick = () => handleHotspotClick(hotspot);
     }
 
-    // 应用卡片变换 - 3D版本
+    // 应用卡片变换 - 苹果Music风格横向布局
     function applyCardTransform(card, index) {
         // 移除所有动画类
-        card.classList.remove('rotating-out', 'rotating-in');
+        card.classList.remove('sliding-left', 'sliding-right');
 
-        // 3D变换参数 - 与CSS保持一致
+        // 苹果Music风格横向排列的变换参数
+        // 计算相对于当前中心位置的索引
+        const relativeIndex = (index - currentRotationIndex + allHotspots.length) % allHotspots.length;
+
+        // 定义5个位置的变换：左2、左1、中心、右1、右2
         const transforms = [
-            'translateZ(0px) rotateY(0deg) rotateX(0deg)',
-            'translateZ(-40px) rotateY(-8deg) rotateX(2deg) translateX(15px)',
-            'translateZ(-80px) rotateY(-16deg) rotateX(4deg) translateX(30px)',
-            'translateZ(-120px) rotateY(-24deg) rotateX(6deg) translateX(45px)',
-            'translateZ(-160px) rotateY(-32deg) rotateX(8deg) translateX(60px)'
+            'translateX(0px) translateZ(0px) rotateY(0deg) scale(1)',           // 中心位置
+            'translateX(196px) translateZ(-50px) rotateY(-25deg) scale(0.85)',  // 右1
+            'translateX(336px) translateZ(-100px) rotateY(-45deg) scale(0.7)',  // 右2
+            'translateX(-196px) translateZ(-50px) rotateY(25deg) scale(0.85)',  // 左1
+            'translateX(-336px) translateZ(-100px) rotateY(45deg) scale(0.7)'   // 左2
         ];
 
-        const opacities = [1, 0.92, 0.84, 0.76, 0.68];
-        const zIndexes = [50, 40, 30, 20, 10];
+        const opacities = [1, 0.8, 0.6, 0.8, 0.6];
+        const zIndexes = [50, 40, 30, 40, 30];
 
-        if (index < transforms.length) {
-            card.style.transform = transforms[index];
-            card.style.opacity = opacities[index];
-            card.style.zIndex = zIndexes[index];
+        if (relativeIndex < transforms.length) {
+            card.style.transform = transforms[relativeIndex];
+            card.style.opacity = opacities[relativeIndex];
+            card.style.zIndex = zIndexes[relativeIndex];
+        } else {
+            // 隐藏超出5个位置的卡片
+            card.style.opacity = '0';
+            card.style.zIndex = '1';
         }
     }
 
