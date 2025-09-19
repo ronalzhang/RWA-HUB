@@ -545,8 +545,10 @@ section[id="assets"] .card .card-text,
 .hotspot-card-image {
     width: 100% !important;
     height: 200px !important;
-    object-fit: cover !important;
+    object-fit: contain !important; /* 改为contain确保图片完整显示 */
+    object-position: center !important; /* 居中显示 */
     border-radius: 0 !important;
+    background: #f8f9fa !important; /* 添加浅灰色背景 */
 }
 
 .hotspot-card-content {
@@ -709,6 +711,8 @@ section[id="assets"] .card .card-text,
 
     .hotspot-card-image {
         height: 160px !important;
+        object-fit: contain !important; /* 移动端也使用contain */
+        object-position: center !important; /* 居中显示 */
     }
 
     .hotspot-card-content {
