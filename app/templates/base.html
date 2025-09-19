@@ -1118,6 +1118,9 @@
                     // 更新UI
                     updateWalletUI(connectedAddress);
 
+                    // 检查管理员权限
+                    checkAdminStatus(connectedAddress);
+
                     // 加载钱包数据
                     if (typeof loadWalletData === 'function') {
                         loadWalletData(connectedAddress);
@@ -1644,6 +1647,9 @@
 
                             // 更新UI
                             updateWalletUI(address);
+
+                            // 检查管理员权限
+                            checkAdminStatus(address);
 
                             // 加载钱包数据
                             if (typeof loadWalletData === 'function') {
