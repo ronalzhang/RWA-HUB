@@ -471,7 +471,10 @@
 
         // 启动无限循环轮播（无需指示器）
         if (hotspots.length >= 2) {
+            console.log('🎠 启动轮播功能，热点数量:', hotspots.length);
             startInfiniteRotation(hotspots);
+        } else {
+            console.log('⚠️ 热点数量不足，不启动轮播:', hotspots.length);
         }
     }
 
@@ -544,22 +547,28 @@
 
     // 启动无限循环轮播
     function startInfiniteRotation(hotspots) {
+        console.log('🎠 startInfiniteRotation 被调用，热点数量:', hotspots.length);
         allHotspots = hotspots;
 
         // 清除之前的定时器
         if (rotationInterval) {
             clearInterval(rotationInterval);
+            console.log('🔄 清除之前的轮播定时器');
         }
 
         // 每4秒轮播一次
         rotationInterval = setInterval(() => {
+            console.log('🎯 轮播定时器触发');
             rotateToNext();
         }, 4000);
+        console.log('✅ 轮播定时器已设置，间隔4秒');
     }
 
     // 轮播到下一个
     function rotateToNext() {
+        console.log('🎪 rotateToNext 被调用，当前索引:', currentRotationIndex);
         currentRotationIndex = (currentRotationIndex + 1) % allHotspots.length;
+        console.log('🎪 新索引:', currentRotationIndex);
         rotateToCard(currentRotationIndex);
     }
 
