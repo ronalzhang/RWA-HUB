@@ -434,9 +434,12 @@
             hotspotsNoData.style.opacity = '0';
         }
 
-        // 显示加载状态和卡片容器
+        // 强制确保加载状态完全隐藏
         if (hotspotsLoading) {
             hotspotsLoading.style.display = 'none';
+            hotspotsLoading.style.visibility = 'hidden';
+            hotspotsLoading.style.opacity = '0';
+            hotspotsLoading.style.pointerEvents = 'none';
         }
         if (hotspotsStack) {
             hotspotsStack.style.display = 'flex';

@@ -1686,11 +1686,26 @@
                         address: address,
                         publicKey: window.solana.publicKey,
                         walletType: 'phantom',
+                        adapter: window.solana,
                         formatAddress: function(addr) {
                             return addr ? addr.slice(0, 6) + '...' + addr.slice(-4) : '';
+                        },
+                        copyWalletAddress: function() {
+                            if (this.address) {
+                                navigator.clipboard.writeText(this.address).then(() => {
+                                    const successMsg = document.getElementById('copyAddressSuccess');
+                                    if (successMsg) {
+                                        successMsg.style.opacity = '1';
+                                        setTimeout(() => successMsg.style.opacity = '0', 2000);
+                                    }
+                                }).catch(() => {
+                                    alert('Address: ' + this.address);
+                                });
+                            }
                         }
                     };
 
+                    // 手动创建钱包状态
                     window.walletState = walletState;
 
                     // 更新UI
@@ -1706,42 +1721,9 @@
             }
         }
 
-        // 断开钱包连接 - 直接实现断开逻辑，避免递归调用
-        async function disconnectWallet() {
-            console.log('🔌 断开钱包连接...');
-
-            try {
-                // 使用统一钱包管理器断开
-                if (window.unifiedWalletManager && window.unifiedWalletManager.disconnectWallet) {
-                    await window.unifiedWalletManager.disconnectWallet();
-                    return true;
-                }
-
-                // 基本断开逻辑
-                if (window.solana && window.solana.disconnect) {
-                    await window.solana.disconnect();
-                }
-
-                // 清除钱包状态
-                window.walletState = null;
-
-                // 更新UI
-                const walletBtnText = document.getElementById('walletBtnText');
-                if (walletBtnText) {
-                    walletBtnText.textContent = 'Connect Wallet';
-                }
-
-                console.log('钱包已断开连接');
-                return true;
-            } catch (error) {
-                console.error('断开钱包连接失败:', error);
-                return false;
-            }
-        }
-
         // 断开钱包并关闭菜单
         async function disconnectAndCloseMenu() {
-            await disconnectWallet();
+            await window.disconnectWallet();
 
             const walletMenu = document.getElementById('walletMenu');
             if (walletMenu) {
@@ -1752,7 +1734,7 @@
 
         // 切换钱包（重新连接）
         async function switchWalletAndCloseMenu() {
-            await disconnectWallet();
+            await window.disconnectWallet();
             setTimeout(() => {
                 openWalletSelector();
             }, 500);
