@@ -551,9 +551,9 @@
         }
     }
 
-    // =================== 现代化热点卡片系统 ===================
+    // =================== 极简热点卡片系统 ===================
 
-    // 现代化热点卡片渲染函数
+    // 极简热点卡片渲染函数 - 单卡片上下切换
     function renderModernHotspots(hotspots) {
         console.log('✅ 热点数据加载成功，数量:', hotspots.length);
 
@@ -574,108 +574,70 @@
         // 清空容器
         newsCarousel.innerHTML = '';
 
-        // 创建无限滚动容器
-        const scrollContainer = document.createElement('div');
-        scrollContainer.className = 'hotspots-infinite-scroll';
+        if (hotspots.length === 0) {
+            if (newsEmpty) newsEmpty.style.display = 'flex';
+            return;
+        }
 
-        // 复制数组以实现无限滚动（显示两倍数据）
-        const infiniteHotspots = [...hotspots, ...hotspots];
+        // 创建单卡片容器
+        const singleCardContainer = document.createElement('div');
+        singleCardContainer.className = 'hotspots-single-card fade-in';
+        singleCardContainer.id = 'hotspotsSingleCard';
 
-        infiniteHotspots.forEach((hotspot, index) => {
-            const card = createModernHotspotCard(hotspot, index);
-            scrollContainer.appendChild(card);
-        });
+        // 显示第一个热点
+        updateSingleCard(singleCardContainer, hotspots[0]);
+        newsCarousel.appendChild(singleCardContainer);
 
-        newsCarousel.appendChild(scrollContainer);
+        // 如果有多个热点，启动切换动画
+        if (hotspots.length > 1) {
+            startSimpleCardSwitching(hotspots);
+        }
 
-        // 启动无限滚动动画
-        startInfiniteScrollAnimation(scrollContainer, hotspots.length);
-
-        console.log('✅ 现代热点卡片渲染完成');
+        console.log('✅ 极简热点卡片渲染完成');
     }
 
-    // 创建现代热点卡片（图片背景，文字叠加）
-    function createModernHotspotCard(hotspot, index) {
-        const card = document.createElement('div');
-        card.className = 'hotspot-card-modern';
-
+    // 更新单张卡片内容
+    function updateSingleCard(container, hotspot) {
         const imageUrl = hotspot.image_url || '/static/images/placeholder.jpg';
-        const categoryText = getCategoryDisplayText(hotspot.category);
-        const createdDate = hotspot.created_at ? new Date(hotspot.created_at).toLocaleDateString('zh-CN', {
-            month: 'short',
-            day: 'numeric'
-        }) : '';
 
-        card.innerHTML = `
-            <div class="hotspot-card-bg" style="background-image: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.6) 100%), url('${imageUrl}');">
-                <div class="hotspot-card-overlay">
-                    <div class="hotspot-card-top">
-                        <span class="hotspot-card-category">${categoryText}</span>
-                        <span class="hotspot-card-date">${createdDate}</span>
-                    </div>
-                    <div class="hotspot-card-bottom">
-                        <h3 class="hotspot-card-title">${escapeHtml(hotspot.title)}</h3>
-                    </div>
-                </div>
+        container.innerHTML = `
+            <div class="hotspot-card-simple" style="background-image: url('${imageUrl}');">
+                <h3 class="hotspot-card-simple-title">${escapeHtml(hotspot.title)}</h3>
             </div>
         `;
 
         // 点击事件
-        card.onclick = () => {
+        container.onclick = () => {
             if (hotspot.link_url) {
                 window.open(hotspot.link_url, '_blank');
             } else {
                 window.location.href = `/news/${hotspot.id}`;
             }
         };
-
-        return card;
     }
 
-    // 启动无限滚动动画
-    function startInfiniteScrollAnimation(container, originalCount) {
-        const cardHeight = 150; // 每张卡片的高度
-        const gap = 12; // 卡片间距
-        const totalHeight = originalCount * (cardHeight + gap);
-        let currentOffset = 0;
-        let isPaused = false;
+    // 启动简单的卡片切换动画
+    function startSimpleCardSwitching(hotspots) {
+        let currentIndex = 0;
+        const switchInterval = 4000; // 4秒切换一次
 
-        function animate() {
-            if (!isPaused) {
-                currentOffset += 0.8; // 滚动速度
+        setInterval(() => {
+            const container = document.getElementById('hotspotsSingleCard');
+            if (!container) return;
 
-                if (currentOffset >= totalHeight) {
-                    currentOffset = 0; // 重置到开始位置
-                }
+            // 淡出效果
+            container.classList.add('fade-out');
 
-                container.style.transform = `translateY(-${currentOffset}px)`;
-            }
-            requestAnimationFrame(animate);
-        }
+            setTimeout(() => {
+                // 切换到下一个热点
+                currentIndex = (currentIndex + 1) % hotspots.length;
+                updateSingleCard(container, hotspots[currentIndex]);
 
-        // 启动动画
-        animate();
-
-        // 鼠标悬停时暂停滚动
-        container.addEventListener('mouseenter', () => {
-            isPaused = true;
-        });
-
-        container.addEventListener('mouseleave', () => {
-            isPaused = false;
-        });
-    }
-
-    // 获取分类显示文本
-    function getCategoryDisplayText(category) {
-        const categoryMap = {
-            'general': '通用',
-            'crypto': '加密货币',
-            'defi': 'DeFi',
-            'market': '市场动态',
-            'announcement': '公告'
-        };
-        return categoryMap[category] || category;
+                // 淡入效果
+                container.classList.remove('fade-out');
+                container.classList.add('fade-in');
+            }, 250); // 淡出动画持续时间
+        }, switchInterval);
     }
 
     // 加载新闻热点数据
@@ -1071,7 +1033,7 @@
 </script>
 
 <style>
-/* 现代热点卡片样式 */
+/* 极简热点卡片样式 - 透明背景融合 */
 .hotspots-container {
     position: relative;
     width: 100%;
@@ -1080,11 +1042,12 @@
 .hotspots-scroll-wrapper {
     position: relative;
     width: 100%;
-    height: 500px; /* 更高的容器 */
+    height: 400px;
     border-radius: 20px;
     overflow: hidden;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: transparent; /* 透明背景，与页面背景融合 */
+    backdrop-filter: blur(10px); /* 毛玻璃效果 */
+    border: 1px solid rgba(255,255,255,0.1); /* 微妙边框 */
 }
 
 .hotspots-loading {
@@ -1092,7 +1055,8 @@
     align-items: center;
     justify-content: center;
     height: 100%;
-    background: rgba(255,255,255,0.95);
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
 }
 
 .hotspots-scroll-area {
@@ -1102,95 +1066,60 @@
     overflow: hidden;
 }
 
-.hotspots-infinite-scroll {
+/* 单卡片显示容器 */
+.hotspots-single-card {
     position: relative;
     width: 100%;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.hotspot-card-modern {
-    position: relative;
-    width: 100%;
-    height: 150px;
-    border-radius: 16px;
+    height: 100%;
+    border-radius: 20px;
     overflow: hidden;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    transition: all 0.5s ease;
 }
 
-.hotspot-card-modern:hover {
-    transform: translateX(8px);
-    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+.hotspots-single-card.fade-out {
+    opacity: 0;
+    transform: translateY(-20px);
 }
 
-.hotspot-card-bg {
-    position: absolute;
-    top: 0;
-    left: 0;
+.hotspots-single-card.fade-in {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.hotspot-card-simple {
+    position: relative;
     width: 100%;
     height: 100%;
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
+    border-radius: 20px;
 }
 
-.hotspot-card-overlay {
+.hotspot-card-simple::before {
+    content: '';
     position: absolute;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.6) 100%);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 16px;
-}
-
-.hotspot-card-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-}
-
-.hotspot-card-category {
-    background: rgba(255,255,255,0.25);
-    backdrop-filter: blur(10px);
-    color: white;
-    padding: 4px 12px;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 100%);
     border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    border: 1px solid rgba(255,255,255,0.2);
 }
 
-.hotspot-card-date {
-    color: rgba(255,255,255,0.9);
-    font-size: 0.8rem;
-    font-weight: 400;
-}
-
-.hotspot-card-bottom {
-    display: flex;
-    flex-direction: column;
-}
-
-.hotspot-card-title {
+.hotspot-card-simple-title {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
     color: white;
-    font-size: 1.1rem;
+    font-size: 1.4rem;
     font-weight: 600;
     line-height: 1.3;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    z-index: 2;
     margin: 0;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
 }
 
 .hotspots-empty {
@@ -1201,6 +1130,8 @@
     height: 100%;
     color: rgba(255,255,255,0.8);
     text-align: center;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(10px);
 }
 
 .hotspots-empty i {
@@ -1217,29 +1148,19 @@
 /* 响应式设计 */
 @media (max-width: 768px) {
     .hotspots-scroll-wrapper {
-        height: 400px;
+        height: 300px;
     }
 
-    .hotspot-card-modern {
-        height: 120px;
-    }
-
-    .hotspot-card-overlay {
-        padding: 12px;
-    }
-
-    .hotspot-card-title {
-        font-size: 1rem;
-    }
-
-    .hotspot-card-category {
-        font-size: 0.7rem;
-        padding: 3px 8px;
+    .hotspot-card-simple-title {
+        font-size: 1.1rem;
+        bottom: 15px;
+        left: 15px;
+        right: 15px;
     }
 }
 
-/* 极简新闻轮播样式 */
-.news-carousel-wrapper {
+/* 现代热点卡片样式 */
+.hotspots-container {
     position: relative;
     width: 100%;
     height: 400px;
