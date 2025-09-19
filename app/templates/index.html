@@ -455,7 +455,22 @@
             const card = createHotspotCard(hotspot, index);
             hotspotsStack.appendChild(card);
             console.log(`第${index + 1}个卡片已添加到DOM`);
+
+        // 强制调试：检查卡片可见性
+        console.log(`卡片${index}样式检查:`, {
+            display: card.style.display,
+            visibility: card.style.visibility,
+            opacity: card.style.opacity,
+            position: card.style.position,
+            zIndex: card.style.zIndex
         });
+        });
+
+        console.log('🔍 渲染完成后容器状态检查:');
+        console.log('hotspotsStack.style.display:', hotspotsStack.style.display);
+        console.log('hotspotsStack.children.length:', hotspotsStack.children.length);
+        console.log('hotspotsLoading.style.display:', hotspotsLoading.style.display);
+        console.log('hotspotsNoData.style.display:', hotspotsNoData.style.display);
 
         // 创建轮播指示器（如果有2个或以上卡片）
         if (hotspots.length >= 2) {
