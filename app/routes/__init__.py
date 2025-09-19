@@ -107,6 +107,10 @@ def register_blueprints(app):
     # 注册Solana API蓝图
     app.register_blueprint(solana_api_bp)
 
+    # 导入新闻热点管理蓝图
+    from .admin.news_hotspot import news_hotspot_api_bp
+    app.register_blueprint(news_hotspot_api_bp)
+
     # 注册SPL Token API蓝图
     from .spl_token_routes import spl_token_bp
     app.register_blueprint(spl_token_bp)

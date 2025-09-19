@@ -36,14 +36,15 @@ from .ip_visit import IPVisit
 # 导入新的模型
 from .share_message import ShareMessage
 from .task import TaskQueue, TaskStatus
+from .news_hotspot import NewsHotspot
 
 # 导出所有模型
 __all__ = [
-    'db', 'Asset', 'AssetType', 'AssetStatus', 'AssetStatusHistory', 'DividendRecord', 'Dividend', 
-    'Trade', 'TradeType', 'TradeStatus', 'User', 'UserRole', 'UserStatus', 
+    'db', 'Asset', 'AssetType', 'AssetStatus', 'AssetStatusHistory', 'DividendRecord', 'Dividend',
+    'Trade', 'TradeType', 'TradeStatus', 'User', 'UserRole', 'UserStatus',
     'Commission', 'AdminUser', 'SystemConfig', 'CommissionSetting',
     'DistributionLevel', 'UserReferral', 'CommissionRecord', 'AdminOperationLog',
     'DashboardStats', 'OnchainHistory', 'OnchainStatus', 'ShortLink', 'Transaction', 'TransactionType', 'TransactionStatus',
     'Holding', 'CommissionConfig', 'UserCommissionBalance', 'CommissionWithdrawal', 'IPVisit',
-    'ShareMessage', 'TaskQueue', 'TaskStatus'
+    'ShareMessage', 'TaskQueue', 'TaskStatus', 'NewsHotspot'
 ]

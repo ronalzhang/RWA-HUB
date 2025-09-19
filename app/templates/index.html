@@ -27,10 +27,30 @@
                         </div>
                     </div>
                     <div class="col-lg-6 mt-4 mt-lg-0 ps-lg-4">
-                        <div class="platform-illustration" data-aos="fade-left">
-                            <img src="{{ url_for('static', filename='images/platform-illustration.png') }}" 
-                                 alt="Platform Illustration" 
-                                 class="img-fluid">
+                        <div class="news-hotspots-container" data-aos="fade-up">
+                            <!-- 新闻热点卡片堆叠容器 -->
+                            <div class="hotspots-stack" id="hotspotsStack">
+                                <!-- 动态加载新闻热点卡片 -->
+                            </div>
+
+                            <!-- 加载状态 -->
+                            <div class="loading-placeholder" id="hotspotsLoading">
+                                <div class="placeholder-card">
+                                    <div class="placeholder-image"></div>
+                                    <div class="placeholder-content">
+                                        <div class="placeholder-title"></div>
+                                        <div class="placeholder-text"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 无数据状态 -->
+                            <div class="no-data-placeholder" id="hotspotsNoData" style="display: none;">
+                                <div class="no-data-card">
+                                    <i class="fas fa-newspaper"></i>
+                                    <p>暂无热点新闻</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -301,10 +321,15 @@
     });
     
     document.addEventListener('DOMContentLoaded', function() {
-        console.log("DOM加载完成，开始处理资产卡片");
+        console.log("DOM加载完成，开始处理新闻热点和资产卡片");
+
+        // 加载新闻热点
+        loadNewsHotspots();
+
+        // 处理资产卡片
         const cards = document.querySelectorAll('#assets .card');
         console.log("找到资产卡片数量:", cards.length);
-        
+
         // 鼠标交互效果 - 保持
         cards.forEach((card, index) => {
             card.addEventListener('mouseenter', function() {
@@ -312,21 +337,21 @@
                 this.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
                 this.style.transition = 'all 0.3s ease';
             });
-            
+
             card.addEventListener('mouseleave', function() {
                 this.style.transform = 'translateY(0)';
                 this.style.boxShadow = '0 2px 10px rgba(0,0,0,0.05)';
                 this.style.transition = 'all 0.3s ease';
             });
         });
-        
+
         // 如果需要，重新初始化AOS
         if (typeof AOS !== 'undefined') {
             AOS.init(); // 重新启用AOS
         }
-        
+
         console.log("资产卡片处理完成");
-        
+
         // 可以选择性保留调试日志，或移除
         const assetLinks = document.querySelectorAll('.home-asset-card-link');
         assetLinks.forEach(link => {
@@ -338,6 +363,157 @@
             });
         });
     });
+
+    // 加载新闻热点数据
+    function loadNewsHotspots() {
+        const hotspotsStack = document.getElementById('hotspotsStack');
+        const hotspotsLoading = document.getElementById('hotspotsLoading');
+        const hotspotsNoData = document.getElementById('hotspotsNoData');
+
+        // 显示加载状态
+        hotspotsLoading.style.display = 'flex';
+        hotspotsStack.style.display = 'none';
+        hotspotsNoData.style.display = 'none';
+
+        // 获取新闻热点数据
+        fetch('/api/admin/news/hotspots?limit=5')
+            .then(response => response.json())
+            .then(data => {
+                console.log('新闻热点数据:', data);
+
+                if (data.success && data.data && data.data.length > 0) {
+                    renderHotspots(data.data);
+                } else {
+                    showNoData();
+                }
+            })
+            .catch(error => {
+                console.error('加载新闻热点失败:', error);
+                showNoData();
+            });
+    }
+
+    // 渲染新闻热点卡片
+    function renderHotspots(hotspots) {
+        const hotspotsStack = document.getElementById('hotspotsStack');
+        const hotspotsLoading = document.getElementById('hotspotsLoading');
+
+        // 隐藏加载状态
+        hotspotsLoading.style.display = 'none';
+        hotspotsStack.style.display = 'block';
+
+        // 清空容器
+        hotspotsStack.innerHTML = '';
+
+        // 创建卡片
+        hotspots.forEach((hotspot, index) => {
+            const card = createHotspotCard(hotspot, index);
+            hotspotsStack.appendChild(card);
+        });
+
+        // 启动自动轮播
+        startAutoRotation();
+    }
+
+    // 创建新闻热点卡片
+    function createHotspotCard(hotspot, index) {
+        const card = document.createElement('div');
+        card.className = 'hotspot-card';
+        card.setAttribute('data-hotspot-id', hotspot.id);
+
+        // 处理分类显示文本
+        const categoryMap = {
+            'general': '通用',
+            'crypto': '加密货币',
+            'defi': 'DeFi',
+            'market': '市场动态',
+            'announcement': '公告'
+        };
+        const categoryText = categoryMap[hotspot.category] || hotspot.category;
+
+        // 处理日期格式
+        const createdDate = hotspot.created_at ? new Date(hotspot.created_at).toLocaleDateString('zh-CN') : '';
+
+        // 处理图片
+        const imageUrl = hotspot.image_url || '/static/images/placeholder.jpg';
+
+        card.innerHTML = `
+            <img src="${imageUrl}"
+                 alt="${escapeHtml(hotspot.title)}"
+                 class="hotspot-card-image"
+                 onerror="this.src='/static/images/placeholder.jpg'">
+            <div class="hotspot-card-content">
+                <h3 class="hotspot-card-title">${escapeHtml(hotspot.title)}</h3>
+                <p class="hotspot-card-summary">${escapeHtml(hotspot.summary || '')}</p>
+                <div class="hotspot-card-meta">
+                    <span class="hotspot-card-category">${categoryText}</span>
+                    <span class="hotspot-card-date">${createdDate}</span>
+                </div>
+            </div>
+        `;
+
+        // 添加点击事件
+        card.addEventListener('click', function() {
+            handleHotspotClick(hotspot);
+        });
+
+        return card;
+    }
+
+    // 处理新闻热点点击事件
+    function handleHotspotClick(hotspot) {
+        if (hotspot.link_url) {
+            // 如果有链接，跳转到链接
+            window.open(hotspot.link_url, '_blank');
+        } else {
+            // 否则显示详情（可以扩展为模态框）
+            console.log('点击新闻热点:', hotspot.title);
+            alert(`新闻标题: ${hotspot.title}\n\n${hotspot.summary || '暂无详情'}`);
+        }
+    }
+
+    // 显示无数据状态
+    function showNoData() {
+        const hotspotsStack = document.getElementById('hotspotsStack');
+        const hotspotsLoading = document.getElementById('hotspotsLoading');
+        const hotspotsNoData = document.getElementById('hotspotsNoData');
+
+        hotspotsLoading.style.display = 'none';
+        hotspotsStack.style.display = 'none';
+        hotspotsNoData.style.display = 'flex';
+    }
+
+    // 启动自动轮播
+    function startAutoRotation() {
+        const cards = document.querySelectorAll('.hotspot-card');
+        if (cards.length <= 1) return;
+
+        let currentIndex = 0;
+
+        // 每5秒轮播一次
+        setInterval(() => {
+            // 移除当前活跃状态
+            cards.forEach(card => card.classList.remove('active'));
+
+            // 设置下一个卡片为活跃状态
+            currentIndex = (currentIndex + 1) % cards.length;
+            cards[currentIndex].classList.add('active');
+
+            // 重新排列卡片顺序（可选，实现更复杂的轮播效果）
+            setTimeout(() => {
+                cards[currentIndex].classList.remove('active');
+            }, 4000);
+
+        }, 5000);
+    }
+
+    // HTML转义函数
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 
     // 处理首页资产卡片点击事件
     function handleHomeAssetCardClick(event, element) {

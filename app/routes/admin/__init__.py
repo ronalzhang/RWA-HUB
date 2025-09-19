@@ -14,13 +14,14 @@ admin_api_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
 
 # 导入所有子模块，确保路由被注册
 from . import auth
-from . import assets  
+from . import assets
 from . import users
 from . import dashboard
 from . import commission
 from . import trades
 from . import utils
 from . import monitoring
+from . import news_hotspot
 
 # 导出常用函数，保持向后兼容
 from .auth import admin_required, api_admin_required, admin_page_required, permission_required
@@ -69,11 +70,11 @@ def share_messages_v2():
     """V2版本分享消息管理页面"""
     return render_template('admin_v2/share_messages.html')
 
-@admin_bp.route('/share-messages')
+@admin_bp.route('/v2/news-hotspots')
 @admin_page_required
-def share_messages():
-    """分享消息管理页面"""
-    return render_template('admin_v2/share_messages.html')
+def news_hotspots_v2():
+    """V2版本热点新闻管理页面"""
+    return render_template('admin_v2/news_hotspots.html')
 
 @admin_bp.route('/v2/settings')
 @admin_page_required
