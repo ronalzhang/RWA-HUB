@@ -173,13 +173,57 @@ def news_detail(news_id):
             NewsHotspot.id != news_id
         ).order_by(NewsHotspot.created_at.desc()).limit(3).all()
 
-        current_app.logger.info(f'显示新闻详情: {hotspot.title}')
-
-        return render_template('news_detail.html',
-                             hotspot=hotspot,
-                             related_news=related_news,
-                             _=_)
+        current_app.logger.info(f'新闻详情页面 - 成功加载新闻: {hotspot.title}')
+        return render_template('news_detail.html', hotspot=hotspot, related_news=related_news)
 
     except Exception as e:
-        current_app.logger.error(f'加载新闻详情页面失败: {str(e)}')
+        current_app.logger.error(f'新闻详情页面 - 加载失败: {str(e)}')
+        return render_template('404.html'), 404
+
+@main_bp.route('/news/<int:year>/<int:month>/<int:day>/<slug>')
+def news_detail_by_date(year, month, day, slug):
+    """基于日期的新闻详情页面 - SEO友好的URL格式"""
+    try:
+        from datetime import datetime
+
+        # 构建日期范围（当天的开始和结束）
+        start_date = datetime(year, month, day)
+        end_date = datetime(year, month, day, 23, 59, 59)
+
+        # 根据日期和slug查找新闻
+        hotspot = NewsHotspot.query.filter(
+            NewsHotspot.is_active == True,
+            NewsHotspot.created_at >= start_date,
+            NewsHotspot.created_at <= end_date
+        ).first()
+
+        # 如果找不到精确匹配，尝试模糊匹配标题
+        if not hotspot:
+            # 将slug转换为可能的标题关键词
+            title_keywords = slug.replace('-', ' ').split()
+            for keyword in title_keywords:
+                if len(keyword) > 2:  # 只搜索长度大于2的关键词
+                    hotspot = NewsHotspot.query.filter(
+                        NewsHotspot.is_active == True,
+                        NewsHotspot.title.contains(keyword)
+                    ).first()
+                    if hotspot:
+                        break
+
+        if not hotspot:
+            current_app.logger.warning(f'日期新闻详情页面 - 未找到 {year}-{month}-{day}/{slug} 的新闻')
+            return render_template('404.html'), 404
+
+        # 获取相关新闻
+        related_news = NewsHotspot.query.filter(
+            NewsHotspot.category == hotspot.category,
+            NewsHotspot.is_active == True,
+            NewsHotspot.id != hotspot.id
+        ).order_by(NewsHotspot.created_at.desc()).limit(3).all()
+
+        current_app.logger.info(f'日期新闻详情页面 - 成功加载新闻: {hotspot.title}')
+        return render_template('news_detail.html', hotspot=hotspot, related_news=related_news)
+
+    except Exception as e:
+        current_app.logger.error(f'日期新闻详情页面 - 加载失败: {str(e)}')
         return render_template('404.html'), 404

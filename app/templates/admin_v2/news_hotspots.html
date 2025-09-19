@@ -2,603 +2,677 @@
 
 {% block title %}热点新闻管理 - 管理后台{% endblock %}
 
+{% block page_title %}热点新闻管理{% endblock %}
+{% block page_subtitle %}管理首页展示的热点新闻内容{% endblock %}
+
+{% block breadcrumb %}
+<li class="flex items-center">
+    <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+    <span class="text-gray-500">热点新闻管理</span>
+</li>
+{% endblock %}
+
 {% block content %}
-<div class="main-content">
-    <!-- 页面标题和操作区 -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="h4 mb-0">热点新闻管理</h2>
-            <p class="text-muted mt-1">管理首页展示的热点新闻内容</p>
+<div x-data="newsHotspotsData()" x-init="loadHotspots()">
+    <!-- 操作按钮区 -->
+    <div class="mb-6 flex justify-between items-center">
+        <div class="flex space-x-3">
+            <button @click="openAddModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center">
+                <i class="fas fa-plus mr-2"></i>添加热点新闻
+            </button>
+            <button @click="loadHotspots()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center">
+                <i class="fas fa-sync-alt mr-2"></i>刷新
+            </button>
         </div>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addHotspotModal">
-            <i class="fas fa-plus me-2"></i>添加热点新闻
-        </button>
+        <div class="text-sm text-gray-600">
+            总计: <span x-text="stats.total || 0" class="font-semibold"></span> 条新闻
+        </div>
     </div>
 
     <!-- 统计卡片 -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <div class="avatar bg-primary bg-opacity-10 text-primary">
-                                <i class="fas fa-newspaper"></i>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <div class="row">
-                                <div class="col">
-                                    <p class="small text-muted mb-0">总新闻数</p>
-                                    <h6 class="fw-bold mb-0" id="totalCount">-</h6>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                    <i class="fas fa-newspaper text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-600">总新闻数</p>
+                    <p class="text-2xl font-semibold text-gray-900" x-text="stats.total || 0"></p>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <div class="avatar bg-success bg-opacity-10 text-success">
-                                <i class="fas fa-eye"></i>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <div class="row">
-                                <div class="col">
-                                    <p class="small text-muted mb-0">活跃显示</p>
-                                    <h6 class="fw-bold mb-0" id="activeCount">-</h6>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 text-green-600">
+                    <i class="fas fa-eye text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-600">活跃显示</p>
+                    <p class="text-2xl font-semibold text-gray-900" x-text="stats.active || 0"></p>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <div class="avatar bg-info bg-opacity-10 text-info">
-                                <i class="fas fa-tags"></i>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <div class="row">
-                                <div class="col">
-                                    <p class="small text-muted mb-0">分类数量</p>
-                                    <h6 class="fw-bold mb-0" id="categoryCount">-</h6>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                    <i class="fas fa-tags text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-600">分类数量</p>
+                    <p class="text-2xl font-semibold text-gray-900" x-text="stats.categories || 0"></p>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <div class="avatar bg-warning bg-opacity-10 text-warning">
-                                <i class="fas fa-star"></i>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <div class="row">
-                                <div class="col">
-                                    <p class="small text-muted mb-0">优先级最高</p>
-                                    <h6 class="fw-bold mb-0" id="maxPriority">-</h6>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                    <i class="fas fa-star text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm text-gray-600">最高优先级</p>
+                    <p class="text-2xl font-semibold text-gray-900" x-text="stats.maxPriority || 0"></p>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- 筛选和搜索 -->
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body">
-            <form id="filterForm">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label small">分类筛选</label>
-                        <select class="form-select" id="categoryFilter">
-                            <option value="">全部分类</option>
-                            <option value="general">通用</option>
-                            <option value="crypto">加密货币</option>
-                            <option value="defi">DeFi</option>
-                            <option value="market">市场动态</option>
-                            <option value="announcement">公告</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small">状态筛选</label>
-                        <select class="form-select" id="statusFilter">
-                            <option value="">全部状态</option>
-                            <option value="true">活跃</option>
-                            <option value="false">禁用</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label small">关键词搜索</label>
-                        <input type="text" class="form-control" id="searchKeyword" placeholder="搜索标题或内容...">
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small">&nbsp;</label>
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-outline-primary">
-                                <i class="fas fa-search me-1"></i>搜索
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </form>
-        </div>
+    <div class="bg-white rounded-lg shadow mb-6 p-6">
+        <form @submit.prevent="applyFilters()" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">分类筛选</label>
+                <select x-model="filters.category" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">全部分类</option>
+                    <option value="general">通用</option>
+                    <option value="crypto">加密货币</option>
+                    <option value="defi">DeFi</option>
+                    <option value="market">市场动态</option>
+                    <option value="announcement">公告</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">状态筛选</label>
+                <select x-model="filters.status" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">全部状态</option>
+                    <option value="true">活跃</option>
+                    <option value="false">禁用</option>
+                </select>
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">关键词搜索</label>
+                <input type="text" x-model="filters.keyword" placeholder="搜索标题或内容..." class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+
+            <div class="flex items-end">
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md flex items-center justify-center">
+                    <i class="fas fa-search mr-2"></i>搜索
+                </button>
+            </div>
+        </form>
     </div>
 
     <!-- 热点新闻列表 -->
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white">
-            <h6 class="mb-0">热点新闻列表</h6>
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">热点新闻列表</h3>
         </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width: 60px;">ID</th>
-                            <th style="width: 80px;">封面</th>
-                            <th>标题</th>
-                            <th style="width: 100px;">分类</th>
-                            <th style="width: 80px;">优先级</th>
-                            <th style="width: 80px;">状态</th>
-                            <th style="width: 120px;">创建时间</th>
-                            <th style="width: 120px;">操作</th>
+
+        <!-- 加载状态 -->
+        <div x-show="loading" class="flex justify-center items-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            <span class="ml-2 text-gray-600">加载中...</span>
+        </div>
+
+        <!-- 数据表格 -->
+        <div x-show="!loading" class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">封面</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">标题</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分类</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">优先级</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-for="hotspot in hotspots" :key="hotspot.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="hotspot.id"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="w-12 h-10 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
+                                    <img x-show="hotspot.image_url" :src="hotspot.image_url" :alt="hotspot.title" class="w-full h-full object-cover" @error="$el.style.display='none'">
+                                    <i x-show="!hotspot.image_url" class="fas fa-image text-gray-400"></i>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm font-medium text-gray-900" x-text="hotspot.title"></div>
+                                <div class="text-sm text-gray-500" x-text="(hotspot.summary || '').substring(0, 50) + ((hotspot.summary || '').length > 50 ? '...' : '')"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800" x-text="getCategoryText(hotspot.category)"></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800" x-text="hotspot.priority"></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span :class="hotspot.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'" class="inline-flex px-2 py-1 text-xs font-semibold rounded-full" x-text="hotspot.is_active ? '活跃' : '禁用'"></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="formatDate(hotspot.created_at)"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div class="flex space-x-2">
+                                    <button @click="editHotspot(hotspot)" class="text-indigo-600 hover:text-indigo-900" title="编辑">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button @click="toggleStatus(hotspot)" :class="hotspot.is_active ? 'text-yellow-600 hover:text-yellow-900' : 'text-green-600 hover:text-green-900'" :title="hotspot.is_active ? '禁用' : '启用'">
+                                        <i :class="hotspot.is_active ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                                    </button>
+                                    <button @click="deleteHotspot(hotspot)" class="text-red-600 hover:text-red-900" title="删除">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody id="hotspotsTableBody">
-                        <!-- 动态加载内容 -->
-                    </tbody>
-                </table>
-            </div>
+                    </template>
+
+                    <!-- 空数据状态 -->
+                    <tr x-show="!loading && hotspots.length === 0">
+                        <td colspan="8" class="px-6 py-12 text-center">
+                            <i class="fas fa-inbox text-gray-400 text-4xl mb-4"></i>
+                            <p class="text-gray-500">暂无热点新闻数据</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
-        <div class="card-footer bg-white">
-            <nav aria-label="分页导航">
-                <ul class="pagination pagination-sm mb-0" id="pagination">
-                    <!-- 分页按钮 -->
-                </ul>
-            </nav>
+
+        <!-- 分页 -->
+        <div x-show="pagination.pages > 1" class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+            <div class="flex-1 flex justify-between sm:hidden">
+                <button x-show="pagination.has_prev" @click="loadHotspots(pagination.page - 1)" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    上一页
+                </button>
+                <button x-show="pagination.has_next" @click="loadHotspots(pagination.page + 1)" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    下一页
+                </button>
+            </div>
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-gray-700">
+                        显示第 <span class="font-medium" x-text="((pagination.page - 1) * 10) + 1"></span> 到
+                        <span class="font-medium" x-text="Math.min(pagination.page * 10, stats.total)"></span> 条，
+                        共 <span class="font-medium" x-text="stats.total"></span> 条记录
+                    </p>
+                </div>
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                        <button x-show="pagination.has_prev" @click="loadHotspots(pagination.page - 1)" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+
+                        <template x-for="page in getPaginationPages()" :key="page">
+                            <button @click="loadHotspots(page)" :class="page === pagination.page ? 'bg-indigo-50 border-indigo-500 text-indigo-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'" class="relative inline-flex items-center px-4 py-2 border text-sm font-medium" x-text="page"></button>
+                        </template>
+
+                        <button x-show="pagination.has_next" @click="loadHotspots(pagination.page + 1)" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </nav>
+                </div>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- 添加/编辑热点新闻模态框 -->
-<div class="modal fade" id="addHotspotModal" tabindex="-1" aria-labelledby="addHotspotModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addHotspotModalLabel">添加热点新闻</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <!-- 添加/编辑模态框 -->
+    <div x-show="showModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div x-show="showModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 transition-opacity">
+                <div class="absolute inset-0 bg-gray-500 opacity-75" @click="closeModal()"></div>
             </div>
-            <form id="hotspotForm">
-                <div class="modal-body">
-                    <input type="hidden" id="hotspotId">
 
-                    <div class="row">
-                        <div class="col-12 mb-3">
-                            <label for="title" class="form-label">新闻标题 <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="title" required maxlength="200">
-                            <div class="form-text">标题最多200个字符</div>
-                        </div>
-                    </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="category" class="form-label">分类</label>
-                            <select class="form-select" id="category" required>
-                                <option value="general">通用</option>
-                                <option value="crypto">加密货币</option>
-                                <option value="defi">DeFi</option>
-                                <option value="market">市场动态</option>
-                                <option value="announcement">公告</option>
-                            </select>
+            <div x-show="showModal" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                <form @submit.prevent="saveHotspot()">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="mb-4">
+                            <h3 class="text-lg font-medium text-gray-900" x-text="isEditing ? '编辑热点新闻' : '添加热点新闻'"></h3>
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <label for="priority" class="form-label">优先级</label>
-                            <input type="number" class="form-control" id="priority" value="0" min="0" max="999">
-                            <div class="form-text">数字越大优先级越高</div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label for="displayOrder" class="form-label">显示顺序</label>
-                            <input type="number" class="form-control" id="displayOrder" value="0" min="0">
-                        </div>
-                    </div>
 
-                    <div class="row">
-                        <div class="col-12 mb-3">
-                            <label for="summary" class="form-label">摘要</label>
-                            <textarea class="form-control" id="summary" rows="3" placeholder="简短描述，用于首页卡片显示"></textarea>
-                        </div>
-                    </div>
+                        <div class="grid grid-cols-1 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">新闻标题 <span class="text-red-500">*</span></label>
+                                <input type="text" x-model="form.title" required maxlength="200" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="输入新闻标题">
+                                <p class="mt-1 text-sm text-gray-500">标题最多200个字符</p>
+                            </div>
 
-                    <div class="row">
-                        <div class="col-12 mb-3">
-                            <label for="imageUrl" class="form-label">封面图片URL</label>
-                            <input type="url" class="form-control" id="imageUrl" placeholder="https://example.com/image.jpg">
-                            <div class="form-text">推荐尺寸: 400x300px，格式: JPG/PNG</div>
-                        </div>
-                    </div>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">分类</label>
+                                    <select x-model="form.category" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        <option value="general">通用</option>
+                                        <option value="crypto">加密货币</option>
+                                        <option value="defi">DeFi</option>
+                                        <option value="market">市场动态</option>
+                                        <option value="announcement">公告</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">优先级</label>
+                                    <input type="number" x-model="form.priority" min="0" max="999" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="0">
+                                    <p class="mt-1 text-sm text-gray-500">数字越大优先级越高</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">显示顺序</label>
+                                    <input type="number" x-model="form.display_order" min="0" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="0">
+                                </div>
+                            </div>
 
-                    <div class="row">
-                        <div class="col-12 mb-3">
-                            <label for="linkUrl" class="form-label">链接URL（可选）</label>
-                            <input type="url" class="form-control" id="linkUrl" placeholder="https://example.com/news">
-                            <div class="form-text">点击卡片时跳转的链接</div>
-                        </div>
-                    </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">摘要</label>
+                                <textarea x-model="form.summary" rows="3" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="简短描述，用于首页卡片显示"></textarea>
+                            </div>
 
-                    <div class="row">
-                        <div class="col-12 mb-3">
-                            <label for="tags" class="form-label">标签</label>
-                            <input type="text" class="form-control" id="tags" placeholder="标签1,标签2,标签3">
-                            <div class="form-text">多个标签用逗号分隔</div>
-                        </div>
-                    </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">封面图片URL</label>
+                                <input type="url" x-model="form.image_url" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="https://example.com/image.jpg">
+                                <p class="mt-1 text-sm text-gray-500">推荐尺寸: 400x300px，格式: JPG/PNG</p>
+                            </div>
 
-                    <div class="row">
-                        <div class="col-12 mb-3">
-                            <label for="content" class="form-label">详细内容（可选）</label>
-                            <textarea class="form-control" id="content" rows="6" placeholder="详细的新闻内容..."></textarea>
-                        </div>
-                    </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">链接URL（可选）</label>
+                                <input type="url" x-model="form.link_url" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="https://example.com/news">
+                                <p class="mt-1 text-sm text-gray-500">点击卡片时跳转的链接</p>
+                            </div>
 
-                    <div class="row">
-                        <div class="col-12">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="isActive" checked>
-                                <label class="form-check-label" for="isActive">
-                                    立即启用并在首页显示
-                                </label>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">标签</label>
+                                <input type="text" x-model="form.tags" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="标签1,标签2,标签3">
+                                <p class="mt-1 text-sm text-gray-500">多个标签用逗号分隔</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">详细内容（可选）</label>
+                                <div class="relative">
+                                    <textarea
+                                        x-model="form.content"
+                                        id="newsContentEditor"
+                                        rows="6"
+                                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="详细的新闻内容...支持HTML格式">
+                                    </textarea>
+                                    <div class="mt-1 text-xs text-gray-500">
+                                        <i class="fas fa-info-circle mr-1"></i>支持富文本编辑，可插入图片、链接和格式化文本
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center">
+                                <input type="checkbox" x-model="form.is_active" id="is_active" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                                <label for="is_active" class="ml-2 block text-sm text-gray-900">立即启用并在首页显示</label>
                             </div>
                         </div>
                     </div>
+
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button type="submit" :disabled="saving" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50">
+                            <i x-show="saving" class="fas fa-spinner fa-spin mr-2"></i>
+                            <i x-show="!saving" class="fas fa-save mr-2"></i>
+                            <span x-text="saving ? '保存中...' : '保存'"></span>
+                        </button>
+                        <button type="button" @click="closeModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            取消
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 消息提示 -->
+    <div x-show="message.show" x-transition class="fixed top-4 right-4 z-50">
+        <div :class="message.type === 'success' ? 'bg-green-100 border-green-500 text-green-700' : 'bg-red-100 border-red-500 text-red-700'" class="border-l-4 p-4 rounded shadow-lg">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i :class="message.type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'"></i>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save me-1"></i>保存
+                <div class="ml-3">
+                    <p class="text-sm" x-text="message.text"></p>
+                </div>
+                <div class="ml-auto pl-3">
+                    <button @click="message.show = false" class="text-sm font-medium">
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<!-- Bootstrap CSS -->
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<!-- jQuery -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-$(document).ready(function() {
-    let currentPage = 1;
-    let isEditing = false;
+function newsHotspotsData() {
+    return {
+        hotspots: [],
+        stats: {},
+        pagination: {},
+        loading: false,
+        saving: false,
+        showModal: false,
+        isEditing: false,
+        filters: {
+            category: '',
+            status: '',
+            keyword: ''
+        },
+        form: {
+            id: null,
+            title: '',
+            summary: '',
+            content: '',
+            image_url: '',
+            link_url: '',
+            category: 'general',
+            priority: 0,
+            display_order: 0,
+            tags: '',
+            is_active: true
+        },
+        message: {
+            show: false,
+            type: 'success',
+            text: ''
+        },
 
-    // 加载热点新闻列表
-    function loadHotspots(page = 1) {
-        const params = new URLSearchParams({
-            page: page,
-            per_page: 10,
-            category: $('#categoryFilter').val(),
-            is_active: $('#statusFilter').val()
-        });
-
-        $.get(`/api/admin/v2/news/hotspots?${params}`)
-            .done(function(response) {
-                if (response.success) {
-                    renderHotspots(response.data.hotspots);
-                    renderPagination(response.data.pagination);
-                    updateStats(response.data.stats);
-                    currentPage = page;
-                }
-            })
-            .fail(function(xhr) {
-                console.error('加载热点新闻失败:', xhr.responseJSON);
-                showAlert('danger', '加载热点新闻失败');
-            });
-    }
-
-    // 渲染热点新闻列表
-    function renderHotspots(hotspots) {
-        const tbody = $('#hotspotsTableBody');
-        tbody.empty();
-
-        if (hotspots.length === 0) {
-            tbody.append(`
-                <tr>
-                    <td colspan="8" class="text-center py-4 text-muted">
-                        <i class="fas fa-inbox fa-2x mb-2"></i><br>
-                        暂无热点新闻数据
-                    </td>
-                </tr>
-            `);
-            return;
-        }
-
-        hotspots.forEach(function(hotspot) {
-            const statusBadge = hotspot.is_active
-                ? '<span class="badge bg-success">活跃</span>'
-                : '<span class="badge bg-secondary">禁用</span>';
-
-            const categoryText = getCategoryText(hotspot.category);
-            const imagePreview = hotspot.image_url
-                ? `<img src="${hotspot.image_url}" class="rounded" style="width: 50px; height: 40px; object-fit: cover;" onerror="this.style.display='none'">`
-                : '<i class="fas fa-image text-muted"></i>';
-
-            const createdAt = hotspot.created_at ? new Date(hotspot.created_at).toLocaleDateString() : '-';
-
-            tbody.append(`
-                <tr>
-                    <td>${hotspot.id}</td>
-                    <td class="text-center">${imagePreview}</td>
-                    <td>
-                        <div class="fw-medium">${escapeHtml(hotspot.title)}</div>
-                        <small class="text-muted">${escapeHtml(hotspot.summary || '').substring(0, 50)}${hotspot.summary && hotspot.summary.length > 50 ? '...' : ''}</small>
-                    </td>
-                    <td><span class="badge bg-info bg-opacity-10 text-info">${categoryText}</span></td>
-                    <td><span class="badge bg-warning bg-opacity-10 text-warning">${hotspot.priority}</span></td>
-                    <td>${statusBadge}</td>
-                    <td class="small text-muted">${createdAt}</td>
-                    <td>
-                        <div class="btn-group btn-group-sm" role="group">
-                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="editHotspot(${hotspot.id})" title="编辑">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline-${hotspot.is_active ? 'warning' : 'success'} btn-sm" onclick="toggleHotspotStatus(${hotspot.id}, ${hotspot.is_active})" title="${hotspot.is_active ? '禁用' : '启用'}">
-                                <i class="fas fa-${hotspot.is_active ? 'eye-slash' : 'eye'}"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteHotspot(${hotspot.id}, '${escapeHtml(hotspot.title)}')" title="删除">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `);
-        });
-    }
-
-    // 渲染分页
-    function renderPagination(pagination) {
-        const paginationEl = $('#pagination');
-        paginationEl.empty();
-
-        if (pagination.pages <= 1) return;
-
-        // 上一页
-        if (pagination.has_prev) {
-            paginationEl.append(`
-                <li class="page-item">
-                    <a class="page-link" href="#" onclick="loadHotspots(${pagination.page - 1})">上一页</a>
-                </li>
-            `);
-        }
-
-        // 页码
-        const startPage = Math.max(1, pagination.page - 2);
-        const endPage = Math.min(pagination.pages, pagination.page + 2);
-
-        for (let i = startPage; i <= endPage; i++) {
-            const isActive = i === pagination.page ? 'active' : '';
-            paginationEl.append(`
-                <li class="page-item ${isActive}">
-                    <a class="page-link" href="#" onclick="loadHotspots(${i})">${i}</a>
-                </li>
-            `);
-        }
-
-        // 下一页
-        if (pagination.has_next) {
-            paginationEl.append(`
-                <li class="page-item">
-                    <a class="page-link" href="#" onclick="loadHotspots(${pagination.page + 1})">下一页</a>
-                </li>
-            `);
-        }
-    }
-
-    // 更新统计信息
-    function updateStats(stats) {
-        $('#totalCount').text(stats.total || 0);
-        $('#activeCount').text(stats.active || 0);
-        $('#categoryCount').text(stats.categories ? stats.categories.length : 0);
-
-        // 计算最大优先级（这里简化处理）
-        $('#maxPriority').text('-');
-    }
-
-    // 表单提交
-    $('#hotspotForm').on('submit', function(e) {
-        e.preventDefault();
-
-        const formData = {
-            title: $('#title').val().trim(),
-            summary: $('#summary').val().trim(),
-            content: $('#content').val().trim(),
-            image_url: $('#imageUrl').val().trim(),
-            link_url: $('#linkUrl').val().trim(),
-            category: $('#category').val(),
-            priority: parseInt($('#priority').val()) || 0,
-            display_order: parseInt($('#displayOrder').val()) || 0,
-            tags: $('#tags').val().trim(),
-            is_active: $('#isActive').is(':checked')
-        };
-
-        if (!formData.title) {
-            showAlert('warning', '请输入新闻标题');
-            return;
-        }
-
-        const hotspotId = $('#hotspotId').val();
-        const url = isEditing ? `/api/admin/v2/news/hotspots/${hotspotId}` : '/api/admin/v2/news/hotspots';
-        const method = isEditing ? 'PUT' : 'POST';
-
-        $.ajax({
-            url: url,
-            method: method,
-            data: JSON.stringify(formData),
-            contentType: 'application/json',
-            success: function(response) {
-                if (response.success) {
-                    showAlert('success', response.message);
-                    $('#addHotspotModal').modal('hide');
-                    loadHotspots(currentPage);
-                } else {
-                    showAlert('danger', response.error || '操作失败');
-                }
-            },
-            error: function(xhr) {
-                const error = xhr.responseJSON ? xhr.responseJSON.error : '操作失败';
-                showAlert('danger', error);
-            }
-        });
-    });
-
-    // 筛选表单提交
-    $('#filterForm').on('submit', function(e) {
-        e.preventDefault();
-        loadHotspots(1);
-    });
-
-    // 重置表单
-    function resetForm() {
-        $('#hotspotForm')[0].reset();
-        $('#hotspotId').val('');
-        $('#priority').val('0');
-        $('#displayOrder').val('0');
-        $('#isActive').prop('checked', true);
-        isEditing = false;
-        $('#addHotspotModalLabel').text('添加热点新闻');
-    }
-
-    // 模态框关闭时重置表单
-    $('#addHotspotModal').on('hidden.bs.modal', function () {
-        resetForm();
-    });
-
-    // 工具函数
-    function getCategoryText(category) {
-        const categoryMap = {
-            'general': '通用',
-            'crypto': '加密货币',
-            'defi': 'DeFi',
-            'market': '市场动态',
-            'announcement': '公告'
-        };
-        return categoryMap[category] || category;
-    }
-
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    function showAlert(type, message) {
-        const alertHtml = `
-            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        `;
-        $('.main-content').prepend(alertHtml);
-
-        // 3秒后自动关闭
-        setTimeout(function() {
-            $('.alert').alert('close');
-        }, 3000);
-    }
-
-    // 全局函数
-    window.editHotspot = function(id) {
-        $.get(`/api/admin/v2/news/hotspots?per_page=100`)
-            .done(function(response) {
-                if (response.success) {
-                    const hotspot = response.data.hotspots.find(h => h.id === id);
-                    if (hotspot) {
-                        $('#hotspotId').val(hotspot.id);
-                        $('#title').val(hotspot.title);
-                        $('#summary').val(hotspot.summary);
-                        $('#content').val(hotspot.content);
-                        $('#imageUrl').val(hotspot.image_url);
-                        $('#linkUrl').val(hotspot.link_url);
-                        $('#category').val(hotspot.category);
-                        $('#priority').val(hotspot.priority);
-                        $('#displayOrder').val(hotspot.display_order);
-                        $('#tags').val(hotspot.tags ? hotspot.tags.join(',') : '');
-                        $('#isActive').prop('checked', hotspot.is_active);
-
-                        isEditing = true;
-                        $('#addHotspotModalLabel').text('编辑热点新闻');
-                        $('#addHotspotModal').modal('show');
-                    }
-                }
-            });
-    };
-
-    window.toggleHotspotStatus = function(id, currentStatus) {
-        const action = currentStatus ? '禁用' : '启用';
-        if (confirm(`确定要${action}这条热点新闻吗？`)) {
-            $.post(`/api/admin/v2/news/hotspots/${id}/toggle`)
-                .done(function(response) {
-                    if (response.success) {
-                        showAlert('success', response.message);
-                        loadHotspots(currentPage);
-                    } else {
-                        showAlert('danger', response.error || '操作失败');
-                    }
-                })
-                .fail(function(xhr) {
-                    const error = xhr.responseJSON ? xhr.responseJSON.error : '操作失败';
-                    showAlert('danger', error);
+        async loadHotspots(page = 1) {
+            this.loading = true;
+            try {
+                const params = new URLSearchParams({
+                    page: page,
+                    per_page: 10,
+                    category: this.filters.category,
+                    is_active: this.filters.status,
+                    keyword: this.filters.keyword
                 });
-        }
-    };
 
-    window.deleteHotspot = function(id, title) {
-        if (confirm(`确定要删除热点新闻"${title}"吗？此操作不可恢复。`)) {
-            $.ajax({
-                url: `/api/admin/v2/news/hotspots/${id}`,
-                method: 'DELETE',
-                success: function(response) {
-                    if (response.success) {
-                        showAlert('success', response.message);
-                        loadHotspots(currentPage);
-                    } else {
-                        showAlert('danger', response.error || '删除失败');
-                    }
-                },
-                error: function(xhr) {
-                    const error = xhr.responseJSON ? xhr.responseJSON.error : '删除失败';
-                    showAlert('danger', error);
+                const response = await axios.get(`/api/admin/v2/news/hotspots?${params}`);
+                if (response.data.success) {
+                    this.hotspots = response.data.data.hotspots || [];
+                    this.pagination = response.data.data.pagination || {};
+                    this.stats = response.data.data.stats || {};
                 }
-            });
-        }
-    };
+            } catch (error) {
+                console.error('加载热点新闻失败:', error);
+                this.showMessage('danger', '加载热点新闻失败');
+            } finally {
+                this.loading = false;
+            }
+        },
 
-    // 页面加载时获取数据
-    loadHotspots();
-});
+        applyFilters() {
+            this.loadHotspots(1);
+        },
+
+        openAddModal() {
+            this.resetForm();
+            this.isEditing = false;
+            this.showModal = true;
+            // 延迟初始化TinyMCE，确保模态框完全打开
+            this.$nextTick(() => {
+                setTimeout(() => {
+                    this.initTinyMCE();
+                }, 100);
+            });
+        },
+
+        editHotspot(hotspot) {
+            this.form = {
+                id: hotspot.id,
+                title: hotspot.title || '',
+                summary: hotspot.summary || '',
+                content: hotspot.content || '',
+                image_url: hotspot.image_url || '',
+                link_url: hotspot.link_url || '',
+                category: hotspot.category || 'general',
+                priority: hotspot.priority || 0,
+                display_order: hotspot.display_order || 0,
+                tags: Array.isArray(hotspot.tags) ? hotspot.tags.join(',') : (hotspot.tags || ''),
+                is_active: hotspot.is_active || false
+            };
+            this.isEditing = true;
+            this.showModal = true;
+            // 延迟初始化TinyMCE，确保模态框完全打开并数据已加载
+            this.$nextTick(() => {
+                setTimeout(() => {
+                    this.initTinyMCE();
+                }, 100);
+            });
+        },
+
+        async saveHotspot() {
+            if (!this.form.title.trim()) {
+                this.showMessage('error', '请输入新闻标题');
+                return;
+            }
+
+            // 确保获取TinyMCE编辑器的最新内容
+            if (typeof tinymce !== 'undefined') {
+                const editor = tinymce.get('newsContentEditor');
+                if (editor) {
+                    this.form.content = editor.getContent();
+                }
+            }
+
+            this.saving = true;
+            try {
+                const url = this.isEditing ? `/api/admin/v2/news/hotspots/${this.form.id}` : '/api/admin/v2/news/hotspots';
+                const method = this.isEditing ? 'put' : 'post';
+
+                const response = await axios[method](url, {
+                    title: this.form.title.trim(),
+                    summary: this.form.summary.trim(),
+                    content: this.form.content.trim(),
+                    image_url: this.form.image_url.trim(),
+                    link_url: this.form.link_url.trim(),
+                    category: this.form.category,
+                    priority: parseInt(this.form.priority) || 0,
+                    display_order: parseInt(this.form.display_order) || 0,
+                    tags: this.form.tags.trim(),
+                    is_active: this.form.is_active
+                });
+
+                if (response.data.success) {
+                    this.showMessage('success', response.data.message || '操作成功');
+                    this.closeModal();
+                    this.loadHotspots();
+                } else {
+                    this.showMessage('error', response.data.error || '操作失败');
+                }
+            } catch (error) {
+                console.error('保存失败:', error);
+                this.showMessage('error', error.response?.data?.error || '操作失败');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async toggleStatus(hotspot) {
+            const action = hotspot.is_active ? '禁用' : '启用';
+            if (!confirm(`确定要${action}这条热点新闻吗？`)) return;
+
+            try {
+                const response = await axios.post(`/api/admin/v2/news/hotspots/${hotspot.id}/toggle`);
+                if (response.data.success) {
+                    this.showMessage('success', response.data.message || '操作成功');
+                    this.loadHotspots();
+                } else {
+                    this.showMessage('error', response.data.error || '操作失败');
+                }
+            } catch (error) {
+                console.error('切换状态失败:', error);
+                this.showMessage('error', error.response?.data?.error || '操作失败');
+            }
+        },
+
+        async deleteHotspot(hotspot) {
+            if (!confirm(`确定要删除热点新闻"${hotspot.title}"吗？此操作不可恢复。`)) return;
+
+            try {
+                const response = await axios.delete(`/api/admin/v2/news/hotspots/${hotspot.id}`);
+                if (response.data.success) {
+                    this.showMessage('success', response.data.message || '删除成功');
+                    this.loadHotspots();
+                } else {
+                    this.showMessage('error', response.data.error || '删除失败');
+                }
+            } catch (error) {
+                console.error('删除失败:', error);
+                this.showMessage('error', error.response?.data?.error || '删除失败');
+            }
+        },
+
+        closeModal() {
+            this.showModal = false;
+            this.destroyTinyMCE();
+            this.resetForm();
+        },
+
+        resetForm() {
+            this.form = {
+                id: null,
+                title: '',
+                summary: '',
+                content: '',
+                image_url: '',
+                link_url: '',
+                category: 'general',
+                priority: 0,
+                display_order: 0,
+                tags: '',
+                is_active: true
+            };
+            this.isEditing = false;
+        },
+
+        // TinyMCE 初始化方法
+        initTinyMCE() {
+            // 先销毁已存在的编辑器实例
+            this.destroyTinyMCE();
+
+            if (typeof tinymce !== 'undefined') {
+                tinymce.init({
+                    selector: '#newsContentEditor',
+                    height: 400,
+                    menubar: false,
+                    branding: false,
+                    plugins: [
+                        'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+                        'searchreplace', 'visualblocks', 'code', 'fullscreen',
+                        'insertdatetime', 'media', 'table', 'help', 'wordcount'
+                    ],
+                    toolbar: 'undo redo | blocks | ' +
+                        'bold italic forecolor | alignleft aligncenter ' +
+                        'alignright alignjustify | bullist numlist outdent indent | ' +
+                        'removeformat | link image | code | help',
+                    content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, San Francisco, Segoe UI, Roboto, Helvetica Neue, sans-serif; font-size: 14px; line-height: 1.6; }',
+                    block_formats: '段落=p; 标题1=h1; 标题2=h2; 标题3=h3; 标题4=h4; 标题5=h5; 标题6=h6; 预格式化=pre',
+                    setup: (editor) => {
+                        // 监听内容变化，同步到Alpine.js数据
+                        editor.on('input change keyup', () => {
+                            this.form.content = editor.getContent();
+                        });
+
+                        // 编辑器准备就绪时设置内容
+                        editor.on('init', () => {
+                            if (this.form.content) {
+                                editor.setContent(this.form.content);
+                            }
+                        });
+                    },
+                    // 图片上传配置
+                    images_upload_handler: (blobInfo, success, failure) => {
+                        // 简单的base64编码处理
+                        const reader = new FileReader();
+                        reader.onload = function() {
+                            success(reader.result);
+                        };
+                        reader.onerror = function() {
+                            failure('图片读取失败');
+                        };
+                        reader.readAsDataURL(blobInfo.blob());
+                    },
+                    // 限制图片大小
+                    images_file_types: 'jpg,jpeg,png,gif,webp',
+                    automatic_uploads: true
+                });
+            }
+        },
+
+        // TinyMCE 销毁方法
+        destroyTinyMCE() {
+            if (typeof tinymce !== 'undefined') {
+                const editor = tinymce.get('newsContentEditor');
+                if (editor) {
+                    editor.destroy();
+                }
+            }
+        },
+
+        getCategoryText(category) {
+            const categoryMap = {
+                'general': '通用',
+                'crypto': '加密货币',
+                'defi': 'DeFi',
+                'market': '市场动态',
+                'announcement': '公告'
+            };
+            return categoryMap[category] || category;
+        },
+
+        formatDate(dateString) {
+            if (!dateString) return '-';
+            try {
+                return new Date(dateString).toLocaleDateString('zh-CN');
+            } catch (e) {
+                return '-';
+            }
+        },
+
+        getPaginationPages() {
+            const pages = [];
+            const current = this.pagination.page || 1;
+            const total = this.pagination.pages || 1;
+
+            const start = Math.max(1, current - 2);
+            const end = Math.min(total, current + 2);
+
+            for (let i = start; i <= end; i++) {
+                pages.push(i);
+            }
+
+            return pages;
+        },
+
+        showMessage(type, text) {
+            this.message = {
+                show: true,
+                type: type,
+                text: text
+            };
+
+            setTimeout(() => {
+                this.message.show = false;
+            }, 3000);
+        }
+    }
+}
 </script>
 {% endblock %}

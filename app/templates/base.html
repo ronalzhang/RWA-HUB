@@ -1115,6 +1115,17 @@
                         }
                     };
 
+                    // ⭐ 关键修复：保存钱包连接状态到localStorage
+                    try {
+                        localStorage.setItem('wallet_address', connectedAddress);
+                        localStorage.setItem('wallet_type', 'phantom');
+                        localStorage.setItem('wallet_connected', 'true');
+                        sessionStorage.setItem('wallet_address', connectedAddress);
+                        console.log('✅ 钱包状态已保存到本地存储');
+                    } catch (error) {
+                        console.warn('保存钱包状态到本地存储失败:', error);
+                    }
+
                     // 更新UI
                     updateWalletUI(connectedAddress);
 
@@ -1155,11 +1166,31 @@
                 // 清除钱包状态
                 window.walletState = null;
 
+                // ⭐ 关键修复：清除本地存储的钱包连接状态
+                try {
+                    localStorage.removeItem('wallet_address');
+                    localStorage.removeItem('wallet_type');
+                    localStorage.removeItem('wallet_connected');
+                    sessionStorage.removeItem('wallet_address');
+                    console.log('✅ 已清除本地存储的钱包状态');
+                } catch (error) {
+                    console.warn('清除本地存储失败:', error);
+                }
+
                 // 更新UI
                 const walletBtnText = document.getElementById('walletBtnText');
                 if (walletBtnText) {
                     walletBtnText.textContent = 'Connect Wallet';
                 }
+
+                // 清除钱包地址显示
+                const walletAddressDisplay = document.getElementById('walletAddressDisplay');
+                if (walletAddressDisplay) {
+                    walletAddressDisplay.textContent = 'Not Connected';
+                }
+
+                // 隐藏管理员入口
+                hideAdminEntry();
 
                 // 隐藏钱包菜单
                 const walletMenu = document.getElementById('walletMenu');
@@ -1167,6 +1198,11 @@
                     walletMenu.classList.remove('show');
                     walletMenu.style.display = 'none';
                 }
+
+                // 触发钱包状态变化事件
+                document.dispatchEvent(new CustomEvent('walletStateChanged', {
+                    detail: { connected: false, address: null }
+                }));
 
                 return true;
             } catch (error) {
@@ -1559,6 +1595,79 @@
         // Initialize wallet connection check - 使用统一管理器
         function initializeWalletConnection() {
             console.log('🚀 初始化钱包连接检查 (使用统一管理器)');
+
+            // ⭐ 关键修复：检查localStorage中的钱包连接状态
+            try {
+                const savedAddress = localStorage.getItem('wallet_address');
+                const savedType = localStorage.getItem('wallet_type');
+                const savedConnected = localStorage.getItem('wallet_connected');
+
+                if (savedAddress && savedType && savedConnected === 'true') {
+                    console.log('🔄 发现已保存的钱包连接状态，尝试恢复:', savedAddress);
+
+                    // 检查钱包扩展是否可用
+                    if (savedType === 'phantom' && window.solana && window.solana.isPhantom) {
+                        // 尝试无需用户交互的连接（仅限已授权的情况）
+                        window.solana.connect({ onlyIfTrusted: true })
+                            .then(response => {
+                                const currentAddress = response.publicKey.toString();
+                                if (currentAddress === savedAddress) {
+                                    console.log('✅ 成功恢复钱包连接:', currentAddress);
+
+                                    // 创建钱包状态
+                                    window.walletState = {
+                                        connected: true,
+                                        isConnected: true,
+                                        address: currentAddress,
+                                        walletType: savedType,
+                                        adapter: window.solana,
+                                        formatAddress: function(addr) {
+                                            if (!addr) return '';
+                                            return addr.slice(0, 6) + '...' + addr.slice(-4);
+                                        },
+                                        copyWalletAddress: function() {
+                                            if (this.address) {
+                                                navigator.clipboard.writeText(this.address).then(() => {
+                                                    const successMsg = document.getElementById('copyAddressSuccess');
+                                                    if (successMsg) {
+                                                        successMsg.style.opacity = '1';
+                                                        setTimeout(() => successMsg.style.opacity = '0', 2000);
+                                                    }
+                                                }).catch(() => {
+                                                    alert('Address: ' + this.address);
+                                                });
+                                            }
+                                        }
+                                    };
+
+                                    // 更新UI
+                                    updateWalletUI(currentAddress);
+                                    checkAdminStatus(currentAddress);
+
+                                    // 触发钱包恢复事件
+                                    document.dispatchEvent(new CustomEvent('walletRestored', {
+                                        detail: { address: currentAddress, type: savedType }
+                                    }));
+                                } else {
+                                    console.log('⚠️ 保存的地址与当前钱包地址不匹配，清除保存的状态');
+                                    localStorage.removeItem('wallet_address');
+                                    localStorage.removeItem('wallet_type');
+                                    localStorage.removeItem('wallet_connected');
+                                }
+                            })
+                            .catch(error => {
+                                console.log('钱包未授权自动连接或连接失败:', error);
+                                // 不清除localStorage，用户可能稍后手动连接
+                            });
+                    } else {
+                        console.log('⚠️ 钱包扩展不可用，无法恢复连接');
+                    }
+                } else {
+                    console.log('📭 没有找到已保存的钱包连接状态');
+                }
+            } catch (error) {
+                console.error('恢复钱包连接状态失败:', error);
+            }
 
             // 延迟初始化，确保所有脚本都已加载
             setTimeout(() => {
