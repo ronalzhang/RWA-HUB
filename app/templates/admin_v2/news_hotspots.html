@@ -295,15 +295,9 @@
                                     <div class="flex space-x-2">
                                         <input type="file" id="imageUpload" accept="image/*" @change="handleImageUpload($event)" class="hidden">
                                         <button type="button" @click="document.getElementById('imageUpload').click()" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm flex items-center">
-                                            <i class="fas fa-upload mr-2"></i>上传图片
+                                            <i class="fas fa-upload mr-2"></i>选择图片
                                         </button>
-                                        <span class="text-sm text-gray-500 self-center">或</span>
-                                    </div>
-
-                                    <!-- URL输入 -->
-                                    <div>
-                                        <input type="url" x-model="form.image_url" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="输入图片URL地址">
-                                        <p class="mt-1 text-sm text-gray-500">推荐尺寸: 400x300px，格式: JPG/PNG/WebP，大小不超过2MB</p>
+                                        <span class="text-sm text-gray-500 self-center">推荐尺寸: 400x300px，大小不超过2MB</span>
                                     </div>
                                 </div>
                             </div>
