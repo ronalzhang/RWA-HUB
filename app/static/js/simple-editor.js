@@ -252,7 +252,12 @@ window.tinymce = {
                 editor.editor.innerHTML = content || `<p style="color: #9ca3af; margin: 0;">${editor.options.placeholder}</p>`;
                 editor.updateContent();
             };
-            editor.destroy = () => editor.destroy();
+            editor.destroy = () => {
+                if (editor.container && editor.container.parentNode) {
+                    editor.container.parentNode.removeChild(editor.container);
+                }
+                editor.element.style.display = '';
+            };
 
             // 触发init事件
             if (config.setup) {
