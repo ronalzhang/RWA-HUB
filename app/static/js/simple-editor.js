@@ -247,8 +247,11 @@ window.tinymce = {
             });
 
             // 扩展编辑器对象以匹配TinyMCE API
-            editor.getContent = () => editor.getContent();
-            editor.setContent = (content) => editor.setContent(content);
+            editor.getContent = () => editor.element.value;
+            editor.setContent = (content) => {
+                editor.editor.innerHTML = content || `<p style="color: #9ca3af; margin: 0;">${editor.options.placeholder}</p>`;
+                editor.updateContent();
+            };
             editor.destroy = () => editor.destroy();
 
             // 触发init事件
