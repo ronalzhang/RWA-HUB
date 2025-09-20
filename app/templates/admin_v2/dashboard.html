@@ -374,19 +374,34 @@
                     if (!response.ok) throw new Error('加载用户增长数据失败');
                     const data = await response.json();
                     const userGrowthData = data.user_growth;
-                    
+
+                    // 验证数据完整性
+                    if (!userGrowthData || !userGrowthData.labels || !userGrowthData.values) {
+                        console.warn('用户增长数据不完整:', userGrowthData);
+                        return;
+                    }
+
                     if (this.userGrowthChart) {
                         this.userGrowthChart.destroy();
                     }
-                    
-                    const ctx = document.getElementById('userGrowthChart').getContext('2d');
+
+                    const ctx = document.getElementById('userGrowthChart')?.getContext('2d');
+                    if (!ctx) {
+                        console.warn('用户增长图表canvas不存在');
+                        return;
+                    }
+
+                    // 确保数据安全
+                    const safeLabels = Array.isArray(userGrowthData.labels) ? userGrowthData.labels : [];
+                    const safeValues = Array.isArray(userGrowthData.values) ? userGrowthData.values : [];
+
                     this.userGrowthChart = new Chart(ctx, {
                         type: 'line',
                         data: {
-                            labels: userGrowthData.labels,
+                            labels: safeLabels,
                             datasets: [{
                                 label: '新增用户',
-                                data: userGrowthData.values,
+                                data: safeValues,
                                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
                                 borderColor: 'rgba(59, 130, 246, 1)',
                                 borderWidth: 2,
@@ -423,19 +438,34 @@
                     if (!response.ok) throw new Error('加载交易量数据失败');
                     const data = await response.json();
                     const tradingVolumeData = data.trading_volume;
-                    
+
+                    // 验证数据完整性
+                    if (!tradingVolumeData || !tradingVolumeData.labels || !tradingVolumeData.values) {
+                        console.warn('交易量数据不完整:', tradingVolumeData);
+                        return;
+                    }
+
                     if (this.tradingVolumeChart) {
                         this.tradingVolumeChart.destroy();
                     }
-                    
-                    const ctx = document.getElementById('tradingVolumeChart').getContext('2d');
+
+                    const ctx = document.getElementById('tradingVolumeChart')?.getContext('2d');
+                    if (!ctx) {
+                        console.warn('交易量图表canvas不存在');
+                        return;
+                    }
+
+                    // 确保数据安全
+                    const safeLabels = Array.isArray(tradingVolumeData.labels) ? tradingVolumeData.labels : [];
+                    const safeValues = Array.isArray(tradingVolumeData.values) ? tradingVolumeData.values : [];
+
                     this.tradingVolumeChart = new Chart(ctx, {
                         type: 'bar',
                         data: {
-                            labels: tradingVolumeData.labels,
+                            labels: safeLabels,
                             datasets: [{
                                 label: '交易量 (ETH)',
-                                data: tradingVolumeData.values,
+                                data: safeValues,
                                 backgroundColor: 'rgba(16, 185, 129, 0.2)',
                                 borderColor: 'rgba(16, 185, 129, 1)',
                                 borderWidth: 1
@@ -466,18 +496,33 @@
                     const response = await this.authFetch('/admin/v2/api/asset-type-stats');
                     if (!response.ok) throw new Error('加载资产类型数据失败');
                     const data = await response.json();
-                    
+
+                    // 验证数据完整性
+                    if (!data || !data.labels || !data.values) {
+                        console.warn('资产类型数据不完整:', data);
+                        return;
+                    }
+
                     if (this.assetTypeChart) {
                         this.assetTypeChart.destroy();
                     }
-                    
-                    const ctx = document.getElementById('assetTypeChart').getContext('2d');
+
+                    const ctx = document.getElementById('assetTypeChart')?.getContext('2d');
+                    if (!ctx) {
+                        console.warn('资产类型图表canvas不存在');
+                        return;
+                    }
+
+                    // 确保数据安全
+                    const safeLabels = Array.isArray(data.labels) ? data.labels : ['暂无数据'];
+                    const safeValues = Array.isArray(data.values) ? data.values : [0];
+
                     this.assetTypeChart = new Chart(ctx, {
                         type: 'doughnut',
                         data: {
-                            labels: data.labels,
+                            labels: safeLabels,
                             datasets: [{
-                                data: data.values,
+                                data: safeValues,
                                 backgroundColor: [
                                     'rgba(59, 130, 246, 0.8)',
                                     'rgba(16, 185, 129, 0.8)',

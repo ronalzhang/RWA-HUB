@@ -165,6 +165,12 @@ class IPStatsManager {
             return;
         }
 
+        // 验证数据完整性
+        if (!data || !data.labels || !data.visit_data || !data.unique_ip_data) {
+            console.warn('图表数据不完整:', data);
+            return;
+        }
+
         // 彻底销毁现有图表
         if (this.charts[period]) {
             try {
@@ -192,16 +198,21 @@ class IPStatsManager {
         // 获取新的canvas上下文
         const ctx = newCanvas.getContext('2d');
         
+        // 确保数据数组有内容，没有则使用空数组
+        const safeLabels = Array.isArray(data.labels) && data.labels.length > 0 ? data.labels : ['暂无数据'];
+        const safeVisitData = Array.isArray(data.visit_data) && data.visit_data.length > 0 ? data.visit_data : [0];
+        const safeUniqueIpData = Array.isArray(data.unique_ip_data) && data.unique_ip_data.length > 0 ? data.unique_ip_data : [0];
+
         // 创建新图表
         try {
             this.charts[period] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: data.labels,
+                    labels: safeLabels,
                     datasets: [
                         {
                             label: '访问次数',
-                            data: data.visit_data,
+                            data: safeVisitData,
                             borderColor: '#3b82f6',
                             backgroundColor: 'rgba(59, 130, 246, 0.1)',
                             borderWidth: 2,
@@ -214,7 +225,7 @@ class IPStatsManager {
                         },
                         {
                             label: '独立IP',
-                            data: data.unique_ip_data,
+                            data: safeUniqueIpData,
                             borderColor: '#10b981',
                             backgroundColor: 'rgba(16, 185, 129, 0.1)',
                             borderWidth: 2,
