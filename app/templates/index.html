@@ -940,8 +940,25 @@
 
     // 处理新闻热点点击事件
     function handleHotspotClick(hotspot) {
-        // 跳转到新闻详情页面
-        window.location.href = `/news/${hotspot.id}`;
+        // 构建日期格式的URL
+        const date = new Date(hotspot.created_at);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+
+        // 创建SEO友好的slug
+        const slug = (hotspot.title || '')
+            .replace(/\s+/g, '-')           // 空格替换为-
+            .replace(/[，。：？！]/g, '-')    // 中文标点替换为-
+            .replace(/[-]+/g, '-')         // 多个-合并为一个
+            .replace(/^-+|-+$/g, '')       // 移除开头和结尾的-
+            .toLowerCase();
+
+        // 截断slug长度
+        const truncatedSlug = slug.length > 50 ? slug.substring(0, 50) : slug;
+
+        // 跳转到日期格式的详情页面
+        window.location.href = `/news/${year}/${month}/${day}/${truncatedSlug}`;
     }
 
     // 显示无数据状态

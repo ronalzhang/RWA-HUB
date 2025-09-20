@@ -283,9 +283,29 @@
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">封面图片URL</label>
-                                <input type="url" x-model="form.image_url" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="https://example.com/image.jpg">
-                                <p class="mt-1 text-sm text-gray-500">推荐尺寸: 400x300px，格式: JPG/PNG</p>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">封面图片</label>
+                                <div class="space-y-3">
+                                    <!-- 图片预览 -->
+                                    <div x-show="form.image_url" class="relative inline-block">
+                                        <img :src="form.image_url" alt="封面预览" class="h-32 w-48 object-cover rounded-lg border border-gray-300">
+                                        <button type="button" @click="form.image_url = ''" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600">×</button>
+                                    </div>
+
+                                    <!-- 上传按钮 -->
+                                    <div class="flex space-x-2">
+                                        <input type="file" id="imageUpload" accept="image/*" @change="handleImageUpload($event)" class="hidden">
+                                        <button type="button" @click="document.getElementById('imageUpload').click()" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm flex items-center">
+                                            <i class="fas fa-upload mr-2"></i>上传图片
+                                        </button>
+                                        <span class="text-sm text-gray-500 self-center">或</span>
+                                    </div>
+
+                                    <!-- URL输入 -->
+                                    <div>
+                                        <input type="url" x-model="form.image_url" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="输入图片URL地址">
+                                        <p class="mt-1 text-sm text-gray-500">推荐尺寸: 400x300px，格式: JPG/PNG/WebP，大小不超过2MB</p>
+                                    </div>
+                                </div>
                             </div>
 
                             <div>
@@ -659,6 +679,31 @@ function newsHotspotsData() {
             }
 
             return pages;
+        },
+
+        // 图片上传处理
+        handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // 验证文件类型
+            if (!file.type.startsWith('image/')) {
+                this.showMessage('error', '请选择图片文件');
+                return;
+            }
+
+            // 验证文件大小 (2MB)
+            if (file.size > 2 * 1024 * 1024) {
+                this.showMessage('error', '图片大小不能超过2MB');
+                return;
+            }
+
+            // 创建预览
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                this.form.image_url = e.target.result;
+            };
+            reader.readAsDataURL(file);
         },
 
         showMessage(type, text) {
