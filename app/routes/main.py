@@ -234,7 +234,8 @@ def news_detail(year, month, day, slug):
                 import re
                 news_slug = str(news.title)
                 news_slug = re.sub(r'\s+', '-', news_slug)           # 空格替换为-
-                news_slug = re.sub(r'[，。：？！]', '-', news_slug)    # 中文标点替换为-
+                news_slug = re.sub(r'[，。：？！\.]', '-', news_slug)  # 中文标点和英文句号替换为-
+                news_slug = re.sub(r'(\.com|\.net|\.org)', '', news_slug, flags=re.IGNORECASE) # 移除常见域名后缀
                 news_slug = re.sub(r'[-]+', '-', news_slug)         # 多个-合并为一个
                 news_slug = re.sub(r'^-+|-+$', '', news_slug)       # 移除开头和结尾的-
                 news_slug = news_slug.lower()

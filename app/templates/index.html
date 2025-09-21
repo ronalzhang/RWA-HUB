@@ -446,7 +446,8 @@
         // 创建SEO友好的slug
         const slug = (news.title || '')
             .replace(/\s+/g, '-')           // 空格替换为-
-            .replace(/[，。：？！]/g, '-')    // 中文标点替换为-
+            .replace(/[，。：？！\.]/g, '-')  // 中文标点和英文句号替换为-
+            .replace(/[\.com|\.net|\.org]/gi, '') // 移除常见域名后缀
             .replace(/[-]+/g, '-')         // 多个-合并为一个
             .replace(/^-+|-+$/g, '')       // 移除开头和结尾的-
             .toLowerCase();
@@ -633,7 +634,8 @@
         // 创建SEO友好的slug
         const slug = (hotspot.title || '')
             .replace(/\s+/g, '-')           // 空格替换为-
-            .replace(/[，。：？！]/g, '-')    // 中文标点替换为-
+            .replace(/[，。：？！\.]/g, '-')  // 中文标点和英文句号替换为-
+            .replace(/[\.com|\.net|\.org]/gi, '') // 移除常见域名后缀
             .replace(/[-]+/g, '-')         // 多个-合并为一个
             .replace(/^-+|-+$/g, '')       // 移除开头和结尾的-
             .toLowerCase();

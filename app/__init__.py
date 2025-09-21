@@ -152,7 +152,8 @@ def create_app(config_name='development'):
         # 创建slug：移除特殊字符，替换空格和标点为连字符
         slug = str(title)
         slug = re.sub(r'\s+', '-', slug)           # 空格替换为-
-        slug = re.sub(r'[，。：？！]', '-', slug)    # 中文标点替换为-
+        slug = re.sub(r'[，。：？！\.]', '-', slug)  # 中文标点和英文句号替换为-
+        slug = re.sub(r'(\.com|\.net|\.org)', '', slug, flags=re.IGNORECASE) # 移除常见域名后缀
         slug = re.sub(r'[-]+', '-', slug)         # 多个-合并为一个
         slug = re.sub(r'^-+|-+$', '', slug)       # 移除开头和结尾的-
         slug = slug.lower()
