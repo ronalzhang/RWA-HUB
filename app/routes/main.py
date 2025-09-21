@@ -157,8 +157,8 @@ def favicon():
         return '', 404
 
 @main_bp.route('/news/<int:news_id>')
-def news_detail(news_id):
-    """新闻详情页面"""
+def news_detail_legacy(news_id):
+    """新闻详情页面 - 兼容旧版本ID链接，重定向到新格式"""
     try:
         # 根据ID查找新闻热点
         hotspot = NewsHotspot.query.filter_by(id=news_id, is_active=True).first()
@@ -166,25 +166,42 @@ def news_detail(news_id):
             current_app.logger.warning(f'新闻详情页面 - 未找到ID为{news_id}的热点新闻')
             return render_template('404.html'), 404
 
-        # 获取相关新闻（同分类，排除当前新闻）
-        related_news = NewsHotspot.query.filter(
-            NewsHotspot.category == hotspot.category,
-            NewsHotspot.is_active == True,
-            NewsHotspot.id != news_id
-        ).order_by(NewsHotspot.created_at.desc()).limit(3).all()
+        # 生成SEO友好的slug
+        from urllib.parse import quote
+        import re
 
-        current_app.logger.info(f'新闻详情页面 - 成功加载新闻: {hotspot.title}')
-        return render_template('news_detail.html', hotspot=hotspot, related_news=related_news)
+        # 创建slug：移除特殊字符，替换空格为连字符
+        slug = re.sub(r'[^\w\s-]', '', hotspot.title)
+        slug = re.sub(r'[-\s]+', '-', slug)
+        slug = slug.strip('-').lower()
+
+        # 如果slug为空或太短，使用默认值
+        if not slug or len(slug) < 3:
+            slug = f"news-{news_id}"
+
+        # 构建新的URL格式并重定向
+        from flask import redirect, url_for
+        new_url = f"/news/{hotspot.created_at.strftime('%Y/%m/%d')}/{slug}"
+        current_app.logger.info(f'重定向旧URL /news/{news_id} 到新URL {new_url}')
+        return redirect(new_url, code=301)  # 永久重定向
 
     except Exception as e:
-        current_app.logger.error(f'新闻详情页面 - 加载失败: {str(e)}')
+        current_app.logger.error(f'新闻详情页面 - 重定向失败: {str(e)}')
         return render_template('404.html'), 404
 
 @main_bp.route('/news/<int:year>/<int:month>/<int:day>/<slug>')
-def news_detail_by_date(year, month, day, slug):
+def news_detail(year, month, day, slug):
     """基于日期的新闻详情页面 - SEO友好的URL格式"""
     try:
         from datetime import datetime
+
+        # 获取当前用户的钱包地址（从多个来源）
+        eth_address_header = request.headers.get('X-Eth-Address')
+        eth_address_cookie = request.cookies.get('eth_address')
+        eth_address_args = request.args.get('eth_address')
+
+        # 优先使用 Args > Header > Cookie
+        eth_address = eth_address_args or eth_address_header or eth_address_cookie
 
         # 构建日期范围（当天的开始和结束）
         start_date = datetime(year, month, day)
@@ -222,7 +239,10 @@ def news_detail_by_date(year, month, day, slug):
         ).order_by(NewsHotspot.created_at.desc()).limit(3).all()
 
         current_app.logger.info(f'日期新闻详情页面 - 成功加载新闻: {hotspot.title}')
-        return render_template('news_detail.html', hotspot=hotspot, related_news=related_news)
+        return render_template('news_detail.html',
+                             hotspot=hotspot,
+                             related_news=related_news,
+                             current_user_address=eth_address)
 
     except Exception as e:
         current_app.logger.error(f'日期新闻详情页面 - 加载失败: {str(e)}')

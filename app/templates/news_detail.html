@@ -44,6 +44,15 @@
     padding: 2rem 1rem;
 }
 
+/* 顶部导航栏 */
+.top-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    gap: 1rem;
+}
+
 /* 返回按钮 */
 .back-button {
     display: inline-flex;
@@ -52,7 +61,6 @@
     color: #94a3b8;
     text-decoration: none;
     font-size: 0.9rem;
-    margin-bottom: 2rem;
     padding: 0.5rem 1rem;
     border-radius: 12px;
     background: rgba(30, 41, 59, 0.6);
@@ -66,6 +74,29 @@
     background: rgba(30, 41, 59, 0.8);
     border-color: rgba(148, 163, 184, 0.2);
     transform: translateX(-2px);
+}
+
+/* 分享按钮 */
+.share-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #94a3b8;
+    background: rgba(30, 41, 59, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    border-radius: 12px;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.share-button:hover {
+    color: #e2e8f0;
+    background: rgba(30, 41, 59, 0.8);
+    border-color: rgba(148, 163, 184, 0.2);
+    transform: translateX(2px);
 }
 
 /* 主内容卡片 */
@@ -444,6 +475,16 @@
         padding: 1rem;
     }
 
+    .top-navigation {
+        margin-bottom: 1.5rem;
+    }
+
+    .back-button,
+    .share-button {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+    }
+
     .news-title {
         font-size: 2rem;
     }
@@ -493,11 +534,20 @@
 {% block content %}
 <div class="news-detail-page">
     <div class="news-detail-container">
-        <!-- 返回按钮 -->
-        <a href="/" class="back-button">
-            <i class="fas fa-arrow-left"></i>
-            返回首页
-        </a>
+        <!-- 顶部导航栏 -->
+        <div class="top-navigation">
+            <!-- 返回按钮 -->
+            <a href="/" class="back-button">
+                <i class="fas fa-arrow-left"></i>
+                Back to Home
+            </a>
+
+            <!-- 分享按钮 -->
+            <button class="share-button" onclick="window.shareNews()">
+                <i class="fas fa-share-alt"></i>
+                Share
+            </button>
+        </div>
 
         <!-- 主内容卡片 -->
         <article class="news-card">
@@ -522,16 +572,16 @@
                 <div class="news-meta">
                     <div class="news-category">
                         <i class="fas fa-tag"></i>
-                        {% if hotspot.category == 'announcement' %}公告
-                        {% elif hotspot.category == 'crypto' %}加密货币
+                        {% if hotspot.category == 'announcement' %}Announcement
+                        {% elif hotspot.category == 'crypto' %}Cryptocurrency
                         {% elif hotspot.category == 'defi' %}DeFi
-                        {% elif hotspot.category == 'market' %}市场动态
-                        {% else %}{{ hotspot.category }}
+                        {% elif hotspot.category == 'market' %}Market News
+                        {% else %}{{ hotspot.category.title() }}
                         {% endif %}
                     </div>
                     <div class="news-date">
                         <i class="fas fa-calendar-alt"></i>
-                        {{ hotspot.created_at.strftime('%Y年%m月%d日') if hotspot.created_at else '最新' }}
+                        {{ hotspot.created_at.strftime('%B %d, %Y') if hotspot.created_at else 'Latest' }}
                     </div>
                 </div>
 
@@ -570,7 +620,7 @@
                 <div class="news-tags">
                     <div class="news-tags-title">
                         <i class="fas fa-tags"></i>
-                        相关标签
+                        Related Tags
                     </div>
                     <div class="tag-list">
                         {% for tag in hotspot.tags.split(',') if tag.strip() %}
@@ -585,7 +635,7 @@
                 <div class="news-recommendations">
                     <div class="recommendations-title">
                         <i class="fas fa-newspaper"></i>
-                        推荐阅读
+                        Recommended Reading
                     </div>
                     <div class="recommendations-list">
                         {% for news in related_news[:2] %}
@@ -595,14 +645,14 @@
                                 <p class="recommendation-summary">{{ news.summary[:100] }}{% if news.summary|length > 100 %}...{% endif %}</p>
                                 <div class="recommendation-meta">
                                     <span class="recommendation-category">
-                                        {% if news.category == 'announcement' %}公告
-                                        {% elif news.category == 'crypto' %}加密货币
+                                        {% if news.category == 'announcement' %}Announcement
+                                        {% elif news.category == 'crypto' %}Cryptocurrency
                                         {% elif news.category == 'defi' %}DeFi
-                                        {% elif news.category == 'market' %}市场动态
-                                        {% else %}{{ news.category }}
+                                        {% elif news.category == 'market' %}Market News
+                                        {% else %}{{ news.category.title() }}
                                         {% endif %}
                                     </span>
-                                    <span class="recommendation-date">{{ news.created_at.strftime('%m月%d日') if news.created_at else '最新' }}</span>
+                                    <span class="recommendation-date">{{ news.created_at.strftime('%b %d') if news.created_at else 'Latest' }}</span>
                                 </div>
                             </div>
                             <div class="recommendation-arrow">
@@ -618,7 +668,263 @@
     </div>
 </div>
 
+<!-- 分享模态框 -->
+<div id="shareModal" class="modal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 12px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                <h5 class="modal-title">
+                    <i class="fas fa-share-alt me-2"></i>Share News Article
+                </h5>
+                <button type="button" class="btn-close btn-close-white" onclick="closeShareModal()"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="alert" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border: none; border-radius: 8px;">
+                        <p class="mb-0" style="color: #1565c0;">🔥 Hot news! Share quality blockchain and RWA information with friends to earn referral rewards!</p>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Your Exclusive Invitation Link</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" readonly
+                               style="background-color: #f8f9fa; border-radius: 8px 0 0 8px;"
+                               placeholder="Generating share link...">
+                        <button class="btn btn-primary" onclick="window.copyShareLink()"
+                                style="border-radius: 0 8px 8px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
+                            <i class="fas fa-copy me-2"></i>Copy
+                        </button>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <small class="text-muted">
+                        <i class="fas fa-gift me-1"></i>
+                        Share and earn commission on every successful referral!
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+// 新闻分享功能
+window.shareNews = function() {
+    console.log('新闻分享功能被调用');
+
+    // 显示模态框
+    const modal = document.getElementById('shareModal');
+    if (modal) {
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+
+        // 获取钱包地址用于创建短链接
+        const ethAddress = localStorage.getItem('eth_address') ||
+                          window.ethereum?.selectedAddress ||
+                          '{{ current_user_address }}';
+        console.log('当前钱包地址:', ethAddress);
+
+        // 构建分享链接（包含推荐码）
+        const baseUrl = window.location.href.split('?')[0]; // 移除现有参数
+        const shareUrl = ethAddress ? `${baseUrl}?ref=${ethAddress.slice(-8)}` : baseUrl;
+        console.log('原始分享链接:', shareUrl);
+
+        // 并行获取分享消息和创建短链接
+        Promise.all([
+            // 获取随机分享消息
+            fetch('/api/share-messages/random?type=news_share')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        return data.message;
+                    } else {
+                        return '🔥 Hot news! Share quality blockchain and RWA information with friends to earn referral rewards!';
+                    }
+                })
+                .catch(error => {
+                    console.error('获取分享消息失败:', error);
+                    return '🔥 Hot news! Share quality blockchain and RWA information with friends to earn referral rewards!';
+                }),
+
+            // 创建短链接
+            fetch('/api/shortlink/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Eth-Address': ethAddress || ''
+                },
+                body: JSON.stringify({
+                    url: shareUrl,
+                    expires_days: 365
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        return data.short_url;
+                    } else {
+                        return shareUrl; // 如果短链接创建失败，使用原始链接
+                    }
+                })
+                .catch(error => {
+                    console.error('创建短链接失败:', error);
+                    return shareUrl; // 如果短链接创建失败，使用原始链接
+                })
+        ])
+        .then(([shareMessage, finalShareUrl]) => {
+            console.log('获取到分享消息:', shareMessage);
+            console.log('最终分享链接:', finalShareUrl);
+
+            // 更新模态框内容
+            const messageElement = document.querySelector('#shareModal .modal-body .alert p');
+            if (messageElement) {
+                messageElement.textContent = shareMessage;
+            }
+
+            const linkElement = document.querySelector('#shareModal input[readonly]');
+            if (linkElement) {
+                linkElement.value = finalShareUrl;
+            }
+
+            // 更新复制按钮的数据
+            window.currentShareUrl = finalShareUrl;
+        })
+        .catch(error => {
+            console.error('分享准备失败:', error);
+            // 使用默认值
+            const messageElement = document.querySelector('#shareModal .modal-body .alert p');
+            if (messageElement) {
+                messageElement.textContent = '🔥 Hot news! Share quality blockchain and RWA information with friends to earn referral rewards!';
+            }
+
+            const linkElement = document.querySelector('#shareModal input[readonly]');
+            if (linkElement) {
+                linkElement.value = shareUrl;
+            }
+
+            window.currentShareUrl = shareUrl;
+        });
+    }
+};
+
+// 复制分享链接
+window.copyShareLink = async function() {
+    console.log('复制分享链接被调用');
+
+    const shareUrl = window.currentShareUrl || document.querySelector('#shareModal input[readonly]')?.value;
+    const copyButton = document.querySelector('#shareModal .btn-primary');
+
+    if (!shareUrl) {
+        if (copyButton) {
+            const originalHtml = copyButton.innerHTML;
+            copyButton.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Error';
+            copyButton.classList.add('btn-danger');
+            copyButton.classList.remove('btn-primary');
+            setTimeout(() => {
+                copyButton.innerHTML = originalHtml;
+                copyButton.classList.remove('btn-danger');
+                copyButton.classList.add('btn-primary');
+            }, 2000);
+        }
+        return;
+    }
+
+    // 保存原始按钮内容
+    const originalHtml = copyButton ? copyButton.innerHTML : '';
+
+    try {
+        await navigator.clipboard.writeText(shareUrl);
+
+        // 显示成功状态
+        if (copyButton) {
+            copyButton.innerHTML = '<i class="fas fa-check me-2"></i>Copied!';
+            copyButton.classList.add('btn-success');
+            copyButton.classList.remove('btn-primary');
+            copyButton.disabled = true;
+
+            // 2秒后恢复原状
+            setTimeout(() => {
+                copyButton.innerHTML = originalHtml;
+                copyButton.classList.remove('btn-success');
+                copyButton.classList.add('btn-primary');
+                copyButton.disabled = false;
+            }, 2000);
+        }
+
+        console.log('分享链接复制成功:', shareUrl);
+    } catch (error) {
+        console.error('使用剪贴板API复制失败，尝试传统方法:', error);
+
+        // 降级到传统复制方法
+        const input = document.querySelector('#shareModal input[readonly]');
+        if (input) {
+            input.select();
+            input.setSelectionRange(0, 99999); // 对移动端兼容
+            const success = document.execCommand('copy');
+
+            if (success && copyButton) {
+                copyButton.innerHTML = '<i class="fas fa-check me-2"></i>Copied!';
+                copyButton.classList.add('btn-success');
+                copyButton.classList.remove('btn-primary');
+                copyButton.disabled = true;
+
+                setTimeout(() => {
+                    copyButton.innerHTML = originalHtml;
+                    copyButton.classList.remove('btn-success');
+                    copyButton.classList.add('btn-primary');
+                    copyButton.disabled = false;
+                }, 2000);
+
+                console.log('分享链接复制成功（传统方法）:', shareUrl);
+            } else if (copyButton) {
+                copyButton.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Failed';
+                copyButton.classList.add('btn-danger');
+                copyButton.classList.remove('btn-primary');
+
+                setTimeout(() => {
+                    copyButton.innerHTML = originalHtml;
+                    copyButton.classList.remove('btn-danger');
+                    copyButton.classList.add('btn-primary');
+                }, 2000);
+            }
+        } else if (copyButton) {
+            copyButton.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Failed';
+            copyButton.classList.add('btn-danger');
+            copyButton.classList.remove('btn-primary');
+
+            setTimeout(() => {
+                copyButton.innerHTML = originalHtml;
+                copyButton.classList.remove('btn-danger');
+                copyButton.classList.add('btn-primary');
+            }, 2000);
+        }
+    }
+};
+
+// 关闭分享模态框
+function closeShareModal() {
+    const modal = document.getElementById('shareModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+// 点击模态框背景关闭
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('shareModal');
+    if (event.target === modal) {
+        closeShareModal();
+    }
+});
+
+// ESC键关闭模态框
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeShareModal();
+    }
+});
+
 // 平滑滚动效果
 document.addEventListener('DOMContentLoaded', function() {
     // 如果页面是从锚点链接进入的，平滑滚动到顶部
