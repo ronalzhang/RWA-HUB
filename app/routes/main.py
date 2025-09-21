@@ -231,12 +231,15 @@ def news_detail(year, month, day, slug):
             current_app.logger.warning(f'日期新闻详情页面 - 未找到 {year}-{month}-{day}/{slug} 的新闻')
             return render_template('404.html'), 404
 
-        # 获取相关新闻
-        related_news = NewsHotspot.query.filter(
-            NewsHotspot.category == hotspot.category,
-            NewsHotspot.is_active == True,
-            NewsHotspot.id != hotspot.id
-        ).order_by(NewsHotspot.created_at.desc()).limit(3).all()
+        # 增加访问量（异步处理，避免影响页面加载速度）
+        try:
+            hotspot.increment_view_count()
+            current_app.logger.info(f'新闻访问量已更新: {hotspot.title} -> {hotspot.view_count}')
+        except Exception as e:
+            current_app.logger.error(f'更新访问量失败: {str(e)}')
+
+        # 获取推荐新闻（基于访问量的智能推荐）
+        related_news = NewsHotspot.get_recommended_news(hotspot.id, limit=2)
 
         current_app.logger.info(f'日期新闻详情页面 - 成功加载新闻: {hotspot.title}')
         return render_template('news_detail.html',

@@ -25,6 +25,7 @@ class NewsHotspot(db.Model):
 
     # 显示控制
     display_order = Column(Integer, default=0, comment='显示顺序')
+    view_count = Column(Integer, default=0, comment='访问量统计')
 
     # 时间字段
     created_at = Column(DateTime, default=datetime.utcnow, comment='创建时间')
@@ -54,9 +55,15 @@ class NewsHotspot(db.Model):
             'category': self.category,
             'tags': self.tags.split(',') if self.tags else [],
             'display_order': self.display_order,
+            'view_count': self.view_count,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+    def increment_view_count(self):
+        """增加访问量"""
+        self.view_count = (self.view_count or 0) + 1
+        db.session.commit()
 
     @classmethod
     def get_active_hotspots(cls, limit=5):
@@ -76,3 +83,50 @@ class NewsHotspot(db.Model):
             cls.priority.desc(),
             cls.created_at.desc()
         ).limit(limit).all()
+
+    @classmethod
+    def get_popular_hotspots(cls, exclude_id=None, limit=2):
+        """获取热门新闻（按访问量排序）"""
+        query = cls.query.filter_by(is_active=True)
+        if exclude_id:
+            query = query.filter(cls.id != exclude_id)
+
+        return query.order_by(
+            cls.view_count.desc(),
+            cls.priority.desc(),
+            cls.created_at.desc()
+        ).limit(limit).all()
+
+    @classmethod
+    def get_recommended_news(cls, current_news_id, limit=2):
+        """获取推荐新闻（同分类热门 + 其他热门）"""
+        current_news = cls.query.get(current_news_id)
+        if not current_news:
+            return cls.get_popular_hotspots(exclude_id=current_news_id, limit=limit)
+
+        # 先尝试获取同分类的热门新闻
+        same_category_news = cls.query.filter(
+            cls.category == current_news.category,
+            cls.is_active == True,
+            cls.id != current_news_id
+        ).order_by(
+            cls.view_count.desc(),
+            cls.priority.desc(),
+            cls.created_at.desc()
+        ).limit(limit).all()
+
+        # 如果同分类新闻不够，补充其他热门新闻
+        if len(same_category_news) < limit:
+            existing_ids = [news.id for news in same_category_news] + [current_news_id]
+            additional_news = cls.query.filter(
+                cls.is_active == True,
+                cls.id.notin_(existing_ids)
+            ).order_by(
+                cls.view_count.desc(),
+                cls.priority.desc(),
+                cls.created_at.desc()
+            ).limit(limit - len(same_category_news)).all()
+
+            same_category_news.extend(additional_news)
+
+        return same_category_news
