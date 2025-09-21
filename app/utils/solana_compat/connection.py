@@ -1,8 +1,7 @@
 from typing import Dict, Any, Optional, List, Union, Callable
 from .rpc.api import Client
 from .rpc.types import TxOpts
-# 临时注释PublicKey导入
-# from .publickey import PublicKey
+from .publickey import PublicKey
 from .transaction import Transaction
 
 class Connection:
@@ -14,7 +13,7 @@ class Connection:
         self.rpc_client = Client(endpoint)
     
     def get_account_info(
-        self, public_key: Union[Any, str], commitment: Optional[str] = None
+        self, public_key: Union[PublicKey, str], commitment: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         获取账户信息
@@ -26,11 +25,11 @@ class Connection:
         Returns:
             Dict包含账户信息
         """
-        pubkey_str = str(public_key) if hasattr(public_key, '__str__') else public_key
+        pubkey_str = str(public_key) if isinstance(public_key, PublicKey) else public_key
         return self.rpc_client.get_account_info(pubkey_str, commitment or self.commitment)
     
     def get_balance(
-        self, public_key: Union[Any, str], commitment: Optional[str] = None
+        self, public_key: Union[PublicKey, str], commitment: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         获取账户余额
@@ -42,7 +41,7 @@ class Connection:
         Returns:
             Dict包含余额信息
         """
-        pubkey_str = str(public_key) if hasattr(public_key, '__str__') else public_key
+        pubkey_str = str(public_key) if isinstance(public_key, PublicKey) else public_key
         return self.rpc_client.get_balance(pubkey_str, commitment or self.commitment)
     
     def get_recent_blockhash(self, commitment: Optional[str] = None) -> Dict[str, Any]:

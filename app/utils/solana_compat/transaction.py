@@ -1,13 +1,12 @@
 from dataclasses import dataclass
 from typing import List, Any, Optional, Dict, Set, Union
-# 临时移除PublicKey导入，使用字符串代替
-# from .publickey import PublicKey
+from .publickey import PublicKey
 
 @dataclass
 class AccountMeta:
     """Account metadata used to define instructions."""
     
-    pubkey: Any  # 应该是PublicKey类型，但为了简化使用Any
+    pubkey: PublicKey  # 恢复正确的类型
     is_signer: bool
     is_writable: bool
     
@@ -63,7 +62,7 @@ class Transaction:
         self.instructions.append(instruction)
         return self
     
-    def add_memo(self, memo: str, pubkey: Optional[Any] = None) -> "Transaction":
+    def add_memo(self, memo: str, pubkey: Optional[PublicKey] = None) -> "Transaction":
         """
         向交易添加备注指令
         
@@ -74,8 +73,8 @@ class Transaction:
         Returns:
             Transaction: 当前交易实例，用于链式调用
         """
-        # 备注程序ID - 使用字符串替代PublicKey
-        memo_program_id = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
+        # 备注程序ID
+        memo_program_id = PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr")
         
         # 创建账户元数据
         keys = []
@@ -93,7 +92,7 @@ class Transaction:
         self.add(instruction)
         return self
     
-    def add_signature(self, pubkey: Any, signature: bytes) -> "Transaction":
+    def add_signature(self, pubkey: PublicKey, signature: bytes) -> "Transaction":
         """Add an external signature to the transaction."""
         self.signatures.append({
             "publicKey": pubkey,
@@ -106,7 +105,7 @@ class Transaction:
         self.recent_blockhash = recent_blockhash
         return self
     
-    def set_fee_payer(self, fee_payer: Any) -> "Transaction":
+    def set_fee_payer(self, fee_payer: PublicKey) -> "Transaction":
         """Set the fee payer for the transaction."""
         self.fee_payer = fee_payer
         return self

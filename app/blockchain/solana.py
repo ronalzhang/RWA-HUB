@@ -14,13 +14,13 @@ import asyncio
 # from solana.blockhash import Blockhash
 import base58  # 添加base58库导入
 
-# 临时注释掉有问题的导入
-# from app.utils.solana_compat.rpc.api import Client as SolanaRpcClient
-# from app.utils.solana_compat.transaction import Transaction
-# from app.utils.solana_compat.publickey import PublicKey
-# from app.utils.solana_compat.keypair import Keypair
-# from app.utils.solana_compat.system_program import SystemProgram
-# from app.utils.solana_compat.rpc.types import TxOpts
+# 使用我们的兼容层
+from app.utils.solana_compat.rpc.api import Client as SolanaRpcClient
+from app.utils.solana_compat.transaction import Transaction
+from app.utils.solana_compat.publickey import PublicKey
+from app.utils.solana_compat.keypair import Keypair
+from app.utils.solana_compat.system_program import SystemProgram
+from app.utils.solana_compat.rpc.types import TxOpts
 # SPL Token 兼容
 # from app.utils.solana_compat.token import Token, TOKEN_PROGRAM_ID
 
