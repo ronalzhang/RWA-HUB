@@ -95,6 +95,11 @@ def get_admin_hotspots():
         categories = db.session.query(NewsHotspot.category).distinct().all()
         category_list = [cat[0] for cat in categories if cat[0]]
 
+        # 访问量统计
+        total_views = db.session.query(db.func.sum(NewsHotspot.view_count)).scalar() or 0
+        popular_count = NewsHotspot.query.filter(NewsHotspot.view_count > 100).count()
+        max_priority = db.session.query(db.func.max(NewsHotspot.priority)).scalar() or 0
+
         return jsonify({
             'success': True,
             'data': {
@@ -110,7 +115,10 @@ def get_admin_hotspots():
                 'stats': {
                     'total': total_count,
                     'active': active_count,
-                    'categories': category_list
+                    'categories': len(category_list),
+                    'maxPriority': max_priority,
+                    'totalViews': total_views,
+                    'popularCount': popular_count
                 }
             }
         })
