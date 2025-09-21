@@ -244,6 +244,12 @@
                                 <span class="ml-3">管理员用户</span>
                             </a>
                         </li>
+                        <li>
+                            <a href="{{ url_for('admin.ip_security_page') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 {{ 'bg-indigo-50 text-indigo-700' if request.endpoint == 'admin.ip_security_page' }}">
+                                <i class="fas fa-shield-alt w-5 text-center"></i>
+                                <span class="ml-3">IP安全管理</span>
+                            </a>
+                        </li>
                     </ul>
                 </nav>
             </div>

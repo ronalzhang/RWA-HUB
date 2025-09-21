@@ -2,181 +2,163 @@
 
 {% block title %}IP安全管理 - RWA-HUB 管理后台{% endblock %}
 
+{% block page_title %}IP安全管理{% endblock %}
+{% block page_subtitle %}监控和管理恶意IP访问，保护系统安全{% endblock %}
+
+{% block breadcrumb %}
+<li aria-current="page">
+    <div class="flex items-center">
+        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+        <span class="text-gray-500">IP安全管理</span>
+    </div>
+</li>
+{% endblock %}
+
 {% block content %}
-<div class="min-h-screen bg-gray-100">
-    <!-- 导航栏 -->
-    <nav class="bg-blue-600 shadow-lg">
-        <div class="max-w-7xl mx-auto px-4">
-            <div class="flex justify-between">
-                <div class="flex">
-                    <div class="flex-shrink-0 flex items-center">
-                        <h1 class="text-white text-xl font-bold">RWA-HUB 管理后台</h1>
-                    </div>
-                    <div class="hidden md:block">
-                        <div class="ml-10 flex items-baseline space-x-4">
-                            <a href="/admin/v2/dashboard" class="text-blue-200 hover:text-white px-3 py-2 rounded-md text-sm font-medium">仪表盘</a>
-                            <a href="/admin/v2/assets" class="text-blue-200 hover:text-white px-3 py-2 rounded-md text-sm font-medium">资产管理</a>
-                            <a href="/admin/v2/users" class="text-blue-200 hover:text-white px-3 py-2 rounded-md text-sm font-medium">用户管理</a>
-                            <a href="/admin/v2/commission" class="text-blue-200 hover:text-white px-3 py-2 rounded-md text-sm font-medium">佣金管理</a>
-                            <a href="/admin/v2/news-hotspots" class="text-blue-200 hover:text-white px-3 py-2 rounded-md text-sm font-medium">新闻热点</a>
-                            <a href="/admin/v2/ip-security" class="bg-blue-800 text-white px-3 py-2 rounded-md text-sm font-medium">IP安全</a>
-                        </div>
-                    </div>
+<div x-data="ipSecurityData()" x-init="loadSecurityStats(); loadBlacklist()">
+    <!-- 安全统计概览 -->
+    <div class="mb-8">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">安全统计概览</h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6" id="security-stats">
+            <!-- 统计数据将通过JavaScript动态加载 -->
+        </div>
+    </div>
+
+    <!-- 功能选项卡 -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                <button @click="switchTab('blacklist')"
+                        :class="['tab-button whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm',
+                                activeTab === 'blacklist' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
+                    🚫 黑名单管理
+                </button>
+                <button @click="switchTab('suspicious')"
+                        :class="['tab-button whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm',
+                                activeTab === 'suspicious' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
+                    ⚠️ 可疑IP检测
+                </button>
+                <button @click="switchTab('analysis')"
+                        :class="['tab-button whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm',
+                                activeTab === 'analysis' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
+                    📊 IP行为分析
+                </button>
+            </nav>
+        </div>
+
+        <!-- 黑名单管理 -->
+        <div x-show="activeTab === 'blacklist'" class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h4 class="text-lg font-medium text-gray-900">黑名单IP列表</h4>
+                <button @click="loadBlacklist()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                    <i class="fas fa-sync-alt mr-2"></i>刷新
+                </button>
+            </div>
+
+            <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                <table class="min-w-full divide-y divide-gray-300">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP地址</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">封禁原因</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="blacklist-table" class="bg-white divide-y divide-gray-200">
+                        <!-- 数据将通过JavaScript动态加载 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4 bg-blue-50 border border-blue-200 rounded-md p-4">
+                <h5 class="text-sm font-medium text-blue-900 mb-2">白名单IP (不会被封禁)</h5>
+                <div id="whitelist-ips" class="text-sm text-blue-700">
+                    <!-- 白名单IP将通过JavaScript动态加载 -->
                 </div>
             </div>
         </div>
-    </nav>
 
-    <!-- 主要内容 -->
-    <div class="py-10">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <!-- 页面标题 -->
-            <div class="md:flex md:items-center md:justify-between mb-8">
-                <div class="flex-1 min-w-0">
-                    <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-                        🔒 IP安全管理
-                    </h2>
-                    <p class="mt-2 text-sm text-gray-500">监控和管理恶意IP访问，保护系统安全</p>
+        <!-- 可疑IP检测 -->
+        <div x-show="activeTab === 'suspicious'" class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h4 class="text-lg font-medium text-gray-900">可疑IP检测</h4>
+                <div class="flex space-x-2">
+                    <select id="hours-filter" class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        <option value="1">过去1小时</option>
+                        <option value="6">过去6小时</option>
+                        <option value="24" selected>过去24小时</option>
+                        <option value="72">过去3天</option>
+                        <option value="168">过去7天</option>
+                    </select>
+                    <input type="number" id="min-visits" placeholder="最小访问次数" value="100" class="border border-gray-300 rounded-md px-3 py-2 text-sm w-32">
+                    <button @click="detectSuspiciousIPs()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-search mr-2"></i>检测
+                    </button>
                 </div>
             </div>
 
-            <!-- 安全统计概览 -->
-            <div class="mb-8">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">安全统计概览</h3>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6" id="security-stats">
-                    <!-- 统计数据将通过JavaScript动态加载 -->
+            <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                <table class="min-w-full divide-y divide-gray-300">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP地址</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">访问次数</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">路径数</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">威胁等级</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后访问</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="suspicious-table" class="bg-white divide-y divide-gray-200">
+                        <!-- 数据将通过JavaScript动态加载 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- IP行为分析 -->
+        <div x-show="activeTab === 'analysis'" class="p-6">
+            <div class="mb-4">
+                <h4 class="text-lg font-medium text-gray-900 mb-4">IP行为分析</h4>
+                <div class="flex space-x-4">
+                    <input type="text" id="analysis-ip" placeholder="输入IP地址" class="border border-gray-300 rounded-md px-3 py-2 text-sm flex-1">
+                    <select id="analysis-hours" class="border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        <option value="1">过去1小时</option>
+                        <option value="6">过去6小时</option>
+                        <option value="24" selected>过去24小时</option>
+                        <option value="72">过去3天</option>
+                    </select>
+                    <button @click="analyzeIP()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-chart-line mr-2"></i>分析
+                    </button>
                 </div>
             </div>
 
-            <!-- 功能选项卡 -->
-            <div class="bg-white shadow rounded-lg">
-                <div class="border-b border-gray-200">
-                    <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                        <button id="tab-blacklist" class="tab-button border-blue-500 text-blue-600 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
-                            🚫 黑名单管理
-                        </button>
-                        <button id="tab-suspicious" class="tab-button border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
-                            ⚠️ 可疑IP检测
-                        </button>
-                        <button id="tab-analysis" class="tab-button border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
-                            📊 IP行为分析
-                        </button>
-                    </nav>
-                </div>
-
-                <!-- 黑名单管理 -->
-                <div id="content-blacklist" class="tab-content p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h4 class="text-lg font-medium text-gray-900">黑名单IP列表</h4>
-                        <button id="refresh-blacklist" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-                            <i class="fas fa-sync-alt mr-2"></i>刷新
-                        </button>
-                    </div>
-
-                    <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-                        <table class="min-w-full divide-y divide-gray-300">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP地址</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">封禁原因</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="blacklist-table" class="bg-white divide-y divide-gray-200">
-                                <!-- 数据将通过JavaScript动态加载 -->
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="mt-4 bg-blue-50 border border-blue-200 rounded-md p-4">
-                        <h5 class="text-sm font-medium text-blue-900 mb-2">白名单IP (不会被封禁)</h5>
-                        <div id="whitelist-ips" class="text-sm text-blue-700">
-                            <!-- 白名单IP将通过JavaScript动态加载 -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 可疑IP检测 -->
-                <div id="content-suspicious" class="tab-content p-6 hidden">
-                    <div class="flex justify-between items-center mb-4">
-                        <h4 class="text-lg font-medium text-gray-900">可疑IP检测</h4>
-                        <div class="flex space-x-2">
-                            <select id="hours-filter" class="border border-gray-300 rounded-md px-3 py-2 text-sm">
-                                <option value="1">过去1小时</option>
-                                <option value="6">过去6小时</option>
-                                <option value="24" selected>过去24小时</option>
-                                <option value="72">过去3天</option>
-                                <option value="168">过去7天</option>
-                            </select>
-                            <input type="number" id="min-visits" placeholder="最小访问次数" value="100" class="border border-gray-300 rounded-md px-3 py-2 text-sm w-32">
-                            <button id="detect-suspicious" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-                                <i class="fas fa-search mr-2"></i>检测
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-                        <table class="min-w-full divide-y divide-gray-300">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP地址</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">访问次数</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">路径数</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">威胁等级</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后访问</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="suspicious-table" class="bg-white divide-y divide-gray-200">
-                                <!-- 数据将通过JavaScript动态加载 -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- IP行为分析 -->
-                <div id="content-analysis" class="tab-content p-6 hidden">
-                    <div class="mb-4">
-                        <h4 class="text-lg font-medium text-gray-900 mb-4">IP行为分析</h4>
-                        <div class="flex space-x-4">
-                            <input type="text" id="analysis-ip" placeholder="输入IP地址" class="border border-gray-300 rounded-md px-3 py-2 text-sm flex-1">
-                            <select id="analysis-hours" class="border border-gray-300 rounded-md px-3 py-2 text-sm">
-                                <option value="1">过去1小时</option>
-                                <option value="6">过去6小时</option>
-                                <option value="24" selected>过去24小时</option>
-                                <option value="72">过去3天</option>
-                            </select>
-                            <button id="analyze-ip" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-                                <i class="fas fa-chart-line mr-2"></i>分析
-                            </button>
-                        </div>
-                    </div>
-
-                    <div id="analysis-result" class="hidden">
-                        <!-- 分析结果将通过JavaScript动态显示 -->
-                    </div>
-                </div>
+            <div id="analysis-result" class="hidden">
+                <!-- 分析结果将通过JavaScript动态显示 -->
             </div>
         </div>
     </div>
 
     <!-- 手动封禁IP模态框 -->
-    <div id="block-ip-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+    <div x-show="showBlockModal" x-transition.opacity
+         class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+         @click.outside="showBlockModal = false">
         <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div class="mt-3">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">封禁IP地址</h3>
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">IP地址</label>
-                    <input type="text" id="block-ip-address" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                    <input type="text" x-model="blockIPForm.ip" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
                 </div>
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">封禁原因</label>
-                    <textarea id="block-ip-reason" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm h-20" placeholder="请输入封禁原因..."></textarea>
+                    <textarea x-model="blockIPForm.reason" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm h-20" placeholder="请输入封禁原因..."></textarea>
                 </div>
                 <div class="flex justify-end space-x-3">
-                    <button id="cancel-block" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md text-sm font-medium">取消</button>
-                    <button id="confirm-block" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium">确认封禁</button>
+                    <button @click="showBlockModal = false" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md text-sm font-medium">取消</button>
+                    <button @click="confirmBlockIP()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium">确认封禁</button>
                 </div>
             </div>
         </div>
@@ -184,351 +166,306 @@
 </div>
 
 <script>
-// IP安全管理JavaScript代码
-class IPSecurityManager {
-    constructor() {
-        this.activeTab = 'blacklist';
-        this.init();
-    }
+// IP安全管理Alpine.js组件
+function ipSecurityData() {
+    return {
+        activeTab: 'blacklist',
+        showBlockModal: false,
+        blockIPForm: {
+            ip: '',
+            reason: ''
+        },
 
-    init() {
-        this.bindEvents();
-        this.loadSecurityStats();
-        this.loadBlacklist();
-    }
+        switchTab(tabId) {
+            this.activeTab = tabId;
 
-    bindEvents() {
-        // 选项卡切换
-        document.querySelectorAll('.tab-button').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const tabId = e.target.id.replace('tab-', '');
-                this.switchTab(tabId);
-            });
-        });
-
-        // 刷新黑名单
-        document.getElementById('refresh-blacklist').addEventListener('click', () => {
-            this.loadBlacklist();
-        });
-
-        // 检测可疑IP
-        document.getElementById('detect-suspicious').addEventListener('click', () => {
-            this.detectSuspiciousIPs();
-        });
-
-        // 分析IP
-        document.getElementById('analyze-ip').addEventListener('click', () => {
-            this.analyzeIP();
-        });
-
-        // 模态框事件
-        document.getElementById('cancel-block').addEventListener('click', () => {
-            this.hideBlockModal();
-        });
-
-        document.getElementById('confirm-block').addEventListener('click', () => {
-            this.blockIP();
-        });
-    }
-
-    switchTab(tabId) {
-        // 更新按钮样式
-        document.querySelectorAll('.tab-button').forEach(button => {
-            button.className = 'tab-button border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm';
-        });
-        document.getElementById(`tab-${tabId}`).className = 'tab-button border-blue-500 text-blue-600 whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm';
-
-        // 切换内容
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.add('hidden');
-        });
-        document.getElementById(`content-${tabId}`).classList.remove('hidden');
-
-        this.activeTab = tabId;
-
-        // 加载对应数据
-        if (tabId === 'suspicious') {
-            this.detectSuspiciousIPs();
-        }
-    }
-
-    async loadSecurityStats() {
-        try {
-            const response = await axios.get('/api/admin/ip-security/stats');
-            if (response.data.success) {
-                const stats = response.data.data;
-                document.getElementById('security-stats').innerHTML = `
-                    <div class="bg-white overflow-hidden shadow rounded-lg">
-                        <div class="p-5">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0">
-                                    <div class="text-2xl">🚫</div>
-                                </div>
-                                <div class="ml-5 w-0 flex-1">
-                                    <dl>
-                                        <dt class="text-sm font-medium text-gray-500 truncate">黑名单IP</dt>
-                                        <dd class="text-lg font-medium text-gray-900">${stats.blacklist_count}</dd>
-                                    </dl>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white overflow-hidden shadow rounded-lg">
-                        <div class="p-5">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0">
-                                    <div class="text-2xl">✅</div>
-                                </div>
-                                <div class="ml-5 w-0 flex-1">
-                                    <dl>
-                                        <dt class="text-sm font-medium text-gray-500 truncate">白名单IP</dt>
-                                        <dd class="text-lg font-medium text-gray-900">${stats.whitelist_count}</dd>
-                                    </dl>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white overflow-hidden shadow rounded-lg">
-                        <div class="p-5">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0">
-                                    <div class="text-2xl">📊</div>
-                                </div>
-                                <div class="ml-5 w-0 flex-1">
-                                    <dl>
-                                        <dt class="text-sm font-medium text-gray-500 truncate">24小时访问</dt>
-                                        <dd class="text-lg font-medium text-gray-900">${stats.total_visits_24h}</dd>
-                                    </dl>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white overflow-hidden shadow rounded-lg">
-                        <div class="p-5">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0">
-                                    <div class="text-2xl">🌐</div>
-                                </div>
-                                <div class="ml-5 w-0 flex-1">
-                                    <dl>
-                                        <dt class="text-sm font-medium text-gray-500 truncate">独立IP数</dt>
-                                        <dd class="text-lg font-medium text-gray-900">${stats.unique_ips_24h}</dd>
-                                    </dl>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
+            // 加载对应数据
+            if (tabId === 'suspicious') {
+                this.detectSuspiciousIPs();
             }
-        } catch (error) {
-            console.error('加载安全统计失败:', error);
-        }
-    }
+        },
 
-    async loadBlacklist() {
-        try {
-            const response = await axios.get('/api/admin/ip-security/blacklist');
-            if (response.data.success) {
-                const data = response.data.data;
-
-                // 更新黑名单表格
-                const tableBody = document.getElementById('blacklist-table');
-                tableBody.innerHTML = data.blacklist.map(item => `
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.ip}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.reason}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                                已封禁
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <button onclick="ipSecurity.analyzeSpecificIP('${item.ip}')" class="text-blue-600 hover:text-blue-900 mr-2">分析</button>
-                        </td>
-                    </tr>
-                `).join('');
-
-                // 更新白名单显示
-                document.getElementById('whitelist-ips').innerHTML =
-                    data.whitelist.map(ip => `<span class="inline-block bg-green-100 text-green-800 px-2 py-1 rounded text-xs mr-2 mb-1">${ip}</span>`).join('');
+        async loadSecurityStats() {
+            try {
+                const response = await axios.get('/api/admin/ip-security/stats');
+                if (response.data.success) {
+                    const stats = response.data.data;
+                    document.getElementById('security-stats').innerHTML = `
+                        <div class="bg-white overflow-hidden shadow rounded-lg">
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div class="text-2xl">🚫</div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt class="text-sm font-medium text-gray-500 truncate">黑名单IP</dt>
+                                            <dd class="text-lg font-medium text-gray-900">${stats.blacklist_count}</dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white overflow-hidden shadow rounded-lg">
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div class="text-2xl">✅</div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt class="text-sm font-medium text-gray-500 truncate">白名单IP</dt>
+                                            <dd class="text-lg font-medium text-gray-900">${stats.whitelist_count}</dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white overflow-hidden shadow rounded-lg">
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div class="text-2xl">📊</div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt class="text-sm font-medium text-gray-500 truncate">24小时访问</dt>
+                                            <dd class="text-lg font-medium text-gray-900">${stats.total_visits_24h}</dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white overflow-hidden shadow rounded-lg">
+                            <div class="p-5">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div class="text-2xl">🌐</div>
+                                    </div>
+                                    <div class="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt class="text-sm font-medium text-gray-500 truncate">独立IP数</dt>
+                                            <dd class="text-lg font-medium text-gray-900">${stats.unique_ips_24h}</dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('加载安全统计失败:', error);
             }
-        } catch (error) {
-            console.error('加载黑名单失败:', error);
-        }
-    }
+        },
 
-    async detectSuspiciousIPs() {
-        const hours = document.getElementById('hours-filter').value;
-        const minVisits = document.getElementById('min-visits').value;
+        async loadBlacklist() {
+            try {
+                const response = await axios.get('/api/admin/ip-security/blacklist');
+                if (response.data.success) {
+                    const data = response.data.data;
 
-        try {
-            const response = await axios.get(`/api/admin/ip-security/suspicious?hours=${hours}&min_visits=${minVisits}`);
-            if (response.data.success) {
-                const ips = response.data.data.suspicious_ips;
-
-                const tableBody = document.getElementById('suspicious-table');
-                tableBody.innerHTML = ips.map(ip => {
-                    let statusBadge = '';
-                    let threatColor = '';
-
-                    switch(ip.status) {
-                        case 'whitelisted':
-                            statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">白名单</span>';
-                            break;
-                        case 'blacklisted':
-                            statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">已封禁</span>';
-                            break;
-                        case 'high_risk':
-                            statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">高危</span>';
-                            break;
-                        case 'medium_risk':
-                            statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">中危</span>';
-                            break;
-                        case 'low_risk':
-                            statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">低危</span>';
-                            break;
-                        default:
-                            statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">正常</span>';
-                    }
-
-                    return `
+                    // 更新黑名单表格
+                    const tableBody = document.getElementById('blacklist-table');
+                    tableBody.innerHTML = data.blacklist.map(item => `
                         <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${ip.ip_address}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${ip.visit_count}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${ip.unique_paths}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">${statusBadge}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${ip.last_visit ? new Date(ip.last_visit).toLocaleString() : '-'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.ip}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.reason}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                    已封禁
+                                </span>
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <button onclick="ipSecurity.analyzeSpecificIP('${ip.ip_address}')" class="text-blue-600 hover:text-blue-900 mr-2">分析</button>
-                                ${ip.status !== 'blacklisted' && ip.status !== 'whitelisted' ?
-                                    `<button onclick="ipSecurity.showBlockModal('${ip.ip_address}')" class="text-red-600 hover:text-red-900">封禁</button>` :
-                                    ''
-                                }
+                                <button onclick="ipSecurity.analyzeSpecificIP('${item.ip}')" class="text-indigo-600 hover:text-indigo-900 mr-2">分析</button>
                             </td>
                         </tr>
-                    `;
-                }).join('');
-            }
-        } catch (error) {
-            console.error('检测可疑IP失败:', error);
-        }
-    }
+                    `).join('');
 
-    async analyzeIP() {
-        const ip = document.getElementById('analysis-ip').value.trim();
-        const hours = document.getElementById('analysis-hours').value;
-
-        if (!ip) {
-            alert('请输入IP地址');
-            return;
-        }
-
-        try {
-            const response = await axios.get(`/api/admin/ip-security/analyze/${ip}?hours=${hours}`);
-            if (response.data.success) {
-                const data = response.data.data;
-                this.displayAnalysisResult(ip, data);
-            }
-        } catch (error) {
-            console.error('分析IP失败:', error);
-            alert('分析失败: ' + error.message);
-        }
-    }
-
-    analyzeSpecificIP(ip) {
-        document.getElementById('analysis-ip').value = ip;
-        this.switchTab('analysis');
-        setTimeout(() => this.analyzeIP(), 100);
-    }
-
-    displayAnalysisResult(ip, data) {
-        const resultDiv = document.getElementById('analysis-result');
-        resultDiv.className = 'bg-white border border-gray-200 rounded-lg p-6';
-        resultDiv.innerHTML = `
-            <h5 class="text-lg font-medium text-gray-900 mb-4">IP: ${ip} 分析结果</h5>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-blue-600">${data.total_visits || 0}</div>
-                    <div class="text-sm text-gray-500">总访问次数</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-green-600">${data.unique_paths || 0}</div>
-                    <div class="text-sm text-gray-500">唯一路径数</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-orange-600">${(data.visits_per_hour || 0).toFixed(1)}</div>
-                    <div class="text-sm text-gray-500">每小时访问</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold ${data.risk_score >= 80 ? 'text-red-600' : data.risk_score >= 60 ? 'text-orange-600' : 'text-yellow-600'}">${data.risk_score || 0}</div>
-                    <div class="text-sm text-gray-500">风险评分</div>
-                </div>
-            </div>
-            <div class="border-t pt-4">
-                <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-gray-700">威胁等级:</span>
-                    <span class="px-3 py-1 rounded-full text-sm font-medium ${
-                        data.threat_level === 'HIGH' ? 'bg-red-100 text-red-800' :
-                        data.threat_level === 'MEDIUM' ? 'bg-orange-100 text-orange-800' :
-                        data.threat_level === 'LOW' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-green-100 text-green-800'
-                    }">${data.threat_level || 'SAFE'}</span>
-                </div>
-            </div>
-        `;
-    }
-
-    showBlockModal(ip) {
-        document.getElementById('block-ip-address').value = ip;
-        document.getElementById('block-ip-reason').value = '';
-        document.getElementById('block-ip-modal').classList.remove('hidden');
-    }
-
-    hideBlockModal() {
-        document.getElementById('block-ip-modal').classList.add('hidden');
-    }
-
-    async blockIP() {
-        const ip = document.getElementById('block-ip-address').value.trim();
-        const reason = document.getElementById('block-ip-reason').value.trim();
-
-        if (!ip) {
-            alert('请输入IP地址');
-            return;
-        }
-
-        if (!reason) {
-            alert('请输入封禁原因');
-            return;
-        }
-
-        try {
-            const response = await axios.post('/api/admin/ip-security/block', {
-                ip_address: ip,
-                reason: reason
-            });
-
-            if (response.data.success) {
-                alert('IP封禁成功');
-                this.hideBlockModal();
-                this.loadBlacklist();
-                if (this.activeTab === 'suspicious') {
-                    this.detectSuspiciousIPs();
+                    // 更新白名单显示
+                    document.getElementById('whitelist-ips').innerHTML =
+                        data.whitelist.map(ip => `<span class="inline-block bg-green-100 text-green-800 px-2 py-1 rounded text-xs mr-2 mb-1">${ip}</span>`).join('');
                 }
-            } else {
-                alert('封禁失败: ' + response.data.error);
+            } catch (error) {
+                console.error('加载黑名单失败:', error);
             }
-        } catch (error) {
-            console.error('封禁IP失败:', error);
-            alert('封禁失败: ' + error.message);
+        },
+
+        async detectSuspiciousIPs() {
+            const hours = document.getElementById('hours-filter').value;
+            const minVisits = document.getElementById('min-visits').value;
+
+            try {
+                const response = await axios.get(`/api/admin/ip-security/suspicious?hours=${hours}&min_visits=${minVisits}`);
+                if (response.data.success) {
+                    const ips = response.data.data.suspicious_ips;
+
+                    const tableBody = document.getElementById('suspicious-table');
+                    tableBody.innerHTML = ips.map(ip => {
+                        let statusBadge = '';
+
+                        switch(ip.status) {
+                            case 'whitelisted':
+                                statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">白名单</span>';
+                                break;
+                            case 'blacklisted':
+                                statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">已封禁</span>';
+                                break;
+                            case 'high_risk':
+                                statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">高危</span>';
+                                break;
+                            case 'medium_risk':
+                                statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">中危</span>';
+                                break;
+                            case 'low_risk':
+                                statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">低危</span>';
+                                break;
+                            default:
+                                statusBadge = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">正常</span>';
+                        }
+
+                        return `
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${ip.ip_address}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${ip.visit_count}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${ip.unique_paths}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">${statusBadge}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${ip.last_visit ? new Date(ip.last_visit).toLocaleString() : '-'}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button onclick="ipSecurity.analyzeSpecificIP('${ip.ip_address}')" class="text-indigo-600 hover:text-indigo-900 mr-2">分析</button>
+                                    ${ip.status !== 'blacklisted' && ip.status !== 'whitelisted' ?
+                                        `<button onclick="ipSecurity.showBlockModal('${ip.ip_address}')" class="text-red-600 hover:text-red-900">封禁</button>` :
+                                        ''
+                                    }
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('检测可疑IP失败:', error);
+            }
+        },
+
+        async analyzeIP() {
+            const ip = document.getElementById('analysis-ip').value.trim();
+            const hours = document.getElementById('analysis-hours').value;
+
+            if (!ip) {
+                alert('请输入IP地址');
+                return;
+            }
+
+            try {
+                const response = await axios.get(`/api/admin/ip-security/analyze/${ip}?hours=${hours}`);
+                if (response.data.success) {
+                    const data = response.data.data;
+                    this.displayAnalysisResult(ip, data);
+                }
+            } catch (error) {
+                console.error('分析IP失败:', error);
+                alert('分析失败: ' + error.message);
+            }
+        },
+
+        analyzeSpecificIP(ip) {
+            document.getElementById('analysis-ip').value = ip;
+            this.activeTab = 'analysis';
+            setTimeout(() => this.analyzeIP(), 100);
+        },
+
+        displayAnalysisResult(ip, data) {
+            const resultDiv = document.getElementById('analysis-result');
+            resultDiv.className = 'bg-white border border-gray-200 rounded-lg p-6';
+            resultDiv.innerHTML = `
+                <h5 class="text-lg font-medium text-gray-900 mb-4">IP: ${ip} 分析结果</h5>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600">${data.total_visits || 0}</div>
+                        <div class="text-sm text-gray-500">总访问次数</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600">${data.unique_paths || 0}</div>
+                        <div class="text-sm text-gray-500">唯一路径数</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-orange-600">${(data.visits_per_hour || 0).toFixed(1)}</div>
+                        <div class="text-sm text-gray-500">每小时访问</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold ${data.risk_score >= 80 ? 'text-red-600' : data.risk_score >= 60 ? 'text-orange-600' : 'text-yellow-600'}">${data.risk_score || 0}</div>
+                        <div class="text-sm text-gray-500">风险评分</div>
+                    </div>
+                </div>
+                <div class="border-t pt-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-700">威胁等级:</span>
+                        <span class="px-3 py-1 rounded-full text-sm font-medium ${
+                            data.threat_level === 'HIGH' ? 'bg-red-100 text-red-800' :
+                            data.threat_level === 'MEDIUM' ? 'bg-orange-100 text-orange-800' :
+                            data.threat_level === 'LOW' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-green-100 text-green-800'
+                        }">${data.threat_level || 'SAFE'}</span>
+                    </div>
+                </div>
+            `;
+        },
+
+        showBlockIPModal(ip) {
+            this.blockIPForm.ip = ip;
+            this.blockIPForm.reason = '';
+            this.showBlockModal = true;
+        },
+
+        async confirmBlockIP() {
+            if (!this.blockIPForm.ip) {
+                alert('请输入IP地址');
+                return;
+            }
+
+            if (!this.blockIPForm.reason) {
+                alert('请输入封禁原因');
+                return;
+            }
+
+            try {
+                const response = await axios.post('/api/admin/ip-security/block', {
+                    ip_address: this.blockIPForm.ip,
+                    reason: this.blockIPForm.reason
+                });
+
+                if (response.data.success) {
+                    alert('IP封禁成功');
+                    this.showBlockModal = false;
+                    this.loadBlacklist();
+                    if (this.activeTab === 'suspicious') {
+                        this.detectSuspiciousIPs();
+                    }
+                } else {
+                    alert('封禁失败: ' + response.data.error);
+                }
+            } catch (error) {
+                console.error('封禁IP失败:', error);
+                alert('封禁失败: ' + error.message);
+            }
         }
     }
 }
 
-// 初始化IP安全管理器
-let ipSecurity;
-document.addEventListener('DOMContentLoaded', function() {
-    ipSecurity = new IPSecurityManager();
-});
+// 全局函数，兼容旧代码
+window.ipSecurity = {
+    analyzeSpecificIP: function(ip) {
+        document.getElementById('analysis-ip').value = ip;
+        // 触发Alpine.js的方法
+        document.querySelector('[x-data*="ipSecurityData"]').__x.$data.activeTab = 'analysis';
+        setTimeout(() => {
+            document.querySelector('[x-data*="ipSecurityData"]').__x.$data.analyzeIP();
+        }, 100);
+    },
+
+    showBlockModal: function(ip) {
+        const component = document.querySelector('[x-data*="ipSecurityData"]').__x.$data;
+        component.showBlockIPModal(ip);
+    }
+};
 </script>
 {% endblock %}
